@@ -24,7 +24,7 @@ class DepthPose():
         self.camera = DepthCam((self.width, self.height))
         self.camera.setRotate90(self.portrait_mode)
 
-        self.render: Render = Render(self.width, self.height , 960, 1080, 'CamTest', fullscreen=False, v_sync=True, stretch=False)
+        self.render: Render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
 
         self._running: bool = False
 

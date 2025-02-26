@@ -24,15 +24,8 @@ from modules.gl.shaders.Hsv import Hsv
 from modules.gl.Utils import lfo, fit, fill
 
 class ImageType(Enum):
-    CAM = 0
-    CAP = 1
-    CAD = 2
-    CN1 = 3
-    CN2 = 4
-    SDF = 5
-    SDD = 6
-    LOGO = 7
-    TEXT = 8
+    VIDEO = 0
+    DEPTH = 1
 
 class Render(RenderWindow):
     def __init__(self, composition_width: int, composition_height: int, window_width: int, window_height: int, name: str, fullscreen: bool = False, v_sync = False, stretch = False) -> None:
@@ -119,8 +112,8 @@ class Render(RenderWindow):
 
         self.update_textures()
 
-        self.draw_camera(ImageType.CAM)
-        self.draw_diffusion(ImageType.SDF)
+        self.draw_video(ImageType.VIDEO, True)
+        self.draw_video(ImageType.DEPTH, False)
 
 
     def update_trails(self, tex: Texture | Fbo | SwapFbo, fbo: SwapFbo, trail: float) -> None:
@@ -137,18 +130,20 @@ class Render(RenderWindow):
         tex.draw(0, 0, fbo.width, fbo.height)
         fbo.end()
 
-    def draw_camera(self, type: ImageType) -> None:
+    def draw_video(self, type: ImageType, top: bool) -> None:
         self.setView(self.window_width, self.window_height)
         tex: Texture = self.textures[type]
         if tex.width == 0 or tex.height == 0:
             return
 
         x, y, w, h = fit(tex.width, tex.height, self.window_width, self.window_height / 2)
-        self.textures[type].draw(x, y, w, h)
+        if top:
+            self.textures[type].draw(x, y, w, h)
+        else:
+            self.textures[type].draw(x, y + h, w, h)
 
-    def draw_diffusion(self, type: ImageType) -> None:
+    def draw_depth(self, type: ImageType) -> None:
         self.update_trails(self.textures[type], self.diffusion_fbo, self.trail)
-        rawFbo: SwapFbo = self.diffusion_fbo
 
         self.setView(self.window_width, self.window_height)
         x, y, w, h = fit(self.diffusion_fbo.width, self.diffusion_fbo.height, self.window_width, self.window_height / 2)
@@ -169,17 +164,7 @@ class Render(RenderWindow):
             self._images[type] = None
             return ret_image
 
-    def set_cam_image(self, image: np.ndarray) -> None :
-        self.set_image(ImageType.CAM, image)
-    def set_cap_image(self, image: np.ndarray) -> None :
-        self.set_image(ImageType.CAP, image)
-    def set_cap_depth(self, image: np.ndarray) -> None :
-        self.set_image(ImageType.CAD, image)
-    def set_cn1_image(self, image: np.ndarray) -> None :
-        self.set_image(ImageType.CN1, image)
-    def set_cn2_image(self, image: np.ndarray) -> None :
-        self.set_image(ImageType.CN2, image)
-    def set_sdf_image(self, image: np.ndarray) -> None :
-        self.set_image(ImageType.SDF, image)
-    def set_sdf_depth(self, image: np.ndarray) -> None :
-        self.set_image(ImageType.SDD, image)
+    def set_video_image(self, image: np.ndarray) -> None :
+        self.set_image(ImageType.VIDEO, image)
+    def set_depth_image(self, image: np.ndarray) -> None :
+        self.set_image(ImageType.DEPTH, image)

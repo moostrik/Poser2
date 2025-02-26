@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import depthai as dai
 from threading import Lock
+from datetime import timedelta
 import time
 from PIL import Image, ImageOps
 
@@ -21,6 +22,16 @@ depthDisparityRange: tuple[int, int]=   (   0, 48   )
 def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | float:
     return max(size[0], min(num, size[1]))
 
+def fit(image: np.ndarray, width, height) -> np.ndarray:
+    h, w = image.shape[:2]
+    if w == width and h == height:
+        # print('yes', w, h, width, height)
+        return image
+    pil_image = Image.fromarray(image)
+    size = (width, height)
+    fit_image = ImageOps.fit(pil_image, size)
+    return np.asarray(fit_image)
+
 def makeWarpList(flipH: bool, flipV:bool, rotate90:bool, zoom: float, offset: tuple[float,float], perspective: tuple[float,float]) -> list[dai.Point2f]:
     z:float = (zoom-1.0) * 0.25
     Lz:float = 0.0+z
@@ -39,89 +50,51 @@ def makeWarpList(flipH: bool, flipV:bool, rotate90:bool, zoom: float, offset: tu
     dW: list[dai.Point2f] = [dai.Point2f(W[0][0], W[0][1]), dai.Point2f(W[1][0], W[1][1]),dai.Point2f(W[2][0], W[2][1]),dai.Point2f(W[3][0], W[3][1])]
     return dW
 
-def setupColor(pipeline : dai.Pipeline, width: int, height: int) -> None:
-    camColor = pipeline.create(dai.node.ColorCamera)
-    camColor.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
-    # camColor.setVideoSize(int(width), int(height))
-    camColor.setInterleaved(False)
-    camColor.setColorOrder(dai.ColorCameraProperties.ColorOrder.RGB)
-    camColor.setPreviewSize(camColor.getVideoWidth(), camColor.getVideoHeight())
+def setupStereo(pipeline : dai.Pipeline, width: int, height: int) -> None:
+    monoLeft: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+    monoRight: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+    color: dai.node.ColorCamera = pipeline.create(dai.node.ColorCamera)
+    stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
+    sync: dai.node.Sync = pipeline.create(dai.node.Sync)
 
-    colorControl = pipeline.create(dai.node.XLinkIn)
+    colorControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     colorControl.setStreamName('color_control')
-    colorControl.out.link(camColor.inputControl)
+    colorControl.out.link(color.inputControl)
 
-    colorManip = pipeline.create(dai.node.ImageManip)
-    frame_size= max(camColor.getVideoWidth() * camColor.getVideoHeight() * 3, 1920 * 1080 * 3)
-    colorManip.setMaxOutputFrameSize(frame_size)
-    colorManip.setNumFramesPool(1)
-    colorManip.initialConfig.setCropRect(0.3, 0, 0.7, 1)
-    # colorManip.initialConfig.setResize(width, height)
-    camColor.preview.link(colorManip.inputImage)
+    stereoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+    stereoControl.setStreamName('stereo_control')
+    stereoControl.out.link(stereo.inputConfig)
 
-    colorConfig = pipeline.create(dai.node.XLinkIn)
-    colorConfig.setStreamName('color_manip_config')
-    colorConfig.out.link(colorManip.inputConfig)
+    outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+    outputImages.setStreamName("output_images")
 
-    colorImage = pipeline.create(dai.node.XLinkOut)
-    colorImage.setStreamName('color_image')
-    colorManip.out.link(colorImage.input)
-    # camColor.preview.link(colorImage.input)
+    monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+    monoLeft.setCamera("left")
+    monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+    monoRight.setCamera("right")
 
-def setupDepth(pipeline : dai.Pipeline, width: int, height: int) -> None:
-    monoLeft = pipeline.create(dai.node.MonoCamera)
-    monoLeft.setBoardSocket(dai.CameraBoardSocket.LEFT)
-    monoRight = pipeline.create(dai.node.MonoCamera)
-    monoRight.setBoardSocket(dai.CameraBoardSocket.RIGHT)
-    monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
-    monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_800_P)
+    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+    stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
+    stereo.setLeftRightCheck(True)
+    stereo.setExtendedDisparity(False)
+    stereo.setSubpixel(False)
 
-    monoControl = pipeline.create(dai.node.XLinkIn)
-    monoControl.setStreamName('mono_control')
-    monoControl.out.link(monoRight.inputControl)
-    monoControl.out.link(monoLeft.inputControl)
+    color.setCamera("color")
+    color.setResolution(dai.ColorCameraProperties.SensorResolution.THE_720_P)
 
-    depth = pipeline.create(dai.node.StereoDepth)
-    depth.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-    depth.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
-    depth.setLeftRightCheck(True)
-    depth.setExtendedDisparity(False)
-    depth.setSubpixel(False)
-    monoLeft.out.link(depth.left)
-    monoRight.out.link(depth.right)
+    sync.setSyncThreshold(timedelta(milliseconds=50))
 
-    depthConfig = pipeline.create(dai.node.XLinkIn)
-    depthConfig.setStreamName('depth_config')
-    depthConfig.out.link(depth.inputConfig)
+    monoLeft.out.link(stereo.left)
+    monoRight.out.link(stereo.right)
 
-    disparityManip = pipeline.create(dai.node.ImageManip)
-    disparityManip.setMaxOutputFrameSize(width*height)
-    disparityManip.initialConfig.setCropRect(0, 0, 1, 1)
-    disparityManip.initialConfig.setResize(width, height)
-    depth.disparity.link(disparityManip.inputImage)
+    stereo.disparity.link(sync.inputs["disparity"])
+    color.video.link(sync.inputs["video"])
 
-    disparityConfig = pipeline.create(dai.node.XLinkIn)
-    disparityConfig.setStreamName('disparity_manip_config')
-    disparityConfig.out.link(disparityManip.inputConfig)
-
-    disparity = pipeline.create(dai.node.XLinkOut)
-    disparity.setStreamName('disparity')
-    disparityManip.out.link(disparity.input)
-
-def fit(image: np.ndarray, width, height) -> np.ndarray:
-    h, w = image.shape[:2]
-    if w == width and h == height:
-        # print('yes', w, h, width, height)
-        return image
-    pil_image = Image.fromarray(image)
-    size = (width, height)
-    fit_image = ImageOps.fit(pil_image, size)
-    return np.asarray(fit_image)
+    sync.out.link(outputImages.input)
 
 class DepthAi():
-    def __init__(self, forceSize: tuple[int, int] | None = None, doDepth: bool = True, doPerson: bool = True) -> None:
+    def __init__(self, forceSize: tuple[int, int] | None = None, doPerson: bool = True) -> None:
 
-        self.doDepth: bool = doDepth
         self.doPerson: bool = doPerson
 
         self.colorMutex: Lock = Lock()
@@ -161,23 +134,11 @@ class DepthAi():
         self.depthTresholdMax: int  = depthTresholdRange[1]
         self.depthDispShift: int    = depthDisparityRange[0]
 
-        # TRANSFORMATION SETTINGS
-        self.flipV: bool            = False
-        self.flipH: bool            = False
-        self.rotate90: bool         = False
-        self.zoom: float            = 1.0
-        self.offset: np.ndarray     = np.array([0.0, 0.0], dtype=np.float32)
-        self.perspective: np.ndarray= np.array([0.0, 0.0], dtype=np.float32)
-
-        self.device: dai.Device
-
-        self.qColorImage:           dai.DataOutputQueue
-        self.qColorControl:         dai.DataInputQueue
-        self.qColorConfig:          dai.DataInputQueue
-
-        self.qDepthImage:           dai.DataOutputQueue
-        self.qDepthConfig:          dai.DataInputQueue
-        self.qDepthTransform:       dai.DataInputQueue
+        # DAI
+        self.device:        dai.Device
+        self.dataQueue:     dai.DataOutputQueue
+        self.colorControl:  dai.DataInputQueue
+        self.stereoControl: dai.DataInputQueue
 
         self.deviceOpen: bool = False
         self.capturing:  bool = False
@@ -189,8 +150,8 @@ class DepthAi():
         if self.deviceOpen: return True
 
         pipeline = dai.Pipeline()
-        setupColor(pipeline, self.outWidth, self.outHeight)
-        if self.doDepth: setupDepth(pipeline, self.outWidth, self.outHeight)
+        setupStereo(pipeline, self.outWidth, self.outHeight)
+
         try: self.device = dai.Device(pipeline)
         except Exception as e:
             print('could not open camera, error', e, 'try again')
@@ -199,14 +160,9 @@ class DepthAi():
                 print('still could not open camera, error', e)
                 return False
 
-        self.qColorImage    = self.device.getOutputQueue(name='color_image', maxSize=4, blocking=False)
-        self.qColorControl  = self.device.getInputQueue('color_control')
-        self.qColorConfig   = self.device.getInputQueue('color_manip_config')
-
-        if self.doDepth:
-            self.qDepthImage    = self.device.getOutputQueue(name='disparity', maxSize=4, blocking=False)
-            self.qDepthConfig   = self.device.getInputQueue('depth_config')
-            self.qDepthTransform= self.device.getInputQueue('disparity_manip_config')
+        self.dataQueue =    self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
+        self.colorControl = self.device.getInputQueue('color_control')
+        self.stereoControl =self.device.getInputQueue('stereo_control')
 
         self.deviceOpen = True
         return True
@@ -217,13 +173,9 @@ class DepthAi():
         self.deviceOpen = False
 
         self.device.close()
-        self.qColorConfig.close()
-        self.qColorControl.close()
-        self.qColorImage.close()
-        if self.doDepth:
-            self.qDepthImage.close()
-            self.qDepthConfig.close()
-            self.qDepthTransform.close()
+        self.stereoControl.close()
+        self.colorControl.close()
+        self.dataQueue.close()
 
     def startCapture(self) -> None:
         if not self.deviceOpen:
@@ -231,34 +183,34 @@ class DepthAi():
             return
         if self.capturing: return
         self.updateWarp
-        self.colorId = self.qColorImage.addCallback(self.updateColor) #type:ignore
-
-        if self.doDepth:
-            self.depthId = self.qDepthImage.addCallback(self.updateDepth) #type:ignore
+        self.colorId: int = self.dataQueue.addCallback(self.updateData)
 
     def stopCapture(self) -> None:
         if not self.capturing: return
-        self.qColorImage.removeCallback(self.colorId) #type:ignore
+        self.dataQueue.removeCallback(self.colorId)
 
-        if self.doDepth:
-            self.qDepthImage.removeCallback(self.depthId) #type:ignore
+    def updateData(self, daiMessages) -> None:
+        for name, msg in daiMessages:
+            if name == 'video':
+                self.updateColor(msg.getCvFrame()) #type:ignore
+            elif name == 'disparity':
+                self.updateDepth(msg.getCvFrame()) #type:ignore
+            else:
+                print('unknown message', name)
 
-    def updateColor(self, inColor) -> None:
-        cv_raw_frame: np.ndarray = inColor.getCvFrame() #type:ignore
-        cv_frame: np.ndarray = fit(cv_raw_frame, self.outWidth, self.outHeight)
+    def updateColor(self, frame: np.ndarray) -> None:
+        cv_frame: np.ndarray = fit(frame, self.outWidth, self.outHeight)
 
         for c in self.colorCallbacks:
             c(cv_frame)
         with self.colorMutex:
             self.colorFrameNew = True
             self.outputColor = cv_frame
-            self.RAW_outputColor = cv_raw_frame
-        self.updateControlValues(inColor)
+            self.RAW_outputColor = frame
+        # self.updateControlValues(inColor)
 
-    def updateDepth(self, inDepth) -> None:
-        if not self.doDepth: return
-        depthFrame = inDepth.getFrame() #type:ignore
-        cvFrame = (depthFrame * (255 / 95)).astype(np.uint8)
+    def updateDepth(self, frame: np.ndarray) -> None:
+        cvFrame = (frame * (255 / 95)).astype(np.uint8)
         for c in self.depthCallbacks: c(cvFrame)
         with self.depthMutex:
             self.depthFrameNew = True
@@ -310,7 +262,7 @@ class DepthAi():
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoExposureEnable()
-        self.qColorControl.send(ctrl)
+        self.colorControl.send(ctrl)
 
     def setAutoFocus(self, value) -> None:
         if not self.deviceOpen: return
@@ -320,7 +272,7 @@ class DepthAi():
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoFocusMode(dai.CameraControl.AutoFocusMode.CONTINUOUS_VIDEO)
-        self.qColorControl.send(ctrl)
+        self.colorControl.send(ctrl)
 
     def setAutoWhiteBalance(self, value) -> None:
         if not self.deviceOpen: return
@@ -330,7 +282,7 @@ class DepthAi():
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoWhiteBalanceMode(dai.CameraControl.AutoWhiteBalanceMode.AUTO)
-        self.qColorControl.send(ctrl)
+        self.colorControl.send(ctrl)
 
     def setExposureIso(self, exposure: int, iso: int) -> None:
         if not self.deviceOpen: return
@@ -339,7 +291,7 @@ class DepthAi():
         self.iso = int(clamp(iso, isoRange))
         ctrl = dai.CameraControl()
         ctrl.setManualExposure(int(self.exposure), int(self.iso))
-        self.qColorControl.send(ctrl)
+        self.colorControl.send(ctrl)
 
     def setExposure(self, value : int) -> None:
         self.setExposureIso(value, self.iso)
@@ -353,7 +305,7 @@ class DepthAi():
         ctrl = dai.CameraControl()
         self.focus = int(clamp(value, focusRange))
         ctrl.setManualFocus(int(self.focus))
-        self.qColorControl.send(ctrl)
+        self.colorControl.send(ctrl)
 
     def setWhiteBalance(self, value: int) -> None:
         if not self.deviceOpen: return
@@ -361,7 +313,7 @@ class DepthAi():
         ctrl = dai.CameraControl()
         self.whiteBalance = int(clamp(value, whiteBalanceRange))
         ctrl.setManualWhiteBalance(int(self.whiteBalance))
-        self.qColorControl.send(ctrl)
+        self.colorControl.send(ctrl)
 
 
     def updateDepthControl(self) -> None:
@@ -387,7 +339,7 @@ class DepthAi():
 
         cnfg.algorithmControl.disparityShift = self.depthDispShift
 
-        self.qDepthConfig.send(cnfg)
+        self.stereoControl.send(cnfg)
 
     def setDepthDecimation(self, value: int) -> None:
         self.depthDecimation = int(clamp(value, depthDecimationRange))
@@ -423,16 +375,7 @@ class DepthAi():
 
 
     def updateWarp(self) -> None:
-        if not self.deviceOpen: return
-        offset: tuple[float, float] = (self.offset[0], self.offset[1])
-        perspective: tuple[float, float] = (self.perspective[0], self.perspective[1])
-        dW: list[dai.Point2f] = makeWarpList(self.flipH, self.flipV, self.rotate90, self.zoom, offset, perspective)
-        config = dai.ImageManipConfig()
-        config.setWarpTransformFourPoints(dW, True)
-        # config.setResize(self.outWidth, self.outHeight)
-        self.qColorConfig.send(config)
-        if self.doDepth:
-            self.qDepthTransform.send(config)
+        pass
 
     def setFlipH(self, flipH: bool) -> None:
         self.flipH = flipH
@@ -450,22 +393,6 @@ class DepthAi():
         self.zoom = zoom
         self.updateWarp()
 
-    def setPerspectiveH(self, perspectiveV: float) -> None:
-        self.perspective[1] = perspectiveV
-        self.updateWarp()
-
-    def setPerspectiveV(self, perspectiveV: float) -> None:
-        self.perspective[0] = perspectiveV
-        self.updateWarp()
-
-    def setOffsetH(self, offsetV: float) -> None:
-        self.offset[0] = offsetV
-        self.updateWarp()
-
-    def setOffsetV(self, offsetV: float) -> None:
-        self.offset[1] = offsetV
-        self.updateWarp()
-
     def setColorCallback(self, callback) -> None:
         self.colorCallbacks.append(callback)
 
@@ -474,6 +401,9 @@ class DepthAi():
 
     def setDepthCallback(self, callback) -> None:
         self.depthCallbacks.append(callback)
+
+    def clearDepthCallbacks(self) -> None:
+        self.colorCallbacks = []
 
 
 
