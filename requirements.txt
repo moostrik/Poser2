@@ -1,0 +1,7 @@
+# tensorflow==2.12.0
+# numpy
+opencv-python
+opencv-contrib-python
+Pillow
+depthai
+watchdog
