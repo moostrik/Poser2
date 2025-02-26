@@ -89,31 +89,32 @@ def setupStereo(pipeline : dai.Pipeline, width: int, height: int) -> None:
 
     stereo.disparity.link(sync.inputs["disparity"])
     color.video.link(sync.inputs["video"])
+    monoLeft.out.link(sync.inputs["mono"])
 
     sync.out.link(outputImages.input)
 
 class DepthAi():
-    def __init__(self, forceSize: tuple[int, int] | None = None, doPerson: bool = True) -> None:
+    def __init__(self, forceSize: tuple[int, int] | None = None, doMono: bool = True) -> None:
 
-        self.doPerson: bool = doPerson
+        self.doMono: bool = doMono
 
-        self.colorMutex: Lock = Lock()
-        self.colorFrameNew: bool = False
         self.colorID: int = 0
         self.colorCallbacks: list = []
-        self.depthMutex: Lock = Lock()
-        self.depthFrameNew: bool = False
-        self.depthId: int = 0
-        self.depthCallbacks: list = []
+        self.stereoId: int = 0
+        self.stereoCallbacks: list = []
+        self.monoId: int = 0
+        self.monoCallbacks: list = []
 
-        self.outWidth: int = 1920
-        self.outHeight: int = 1080
-
+        self.outWidth: int = 1280
+        self.outHeight: int = 720
+        self.flipH: bool = False
+        self.flipV: bool = False
+        self.rotate90: bool = False
         if (forceSize):
             self.outWidth, self.outHeight = forceSize
-        self.RAW_outputColor: np.ndarray = np.zeros((self.outWidth, self.outHeight, 3), dtype=np.uint8)
-        self.outputColor: np.ndarray = np.zeros((self.outWidth, self.outHeight, 3), dtype=np.uint8)
-        self.outputDepth: np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)
+        self.outputColor:   np.ndarray = np.zeros((self.outWidth, self.outHeight, 3), dtype=np.uint8)
+        self.outputDepth:   np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)
+        self.outputMono:    np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)\
 
         # COLOR SETTINGS
         self.autoExposure: bool     = True
@@ -194,49 +195,24 @@ class DepthAi():
             if name == 'video':
                 self.updateColor(msg.getCvFrame()) #type:ignore
             elif name == 'disparity':
-                self.updateDepth(msg.getCvFrame()) #type:ignore
+                self.updateStereo(msg.getCvFrame()) #type:ignore
+            elif name == 'mono':
+                self.updateMono(msg.getCvFrame()) #type:ignore
             else:
                 print('unknown message', name)
 
     def updateColor(self, frame: np.ndarray) -> None:
         cv_frame: np.ndarray = fit(frame, self.outWidth, self.outHeight)
-
         for c in self.colorCallbacks:
             c(cv_frame)
-        with self.colorMutex:
-            self.colorFrameNew = True
-            self.outputColor = cv_frame
-            self.RAW_outputColor = frame
-        # self.updateControlValues(inColor)
 
-    def updateDepth(self, frame: np.ndarray) -> None:
-        cvFrame = (frame * (255 / 95)).astype(np.uint8)
-        for c in self.depthCallbacks: c(cvFrame)
-        with self.depthMutex:
-            self.depthFrameNew = True
-            self.outputDepth = cvFrame
+    def updateStereo(self, frame: np.ndarray) -> None:
+        cvFrame: np.ndarray = (frame * (255 / 95)).astype(np.uint8)
+        for c in self.stereoCallbacks: c(cvFrame)
 
-    def isColorFrameNew(self) -> bool:
-        value: bool = self.colorFrameNew
-        self.colorFrameNew = False
-        return value
-
-    def isDepthFrameNew(self) -> bool:
-        value: bool = self.depthFrameNew
-        self.depthFrameNew = False
-        return value
-
-    def getColorImgRaw(self) -> np.ndarray:
-        with self.colorMutex:
-            return self.RAW_outputColor
-
-    def getColorImg(self) -> np.ndarray:
-        with self.colorMutex:
-            return self.outputColor
-
-    def getDepthImg(self) -> np.ndarray:
-        with self.depthMutex:
-            return self.outputDepth
+    def updateMono(self, frame: np.ndarray) -> None:
+        # cvFrame: np.ndarray = (frame * (255 / 95)).astype(np.uint8)
+        for c in self.monoCallbacks: c(frame)
 
     def updateControlValues(self, frame) -> None:
         if (self.autoExposure):
@@ -393,17 +369,23 @@ class DepthAi():
         self.zoom = zoom
         self.updateWarp()
 
-    def setColorCallback(self, callback) -> None:
+    def addColorCallback(self, callback) -> None:
         self.colorCallbacks.append(callback)
 
     def clearColorCallbacks(self) -> None:
         self.colorCallbacks = []
 
-    def setDepthCallback(self, callback) -> None:
-        self.depthCallbacks.append(callback)
+    def addStereoCallback(self, callback) -> None:
+        self.stereoCallbacks.append(callback)
 
-    def clearDepthCallbacks(self) -> None:
-        self.colorCallbacks = []
+    def clearStereoCallbacks(self) -> None:
+        self.stereoCallbacks = []
+
+    def addMonoCallback(self, callback) -> None:
+        self.monoCallbacks.append(callback)
+
+    def clearMonoCallbacks(self) -> None:
+        self.monoCallbacks = []
 
 
 

@@ -8,9 +8,9 @@ from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
 
 
 class DepthAiGui(Cam):
-    def __init__(self, gui: Gui | None, forceSize: tuple[int, int] | None = None, doDepth: bool = True, doPerson: bool = True) -> None:
+    def __init__(self, gui: Gui | None, forceSize: tuple[int, int] | None = None, doPerson: bool = True) -> None:
         self.gui: Gui | None = gui
-        super().__init__(forceSize, doDepth, doPerson)
+        super().__init__(forceSize, doPerson)
 
         elem: list = []
         elem.append([E(eT.TEXT, 'Exposure '),
@@ -26,42 +26,27 @@ class DepthAiGui(Cam):
                      E(eT.CHCK, 'Auto Focus',       super().setAutoFocus,           True),
                      E(eT.CHCK, 'Auto W Balance',   super().setAutoWhiteBalance,    True)])
 
-        if doDepth:
-            elem.append([E(eT.SEPR, '')])
-            elem.append([E(eT.TEXT, 'DEPTH    '),
-                         E(eT.TEXT, 'Decimation'),
-                         E(eT.SLDR, 'Decimation',       super().setDepthDecimation,     depthDecimationRange[0],    depthDecimationRange,   1),
-                         E(eT.TEXT, 'Speckle'),
-                         E(eT.SLDR, 'Speckle',          super().setDepthSpeckle,        depthSpeckleRange[0],       depthSpeckleRange,      1),])
-            elem.append([E(eT.TEXT, '         '),
-                         E(eT.TEXT, 'Range Min'),
-                         E(eT.SLDR, 'Min Range',        super().setDepthTresholdMin,    depthTresholdRange[0],      depthTresholdRange,     50),
-                         E(eT.TEXT, 'Max'),
-                         E(eT.SLDR, 'Max Range',        super().setDepthTresholdMax,    depthTresholdRange[1],      depthTresholdRange,     50)])
-            elem.append([E(eT.TEXT, '         '),
-                         E(eT.TEXT, 'Hole Size'),
-                         E(eT.SLDR, 'Hole Size',        super().setDepthHoleFilling,    depthHoleFillingRange[0],   depthHoleFillingRange,  1),
-                         E(eT.TEXT, 'Iterations'),
-                         E(eT.SLDR, 'Iterations',       super().setDepthHoleIter,       depthHoleIterRange[0],      depthHoleIterRange,     1)])
-            elem.append([E(eT.TEXT, '         '),
-                         E(eT.TEXT, 'Temp Persist'),
-                         E(eT.SLDR, 'Persistence',      super().setDepthTempPersist,    depthTempPersistRange[0],   depthTempPersistRange,  1),
-                         E(eT.TEXT, 'Disparity'),
-                         E(eT.SLDR, 'Disparity',        super().setDepthDisparityShift, depthDisparityRange[0],     depthDisparityRange,  1)])
+        self.color_frame = Frame('CAMERA', elem, 230)
 
-        elem.append([E(eT.SEPR, '')])
-        elem.append([E(eT.TEXT, 'TRANSFORM'),
-                     E(eT.CHCK, 'Flip H',           super().setFlipH,               False),
-                     E(eT.CHCK, 'Flip V',           super().setFlipV,               False),
-                     E(eT.TEXT, 'Zoom'),
-                     E(eT.SLDR, 'Zoom',             super().setZoom,                0,            (1, 2),           0.01)])
-        elem.append([E(eT.TEXT, '         '),
-                     E(eT.TEXT, 'Offset H'),
-                     E(eT.SLDR, 'OffsetH',          super().setOffsetH,             0,            (-1, 1),          0.01),
-                     E(eT.TEXT, 'V'),
-                     E(eT.SLDR, 'OffsetV',          super().setOffsetV,             0,            (-1, 1),          0.01)])
+        elem: list = []
+        elem.append([E(eT.TEXT, 'Decimation'),
+                     E(eT.SLDR, 'Decimation',       super().setDepthDecimation,     depthDecimationRange[0],    depthDecimationRange,   1),
+                     E(eT.TEXT, 'Speckle'),
+                     E(eT.SLDR, 'Speckle',          super().setDepthSpeckle,        depthSpeckleRange[0],       depthSpeckleRange,      1),])
+        elem.append([E(eT.TEXT, 'Range Min'),
+                     E(eT.SLDR, 'Min Range',        super().setDepthTresholdMin,    depthTresholdRange[0],      depthTresholdRange,     50),
+                     E(eT.TEXT, 'Max'),
+                     E(eT.SLDR, 'Max Range',        super().setDepthTresholdMax,    depthTresholdRange[1],      depthTresholdRange,     50)])
+        elem.append([E(eT.TEXT, 'Hole Size'),
+                     E(eT.SLDR, 'Hole Size',        super().setDepthHoleFilling,    depthHoleFillingRange[0],   depthHoleFillingRange,  1),
+                     E(eT.TEXT, 'Iterations'),
+                     E(eT.SLDR, 'Iterations',       super().setDepthHoleIter,       depthHoleIterRange[0],      depthHoleIterRange,     1)])
+        elem.append([E(eT.TEXT, 'Temp Persist'),
+                     E(eT.SLDR, 'Persistence',      super().setDepthTempPersist,    depthTempPersistRange[0],   depthTempPersistRange,  1),
+                     E(eT.TEXT, 'Disparity'),
+                     E(eT.SLDR, 'Disparity',        super().setDepthDisparityShift, depthDisparityRange[0],     depthDisparityRange,  1)])
+        self.stereo_frame = Frame('STEREO', elem, 230)
 
-        self.frame = Frame('CAMERA', elem, 230)
 
         self.prevautoExposure: bool      = self.autoExposure
         self.prevAutoFocus: bool         = self.autoFocus
@@ -105,4 +90,10 @@ class DepthAiGui(Cam):
                 self.gui.updateElement('W Balance', self.whiteBalance)
 
     def get_gui_frame(self):
-          return self.frame
+          return self.get_color_frame()
+
+    def get_color_frame(self):
+          return self.color_frame
+
+    def get_stereo_frame(self):
+          return self.stereo_frame

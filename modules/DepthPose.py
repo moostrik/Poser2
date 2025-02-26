@@ -1,6 +1,7 @@
 
-from modules.cam.DepthAi import DepthAi as DepthCam
+from modules.cam.DepthAiGui import DepthAiGui as DepthCam
 from modules.render.Render import Render
+from modules.gui.PyReallySimpleGui import Gui
 
 from enum import Enum
 import numpy as np
@@ -21,10 +22,11 @@ class DepthPose():
             self.width: int = height
             self.height: int = width
 
-        self.camera = DepthCam((self.width, self.height))
-        self.camera.setRotate90(self.portrait_mode)
+        self.gui: Gui = Gui('DepthPose', path + '/files/', 'default')
+        self.render: Render = Render(self.width, self.height , self.width, self.height * 2, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
 
-        self.render: Render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
+        self.camera = DepthCam(self.gui, (self.width, self.height))
+        self.camera.setRotate90(self.portrait_mode)
 
         self._running: bool = False
 
@@ -32,11 +34,16 @@ class DepthPose():
     def start(self) -> None:
         self.camera.open()
         self.camera.startCapture()
-        self.camera.setColorCallback(self.render.set_cam_image)
+        self.camera.addColorCallback(self.render.set_video_image)
+        self.camera.addMonoCallback(self.render.set_depth_image)
 
         self.render.exit_callback = self.stop
         self.render.addKeyboardCallback(self.render_keyboard_callback)
         self.render.start()
+
+        self.gui.exit_callback = self.stop
+        self.gui.addFrame([self.camera.get_color_frame(), self.camera.get_stereo_frame()])
+        self.gui.start()
 
         self._running = True
 
@@ -47,6 +54,9 @@ class DepthPose():
 
         self.render.exit_callback = None
         self.render.stop()
+
+        self.gui.exit_callback = None
+        self.gui.stop()
 
         self._running = False
 
