@@ -25,7 +25,7 @@ class DepthPose():
         self.gui: Gui = Gui('DepthPose', path + '/files/', 'default')
         self.render: Render = Render(self.width, self.height , self.width, self.height * 2, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
 
-        self.camera = DepthCam(self.gui, (self.width, self.height))
+        self.camera = DepthCam(self.gui, (self.width, self.height), True)
         self.camera.setRotate90(self.portrait_mode)
 
         self._running: bool = False
@@ -35,7 +35,7 @@ class DepthPose():
         self.camera.open()
         self.camera.startCapture()
         self.camera.addColorCallback(self.render.set_video_image)
-        self.camera.addMonoCallback(self.render.set_depth_image)
+        self.camera.addStereoCallback(self.render.set_depth_image)
 
         self.render.exit_callback = self.stop
         self.render.addKeyboardCallback(self.render_keyboard_callback)

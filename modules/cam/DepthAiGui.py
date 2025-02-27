@@ -8,9 +8,9 @@ from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
 
 
 class DepthAiGui(Cam):
-    def __init__(self, gui: Gui | None, forceSize: tuple[int, int] | None = None, doPerson: bool = True) -> None:
+    def __init__(self, gui: Gui | None, forceSize: tuple[int, int] | None = None, doMono: bool = True) -> None:
         self.gui: Gui | None = gui
-        super().__init__(forceSize, doPerson)
+        super().__init__(forceSize, doMono)
 
         elem: list = []
         elem.append([E(eT.TEXT, 'Exposure '),

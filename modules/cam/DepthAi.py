@@ -50,7 +50,7 @@ def makeWarpList(flipH: bool, flipV:bool, rotate90:bool, zoom: float, offset: tu
     dW: list[dai.Point2f] = [dai.Point2f(W[0][0], W[0][1]), dai.Point2f(W[1][0], W[1][1]),dai.Point2f(W[2][0], W[2][1]),dai.Point2f(W[3][0], W[3][1])]
     return dW
 
-def setupStereo(pipeline : dai.Pipeline, width: int, height: int) -> None:
+def setupStereo(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
     monoLeft: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     monoRight: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     color: dai.node.ColorCamera = pipeline.create(dai.node.ColorCamera)
@@ -87,9 +87,10 @@ def setupStereo(pipeline : dai.Pipeline, width: int, height: int) -> None:
     monoLeft.out.link(stereo.left)
     monoRight.out.link(stereo.right)
 
-    stereo.disparity.link(sync.inputs["disparity"])
+    stereo.disparity.link(sync.inputs["stereo"])
     color.video.link(sync.inputs["video"])
-    monoLeft.out.link(sync.inputs["mono"])
+    if addMonoOutput:
+        monoLeft.out.link(sync.inputs["mono"])
 
     sync.out.link(outputImages.input)
 
@@ -114,7 +115,7 @@ class DepthAi():
             self.outWidth, self.outHeight = forceSize
         self.outputColor:   np.ndarray = np.zeros((self.outWidth, self.outHeight, 3), dtype=np.uint8)
         self.outputDepth:   np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)
-        self.outputMono:    np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)\
+        self.outputMono:    np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)
 
         # COLOR SETTINGS
         self.autoExposure: bool     = True
@@ -151,7 +152,7 @@ class DepthAi():
         if self.deviceOpen: return True
 
         pipeline = dai.Pipeline()
-        setupStereo(pipeline, self.outWidth, self.outHeight)
+        setupStereo(pipeline, self.doMono)
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:
@@ -191,28 +192,45 @@ class DepthAi():
         self.dataQueue.removeCallback(self.colorId)
 
     def updateData(self, daiMessages) -> None:
+        video_frame: np.ndarray | None = None
+        stereo_frame: np.ndarray | None = None
+
         for name, msg in daiMessages:
             if name == 'video':
-                self.updateColor(msg.getCvFrame()) #type:ignore
-            elif name == 'disparity':
-                self.updateStereo(msg.getCvFrame()) #type:ignore
+                video_frame = self.updateColor(msg.getCvFrame()) #type:ignore
+            elif name == 'stereo':
+                stereo_frame = self.updateStereo(msg.getCvFrame()) #type:ignore
             elif name == 'mono':
                 self.updateMono(msg.getCvFrame()) #type:ignore
             else:
                 print('unknown message', name)
 
-    def updateColor(self, frame: np.ndarray) -> None:
+        if video_frame is not None and stereo_frame is not None:
+            self.updateDepthMask(video_frame, stereo_frame)
+        else:
+            if video_frame is None:
+                print('missing video frame')
+            if stereo_frame is None:
+                print('missing stereo frame')
+
+    def updateColor(self, frame: np.ndarray) -> np.ndarray:
         cv_frame: np.ndarray = fit(frame, self.outWidth, self.outHeight)
         for c in self.colorCallbacks:
-            c(cv_frame)
+             c(frame)
+        return frame
 
-    def updateStereo(self, frame: np.ndarray) -> None:
+    def updateStereo(self, frame: np.ndarray) -> np.ndarray:
         cvFrame: np.ndarray = (frame * (255 / 95)).astype(np.uint8)
-        for c in self.stereoCallbacks: c(cvFrame)
+        for c in self.stereoCallbacks:
+            c(cvFrame)
+        return cvFrame
 
     def updateMono(self, frame: np.ndarray) -> None:
         # cvFrame: np.ndarray = (frame * (255 / 95)).astype(np.uint8)
         for c in self.monoCallbacks: c(frame)
+
+    def updateDepthMask(self, color: np.ndarray, depth: np.ndarray) -> None:
+        pass
 
     def updateControlValues(self, frame) -> None:
         if (self.autoExposure):

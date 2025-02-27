@@ -10,7 +10,7 @@ from modules.DepthPose import DepthPose
 
 parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-cw',  '--width',          type=int,   default=1280,   help='camera width')
-parser.add_argument('-ch',  '--height',         type=int,   default=800,   help='camera height')
+parser.add_argument('-ch',  '--height',         type=int,   default=720,   help='camera height')
 parser.add_argument('-p',   '--portrait',       type=bool,  default=False,  help='portrait mode')
 args = parser.parse_args()
 
