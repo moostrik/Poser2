@@ -144,6 +144,7 @@ class DepthAi():
         # DAI
         self.device:        dai.Device
         self.dataQueue:     dai.DataOutputQueue
+        self.dataCallbackId:int
         self.colorControl:  dai.DataInputQueue
         self.stereoControl: dai.DataInputQueue
 
@@ -189,12 +190,11 @@ class DepthAi():
             print('CamDepthAi:start', 'device is not open')
             return
         if self.capturing: return
-        self.updateWarp
-        self.colorId: int = self.dataQueue.addCallback(self.updateData)
+        self.dataCallbackId = self.dataQueue.addCallback(self.updateData)
 
     def stopCapture(self) -> None:
         if not self.capturing: return
-        self.dataQueue.removeCallback(self.colorId)
+        self.dataQueue.removeCallback(self.dataCallbackId)
 
     def updateData(self, daiMessages) -> None:
         if self.previewType == PreviewType.NONE:
@@ -298,16 +298,6 @@ class DepthAi():
         ctrl.setAutoExposureEnable()
         self.colorControl.send(ctrl)
 
-    def setAutoFocus(self, value) -> None:
-        if not self.deviceOpen: return
-        self.autoFocus = value
-        if value == False:
-            self.setFocus(self.focus)
-            return
-        ctrl = dai.CameraControl()
-        ctrl.setAutoFocusMode(dai.CameraControl.AutoFocusMode.CONTINUOUS_VIDEO)
-        self.colorControl.send(ctrl)
-
     def setAutoWhiteBalance(self, value) -> None:
         if not self.deviceOpen: return
         self.autoWhiteBalance = value
@@ -333,14 +323,6 @@ class DepthAi():
     def setIso(self, value: int) -> None:
         self.setExposureIso(self.exposure, value)
 
-    def setFocus(self, value: int) -> None:
-        if not self.deviceOpen: return
-        self.autoFocus = False
-        ctrl = dai.CameraControl()
-        self.focus = int(clamp(value, focusRange))
-        ctrl.setManualFocus(int(self.focus))
-        self.colorControl.send(ctrl)
-
     def setWhiteBalance(self, value: int) -> None:
         if not self.deviceOpen: return
         self.autoWhiteBalance = False
@@ -349,6 +331,16 @@ class DepthAi():
         ctrl.setManualWhiteBalance(int(self.whiteBalance))
         self.colorControl.send(ctrl)
 
+
+    def setIrFloodLight(self, value: float) -> None:
+        if not self.deviceOpen: return
+        v: float = clamp(value, (0.0, 1.0))
+        self.device.setIrFloodLightIntensity(v)
+
+    def setIrGridLight(self, value: float) -> None:
+        if not self.deviceOpen: return
+        v: float = clamp(value, (0.0, 1.0))
+        self.device.setIrLaserDotProjectorIntensity(v)
 
     def updateDepthControl(self) -> None:
         if not self.deviceOpen: return
@@ -408,24 +400,13 @@ class DepthAi():
         self.updateDepthControl()
 
 
-    def updateWarp(self) -> None:
-        pass
-
     def setFlipH(self, flipH: bool) -> None:
         self.flipH = flipH
-        self.updateWarp()
 
     def setFlipV(self, flipV: bool) -> None:
         self.flipV = flipV
-        self.updateWarp()
 
-    def setRotate90(self, rotate90: bool) -> None:
-        self.rotate90 = rotate90
-        self.updateWarp()
 
-    def setZoom(self, zoom:float) -> None:
-        self.zoom = zoom
-        self.updateWarp()
 
 
     def addFrameCallback(self, callback) -> None:

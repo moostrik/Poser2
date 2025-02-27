@@ -25,8 +25,7 @@ class DepthPose():
         self.gui: Gui = Gui('DepthPose', path + '/files/', 'default')
         self.render: Render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
 
-        self.camera = DepthCam(self.gui, False)
-        self.camera.setRotate90(self.portrait_mode)
+        self.camera = DepthCam(self.gui, True)
 
         self._running: bool = False
 
