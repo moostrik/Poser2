@@ -5,6 +5,17 @@ from threading import Lock
 from datetime import timedelta
 import time
 from PIL import Image, ImageOps
+from enum import Enum
+
+class PreviewType(Enum):
+    NONE =  0
+    VIDEO = 1
+    MONO =  2
+    STEREO= 3
+    MASK =  4
+    MASKED= 5
+
+PreviewTypeNames: list[str] = [e.name for e in PreviewType]
 
 exposureRange: tuple[int, int] =    (1000, 33000)
 isoRange: tuple[int, int] =         ( 100, 1600 )
@@ -97,14 +108,14 @@ def setupStereo(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
 class DepthAi():
     def __init__(self, forceSize: tuple[int, int] | None = None, doMono: bool = True) -> None:
 
+        self.previewType: PreviewType = PreviewType.VIDEO
+
         self.doMono: bool = doMono
 
-        self.colorID: int = 0
         self.colorCallbacks: list = []
-        self.stereoId: int = 0
         self.stereoCallbacks: list = []
-        self.monoId: int = 0
         self.monoCallbacks: list = []
+        self.previewCallbacks: list = []
 
         self.outWidth: int = 1280
         self.outHeight: int = 720
@@ -113,9 +124,13 @@ class DepthAi():
         self.rotate90: bool = False
         if (forceSize):
             self.outWidth, self.outHeight = forceSize
-        self.outputColor:   np.ndarray = np.zeros((self.outWidth, self.outHeight, 3), dtype=np.uint8)
-        self.outputDepth:   np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)
-        self.outputMono:    np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)
+        self.errorFrame:   np.ndarray = np.zeros((self.outHeight, self.outWidth, 3), dtype=np.uint8)
+        # set errorframe red to 255
+        self.errorFrame[:,:,2] = 255
+
+        # self.outputDepth:   np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)
+        # self.outputMono:    np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)
+        self.preview:   np.ndarray = np.zeros((self.outWidth, self.outHeight, 3), dtype=np.uint8)
 
         # COLOR SETTINGS
         self.autoExposure: bool     = True
@@ -192,32 +207,44 @@ class DepthAi():
         self.dataQueue.removeCallback(self.colorId)
 
     def updateData(self, daiMessages) -> None:
-        video_frame: np.ndarray | None = None
+        video_frame:  np.ndarray | None = None
         stereo_frame: np.ndarray | None = None
+        mono_frame:   np.ndarray | None = None
+        mask_frame:   np.ndarray | None = None
+        masked_frame: np.ndarray | None = None
 
         for name, msg in daiMessages:
             if name == 'video':
-                video_frame = self.updateColor(msg.getCvFrame()) #type:ignore
+                video_frame = msg.getCvFrame() #type:ignore
             elif name == 'stereo':
                 stereo_frame = self.updateStereo(msg.getCvFrame()) #type:ignore
             elif name == 'mono':
-                self.updateMono(msg.getCvFrame()) #type:ignore
+                mono_frame = msg.getCvFrame() #type:ignore
             else:
                 print('unknown message', name)
 
-        if video_frame is not None and stereo_frame is not None:
-            self.updateDepthMask(video_frame, stereo_frame)
-        else:
-            if video_frame is None:
-                print('missing video frame')
-            if stereo_frame is None:
-                print('missing stereo frame')
+        if stereo_frame is not None:
+            mask_frame = self.updateMask(stereo_frame)
 
-    def updateColor(self, frame: np.ndarray) -> np.ndarray:
-        cv_frame: np.ndarray = fit(frame, self.outWidth, self.outHeight)
-        for c in self.colorCallbacks:
-             c(frame)
-        return frame
+        if video_frame is not None and mask_frame is not None:
+            masked_frame = self.applyMask(video_frame, mask_frame)
+
+        preview_frame: np.ndarray | None = None
+        if self.previewType == PreviewType.VIDEO:
+            preview_frame = video_frame
+        if self.previewType == PreviewType.MONO:
+            preview_frame = mono_frame
+        if self.previewType == PreviewType.STEREO:
+            preview_frame = stereo_frame
+        if self.previewType == PreviewType.MASK:
+            preview_frame = mask_frame
+        if self.previewType == PreviewType.MASKED:
+            preview_frame = masked_frame
+        if preview_frame is None:
+            preview_frame = self.errorFrame
+
+        for c in self.previewCallbacks:
+            c(preview_frame)
 
     def updateStereo(self, frame: np.ndarray) -> np.ndarray:
         cvFrame: np.ndarray = (frame * (255 / 95)).astype(np.uint8)
@@ -225,12 +252,14 @@ class DepthAi():
             c(cvFrame)
         return cvFrame
 
-    def updateMono(self, frame: np.ndarray) -> None:
-        # cvFrame: np.ndarray = (frame * (255 / 95)).astype(np.uint8)
-        for c in self.monoCallbacks: c(frame)
+    def updateMask(self, frame: np.ndarray) -> np.ndarray:
+        _, binary_mask = cv2.threshold(frame, 10, 255, cv2.THRESH_BINARY)
+        return binary_mask
 
-    def updateDepthMask(self, color: np.ndarray, depth: np.ndarray) -> None:
-        pass
+    def applyMask(self, color: np.ndarray, mask: np.ndarray) -> np.ndarray:
+        # multiply the color image with the mask
+        masked_frame = cv2.bitwise_and(color, color, mask=mask)
+        return masked_frame
 
     def updateControlValues(self, frame) -> None:
         if (self.autoExposure):
@@ -247,6 +276,12 @@ class DepthAi():
     def isOpen(self) -> bool:
         return self.deviceOpen
 
+
+    def setPreview(self, value: PreviewType | int | str) -> None:
+        if isinstance(value, str) and value in PreviewTypeNames:
+            self.previewType = PreviewType(PreviewTypeNames.index(value))
+        else:
+            self.previewType = PreviewType(value)
 
     def setAutoExposure(self, value) -> None:
         if not self.deviceOpen: return
@@ -404,6 +439,12 @@ class DepthAi():
 
     def clearMonoCallbacks(self) -> None:
         self.monoCallbacks = []
+
+    def addPreviewCallback(self, callback) -> None:
+        self.previewCallbacks.append(callback)
+
+    def clearPreviewCallbacks(self) -> None:
+        self.previewCallbacks = []
 
 
 

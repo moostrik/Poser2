@@ -1,6 +1,7 @@
 from cv2 import ROTATE_180, ROTATE_90_CLOCKWISE, ROTATE_90_COUNTERCLOCKWISE
 
 from modules.cam.DepthAi import DepthAi as Cam
+from modules.cam.DepthAi import PreviewType, PreviewTypeNames
 from modules.cam.DepthAi import exposureRange, isoRange, focusRange, whiteBalanceRange
 from modules.cam.DepthAi import depthDecimationRange, depthSpeckleRange, depthTresholdRange, depthHoleFillingRange, depthHoleIterRange, depthTempPersistRange, depthDisparityRange
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
@@ -25,6 +26,8 @@ class DepthAiGui(Cam):
                      E(eT.CHCK, 'Auto Exposure',    super().setAutoExposure,        True),
                      E(eT.CHCK, 'Auto Focus',       super().setAutoFocus,           True),
                      E(eT.CHCK, 'Auto W Balance',   super().setAutoWhiteBalance,    True)])
+        elem.append([E(eT.TEXT, 'Preview'),
+                     E(eT.CMBO, 'Preview',          super().setPreview,            PreviewTypeNames[0], PreviewTypeNames)])
 
         self.color_frame = Frame('CAMERA', elem, 230)
 
@@ -55,6 +58,7 @@ class DepthAiGui(Cam):
         self.prevIso: int                = self.iso
         self.prevFocus: int              = self.focus
         self.prevWhiteBalance: int       = self.whiteBalance
+
 
     def updateControlValues(self, frame) -> None:
         super().updateControlValues(frame)

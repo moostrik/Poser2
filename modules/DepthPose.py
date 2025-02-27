@@ -34,7 +34,7 @@ class DepthPose():
     def start(self) -> None:
         self.camera.open()
         self.camera.startCapture()
-        self.camera.addColorCallback(self.render.set_video_image)
+        self.camera.addPreviewCallback(self.render.set_video_image)
         self.camera.addStereoCallback(self.render.set_depth_image)
 
         self.render.exit_callback = self.stop
