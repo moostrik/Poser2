@@ -211,6 +211,7 @@ class DepthAi():
         for name, msg in daiMessages:
             if name == 'video':
                 video_frame = msg.getCvFrame() #type:ignore
+                self.updateControlValues(msg)
             elif name == 'stereo':
                 stereo_frame = self.updateStereo(msg.getCvFrame()) #type:ignore
             elif name == 'mono':
@@ -251,6 +252,9 @@ class DepthAi():
         return binary_mask
 
     def applyMask(self, color: np.ndarray, mask: np.ndarray) -> np.ndarray:
+        # resize color to mask size
+        color = fit(color, mask.shape[1], mask.shape[0])
+
         return cv2.bitwise_and(color, color, mask=mask)
 
     def flip(self, frame: np.ndarray) -> np.ndarray:

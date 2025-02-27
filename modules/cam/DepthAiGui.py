@@ -14,20 +14,22 @@ class DepthAiGui(Cam):
         super().__init__(doMono)
 
         elem: list = []
-        elem.append([E(eT.TEXT, 'Exposure '),
-                     E(eT.SLDR, 'Exposure',         super().setExposure,            0,     exposureRange,        500),
-                     E(eT.TEXT, 'Iso      '),
-                     E(eT.SLDR, 'Iso',              super().setIso,                 0,          isoRange,         50)])
-        elem.append([E(eT.TEXT, 'Focus    '),
-                     E(eT.SLDR, 'Focus',            super().setFocus,               0,        focusRange,          3),
-                     E(eT.TEXT, 'W Balance'),
-                     E(eT.SLDR, 'W Balance',        super().setWhiteBalance,        0, whiteBalanceRange,        200)])
-        elem.append([E(eT.TEXT, '         '),
-                     E(eT.CHCK, 'Auto Exposure',    super().setAutoExposure,        True),
-                     E(eT.CHCK, 'Auto Focus',       super().setAutoFocus,           True),
-                     E(eT.CHCK, 'Auto W Balance',   super().setAutoWhiteBalance,    True)])
         elem.append([E(eT.TEXT, 'Preview'),
-                     E(eT.CMBO, 'Preview',          super().setPreview,            PreviewTypeNames[0], PreviewTypeNames)])
+                     E(eT.CMBO, 'Preview',          super().setPreview,             PreviewTypeNames[0], PreviewTypeNames),
+                     E(eT.CHCK, 'Flip H',           super().setFlipH,               False),
+                     E(eT.CHCK, 'Flip V',           super().setFlipV,               False)])
+        elem.append([E(eT.CHCK, 'Auto Exposure',    super().setAutoExposure,        False),
+                     E(eT.SLDR, 'Exposure',         super().setExposure,            0,     exposureRange,        500),
+                     E(eT.TEXT, 'Iso'),
+                     E(eT.SLDR, 'Iso',              super().setIso,                 0,          isoRange,         50)])
+        elem.append([E(eT.CHCK, 'Auto Focus   ',    super().setAutoFocus,           True),
+                     E(eT.SLDR, 'Focus',            super().setFocus,               0,        focusRange,          3),
+                     E(eT.CHCK, 'Auto Balance ',    super().setAutoWhiteBalance,    True),
+                     E(eT.SLDR, 'Balance',          super().setWhiteBalance,        0, whiteBalanceRange,        200)])
+        elem.append([E(eT.TEXT, 'Stereo Range Min'),
+                     E(eT.SLDR, 'Min Range',        super().setDepthTresholdMin,    depthTresholdRange[0],      depthTresholdRange,     50),
+                     E(eT.TEXT, 'Max'),
+                     E(eT.SLDR, 'Max Range',        super().setDepthTresholdMax,    depthTresholdRange[1],      depthTresholdRange,     50)])
 
         self.color_frame = Frame('CAMERA', elem, 230)
 
@@ -36,10 +38,6 @@ class DepthAiGui(Cam):
                      E(eT.SLDR, 'Decimation',       super().setDepthDecimation,     depthDecimationRange[0],    depthDecimationRange,   1),
                      E(eT.TEXT, 'Speckle'),
                      E(eT.SLDR, 'Speckle',          super().setDepthSpeckle,        depthSpeckleRange[0],       depthSpeckleRange,      1),])
-        elem.append([E(eT.TEXT, 'Range Min'),
-                     E(eT.SLDR, 'Min Range',        super().setDepthTresholdMin,    depthTresholdRange[0],      depthTresholdRange,     50),
-                     E(eT.TEXT, 'Max'),
-                     E(eT.SLDR, 'Max Range',        super().setDepthTresholdMax,    depthTresholdRange[1],      depthTresholdRange,     50)])
         elem.append([E(eT.TEXT, 'Hole Size'),
                      E(eT.SLDR, 'Hole Size',        super().setDepthHoleFilling,    depthHoleFillingRange[0],   depthHoleFillingRange,  1),
                      E(eT.TEXT, 'Iterations'),
@@ -73,7 +71,7 @@ class DepthAiGui(Cam):
 
         if (self.prevAutoWhiteBalance != self.autoWhiteBalance) :
             self.prevAutoWhiteBalance = self.autoWhiteBalance
-            self.gui.updateElement('Auto W Balance', self.autoWhiteBalance)
+            self.gui.updateElement('Auto Balance', self.autoWhiteBalance)
 
         if self.autoExposure:
             if (self.prevExposure != self.exposure) :
@@ -91,7 +89,7 @@ class DepthAiGui(Cam):
         if self.autoWhiteBalance:
             if (self.prevWhiteBalance != self.whiteBalance) :
                 self.prevWhiteBalance = self.whiteBalance
-                self.gui.updateElement('W Balance', self.whiteBalance)
+                self.gui.updateElement('Balance', self.whiteBalance)
 
     def get_gui_frame(self):
           return self.get_color_frame()
