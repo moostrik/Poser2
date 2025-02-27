@@ -112,8 +112,7 @@ class Render(RenderWindow):
 
         self.update_textures()
 
-        self.draw_video(ImageType.VIDEO, True)
-        self.draw_video(ImageType.DEPTH, False)
+        self.draw_video(ImageType.VIDEO)
 
 
     def update_trails(self, tex: Texture | Fbo | SwapFbo, fbo: SwapFbo, trail: float) -> None:
@@ -130,17 +129,14 @@ class Render(RenderWindow):
         tex.draw(0, 0, fbo.width, fbo.height)
         fbo.end()
 
-    def draw_video(self, type: ImageType, top: bool) -> None:
+    def draw_video(self, type: ImageType) -> None:
         self.setView(self.window_width, self.window_height)
         tex: Texture = self.textures[type]
         if tex.width == 0 or tex.height == 0:
             return
 
-        x, y, w, h = fit(tex.width, tex.height, self.window_width, self.window_height / 2)
-        if top:
-            self.textures[type].draw(x, y, w, h)
-        else:
-            self.textures[type].draw(x, y + h, w, h)
+        x, y, w, h = fit(tex.width, tex.height, self.window_width, self.window_height)
+        self.textures[type].draw(x, y, w, h)
 
     def draw_depth(self, type: ImageType) -> None:
         self.update_trails(self.textures[type], self.diffusion_fbo, self.trail)

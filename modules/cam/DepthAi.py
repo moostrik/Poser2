@@ -106,31 +106,21 @@ def setupStereo(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
     sync.out.link(outputImages.input)
 
 class DepthAi():
-    def __init__(self, forceSize: tuple[int, int] | None = None, doMono: bool = True) -> None:
+    def __init__(self, doMono: bool = True) -> None:
 
         self.previewType: PreviewType = PreviewType.VIDEO
 
         self.doMono: bool = doMono
 
-        self.colorCallbacks: list = []
-        self.stereoCallbacks: list = []
-        self.monoCallbacks: list = []
-        self.previewCallbacks: list = []
+        self.frameCallbacks: set = set()
 
         self.outWidth: int = 1280
         self.outHeight: int = 720
         self.flipH: bool = False
         self.flipV: bool = False
         self.rotate90: bool = False
-        if (forceSize):
-            self.outWidth, self.outHeight = forceSize
         self.errorFrame:   np.ndarray = np.zeros((self.outHeight, self.outWidth, 3), dtype=np.uint8)
-        # set errorframe red to 255
         self.errorFrame[:,:,2] = 255
-
-        # self.outputDepth:   np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)
-        # self.outputMono:    np.ndarray = np.zeros((self.outWidth, self.outHeight), dtype=np.uint8)
-        self.preview:   np.ndarray = np.zeros((self.outWidth, self.outHeight, 3), dtype=np.uint8)
 
         # COLOR SETTINGS
         self.autoExposure: bool     = True
@@ -207,6 +197,11 @@ class DepthAi():
         self.dataQueue.removeCallback(self.colorId)
 
     def updateData(self, daiMessages) -> None:
+        if self.previewType == PreviewType.NONE:
+            return
+        if len(self.frameCallbacks) == 0:
+            return
+
         video_frame:  np.ndarray | None = None
         stereo_frame: np.ndarray | None = None
         mono_frame:   np.ndarray | None = None
@@ -229,37 +224,43 @@ class DepthAi():
         if video_frame is not None and mask_frame is not None:
             masked_frame = self.applyMask(video_frame, mask_frame)
 
-        preview_frame: np.ndarray | None = None
+        return_frame: np.ndarray | None = None
         if self.previewType == PreviewType.VIDEO:
-            preview_frame = video_frame
+            return_frame = video_frame
         if self.previewType == PreviewType.MONO:
-            preview_frame = mono_frame
+            return_frame = mono_frame
         if self.previewType == PreviewType.STEREO:
-            preview_frame = stereo_frame
+            return_frame = stereo_frame
         if self.previewType == PreviewType.MASK:
-            preview_frame = mask_frame
+            return_frame = mask_frame
         if self.previewType == PreviewType.MASKED:
-            preview_frame = masked_frame
-        if preview_frame is None:
-            preview_frame = self.errorFrame
+            return_frame = masked_frame
+        if return_frame is None:
+            return_frame = self.errorFrame
 
-        for c in self.previewCallbacks:
-            c(preview_frame)
+        return_frame = self.flip(return_frame)
+
+        for c in self.frameCallbacks:
+            c(return_frame)
 
     def updateStereo(self, frame: np.ndarray) -> np.ndarray:
-        cvFrame: np.ndarray = (frame * (255 / 95)).astype(np.uint8)
-        for c in self.stereoCallbacks:
-            c(cvFrame)
-        return cvFrame
+        return (frame * (255 / 95)).astype(np.uint8)
 
     def updateMask(self, frame: np.ndarray) -> np.ndarray:
         _, binary_mask = cv2.threshold(frame, 10, 255, cv2.THRESH_BINARY)
         return binary_mask
 
     def applyMask(self, color: np.ndarray, mask: np.ndarray) -> np.ndarray:
-        # multiply the color image with the mask
-        masked_frame = cv2.bitwise_and(color, color, mask=mask)
-        return masked_frame
+        return cv2.bitwise_and(color, color, mask=mask)
+
+    def flip(self, frame: np.ndarray) -> np.ndarray:
+        if self.flipH and self.flipV:
+            return cv2.flip(frame, -1)
+        if self.flipH:
+            return cv2.flip(frame, 1)
+        if self.flipV:
+            return cv2.flip(frame, 0)
+        return frame
 
     def updateControlValues(self, frame) -> None:
         if (self.autoExposure):
@@ -422,29 +423,12 @@ class DepthAi():
         self.zoom = zoom
         self.updateWarp()
 
-    def addColorCallback(self, callback) -> None:
-        self.colorCallbacks.append(callback)
 
-    def clearColorCallbacks(self) -> None:
-        self.colorCallbacks = []
+    def addFrameCallback(self, callback) -> None:
+        self.frameCallbacks.add(callback)
 
-    def addStereoCallback(self, callback) -> None:
-        self.stereoCallbacks.append(callback)
-
-    def clearStereoCallbacks(self) -> None:
-        self.stereoCallbacks = []
-
-    def addMonoCallback(self, callback) -> None:
-        self.monoCallbacks.append(callback)
-
-    def clearMonoCallbacks(self) -> None:
-        self.monoCallbacks = []
-
-    def addPreviewCallback(self, callback) -> None:
-        self.previewCallbacks.append(callback)
-
-    def clearPreviewCallbacks(self) -> None:
-        self.previewCallbacks = []
+    def clearFrameCallbacks(self) -> None:
+        self.frameCallbacks = set()
 
 
 
