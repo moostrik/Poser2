@@ -4,13 +4,9 @@
 import cv2
 import numpy as np
 import depthai as dai
-from threading import Lock
 from datetime import timedelta
-import time
 from PIL import Image, ImageOps
 from enum import Enum
-
-RGB_SOCKET: dai.CameraBoardSocket = dai.CameraBoardSocket.CAM_A
 
 class PreviewType(Enum):
     NONE =  0
@@ -42,27 +38,9 @@ def fit(image: np.ndarray, width, height) -> np.ndarray:
     fit_image = ImageOps.fit(pil_image, size)
     return np.asarray(fit_image)
 
-def makeWarpList(flipH: bool, flipV:bool, rotate90:bool, zoom: float, offset: tuple[float,float], perspective: tuple[float,float]) -> list[dai.Point2f]:
-    z:float = (zoom-1.0) * 0.25
-    Lz:float = 0.0+z
-    Hz:float = 1.0-z
-    Ox: float = offset[0] * z
-    Oy: float = offset[1] * z
-    W = np.array([[Lz+Ox,Lz+Oy],[Hz+Ox,Lz+Oy],[Hz+Ox,Hz+Oy],[Lz+Ox,Hz+Oy]])
-    P = np.array([[-perspective[0],-perspective[1]],[perspective[0],perspective[1]],[-perspective[0],-perspective[1]],[perspective[0],perspective[1]]])
-    W += P
-    if (rotate90):
-        W = [W[3],W[0],W[1],W[2]]
-    if flipH:
-        W = [W[3],W[2],W[1],W[0]]
-    if flipV:
-        W = [W[1],W[0],W[3],W[2]]
-    dW: list[dai.Point2f] = [dai.Point2f(W[0][0], W[0][1]), dai.Point2f(W[1][0], W[1][1]),dai.Point2f(W[2][0], W[2][1]),dai.Point2f(W[3][0], W[3][1])]
-    return dW
-
-def setupStereo(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
-    monoLeft: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
-    monoRight: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+def setupStereo(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> None:
+    left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+    right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     color: dai.node.Camera = pipeline.create(dai.node.Camera)
     stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
     sync: dai.node.Sync = pipeline.create(dai.node.Sync)
@@ -78,71 +56,12 @@ def setupStereo(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
     outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
     outputImages.setStreamName("output_images")
 
-    monoLeft.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
-    monoLeft.setCamera("left")
-    monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
-    monoRight.setCamera("right")
-
-    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-    stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
-    stereo.setLeftRightCheck(True)
-    stereo.setExtendedDisparity(False)
-    stereo.setSubpixel(False)
-    stereo.setDepthAlign(RGB_SOCKET)
-
     color.setCamera("color")
-    color.setBoardSocket(RGB_SOCKET)
     color.setSize(1280, 720)
-    # color.setResolution(dai.ColorCameraProperties.SensorResolution.THE_720_P)
+    color.setFps(fps)
     color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
-
-    sync.setSyncThreshold(timedelta(milliseconds=50))
-
-    monoLeft.out.link(stereo.left)
-    monoRight.out.link(stereo.right)
-
-    stereo.disparity.link(sync.inputs["stereo"])
-    color.video.link(sync.inputs["video"])
-    if addMonoOutput:
-        monoLeft.out.link(sync.inputs["mono"])
-
-    sync.out.link(outputImages.input)
-
-def setupStereo2(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
-    fps = 30
-    # The disparity is computed at this resolution, then upscaled to RGB resolution
-    monoResolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
-
-    # Define sources and outputs
-    camRgb = pipeline.create(dai.node.Camera)
-    left = pipeline.create(dai.node.MonoCamera)
-    right = pipeline.create(dai.node.MonoCamera)
-    stereo = pipeline.create(dai.node.StereoDepth)
-    sync: dai.node.Sync = pipeline.create(dai.node.Sync)
-
-    colorControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-    colorControl.setStreamName('color_control')
-    colorControl.out.link(camRgb.inputControl)
-
-    stereoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-    stereoControl.setStreamName('stereo_control')
-    stereoControl.out.link(stereo.inputConfig)
-
-    outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
-    outputImages.setStreamName("output_images")
-    # rgbOut = pipeline.create(dai.node.XLinkOut)
-    # disparityOut = pipeline.create(dai.node.XLinkOut)
-
-    # rgbOut.setStreamName("rgb")
-    # queueNames.append("rgb")
-    # disparityOut.setStreamName("disp")
-    # queueNames.append("disp")
-
-    camRgb.setBoardSocket(RGB_SOCKET)
-    camRgb.setSize(1280, 720)
-    camRgb.setFps(fps)
-
-    # For now, RGB needs fixed focus to properly align with depth.
+    # color.setBoardSocket(socket)
+        # For now, RGB needs fixed focus to properly align with depth.
     # This value was used during calibration
     # try:
     #     calibData = readCalibration2()
@@ -151,33 +70,28 @@ def setupStereo2(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
     #         camRgb.initialControl.setManualFocus(lensPosition)
     # except:
     #     raise
-    left.setResolution(monoResolution)
+
     left.setCamera("left")
+    left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
     left.setFps(fps)
-    right.setResolution(monoResolution)
     right.setCamera("right")
+    right.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
     right.setFps(fps)
 
-    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.DEFAULT)
-    # LR-check is required for depth alignment
+    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+    stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
     stereo.setLeftRightCheck(True)
-    stereo.setDepthAlign(RGB_SOCKET)
-
-    # Linking
-    # camRgb.video.link(rgbOut.input)
-    left.out.link(stereo.left)
-    right.out.link(stereo.right)
-    # stereo.disparity.link(disparityOut.input)
-
-    camRgb.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
-    # if alpha is not None:
-    #     camRgb.setCalibrationAlpha(alpha)
-    #     stereo.setAlphaScaling(alpha)
-
+    stereo.setExtendedDisparity(False)
+    stereo.setSubpixel(False)
+    stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
 
     sync.setSyncThreshold(timedelta(milliseconds=50))
+
+    left.out.link(stereo.left)
+    right.out.link(stereo.right)
+
     stereo.disparity.link(sync.inputs["stereo"])
-    camRgb.video.link(sync.inputs["video"])
+    color.video.link(sync.inputs["video"])
     if addMonoOutput:
         left.out.link(sync.inputs["mono"])
 
@@ -188,8 +102,8 @@ class DepthAi():
     def __init__(self, doMono: bool = True) -> None:
 
         self.previewType: PreviewType = PreviewType.VIDEO
-
         self.doMono: bool = doMono
+        self.fps = 30
 
         self.frameCallbacks: set = set()
 
@@ -198,7 +112,7 @@ class DepthAi():
         self.flipH: bool = False
         self.flipV: bool = False
         self.rotate90: bool = False
-        self.errorFrame:   np.ndarray = np.zeros((self.outHeight, self.outWidth, 3), dtype=np.uint8)
+        self.errorFrame:   np.ndarray = np.zeros((720, 1280, 3), dtype=np.uint8)
         self.errorFrame[:,:,2] = 255
 
         # COLOR SETTINGS
@@ -233,7 +147,7 @@ class DepthAi():
         if self.deviceOpen: return True
 
         pipeline = dai.Pipeline()
-        setupStereo(pipeline, self.doMono)
+        setupStereo(pipeline, self.fps, self.doMono)
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:
@@ -421,21 +335,11 @@ class DepthAi():
         self.device.setIrLaserDotProjectorIntensity(v)
 
 
-    def setDepthTresholdMin(self, value: int) -> None:
-        self.depthTresholdMin = value
-        return
-        if not self.deviceOpen: return
-        v: int = int(clamp(value, stereoDepthRange))
-        self.stereoConfig.postProcessing.thresholdFilter.minRange = v
-        self.stereoControl.send(self.stereoConfig)
+    def setDepthTresholdMin(self, value: float) -> None:
+        self.depthTresholdMin = int(value * 255)
 
-    def setDepthTresholdMax(self, value: int) -> None:
-        self.depthTresholdMax = value
-        return
-        if not self.deviceOpen: return
-        v: int = int(clamp(value, stereoDepthRange))
-        self.stereoConfig.postProcessing.thresholdFilter.maxRange = v
-        self.stereoControl.send(self.stereoConfig)
+    def setDepthTresholdMax(self, value: float) -> None:
+        self.depthTresholdMax = int(value * 255)
 
     def setStereoMinBrightness(self, value: int) -> None:
         return

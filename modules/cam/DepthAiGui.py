@@ -24,16 +24,16 @@ class DepthAiGui(Cam):
                      E(eT.TEXT, 'Iso'),
                      E(eT.SLDR, 'Iso',          super().setIso,                 0,          isoRange,       50)])
         elem.append([E(eT.TEXT, 'Stereo  Min'),
-                     E(eT.SLDR, 'StereoMin',    super().setDepthTresholdMin,    stereoDepthRange[0],        stereoDepthRange,     50),
+                     E(eT.SLDR, 'StereoMin',    super().setDepthTresholdMin,    0, [0,1], 0.05),
                      E(eT.TEXT, 'Max'),
-                     E(eT.SLDR, 'StereoMax',    super().setDepthTresholdMax,    stereoDepthRange[1],        stereoDepthRange,     50)])
-        elem.append([E(eT.TEXT, 'Stereo Brgs'),
-                     E(eT.SLDR, 'B_Filter',     super().setStereoMinBrightness,  stereoBrightnessRange[0],   stereoBrightnessRange, 1)])
+                     E(eT.SLDR, 'StereoMax',    super().setDepthTresholdMax,    0, [0,1], 0.05)])
+        # elem.append([E(eT.TEXT, 'Stereo Brgs'),
+        #              E(eT.SLDR, 'B_Filter',     super().setStereoMinBrightness, 0, [0,1], 0.05)])
 
         elem.append([E(eT.TEXT, 'IR     Grid'),
-                     E(eT.SLDR, 'LightGrid',    self.setIrGridLight,           0, [0,1], 0.05),
+                     E(eT.SLDR, 'LightGrid',    self.setIrGridLight,            0, [0,1], 0.05),
                      E(eT.TEXT, 'Fld'),
-                     E(eT.SLDR, 'LightFlood',   self.setIrFloodLight,          0, [0,1], 0.05)])
+                     E(eT.SLDR, 'LightFlood',   self.setIrFloodLight,           0, [0,1], 0.05)])
 
         self.color_frame = Frame('CAMERA', elem, 200)
 
