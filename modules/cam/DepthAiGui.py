@@ -2,8 +2,8 @@ from cv2 import ROTATE_180, ROTATE_90_CLOCKWISE, ROTATE_90_COUNTERCLOCKWISE
 
 from modules.cam.DepthAi import DepthAi as Cam
 from modules.cam.DepthAi import PreviewType, PreviewTypeNames
-from modules.cam.DepthAi import exposureRange, isoRange, focusRange, whiteBalanceRange
-from modules.cam.DepthAi import depthDecimationRange, depthSpeckleRange, depthTresholdRange, depthHoleFillingRange, depthHoleIterRange, depthTempPersistRange, depthDisparityRange
+from modules.cam.DepthAi import exposureRange, isoRange, whiteBalanceRange
+from modules.cam.DepthAi import stereoDepthRange, stereoBrightnessRange
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
 
@@ -24,9 +24,11 @@ class DepthAiGui(Cam):
                      E(eT.TEXT, 'Iso'),
                      E(eT.SLDR, 'Iso',          super().setIso,                 0,          isoRange,       50)])
         elem.append([E(eT.TEXT, 'Stereo  Min'),
-                     E(eT.SLDR, 'StereoMin',    super().setDepthTresholdMin,    depthTresholdRange[0],      depthTresholdRange,     50),
+                     E(eT.SLDR, 'StereoMin',    super().setDepthTresholdMin,    stereoDepthRange[0],        stereoDepthRange,     50),
                      E(eT.TEXT, 'Max'),
-                     E(eT.SLDR, 'StereoMax',    super().setDepthTresholdMax,    depthTresholdRange[1],      depthTresholdRange,     50)])
+                     E(eT.SLDR, 'StereoMax',    super().setDepthTresholdMax,    stereoDepthRange[1],        stereoDepthRange,     50)])
+        elem.append([E(eT.TEXT, 'Stereo Brgs'),
+                     E(eT.SLDR, 'B_Filter',     super().setStereoMinBrightness,  stereoBrightnessRange[0],   stereoBrightnessRange, 1)])
 
         elem.append([E(eT.TEXT, 'IR     Grid'),
                      E(eT.SLDR, 'LightGrid',    self.setIrGridLight,           0, [0,1], 0.05),
@@ -36,18 +38,6 @@ class DepthAiGui(Cam):
         self.color_frame = Frame('CAMERA', elem, 200)
 
         elem: list = []
-        elem.append([E(eT.TEXT, 'Decimation'),
-                     E(eT.SLDR, 'Decimation',   super().setDepthDecimation,     depthDecimationRange[0],    depthDecimationRange,   1),
-                     E(eT.TEXT, 'Speckle'),
-                     E(eT.SLDR, 'Speckle',      super().setDepthSpeckle,        depthSpeckleRange[0],       depthSpeckleRange,      1),])
-        elem.append([E(eT.TEXT, 'Hole Size'),
-                     E(eT.SLDR, 'Hole Size',    super().setDepthHoleFilling,    depthHoleFillingRange[0],   depthHoleFillingRange,  1),
-                     E(eT.TEXT, 'Iterations'),
-                     E(eT.SLDR, 'Iterations',   super().setDepthHoleIter,       depthHoleIterRange[0],      depthHoleIterRange,     1)])
-        elem.append([E(eT.TEXT, 'Temp Persist'),
-                     E(eT.SLDR, 'Persistence',  super().setDepthTempPersist,    depthTempPersistRange[0],   depthTempPersistRange,  1),
-                     E(eT.TEXT, 'Disparity'),
-                     E(eT.SLDR, 'Disparity',    super().setDepthDisparityShift, depthDisparityRange[0],     depthDisparityRange,  1)])
         self.stereo_frame = Frame('STEREO', elem, 100)
 
 

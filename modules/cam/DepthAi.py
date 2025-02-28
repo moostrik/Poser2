@@ -1,3 +1,6 @@
+# DOCS
+# https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
+
 import cv2
 import numpy as np
 import depthai as dai
@@ -17,18 +20,12 @@ class PreviewType(Enum):
 
 PreviewTypeNames: list[str] = [e.name for e in PreviewType]
 
-exposureRange: tuple[int, int] =    (1000, 33000)
-isoRange: tuple[int, int] =         ( 100, 1600 )
-focusRange: tuple[int, int] =       (   0, 255  )
-whiteBalanceRange: tuple[int, int]= (1000, 12000)
+exposureRange:          tuple[int, int] = (1000, 33000)
+isoRange:               tuple[int, int] = ( 100, 1600 )
+whiteBalanceRange:      tuple[int, int] = (1000, 12000)
 
-depthDecimationRange: tuple[int, int]=  (   0, 4    )
-depthSpeckleRange: tuple[int, int]=     (   0, 50   )
-depthHoleFillingRange: tuple[int, int]= (   0, 4    )
-depthHoleIterRange: tuple[int, int]=    (   1, 4    )
-depthTempPersistRange: tuple[int, int]= (   0, 8    )
-depthTresholdRange: tuple[int, int]=    ( 500, 15000)
-depthDisparityRange: tuple[int, int]=   (   0, 48   )
+stereoDepthRange:    tuple[int, int] = ( 500, 15000)
+stereoBrightnessRange:  tuple[int, int] = (   0, 255  )
 
 def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | float:
     return max(size[0], min(num, size[1]))
@@ -84,7 +81,7 @@ def setupStereo(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
     monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
     monoRight.setCamera("right")
 
-    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.ROBOTICS)
     stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
     stereo.setLeftRightCheck(True)
     stereo.setExtendedDisparity(False)
@@ -132,14 +129,7 @@ class DepthAi():
         self.whiteBalance: int      = 0
 
         # DEPTH SETTINGS
-        self.depthDecimation: int   = depthDecimationRange[0]
-        self.depthSpeckle: int      = depthSpeckleRange[0]
-        self.depthHoleFilling: int  = depthHoleFillingRange[0]
-        self.depthHoleIter: int     = depthHoleIterRange[0]
-        self.depthTempPersist: int  = depthTempPersistRange[0]
-        self.depthTresholdMin: int  = depthTresholdRange[0]
-        self.depthTresholdMax: int  = depthTresholdRange[1]
-        self.depthDispShift: int    = depthDisparityRange[0]
+        self.stereoConfig = dai.RawStereoDepthConfig()
 
         # DAI
         self.device:        dai.Device
@@ -342,63 +332,28 @@ class DepthAi():
         v: float = clamp(value, (0.0, 1.0))
         self.device.setIrLaserDotProjectorIntensity(v)
 
-    def updateDepthControl(self) -> None:
-        if not self.deviceOpen: return
-        cnfg = dai.RawStereoDepthConfig()
-        cnfg.postProcessing.decimationFilter.decimationFactor = self.depthDecimation
-        cnfg.postProcessing.speckleFilter.enable = self.depthSpeckle > 0
-        cnfg.postProcessing.speckleFilter.speckleRange = self.depthSpeckle
-        cnfg.postProcessing.spatialFilter.enable = self.depthHoleFilling >0
-        cnfg.postProcessing.spatialFilter.holeFillingRadius = self.depthHoleFilling
-        cnfg.postProcessing.spatialFilter.numIterations = self.depthHoleIter
-        cnfg.postProcessing.thresholdFilter.minRange = self.depthTresholdMin
-        cnfg.postProcessing.thresholdFilter.maxRange = self.depthTresholdMax
-        cnfg.postProcessing.temporalFilter.enable = self.depthTempPersist > 0
-        cnfg.postProcessing.temporalFilter.persistencyMode = cnfg.postProcessing.temporalFilter.persistencyMode.PERSISTENCY_OFF
-        if   self.depthTempPersist == 1: cnfg.postProcessing.temporalFilter.persistencyMode = cnfg.postProcessing.temporalFilter.persistencyMode.VALID_1_IN_LAST_2
-        elif self.depthTempPersist == 2: cnfg.postProcessing.temporalFilter.persistencyMode = cnfg.postProcessing.temporalFilter.persistencyMode.VALID_1_IN_LAST_5
-        elif self.depthTempPersist == 3: cnfg.postProcessing.temporalFilter.persistencyMode = cnfg.postProcessing.temporalFilter.persistencyMode.VALID_1_IN_LAST_8
-        elif self.depthTempPersist == 4: cnfg.postProcessing.temporalFilter.persistencyMode = cnfg.postProcessing.temporalFilter.persistencyMode.VALID_2_IN_LAST_3
-        elif self.depthTempPersist == 5: cnfg.postProcessing.temporalFilter.persistencyMode = cnfg.postProcessing.temporalFilter.persistencyMode.VALID_2_IN_LAST_4
-        elif self.depthTempPersist == 6: cnfg.postProcessing.temporalFilter.persistencyMode = cnfg.postProcessing.temporalFilter.persistencyMode.VALID_2_OUT_OF_8
-        elif self.depthTempPersist == 7: cnfg.postProcessing.temporalFilter.persistencyMode = cnfg.postProcessing.temporalFilter.persistencyMode.VALID_8_OUT_OF_8
-
-        cnfg.algorithmControl.disparityShift = self.depthDispShift
-
-        self.stereoControl.send(cnfg)
-
-    def setDepthDecimation(self, value: int) -> None:
-        self.depthDecimation = int(clamp(value, depthDecimationRange))
-        self.updateDepthControl()
-
-    def setDepthSpeckle(self, value: int) -> None:
-        self.depthSpeckle = int(clamp(value, depthSpeckleRange))
-        self.updateDepthControl()
-
-    def setDepthHoleFilling(self, value: int) -> None:
-        self.depthHoleFilling = int(clamp(value, depthHoleFillingRange))
-        self.updateDepthControl()
-
-    def setDepthHoleIter(self, value: int) -> None:
-        self.depthHoleIter = int(clamp(value, depthHoleIterRange))
-        self.updateDepthControl()
-
-    def setDepthTempPersist(self, value: int) -> None:
-        self.depthTempPersist = int(clamp(value, depthTempPersistRange))
-        self.updateDepthControl()
 
     def setDepthTresholdMin(self, value: int) -> None:
-        self.depthTresholdMin = int(clamp(value, depthTresholdRange))
-        self.updateDepthControl()
+        if not self.deviceOpen: return
+        v: int = int(clamp(value, stereoDepthRange))
+        self.stereoConfig.postProcessing.thresholdFilter.minRange = v
+        self.stereoControl.send(self.stereoConfig)
 
     def setDepthTresholdMax(self, value: int) -> None:
-        self.depthTresholdMax = int(clamp(value, depthTresholdRange))
-        self.updateDepthControl()
+        if not self.deviceOpen: return
+        v: int = int(clamp(value, stereoDepthRange))
+        self.stereoConfig.postProcessing.thresholdFilter.maxRange = v
+        self.stereoControl.send(self.stereoConfig)
 
-    def setDepthDisparityShift(self, value: int) -> None:
-        self.depthDispShift = int(clamp(value, depthDisparityRange))
-        self.updateDepthControl()
+    def setStereoMinBrightness(self, value: int) -> None:
+        if not self.deviceOpen: return
+        v: int = int(clamp(value, stereoBrightnessRange))
+        self.stereoConfig.postProcessing.brightnessFilter.minBrightness = v
+        self.stereoControl.send(self.stereoConfig)
 
+    def setStereoConfidence(self, value: float) -> None:
+        self.stereoConfig.algorithmControl.leftRightCheckThreshold
+        pass
 
     def setFlipH(self, flipH: bool) -> None:
         self.flipH = flipH

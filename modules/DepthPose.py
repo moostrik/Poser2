@@ -40,7 +40,7 @@ class DepthPose():
         self.render.start()
 
         self.gui.exit_callback = self.stop
-        self.gui.addFrame([self.camera.get_color_frame(), self.camera.get_stereo_frame()])
+        self.gui.addFrame([self.camera.get_color_frame()])
         self.gui.start()
 
         self._running = True
