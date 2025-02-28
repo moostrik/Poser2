@@ -1,1 +1,1 @@
-{"Preview": "STEREO", "FlipH": true, "FlipV": false, "Balance ": false, "Bal": 2600.0, "Exposure": false, "Exp": 30000.0, "Iso": 1600.0, "StereoMin": 500.0, "StereoMax": 15000.0, "B_Filter": 33.0, "LightGrid": 0.2, "LightFlood": 0.0, "SettingsFile": "default"}
+{"Preview": "STEREO", "FlipH": true, "FlipV": false, "Balance ": false, "Bal": 2600.0, "Exposure": false, "Exp": 10000.0, "Iso": 100.0, "StereoMin": 500.0, "StereoMax": 2100.0, "B_Filter": 10.0, "LightGrid": 0.3, "LightFlood": 0.0, "SettingsFile": "default"}

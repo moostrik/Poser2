@@ -10,6 +10,8 @@ import time
 from PIL import Image, ImageOps
 from enum import Enum
 
+RGB_SOCKET: dai.CameraBoardSocket = dai.CameraBoardSocket.CAM_A
+
 class PreviewType(Enum):
     NONE =  0
     VIDEO = 1
@@ -88,6 +90,7 @@ def setupStereo(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
     stereo.setSubpixel(False)
 
     color.setCamera("color")
+    # color.setBoardSocket(RGB_SOCKET)
     color.setResolution(dai.ColorCameraProperties.SensorResolution.THE_720_P)
 
     sync.setSyncThreshold(timedelta(milliseconds=50))
@@ -101,6 +104,82 @@ def setupStereo(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
         monoLeft.out.link(sync.inputs["mono"])
 
     sync.out.link(outputImages.input)
+
+def setupStereo2(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
+    fps = 30
+    # The disparity is computed at this resolution, then upscaled to RGB resolution
+    monoResolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
+
+    # Define sources and outputs
+    camRgb = pipeline.create(dai.node.Camera)
+    left = pipeline.create(dai.node.MonoCamera)
+    right = pipeline.create(dai.node.MonoCamera)
+    stereo = pipeline.create(dai.node.StereoDepth)
+    sync: dai.node.Sync = pipeline.create(dai.node.Sync)
+
+    colorControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+    colorControl.setStreamName('color_control')
+    colorControl.out.link(camRgb.inputControl)
+
+    stereoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+    stereoControl.setStreamName('stereo_control')
+    stereoControl.out.link(stereo.inputConfig)
+
+    outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+    outputImages.setStreamName("output_images")
+    # rgbOut = pipeline.create(dai.node.XLinkOut)
+    # disparityOut = pipeline.create(dai.node.XLinkOut)
+
+    # rgbOut.setStreamName("rgb")
+    # queueNames.append("rgb")
+    # disparityOut.setStreamName("disp")
+    # queueNames.append("disp")
+
+    camRgb.setBoardSocket(RGB_SOCKET)
+    camRgb.setSize(1280, 720)
+    camRgb.setFps(fps)
+
+    # For now, RGB needs fixed focus to properly align with depth.
+    # This value was used during calibration
+    # try:
+    #     calibData = readCalibration2()
+    #     lensPosition = calibData.getLensPosition(RGB_SOCKET)
+    #     if lensPosition:
+    #         camRgb.initialControl.setManualFocus(lensPosition)
+    # except:
+    #     raise
+    left.setResolution(monoResolution)
+    left.setCamera("left")
+    left.setFps(fps)
+    right.setResolution(monoResolution)
+    right.setCamera("right")
+    right.setFps(fps)
+
+    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.ROBOTICS)
+    # LR-check is required for depth alignment
+    stereo.setLeftRightCheck(True)
+    stereo.setDepthAlign(RGB_SOCKET)
+
+    # Linking
+    # camRgb.video.link(rgbOut.input)
+    left.out.link(stereo.left)
+    right.out.link(stereo.right)
+    # stereo.disparity.link(disparityOut.input)
+
+    camRgb.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
+    # if alpha is not None:
+    #     camRgb.setCalibrationAlpha(alpha)
+    #     stereo.setAlphaScaling(alpha)
+
+
+    sync.setSyncThreshold(timedelta(milliseconds=50))
+    stereo.disparity.link(sync.inputs["stereo"])
+    camRgb.video.link(sync.inputs["video"])
+    if addMonoOutput:
+        left.out.link(sync.inputs["mono"])
+
+    sync.out.link(outputImages.input)
+
 
 class DepthAi():
     def __init__(self, doMono: bool = True) -> None:
@@ -235,6 +314,7 @@ class DepthAi():
             c(return_frame)
 
     def updateStereo(self, frame: np.ndarray) -> np.ndarray:
+        # return (frame * 255. / 95.).astype(np.uint8)
         return (frame * (255 / 95)).astype(np.uint8)
 
     def updateMask(self, frame: np.ndarray) -> np.ndarray:
@@ -334,26 +414,26 @@ class DepthAi():
 
 
     def setDepthTresholdMin(self, value: int) -> None:
+        return
         if not self.deviceOpen: return
         v: int = int(clamp(value, stereoDepthRange))
         self.stereoConfig.postProcessing.thresholdFilter.minRange = v
         self.stereoControl.send(self.stereoConfig)
 
     def setDepthTresholdMax(self, value: int) -> None:
+        return
         if not self.deviceOpen: return
         v: int = int(clamp(value, stereoDepthRange))
         self.stereoConfig.postProcessing.thresholdFilter.maxRange = v
         self.stereoControl.send(self.stereoConfig)
 
     def setStereoMinBrightness(self, value: int) -> None:
+        return
         if not self.deviceOpen: return
         v: int = int(clamp(value, stereoBrightnessRange))
         self.stereoConfig.postProcessing.brightnessFilter.minBrightness = v
         self.stereoControl.send(self.stereoConfig)
 
-    def setStereoConfidence(self, value: float) -> None:
-        self.stereoConfig.algorithmControl.leftRightCheckThreshold
-        pass
 
     def setFlipH(self, flipH: bool) -> None:
         self.flipH = flipH
