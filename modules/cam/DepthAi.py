@@ -26,7 +26,7 @@ exposureRange:          tuple[int, int] = (1000, 33000)
 isoRange:               tuple[int, int] = ( 100, 1600 )
 whiteBalanceRange:      tuple[int, int] = (1000, 12000)
 
-stereoDepthRange:    tuple[int, int] = ( 500, 15000)
+stereoDepthRange:    tuple[int, int] = ( 0, 255)
 stereoBrightnessRange:  tuple[int, int] = (   0, 255  )
 
 def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | float:
@@ -63,7 +63,7 @@ def makeWarpList(flipH: bool, flipV:bool, rotate90:bool, zoom: float, offset: tu
 def setupStereo(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
     monoLeft: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     monoRight: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
-    color: dai.node.ColorCamera = pipeline.create(dai.node.ColorCamera)
+    color: dai.node.Camera = pipeline.create(dai.node.Camera)
     stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
     sync: dai.node.Sync = pipeline.create(dai.node.Sync)
 
@@ -83,15 +83,18 @@ def setupStereo(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
     monoRight.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
     monoRight.setCamera("right")
 
-    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.ROBOTICS)
+    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
     stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
     stereo.setLeftRightCheck(True)
     stereo.setExtendedDisparity(False)
     stereo.setSubpixel(False)
+    stereo.setDepthAlign(RGB_SOCKET)
 
     color.setCamera("color")
-    # color.setBoardSocket(RGB_SOCKET)
-    color.setResolution(dai.ColorCameraProperties.SensorResolution.THE_720_P)
+    color.setBoardSocket(RGB_SOCKET)
+    color.setSize(1280, 720)
+    # color.setResolution(dai.ColorCameraProperties.SensorResolution.THE_720_P)
+    color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
 
     sync.setSyncThreshold(timedelta(milliseconds=50))
 
@@ -155,7 +158,7 @@ def setupStereo2(pipeline : dai.Pipeline, addMonoOutput:bool = False) -> None:
     right.setCamera("right")
     right.setFps(fps)
 
-    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.ROBOTICS)
+    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.DEFAULT)
     # LR-check is required for depth alignment
     stereo.setLeftRightCheck(True)
     stereo.setDepthAlign(RGB_SOCKET)
@@ -209,6 +212,9 @@ class DepthAi():
 
         # DEPTH SETTINGS
         self.stereoConfig = dai.RawStereoDepthConfig()
+
+        self.depthTresholdMin: int = 0
+        self.depthTresholdMax: int = 255
 
         # DAI
         self.device:        dai.Device
@@ -318,7 +324,9 @@ class DepthAi():
         return (frame * (255 / 95)).astype(np.uint8)
 
     def updateMask(self, frame: np.ndarray) -> np.ndarray:
-        _, binary_mask = cv2.threshold(frame, 10, 255, cv2.THRESH_BINARY)
+        min: int = self.depthTresholdMin
+        max: int = self.depthTresholdMax
+        _, binary_mask = cv2.threshold(frame, min, max, cv2.THRESH_BINARY)
         return binary_mask
 
     def applyMask(self, color: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -414,6 +422,7 @@ class DepthAi():
 
 
     def setDepthTresholdMin(self, value: int) -> None:
+        self.depthTresholdMin = value
         return
         if not self.deviceOpen: return
         v: int = int(clamp(value, stereoDepthRange))
@@ -421,6 +430,7 @@ class DepthAi():
         self.stereoControl.send(self.stereoConfig)
 
     def setDepthTresholdMax(self, value: int) -> None:
+        self.depthTresholdMax = value
         return
         if not self.deviceOpen: return
         v: int = int(clamp(value, stereoDepthRange))
