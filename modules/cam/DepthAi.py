@@ -191,7 +191,7 @@ class DepthAi():
         if self.deviceOpen: return True
 
         pipeline = dai.Pipeline()
-        setupStereoLeft(pipeline, self.fps, self.doMono)
+        setupStereoColor(pipeline, self.fps, self.doMono)
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:
