@@ -39,7 +39,7 @@ def fit(image: np.ndarray, width, height) -> np.ndarray:
     fit_image = ImageOps.fit(pil_image, size)
     return np.asarray(fit_image)
 
-def setupStereo(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> None:
+def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> None:
     color: dai.node.Camera = pipeline.create(dai.node.Camera)
     left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
@@ -98,7 +98,7 @@ def setupStereo(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = Fal
 
     sync.out.link(outputImages.input)
 
-def setupStereoLeft(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> None:
+def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> None:
     left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
@@ -114,17 +114,11 @@ def setupStereoLeft(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool =
     outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
     outputImages.setStreamName("output_images")
 
-
-
     left.setCamera("left")
-    # left.setSize(1280, 720)
-    # left.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
     left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
     left.setFps(fps)
 
     right.setCamera("right")
-    # right.setSize(1280, 720)
-    # right.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
     right.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
     right.setFps(fps)
 
@@ -142,7 +136,8 @@ def setupStereoLeft(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool =
 
     stereo.disparity.link(sync.inputs["stereo"])
     stereo.rectifiedLeft.link(sync.inputs["video"])
-    left.out.link(sync.inputs["mono"])
+    if addMonoOutput:
+        left.out.link(sync.inputs["mono"])
 
     sync.out.link(outputImages.input)
 
@@ -152,7 +147,7 @@ class DepthAi():
 
         self.previewType: PreviewType = PreviewType.VIDEO
         self.doMono: bool = doMono
-        self.fps = 30
+        self.fps = 60
 
         self.frameCallbacks: set = set()
 
@@ -259,6 +254,7 @@ class DepthAi():
 
         if stereo_frame is not None:
             mask_frame = self.updateMask(stereo_frame)
+            stereo_frame = cv2.applyColorMap(stereo_frame, cv2.COLORMAP_JET)
 
         if video_frame is not None and mask_frame is not None:
             masked_frame = self.applyMask(video_frame, mask_frame)
