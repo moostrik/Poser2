@@ -27,8 +27,8 @@ class DepthAiGui(Cam):
                      E(eT.SLDR, 'StereoMin',    super().setDepthTresholdMin,    0, [0,1], 0.05),
                      E(eT.TEXT, 'Max'),
                      E(eT.SLDR, 'StereoMax',    super().setDepthTresholdMax,    0, [0,1], 0.05)])
-        # elem.append([E(eT.TEXT, 'Stereo Brgs'),
-        #              E(eT.SLDR, 'B_Filter',     super().setStereoMinBrightness, 0, [0,1], 0.05)])
+        elem.append([E(eT.TEXT, 'Stereo Brgs'),
+                     E(eT.SLDR, 'B_Filter',     super().setStereoMinBrightness, 0, [0,1], 0.05)])
 
         elem.append([E(eT.TEXT, 'IR     Grid'),
                      E(eT.SLDR, 'LightGrid',    self.setIrGridLight,            0, [0,1], 0.05),

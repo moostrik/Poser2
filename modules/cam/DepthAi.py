@@ -2,6 +2,13 @@
 # https://oak-web.readthedocs.io/
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
+# TODO
+# all controls
+# Contrast Mono
+# gui fixes
+
+# openPose
+
 import cv2
 import numpy as np
 import depthai as dai
@@ -23,7 +30,7 @@ exposureRange:          tuple[int, int] = (1000, 33000)
 isoRange:               tuple[int, int] = ( 100, 1600 )
 whiteBalanceRange:      tuple[int, int] = (1000, 12000)
 
-stereoDepthRange:    tuple[int, int] = ( 0, 255)
+stereoDepthRange:    tuple[int, int] = ( 500, 15000)
 stereoBrightnessRange:  tuple[int, int] = (   0, 255  )
 
 def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | float:
@@ -39,7 +46,7 @@ def fit(image: np.ndarray, width, height) -> np.ndarray:
     fit_image = ImageOps.fit(pil_image, size)
     return np.asarray(fit_image)
 
-def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> None:
+def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> dai.RawStereoDepthConfig:
     color: dai.node.Camera = pipeline.create(dai.node.Camera)
     left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
@@ -49,6 +56,10 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool 
     colorControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     colorControl.setStreamName('color_control')
     colorControl.out.link(color.inputControl)
+
+    monoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+    monoControl.setStreamName('mono_control')
+    monoControl.out.link(color.inputControl)
 
     stereoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     stereoControl.setStreamName('stereo_control')
@@ -86,6 +97,10 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool 
     stereo.setSubpixel(False)
     stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
 
+    config: dai.RawStereoDepthConfig = stereo.initialConfig.get()
+    config.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
+    stereo.initialConfig.set(config)
+
     sync.setSyncThreshold(timedelta(milliseconds=50))
 
     left.out.link(stereo.left)
@@ -97,8 +112,9 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool 
         left.out.link(sync.inputs["mono"])
 
     sync.out.link(outputImages.input)
+    return stereo.initialConfig.get()
 
-def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> None:
+def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> dai.RawStereoDepthConfig:
     left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
@@ -140,6 +156,8 @@ def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool =
         left.out.link(sync.inputs["mono"])
 
     sync.out.link(outputImages.input)
+    # return stereo.initialConfig.get()
+    return stereo.initialConfig.get()
 
 
 class DepthAi():
@@ -169,7 +187,7 @@ class DepthAi():
         self.whiteBalance: int      = 0
 
         # DEPTH SETTINGS
-        self.stereoConfig = dai.RawStereoDepthConfig()
+        self.stereoConfig: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
 
         self.depthTresholdMin: int = 0
         self.depthTresholdMax: int = 255
@@ -191,7 +209,7 @@ class DepthAi():
         if self.deviceOpen: return True
 
         pipeline = dai.Pipeline()
-        setupStereoColor(pipeline, self.fps, self.doMono)
+        self.stereoConfig = setupStereoColor(pipeline, self.fps, self.doMono)
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:
@@ -379,18 +397,33 @@ class DepthAi():
         v: float = clamp(value, (0.0, 1.0))
         self.device.setIrLaserDotProjectorIntensity(v)
 
-
     def setDepthTresholdMin(self, value: float) -> None:
-        self.depthTresholdMin = int(value * 255)
+        if not self.deviceOpen: return
+        v: float = value * (stereoDepthRange[1] - stereoDepthRange[0])
+        v += stereoDepthRange[0]
+        self.stereoConfig.postProcessing.thresholdFilter.minRange = int(v)
+        self.stereoControl.send(self.stereoConfig)
 
     def setDepthTresholdMax(self, value: float) -> None:
-        self.depthTresholdMax = int(value * 255)
-
-    def setStereoMinBrightness(self, value: int) -> None:
-        return
         if not self.deviceOpen: return
-        v: int = int(clamp(value, stereoBrightnessRange))
-        self.stereoConfig.postProcessing.brightnessFilter.minBrightness = v
+        v: float = value * (stereoDepthRange[1] - stereoDepthRange[0])
+        v += stereoDepthRange[0]
+        self.stereoConfig.postProcessing.thresholdFilter.maxRange = int(v)
+        self.stereoControl.send(self.stereoConfig)
+
+    # def setDepthTresholdMin(self, value: float) -> None:
+    #     self.depthTresholdMin = int(value * 255)
+
+    # def setDepthTresholdMax(self, value: float) -> None:
+    #     self.depthTresholdMax = int(value * 255)
+
+    def setStereoMinBrightness(self, value: float) -> None:
+        if not self.deviceOpen: return
+        # v: int = int(clamp(value, stereoBrightnessRange))
+
+        v: float = value * (stereoBrightnessRange[1] - stereoBrightnessRange[0])
+        v += stereoBrightnessRange[0]
+        self.stereoConfig.postProcessing.brightnessFilter.minBrightness = int(v)
         self.stereoControl.send(self.stereoConfig)
 
 
