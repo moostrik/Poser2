@@ -1,4 +1,5 @@
 # DOCS
+# https://oak-web.readthedocs.io/
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
 import cv2
@@ -39,9 +40,9 @@ def fit(image: np.ndarray, width, height) -> np.ndarray:
     return np.asarray(fit_image)
 
 def setupStereo(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> None:
+    color: dai.node.Camera = pipeline.create(dai.node.Camera)
     left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
-    color: dai.node.Camera = pipeline.create(dai.node.Camera)
     stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
     sync: dai.node.Sync = pipeline.create(dai.node.Sync)
 
@@ -97,6 +98,54 @@ def setupStereo(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = Fal
 
     sync.out.link(outputImages.input)
 
+def setupStereoLeft(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> None:
+    left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+    right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+    stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
+    sync: dai.node.Sync = pipeline.create(dai.node.Sync)
+
+    colorControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+    colorControl.setStreamName('color_control')
+
+    stereoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+    stereoControl.setStreamName('stereo_control')
+    stereoControl.out.link(stereo.inputConfig)
+
+    outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+    outputImages.setStreamName("output_images")
+
+
+
+    left.setCamera("left")
+    # left.setSize(1280, 720)
+    # left.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
+    left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+    left.setFps(fps)
+
+    right.setCamera("right")
+    # right.setSize(1280, 720)
+    # right.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
+    right.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+    right.setFps(fps)
+
+    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+    stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
+    stereo.setLeftRightCheck(True)
+    stereo.setExtendedDisparity(False)
+    stereo.setSubpixel(False)
+    stereo.setDepthAlign(dai.CameraBoardSocket.LEFT)
+
+    sync.setSyncThreshold(timedelta(milliseconds=50))
+
+    left.out.link(stereo.left)
+    right.out.link(stereo.right)
+
+    stereo.disparity.link(sync.inputs["stereo"])
+    stereo.rectifiedLeft.link(sync.inputs["video"])
+    left.out.link(sync.inputs["mono"])
+
+    sync.out.link(outputImages.input)
+
 
 class DepthAi():
     def __init__(self, doMono: bool = True) -> None:
@@ -147,7 +196,7 @@ class DepthAi():
         if self.deviceOpen: return True
 
         pipeline = dai.Pipeline()
-        setupStereo(pipeline, self.fps, self.doMono)
+        setupStereoLeft(pipeline, self.fps, self.doMono)
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:
