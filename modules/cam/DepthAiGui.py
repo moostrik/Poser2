@@ -24,64 +24,60 @@ class DepthAiGui(Cam):
         super().__init__(doMono)
 
         elem: list = []
-        elem.append([E(eT.CMBO, 'Preview',              super().setPreview,            PreviewTypeNames[0],     PreviewTypeNames,   expand=False),
-                     E(eT.CHCK, 'FlipH',                super().setFlipH,              False),
-                     E(eT.CHCK, 'FlipV',                super().setFlipV,              False)])
-
-        elem.append([E(eT.SEPR, 'COLOR')])
-        elem.append([E(eT.TEXT, 'Exposure'),
+        elem.append([E(eT.TEXT, 'Exposure  '),
                      E(eT.SLDR, 'ColorExposure',        super().setColorExposure,       exposureRange[0],       exposureRange,      gsfr(exposureRange)),
-                     E(eT.TEXT, 'Iso'),
+                     E(eT.TEXT, '       Iso'),
                      E(eT.SLDR, 'ColorIso',             super().setColorIso,            isoRange[0],            isoRange,           gsfr(isoRange))])
-        elem.append([E(eT.TEXT, 'Balance'),
-                     E(eT.SLDR, 'ColorWhiteBalance',    super().setColorBalance,        whiteBalanceRange[0],   whiteBalanceRange,  gsfr(whiteBalanceRange)),
-                     E(eT.TEXT, 'Contrast'),
+        elem.append([E(eT.TEXT, 'Balance   '),
+                     E(eT.SLDR, 'ColorBalance',         super().setColorBalance,        whiteBalanceRange[0],   whiteBalanceRange,  gsfr(whiteBalanceRange)),
+                     E(eT.TEXT, '  Contrast'),
                      E(eT.SLDR, 'ColorContrast',        super().setColorContrast,       contrastRange[0],       contrastRange,      gsfr(contrastRange))])
-        elem.append([E(eT.CHCK, 'ColorAutoExposure',    super().setColorAutoExposure,   True),
-                     E(eT.CHCK, 'ColorAutoWhiteBalance',super().setColorAutoBalance,    True)])
         elem.append([E(eT.TEXT, 'Brightness'),
                      E(eT.SLDR, 'ColorBrightness',      super().setColorBrightness,     brightnessRange[0],     brightnessRange,    gsfr(brightnessRange)),
-                     E(eT.TEXT, 'LumaDenoise'),
-                     E(eT.SLDR, 'ColorLumaDenoise',     super().setColorLumaDenoise,    lumaDenoiseRange[0],    lumaDenoiseRange,   gsfr(lumaDenoiseRange))])
+                     E(eT.TEXT, '   Denoise'),
+                     E(eT.SLDR, 'ColorDenoise',         super().setColorDenoise,        lumaDenoiseRange[0],    lumaDenoiseRange,   gsfr(lumaDenoiseRange))])
         elem.append([E(eT.TEXT, 'Saturation'),
                      E(eT.SLDR, 'ColorSaturation',      super().setColorSaturation,     saturationRange[0],     saturationRange,    gsfr(saturationRange)),
-                     E(eT.TEXT, 'Sharpness'),
+                     E(eT.TEXT, ' Sharpness'),
                      E(eT.SLDR, 'ColorSharpness',       super().setColorSharpness,      sharpnessRange[0],      sharpnessRange,     gsfr(sharpnessRange))])
+        elem.append([E(eT.CMBO, 'Preview',              super().setPreview,             PreviewTypeNames[0],    PreviewTypeNames,   expand=False),
+                     E(eT.CHCK, ' FlipH',               super().setFlipH,               False),
+                     E(eT.CHCK, ' FlipV',               super().setFlipV,               False),
+                     E(eT.TEXT, ''),
+                     E(eT.CHCK, 'AutoExposure',         super().setColorAutoExposure,   True),
+                     E(eT.CHCK, 'AutoBalance',          super().setColorAutoBalance,    True)])
 
-        elem.append([E(eT.SEPR, 'MONO')])
-        elem.append([E(eT.TEXT, 'Exposure'),
-                     E(eT.SLDR, 'MonoExposure',         super().setMonoExposure,        exposureRange[0],       exposureRange,       gsfr(exposureRange)),
+        self.color_frame = Frame('CAMERA COLOR', elem, 200)
+
+        elem: list = []
+        elem.append([E(eT.TEXT, 'Exposure  '),
+                     E(eT.SLDR, 'MonoExposure',         super().setMonoExposure,        exposureRange[0],       exposureRange,      gsfr(exposureRange)),
                      E(eT.TEXT, 'Iso'),
-                     E(eT.SLDR, 'MonoIso',              super().setMonoIso,             isoRange[0],            isoRange,            gsfr(isoRange)),
-                     E(eT.CHCK, 'MonoAutoExposure',     super().setMonoAutoExposure,    False)])
-        elem.append([E(eT.TEXT, 'Contrast    '),
-                     E(eT.SLDR, 'MonoContrast',         super().setMonoContrast,        contrastRange[0],       contrastRange,       gsfr(contrastRange))])
-
-        elem.append([E(eT.SEPR, 'STEREO')])
-        elem.append([E(eT.TEXT, 'Depth Min'),
+                     E(eT.SLDR, 'MonoIso',              super().setMonoIso,             isoRange[0],            isoRange,           gsfr(isoRange))])
+        elem.append([E(eT.TEXT, 'Depth Min '),
                      E(eT.SLDR, 'StereoMin',            super().setDepthTresholdMin,    stereoDepthRange[0],    stereoDepthRange,   gsfr(stereoDepthRange)),
                      E(eT.TEXT, 'Max'),
                      E(eT.SLDR, 'StereoMax',            super().setDepthTresholdMax,    stereoDepthRange[0],    stereoDepthRange,   gsfr(stereoDepthRange))])
-        elem.append([E(eT.TEXT, 'Brighness Min'),
+        elem.append([E(eT.TEXT, 'Bright Min'),
                      E(eT.SLDR, 'StereoBrighnessMin',   super().setStereoMinBrightness, stereoBrightnessRange[0], stereoBrightnessRange, gsfr(stereoBrightnessRange)),
                      E(eT.TEXT, 'Max'),
                      E(eT.SLDR, 'StereoBrighnessMax',   super().setStereoMaxBrightness, stereoBrightnessRange[0], stereoBrightnessRange, gsfr(stereoBrightnessRange))])
-        elem.append([E(eT.CMBO, 'Median',               super().setStereoMedianFilter,  StereoMedianFilterTypeNames[0],     StereoMedianFilterTypeNames, expand=False)])
-
-        elem.append([E(eT.SEPR, 'IR')])
-        elem.append([E(eT.TEXT, 'IR     Grid'),
+        elem.append([E(eT.TEXT, 'IR Grid   '),
                      E(eT.SLDR, 'LightGrid',            self.setIrGridLight,            0, [0,1], 0.05),
                      E(eT.TEXT, 'Fld'),
                      E(eT.SLDR, 'LightFlood',           self.setIrFloodLight,           0, [0,1], 0.05)])
+        elem.append([E(eT.TEXT, 'Filter    '),
+                     E(eT.CMBO, 'Median',               super().setStereoMedianFilter,  StereoMedianFilterTypeNames[0],     StereoMedianFilterTypeNames, expand=False),
+                     E(eT.TEXT, '    '),
+                     E(eT.CHCK, 'MonoAutoExposure',     super().setMonoAutoExposure,    False)])
 
-        self.color_frame = Frame('CAMERA', elem, 600)
+        self.depth_frame = Frame('CAMERA DEPTH', elem, 100)
 
         self.prevColorAutoExposure: bool =  self.colorAutoExposure
         self.prevColorExposure: int =       self.colorExposure
         self.prevColorIso: int =            self.colorIso
         self.prevColorAutoBalance: bool =   self.colorAutoBalance
         self.prevColorWhiteBalance: int =   self.colorWhiteBalance
-
         self.prevMonoAutoExposure: bool =   self.monoAutoExposure
         self.prevMonoExposure: int =        self.monoExposure
         self.prevMonoIso: int =             self.monoIso
@@ -92,11 +88,11 @@ class DepthAiGui(Cam):
         if not self.gui or not self.gui.isRunning(): return
         if (self.prevColorAutoExposure != self.colorAutoExposure) :
             self.prevColorAutoExposure = self.colorAutoExposure
-            self.gui.updateElement('ColorAutoExposure', self.colorAutoExposure)
+            self.gui.updateElement('AutoExposure', self.colorAutoExposure)
 
         if (self.prevColorAutoBalance != self.colorAutoBalance) :
             self.prevColorAutoBalance = self.colorAutoBalance
-            self.gui.updateElement('ColorAutoWhiteBalance', self.colorAutoBalance)
+            self.gui.updateElement('AutoBalance', self.colorAutoBalance)
 
         if self.colorAutoExposure:
             if (self.prevColorExposure != self.colorExposure) :
@@ -109,7 +105,7 @@ class DepthAiGui(Cam):
         if self.colorAutoBalance:
             if (self.prevColorWhiteBalance != self.colorWhiteBalance) :
                 self.prevColorWhiteBalance = self.colorWhiteBalance
-                self.gui.updateElement('ColorWhiteBalance', self.colorWhiteBalance)
+                self.gui.updateElement('ColorBalance', self.colorWhiteBalance)
 
     # MONO
     def updateMonoControl(self, frame) -> None: #override
@@ -127,8 +123,7 @@ class DepthAiGui(Cam):
                 self.prevMonoIso = self.monoIso
                 self.gui.updateElement('MonoIso', self.monoIso)
 
-
-
+    # IR
     def setIrGridLight(self, value: float) -> None: #override
         super().setIrGridLight(value)
         if not self.gui or not self.gui.isRunning(): return
@@ -143,9 +138,12 @@ class DepthAiGui(Cam):
             self.gui.updateElement('LightGrid', 0.0)
             super().setIrGridLight(0.0)
 
-
+    # GUI FRAME
     def get_gui_frame(self):
-          return self.get_color_frame()
+          return self.get_gui_color_frame()
 
-    def get_color_frame(self):
+    def get_gui_color_frame(self):
           return self.color_frame
+
+    def get_gui_depth_frame(self):
+          return self.depth_frame

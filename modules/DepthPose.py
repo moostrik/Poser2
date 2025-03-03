@@ -40,8 +40,9 @@ class DepthPose():
         self.render.start()
 
         self.gui.exit_callback = self.stop
-        self.gui.addFrame([self.camera.get_color_frame()])
+        self.gui.addFrame([self.camera.get_gui_color_frame(), self.camera.get_gui_depth_frame()])
         self.gui.start()
+        self.gui.bringToFront()
 
         self._running = True
 
@@ -62,5 +63,6 @@ class DepthPose():
         return self._running
 
     def render_keyboard_callback(self, key, x, y) -> None:
-        if key == b' ': # space
-            pass
+        if key == b'g' or key == b'G':
+            if not self.gui or not self.gui.isRunning(): return
+            self.gui.bringToFront()

@@ -162,6 +162,10 @@ def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool =
     stereo.setSubpixel(False)
     stereo.setDepthAlign(dai.CameraBoardSocket.LEFT)
 
+    config: dai.RawStereoDepthConfig = stereo.initialConfig.get()
+    config.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT
+    stereo.initialConfig.set(config)
+
     sync.setSyncThreshold(timedelta(milliseconds=50))
 
     left.out.link(stereo.left)
@@ -194,7 +198,7 @@ class DepthAi():
         # COLOR SETTINGS
         self.colorAutoExposure: bool =      True
         self.colorAutoFocus: bool =         True
-        self.colorAutoWhiteBalance: bool =  True
+        self.colorAutoBalance: bool =  True
         self.colorExposure: int =           0
         self.colorIso: int =                0
         self.colorFocus: int =              0
@@ -211,7 +215,6 @@ class DepthAi():
         self.monoAutoWhiteBalance: bool =   True
         self.monoExposure: int =            0
         self.monoIso: int =                 0
-        self.monoContrast: int =            0
 
         # STEREO SETTINGS
         self.stereoConfig: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
@@ -379,7 +382,7 @@ class DepthAi():
             self.colorIso = frame.getSensitivity()
         if (self.colorAutoFocus):
             self.colorFocus = frame.getLensPosition()
-        if (self.colorAutoWhiteBalance):
+        if (self.colorAutoBalance):
             self.colorWhiteBalance = frame.getColorTemperature()
 
     def setColorAutoExposure(self, value) -> None:
@@ -394,7 +397,7 @@ class DepthAi():
 
     def setColorAutoBalance(self, value) -> None:
         if not self.deviceOpen: return
-        self.colorAutoWhiteBalance = value
+        self.colorAutoBalance = value
         if value == False:
             self.setColorBalance(self.colorWhiteBalance)
             return
@@ -419,7 +422,7 @@ class DepthAi():
 
     def setColorBalance(self, value: int) -> None:
         if not self.deviceOpen: return
-        self.colorAutoWhiteBalance = False
+        self.colorAutoBalance = False
         ctrl = dai.CameraControl()
         self.colorWhiteBalance = int(clamp(value, whiteBalanceRange))
         ctrl.setManualWhiteBalance(self.colorWhiteBalance)
@@ -439,7 +442,7 @@ class DepthAi():
         ctrl.setBrightness(self.colorBrightness)
         self.colorControl.send(ctrl)
 
-    def setColorLumaDenoise(self, value: int) -> None:
+    def setColorDenoise(self, value: int) -> None:
         if not self.deviceOpen: return
         ctrl = dai.CameraControl()
         self.colorLumaDenoise = int(clamp(value, lumaDenoiseRange))
@@ -490,14 +493,6 @@ class DepthAi():
 
     def setMonoIso(self, value: int) -> None:
         self.setMonoExposureIso(self.monoExposure, value)
-
-    def setMonoContrast(self, value: int) -> None:
-        if not self.deviceOpen: return
-        ctrl = dai.CameraControl()
-        self.monoContrast = int(clamp(value, contrastRange))
-        ctrl.setContrast(self.monoContrast)
-        ctrl.setBrightness(self.monoContrast * 10)
-        self.monoControl.send(ctrl)
 
     # STEREO SETTINGS
 

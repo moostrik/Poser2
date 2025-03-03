@@ -166,7 +166,7 @@ class Gui(Thread):
 
     def start(self) -> None:
         elem = []
-        elem.append([Element(eType.TEXT, 'AIAIAI.AI | Matthias Oostrik | 2024')])
+        elem.append([Element(eType.TEXT, '© Matthias Oostrik 2025')])
         autograph = Frame('TITLE', elem, 60)
         elem = []
         elem.append([Element(eType.BTTN, 'Exit', self.exit_callback),
