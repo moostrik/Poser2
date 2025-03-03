@@ -3,9 +3,7 @@
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
 # TODO
-# all controls
-# Contrast Mono
-# gui fixes
+# gui cleanup
 
 # openPose
 
@@ -29,9 +27,23 @@ PreviewTypeNames: list[str] = [e.name for e in PreviewType]
 exposureRange:          tuple[int, int] = (1000, 33000)
 isoRange:               tuple[int, int] = ( 100, 1600 )
 whiteBalanceRange:      tuple[int, int] = (1000, 12000)
+contrastRange:          tuple[int, int] = ( -10, 10   )
+brightnessRange:        tuple[int, int] = ( -10, 10   )
+lumaDenoiseRange:       tuple[int, int] = (   0, 4    )
+saturationRange:        tuple[int, int] = ( -10, 10   )
+sharpnessRange:         tuple[int, int] = (   0, 4    )
 
-stereoDepthRange:    tuple[int, int] = ( 500, 15000)
+stereoDepthRange:       tuple[int, int] = ( 500, 15000)
 stereoBrightnessRange:  tuple[int, int] = (   0, 255  )
+
+class StereoMedianFilterType(Enum):
+    OFF = 0
+    KERNEL_3x3 = 1
+    KERNEL_5x5 = 2
+    KERNEL_7x7 = 3
+
+StereoMedianFilterTypeNames: list[str] = [e.name for e in StereoMedianFilterType]
+
 
 def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | float:
     return max(size[0], min(num, size[1]))
@@ -39,7 +51,6 @@ def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | floa
 def fit(image: np.ndarray, width, height) -> np.ndarray:
     h, w = image.shape[:2]
     if w == width and h == height:
-        # print('yes', w, h, width, height)
         return image
     pil_image = Image.fromarray(image)
     size = (width, height)
@@ -59,7 +70,8 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool 
 
     monoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     monoControl.setStreamName('mono_control')
-    monoControl.out.link(color.inputControl)
+    monoControl.out.link(left.inputControl)
+    monoControl.out.link(right.inputControl)
 
     stereoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     stereoControl.setStreamName('stereo_control')
@@ -123,6 +135,11 @@ def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool =
     colorControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     colorControl.setStreamName('color_control')
 
+    monoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+    monoControl.setStreamName('mono_control')
+    monoControl.out.link(left.inputControl)
+    monoControl.out.link(right.inputControl)
+
     stereoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     stereoControl.setStreamName('stereo_control')
     stereoControl.out.link(stereo.inputConfig)
@@ -156,48 +173,60 @@ def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool =
         left.out.link(sync.inputs["mono"])
 
     sync.out.link(outputImages.input)
-    # return stereo.initialConfig.get()
+
     return stereo.initialConfig.get()
 
 
 class DepthAi():
     def __init__(self, doMono: bool = True) -> None:
 
-        self.previewType: PreviewType = PreviewType.VIDEO
-        self.doMono: bool = doMono
-        self.fps = 60
-
         self.frameCallbacks: set = set()
 
-        self.outWidth: int = 1280
-        self.outHeight: int = 720
-        self.flipH: bool = False
-        self.flipV: bool = False
-        self.rotate90: bool = False
-        self.errorFrame:   np.ndarray = np.zeros((720, 1280, 3), dtype=np.uint8)
-        self.errorFrame[:,:,2] = 255
+        self.previewType: PreviewType =     PreviewType.VIDEO
+        self.doMono: bool =                 doMono
+        self.fps =                          60
+        self.flipH: bool =                  False
+        self.flipV: bool =                  False
+        self.rotate90: bool =               False
+        self.errorFrame: np.ndarray =       np.zeros((720, 1280, 3), dtype=np.uint8)
+        self.errorFrame[:,:,2] =            255
 
         # COLOR SETTINGS
-        self.autoExposure: bool     = True
-        self.autoFocus: bool        = True
-        self.autoWhiteBalance: bool = True
-        self.exposure: int          = 0
-        self.iso: int               = 0
-        self.focus: int             = 0
-        self.whiteBalance: int      = 0
+        self.colorAutoExposure: bool =      True
+        self.colorAutoFocus: bool =         True
+        self.colorAutoWhiteBalance: bool =  True
+        self.colorExposure: int =           0
+        self.colorIso: int =                0
+        self.colorFocus: int =              0
+        self.colorWhiteBalance: int =       0
+        self.colorContrast: int =           0
+        self.colorBrightness: int =         0
+        self.colorLumaDenoise: int =        0
+        self.colorSaturation: int =         0
+        self.colorSharpness: int =          0
 
-        # DEPTH SETTINGS
+        # MONO SETTINGS
+        self.monoAutoExposure: bool =       True
+        self.monoAutoFocus: bool =          True
+        self.monoAutoWhiteBalance: bool =   True
+        self.monoExposure: int =            0
+        self.monoIso: int =                 0
+        self.monoContrast: int =            0
+
+        # STEREO SETTINGS
         self.stereoConfig: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
 
-        self.depthTresholdMin: int = 0
-        self.depthTresholdMax: int = 255
+        # MASK SETTINGS
+        self.depthTresholdMin:  int = 0
+        self.depthTresholdMax:  int = 255
 
         # DAI
-        self.device:        dai.Device
-        self.dataQueue:     dai.DataOutputQueue
-        self.dataCallbackId:int
-        self.colorControl:  dai.DataInputQueue
-        self.stereoControl: dai.DataInputQueue
+        self.device:            dai.Device
+        self.colorControl:      dai.DataInputQueue
+        self.monoControl:       dai.DataInputQueue
+        self.stereoControl:     dai.DataInputQueue
+        self.dataQueue:         dai.DataOutputQueue
+        self.dataCallbackId:    int
 
         self.deviceOpen: bool = False
         self.capturing:  bool = False
@@ -221,6 +250,7 @@ class DepthAi():
 
         self.dataQueue =    self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
         self.colorControl = self.device.getInputQueue('color_control')
+        self.monoControl =  self.device.getInputQueue('mono_control')
         self.stereoControl =self.device.getInputQueue('stereo_control')
 
         self.deviceOpen = True
@@ -233,6 +263,7 @@ class DepthAi():
 
         self.device.close()
         self.stereoControl.close()
+        self.monoControl.close()
         self.colorControl.close()
         self.dataQueue.close()
 
@@ -262,9 +293,10 @@ class DepthAi():
         for name, msg in daiMessages:
             if name == 'video':
                 video_frame = msg.getCvFrame() #type:ignore
-                self.updateControlValues(msg)
+                self.updateColorControl(msg)
             elif name == 'stereo':
                 stereo_frame = self.updateStereo(msg.getCvFrame()) #type:ignore
+                self.updateMonoControl(msg)
             elif name == 'mono':
                 mono_frame = msg.getCvFrame() #type:ignore
             else:
@@ -321,43 +353,50 @@ class DepthAi():
             return cv2.flip(frame, 0)
         return frame
 
-    def updateControlValues(self, frame) -> None:
-        if (self.autoExposure):
-            self.exposure = frame.getExposureTime().total_seconds()*1000000
-            self.iso = frame.getSensitivity()
-        if (self.autoFocus):
-            self.focus = frame.getLensPosition()
-        if (self.autoWhiteBalance):
-            self.whiteBalance = frame.getColorTemperature()
-
     def iscapturing(self) ->bool:
         return self.capturing
 
     def isOpen(self) -> bool:
         return self.deviceOpen
 
-
+    # GENERAL SETTINGS
     def setPreview(self, value: PreviewType | int | str) -> None:
         if isinstance(value, str) and value in PreviewTypeNames:
             self.previewType = PreviewType(PreviewTypeNames.index(value))
         else:
             self.previewType = PreviewType(value)
 
-    def setAutoExposure(self, value) -> None:
+    def setFlipH(self, flipH: bool) -> None:
+        self.flipH = flipH
+
+    def setFlipV(self, flipV: bool) -> None:
+        self.flipV = flipV
+
+    # COLOR SETTINGS
+    def updateColorControl(self, frame) -> None:
+        if (self.colorAutoExposure):
+            self.colorExposure = frame.getExposureTime().total_seconds() * 1000000
+            self.colorIso = frame.getSensitivity()
+        if (self.colorAutoFocus):
+            self.colorFocus = frame.getLensPosition()
+        if (self.colorAutoWhiteBalance):
+            self.colorWhiteBalance = frame.getColorTemperature()
+
+    def setColorAutoExposure(self, value) -> None:
         if not self.deviceOpen: return
-        self.autoExposure = value
+        self.colorAutoExposure = value
         if value == False:
-            self.setExposureIso(self.exposure, self.iso)
+            self.setExposureIso(self.colorExposure, self.colorIso)
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoExposureEnable()
         self.colorControl.send(ctrl)
 
-    def setAutoWhiteBalance(self, value) -> None:
+    def setColorAutoBalance(self, value) -> None:
         if not self.deviceOpen: return
-        self.autoWhiteBalance = value
+        self.colorAutoWhiteBalance = value
         if value == False:
-            self.setWhiteBalance(self.whiteBalance)
+            self.setColorBalance(self.colorWhiteBalance)
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoWhiteBalanceMode(dai.CameraControl.AutoWhiteBalanceMode.AUTO)
@@ -365,28 +404,148 @@ class DepthAi():
 
     def setExposureIso(self, exposure: int, iso: int) -> None:
         if not self.deviceOpen: return
-        self.autoExposure = False
-        self.exposure = int(clamp(exposure, exposureRange))
-        self.iso = int(clamp(iso, isoRange))
+        self.colorAutoExposure = False
+        self.colorExposure = int(clamp(exposure, exposureRange))
+        self.colorIso = int(clamp(iso, isoRange))
         ctrl = dai.CameraControl()
-        ctrl.setManualExposure(int(self.exposure), int(self.iso))
+        ctrl.setManualExposure(self.colorExposure, self.colorIso)
         self.colorControl.send(ctrl)
 
-    def setExposure(self, value : int) -> None:
-        self.setExposureIso(value, self.iso)
+    def setColorExposure(self, value : int) -> None:
+        self.setExposureIso(value, self.colorIso)
 
-    def setIso(self, value: int) -> None:
-        self.setExposureIso(self.exposure, value)
+    def setColorIso(self, value: int) -> None:
+        self.setExposureIso(self.colorExposure, value)
 
-    def setWhiteBalance(self, value: int) -> None:
+    def setColorBalance(self, value: int) -> None:
         if not self.deviceOpen: return
-        self.autoWhiteBalance = False
+        self.colorAutoWhiteBalance = False
         ctrl = dai.CameraControl()
-        self.whiteBalance = int(clamp(value, whiteBalanceRange))
-        ctrl.setManualWhiteBalance(int(self.whiteBalance))
+        self.colorWhiteBalance = int(clamp(value, whiteBalanceRange))
+        ctrl.setManualWhiteBalance(self.colorWhiteBalance)
         self.colorControl.send(ctrl)
 
+    def setColorContrast(self, value: int) -> None:
+        if not self.deviceOpen: return
+        ctrl = dai.CameraControl()
+        self.colorContrast = int(clamp(value, contrastRange))
+        ctrl.setContrast(self.colorContrast)
+        self.colorControl.send(ctrl)
 
+    def setColorBrightness(self, value: int) -> None:
+        if not self.deviceOpen: return
+        ctrl = dai.CameraControl()
+        self.colorBrightness = int(clamp(value, brightnessRange))
+        ctrl.setBrightness(self.colorBrightness)
+        self.colorControl.send(ctrl)
+
+    def setColorLumaDenoise(self, value: int) -> None:
+        if not self.deviceOpen: return
+        ctrl = dai.CameraControl()
+        self.colorLumaDenoise = int(clamp(value, lumaDenoiseRange))
+        ctrl.setLumaDenoise(self.colorLumaDenoise)
+        self.colorControl.send(ctrl)
+
+    def setColorSaturation(self, value: int) -> None:
+        if not self.deviceOpen: return
+        ctrl = dai.CameraControl()
+        self.colorSaturation = int(clamp(value, saturationRange))
+        ctrl.setSaturation(self.colorSaturation)
+        self.colorControl.send(ctrl)
+
+    def setColorSharpness(self, value: int) -> None:
+        if not self.deviceOpen: return
+        ctrl = dai.CameraControl()
+        self.colorSharpness = int(clamp(value, sharpnessRange))
+        ctrl.setSharpness(self.colorSharpness)
+        self.colorControl.send(ctrl)
+
+    # MONO SETTINGS
+    def updateMonoControl(self, frame) -> None:
+        if (self.monoAutoExposure):
+            self.monoExposure = frame.getExposureTime().total_seconds() * 1000000
+            self.monoIso = frame.getSensitivity()
+
+    def setMonoAutoExposure(self, value) -> None:
+        if not self.deviceOpen: return
+        self.monoAutoExposure = value
+        if value == False:
+            self.setMonoExposureIso(self.monoExposure, self.monoIso)
+            return
+        ctrl = dai.CameraControl()
+        ctrl.setAutoExposureEnable()
+        self.monoControl.send(ctrl)
+
+    def setMonoExposureIso(self, exposure: int, iso: int) -> None:
+        if not self.deviceOpen: return
+        self.monoAutoExposure = False
+        self.monoExposure = int(clamp(exposure, exposureRange))
+        self.monoIso = int(clamp(iso, isoRange))
+        ctrl = dai.CameraControl()
+        ctrl.setManualExposure(self.monoExposure, self.monoIso)
+        self.monoControl.send(ctrl)
+
+    def setMonoExposure(self, value : int) -> None:
+        self.setMonoExposureIso(value, self.monoIso)
+
+    def setMonoIso(self, value: int) -> None:
+        self.setMonoExposureIso(self.monoExposure, value)
+
+    def setMonoContrast(self, value: int) -> None:
+        if not self.deviceOpen: return
+        ctrl = dai.CameraControl()
+        self.monoContrast = int(clamp(value, contrastRange))
+        ctrl.setContrast(self.monoContrast)
+        ctrl.setBrightness(self.monoContrast * 10)
+        self.monoControl.send(ctrl)
+
+    # STEREO SETTINGS
+
+    def setDepthTresholdMin(self, value: int) -> None:
+        if not self.deviceOpen: return
+        v: int = int(clamp(value, stereoDepthRange))
+        self.stereoConfig.postProcessing.thresholdFilter.minRange = int(v)
+        self.stereoControl.send(self.stereoConfig)
+
+    def setDepthTresholdMax(self, value: int) -> None:
+        if not self.deviceOpen: return
+        v: int = int(clamp(value, stereoDepthRange))
+        self.stereoConfig.postProcessing.thresholdFilter.maxRange = int(v)
+        self.stereoControl.send(self.stereoConfig)
+
+    def setStereoMinBrightness(self, value: int) -> None:
+        if not self.deviceOpen: return
+        v: int = int(clamp(value, stereoBrightnessRange))
+        self.stereoConfig.postProcessing.brightnessFilter.minBrightness = int(v)
+        self.stereoControl.send(self.stereoConfig)
+
+    def setStereoMaxBrightness(self, value: int) -> None:
+        if not self.deviceOpen: return
+        v: int = int(clamp(value, stereoBrightnessRange))
+        self.stereoConfig.postProcessing.brightnessFilter.maxBrightness = int(v)
+        self.stereoControl.send(self.stereoConfig)
+
+    def setStereoMedianFilter(self, value: StereoMedianFilterType | int | str) -> None:
+        if not self.deviceOpen: return
+        if isinstance(value, str):
+            if value in StereoMedianFilterTypeNames:
+                self.setStereoMedianFilter(StereoMedianFilterType(StereoMedianFilterTypeNames.index(value)))
+            else:
+                print('setStereoMedianFilter wrong type', value)
+            return
+
+        if value == StereoMedianFilterType.OFF:
+            self.stereoConfig.postProcessing.median = dai.MedianFilter.MEDIAN_OFF
+        elif value == StereoMedianFilterType.KERNEL_3x3:
+            self.stereoConfig.postProcessing.median = dai.MedianFilter.KERNEL_3x3
+        elif value == StereoMedianFilterType.KERNEL_5x5:
+            self.stereoConfig.postProcessing.median = dai.MedianFilter.KERNEL_5x5
+        elif value == StereoMedianFilterType.KERNEL_7x7:
+            self.stereoConfig.postProcessing.median = dai.MedianFilter.KERNEL_7x7
+        self.stereoControl.send(self.stereoConfig)
+
+
+    # IR SETTINGS
     def setIrFloodLight(self, value: float) -> None:
         if not self.deviceOpen: return
         v: float = clamp(value, (0.0, 1.0))
@@ -397,45 +556,7 @@ class DepthAi():
         v: float = clamp(value, (0.0, 1.0))
         self.device.setIrLaserDotProjectorIntensity(v)
 
-    def setDepthTresholdMin(self, value: float) -> None:
-        if not self.deviceOpen: return
-        v: float = value * (stereoDepthRange[1] - stereoDepthRange[0])
-        v += stereoDepthRange[0]
-        self.stereoConfig.postProcessing.thresholdFilter.minRange = int(v)
-        self.stereoControl.send(self.stereoConfig)
-
-    def setDepthTresholdMax(self, value: float) -> None:
-        if not self.deviceOpen: return
-        v: float = value * (stereoDepthRange[1] - stereoDepthRange[0])
-        v += stereoDepthRange[0]
-        self.stereoConfig.postProcessing.thresholdFilter.maxRange = int(v)
-        self.stereoControl.send(self.stereoConfig)
-
-    # def setDepthTresholdMin(self, value: float) -> None:
-    #     self.depthTresholdMin = int(value * 255)
-
-    # def setDepthTresholdMax(self, value: float) -> None:
-    #     self.depthTresholdMax = int(value * 255)
-
-    def setStereoMinBrightness(self, value: float) -> None:
-        if not self.deviceOpen: return
-        # v: int = int(clamp(value, stereoBrightnessRange))
-
-        v: float = value * (stereoBrightnessRange[1] - stereoBrightnessRange[0])
-        v += stereoBrightnessRange[0]
-        self.stereoConfig.postProcessing.brightnessFilter.minBrightness = int(v)
-        self.stereoControl.send(self.stereoConfig)
-
-
-    def setFlipH(self, flipH: bool) -> None:
-        self.flipH = flipH
-
-    def setFlipV(self, flipV: bool) -> None:
-        self.flipV = flipV
-
-
-
-
+    # CALLBACKS
     def addFrameCallback(self, callback) -> None:
         self.frameCallbacks.add(callback)
 
