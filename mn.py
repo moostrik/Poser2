@@ -1,6 +1,7 @@
 # experiments based on
 # https://www.tensorflow.org/hub/tutorials/movenet
 # https://github.com/Kazuhito00/MoveNet-Python-Example/tree/main
+# Lightning for low latency, Thunder for high accuracy
 
 
 import tensorflow as tf
@@ -44,22 +45,25 @@ def movenet1(model, image):
     keypoints_with_scores = np.squeeze(keypoints_with_scores)
     return keypoints_with_scores
 
-def run_inference(model, image, input_size):
+def load_ML1():
+    module = hub.load("C:/Developer/DepthAI/DepthPose/models/movenet-tensorflow2-multipose-lightning-v1")
+    model = module.signatures['serving_default']
+    input_size = 256
+    return model, input_size
+
+def run_Multi(model, image, input_size):
     image_width, image_height = image.shape[1], image.shape[0]
 
-    # 前処理
     input_image: np.ndarray = cv2.resize(image, dsize=(input_size, input_size))  # リサイズ
     input_image = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)  # BGR→RGB変換
     input_image = input_image.reshape(-1, input_size, input_size, 3)  # リシェイプ
     input_image = tf.cast(input_image, dtype=tf.int32)  # int32へキャスト
 
-    # 推論
     outputs = model(input_image)
 
     keypoints_with_scores = outputs['output_0'].numpy()
     keypoints_with_scores = np.squeeze(keypoints_with_scores)
 
-    # キーポイント、バウンディングボックス、スコア取り出し
     keypoints_list, scores_list = [], []
     bbox_list = []
     for keypoints_with_score in keypoints_with_scores:
@@ -76,14 +80,12 @@ def run_inference(model, image, input_size):
             keypoints.append([keypoint_x, keypoint_y])
             scores.append(score)
 
-        # バウンディングボックス
         bbox_ymin = int(image_height * keypoints_with_score[51])
         bbox_xmin = int(image_width * keypoints_with_score[52])
         bbox_ymax = int(image_height * keypoints_with_score[53])
         bbox_xmax = int(image_width * keypoints_with_score[54])
         bbox_score = keypoints_with_score[55]
 
-        # 6人分のデータ格納用のリストに追加
         keypoints_list.append(keypoints)
         scores_list.append(scores)
         bbox_list.append(
@@ -91,35 +93,47 @@ def run_inference(model, image, input_size):
 
     return keypoints_list, scores_list, bbox_list
 
+def load_SL4():
+    module = hub.load("C:/Developer/DepthAI/DepthPose/models/movenet-tensorflow2-singlepose-lightning-v4")
+    model = module.signatures['serving_default']
+    input_size = 192
+    return model, input_size
+
+def load_ST4():
+    module = hub.load("C:/Developer/DepthAI/DepthPose/models/movenet-tensorflow2-singlepose-thunder-v4")
+    model = module.signatures['serving_default']
+    input_size = 256
+    return model, input_size
+
+def run_Single(model, image, input_size):
+    image_width, image_height = image.shape[1], image.shape[0]
+
+    input_image: np.ndarray = cv2.resize(image, dsize=(input_size, input_size))  # リサイズ
+    input_image = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)  # BGR→RGB変換
+    input_image = input_image.reshape(-1, input_size, input_size, 3)  # リシェイプ
+    input_image = tf.cast(input_image, dtype=tf.int32)  # int32へキャスト
+
+    outputs = model(input_image)
+
+    keypoints_with_scores = outputs['output_0'].numpy()
+    keypoints_with_scores = np.squeeze(keypoints_with_scores)
+
+    keypoints = []
+    scores = []
+    for index in range(17):
+        keypoint_x = int(image_width * keypoints_with_scores[index][1])
+        keypoint_y = int(image_height * keypoints_with_scores[index][0])
+        score = keypoints_with_scores[index][2]
+
+        keypoints.append([keypoint_x, keypoint_y])
+        scores.append(score)
+        # print(scores)
+
+    return keypoints, scores, None
 
 
 with tf.device('/device:GPU:0'):
-#     interpreter = tf.lite.Interpreter(model_path='C:/Developer/DepthAI/DepthPose/models/4.tflite')
-#     interpreter.allocate_tensors()
-#     input_size = 192
-
-
-#     image = tf.io.read_file(image_path)
-#     image = tf.image.decode_jpeg(image)
-#     # print('shape', image.get_shape())
-
-# # Resize and pad the image to keep the aspect ratio and fit the expected size.
-#     input_image = tf.expand_dims(image, axis=0)
-#     # print('shape', input_image.get_shape())
-#     input_image = tf.image.resize_with_pad(input_image, input_size, input_size)
-#     # print('shape', input_image.get_shape())
-
-# Run model inference.
-    # keypoints_with_scores = movenet(interpreter, input_image)
-    # print(keypoints_with_scores)
-
-
-
-    module = hub.load("C:/Developer/DepthAI/DepthPose/models/movenet-tensorflow2-multipose-lightning-v1")
-    input_size = 256
-    model = module.signatures['serving_default']
-    # keypoints_with_scores = movenet2(model)
-    # print(keypoints_with_scores)
+    model, input_size = load_SL4()
 
     cap = cv2.VideoCapture(0)
 
@@ -129,15 +143,11 @@ with tf.device('/device:GPU:0'):
         # keypoints_with_scores = movenet2(model, frame)
 
         # output_overlay  = mn_viz.draw_prediction_on_image(frame, keypoints_with_scores)
-        for i in range(8):
-            keypoints_list, scores_list, bbox_list = run_inference(
-                model,
-                frame,
-                input_size
-            )
-
+        for i in range(6):
+            keypoints_list, scores_list, bbox_list = run_Single(model, frame, input_size)
+        # print(keypoints_list)
         elapsed_time = time.time() - start_time
-        debug_image = mn_viz2.draw_debug(
+        debug_image = mn_viz2.draw_Single(
             frame,
             elapsed_time,
             0.5,
