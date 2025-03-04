@@ -1,3 +1,8 @@
+# experiments based on
+# https://www.tensorflow.org/hub/tutorials/movenet
+# https://github.com/Kazuhito00/MoveNet-Python-Example/tree/main
+
+
 import tensorflow as tf
 import tensorflow_hub as hub
 import numpy as np
@@ -39,7 +44,7 @@ def movenet1(model, image):
     keypoints_with_scores = np.squeeze(keypoints_with_scores)
     return keypoints_with_scores
 
-def run_inference(model, image, input_size=256):
+def run_inference(model, image, input_size):
     image_width, image_height = image.shape[1], image.shape[0]
 
     # 前処理
@@ -89,20 +94,20 @@ def run_inference(model, image, input_size=256):
 
 
 with tf.device('/device:GPU:0'):
-    interpreter = tf.lite.Interpreter(model_path='C:/Developer/DepthAI/DepthPose/models/4.tflite')
-    interpreter.allocate_tensors()
-    input_size = 192
+#     interpreter = tf.lite.Interpreter(model_path='C:/Developer/DepthAI/DepthPose/models/4.tflite')
+#     interpreter.allocate_tensors()
+#     input_size = 192
 
 
-    image = tf.io.read_file(image_path)
-    image = tf.image.decode_jpeg(image)
-    # print('shape', image.get_shape())
+#     image = tf.io.read_file(image_path)
+#     image = tf.image.decode_jpeg(image)
+#     # print('shape', image.get_shape())
 
-# Resize and pad the image to keep the aspect ratio and fit the expected size.
-    input_image = tf.expand_dims(image, axis=0)
-    # print('shape', input_image.get_shape())
-    input_image = tf.image.resize_with_pad(input_image, input_size, input_size)
-    # print('shape', input_image.get_shape())
+# # Resize and pad the image to keep the aspect ratio and fit the expected size.
+#     input_image = tf.expand_dims(image, axis=0)
+#     # print('shape', input_image.get_shape())
+#     input_image = tf.image.resize_with_pad(input_image, input_size, input_size)
+#     # print('shape', input_image.get_shape())
 
 # Run model inference.
     # keypoints_with_scores = movenet(interpreter, input_image)
@@ -110,7 +115,8 @@ with tf.device('/device:GPU:0'):
 
 
 
-    module = hub.load("C:/Developer/DepthAI/DepthPose/models/movenet_multipose_lightning")
+    module = hub.load("C:/Developer/DepthAI/DepthPose/models/movenet-tensorflow2-multipose-lightning-v1")
+    input_size = 256
     model = module.signatures['serving_default']
     # keypoints_with_scores = movenet2(model)
     # print(keypoints_with_scores)
