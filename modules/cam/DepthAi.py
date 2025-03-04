@@ -182,13 +182,13 @@ def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool =
 
 
 class DepthAi():
-    def __init__(self, doMono: bool = True) -> None:
+    def __init__(self, fps: int = 30, doMono: bool = True) -> None:
 
         self.frameCallbacks: set = set()
 
         self.previewType: PreviewType =     PreviewType.VIDEO
         self.doMono: bool =                 doMono
-        self.fps =                          60
+        self.fps: int =                     fps
         self.flipH: bool =                  False
         self.flipV: bool =                  False
         self.rotate90: bool =               False
@@ -316,11 +316,12 @@ class DepthAi():
         if self.previewType == PreviewType.VIDEO:
             return_frame = video_frame
         if self.previewType == PreviewType.MONO:
-            return_frame = mono_frame
+            # convert gray to rgb frame
+            return_frame = cv2.cvtColor(mono_frame, cv2.COLOR_GRAY2RGB)  # type: ignore
         if self.previewType == PreviewType.STEREO:
             return_frame = stereo_frame
         if self.previewType == PreviewType.MASK:
-            return_frame = mask_frame
+            return_frame = cv2.cvtColor(mask_frame, cv2.COLOR_GRAY2RGB)  # type: ignore
         if self.previewType == PreviewType.MASKED:
             return_frame = masked_frame
         if return_frame is None:

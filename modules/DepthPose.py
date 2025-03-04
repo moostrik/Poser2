@@ -2,6 +2,8 @@
 from modules.cam.DepthAiGui import DepthAiGui as DepthCam
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
+from modules.pose.Pose import Pose
+
 
 from enum import Enum
 import numpy as np
@@ -25,15 +27,21 @@ class DepthPose():
         self.gui: Gui = Gui('DepthPose', path + '/files/', 'default')
         self.render: Render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
 
-        self.camera = DepthCam(self.gui, True)
+        self.camera = DepthCam(self.gui, 30, True)
+        self.detector = Pose()
+        # self.detector2 = Pose()
 
         self._running: bool = False
+
 
 
     def start(self) -> None:
         self.camera.open()
         self.camera.startCapture()
-        self.camera.addFrameCallback(self.render.set_video_image)
+        # self.camera.addFrameCallback(self.render.set_video_image)
+        self.camera.addFrameCallback(self.detector.detect)
+        # self.camera.addFrameCallback(self.detector2.detect)
+        self.detector.addFrameCallback(self.render.set_video_image)
 
         self.render.exit_callback = self.stop
         self.render.addKeyboardCallback(self.render_keyboard_callback)

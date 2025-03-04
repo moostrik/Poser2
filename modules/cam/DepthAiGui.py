@@ -19,9 +19,9 @@ def gsfr(range: tuple[int, int]) -> float:
     return getStepsFromRange(range)
 
 class DepthAiGui(Cam):
-    def __init__(self, gui: Gui | None, doMono: bool = True) -> None:
+    def __init__(self, gui: Gui | None, fps: int = 30, doMono: bool = True) -> None:
         self.gui: Gui | None = gui
-        super().__init__(doMono)
+        super().__init__(fps, doMono)
 
         elem: list = []
         elem.append([E(eT.TEXT, 'Exposure  '),

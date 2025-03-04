@@ -5,3 +5,4 @@ opencv-contrib-python
 Pillow
 depthai
 watchdog
+tensorflow==2.10.0
