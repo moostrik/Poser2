@@ -54,7 +54,8 @@ def load_ML1():
     onnx_session = onnxruntime.InferenceSession(
         model_path,
         providers=[
-            'CUDAExecutionProvider'
+            'CUDAExecutionProvider',
+            'CPUExecutionProvider'
         ],
     )
     input_size = 256
@@ -123,7 +124,8 @@ def load_ST4():
     onnx_session = onnxruntime.InferenceSession(
         model_path,
         providers=[
-            'CUDAExecutionProvider'
+            'CUDAExecutionProvider',
+            'CPUExecutionProvider'
         ],
     )
     input_size = 256
@@ -158,7 +160,7 @@ def run_Single(onnx_session, image, input_size):
     return keypoints, scores, None
 
 
-with tf.device('/device:GPU:0'):
+def run_single() -> None:
     model, input_size = load_ST4()
 
     cap = cv2.VideoCapture(0)
@@ -182,10 +184,48 @@ with tf.device('/device:GPU:0'):
             0.5,
             bbox_list)
 
-        cv2.imshow('MoveNet(multipose) Demo', debug_image )
+        cv2.imshow('MoveNet SinglePose Onnx Demo', debug_image )
         key = cv2.waitKey(1)
         if key == 27:  # ESC
             break
 
     cap.release()
     cv2.destroyAllWindows()
+
+def run_multi() -> None:
+    model, input_size = load_ML1()
+
+    cap = cv2.VideoCapture(0)
+
+    while True:
+        ret, frame = cap.read()
+        # keypoints_with_scores = movenet2(model, frame)
+
+        start_time = time.time()
+        # output_overlay  = mn_viz.draw_prediction_on_image(frame, keypoints_with_scores)
+        for i in range(6):
+            keypoints_list, scores_list, bbox_list = run_Multi(model, frame, input_size)
+        # print(keypoints_list)
+        elapsed_time = time.time() - start_time
+        debug_image = mn_viz2.draw_Multi(
+            frame,
+            elapsed_time,
+            0.5,
+            keypoints_list,
+            scores_list,
+            0.5,
+            bbox_list)
+
+        cv2.imshow('MoveNet MultiPose Onnx Demo', debug_image )
+        key = cv2.waitKey(1)
+        if key == 27:  # ESC
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+with tf.device('/device:GPU:0'):
+    run_single()
+    # run_multi()
+
+
