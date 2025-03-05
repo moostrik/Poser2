@@ -32,17 +32,17 @@ class DepthPose():
         self._running: bool = False
 
     def start(self) -> None:
-        self.camera.open()
-        self.camera.startCapture()
-        # self.camera.addFrameCallback(self.render.set_video_image)
-        self.camera.addFrameCallback(self.detector.set_image)
+        self.render.exit_callback = self.stop
+        self.render.addKeyboardCallback(self.render_keyboard_callback)
+        self.render.start()
 
         self.detector.start()
         self.detector.addMessageCallback(self.pose_callback)
 
-        self.render.exit_callback = self.stop
-        self.render.addKeyboardCallback(self.render_keyboard_callback)
-        self.render.start()
+        self.camera.open()
+        self.camera.startCapture()
+        # self.camera.addFrameCallback(self.render.set_video_image)
+        self.camera.addFrameCallback(self.detector.set_image)
 
         self.gui.exit_callback = self.stop
         self.gui.addFrame([self.camera.get_gui_color_frame(), self.camera.get_gui_depth_frame()])
@@ -71,9 +71,11 @@ class DepthPose():
         return self._running
 
     def render_keyboard_callback(self, key, x, y) -> None:
+        if not  self.isRunning(): return
         if key == b'g' or key == b'G':
             if not self.gui or not self.gui.isRunning(): return
             self.gui.bringToFront()
 
     def pose_callback(self, pose_message: PoseMessage) -> None:
+        if not  self.isRunning(): return
         self.render.set_video_image(pose_message.image)
