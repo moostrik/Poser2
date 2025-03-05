@@ -2,7 +2,7 @@
 from modules.cam.DepthAiGui import DepthAiGui as DepthCam
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
-from modules.pose.Pose import Pose
+from modules.pose.PoseDetection import PoseDetection, ModelType, PoseMessage
 
 
 from enum import Enum
@@ -24,24 +24,21 @@ class DepthPose():
             self.width: int = height
             self.height: int = width
 
-        self.gui: Gui = Gui('DepthPose', path + '/files/', 'default')
-        self.render: Render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
-
-        self.camera = DepthCam(self.gui, 30, True)
-        self.detector = Pose()
-        # self.detector2 = Pose()
+        self.gui = Gui('DepthPose', path + '/files/', 'default')
+        self.render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
+        self.camera = DepthCam(self.gui, 60, True)
+        self.detector = PoseDetection(ModelType.THUNDER)
 
         self._running: bool = False
-
-
 
     def start(self) -> None:
         self.camera.open()
         self.camera.startCapture()
         # self.camera.addFrameCallback(self.render.set_video_image)
-        self.camera.addFrameCallback(self.detector.detect)
-        # self.camera.addFrameCallback(self.detector2.detect)
-        self.detector.addFrameCallback(self.render.set_video_image)
+        self.camera.addFrameCallback(self.detector.set_image)
+
+        self.detector.start()
+        self.detector.addMessageCallback(self.pose_callback)
 
         self.render.exit_callback = self.stop
         self.render.addKeyboardCallback(self.render_keyboard_callback)
@@ -59,6 +56,9 @@ class DepthPose():
         self.camera.clearFrameCallbacks()
         self.camera.close()
 
+        self.detector.stop()
+        self.detector.clearMessageCallbacks()
+
         self.render.exit_callback = None
         self.render.stop()
 
@@ -74,3 +74,6 @@ class DepthPose():
         if key == b'g' or key == b'G':
             if not self.gui or not self.gui.isRunning(): return
             self.gui.bringToFront()
+
+    def pose_callback(self, pose_message: PoseMessage) -> None:
+        self.render.set_video_image(pose_message.image)
