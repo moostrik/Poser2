@@ -5,11 +5,15 @@
 
 
 import tensorflow as tf
-import tensorflow_hub as hub # install without dependncies --no-deps
+# import tensorflow_hub as hub
 import numpy as np
 import cv2
 import mn_viz2
 import time
+
+import onnxruntime
+
+print(onnxruntime.cuda_version)
 
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
@@ -46,22 +50,31 @@ def movenet1(model, image):
     return keypoints_with_scores
 
 def load_ML1():
-    module = hub.load("C:/Developer/DepthAI/DepthPose/models/movenet-tensorflow2-multipose-lightning-v1")
-    model = module.signatures['serving_default']
+    model_path = "C:/Developer/DepthAI/DepthPose/models/movenet_multipose_lightning_1.onnx"
+    onnx_session = onnxruntime.InferenceSession(
+        model_path,
+        providers=[
+            'CUDAExecutionProvider'
+        ],
+    )
     input_size = 256
-    return model, input_size
+    return onnx_session, input_size
 
-def run_Multi(model, image, input_size):
+def run_Multi(onnx_session, image, input_size):
     image_width, image_height = image.shape[1], image.shape[0]
 
     input_image: np.ndarray = cv2.resize(image, dsize=(input_size, input_size))  # リサイズ
     input_image = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)  # BGR→RGB変換
     input_image = input_image.reshape(-1, input_size, input_size, 3)  # リシェイプ
-    input_image = tf.cast(input_image, dtype=tf.int32)  # int32へキャスト
+    input_image = input_image.astype('int32')   # int32へキャスト
 
-    outputs = model(input_image)
+    input_name = onnx_session.get_inputs()[0].name
+    output_name = onnx_session.get_outputs()[0].name
+    outputs = onnx_session.run([output_name], {input_name: input_image})
 
-    keypoints_with_scores = outputs['output_0'].numpy()
+    # outputs = model(input_image)
+
+    keypoints_with_scores = outputs[0]
     keypoints_with_scores = np.squeeze(keypoints_with_scores)
 
     keypoints_list, scores_list = [], []
@@ -94,28 +107,41 @@ def run_Multi(model, image, input_size):
     return keypoints_list, scores_list, bbox_list
 
 def load_SL4():
-    module = hub.load("C:/Developer/DepthAI/DepthPose/models/movenet-tensorflow2-singlepose-lightning-v4")
-    model = module.signatures['serving_default']
+    model_path = "C:/Developer/DepthAI/DepthPose/models/movenet_singlepose_lightning_4.onnx"
+    onnx_session = onnxruntime.InferenceSession(
+        model_path,
+        providers=[
+            'CUDAExecutionProvider',
+            'CPUExecutionProvider'
+        ],
+    )
     input_size = 192
-    return model, input_size
+    return onnx_session, input_size
 
 def load_ST4():
-    module = hub.load("C:/Developer/DepthAI/DepthPose/models/movenet-tensorflow2-singlepose-thunder-v4")
-    model = module.signatures['serving_default']
+    model_path = "C:/Developer/DepthAI/DepthPose/models/movenet_singlepose_thunder_4.onnx"
+    onnx_session = onnxruntime.InferenceSession(
+        model_path,
+        providers=[
+            'CUDAExecutionProvider'
+        ],
+    )
     input_size = 256
-    return model, input_size
+    return onnx_session, input_size
 
-def run_Single(model, image, input_size):
+def run_Single(onnx_session, image, input_size):
     image_width, image_height = image.shape[1], image.shape[0]
 
     input_image: np.ndarray = cv2.resize(image, dsize=(input_size, input_size))  # リサイズ
     input_image = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)  # BGR→RGB変換
     input_image = input_image.reshape(-1, input_size, input_size, 3)  # リシェイプ
-    input_image = tf.cast(input_image, dtype=tf.int32)  # int32へキャスト
+    input_image = input_image.astype('int32')  # int32へキャスト
 
-    outputs = model(input_image)
+    input_name = onnx_session.get_inputs()[0].name
+    output_name = onnx_session.get_outputs()[0].name
+    outputs = onnx_session.run([output_name], {input_name: input_image})
 
-    keypoints_with_scores = outputs['output_0'].numpy()
+    keypoints_with_scores = outputs[0]
     keypoints_with_scores = np.squeeze(keypoints_with_scores)
 
     keypoints = []
