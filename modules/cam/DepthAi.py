@@ -83,10 +83,9 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, lowres:bool = False
     outputImages.setStreamName("output_images")
 
     color.setCamera("color")
+    color.setSize(1280, 720)
     if lowres:
-        color.setSize(640, 400)
-    else:
-        color.setSize(1280, 720)
+        color.setSize(640, 360)
 
     color.setFps(fps)
     color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
@@ -249,7 +248,7 @@ class DepthAi():
 
         self.errorFrame: np.ndarray =   np.zeros((720, 1280, 3), dtype=np.uint8)
         if self.lowres:
-            self.errorFrame = cv2.resize(self.errorFrame, (640, 400))
+            self.errorFrame = cv2.resize(self.errorFrame, (640, 360))
         self.errorFrame[:,:,2] =        255
 
     def __exit__(self) -> None:

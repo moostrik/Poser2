@@ -22,7 +22,7 @@ class DepthPose():
         self.height: int =  720
         if lowres:
             self.width =    640
-            self.height =   400
+            self.height =   360
 
         self.gui = Gui('DepthPose', path + '/files/', 'default')
         self.render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
