@@ -116,7 +116,7 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, lowres:bool = False
     config.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
     stereo.initialConfig.set(config)
 
-    syncThreshold = int(1500 / fps)
+    syncThreshold = int(1250 / fps)
     sync.setSyncThreshold(timedelta(milliseconds=syncThreshold))
 
     left.out.link(stereo.left)
