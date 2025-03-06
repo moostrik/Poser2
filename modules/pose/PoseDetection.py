@@ -7,6 +7,7 @@ import onnxruntime as ort
 from enum import Enum
 from threading import Thread, Lock
 import copy
+import os
 
 class ModelType(Enum):
     NONE = 0
@@ -41,10 +42,7 @@ class PoseMessage():
         self.image: np.ndarray = pose_image
 
 def LoadSession(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSession, int]:
-    # check for trailing slash
-    if model_path[-1] != '/':
-        model_path += '/'
-    path: str = model_path + ModelFileNames[model_type.value]
+    path: str = os.path.join(model_path, ModelFileNames[model_type.value])
     print('Loading model', ModelTypeNames[model_type.value], 'from path', path)
     onnx_session = ort.InferenceSession(
         path,
@@ -242,9 +240,9 @@ def DrawPose(image, keypoints, scores) -> np.ndarray:
     return debug_image
 
 class PoseDetection(Thread):
-    def __init__(self, model_type:ModelType) -> None:
+    def __init__(self, path: str, model_type:ModelType) -> None:
         super().__init__()
-        self.path = 'C:/Developer/DepthAI/DepthPose/models/'
+        self.path: str = path
         self.modelType: ModelType = model_type
 
         self._input_mutex: Lock = Lock()

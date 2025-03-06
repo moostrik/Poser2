@@ -3,10 +3,8 @@ from modules.cam.DepthAiGui import DepthAiGui as DepthCam
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.PoseDetection import PoseDetection, ModelType, PoseMessage
-
-
+import os
 from enum import Enum
-import numpy as np
 
 class CamType(Enum):
     DEPTH   = 1
@@ -27,7 +25,7 @@ class DepthPose():
         self.gui = Gui('DepthPose', path + '/files/', 'default')
         self.render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
         self.camera = DepthCam(self.gui, fps, mono, lowres, queueLeft)
-        self.detector = PoseDetection(ModelType.THUNDER)
+        self.detector = PoseDetection(os.path.join(path, 'models'), ModelType.THUNDER)
 
         self._running: bool = False
 
