@@ -2,11 +2,6 @@
 # https://oak-web.readthedocs.io/
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
-# TODO
-# gui cleanup
-
-# openPose
-
 import cv2
 import numpy as np
 import depthai as dai

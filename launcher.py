@@ -1,7 +1,9 @@
 # TODO
-#
+# Camera video stream
+# Camera person detection / tracking
+# Multi person pose
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from os import path
 from signal import signal, SIGINT
 from sys import exit
@@ -14,7 +16,7 @@ parser.add_argument('-mono',    '--mono',       action='store_true',        help
 parser.add_argument('-low',     '--lowres',     action='store_true',        help='low resolution camera (400p instead of 720p)')
 parser.add_argument('-left',    '--queueleft',  action='store_true',        help='queue left monochrome camera frames')
 parser.add_argument('-nopose',  '--nopose',     action='store_true',        help='do not do pose detection')
-args = parser.parse_args()
+args: Namespace = parser.parse_args()
 
 currentPath: str = path.dirname(__file__)
 

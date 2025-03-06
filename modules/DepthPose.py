@@ -27,7 +27,7 @@ class DepthPose():
         self.camera = DepthCam(self.gui, fps, mono, lowres, queueLeft)
         self.detector = PoseDetection(os.path.join(path, 'models'), ModelType.THUNDER)
 
-        self._running: bool = False
+        self.running: bool = False
 
     def start(self) -> None:
         self.render.exit_callback = self.stop
@@ -49,7 +49,7 @@ class DepthPose():
         self.gui.start()
         self.gui.bringToFront()
 
-        self._running = True
+        self.running = True
 
     def stop(self) -> None:
         if not self.noPose:
@@ -66,10 +66,10 @@ class DepthPose():
         self.gui.exit_callback = None
         self.gui.stop()
 
-        self._running = False
+        self.running = False
 
     def isRunning(self) -> bool :
-        return self._running
+        return self.running
 
     def render_keyboard_callback(self, key, x, y) -> None:
         if not  self.isRunning(): return
