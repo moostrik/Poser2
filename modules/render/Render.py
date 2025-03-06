@@ -1,127 +1,64 @@
 from OpenGL.GL import * # type: ignore
-import OpenGL.GLUT as glut
 from threading import Lock
-import cv2
 import numpy as np
 from enum import Enum
-import os
-import random
 
 from modules.gl.RenderWindow import RenderWindow
 from modules.gl.Texture import Texture
 from modules.gl.Fbo import Fbo, SwapFbo
-from modules.gl.shaders.Blend import Blend
-from modules.gl.shaders.BlurH import BlurH
-from modules.gl.shaders.BlurV import BlurV
-from modules.gl.shaders.Noise import Noise
-from modules.gl.shaders.NoiseBlend import NoiseBlend
-from modules.gl.shaders.NoiseSimplex import NoiseSimplex
-from modules.gl.shaders.NoiseSimplexBlend import NoiseSimplexBlend
-from modules.gl.shaders.Omission import Omission
-from modules.gl.shaders.FlashIn import FlashIn
-from modules.gl.shaders.FlashOut import FlashOut
-from modules.gl.shaders.Hsv import Hsv
+from modules.gl.Mesh import Mesh
 from modules.gl.Utils import lfo, fit, fill
+
+from modules.pose.PoseConstants import PoseMessage, PoseIndicesFlat
 
 class ImageType(Enum):
     VIDEO = 0
-    DEPTH = 1
+    POSE = 1
+
+class MeshType(Enum):
+    POSE_0 = 0
+    POSE_1 = 1
 
 class Render(RenderWindow):
-    def __init__(self, composition_width: int, composition_height: int, window_width: int, window_height: int, name: str, fullscreen: bool = False, v_sync = False, stretch = False) -> None:
+    def __init__(self, window_width: int, window_height: int, name: str, fullscreen: bool = False, v_sync = False) -> None:
         super().__init__(window_width, window_height, name, fullscreen, v_sync)
 
         self.input_mutex: Lock = Lock()
+
+        self.width: int = window_width
+        self.height: int = window_height
+
         self._images: dict[ImageType, np.ndarray | None] = {}
         self.textures: dict[ImageType, Texture] = {}
-
-        self.width: int = composition_width
-        self.height: int = composition_height
 
         for image_type in ImageType:
             self._images[image_type] = None
             self.textures[image_type] = Texture()
 
+        self._vertices: dict[MeshType, np.ndarray | None] = {}
+        self._colors: dict[MeshType, np.ndarray | None] = {}
+        self.meshes: dict[MeshType, Mesh] = {}
+        for mesh_type in MeshType:
+            self._vertices[mesh_type] = None
+            self._colors[mesh_type] = None
+            self.meshes[mesh_type] = Mesh()
+            self.meshes[mesh_type].set_indices(PoseIndicesFlat)
+
         self.fbos: list[Fbo | SwapFbo] = []
-        self.seq_fbo = Fbo()
-        self.fbos.append(self.seq_fbo)
-        self.noise_fbo = Fbo()
-        self.fbos.append(self.noise_fbo)
-        self.cam_depth_fbo = SwapFbo()
-        self.fbos.append(self.cam_depth_fbo)
-        self.camera_fbo = SwapFbo()
-        self.fbos.append(self.camera_fbo)
-        self.diffusion_fbo = SwapFbo()
-        self.fbos.append(self.diffusion_fbo)
-        self.dif_depth_fbo = SwapFbo()
-        self.fbos.append(self.dif_depth_fbo)
-        self.freeze_fbo = Fbo()
-        self.fbos.append(self.freeze_fbo)
 
-        self.shaders: list = []
-        self.blend_shader = Blend()
-        self.shaders.append(self.blend_shader)
-        self.blurH_shader = BlurH()
-        self.shaders.append(self.blurH_shader)
-        self.blurV_shader = BlurV()
-        self.shaders.append(self.blurV_shader)
-        self.noise_shader = Noise()
-        self.shaders.append(self.noise_shader)
-        self.noise_blend_shader = NoiseBlend()
-        self.shaders.append(self.noise_blend_shader)
-        self.noise_simplex_shader = NoiseSimplex()
-        self.shaders.append(self.noise_simplex_shader)
-        self.noise_simplex_blend_shader = NoiseSimplexBlend()
-        self.shaders.append(self.noise_simplex_blend_shader)
-        self.flash_in_shader = FlashIn()
-        self.shaders.append(self.flash_in_shader)
-        self.flash_out_shader = FlashOut()
-        self.shaders.append(self.flash_out_shader)
-        self.omission_shader = Omission()
-        self.shaders.append(self.omission_shader)
-        self.hsv_shader = Hsv()
-        self.shaders.append(self.hsv_shader)
-
-
-        self.trail: float = 0.996
-        self.dstry_blur: float = 0.1
-        self.dstry_bloom: float = 0.7
-        self.show_prompt: bool = False
-
-        self.prompt: str = ''
-        self.negative: str = ''
-
-        self.freeze: bool = False
-        self.prev_freeze: bool = False
-
-        # self.sequencer = Sequencer()
-
-
-        self.cap_prompt: list[str] = ['test']
 
     def allocate(self) -> None:
         for fbo in self.fbos: fbo.allocate(self.width, self.height, GL_RGBA32F)
-        for shader in self.shaders: shader.allocate(True)
-
-    def reload_shaders(self) -> None :
-        for s in self.shaders: s.load(True)
-
+        for mesh in self.meshes.values(): mesh.allocate()
 
     def draw(self) -> None: # override
         if not self.is_allocated: self.allocate()
 
         self.update_textures()
+        self.update_meshes()
 
         self.draw_video(ImageType.VIDEO)
 
-
-    def update_trails(self, tex: Texture | Fbo | SwapFbo, fbo: SwapFbo, trail: float) -> None:
-        self.setView(fbo.width, fbo.height, False, True)
-        fbo.swap()
-        self.blend_shader.use(fbo.fbo_id,
-                              tex.tex_id,
-                              fbo.back_tex_id,
-                              trail)
 
     def draw_in_fbo(self, tex: Texture | Fbo | SwapFbo, fbo: Fbo | SwapFbo) -> None:
         self.setView(fbo.width, fbo.height, False, True)
@@ -136,20 +73,20 @@ class Render(RenderWindow):
             return
 
         x, y, w, h = fit(tex.width, tex.height, self.window_width, self.window_height)
-        self.textures[type].draw(x, y, w, h)
+        self.textures[type].draw(x, 0, w, h)
 
-    def draw_depth(self, type: ImageType) -> None:
-        self.update_trails(self.textures[type], self.diffusion_fbo, self.trail)
+        if  self.meshes[MeshType.POSE_0].isInitialized():
+            self.meshes[MeshType.POSE_0].draw(x, 0, w, h)
 
-        self.setView(self.window_width, self.window_height)
-        x, y, w, h = fit(self.diffusion_fbo.width, self.diffusion_fbo.height, self.window_width, self.window_height / 2)
-        self.diffusion_fbo.draw(x, y + h, w, h)
+        self.textures[ImageType.POSE].draw(0, h, 256, 256)
+
 
     def update_textures(self) -> None:
         for image_type in ImageType:
             image: np.ndarray | None = self.get_image(image_type)
             texture: Texture = self.textures[image_type]
-            if image is not None: texture.set_from_image(image)
+            if image is not None:
+                texture.set_from_image(image)
 
     def set_image(self, type: ImageType, image: np.ndarray) -> None :
         with self.input_mutex:
@@ -160,7 +97,41 @@ class Render(RenderWindow):
             self._images[type] = None
             return ret_image
 
-    def set_video_image(self, image: np.ndarray) -> None :
+    def update_meshes(self) -> None:
+        for mesh_type in MeshType:
+            vertices: np.ndarray | None = self.get_vertices(mesh_type)
+            mesh: Mesh = self.meshes[mesh_type]
+            if vertices is not None:
+                mesh.set_vertices(vertices)
+            colors: np.ndarray | None = self.get_colors(mesh_type)
+            if colors is not None:
+                mesh.set_colors(colors)
+
+    def set_vertices(self, type: MeshType, vertices: np.ndarray) -> None:
+        with self.input_mutex:
+            self._vertices[type] = vertices
+
+    def get_vertices(self, type: MeshType) -> np.ndarray | None:
+        with self.input_mutex:
+            ret_vertices: np.ndarray | None = self._vertices[type]
+            self._vertices[type] = None
+            return ret_vertices
+
+    def set_colors(self, type: MeshType, colors: np.ndarray) -> None:
+        with self.input_mutex:
+            self._colors[type] = colors
+
+    def get_colors(self, type: MeshType) -> np.ndarray | None:
+        with self.input_mutex:
+            ret_colors: np.ndarray | None = self._colors[type]
+            self._colors[type] = None
+            return ret_colors
+
+
+    def set_camera_image(self, image: np.ndarray) -> None :
         self.set_image(ImageType.VIDEO, image)
-    def set_depth_image(self, image: np.ndarray) -> None :
-        self.set_image(ImageType.DEPTH, image)
+
+    def set_pose_message(self, message: PoseMessage) -> None:
+        self.set_image(ImageType.POSE, message.image)
+        self.set_vertices(MeshType.POSE_0, message.pose_list[0].getVertices())
+        self.set_colors(MeshType.POSE_0, message.pose_list[0].getColors())

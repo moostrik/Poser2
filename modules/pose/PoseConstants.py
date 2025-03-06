@@ -70,6 +70,9 @@ PoseIndices: list[list[Keypoints]] = [
     [Keypoints.right_knee, Keypoints.right_ankle]
 ]
 
+# convert PoseIndices to a 1 dimentional np.ndarray
+PoseIndicesFlat: np.ndarray = np.array([kp.value for pose in PoseIndices for kp in pose], dtype=np.int32)
+
 class PoseBox():
     def __init__(self, xmin: float, ymin: float, xmax: float, ymax: float, score: float) -> None:
         self._xmin: float =  xmin
@@ -110,7 +113,20 @@ class Pose():
     def __init__(self, keypoints: np.ndarray, box: PoseBox) -> None:
         self.keypoints: np.ndarray = keypoints
         self.box: PoseBox = box
-        # keypoints: np.ndarray = np.zeros((NUM_KEYPOINTS, NUM_KEYPOINT_VALUES), dtype=np.float32)
-        # box: PoseBox = PoseBox(0.0, 0.0, 1.0, 1.0, 0.0)
+
+    def getVertices(self) -> np.ndarray:
+        vertices = self.keypoints[:, :2]
+        # swap x and y
+        return np.flip(vertices, axis=1)
+
+    def getColors(self) -> np.ndarray:
+        # return the last column of keypoints
+        return self.keypoints[:, 2]
 
 PoseList = list[Pose]
+
+
+class PoseMessage():
+    def __init__(self, pose_list: PoseList, pose_image: np.ndarray) -> None:
+        self.pose_list: PoseList = pose_list
+        self.image: np.ndarray = pose_image

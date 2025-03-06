@@ -1,4 +1,5 @@
 # TODO
+# Draw Pose GL
 # Camera video stream
 # Camera person detection / tracking
 # Multi person pose

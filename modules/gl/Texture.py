@@ -35,10 +35,10 @@ def get_data_type(internat_format) -> Constant:
 
 def get_internal_format(image: np.ndarray) -> Constant:
     # only works for byte images (not float)
-    
+
     channels: int = image.shape[-1] if len(image.shape) == 3 else 1
     # channels: int = len(cv2.split(image))
-    
+
     if channels == 1:
         return GL_R8
     if channels == 3:
@@ -87,7 +87,7 @@ class Texture():
         self.internal_format = internal_format
         self.format = get_format(internal_format)
         self.data_type = data_type
-        self.tex_id = glGenTextures(1)
+        self.tex_id: int = glGenTextures(1)
 
         glBindTexture(GL_TEXTURE_2D, self.tex_id)
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)

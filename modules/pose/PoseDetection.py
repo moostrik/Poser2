@@ -15,11 +15,6 @@ import os
 
 from modules.pose.PoseConstants import *
 
-class PoseMessage():
-    def __init__(self, pose_list: PoseList, pose_image: np.ndarray) -> None:
-        self.pose_list: PoseList = pose_list
-        self.image: np.ndarray = pose_image
-
 def LoadSession(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSession, int]:
     path: str = os.path.join(model_path, ModelFileNames[model_type.value])
     print('Loading model', ModelTypeNames[model_type.value], 'from path', path)
@@ -287,8 +282,8 @@ class PoseDetection(Thread):
                 image: np.ndarray | None = self.get_image()
                 if image is not None:
                     Poses: list[Pose] = RunSession(session, input_size, image)
-                    pose_image: np.ndarray = DrawPose(image, Poses)
-                    pose_message = PoseMessage(Poses, pose_image)
+                    # pose_image: np.ndarray = DrawPose(image, Poses)
+                    pose_message = PoseMessage(Poses, image)
                     self.callback(pose_message)
 
             time.sleep(0.1)

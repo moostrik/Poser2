@@ -16,14 +16,9 @@ class DepthPose():
     def __init__(self, path: str, fps: int, mono: bool, lowres: bool, queueLeft: bool, lightning: bool,  nopose:bool) -> None:
         self.path: str =    path
         self.noPose: bool = nopose
-        self.width: int =   1280
-        self.height: int =  720
-        if lowres:
-            self.width =    640
-            self.height =   360
 
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
-        self.render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
+        self.render = Render(1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
         self.camera = DepthCam(self.gui, fps, mono, lowres, queueLeft)
         self.detector = PoseDetection(os.path.join(path, 'models'), ModelType.LIGHTNING if lightning else ModelType.THUNDER)
 
@@ -37,12 +32,11 @@ class DepthPose():
         self.camera.open()
         self.camera.startCapture()
         self.camera.addFrameCallback(self.detector.set_image)
+        self.camera.addFrameCallback(self.render.set_camera_image)
 
         if not self.noPose:
             self.detector.start()
-            self.detector.addMessageCallback(self.pose_callback)
-        else:
-            self.camera.addFrameCallback(self.render.set_video_image)
+            self.detector.addMessageCallback(self.render.set_pose_message)
 
         self.gui.exit_callback = self.stop
         self.gui.addFrame([self.camera.get_gui_color_frame(), self.camera.get_gui_depth_frame()])
@@ -76,7 +70,3 @@ class DepthPose():
         if key == b'g' or key == b'G':
             if not self.gui or not self.gui.isRunning(): return
             self.gui.bringToFront()
-
-    def pose_callback(self, pose_message: PoseMessage) -> None:
-        if not  self.isRunning(): return
-        self.render.set_video_image(pose_message.image)
