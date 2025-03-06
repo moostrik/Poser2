@@ -22,7 +22,7 @@ class DepthPose():
             self.width =    640
             self.height =   360
 
-        self.gui = Gui('DepthPose', path + '/files/', 'default')
+        self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
         self.camera = DepthCam(self.gui, fps, mono, lowres, queueLeft)
         self.detector = PoseDetection(os.path.join(path, 'models'), ModelType.THUNDER)
