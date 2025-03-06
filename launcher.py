@@ -9,17 +9,16 @@ from time import sleep
 from modules.DepthPose import DepthPose
 
 parser: ArgumentParser = ArgumentParser()
-parser.add_argument('-cw',  '--width',          type=int,   default=1280,   help='camera width')
-parser.add_argument('-ch',  '--height',         type=int,   default=720,   help='camera height')
-parser.add_argument('-p',   '--portrait',       type=bool,  default=False,  help='portrait mode')
+parser.add_argument('-fps',     '--fps',        type=int,   default=60,     help='frames per second')
+parser.add_argument('-mono',    '--mono',       action='store_true',        help='use left mono input instead of color')
+parser.add_argument('-low',     '--lowres',     action='store_true',        help='low resolution camera (400p instead of 720p)')
+parser.add_argument('-left',    '--queueleft',  action='store_true',        help='queue left monochrome camera frames')
+parser.add_argument('-nopose',  '--nopose',     action='store_true',        help='do not do pose detection')
 args = parser.parse_args()
 
 currentPath: str = path.dirname(__file__)
 
-modWidth :int = round(args.width / 4) * 4
-modHeight : int = round(args.height / 4) * 4
-
-app: DepthPose = DepthPose(currentPath, modWidth, modHeight, args.portrait)
+app: DepthPose = DepthPose(currentPath, args.fps, args.mono, args.lowres, args.queueleft, args.nopose)
 app.start()
 
 def signal_handler_exit(sig, frame) -> None:

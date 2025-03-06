@@ -88,7 +88,7 @@ def RunSession(onnx_session: ort.InferenceSession, input_size: int, image: np.nd
 
 def DrawPose(image, keypoints, scores) -> np.ndarray:
     debug_image = copy.deepcopy(image)
-    keypoint_score_th = 0.0
+    keypoint_score_th = 0.5
     index01, index02 = 0, 1
     if scores[index01] > keypoint_score_th and scores[
             index02] > keypoint_score_th:

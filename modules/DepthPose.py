@@ -15,18 +15,18 @@ class CamType(Enum):
     IMAGE   = 4
 
 class DepthPose():
-    def __init__(self, path: str, width: int, height: int, portrait_mode: bool) -> None:
-        self.path: str = path
-        self.width: int = width
-        self.height: int = height
-        self.portrait_mode: bool = portrait_mode
-        if self.portrait_mode:
-            self.width: int = height
-            self.height: int = width
+    def __init__(self, path: str, fps: int, mono: bool, lowres: bool, queueLeft: bool, nopose:bool) -> None:
+        self.path: str =    path
+        self.noPose: bool = nopose
+        self.width: int =   1280
+        self.height: int =  720
+        if lowres:
+            self.width =    640
+            self.height =   400
 
         self.gui = Gui('DepthPose', path + '/files/', 'default')
         self.render = Render(self.width, self.height , self.width, self.height, 'Depth Pose', fullscreen=False, v_sync=True, stretch=False)
-        self.camera = DepthCam(self.gui, 60, True)
+        self.camera = DepthCam(self.gui, fps, mono, lowres, queueLeft)
         self.detector = PoseDetection(ModelType.THUNDER)
 
         self._running: bool = False
@@ -36,13 +36,15 @@ class DepthPose():
         self.render.addKeyboardCallback(self.render_keyboard_callback)
         self.render.start()
 
-        self.detector.start()
-        self.detector.addMessageCallback(self.pose_callback)
-
         self.camera.open()
         self.camera.startCapture()
-        # self.camera.addFrameCallback(self.render.set_video_image)
         self.camera.addFrameCallback(self.detector.set_image)
+
+        if not self.noPose:
+            self.detector.start()
+            self.detector.addMessageCallback(self.pose_callback)
+        else:
+            self.camera.addFrameCallback(self.render.set_video_image)
 
         self.gui.exit_callback = self.stop
         self.gui.addFrame([self.camera.get_gui_color_frame(), self.camera.get_gui_depth_frame()])
@@ -52,12 +54,13 @@ class DepthPose():
         self._running = True
 
     def stop(self) -> None:
+        if not self.noPose:
+            self.detector.stop()
+            self.detector.clearMessageCallbacks()
+
         self.camera.stopCapture()
         self.camera.clearFrameCallbacks()
         self.camera.close()
-
-        self.detector.stop()
-        self.detector.clearMessageCallbacks()
 
         self.render.exit_callback = None
         self.render.stop()

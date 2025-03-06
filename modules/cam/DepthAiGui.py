@@ -3,7 +3,7 @@ import math
 
 from modules.cam.DepthAi import DepthAi as Cam
 from modules.cam.DepthAi import PreviewTypeNames, StereoMedianFilterTypeNames
-from modules.cam.DepthAi import exposureRange, isoRange, whiteBalanceRange, contrastRange, brightnessRange, lumaDenoiseRange, saturationRange, sharpnessRange
+from modules.cam.DepthAi import exposureRange, isoRange, balanceRange, contrastRange, brightnessRange, lumaDenoiseRange, saturationRange, sharpnessRange
 from modules.cam.DepthAi import stereoDepthRange, stereoBrightnessRange
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
@@ -19,9 +19,9 @@ def gsfr(range: tuple[int, int]) -> float:
     return getStepsFromRange(range)
 
 class DepthAiGui(Cam):
-    def __init__(self, gui: Gui | None, fps: int = 30, doMono: bool = True) -> None:
+    def __init__(self, gui: Gui | None, fps: int = 30, mono: bool = True, lowres: bool = False, queueLeft: bool = False) -> None:
         self.gui: Gui | None = gui
-        super().__init__(fps, doMono)
+        super().__init__(fps, mono, lowres, queueLeft)
 
         elem: list = []
         elem.append([E(eT.TEXT, 'Exposure  '),
@@ -29,7 +29,7 @@ class DepthAiGui(Cam):
                      E(eT.TEXT, '       Iso'),
                      E(eT.SLDR, 'ColorIso',             super().setColorIso,            isoRange[0],            isoRange,           gsfr(isoRange))])
         elem.append([E(eT.TEXT, 'Balance   '),
-                     E(eT.SLDR, 'ColorBalance',         super().setColorBalance,        whiteBalanceRange[0],   whiteBalanceRange,  gsfr(whiteBalanceRange)),
+                     E(eT.SLDR, 'ColorBalance',         super().setColorBalance,        balanceRange[0],   balanceRange,  gsfr(balanceRange)),
                      E(eT.TEXT, '  Contrast'),
                      E(eT.SLDR, 'ColorContrast',        super().setColorContrast,       contrastRange[0],       contrastRange,      gsfr(contrastRange))])
         elem.append([E(eT.TEXT, 'Brightness'),
@@ -41,11 +41,11 @@ class DepthAiGui(Cam):
                      E(eT.TEXT, ' Sharpness'),
                      E(eT.SLDR, 'ColorSharpness',       super().setColorSharpness,      sharpnessRange[0],      sharpnessRange,     gsfr(sharpnessRange))])
         elem.append([E(eT.CMBO, 'Preview',              super().setPreview,             PreviewTypeNames[0],    PreviewTypeNames,   expand=False),
-                     E(eT.CHCK, ' FlipH',               super().setFlipH,               False),
-                     E(eT.CHCK, ' FlipV',               super().setFlipV,               False),
-                     E(eT.TEXT, ''),
+                     E(eT.CHCK, 'FlipH',                super().setFlipH,               False),
+                     E(eT.CHCK, 'FlipV',                super().setFlipV,               False),
                      E(eT.CHCK, 'AutoExposure',         super().setColorAutoExposure,   True),
-                     E(eT.CHCK, 'AutoBalance',          super().setColorAutoBalance,    True)])
+                     E(eT.CHCK, 'AutoBalance',          super().setColorAutoBalance,    True),
+                     E(eT.SLDR, 'FPS',                  None,                           0,    [0,60],  1)])
 
         self.color_frame = Frame('CAMERA COLOR', elem, 200)
 
@@ -68,16 +68,16 @@ class DepthAiGui(Cam):
                      E(eT.SLDR, 'LightFlood',           self.setIrFloodLight,           0, [0,1], 0.05)])
         elem.append([E(eT.TEXT, 'Filter    '),
                      E(eT.CMBO, 'Median',               super().setStereoMedianFilter,  StereoMedianFilterTypeNames[0],     StereoMedianFilterTypeNames, expand=False),
-                     E(eT.TEXT, '    '),
+                     E(eT.TEXT, '              '),
                      E(eT.CHCK, 'MonoAutoExposure',     super().setMonoAutoExposure,    False)])
 
-        self.depth_frame = Frame('CAMERA DEPTH', elem, 100)
+        self.depth_frame = Frame('CAMERA DEPTH', elem, 200)
 
         self.prevColorAutoExposure: bool =  self.colorAutoExposure
         self.prevColorExposure: int =       self.colorExposure
         self.prevColorIso: int =            self.colorIso
         self.prevColorAutoBalance: bool =   self.colorAutoBalance
-        self.prevColorWhiteBalance: int =   self.colorWhiteBalance
+        self.prevColorWhiteBalance: int =   self.colorBalance
         self.prevMonoAutoExposure: bool =   self.monoAutoExposure
         self.prevMonoExposure: int =        self.monoExposure
         self.prevMonoIso: int =             self.monoIso
@@ -86,6 +86,7 @@ class DepthAiGui(Cam):
     def updateColorControl(self, frame) -> None: #override
         super().updateColorControl(frame)
         if not self.gui or not self.gui.isRunning(): return
+
         if (self.prevColorAutoExposure != self.colorAutoExposure) :
             self.prevColorAutoExposure = self.colorAutoExposure
             self.gui.updateElement('AutoExposure', self.colorAutoExposure)
@@ -103,9 +104,9 @@ class DepthAiGui(Cam):
                 self.gui.updateElement('ColorIso', self.colorIso)
 
         if self.colorAutoBalance:
-            if (self.prevColorWhiteBalance != self.colorWhiteBalance) :
-                self.prevColorWhiteBalance = self.colorWhiteBalance
-                self.gui.updateElement('ColorBalance', self.colorWhiteBalance)
+            if (self.prevColorWhiteBalance != self.colorBalance) :
+                self.prevColorWhiteBalance = self.colorBalance
+                self.gui.updateElement('ColorBalance', self.colorBalance)
 
     # MONO
     def updateMonoControl(self, frame) -> None: #override
@@ -137,6 +138,11 @@ class DepthAiGui(Cam):
         if value > 0.0:
             self.gui.updateElement('LightGrid', 0.0)
             super().setIrGridLight(0.0)
+
+    # FPS
+    def updateFPS(self) -> None: #override
+        if not self.gui or not self.gui.isRunning(): return
+        self.gui.updateElement('FPS', self.getFPS())
 
     # GUI FRAME
     def get_gui_frame(self):

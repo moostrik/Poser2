@@ -14,6 +14,8 @@ from datetime import timedelta
 from PIL import Image, ImageOps
 from enum import Enum
 
+from modules.utils.FPS import FPS
+
 class PreviewType(Enum):
     NONE =  0
     VIDEO = 1
@@ -26,7 +28,7 @@ PreviewTypeNames: list[str] = [e.name for e in PreviewType]
 
 exposureRange:          tuple[int, int] = (1000, 33000)
 isoRange:               tuple[int, int] = ( 100, 1600 )
-whiteBalanceRange:      tuple[int, int] = (1000, 12000)
+balanceRange:           tuple[int, int] = (1000, 12000)
 contrastRange:          tuple[int, int] = ( -10, 10   )
 brightnessRange:        tuple[int, int] = ( -10, 10   )
 lumaDenoiseRange:       tuple[int, int] = (   0, 4    )
@@ -57,7 +59,7 @@ def fit(image: np.ndarray, width, height) -> np.ndarray:
     fit_image = ImageOps.fit(pil_image, size)
     return np.asarray(fit_image)
 
-def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> dai.RawStereoDepthConfig:
+def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, lowres:bool = False, queueLeft:bool = False) -> dai.RawStereoDepthConfig:
     color: dai.node.Camera = pipeline.create(dai.node.Camera)
     left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
@@ -81,7 +83,11 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool 
     outputImages.setStreamName("output_images")
 
     color.setCamera("color")
-    color.setSize(1280, 720)
+    if lowres:
+        color.setSize(640, 400)
+    else:
+        color.setSize(1280, 720)
+
     color.setFps(fps)
     color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
     # color.setBoardSocket(socket)
@@ -95,11 +101,14 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool 
     # except:
     #     raise
 
+    resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
+    if lowres:
+        resolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
     left.setCamera("left")
-    left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+    left.setResolution(resolution)
     left.setFps(fps)
     right.setCamera("right")
-    right.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+    right.setResolution(resolution)
     right.setFps(fps)
 
     stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
@@ -113,20 +122,21 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool 
     config.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
     stereo.initialConfig.set(config)
 
-    sync.setSyncThreshold(timedelta(milliseconds=50))
+    syncThreshold = int(1500 / fps)
+    sync.setSyncThreshold(timedelta(milliseconds=syncThreshold))
 
     left.out.link(stereo.left)
     right.out.link(stereo.right)
 
     stereo.disparity.link(sync.inputs["stereo"])
     color.video.link(sync.inputs["video"])
-    if addMonoOutput:
+    if queueLeft:
         left.out.link(sync.inputs["mono"])
 
     sync.out.link(outputImages.input)
     return stereo.initialConfig.get()
 
-def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool = False) -> dai.RawStereoDepthConfig:
+def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, lowres:bool = False) -> dai.RawStereoDepthConfig:
     left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
@@ -147,12 +157,14 @@ def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool =
     outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
     outputImages.setStreamName("output_images")
 
+    resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
+    if lowres:
+        resolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
     left.setCamera("left")
-    left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+    left.setResolution(resolution)
     left.setFps(fps)
-
     right.setCamera("right")
-    right.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+    right.setResolution(resolution)
     right.setFps(fps)
 
     stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
@@ -166,15 +178,14 @@ def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool =
     config.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT
     stereo.initialConfig.set(config)
 
-    sync.setSyncThreshold(timedelta(milliseconds=50))
+    syncThreshold = int(1500 / fps)
+    sync.setSyncThreshold(timedelta(milliseconds=syncThreshold))
 
     left.out.link(stereo.left)
     right.out.link(stereo.right)
 
     stereo.disparity.link(sync.inputs["stereo"])
     stereo.rectifiedLeft.link(sync.inputs["video"])
-    if addMonoOutput:
-        left.out.link(sync.inputs["mono"])
 
     sync.out.link(outputImages.input)
 
@@ -182,57 +193,64 @@ def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, addMonoOutput:bool =
 
 
 class DepthAi():
-    def __init__(self, fps: int = 30, doMono: bool = True) -> None:
+    def __init__(self, fps: int = 30, mono: bool = True, lowres: bool = False, queueLeft: bool = False) -> None:
 
-        self.frameCallbacks: set = set()
+        # FIXED SETTINGS
+        self.fps: int =                 fps
+        self.mono: bool =               mono
+        self.lowres: bool =             lowres
+        self.queueLeft: bool =          queueLeft
 
-        self.previewType: PreviewType =     PreviewType.VIDEO
-        self.doMono: bool =                 doMono
-        self.fps: int =                     fps
-        self.flipH: bool =                  False
-        self.flipV: bool =                  False
-        self.rotate90: bool =               False
-        self.errorFrame: np.ndarray =       np.zeros((720, 1280, 3), dtype=np.uint8)
-        self.errorFrame[:,:,2] =            255
+        # GENERAL SETTINGS
+        self.previewType =              PreviewType.VIDEO
+        self.flipH: bool =              False
+        self.flipV: bool =              False
 
         # COLOR SETTINGS
-        self.colorAutoExposure: bool =      True
-        self.colorAutoFocus: bool =         True
-        self.colorAutoBalance: bool =  True
-        self.colorExposure: int =           0
-        self.colorIso: int =                0
-        self.colorFocus: int =              0
-        self.colorWhiteBalance: int =       0
-        self.colorContrast: int =           0
-        self.colorBrightness: int =         0
-        self.colorLumaDenoise: int =        0
-        self.colorSaturation: int =         0
-        self.colorSharpness: int =          0
+        self.colorAutoExposure: bool =  True
+        self.colorAutoFocus: bool =     True
+        self.colorAutoBalance: bool =   True
+        self.colorExposure: int =       0
+        self.colorIso: int =            0
+        self.colorFocus: int =          0
+        self.colorBalance: int =        0
+        self.colorContrast: int =       0
+        self.colorBrightness: int =     0
+        self.colorLumaDenoise: int =    0
+        self.colorSaturation: int =     0
+        self.colorSharpness: int =      0
 
         # MONO SETTINGS
-        self.monoAutoExposure: bool =       True
-        self.monoAutoFocus: bool =          True
-        self.monoAutoWhiteBalance: bool =   True
-        self.monoExposure: int =            0
-        self.monoIso: int =                 0
+        self.monoAutoExposure: bool =   True
+        self.monoAutoFocus: bool =      True
+        self.monoExposure: int =        0
+        self.monoIso: int =             0
 
         # STEREO SETTINGS
         self.stereoConfig: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
 
         # MASK SETTINGS
-        self.depthTresholdMin:  int = 0
-        self.depthTresholdMax:  int = 255
+        self.depthTresholdMin:  int =   0
+        self.depthTresholdMax:  int =   255
 
         # DAI
-        self.device:            dai.Device
-        self.colorControl:      dai.DataInputQueue
-        self.monoControl:       dai.DataInputQueue
-        self.stereoControl:     dai.DataInputQueue
-        self.dataQueue:         dai.DataOutputQueue
-        self.dataCallbackId:    int
+        self.device:                    dai.Device
+        self.colorControl:              dai.DataInputQueue
+        self.monoControl:               dai.DataInputQueue
+        self.stereoControl:             dai.DataInputQueue
+        self.dataQueue:                 dai.DataOutputQueue
+        self.dataCallbackId:            int
 
-        self.deviceOpen: bool = False
-        self.capturing:  bool = False
+        # OTHER
+        self.deviceOpen: bool =         False
+        self.capturing:  bool =         False
+        self.frameCallbacks: set =      set()
+        self.fps_counter =              FPS()
+
+        self.errorFrame: np.ndarray =   np.zeros((720, 1280, 3), dtype=np.uint8)
+        if self.lowres:
+            self.errorFrame = cv2.resize(self.errorFrame, (640, 400))
+        self.errorFrame[:,:,2] =        255
 
     def __exit__(self) -> None:
         self.close()
@@ -241,7 +259,10 @@ class DepthAi():
         if self.deviceOpen: return True
 
         pipeline = dai.Pipeline()
-        self.stereoConfig = setupStereoColor(pipeline, self.fps, self.doMono)
+        if self.mono:
+            self.stereoConfig = setupStereoMono(pipeline, self.fps, self.lowres)
+        else:
+            self.stereoConfig = setupStereoColor(pipeline, self.fps, self.lowres, self.queueLeft)
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:
@@ -282,6 +303,8 @@ class DepthAi():
         self.dataQueue.removeCallback(self.dataCallbackId)
 
     def updateData(self, daiMessages) -> None:
+        self.fps_counter.processed()
+        self.updateFPS()
         if self.previewType == PreviewType.NONE:
             return
         if len(self.frameCallbacks) == 0:
@@ -312,20 +335,17 @@ class DepthAi():
         if video_frame is not None and mask_frame is not None:
             masked_frame = self.applyMask(video_frame, mask_frame)
 
-        return_frame: np.ndarray | None = None
-        if self.previewType == PreviewType.VIDEO:
+        return_frame: np.ndarray = self.errorFrame
+        if self.previewType == PreviewType.VIDEO and video_frame is not None:
             return_frame = video_frame
-        if self.previewType == PreviewType.MONO:
-            # convert gray to rgb frame
+        if self.previewType == PreviewType.MONO and mono_frame is not None:
             return_frame = cv2.cvtColor(mono_frame, cv2.COLOR_GRAY2RGB)  # type: ignore
-        if self.previewType == PreviewType.STEREO:
+        if self.previewType == PreviewType.STEREO and stereo_frame is not None:
             return_frame = stereo_frame
-        if self.previewType == PreviewType.MASK:
+        if self.previewType == PreviewType.MASK and mask_frame is not None:
             return_frame = cv2.cvtColor(mask_frame, cv2.COLOR_GRAY2RGB)  # type: ignore
-        if self.previewType == PreviewType.MASKED:
+        if self.previewType == PreviewType.MASKED and masked_frame is not None:
             return_frame = masked_frame
-        if return_frame is None:
-            return_frame = self.errorFrame
 
         return_frame = self.flip(return_frame)
 
@@ -333,7 +353,6 @@ class DepthAi():
             c(return_frame)
 
     def updateStereo(self, frame: np.ndarray) -> np.ndarray:
-        # return (frame * 255. / 95.).astype(np.uint8)
         return (frame * (255 / 95)).astype(np.uint8)
 
     def updateMask(self, frame: np.ndarray) -> np.ndarray:
@@ -384,7 +403,7 @@ class DepthAi():
         if (self.colorAutoFocus):
             self.colorFocus = frame.getLensPosition()
         if (self.colorAutoBalance):
-            self.colorWhiteBalance = frame.getColorTemperature()
+            self.colorBalance = frame.getColorTemperature()
 
     def setColorAutoExposure(self, value) -> None:
         if not self.deviceOpen: return
@@ -400,7 +419,7 @@ class DepthAi():
         if not self.deviceOpen: return
         self.colorAutoBalance = value
         if value == False:
-            self.setColorBalance(self.colorWhiteBalance)
+            self.setColorBalance(self.colorBalance)
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoWhiteBalanceMode(dai.CameraControl.AutoWhiteBalanceMode.AUTO)
@@ -425,8 +444,8 @@ class DepthAi():
         if not self.deviceOpen: return
         self.colorAutoBalance = False
         ctrl = dai.CameraControl()
-        self.colorWhiteBalance = int(clamp(value, whiteBalanceRange))
-        ctrl.setManualWhiteBalance(self.colorWhiteBalance)
+        self.colorBalance = int(clamp(value, balanceRange))
+        ctrl.setManualWhiteBalance(self.colorBalance)
         self.colorControl.send(ctrl)
 
     def setColorContrast(self, value: int) -> None:
@@ -496,7 +515,6 @@ class DepthAi():
         self.setMonoExposureIso(self.monoExposure, value)
 
     # STEREO SETTINGS
-
     def setDepthTresholdMin(self, value: int) -> None:
         if not self.deviceOpen: return
         v: int = int(clamp(value, stereoDepthRange))
@@ -540,7 +558,6 @@ class DepthAi():
             self.stereoConfig.postProcessing.median = dai.MedianFilter.KERNEL_7x7
         self.stereoControl.send(self.stereoConfig)
 
-
     # IR SETTINGS
     def setIrFloodLight(self, value: float) -> None:
         if not self.deviceOpen: return
@@ -559,9 +576,12 @@ class DepthAi():
     def clearFrameCallbacks(self) -> None:
         self.frameCallbacks = set()
 
+    # FPS
+    def updateFPS(self) -> None:
+        pass
 
-
-
+    def getFPS(self) -> float:
+        return self.fps_counter.get_rate_average()
 
 
 
