@@ -13,13 +13,13 @@ class CamType(Enum):
     IMAGE   = 4
 
 class DepthPose():
-    def __init__(self, path: str, fps: int, mono: bool, lowres: bool, queueLeft: bool, lightning: bool,  nopose:bool) -> None:
+    def __init__(self, path: str, fps: int, color: bool, stereo: bool, person: bool, lowres: bool, showLeft: bool, lightning: bool, nopose:bool) -> None:
         self.path: str =    path
         self.noPose: bool = nopose
 
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
-        self.camera = DepthCam(self.gui, fps, mono, lowres, queueLeft)
+        self.camera = DepthCam(self.gui, fps, color, stereo, person, lowres, showLeft)
         self.detector = PoseDetection(os.path.join(path, 'models'), ModelType.LIGHTNING if lightning else ModelType.THUNDER)
 
         self.running: bool = False

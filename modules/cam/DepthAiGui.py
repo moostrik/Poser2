@@ -19,9 +19,9 @@ def gsfr(range: tuple[int, int]) -> float:
     return getStepsFromRange(range)
 
 class DepthAiGui(Cam):
-    def __init__(self, gui: Gui | None, fps: int = 30, mono: bool = True, lowres: bool = False, queueLeft: bool = False) -> None:
+    def __init__(self, gui: Gui | None, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> None:
         self.gui: Gui | None = gui
-        super().__init__(fps, mono, lowres, queueLeft)
+        super().__init__(fps, doColor, doStereo, doPerson, lowres, showLeft)
 
         elem: list = []
         elem.append([E(eT.TEXT, 'Exposure  '),
@@ -46,8 +46,10 @@ class DepthAiGui(Cam):
                      E(eT.CHCK, 'AutoExposure',         super().setColorAutoExposure,   True),
                      E(eT.CHCK, 'AutoBalance',          super().setColorAutoBalance,    True),
                      E(eT.SLDR, 'FPS',                  None,                           0,    [0,60],  1)])
+        elem.append([E(eT.SLDR, 'NumPeople',            None,                           0,    [0,6],  1)])
 
-        self.color_frame = Frame('CAMERA COLOR', elem, 200)
+
+        self.color_frame = Frame('CAMERA COLOR', elem, 240)
 
         elem: list = []
         elem.append([E(eT.TEXT, 'Exposure  '),
@@ -107,6 +109,9 @@ class DepthAiGui(Cam):
             if (self.prevColorWhiteBalance != self.colorBalance) :
                 self.prevColorWhiteBalance = self.colorBalance
                 self.gui.updateElement('ColorBalance', self.colorBalance)
+
+        self.gui.updateElement('NumPeople', self.numPeople)
+
 
     # MONO
     def updateMonoControl(self, frame) -> None: #override

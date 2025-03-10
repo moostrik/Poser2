@@ -9,7 +9,10 @@ from datetime import timedelta
 from PIL import Image, ImageOps
 from enum import Enum
 
+from pathlib import Path
 from modules.utils.FPS import FPS
+
+from modules.cam.Pipelines.Pipelines import Pipelines
 
 class PreviewType(Enum):
     NONE =  0
@@ -58,8 +61,13 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, lowres:bool = False
     color: dai.node.Camera = pipeline.create(dai.node.Camera)
     left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
     right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
-    stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
+    # stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
     sync: dai.node.Sync = pipeline.create(dai.node.Sync)
+
+    manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
+    detectionNetwork: dai.node.MobileNetDetectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
+    objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
+    # trackerOut = pipeline.create(dai.node.XLinkOut)
 
     colorControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     colorControl.setStreamName('color_control')
@@ -72,7 +80,7 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, lowres:bool = False
 
     stereoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     stereoControl.setStreamName('stereo_control')
-    stereoControl.out.link(stereo.inputConfig)
+    # stereoControl.out.link(stereo.inputConfig)
 
     outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
     outputImages.setStreamName("output_images")
@@ -105,30 +113,57 @@ def setupStereoColor(pipeline : dai.Pipeline, fps: int = 30, lowres:bool = False
     right.setResolution(resolution)
     right.setFps(fps)
 
-    stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-    stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
-    stereo.setLeftRightCheck(True)
-    stereo.setExtendedDisparity(False)
-    stereo.setSubpixel(False)
-    stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
+    # stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
+    # stereo.setRectifyEdgeFillColor(0)  # black, to better see the cutout
+    # stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
+    # stereo.setLeftRightCheck(True)
+    # stereo.setExtendedDisparity(False)
+    # stereo.setSubpixel(False)
+    # stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
 
-    config: dai.RawStereoDepthConfig = stereo.initialConfig.get()
-    config.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
-    stereo.initialConfig.set(config)
+    # config: dai.RawStereoDepthConfig = stereo.initialConfig.get()
+    # config.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
+    # stereo.initialConfig.set(config)
 
     syncThreshold = int(1250 / fps)
     sync.setSyncThreshold(timedelta(milliseconds=syncThreshold))
 
-    left.out.link(stereo.left)
-    right.out.link(stereo.right)
+    manip.initialConfig.setResize(300, 300)
+    manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
 
-    stereo.disparity.link(sync.inputs["stereo"])
+    nnPathDefault: Path = (Path("C:/Developer/DepthAI/DepthPose/models/mobilenet-ssd_openvino_2021.4_6shave.blob")).resolve().absolute()
+    detectionNetwork.setBlobPath(nnPathDefault)
+    detectionNetwork.setConfidenceThreshold(0.2)
+    detectionNetwork.setNumInferenceThreads(2)
+    detectionNetwork.input.setBlocking(False)
+
+    objectTracker.setDetectionLabelsToTrack([15])  # track only person
+    objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
+    objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
+
+    # left.out.link(stereo.left)
+    # right.out.link(stereo.right)
+
+    # stereo.disparity.link(sync.inputs["stereo"])
     color.video.link(sync.inputs["video"])
     if queueLeft:
         left.out.link(sync.inputs["mono"])
 
+    color.video.link(manip.inputImage)
+    manip.out.link(detectionNetwork.input)
+
+    detectionNetwork.out.link(sync.inputs["detection"])
+
+    # objectTracker.passthroughTrackerFrame.link(manip.inputImage)
+    detectionNetwork.passthrough.link(objectTracker.inputTrackerFrame)
+    detectionNetwork.passthrough.link(objectTracker.inputDetectionFrame)
+    detectionNetwork.out.link(objectTracker.inputDetections)
+    objectTracker.out.link(sync.inputs["tracklets"])
+
+
     sync.out.link(outputImages.input)
-    return stereo.initialConfig.get()
+    # return stereo.initialConfig.get()
+    return dai.RawStereoDepthConfig()
 
 def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, lowres:bool = False) -> dai.RawStereoDepthConfig:
     left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
@@ -187,13 +222,17 @@ def setupStereoMono(pipeline : dai.Pipeline, fps: int = 30, lowres:bool = False)
 
 
 class DepthAi():
-    def __init__(self, fps: int = 30, mono: bool = True, lowres: bool = False, queueLeft: bool = False) -> None:
+    def __init__(self, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> None:
 
         # FIXED SETTINGS
         self.fps: int =                 fps
-        self.mono: bool =               mono
+        self.doColor: bool =            doColor
+        self.doStereo: bool =           doStereo
+        self.doPerson: bool =           doPerson
         self.lowres: bool =             lowres
-        self.queueLeft: bool =          queueLeft
+        self.showLeft: bool =           False
+        if self.doStereo and self.doColor and showLeft:
+            self.showLeft: bool =          True
 
         # GENERAL SETTINGS
         self.previewType =              PreviewType.VIDEO
@@ -227,6 +266,9 @@ class DepthAi():
         self.depthTresholdMin:  int =   0
         self.depthTresholdMax:  int =   255
 
+        # TRACKER SETTINGS
+        self.numPeople: int =           0
+
         # DAI
         self.device:                    dai.Device
         self.colorControl:              dai.DataInputQueue
@@ -253,10 +295,11 @@ class DepthAi():
         if self.deviceOpen: return True
 
         pipeline = dai.Pipeline()
-        if self.mono:
-            self.stereoConfig = setupStereoMono(pipeline, self.fps, self.lowres)
-        else:
-            self.stereoConfig = setupStereoColor(pipeline, self.fps, self.lowres, self.queueLeft)
+        self.stereoConfig = Pipelines(pipeline, self.fps, self.doColor, self.doStereo, self.doPerson, self.lowres, self.showLeft)
+        # if self.doColor:
+        #     self.stereoConfig = setupStereoColor(pipeline, self.fps, self.lowres, self.showLeft)
+        # else:
+        # self.stereoConfig = setupStereoMono(pipeline, self.fps, self.lowres)
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:
@@ -319,6 +362,15 @@ class DepthAi():
                 self.updateMonoControl(msg)
             elif name == 'mono':
                 mono_frame = msg.getCvFrame() #type:ignore
+            elif name == 'detection':
+                for detection in msg.detections:
+                    # print('C', detection.xmin, detection.ymin, detection.xmax, detection.ymax)
+                    pass
+                    # print('C', detection.confidence)
+
+            elif name == 'tracklets':
+                self.numPeople = len(msg.tracklets)
+                pass
             else:
                 print('unknown message', name)
 
