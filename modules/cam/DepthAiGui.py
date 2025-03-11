@@ -1,4 +1,3 @@
-from cv2 import ROTATE_180, ROTATE_90_CLOCKWISE, ROTATE_90_COUNTERCLOCKWISE
 import math
 
 from modules.cam.DepthAi import DepthAi as Cam
@@ -19,9 +18,9 @@ def gsfr(range: tuple[int, int]) -> float:
     return getStepsFromRange(range)
 
 class DepthAiGui(Cam):
-    def __init__(self, gui: Gui | None, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> None:
+    def __init__(self, gui: Gui | None, path:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> None:
         self.gui: Gui | None = gui
-        super().__init__(fps, doColor, doStereo, doPerson, lowres, showLeft)
+        super().__init__(path, fps, doColor, doStereo, doPerson, lowres, showLeft)
 
         elem: list = []
         elem.append([E(eT.TEXT, 'Exposure  '),
@@ -29,7 +28,7 @@ class DepthAiGui(Cam):
                      E(eT.TEXT, '       Iso'),
                      E(eT.SLDR, 'ColorIso',             super().setColorIso,            isoRange[0],            isoRange,           gsfr(isoRange))])
         elem.append([E(eT.TEXT, 'Balance   '),
-                     E(eT.SLDR, 'ColorBalance',         super().setColorBalance,        balanceRange[0],   balanceRange,  gsfr(balanceRange)),
+                     E(eT.SLDR, 'ColorBalance',         super().setColorBalance,        balanceRange[0],        balanceRange,       gsfr(balanceRange)),
                      E(eT.TEXT, '  Contrast'),
                      E(eT.SLDR, 'ColorContrast',        super().setColorContrast,       contrastRange[0],       contrastRange,      gsfr(contrastRange))])
         elem.append([E(eT.TEXT, 'Brightness'),
@@ -46,7 +45,8 @@ class DepthAiGui(Cam):
                      E(eT.CHCK, 'AutoExposure',         super().setColorAutoExposure,   True),
                      E(eT.CHCK, 'AutoBalance',          super().setColorAutoBalance,    True),
                      E(eT.SLDR, 'FPS',                  None,                           0,    [0,60],  1)])
-        elem.append([E(eT.SLDR, 'NumPeople',            None,                           0,    [0,6],  1)])
+        elem.append([E(eT.SLDR, 'NumDetections',        None,                           0,    [0,6],  1),
+                     E(eT.SLDR, 'NumTracklets',         None,                           0,    [0,6],  1)])
 
 
         self.color_frame = Frame('CAMERA COLOR', elem, 240)
@@ -110,8 +110,6 @@ class DepthAiGui(Cam):
                 self.prevColorWhiteBalance = self.colorBalance
                 self.gui.updateElement('ColorBalance', self.colorBalance)
 
-        self.gui.updateElement('NumPeople', self.numPeople)
-
 
     # MONO
     def updateMonoControl(self, frame) -> None: #override
@@ -146,8 +144,13 @@ class DepthAiGui(Cam):
 
     # FPS
     def updateFPS(self) -> None: #override
+        super().updateFPS()
         if not self.gui or not self.gui.isRunning(): return
         self.gui.updateElement('FPS', self.getFPS())
+
+        # in a perfect world, this would have its own defintion
+        self.gui.updateElement('NumDetections', self.numDetections)
+        self.gui.updateElement('NumTracklets',  self.numTracklets)
 
     # GUI FRAME
     def get_gui_frame(self):

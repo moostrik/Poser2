@@ -1,10 +1,24 @@
 
 import depthai as dai
 from datetime import timedelta
-from enum import Enum
 from pathlib import Path
 
-def Pipelines(pipeline : dai.Pipeline, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> dai.RawStereoDepthConfig:
+model5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
+model6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
+DetectionConfidenceThreshold: float = 0.0
+
+
+def SetupPipeline(
+    pipeline : dai.Pipeline,
+    modelPath:str,
+    fps: int = 30,
+    doColor: bool = True,
+    doStereo: bool = True,
+    doPerson: bool = True,
+    lowres: bool = False,
+    showLeft: bool = False
+    ) -> dai.RawStereoDepthConfig:
+
     print('Setup Pipeline using', 'Color' if doColor else 'Mono', 'Stereo' if doStereo else '', 'Yolo' if doPerson else '', 'in LowRes' if lowres else 'in Highres', 'with ShowLeft' if showLeft else '')
     # MAIN NODES
     if doColor:
@@ -21,7 +35,7 @@ def Pipelines(pipeline : dai.Pipeline, fps: int = 30, doColor: bool = True, doSt
         detectionNetwork: dai.node.MobileNetDetectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
         objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
 
-    # CONTROLS
+    # CONTROL INPUTS
     colorControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     colorControl.setStreamName('color_control')
     if doColor:
@@ -35,13 +49,14 @@ def Pipelines(pipeline : dai.Pipeline, fps: int = 30, doColor: bool = True, doSt
 
     stereoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
     stereoControl.setStreamName('stereo_control')
-
     if doStereo:
         stereoControl.out.link(stereo.inputConfig)
 
+    # OUTPUTS
     outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
     outputImages.setStreamName("output_images")
 
+    # SETTINGS
     if doColor:
         color.setCamera("color")
         color.setSize(1280, 720)
@@ -99,9 +114,11 @@ def Pipelines(pipeline : dai.Pipeline, fps: int = 30, doColor: bool = True, doSt
         manip.initialConfig.setResize(300, 300)
         manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
 
-        nnPathDefault: Path = (Path("C:/Developer/DepthAI/DepthPose/models/mobilenet-ssd_openvino_2021.4_6shave.blob")).resolve().absolute()
+        nnPathDefault: Path = (Path(modelPath) / model6S).resolve().absolute()
+        if doStereo:
+            nnPathDefault: Path = (Path(modelPath) / model5S).resolve().absolute()
         detectionNetwork.setBlobPath(nnPathDefault)
-        detectionNetwork.setConfidenceThreshold(0.2)
+        detectionNetwork.setConfidenceThreshold(DetectionConfidenceThreshold)
         detectionNetwork.setNumInferenceThreads(2)
         detectionNetwork.input.setBlocking(False)
 
