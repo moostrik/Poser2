@@ -1,9 +1,6 @@
 import math
 
-from modules.cam.DepthAi import DepthAi as Cam
-from modules.cam.DepthAi import PreviewTypeNames, StereoMedianFilterTypeNames
-from modules.cam.DepthAi import exposureRange, isoRange, balanceRange, contrastRange, brightnessRange, lumaDenoiseRange, saturationRange, sharpnessRange
-from modules.cam.DepthAi import stereoDepthRange, stereoBrightnessRange
+from modules.cam.DetpthAiSettings import *
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
 
@@ -17,10 +14,10 @@ def getStepsFromRange(range: tuple[int, int]) -> float:
 def gsfr(range: tuple[int, int]) -> float:
     return getStepsFromRange(range)
 
-class DepthAiGui(Cam):
-    def __init__(self, gui: Gui | None, path:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> None:
+class DepthAiGui(DepthAiSettings):
+    def __init__(self, gui: Gui | None, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> None:
         self.gui: Gui | None = gui
-        super().__init__(path, fps, doColor, doStereo, doPerson, lowres, showLeft)
+        super().__init__(modelPath, fps, doColor, doStereo, doPerson, lowres, showLeft)
 
         elem: list = []
         elem.append([E(eT.TEXT, 'Exposure  '),
