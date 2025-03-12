@@ -21,17 +21,18 @@ def SetupPipeline(
     showLeft: bool = False
     ) -> dai.RawStereoDepthConfig:
 
-    stereoConfig: dai.RawStereoDepthConfig | None = None
+    stereoConfig: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
 
 
-    # SetupColor(pipeline, fps, lowres)
-    # SetupColorPerson(pipeline, fps, lowres, modelPath)
-    # SetupColorStereo(pipeline, fps, lowres)
-    # return stereoConfig
-    setup = SetupColorStereo(pipeline, fps, lowres)
+    #SetupColor(pipeline, fps, lowres)
+    #SetupColorPerson(pipeline, fps, lowres, modelPath)
+    SetupColorStereo(pipeline, fps, lowres)
+
+    return stereoConfig
+    # setup = SetupColorStereo(pipeline, fps, lowres)
     # stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
     # return stereoConfig
-    return setup.getStereoConfig()
+    # return setup.getStereoConfig()
 
 
     if doColor:
@@ -81,6 +82,8 @@ class Setup():
         self.outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.outputImages.setStreamName("output_images")
 
+        # LINKING
+        self.sync.out.link(self.outputImages.input)
 
 class SetupColor(Setup):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool) -> None:
@@ -96,7 +99,6 @@ class SetupColor(Setup):
         self.sync.out.link(self.outputImages.input)
 
         self.colorControl.out.link(self.color.inputControl)
-
 
 class SetupColorPerson(SetupColor):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, model_path) -> None:
@@ -128,12 +130,15 @@ class SetupColorPerson(SetupColor):
         self.detectionNetwork.out.link(self.objectTracker.inputDetections)
         self.objectTracker.out.link(self.sync.inputs["tracklets"])
 
-
 class SetupColorStereo(Setup):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool) -> None:
         super().__init__(pipeline, fps, lowres)
 
+
         self.color: dai.node.Camera = pipeline.create(dai.node.Camera)
+        self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+        self.right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+
         self.color.setCamera("color")
         self.color.setSize(1280, 720)
         if lowres:
@@ -150,13 +155,15 @@ class SetupColorStereo(Setup):
         #         camRgb.initialControl.setManualFocus(lensPosition)
         # except:
         #     raise
+
         resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
         if lowres:
             resolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
-        self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+        self.left.setCamera("left")
         self.left.setResolution(resolution)
         self.left.setFps(fps)
-        self.right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+
+        self.right.setCamera("right")
         self.right.setResolution(resolution)
         self.right.setFps(fps)
 
@@ -168,24 +175,26 @@ class SetupColorStereo(Setup):
         self.stereo.setExtendedDisparity(False)
         self.stereo.setSubpixel(False)
         self.stereo.setDepthAlign(dai.CameraBoardSocket.RGB)
-        stereoConfig: dai.RawStereoDepthConfig = self.stereo.initialConfig.get()
-        stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
-        self.stereo.initialConfig.set(stereoConfig)
+        # stereoConfig: dai.RawStereoDepthConfig = self.stereo.initialConfig.get()
+        # stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
+        # self.stereo.initialConfig.set(stereoConfig)
+        # self.stereoConfig: dai.RawStereoDepthConfig = stereoConfig
 
-        self.stereoConfig: dai.RawStereoDepthConfig = stereoConfig
         self.left.out.link(self.stereo.left)
         self.right.out.link(self.stereo.right)
 
         self.color.video.link(self.sync.inputs["video"])
         self.stereo.disparity.link(self.sync.inputs["stereo"])
-        self.left.out.link(self.sync.inputs["left"])
+        # self.left.out.link(self.sync.inputs["left"])
 
-        self.sync.out.link(self.outputImages.input)
 
-        self.stereoControl.out.link(self.stereo.inputConfig)
+        # self.colorControl.out.link(self.color.inputControl)
+        # self.monoControl.out.link(self.left.inputControl)
+        # self.monoControl.out.link(self.right.inputControl)
+        # self.stereoControl.out.link(self.stereo.inputConfig)
 
-    def getStereoConfig(self) -> dai.RawStereoDepthConfig:
-        return self.stereoConfig
+    # def getStereoConfig(self) -> dai.RawStereoDepthConfig:
+    #     return self.stereoConfig
 
 def SetupColorStereoPerson (pipeline : dai.Pipeline, fps: int, lowres: bool, modelPath:str) -> dai.RawStereoDepthConfig:
     return dai.RawStereoDepthConfig()
