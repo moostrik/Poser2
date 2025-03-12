@@ -1,5 +1,5 @@
 
-from modules.cam.DepthAiGui import DepthAiGui as DepthCam
+from modules.cam.DepthCam import DepthCam
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.PoseDetection import PoseDetection, ModelType, PoseMessage
@@ -34,6 +34,7 @@ class DepthPose():
         self.camera.startCapture()
         self.camera.addFrameCallback(self.detector.set_image)
         self.camera.addFrameCallback(self.render.set_camera_image)
+        self.camera.addTrackerCallback(self.render.add_tracklet)
 
         if not self.noPose:
             self.detector.start()

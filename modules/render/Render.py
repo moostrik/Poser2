@@ -9,15 +9,47 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Mesh import Mesh
 from modules.gl.Utils import lfo, fit, fill
 
-from modules.pose.PoseConstants import PoseMessage, PoseIndicesFlat
+from modules.cam.DepthAi.Definitions import Tracklet, Tracklets
+from modules.pose.PoseDefinitions import PoseMessage, PoseIndicesFlat
+
+from typing import Set
 
 class ImageType(Enum):
-    VIDEO = 0
+    CAM1 = 0
+    CAM2 = 0
+    CAM3 = 0
+    CAM4 = 0
     POSE = 1
 
 class MeshType(Enum):
     POSE_0 = 0
     POSE_1 = 1
+
+
+def draw_tracklet(tracklet: Tracklet, x: float, y: float, w: float, h: float) -> None:
+    x = x + tracklet.x * w
+    y = y + tracklet.y * h
+    w = tracklet.width * w
+    h = tracklet.height * h
+
+    alpha: float = min(tracklet.age / 100.0, 0.5)
+    if tracklet.status == Tracklet.TrackingStatus.NEW:
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+    if tracklet.status == Tracklet.TrackingStatus.TRACKED:
+        glColor4f(0.0, 1.0, 0.0, alpha)
+    if tracklet.status == Tracklet.TrackingStatus.LOST:
+        glColor4f(1.0, 0.0, 0.0, alpha)
+    if tracklet.status == Tracklet.TrackingStatus.REMOVED:
+        glColor4f(1.0, 0.0, 0.0, 1.0)
+    glBegin(GL_QUADS)       # Start drawing a quad
+    glVertex2f(x, y)        # Bottom left
+    glVertex2f(x, y + h)    # Bottom right
+    glVertex2f(x + w, y + h)# Top right
+    glVertex2f(x + w, y)    # Top left
+    glEnd()  # End drawing
+    glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+    glFlush()  # Render now
+
 
 class Render(RenderWindow):
     def __init__(self, window_width: int, window_height: int, name: str, fullscreen: bool = False, v_sync = False) -> None:
@@ -30,10 +62,13 @@ class Render(RenderWindow):
 
         self._images: dict[ImageType, np.ndarray | None] = {}
         self.textures: dict[ImageType, Texture] = {}
+        self.tracklets: dict[ImageType, Tracklets] = {}
 
         for image_type in ImageType:
             self._images[image_type] = None
             self.textures[image_type] = Texture()
+            self.tracklets[image_type] = []
+
 
         self._vertices: dict[MeshType, np.ndarray | None] = {}
         self._colors: dict[MeshType, np.ndarray | None] = {}
@@ -57,7 +92,7 @@ class Render(RenderWindow):
         self.update_textures()
         self.update_meshes()
 
-        self.draw_video(ImageType.VIDEO)
+        self.draw_video(ImageType.CAM1)
 
 
     def draw_in_fbo(self, tex: Texture | Fbo | SwapFbo, fbo: Fbo | SwapFbo) -> None:
@@ -74,6 +109,10 @@ class Render(RenderWindow):
 
         x, y, w, h = fit(tex.width, tex.height, self.window_width, self.window_height)
         self.textures[type].draw(x, 0, w, h)
+
+        tracklets: Tracklets = self.get_tracklets(type)
+        for tracklet in tracklets:
+            draw_tracklet(tracklet, x, y, w, h)
 
         if  self.meshes[MeshType.POSE_0].isInitialized():
             self.meshes[MeshType.POSE_0].draw(x, 0, w, h)
@@ -129,7 +168,21 @@ class Render(RenderWindow):
 
 
     def set_camera_image(self, image: np.ndarray) -> None :
-        self.set_image(ImageType.VIDEO, image)
+        self.set_image(ImageType.CAM1, image)
+
+    def get_tracklets(self, type: ImageType) -> Tracklets:
+        with self.input_mutex:
+            ret_person: Tracklets = self.tracklets[type]
+            self.tracklets[type] = []
+            return ret_person
+
+    def add_tracklet(self, tracklet: Tracklet) -> None :
+        with self.input_mutex:
+            if tracklet.cam_id < 4:
+                type: ImageType = ImageType(tracklet.cam_id)
+                self.tracklets[type].append(tracklet)
+
+
 
     def set_pose_message(self, message: PoseMessage) -> None:
         self.set_image(ImageType.POSE, message.image)

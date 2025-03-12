@@ -19,7 +19,7 @@ def SetupPipeline(
     showLeft: bool = False
     ) -> dai.RawStereoDepthConfig:
 
-    print('Setup Pipeline using', 'Color' if doColor else 'Mono', 'Stereo' if doStereo else '', 'Yolo' if doPerson else '', 'in LowRes' if lowres else 'in Highres', 'with ShowLeft' if showLeft else '')
+    print('Depth Pipeline in', 'Color' if doColor else 'Mono', 'Stereo' if doStereo else '', 'Yolo' if doPerson else '', 'LowRes' if lowres else 'Highres', 'with ShowLeft' if showLeft else '')
     # MAIN NODES
     if doColor:
         color: dai.node.Camera = pipeline.create(dai.node.Camera)

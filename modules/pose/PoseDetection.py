@@ -13,7 +13,7 @@ from threading import Thread, Lock
 import copy
 import os
 
-from modules.pose.PoseConstants import *
+from modules.pose.PoseDefinitions import *
 
 def LoadSession(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSession, int]:
     path: str = os.path.join(model_path, ModelFileNames[model_type.value])

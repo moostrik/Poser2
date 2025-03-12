@@ -8,8 +8,8 @@ import depthai as dai
 from typing import Set
 from PIL import Image, ImageOps
 
-from modules.cam.DepthAiPipeline import SetupPipeline
-from modules.cam.DepthAiDefines import *
+from modules.cam.DepthAi.Pipeline import SetupPipeline
+from modules.cam.DepthAi.Definitions import *
 from modules.utils.FPS import FPS
 
 
@@ -26,7 +26,11 @@ def fit(image: np.ndarray, width, height) -> np.ndarray:
     return np.asarray(fit_image)
 
 class DepthAiCore():
+    _id_counter = 0
     def __init__(self, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> None:
+        self.ID: int =                  DepthAiCore._id_counter
+        self.IDs: str =                 str(self.ID)
+        DepthAiCore._id_counter +=      1
 
         # FIXED SETTINGS
         self.modelpath: str =           modelPath
@@ -41,8 +45,6 @@ class DepthAiCore():
 
         # GENERAL SETTINGS
         self.previewType =              PreviewType.VIDEO
-        self.flipH: bool =              False
-        self.flipV: bool =              False
 
         # COLOR SETTINGS
         self.colorAutoExposure: bool =  True
@@ -85,7 +87,6 @@ class DepthAiCore():
 
         # CALLBACKS
         self.frameCallbacks: Set[FrameCallback] = set()
-        self.detectionCallbacks: Set[DetectionCallback] = set()
         self.trackerCallbacks: Set[TrackerCallback] = set()
 
         # OTHER
@@ -157,8 +158,7 @@ class DepthAiCore():
         mono_frame:   np.ndarray | None = None
         mask_frame:   np.ndarray | None = None
         masked_frame: np.ndarray | None = None
-        detections:   Detections | None = None
-        tracklets:    Tracklets  | None = None
+
 
         for name, msg in daiMessages:
             if name == 'video':
@@ -170,12 +170,10 @@ class DepthAiCore():
             elif name == 'mono':
                 mono_frame = msg.getCvFrame() #type:ignore
             elif name == 'detection':
-                detections = msg.detections
                 self.numDetections = len(msg.detections)
             elif name == 'tracklets':
-                tracklets = msg.tracklets
+                self.updateTracker(msg)
                 self.numTracklets = len(msg.tracklets)
-                pass
             else:
                 print('unknown message', name)
 
@@ -198,17 +196,15 @@ class DepthAiCore():
         if self.previewType == PreviewType.MASKED and masked_frame is not None:
             return_frame = masked_frame
 
-        return_frame = self.flip(return_frame)
-
         for c in self.frameCallbacks:
             c(return_frame)
 
-        if detections is not None:
-            for c in self.detectionCallbacks:
-                c(detections)
-        if tracklets is not None:
+    def updateTracker(self, msg) -> None:
+        Ts = msg.tracklets
+        for t in Ts:
+            tracklet: Tracklet = Tracklet.from_dai(t, self.ID)
             for c in self.trackerCallbacks:
-                c(tracklets)
+                c(tracklet)
 
     def updateStereo(self, frame: np.ndarray) -> np.ndarray:
         return (frame * (255 / 95)).astype(np.uint8)
@@ -224,15 +220,6 @@ class DepthAiCore():
         color = fit(color, mask.shape[1], mask.shape[0])
 
         return cv2.bitwise_and(color, color, mask=mask)
-
-    def flip(self, frame: np.ndarray) -> np.ndarray:
-        if self.flipH and self.flipV:
-            return cv2.flip(frame, -1)
-        if self.flipH:
-            return cv2.flip(frame, 1)
-        if self.flipV:
-            return cv2.flip(frame, 0)
-        return frame
 
     def iscapturing(self) ->bool:
         return self.capturing
@@ -268,13 +255,6 @@ class DepthAiCore():
         self.trackerCallbacks.discard(callback)
     def clearTrackerCallbacks(self) -> None:
         self.trackerCallbacks.clear()
-
-    def addDetectionCallback(self, callback: DetectionCallback) -> None:
-        self.detectionCallbacks.add(callback)
-    def discardDetectionCallback(self, callback: DetectionCallback) -> None:
-        self.detectionCallbacks.discard(callback)
-    def clearDetectionCallbacks(self) -> None:
-        self.detectionCallbacks.clear()
 
     # FPS
     def updateFPS(self) -> None:

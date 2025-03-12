@@ -1,0 +1,1 @@
+from modules.cam.DepthAi.CoreGui import DepthAiGui as DepthCam
