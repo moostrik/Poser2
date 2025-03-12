@@ -167,7 +167,7 @@ class DepthAiCore():
             elif name == 'stereo':
                 stereo_frame = self.updateStereo(msg.getCvFrame()) #type:ignore
                 self.updateMonoControl(msg)
-            elif name == 'mono':
+            elif name == 'left':
                 mono_frame = msg.getCvFrame() #type:ignore
             elif name == 'detection':
                 self.numDetections = len(msg.detections)
@@ -192,7 +192,7 @@ class DepthAiCore():
         if self.previewType == PreviewType.STEREO and stereo_frame is not None:
             return_frame = stereo_frame
         if self.previewType == PreviewType.MASK and mask_frame is not None:
-            return_frame = cv2.cvtColor(mask_frame, cv2.COLOR_GRAY2RGB)  # type: ignore
+            return_frame = cv2.cvtColor(mask_frame, cv2.COLOR_GRAY2RGB)
         if self.previewType == PreviewType.MASKED and masked_frame is not None:
             return_frame = masked_frame
 

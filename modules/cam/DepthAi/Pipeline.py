@@ -3,10 +3,12 @@ import depthai as dai
 from datetime import timedelta
 from pathlib import Path
 
-model5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
-model6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
-DetectionConfidenceThreshold: float = 0.5
-
+MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
+MODEL6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
+DETECTIONTHRESHOLD: float = 0.5
+TRACKERTYPE: dai.TrackerType = dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM
+# ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
+# ZERO_TERM_IMAGELESS slightly faster
 
 def SetupPipeline(
     pipeline : dai.Pipeline,
@@ -112,18 +114,20 @@ def SetupPipeline(
 
     if doPerson:
         manip.initialConfig.setResize(300, 300)
+        manip.initialConfig.setKeepAspectRatio(False)
         manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
 
-        nnPathDefault: Path = (Path(modelPath) / model6S).resolve().absolute()
+        nnPathDefault: Path = (Path(modelPath) / MODEL6S).resolve().absolute()
         if doStereo:
-            nnPathDefault: Path = (Path(modelPath) / model5S).resolve().absolute()
+            nnPathDefault: Path = (Path(modelPath) / MODEL5S).resolve().absolute()
         detectionNetwork.setBlobPath(nnPathDefault)
-        detectionNetwork.setConfidenceThreshold(DetectionConfidenceThreshold)
+        detectionNetwork.setConfidenceThreshold(DETECTIONTHRESHOLD)
         detectionNetwork.setNumInferenceThreads(2)
-        detectionNetwork.input.setBlocking(False)
+        detectionNetwork.input.setBlocking(True)
 
         objectTracker.setDetectionLabelsToTrack([15])  # track only person
-        objectTracker.setTrackerType(dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM)
+        # possible tracking types: ZERO_TERM_COLOR_HISTOGRAM, ZERO_TERM_IMAGELESS, SHORT_TERM_IMAGELESS, SHORT_TERM_KCF
+        objectTracker.setTrackerType(TRACKERTYPE)
         objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
     # LINKING

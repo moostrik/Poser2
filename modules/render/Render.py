@@ -1,7 +1,9 @@
 from OpenGL.GL import * # type: ignore
+import OpenGL.GLUT as glut
 from threading import Lock
 import numpy as np
 from enum import Enum
+from copy import deepcopy
 
 from modules.gl.RenderWindow import RenderWindow
 from modules.gl.Texture import Texture
@@ -27,28 +29,45 @@ class MeshType(Enum):
 
 
 def draw_tracklet(tracklet: Tracklet, x: float, y: float, w: float, h: float) -> None:
+    if tracklet.status == Tracklet.TrackingStatus.REMOVED:
+        return
+
     x = x + tracklet.x * w
     y = y + tracklet.y * h
     w = tracklet.width * w
     h = tracklet.height * h
 
-    alpha: float = min(tracklet.age / 100.0, 0.5)
+    r: float = 1.0
+    g: float = 1.0
+    b: float = 1.0
+    a: float = min(tracklet.age / 100.0, 0.33)
     if tracklet.status == Tracklet.TrackingStatus.NEW:
-        glColor4f(1.0, 1.0, 1.0, 1.0)
+        r, g, b, a = (1.0, 1.0, 1.0, 1.0)
     if tracklet.status == Tracklet.TrackingStatus.TRACKED:
-        glColor4f(0.0, 1.0, 0.0, alpha)
+        r, g, b, a = (0.0, 1.0, 0.0, a)
     if tracklet.status == Tracklet.TrackingStatus.LOST:
-        glColor4f(1.0, 0.0, 0.0, alpha)
+        r, g, b, a = (1.0, 0.0, 0.0, a)
     if tracklet.status == Tracklet.TrackingStatus.REMOVED:
-        glColor4f(1.0, 0.0, 0.0, 1.0)
+        r, g, b, a = (1.0, 0.0, 0.0, 1.0)
+
+    string: str = f'ID: {tracklet.track_id} Age: {tracklet.age} C: {tracklet.confidence:.2f}'
+
+    glColor4f(r, g, b, a)   # Set color
     glBegin(GL_QUADS)       # Start drawing a quad
     glVertex2f(x, y)        # Bottom left
     glVertex2f(x, y + h)    # Bottom right
     glVertex2f(x + w, y + h)# Top right
     glVertex2f(x + w, y)    # Top left
-    glEnd()  # End drawing
+    glEnd()                 # End drawing
     glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
-    glFlush()  # Render now
+    glFlush()               # Render now
+
+    x += 9
+    y += 15
+    glRasterPos2f(x, y)     # Set position
+    for character in string:
+        glut.glutBitmapCharacter(glut.GLUT_BITMAP_9_BY_15, ord(character)) # type: ignore
+    glRasterPos2f(0, 0)     # Reset position
 
 
 class Render(RenderWindow):
@@ -62,12 +81,12 @@ class Render(RenderWindow):
 
         self._images: dict[ImageType, np.ndarray | None] = {}
         self.textures: dict[ImageType, Texture] = {}
-        self.tracklets: dict[ImageType, Tracklets] = {}
+        self.tracklets: dict[ImageType, dict[int, Tracklet]] = {}
 
         for image_type in ImageType:
             self._images[image_type] = None
             self.textures[image_type] = Texture()
-            self.tracklets[image_type] = []
+            self.tracklets[image_type] = {}
 
 
         self._vertices: dict[MeshType, np.ndarray | None] = {}
@@ -110,9 +129,10 @@ class Render(RenderWindow):
         x, y, w, h = fit(tex.width, tex.height, self.window_width, self.window_height)
         self.textures[type].draw(x, 0, w, h)
 
-        tracklets: Tracklets = self.get_tracklets(type)
-        for tracklet in tracklets:
-            draw_tracklet(tracklet, x, y, w, h)
+        # self.half_fps_tracker = not self.half_fps_tracker
+        tracklets: dict[int, Tracklet] = self.get_tracklets(type)
+        for tracklet in tracklets.values():
+            draw_tracklet(tracklet, x, 0, w, h)
 
         if  self.meshes[MeshType.POSE_0].isInitialized():
             self.meshes[MeshType.POSE_0].draw(x, 0, w, h)
@@ -170,18 +190,21 @@ class Render(RenderWindow):
     def set_camera_image(self, image: np.ndarray) -> None :
         self.set_image(ImageType.CAM1, image)
 
-    def get_tracklets(self, type: ImageType) -> Tracklets:
+    def get_tracklets(self, type: ImageType, clearTracklets: bool = False) -> dict[int, Tracklet]:
         with self.input_mutex:
-            ret_person: Tracklets = self.tracklets[type]
-            self.tracklets[type] = []
+            ret_person: dict[int, Tracklet] =  deepcopy(self.tracklets[type])
+            if clearTracklets:
+                self.tracklets[type].clear()
             return ret_person
 
     def add_tracklet(self, tracklet: Tracklet) -> None :
         with self.input_mutex:
             if tracklet.cam_id < 4:
                 type: ImageType = ImageType(tracklet.cam_id)
-                self.tracklets[type].append(tracklet)
-
+                track_id: int = tracklet.track_id
+                self.tracklets[type][track_id] = tracklet
+                # self.tracklets[type][tracklet.track_id] = tracklet
+                # print number of tracklets
 
 
     def set_pose_message(self, message: PoseMessage) -> None:
