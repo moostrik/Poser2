@@ -5,7 +5,7 @@ from pathlib import Path
 
 model5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
 model6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
-DetectionConfidenceThreshold: float = 0.0
+DetectionConfidenceThreshold: float = 0.5
 
 
 def SetupPipeline(

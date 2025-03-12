@@ -5,11 +5,13 @@
 import cv2
 import numpy as np
 import depthai as dai
+from typing import Set
 from PIL import Image, ImageOps
 
 from modules.cam.DepthAiPipeline import SetupPipeline
 from modules.cam.DepthAiDefines import *
 from modules.utils.FPS import FPS
+
 
 def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | float:
     return max(size[0], min(num, size[1]))
@@ -81,11 +83,14 @@ class DepthAiCore():
         self.dataQueue:                 dai.DataOutputQueue
         self.dataCallbackId:            int
 
+        # CALLBACKS
+        self.frameCallbacks: Set[FrameCallback] = set()
+        self.detectionCallbacks: Set[DetectionCallback] = set()
+        self.trackerCallbacks: Set[TrackerCallback] = set()
+
         # OTHER
         self.deviceOpen: bool =         False
         self.capturing:  bool =         False
-        self.frameCallbacks: set =      set()
-        self.trackerCallbacks: set =    set()
         self.fps_counter =              FPS()
 
         self.errorFrame: np.ndarray =   np.zeros((720, 1280, 3), dtype=np.uint8)
@@ -152,8 +157,8 @@ class DepthAiCore():
         mono_frame:   np.ndarray | None = None
         mask_frame:   np.ndarray | None = None
         masked_frame: np.ndarray | None = None
-        detections: list[dai.NNData] | None = None
-        tracklets: list[dai.Tracklet] | None = None
+        detections:   Detections | None = None
+        tracklets:    Tracklets  | None = None
 
         for name, msg in daiMessages:
             if name == 'video':
@@ -198,8 +203,12 @@ class DepthAiCore():
         for c in self.frameCallbacks:
             c(return_frame)
 
-        for c in self.trackerCallbacks:
-            c(tracklets)
+        if detections is not None:
+            for c in self.detectionCallbacks:
+                c(detections)
+        if tracklets is not None:
+            for c in self.trackerCallbacks:
+                c(tracklets)
 
     def updateStereo(self, frame: np.ndarray) -> np.ndarray:
         return (frame * (255 / 95)).astype(np.uint8)
@@ -246,19 +255,26 @@ class DepthAiCore():
             self.monoIso = frame.getSensitivity()
 
     # CALLBACKS
-    def addFrameCallback(self, callback) -> None:
+    def addFrameCallback(self, callback: FrameCallback) -> None:
         self.frameCallbacks.add(callback)
-    def discardFrameCallback(self, callback) -> None:
+    def discardFrameCallback(self, callback: FrameCallback) -> None:
         self.frameCallbacks.discard(callback)
     def clearFrameCallbacks(self) -> None:
         self.frameCallbacks.clear()
 
-    def addTrackerCallback(self, callback) -> None:
+    def addTrackerCallback(self, callback: TrackerCallback) -> None:
         self.trackerCallbacks.add(callback)
-    def discardTrackerCallback(self, callback) -> None:
+    def discardTrackerCallback(self, callback: TrackerCallback) -> None:
         self.trackerCallbacks.discard(callback)
     def clearTrackerCallbacks(self) -> None:
         self.trackerCallbacks.clear()
+
+    def addDetectionCallback(self, callback: DetectionCallback) -> None:
+        self.detectionCallbacks.add(callback)
+    def discardDetectionCallback(self, callback: DetectionCallback) -> None:
+        self.detectionCallbacks.discard(callback)
+    def clearDetectionCallbacks(self) -> None:
+        self.detectionCallbacks.clear()
 
     # FPS
     def updateFPS(self) -> None:

@@ -1,5 +1,16 @@
-
+import numpy as np
 from enum import Enum
+from typing import Callable
+from depthai import Tracklet as T, ImgDetection as D
+
+Tracklet = T
+Detection = D
+Tracklets = list[Tracklet]
+Detections = list[Detection]
+
+FrameCallback = Callable[[np.ndarray], None]
+DetectionCallback = Callable[[Detections], None]
+TrackerCallback = Callable[[Tracklets], None]
 
 class PreviewType(Enum):
     NONE =  0
