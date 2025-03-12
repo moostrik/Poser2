@@ -32,7 +32,7 @@ class DepthPose():
 
         self.camera.open()
         self.camera.startCapture()
-        self.camera.addFrameCallback(self.detector.set_image)
+        # self.camera.addFrameCallback(self.detector.set_image)
         self.camera.addFrameCallback(self.render.set_camera_image)
         self.camera.addTrackerCallback(self.render.add_tracklet)
 

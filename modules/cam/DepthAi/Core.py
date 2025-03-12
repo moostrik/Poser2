@@ -8,7 +8,7 @@ import depthai as dai
 from typing import Set
 from PIL import Image, ImageOps
 
-from modules.cam.DepthAi.Pipeline import SetupPipeline
+from modules.cam.DepthAi.PipelineNew import SetupPipeline
 from modules.cam.DepthAi.Definitions import *
 from modules.utils.FPS import FPS
 
