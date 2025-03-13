@@ -82,8 +82,10 @@ class DepthAiCore():
         self.colorControl:              dai.DataInputQueue
         self.monoControl:               dai.DataInputQueue
         self.stereoControl:             dai.DataInputQueue
-        self.dataQueue:                 dai.DataOutputQueue
-        self.dataCallbackId:            int
+        self.frameQueue:                dai.DataOutputQueue
+        self.frameCallbackId:           int
+        self.trackletQueue:             dai.DataOutputQueue
+        self.trackletCallbackId:        int
 
         # CALLBACKS
         self.frameCallbacks: Set[FrameCallback] = set()
@@ -93,6 +95,7 @@ class DepthAiCore():
         self.deviceOpen: bool =         False
         self.capturing:  bool =         False
         self.fps_counter =              FPS()
+        self.tps_counter =              FPS()
 
         self.errorFrame: np.ndarray =   np.zeros((720, 1280, 3), dtype=np.uint8)
         if self.lowres:
@@ -116,10 +119,12 @@ class DepthAiCore():
                 print('still could not open camera, error', e)
                 return False
 
-        self.dataQueue =    self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
-        self.colorControl = self.device.getInputQueue('color_control')
-        self.monoControl =  self.device.getInputQueue('mono_control')
-        self.stereoControl =self.device.getInputQueue('stereo_control')
+        self.frameQueue =       self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
+        if self.doPerson:
+            self.trackletQueue =    self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
+        self.colorControl =     self.device.getInputQueue('color_control')
+        self.monoControl =      self.device.getInputQueue('mono_control')
+        self.stereoControl =    self.device.getInputQueue('stereo_control')
 
         self.deviceOpen = True
         return True
@@ -133,20 +138,27 @@ class DepthAiCore():
         self.stereoControl.close()
         self.monoControl.close()
         self.colorControl.close()
-        self.dataQueue.close()
+        self.frameQueue.close()
+        if self.doPerson:
+            self.trackletQueue.close()
 
     def startCapture(self) -> None:
         if not self.deviceOpen:
             print('CamDepthAi:start', 'device is not open')
             return
         if self.capturing: return
-        self.dataCallbackId = self.dataQueue.addCallback(self.updateData)
+        self.frameCallbackId = self.frameQueue.addCallback(self.updateFrames)
+        if self.doPerson:
+            self.trackletCallbackId = self.trackletQueue.addCallback(self.updateTracker)
 
     def stopCapture(self) -> None:
         if not self.capturing: return
-        self.dataQueue.removeCallback(self.dataCallbackId)
+        self.frameQueue.removeCallback(self.frameCallbackId)
 
-    def updateData(self, daiMessages) -> None:
+        if self.doPerson:
+            self.trackletQueue.removeCallback(self.trackletCallbackId)
+
+    def updateFrames(self, daiMessages) -> None:
         self.updateFPS()
         if self.previewType == PreviewType.NONE:
             return
@@ -172,11 +184,6 @@ class DepthAiCore():
                 left_frame = msg.getCvFrame() #type:ignore
             elif name == 'right':
                 right_frame = msg.getCvFrame() #type:ignore
-            elif name == 'detection':
-                self.numDetections = len(msg.detections)
-            elif name == 'tracklets':
-                self.updateTracker(msg)
-                self.numTracklets = len(msg.tracklets)
             else:
                 print('unknown message', name)
 
@@ -205,7 +212,9 @@ class DepthAiCore():
             c(return_frame)
 
     def updateTracker(self, msg) -> None:
+        self.updateTPS()
         Ts = msg.tracklets
+        self.numTracklets = len(Ts)
         for t in Ts:
             tracklet: Tracklet = Tracklet.from_dai(t, self.ID)
             for c in self.trackerCallbacks:
@@ -266,6 +275,10 @@ class DepthAiCore():
         self.fps_counter.processed()
     def getFPS(self) -> float:
         return self.fps_counter.get_rate_average()
+    def updateTPS(self) -> None:
+        self.tps_counter.processed()
+    def getTPS(self) -> float:
+        return self.tps_counter.get_rate_average()
 
 
 

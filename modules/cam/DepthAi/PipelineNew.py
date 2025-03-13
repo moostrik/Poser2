@@ -37,28 +37,31 @@ def SetupPipeline(
     # stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
     # return stereoConfig
 
-    SetupColorStereoPerson(pipeline, fps, lowres, showMono, modelPath)
-    stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
-    return stereoConfig
+    # SetupColorStereoPerson(pipeline, fps, lowres, showMono, modelPath)
+    # stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
+    # return stereoConfig
 
 
     if doColor:
+        stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
         if doStereo:
             if doPerson:
-                stereoConfig = SetupColorStereoPerson(pipeline, fps, lowres, modelPath)
+                SetupColorStereoPerson(pipeline, fps, lowres, showMono, modelPath)
+
             else:
-                stereoConfig = SetupColorStereo(pipeline, fps, lowres, modelPath)
+                SetupColorStereo(pipeline, fps, lowres, showMono)
         else:
             if doPerson:
-                SetupColorPerson(pipeline, fps, lowres)
+                SetupColorPerson(pipeline, fps, lowres, modelPath)
             else:
                 SetupColor(pipeline, fps, lowres)
     else:
+        stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT
         if doStereo:
             if doPerson:
-                stereoConfig = SetupMonoStereoPerson(pipeline, fps, lowres, modelPath)
+                SetupMonoStereoPerson(pipeline, fps, lowres, modelPath)
             else:
-                stereoConfig = SetupMonoStereo(pipeline, fps, lowres, modelPath)
+                SetupMonoStereo(pipeline, fps, lowres, modelPath)
         else:
             if doPerson:
                 SetupMonoPerson(pipeline, fps, lowres)
@@ -75,6 +78,7 @@ class Setup():
 
         self.sync: dai.node.Sync = pipeline.create(dai.node.Sync)
         syncThreshold = int(1250 / fps)
+        self.sync.setSyncAttempts(2)
         self.sync.setSyncThreshold(timedelta(milliseconds=syncThreshold))
 
         # CONTROL INPUTS
@@ -123,7 +127,7 @@ class SetupColorPerson(SetupColor):
         self.detectionNetwork.setNumInferenceThreads(2)
         self.detectionNetwork.input.setBlocking(False)
         self.manip.out.link(self.detectionNetwork.input)
-        self.detectionNetwork.out.link(self.sync.inputs["detection"])
+        # self.detectionNetwork.out.link(self.sync.inputs["detection"])
 
         self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
         self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
@@ -136,7 +140,11 @@ class SetupColorPerson(SetupColor):
             self.color.video.link(self.objectTracker.inputTrackerFrame)
         self.detectionNetwork.passthrough.link(self.objectTracker.inputDetectionFrame)
         self.detectionNetwork.out.link(self.objectTracker.inputDetections)
-        self.objectTracker.out.link(self.sync.inputs["tracklets"])
+        # self.objectTracker.out.link(self.sync.inputs["tracklets"])
+
+        trackerOut: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        trackerOut.setStreamName("tracklets")
+        self.objectTracker.out.link(trackerOut.input)
 
 class SetupColorStereo(SetupColor):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showMono:bool) -> None:
@@ -186,12 +194,10 @@ class SetupColorStereoPerson(SetupColorStereo):
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(300, 300)
         self.manip.initialConfig.setKeepAspectRatio(False)
-        # self.manip.setInterleaved(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.color.video.link(self.manip.inputImage)
 
         self.detectionNetwork: dai.node.MobileNetSpatialDetectionNetwork = pipeline.create(dai.node.MobileNetSpatialDetectionNetwork)
-        # self.detectionNetwork: dai.node.MobileNetDetectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
         nnPathDefault: Path = (Path(model_path) / MODEL5S).resolve().absolute()
         self.detectionNetwork.setBlobPath(nnPathDefault)
         self.detectionNetwork.setConfidenceThreshold(DETECTIONTHRESHOLD)
@@ -202,7 +208,6 @@ class SetupColorStereoPerson(SetupColorStereo):
         self.detectionNetwork.input.setBlocking(False)
         self.manip.out.link(self.detectionNetwork.input)
         self.stereo.depth.link(self.detectionNetwork.inputDepth)
-        self.detectionNetwork.out.link(self.sync.inputs["detection"])
 
         self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
         self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
@@ -210,11 +215,12 @@ class SetupColorStereoPerson(SetupColorStereo):
         self.objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
         self.detectionNetwork.passthrough.link(self.objectTracker.inputTrackerFrame)
-        # self.color.video.link(self.objectTracker.inputTrackerFrame)
         self.detectionNetwork.passthrough.link(self.objectTracker.inputDetectionFrame)
         self.detectionNetwork.out.link(self.objectTracker.inputDetections)
-        # self.objectTracker.out.link(self.sync.inputs["tracklets"])
 
+        trackerOut: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        trackerOut.setStreamName("tracklets")
+        self.objectTracker.out.link(trackerOut.input)
 
 
 
