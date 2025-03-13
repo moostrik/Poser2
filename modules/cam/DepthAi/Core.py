@@ -155,7 +155,8 @@ class DepthAiCore():
 
         video_frame:  np.ndarray | None = None
         stereo_frame: np.ndarray | None = None
-        mono_frame:   np.ndarray | None = None
+        left_frame:   np.ndarray | None = None
+        right_frame:  np.ndarray | None = None
         mask_frame:   np.ndarray | None = None
         masked_frame: np.ndarray | None = None
 
@@ -168,7 +169,9 @@ class DepthAiCore():
                 stereo_frame = self.updateStereo(msg.getCvFrame()) #type:ignore
                 self.updateMonoControl(msg)
             elif name == 'left':
-                mono_frame = msg.getCvFrame() #type:ignore
+                left_frame = msg.getCvFrame() #type:ignore
+            elif name == 'right':
+                right_frame = msg.getCvFrame() #type:ignore
             elif name == 'detection':
                 self.numDetections = len(msg.detections)
             elif name == 'tracklets':
@@ -187,8 +190,11 @@ class DepthAiCore():
         return_frame: np.ndarray = self.errorFrame
         if self.previewType == PreviewType.VIDEO and video_frame is not None:
             return_frame = video_frame
-        if self.previewType == PreviewType.MONO and mono_frame is not None:
-            return_frame = cv2.cvtColor(mono_frame, cv2.COLOR_GRAY2RGB)  # type: ignore
+            print('video_frame', video_frame.shape)
+        if self.previewType == PreviewType.LEFT and left_frame is not None:
+            return_frame = cv2.cvtColor(left_frame, cv2.COLOR_GRAY2RGB)
+        if self.previewType == PreviewType.RIGHT and right_frame is not None:
+            return_frame = cv2.cvtColor(right_frame, cv2.COLOR_GRAY2RGB)
         if self.previewType == PreviewType.STEREO and stereo_frame is not None:
             return_frame = stereo_frame
         if self.previewType == PreviewType.MASK and mask_frame is not None:

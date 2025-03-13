@@ -13,10 +13,11 @@ DetectionCallback = Callable[[Detections], None]
 class PreviewType(Enum):
     NONE =  0
     VIDEO = 1
-    MONO =  2
-    STEREO= 3
-    MASK =  4
-    MASKED= 5
+    LEFT =  2
+    RIGHT = 3
+    STEREO= 4
+    MASK =  5
+    MASKED= 6
 
 PreviewTypeNames: list[str] = [e.name for e in PreviewType]
 
