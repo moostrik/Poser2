@@ -120,8 +120,7 @@ class DepthAiCore():
                 return False
 
         self.frameQueue =       self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
-        if self.doPerson:
-            self.trackletQueue =    self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
+        self.trackletQueue =    self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
         self.colorControl =     self.device.getInputQueue('color_control')
         self.monoControl =      self.device.getInputQueue('mono_control')
         self.stereoControl =    self.device.getInputQueue('stereo_control')
@@ -139,8 +138,7 @@ class DepthAiCore():
         self.monoControl.close()
         self.colorControl.close()
         self.frameQueue.close()
-        if self.doPerson:
-            self.trackletQueue.close()
+        self.trackletQueue.close()
 
     def startCapture(self) -> None:
         if not self.deviceOpen:
@@ -148,15 +146,12 @@ class DepthAiCore():
             return
         if self.capturing: return
         self.frameCallbackId = self.frameQueue.addCallback(self.updateFrames)
-        if self.doPerson:
-            self.trackletCallbackId = self.trackletQueue.addCallback(self.updateTracker)
+        self.trackletCallbackId = self.trackletQueue.addCallback(self.updateTracker)
 
     def stopCapture(self) -> None:
         if not self.capturing: return
         self.frameQueue.removeCallback(self.frameCallbackId)
-
-        if self.doPerson:
-            self.trackletQueue.removeCallback(self.trackletCallbackId)
+        self.trackletQueue.removeCallback(self.trackletCallbackId)
 
     def updateFrames(self, daiMessages) -> None:
         self.updateFPS()
