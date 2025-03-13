@@ -190,7 +190,6 @@ class DepthAiCore():
         return_frame: np.ndarray = self.errorFrame
         if self.previewType == PreviewType.VIDEO and video_frame is not None:
             return_frame = video_frame
-            print('video_frame', video_frame.shape)
         if self.previewType == PreviewType.LEFT and left_frame is not None:
             return_frame = cv2.cvtColor(left_frame, cv2.COLOR_GRAY2RGB)
         if self.previewType == PreviewType.RIGHT and right_frame is not None:
