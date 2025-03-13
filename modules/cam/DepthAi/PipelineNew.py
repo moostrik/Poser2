@@ -37,7 +37,7 @@ def SetupPipeline(
     # stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
     # return stereoConfig
 
-    SetupColorStereoPerson(pipeline, fps, lowres, modelPath)
+    SetupColorStereoPerson(pipeline, fps, lowres, showMono, modelPath)
     stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
     return stereoConfig
 
@@ -179,26 +179,30 @@ class SetupColorStereo(SetupColor):
         self.monoControl.out.link(self.right.inputControl)
         self.stereoControl.out.link(self.stereo.inputConfig)
 
-class SetupColorStereoPerson(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, model_path) -> None:
-        super().__init__(pipeline, fps, lowres)
-
-        self.color.setMeshSource(dai.CameraProperties.WarpMeshSource.NONE)
+class SetupColorStereoPerson(SetupColorStereo):
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showMono: bool, model_path) -> None:
+        super().__init__(pipeline, fps, lowres, showMono)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(300, 300)
         self.manip.initialConfig.setKeepAspectRatio(False)
+        # self.manip.setInterleaved(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.color.video.link(self.manip.inputImage)
 
         self.detectionNetwork: dai.node.MobileNetSpatialDetectionNetwork = pipeline.create(dai.node.MobileNetSpatialDetectionNetwork)
+        # self.detectionNetwork: dai.node.MobileNetDetectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
         nnPathDefault: Path = (Path(model_path) / MODEL5S).resolve().absolute()
         self.detectionNetwork.setBlobPath(nnPathDefault)
         self.detectionNetwork.setConfidenceThreshold(DETECTIONTHRESHOLD)
         self.detectionNetwork.setNumInferenceThreads(2)
+        self.detectionNetwork.setBoundingBoxScaleFactor(0.5)
+        self.detectionNetwork.setDepthLowerThreshold(100)
+        self.detectionNetwork.setDepthUpperThreshold(5000)
         self.detectionNetwork.input.setBlocking(False)
         self.manip.out.link(self.detectionNetwork.input)
-        # self.detectionNetwork.out.link(self.sync.inputs["detection"])
+        self.stereo.depth.link(self.detectionNetwork.inputDepth)
+        self.detectionNetwork.out.link(self.sync.inputs["detection"])
 
         self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
         self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
@@ -206,44 +210,11 @@ class SetupColorStereoPerson(SetupColor):
         self.objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
         self.detectionNetwork.passthrough.link(self.objectTracker.inputTrackerFrame)
+        # self.color.video.link(self.objectTracker.inputTrackerFrame)
         self.detectionNetwork.passthrough.link(self.objectTracker.inputDetectionFrame)
         self.detectionNetwork.out.link(self.objectTracker.inputDetections)
         # self.objectTracker.out.link(self.sync.inputs["tracklets"])
 
-        resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
-        if lowres:
-            resolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
-
-        self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
-        self.left.setCamera("left")
-        self.left.setResolution(resolution)
-        self.left.setFps(fps)
-        self.left.out.link(self.sync.inputs["left"])
-
-        self.right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
-        self.right.setCamera("right")
-        self.right.setResolution(resolution)
-        self.right.setFps(fps)
-        self.right.out.link(self.sync.inputs["right"])
-
-        self.stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
-        self.stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
-        self.stereo.initialConfig.setMedianFilter(dai.MedianFilter.KERNEL_7x7)
-        self.stereo.setLeftRightCheck(True)
-        self.stereo.setExtendedDisparity(False)
-        self.stereo.setSubpixel(False)
-        self.stereo.setDepthAlign(dai.CameraBoardSocket.CENTER)
-
-        self.left.out.link(self.stereo.left)
-        self.right.out.link(self.stereo.right)
-
-        self.stereo.depth.link(self.detectionNetwork.inputDepth)
-        self.stereo.disparity.link(self.sync.inputs["stereo"])
-
-        self.colorControl.out.link(self.stereo.inputConfig)
-        self.monoControl.out.link(self.left.inputControl)
-        self.monoControl.out.link(self.right.inputControl)
-        self.stereoControl.out.link(self.stereo.inputConfig)
 
 
 
