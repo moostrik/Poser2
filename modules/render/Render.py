@@ -50,7 +50,9 @@ def draw_tracklet(tracklet: Tracklet, x: float, y: float, w: float, h: float) ->
     if tracklet.status == Tracklet.TrackingStatus.REMOVED:
         r, g, b, a = (1.0, 0.0, 0.0, 1.0)
 
-    string: str = f'ID: {tracklet.track_id} Age: {tracklet.age} C: {tracklet.confidence:.2f}'
+    string: str = f'ID: {tracklet.track_id} \n Age: {tracklet.age} C: {tracklet.confidence:.2f}'
+    if tracklet.sp_z is not None:
+        string += f' Z: {tracklet.sp_z:.0f}'
 
     glColor4f(r, g, b, a)   # Set color
     glBegin(GL_QUADS)       # Start drawing a quad
