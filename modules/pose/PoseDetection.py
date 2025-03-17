@@ -29,8 +29,6 @@ def LoadSession(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSe
     return onnx_session, input_size
 
 def RunSession(onnx_session: ort.InferenceSession, input_size: int, image: np.ndarray) -> PoseList:
-
-
     input_image: np.ndarray = resize_with_pad(image, input_size, input_size)
     input_image = input_image.reshape(-1, input_size, input_size, 3)
     input_image = input_image.astype('int32')
@@ -289,10 +287,11 @@ class PoseDetection(Thread):
             time.sleep(0.1)
 
     # IMAGE INPUTS
-    def set_image(self, image: np.ndarray | None) -> None:
+    def set_image(self, ID: int, image: np.ndarray | None) -> None:
         with self._input_mutex:
             self._image = image
             self._image_consumed = False
+
     def get_image(self, get_cumsumed_image = False) -> np.ndarray | None:
         with self._input_mutex:
             if not self._image_consumed:

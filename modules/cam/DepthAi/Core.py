@@ -204,16 +204,16 @@ class DepthAiCore():
             return_frame = masked_frame
 
         for c in self.frameCallbacks:
-            c(return_frame)
+            c(self.ID, return_frame)
 
     def updateTracker(self, msg) -> None:
         self.updateTPS()
         Ts = msg.tracklets
         self.numTracklets = len(Ts)
         for t in Ts:
-            tracklet: Tracklet = Tracklet.from_dai(t, self.ID)
+            # tracklet: Tracklet = Tracklet.from_dai(t, self.ID)
             for c in self.trackerCallbacks:
-                c(tracklet)
+                c(self.ID, t)
 
     def updateStereo(self, frame: np.ndarray) -> np.ndarray:
         return (frame * (255 / 95)).astype(np.uint8)

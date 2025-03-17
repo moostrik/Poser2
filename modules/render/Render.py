@@ -3,7 +3,6 @@ import OpenGL.GLUT as glut
 from threading import Lock
 import numpy as np
 from enum import Enum
-from copy import deepcopy
 
 from modules.gl.RenderWindow import RenderWindow
 from modules.gl.Texture import Texture
@@ -11,10 +10,11 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Mesh import Mesh
 from modules.gl.Utils import lfo, fit, fill
 
-from modules.cam.DepthAi.Definitions import Tracklet, Tracklets
+# from modules.cam.DepthAi.Definitions import Tracklet, Tracklets
+
+from depthai import Tracklet
 from modules.pose.PoseDefinitions import PoseMessage, PoseIndicesFlat
 
-from typing import Set
 
 class ImageType(Enum):
     CAM1 = 0
@@ -32,10 +32,10 @@ def draw_tracklet(tracklet: Tracklet, x: float, y: float, w: float, h: float) ->
     if tracklet.status == Tracklet.TrackingStatus.REMOVED:
         return
 
-    x = x + tracklet.x * w
-    y = y + tracklet.y * h
-    w = tracklet.width * w
-    h = tracklet.height * h
+    x = x + tracklet.roi.x * w
+    y = y + tracklet.roi.y * h
+    w = tracklet.roi.width * w
+    h = tracklet.roi.height * h
 
     r: float = 1.0
     g: float = 1.0
@@ -50,9 +50,9 @@ def draw_tracklet(tracklet: Tracklet, x: float, y: float, w: float, h: float) ->
     if tracklet.status == Tracklet.TrackingStatus.REMOVED:
         r, g, b, a = (1.0, 0.0, 0.0, 1.0)
 
-    string: str = f'ID: {tracklet.track_id} \n Age: {tracklet.age} C: {tracklet.confidence:.2f}'
-    if tracklet.sp_z is not None:
-        string += f' Z: {tracklet.sp_z:.0f}'
+    string: str = f'ID: {tracklet.id} Age: {tracklet.age} C: {tracklet.srcImgDetection.confidence:.2f}'
+    if tracklet.spatialCoordinates.z > 0:
+        string += f' Z: {tracklet.spatialCoordinates.z:.0f}'
 
     glColor4f(r, g, b, a)   # Set color
     glBegin(GL_QUADS)       # Start drawing a quad
@@ -189,25 +189,22 @@ class Render(RenderWindow):
             return ret_colors
 
 
-    def set_camera_image(self, image: np.ndarray) -> None :
-        self.set_image(ImageType.CAM1, image)
+    def set_camera_image(self, ID: int, image: np.ndarray) -> None :
+        self.set_image(ImageType(ID), image)
 
     def get_tracklets(self, type: ImageType, clearTracklets: bool = False) -> dict[int, Tracklet]:
         with self.input_mutex:
-            ret_person: dict[int, Tracklet] =  deepcopy(self.tracklets[type])
+            ret_person: dict[int, Tracklet] =  self.tracklets[type].copy()
             if clearTracklets:
                 self.tracklets[type].clear()
             return ret_person
 
-    def add_tracklet(self, tracklet: Tracklet) -> None :
+    def add_tracklet(self, ID: int, tracklet: Tracklet) -> None :
         with self.input_mutex:
-            if tracklet.cam_id < 4:
-                type: ImageType = ImageType(tracklet.cam_id)
-                track_id: int = tracklet.track_id
+            if ID < 4:
+                type: ImageType = ImageType(ID)
+                track_id: int = tracklet.id
                 self.tracklets[type][track_id] = tracklet
-                # self.tracklets[type][tracklet.track_id] = tracklet
-                # print number of tracklets
-
 
     def set_pose_message(self, message: PoseMessage) -> None:
         self.set_image(ImageType.POSE, message.image)
