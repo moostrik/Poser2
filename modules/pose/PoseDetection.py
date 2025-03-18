@@ -262,11 +262,12 @@ class PoseDetection(Thread):
         self._image: np.ndarray | None = None
         self._image_consumed: bool = True
 
-        self.running: bool = False
-        self.callbacks: set = set()
+        self._running: bool = False
+        self._callbacks: set = set()
+        self._occupied: bool = False
 
     def stop(self) -> None:
-        self.running = False
+        self._running = False
 
     def run(self) -> None:
 
@@ -274,42 +275,42 @@ class PoseDetection(Thread):
         input_size: int
         session, input_size = LoadSession(self.modelType, self.path)
 
-        self.running = True
-        while self.running:
+        self._running = True
+        while self._running:
             if self.get_image is not None:
                 image: np.ndarray | None = self.get_image()
                 if image is not None:
-                    Poses: list[Pose] = RunSession(session, input_size, image)
+                    Poses: PoseList = RunSession(session, input_size, image)
                     # pose_image: np.ndarray = DrawPose(image, Poses)
                     pose_message = PoseMessage(Poses, image)
                     self.callback(pose_message)
-
+            with self._input_mutex:
+                self._occupied = False
             time.sleep(0.1)
 
     # IMAGE INPUTS
     def set_image(self, ID: int, image: np.ndarray | None) -> None:
         with self._input_mutex:
             self._image = image
-            self._image_consumed = False
+            self._occupied = True
 
-    def get_image(self, get_cumsumed_image = False) -> np.ndarray | None:
+    def get_image(self) -> np.ndarray | None:
         with self._input_mutex:
-            if not self._image_consumed:
-                self._image_consumed = True
-                return self._image
+            return_image: np.ndarray | None = self._image
+            self._image = None
+            return return_image
 
-            if self._image_consumed and get_cumsumed_image:
-                return self._image
-
-            return None
+    def is_occupied(self) -> bool:
+        with self._input_mutex:
+            return not self._occupied
 
     # CALLBACKS
     def callback(self, value: PoseMessage) -> None:
-        for c in self.callbacks:
+        for c in self._callbacks:
             c(value)
 
     def addMessageCallback(self, callback) -> None:
-        self.callbacks.add(callback)
+        self._callbacks.add(callback)
 
     def clearMessageCallbacks(self) -> None:
-        self.callbacks = set()
+        self._callbacks = set()

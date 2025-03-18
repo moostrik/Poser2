@@ -1,15 +1,14 @@
 import numpy as np
 from enum import Enum
 from typing import Callable
-from depthai import Tracklet as T, ImgDetection as D, Rect, Point3f
-
+from depthai import Tracklet, ImgDetection, Rect, Point3f
 # Tracklet = T
-Detection = D
-Detections = list[Detection]
+# Detection = D
+# Detections = list[Detection]
 
 FrameCallback = Callable[[int, np.ndarray], None]
-DetectionCallback = Callable[[int, Detections], None]
-TrackerCallback = Callable[[int, T], None]
+DetectionCallback = Callable[[int, ImgDetection], None]
+TrackerCallback = Callable[[int, Tracklet], None]
 
 class PreviewType(Enum):
     NONE =  0
@@ -42,12 +41,12 @@ class StereoMedianFilterType(Enum):
 
 StereoMedianFilterTypeNames: list[str] = [e.name for e in StereoMedianFilterType]
 
-class Tracklet():
-    class TrackingStatus(Enum):
-        NEW     = 0
-        TRACKED = 1
-        LOST    = 2
-        REMOVED = 3
+# class Tracklet():
+#     class TrackingStatus(Enum):
+#         NEW     = 0
+#         TRACKED = 1
+#         LOST    = 2
+#         REMOVED = 3
 
     # def __init__(self, cam_id: int,
     #              x: float, y: float, width: float, height: float,

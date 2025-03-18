@@ -3,6 +3,8 @@ from modules.cam.DepthCam import DepthCam
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.PoseDetection import PoseDetection, ModelType, PoseMessage
+from modules.detection.Manager import Detection, DetectionCallback, Manager
+
 import os
 from enum import Enum
 
@@ -21,7 +23,9 @@ class DepthPose():
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
         self.camera = DepthCam(self.gui, modelPath, fps, color, stereo, person, lowres, showLeft)
-        self.detector = PoseDetection(modelPath, ModelType.LIGHTNING if lightning else ModelType.THUNDER)
+        # self.detector = PoseDetection(modelPath, ModelType.LIGHTNING if lightning else ModelType.THUNDER)
+
+        self.detector = Manager(6, modelPath, ModelType.LIGHTNING if lightning else ModelType.THUNDER)
 
         self.running: bool = False
 
@@ -34,12 +38,12 @@ class DepthPose():
         self.camera.startCapture()
         self.camera.addFrameCallback(self.detector.set_image)
         self.camera.addFrameCallback(self.render.set_camera_image)
-        # self.camera.addTrackerCallback(self.detector.add_tracklet)
+        self.camera.addTrackerCallback(self.detector.add_tracklet)
         self.camera.addTrackerCallback(self.render.add_tracklet)
 
         if not self.noPose:
             self.detector.start()
-            self.detector.addMessageCallback(self.render.set_pose_message)
+            self.detector.addCallback(self.render.set_detection)
 
         self.gui.exit_callback = self.stop
         self.gui.addFrame([self.camera.get_gui_color_frame(), self.camera.get_gui_depth_frame()])
@@ -51,7 +55,7 @@ class DepthPose():
     def stop(self) -> None:
         if not self.noPose:
             self.detector.stop()
-            self.detector.clearMessageCallbacks()
+            self.detector.clearCallbacks()
 
         self.camera.stopCapture()
         self.camera.clearFrameCallbacks()

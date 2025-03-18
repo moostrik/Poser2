@@ -14,6 +14,7 @@ from modules.gl.Utils import lfo, fit, fill
 
 from depthai import Tracklet
 from modules.pose.PoseDefinitions import PoseMessage, PoseIndicesFlat
+from modules.detection.Manager import Detection
 
 
 class ImageType(Enum):
@@ -83,12 +84,12 @@ class Render(RenderWindow):
 
         self._images: dict[ImageType, np.ndarray | None] = {}
         self.textures: dict[ImageType, Texture] = {}
-        self.tracklets: dict[ImageType, dict[int, Tracklet]] = {}
+        self.input_tracklets: dict[ImageType, dict[int, Tracklet]] = {}
 
         for image_type in ImageType:
             self._images[image_type] = None
             self.textures[image_type] = Texture()
-            self.tracklets[image_type] = {}
+            self.input_tracklets[image_type] = {}
 
 
         self._vertices: dict[MeshType, np.ndarray | None] = {}
@@ -192,11 +193,11 @@ class Render(RenderWindow):
     def set_camera_image(self, ID: int, image: np.ndarray) -> None :
         self.set_image(ImageType(ID), image)
 
-    def get_tracklets(self, type: ImageType, clearTracklets: bool = False) -> dict[int, Tracklet]:
+    def get_tracklets(self, id: ImageType, clearTracklets: bool = False) -> dict[int, Tracklet]:
         with self.input_mutex:
-            ret_person: dict[int, Tracklet] =  self.tracklets[type].copy()
+            ret_person: dict[int, Tracklet] =  self.input_tracklets[id].copy()
             if clearTracklets:
-                self.tracklets[type].clear()
+                self.input_tracklets[id].clear()
             return ret_person
 
     def add_tracklet(self, ID: int, tracklet: Tracklet) -> None :
@@ -204,9 +205,11 @@ class Render(RenderWindow):
             if ID < 4:
                 type: ImageType = ImageType(ID)
                 track_id: int = tracklet.id
-                self.tracklets[type][track_id] = tracklet
+                self.input_tracklets[type][track_id] = tracklet
 
-    def set_pose_message(self, message: PoseMessage) -> None:
-        self.set_image(ImageType.POSE, message.image)
-        self.set_vertices(MeshType.POSE_0, message.pose_list[0].getVertices())
-        self.set_colors(MeshType.POSE_0, message.pose_list[0].getColors())
+    def set_detection(self, detection: Detection) -> None:
+        image: np.ndarray | None = detection.image
+        if image is not None:
+            self.set_image(ImageType.POSE, image)
+        # self.set_vertices(MeshType.POSE_0, message.pose_list[0].getVertices())
+        # self.set_colors(MeshType.POSE_0, message.pose_list[0].getColors())
