@@ -1,31 +1,18 @@
 import cv2
 import numpy as np
 from threading import Thread, Lock
-from typing import Callable
 from time import sleep
 
+from modules.detection.Message import Message, MessageCallback
+
 from modules.cam.DepthAi.Definitions import Tracklet, Rect
-from modules.pose.PoseDetection import PoseDetection, ModelType, PoseMessage, PoseList
+from modules.pose.PoseDetection import PoseDetection, ModelType
 
 from modules.utils.pool import ObjectPool
 
 
 
-class Detection():
-    _id_counter = 0
 
-    def __init__(self, cam_id: int, tracklet: Tracklet) -> None:
-        self.id: str =                  self.create_unique_id(cam_id, tracklet.id)
-        self.cam_id: int =              cam_id
-        self.tracklet: Tracklet =       tracklet
-        self.image: np.ndarray | None = None
-        self.pose: PoseList | None =    None
-
-    @staticmethod
-    def create_unique_id(cam_id: int, tracklet_id: int) -> str:
-        return f"{cam_id}_{tracklet_id}"
-
-DetectionCallback = Callable[[Detection], None]
 
 
 
@@ -35,20 +22,27 @@ class Manager(Thread):
         self.input_mutex: Lock = Lock()
         self.running: bool = False
 
+        print(max_persons)
         self.max_persons: int = max_persons
         self.input_frames: dict[int, np.ndarray] = {}
-        self.input_detections: dict[str, Detection] = {}
+        self.input_detections: dict[str, Message] = {}
 
         self.detector_pool = ObjectPool(PoseDetection, max_persons, model_path, model_type)
+        self.callbacks: set[MessageCallback] = set()
+        self.active_detections: dict[str, PoseDetection] = {}
 
-        self.callbacks: set[DetectionCallback] = set()
 
 
     def run(self) -> None:
+        detectors: list[PoseDetection] = self.detector_pool.get_all_objects()
+        for detector in detectors:
+            detector.addMessageCallback(self.callback)
+            detector.start()
+
         self.running = True
 
         while self.running:
-            detections: dict[str, Detection] = self.get_input_detections()
+            detections: dict[str, Message] = self.get_input_detections()
             for key in detections.keys():
                 if detections[key].image is None:
                     roi = detections[key].tracklet.roi
@@ -56,8 +50,18 @@ class Manager(Thread):
                     image: np.ndarray = self.get_image(cam_id)
                     detections[key].image = self.get_image_cutout(image, roi, 256)
 
-                    for c in self.callbacks:
-                        c(detections[key])
+                    detector: PoseDetection
+                    if self.active_detections.get(key) is None:
+                        detector: PoseDetection = self.detector_pool.acquire()
+                        self.active_detections[key] = detector
+                    else:
+                        detector = self.active_detections[key]
+
+                    detector.set_detection(detections[key])
+
+
+                    # for c in self.callbacks:
+                    #     c(detections[key])
 
 
 
@@ -84,24 +88,26 @@ class Manager(Thread):
             return self.input_frames[id]
 
 
-    def get_input_detections(self) -> dict[str, Detection]:
+    def get_input_detections(self) -> dict[str, Message]:
         with self.input_mutex:
-            detections: dict[str, Detection] =  self.input_detections.copy()
+            detections: dict[str, Message] =  self.input_detections.copy()
             self.input_detections.clear()
             return detections
 
     def add_tracklet(self, id: int, tracklet: Tracklet) -> None :
-        print(tracklet.status)
         if tracklet.status != Tracklet.TrackingStatus.TRACKED:
             return
-        unique_id: str = Detection.create_unique_id(id, tracklet.id)
+        unique_id: str = Message.create_unique_id(id, tracklet.id)
         with self.input_mutex:
-            self.input_detections[unique_id] = Detection(id, tracklet)
+            self.input_detections[unique_id] = Message(id, tracklet)
 
+    def callback(self, detection: Message) -> None:
+        for c in self.callbacks:
+            c(detection)
 
-    def addCallback(self, callback: DetectionCallback) -> None:
+    def addCallback(self, callback: MessageCallback) -> None:
         self.callbacks.add(callback)
-    def discardCallback(self, callback: DetectionCallback) -> None:
+    def discardCallback(self, callback: MessageCallback) -> None:
         self.callbacks.discard(callback)
     def clearCallbacks(self) -> None:
         self.callbacks.clear()

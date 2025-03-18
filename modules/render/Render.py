@@ -13,8 +13,8 @@ from modules.gl.Utils import lfo, fit, fill
 # from modules.cam.DepthAi.Definitions import Tracklet, Tracklets
 
 from depthai import Tracklet
-from modules.pose.PoseDefinitions import PoseMessage, PoseIndicesFlat
-from modules.detection.Manager import Detection
+from modules.pose.PoseDefinitions import Pose, PoseIndicesFlat
+from modules.detection.Manager import Message
 
 
 class ImageType(Enum):
@@ -207,9 +207,11 @@ class Render(RenderWindow):
                 track_id: int = tracklet.id
                 self.input_tracklets[type][track_id] = tracklet
 
-    def set_detection(self, detection: Detection) -> None:
+    def set_detection(self, detection: Message) -> None:
         image: np.ndarray | None = detection.image
         if image is not None:
             self.set_image(ImageType.POSE, image)
-        # self.set_vertices(MeshType.POSE_0, message.pose_list[0].getVertices())
-        # self.set_colors(MeshType.POSE_0, message.pose_list[0].getColors())
+            poses: list[Pose] | None = detection.pose
+            if poses is not None and len(poses) > 0:
+                self.set_vertices(MeshType.POSE_0, poses[0].getVertices())
+                self.set_colors(MeshType.POSE_0, poses[0].getColors())

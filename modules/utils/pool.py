@@ -29,3 +29,6 @@ class ObjectPool:
 
     def available(self) -> int:
         return len(self._available)
+
+    def get_all_objects(self) -> List[T]:
+        return self._pool

@@ -1,5 +1,6 @@
 from enum import Enum
 import numpy as np
+from typing import Callable
 
 NUM_KEYPOINTS = 17
 NUM_KEYPOINT_VALUES = 3 # [y, x, score]
@@ -125,8 +126,3 @@ class Pose():
 
 PoseList = list[Pose]
 
-
-class PoseMessage():
-    def __init__(self, pose_list: PoseList, pose_image: np.ndarray) -> None:
-        self.pose_list: PoseList = pose_list
-        self.image: np.ndarray = pose_image

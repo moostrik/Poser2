@@ -14,6 +14,7 @@ import copy
 import os
 
 from modules.pose.PoseDefinitions import *
+from modules.detection.Manager import Message
 
 def LoadSession(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSession, int]:
     path: str = os.path.join(model_path, ModelFileNames[model_type.value])
@@ -262,6 +263,8 @@ class PoseDetection(Thread):
         self._image: np.ndarray | None = None
         self._image_consumed: bool = True
 
+        self._detection: Message | None = None
+
         self._running: bool = False
         self._callbacks: set = set()
         self._occupied: bool = False
@@ -277,35 +280,42 @@ class PoseDetection(Thread):
 
         self._running = True
         while self._running:
-            if self.get_image is not None:
-                image: np.ndarray | None = self.get_image()
+            detection: Message | None = self.get_detection()
+            if detection is not None:
+                image: np.ndarray | None = detection.image
                 if image is not None:
                     Poses: PoseList = RunSession(session, input_size, image)
-                    # pose_image: np.ndarray = DrawPose(image, Poses)
-                    pose_message = PoseMessage(Poses, image)
-                    self.callback(pose_message)
-            with self._input_mutex:
-                self._occupied = False
+                    detection.pose = Poses
+                    self.callback(detection)
             time.sleep(0.1)
 
-    # IMAGE INPUTS
-    def set_image(self, ID: int, image: np.ndarray | None) -> None:
-        with self._input_mutex:
-            self._image = image
-            self._occupied = True
+    # # IMAGE INPUTS
+    # def set_image(self, ID: int, image: np.ndarray | None) -> None:
+    #     with self._input_mutex:
+    #         self._image = image
+    #         self._occupied = True
 
-    def get_image(self) -> np.ndarray | None:
-        with self._input_mutex:
-            return_image: np.ndarray | None = self._image
-            self._image = None
-            return return_image
+    # def get_image(self) -> np.ndarray | None:
+    #     with self._input_mutex:
+    #         return_image: np.ndarray | None = self._image
+    #         self._image = None
+    #         return return_image
 
-    def is_occupied(self) -> bool:
+    # def is_occupied(self) -> bool:
+    #     with self._input_mutex:
+    #         return not self._occupied
+
+    def get_detection(self) -> Message | None:
         with self._input_mutex:
-            return not self._occupied
+            return_detection: Message | None = self._detection
+            self._detection = None
+            return return_detection
+
+    def set_detection(self, detection: Message) -> None:
+        self._detection = detection
 
     # CALLBACKS
-    def callback(self, value: PoseMessage) -> None:
+    def callback(self, value: Message) -> None:
         for c in self._callbacks:
             c(value)
 

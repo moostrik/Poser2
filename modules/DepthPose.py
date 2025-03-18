@@ -2,8 +2,8 @@
 from modules.cam.DepthCam import DepthCam
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
-from modules.pose.PoseDetection import PoseDetection, ModelType, PoseMessage
-from modules.detection.Manager import Detection, DetectionCallback, Manager
+from modules.pose.PoseDetection import ModelType
+from modules.detection.Manager import Message, MessageCallback, Manager
 
 import os
 from enum import Enum
