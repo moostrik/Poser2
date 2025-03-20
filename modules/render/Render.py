@@ -14,7 +14,7 @@ from modules.gl.Utils import lfo, fit, fill
 
 from depthai import Tracklet
 from modules.pose.PoseDefinitions import Pose, PoseIndicesFlat
-from modules.detection.Manager import Message
+from modules.person.Person import Person
 
 
 class ImageType(Enum):
@@ -207,7 +207,7 @@ class Render(RenderWindow):
                 track_id: int = tracklet.id
                 self.input_tracklets[type][track_id] = tracklet
 
-    def set_detection(self, detection: Message) -> None:
+    def set_detection(self, detection: Person) -> None:
         image: np.ndarray | None = detection.image
         if image is not None:
             self.set_image(ImageType.POSE, image)

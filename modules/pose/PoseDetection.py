@@ -14,11 +14,10 @@ import copy
 import os
 
 from modules.pose.PoseDefinitions import *
-from modules.detection.Manager import Message
+from modules.person.Person import Person
 
 def LoadSession(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSession, int]:
     path: str = os.path.join(model_path, ModelFileNames[model_type.value])
-    print('Loading model', ModelTypeNames[model_type.value], 'from path', path)
     onnx_session = ort.InferenceSession(
         path,
         providers=[
@@ -218,7 +217,6 @@ def DrawPose(image, poses:PoseList) -> np.ndarray:
 
     return debug_image
 
-
 def resize_with_pad(image, target_width, target_height, padding_color=(0, 0, 0)):
     # Get the original dimensions
     original_height, original_width = image.shape[:2]
@@ -251,6 +249,9 @@ def resize_with_pad(image, target_width, target_height, padding_color=(0, 0, 0))
 
 
 class PoseDetection(Thread):
+    onnx_session: ort.InferenceSession | None = None
+    onnx_size: int = 256
+
     def __init__(self, path: str, model_type:ModelType) -> None:
         super().__init__()
         self.path: str = path
@@ -263,7 +264,7 @@ class PoseDetection(Thread):
         self._image: np.ndarray | None = None
         self._image_consumed: bool = True
 
-        self._detection: Message | None = None
+        self._detection: Person | None = None
 
         self._running: bool = False
         self._callbacks: set = set()
@@ -273,18 +274,16 @@ class PoseDetection(Thread):
         self._running = False
 
     def run(self) -> None:
-
-        session: ort.InferenceSession
-        input_size: int
-        session, input_size = LoadSession(self.modelType, self.path)
+        if PoseDetection.onnx_session is None:
+            PoseDetection.onnx_session, PoseDetection.onnx_size = LoadSession(self.modelType, self.path)
 
         self._running = True
         while self._running:
-            detection: Message | None = self.get_detection()
+            detection: Person | None = self.get_detection()
             if detection is not None:
                 image: np.ndarray | None = detection.image
                 if image is not None:
-                    Poses: PoseList = RunSession(session, input_size, image)
+                    Poses: PoseList = RunSession(PoseDetection.onnx_session, PoseDetection.onnx_size, image)
                     detection.pose = Poses
                     self.callback(detection)
             time.sleep(0.1)
@@ -305,17 +304,21 @@ class PoseDetection(Thread):
     #     with self._input_mutex:
     #         return not self._occupied
 
-    def get_detection(self) -> Message | None:
+    def get_detection(self) -> Person | None:
         with self._input_mutex:
-            return_detection: Message | None = self._detection
+            return_detection: Person | None = self._detection
             self._detection = None
             return return_detection
 
-    def set_detection(self, detection: Message) -> None:
-        self._detection = detection
+    def set_detection(self, detection: Person) -> None:
+        with self._input_mutex:
+            self._detection = detection
+
+    def get_frame_size(self) -> int:
+        return PoseDetection.onnx_size
 
     # CALLBACKS
-    def callback(self, value: Message) -> None:
+    def callback(self, value: Person) -> None:
         for c in self._callbacks:
             c(value)
 
