@@ -1,60 +1,112 @@
 import cv2
 import numpy as np
 from threading import Thread, Lock
-from time import sleep
+from time import time, sleep
 
-from modules.person.Person import Person, PersonCallback
-from modules.cam.DepthAi.Definitions import Tracklet, Rect
+from modules.person.Person import Person, PersonDict, PersonCallback, CamTracklet
+from modules.cam.DepthAi.Definitions import Tracklet, Rect, Point3f
 from modules.pose.PoseDetection import PoseDetection, ModelType, ModelTypeNames
-from modules.utils.pool import ObjectPool
+from modules.person.CircularCoordinates import CircularCoordinates
+
+CamTrackletDict = dict[str, CamTracklet]
+
+class IdPool:
+    def __init__(self, max_size: int) -> None:
+        self._available = set(range(max_size))
+        self._lock = Lock()
+
+    def acquire(self) -> int:
+        with self._lock:
+            if not self._available:
+                raise Exception("No more IDs available")
+            return self._available.pop()
+
+    def release(self, obj: int) -> None:
+        with self._lock:
+            self._available.add(obj)
+
+    def size(self) -> int:
+        return len(self._available)
 
 class Manager(Thread):
-    def __init__(self, max_persons: int, model_path: str, model_type: ModelType) -> None:
+    def __init__(self, max_persons: int, num_cams: int, model_path: str, model_type: ModelType) -> None:
         super().__init__()
         self.input_mutex: Lock = Lock()
         self.running: bool = False
+        self.max_persons: int = max_persons
 
-        self.pose_detector_pool: ObjectPool
+        self.pose_detectors: dict[int, PoseDetection] = {}
         self.pose_detector_frame_size: int = 256
-        self.pose_detector_active: bool = False
         if model_type == ModelType.NONE:
             print('Running without pose detection')
         else:
-            self.pose_detector_pool = ObjectPool(PoseDetection, max_persons, model_path, model_type)
-            self.pose_detector_active = True
+            for i in range(max_persons):
+                self.pose_detectors[i] = PoseDetection(model_path, model_type)
             print('Running', max_persons, 'pose detections with model', ModelTypeNames[model_type.value])
 
-        self.max_persons: int = max_persons
         self.input_frames: dict[int, np.ndarray] = {}
-        self.input_persons: dict[str, Person] = {}
+        self.input_tracklets: CamTrackletDict = {}
+
+        self.person_id_pool: IdPool = IdPool(max_persons)
+        self.persons: PersonDict = {}
+
+        self.circular_coordinates: CircularCoordinates = CircularCoordinates(num_cams)
 
         self.callbacks: set[PersonCallback] = set()
-        self.active_detectors: dict[str, PoseDetection] = {}
+
+    def stop(self) -> None:
+        self.running = False
 
     def run(self) -> None:
         self.running = True
 
-        if self.pose_detector_active:
-            detectors: list[PoseDetection] = self.pose_detector_pool.get_all_objects()
-            for detector in detectors:
-                detector.addMessageCallback(self.callback)
-                detector.start()
-                self.pose_detector_frame_size  = detector.get_frame_size()
+        for detector in self.pose_detectors.values():
+            detector.addMessageCallback(self.callback)
+            detector.start()
+            self.pose_detector_frame_size = detector.get_frame_size()
 
         while self.running:
-            persons: dict[str, Person] = self.get_input_persons()
-            for key in persons.keys():
-                self.add_player_id(persons[key])
-                self.add_cropped_image(persons[key])
-
-                if self.pose_detector_active:
-                    self.add_pose(persons[key])
-                else:
-                    for c in self.callbacks:
-                        c(persons[key])
-
+            self.update_persons()
             sleep(0.01)
             pass
+
+    def update_persons(self) -> None:
+        tracklets: CamTrackletDict = self.get_tracklets()
+        # print number of tracklets
+
+        for key in tracklets.keys():
+            cam_id: int = tracklets[key].cam_id
+            tracklet: Tracklet = tracklets[key].tracklet
+            if tracklet.status == Tracklet.TrackingStatus.NEW or tracklet.status == Tracklet.TrackingStatus.TRACKED:
+
+                person: Person = Person(-1, cam_id, tracklet)
+                self.circular_coordinates.add_angle_position(person)
+                person_found: Person | None = self.circular_coordinates.find(person, self.persons)
+
+                if person_found is not None:
+                    person.id = person_found.id
+                    person.start_time = person_found.start_time
+                    person.last_time = time()
+                    self.persons[person.id] = person
+                    continue
+
+                try:
+                    person_id: int = self.person_id_pool.acquire()
+                except:
+                    print('No more person ids available')
+                    continue
+
+                person.id = person_id
+                print('New person id:', person.id)
+                self.persons[person_id] = person
+
+        for key in self.persons.keys():
+            person = self.persons[key]
+            if person.last_time < time() - 1.0:
+                self.person_id_pool.release(person.id)
+
+            self.add_cropped_image(person)
+            self.add_pose(person) # also handles callback
 
     def add_cropped_image(self, person: Person) -> None:
         if person.image is not None:
@@ -63,29 +115,19 @@ class Manager(Thread):
         image: np.ndarray = self.get_image(person.cam_id)
         person.image = self.get_cropped_image(image, roi, self.pose_detector_frame_size)
 
-    def add_player_id(self, person: Person) -> None:
-        person.player_id = Person._id_counter
-
     def add_pose(self, person: Person) -> None:
-        if self.pose_detector_pool is None:
-            return
         if person.image is None:
+            print('No image for person', person.id)
             return
         if person.pose is not None:
             return
 
-        detector: PoseDetection
-        key: str = person.id
-        if self.active_detectors.get(key) is None:
-            detector: PoseDetection = self.pose_detector_pool.acquire()
-            self.active_detectors[key] = detector
+        detector: PoseDetection | None = self.pose_detectors.get(person.id)
+        if detector is not None:
+            detector.set_detection(person)
         else:
-            detector = self.active_detectors[key]
+            self.callback(person)
 
-        detector.set_detection(person)
-
-    def stop(self) -> None:
-        self.running = False
 
     # INPUTS
     def set_image(self, id: int, image: np.ndarray) -> None :
@@ -98,18 +140,15 @@ class Manager(Thread):
                 return np.zeros((self.pose_detector_frame_size, self.pose_detector_frame_size, 3), np.uint8)
             return self.input_frames[id]
 
-    def get_input_persons(self) -> dict[str, Person]:
+    def get_tracklets(self) -> CamTrackletDict:
         with self.input_mutex:
-            detections: dict[str, Person] =  self.input_persons.copy()
-            self.input_persons.clear()
-            return detections
-
+            tracklets: CamTrackletDict =  self.input_tracklets.copy()
+            self.input_tracklets.clear()
+            return tracklets
     def add_tracklet(self, id: int, tracklet: Tracklet) -> None :
-        if tracklet.status != Tracklet.TrackingStatus.TRACKED:
-            return
-        unique_id: str = Person.create_unique_id(id, tracklet.id)
+        unique_id: str = Person.create_cam_id(id, tracklet.id)
         with self.input_mutex:
-            self.input_persons[unique_id] = Person(id, tracklet)
+            self.input_tracklets[unique_id] = CamTracklet(id, tracklet)
 
     # CALLBACKS
     def callback(self, detection: Person) -> None:
@@ -170,3 +209,4 @@ class Manager(Thread):
 
         # Resize the cutout to the desired size
         return cv2.resize(cutout, (size, size), interpolation=cv2.INTER_AREA)
+

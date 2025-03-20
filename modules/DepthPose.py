@@ -29,7 +29,7 @@ class DepthPose():
             modelType = ModelType.NONE
         # self.detector = PoseDetection(modelPath, ModelType.LIGHTNING if lightning else ModelType.THUNDER)
 
-        self.detector = Manager(6, modelPath, modelType)
+        self.detector = Manager(max_persons=6, num_cams=1, model_path=modelPath, model_type=modelType)
 
         self.running: bool = False
 
