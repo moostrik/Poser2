@@ -111,10 +111,9 @@ class Manager(Thread):
     def add_cropped_image(self, person: Person) -> None:
         if person.pose_image is not None:
             return
-        roi: Rect = person.tracklet.roi
         image: np.ndarray = self.get_image(person.cam_id)
         h, w = image.shape[:2]
-        roi = self.get_crop_rect(w, h, roi)
+        roi: Rect = self.get_crop_rect(w, h, person.tracklet.roi)
         person.pose_rect = roi
         person.pose_image = self.get_cropped_image(image, roi, self.pose_detector_frame_size)
 
@@ -167,7 +166,7 @@ class Manager(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def get_crop_rect(image_width: int, image_height: int, roi: Rect) -> Rect:
+    def get_crop_rect(image_width: int, image_height: int, roi: Rect, expansion = 0.0) -> Rect:
        # Calculate the original ROI coordinates
         img_x = int(roi.x * image_width)
         img_y = int(roi.y * image_height)
@@ -176,12 +175,13 @@ class Manager(Thread):
 
         # Determine the size of the square cutout based on the longest side of the ROI
         img_wh: int = max(img_w, img_h)
+        img_wh += int(img_wh * expansion)
 
         # Calculate the new coordinates to center the square cutout around the original ROI
-        crop_center: int = img_x + img_w // 2
-        crop_center: int = img_y + img_h // 2
-        crop_x: int = crop_center - img_wh // 2
-        crop_y: int = crop_center - img_wh // 2
+        crop_center_x: int = img_x + img_w // 2
+        crop_center_y: int = img_y + img_h // 2
+        crop_x: int = crop_center_x - img_wh // 2
+        crop_y: int = crop_center_y - img_wh // 2
         crop_w: int = img_wh
         crop_h: int = img_wh
 
@@ -198,45 +198,28 @@ class Manager(Thread):
         image_height, image_width = image.shape[:2]
 
         # Calculate the original ROI coordinates
-        x = int(roi.x * image_width)
-        y = int(roi.y * image_height)
-        w = int(roi.width * image_width)
-        h = int(roi.height * image_height)
+        x: int = int(roi.x * image_width)
+        y: int = int(roi.y * image_height)
+        w: int = int(roi.width * image_width)
+        h: int = int(roi.height * image_height)
 
-        # Determine the size of the square cutout based on the longest side of the ROI
-        side_length = max(w, h)
+        # Extract the roi without padding
+        img_x: int = max(0, x)
+        img_y: int = max(0, y)
+        img_w: int = min(w, image_width - x)
+        img_h: int = min(h, image_height - y)
 
-        # Calculate the new coordinates to center the square cutout around the original ROI
-        x_center = x + w // 2
-        y_center = y + h // 2
-        x_new = x_center - side_length // 2
-        y_new = y_center - side_length // 2
+        crop: np.ndarray = image[img_y:img_y + img_h, img_x:img_x + img_w]
 
-        # Calculate padding if the cutout goes outside the image boundaries
-        top_padding = max(0, -y_new)
-        left_padding = max(0, -x_new)
-        bottom_padding = max(0, y_new + side_length - image_height)
-        right_padding = max(0, x_new + side_length - image_width)
+        # Apply padding if the roi is outside the image bounds
+        left_padding: int = -min(0, x)
+        top_padding: int = -min(0, y)
+        right_padding: int = max(0, x + w - image_width)
+        bottom_padding: int = max(0, y + h - image_height)
 
-        # Add padding to the image if necessary
-        if top_padding > 0 or left_padding > 0 or bottom_padding > 0 or right_padding > 0:
-            image = cv2.copyMakeBorder(
-                image,
-                top_padding,
-                bottom_padding,
-                left_padding,
-                right_padding,
-                cv2.BORDER_CONSTANT,
-                value=[0, 0, 0]  # You can change the padding color if needed
-            )
-
-        # Recalculate the new coordinates after padding
-        x_new = max(0, x_new)
-        y_new = max(0, y_new)
-
-        # Extract the square cutout
-        cutout: np.ndarray = image[y_new:y_new + side_length, x_new:x_new + side_length]
+        if left_padding + right_padding + top_padding + bottom_padding > 0:
+            crop = cv2.copyMakeBorder(crop, top_padding, bottom_padding, left_padding, right_padding, cv2.BORDER_CONSTANT, value=[0, 0, 0])
 
         # Resize the cutout to the desired size
-        return cv2.resize(cutout, (size, size), interpolation=cv2.INTER_AREA)
+        return cv2.resize(crop, (size, size), interpolation=cv2.INTER_AREA)
 
