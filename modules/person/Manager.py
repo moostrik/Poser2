@@ -38,11 +38,11 @@ class Manager(Thread):
         self.pose_detectors: dict[int, PoseDetection] = {}
         self.pose_detector_frame_size: int = 256
         if model_type == ModelType.NONE:
-            print('Running without pose detection')
+            print('Pose Detection: Disabled')
         else:
             for i in range(max_persons):
                 self.pose_detectors[i] = PoseDetection(model_path, model_type)
-            print('Running', max_persons, 'pose detections with model', ModelTypeNames[model_type.value])
+            print('Pose Detection:', max_persons, 'six instances of model', ModelTypeNames[model_type.value])
 
         self.input_frames: dict[int, np.ndarray] = {}
         self.input_tracklets: CamTrackletDict = {}

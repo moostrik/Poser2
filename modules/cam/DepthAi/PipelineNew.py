@@ -23,6 +23,16 @@ def SetupPipeline(
 
     stereoConfig: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
 
+    options: list[str] = [
+        'Color' if doColor else 'Mono',
+        'Stereo' if doStereo else '',
+        'Yolo' if doPerson else '',
+        'LowRes' if lowres else 'Highres',
+        'showMono' if showMono else ''
+    ]
+    pipeline_description = "Depth Pipeline: " + " ".join(filter(None, options))
+    print(pipeline_description)
+
     if doColor:
         stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
         if doStereo:
