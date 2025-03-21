@@ -26,7 +26,7 @@ def lfo(frequency, phase=0) -> float:
     lfo_value: float = 0.5 + 0.5 * math.sin(2 * math.pi * frequency * elapsed_time + phase)
     return lfo_value
 
-def fit(src_width: int | float, src_height: int | float, dst_width: int | float, dst_height: int | float) -> list[float]:
+def fit(src_width: int | float, src_height: int | float, dst_width: int | float, dst_height: int | float) -> tuple[float, float, float, float]:
     src_ratio: float = float(src_width) / float(src_height)
     dst_ratio: float = float(dst_width) / float(dst_height)
 
@@ -45,9 +45,9 @@ def fit(src_width: int | float, src_height: int | float, dst_width: int | float,
     x = (dst_width - width) / 2.0
     y = (dst_height - height) / 2.0
 
-    return [x, y, width, height]
+    return (x, y, width, height)
 
-def fill(src_width: int | float, src_height: int | float, dst_width: int | float, dst_height: int | float) -> list[float]:
+def fill(src_width: int | float, src_height: int | float, dst_width: int | float, dst_height: int | float) -> tuple[float, float, float, float]:
     src_ratio: float = float(src_width) / float(src_height)
     dst_ratio: float = float(dst_width) / float(dst_height)
 
@@ -66,4 +66,4 @@ def fill(src_width: int | float, src_height: int | float, dst_width: int | float
     x = (dst_width - width) / 2.0
     y = (dst_height - height) / 2.0
 
-    return [x, y, width, height]
+    return (x, y, width, height)

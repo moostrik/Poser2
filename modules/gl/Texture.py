@@ -53,19 +53,41 @@ def draw_quad(x: float, y: float, w: float, h: float) -> None :
     y0: float = y
     y1: float = y + h
 
+    # glBegin(GL_QUADS)
+    # glTexCoord2f(0.0, 0.0)
+
+    # glVertex2f(x0, y0)
+    # glTexCoord2f(1.0, 0.0)
+
+    # glVertex2f(x1, y0)
+    # glTexCoord2f(1.0, 1.0)
+
+    # glVertex2f(x1, y1)
+    # glTexCoord2f(0.0, 1.0)
+
+    # glVertex2f(x0, y1)
+    # glEnd()
+
+
+
     glBegin(GL_QUADS)
-    glTexCoord2f(0.0, 0.0)
 
-    glVertex2f(x0, y0)
-    glTexCoord2f(1.0, 0.0)
-
-    glVertex2f(x1, y0)
-    glTexCoord2f(1.0, 1.0)
-
-    glVertex2f(x1, y1)
+    # Lower-left corner
     glTexCoord2f(0.0, 1.0)
+    glVertex2f(x0, y0)
 
+    # Lower-right corner
+    glTexCoord2f(1.0, 1.0)
+    glVertex2f(x1, y0)
+
+    # Upper-right corner
+    glTexCoord2f(1.0, 0.0)
+    glVertex2f(x1, y1)
+
+    # Upper-left corner
+    glTexCoord2f(0.0, 0.0)
     glVertex2f(x0, y1)
+
     glEnd()
 
 class Texture():

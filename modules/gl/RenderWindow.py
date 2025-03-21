@@ -97,6 +97,7 @@ class RenderWindow(Thread):
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         glOrtho(width if flipH else 0, 0 if flipH else width, 0 if flipV else height, height if flipV else 0, -1, 1)
+
         glMatrixMode(GL_MODELVIEW)
         glViewport(0, 0, width, height)
 

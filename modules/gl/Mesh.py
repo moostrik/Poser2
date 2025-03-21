@@ -1,5 +1,6 @@
 from OpenGL.GL import *  # type: ignore
 import numpy as np
+from threading import Lock
 
 class Mesh:
     def __init__(self) -> None:
@@ -11,7 +12,13 @@ class Mesh:
         self.indices: np.ndarray | None =   None
         self.colors: np.ndarray | None =    None
 
+        self.update_vertices: bool =        False
+        self.update_indices: bool =         False
+        self.update_colors: bool =          False
+
         self.allocated =                    False
+
+        self._mutex: Lock = Lock()
 
     def allocate(self) -> None:
         self.vertex_buffer =                glGenBuffers(1)
@@ -20,9 +27,7 @@ class Mesh:
 
         self.allocated =                    True
 
-        if self.vertices is not None:       self.set_vertices(self.vertices)
-        if self.indices is not None:        self.set_indices(self.indices)
-        if self.colors is not None:         self.set_colors(self.colors)
+        self.update()
 
     def deallocate(self) -> None :
         # delete the buffers?
@@ -82,33 +87,56 @@ class Mesh:
 
         self.unbind()
 
+    def update(self) -> None:
+        if not self.allocated:
+            self.allocate()
+
+        with self._mutex:
+
+            if self.update_vertices and self.vertices is not None:
+                glBindBuffer(GL_ARRAY_BUFFER, self.vertex_buffer)
+                glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
+                glBindBuffer(GL_ARRAY_BUFFER, 0)
+                self.update_vertices = False
+
+            if self.update_indices and self.indices is not None:
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.index_buffer)
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+                self.update_indices = False
+
+            if self.update_colors and self.colors is not None:
+                glBindBuffer(GL_ARRAY_BUFFER, self.color_buffer)
+                glBufferData(GL_ARRAY_BUFFER, self.colors.nbytes, self.colors, GL_STATIC_DRAW)
+                glBindBuffer(GL_ARRAY_BUFFER, 0)
+                self.update_colors = False
+
+
     def set_vertices(self, vertices: np.ndarray) -> None:
         if vertices.shape[1] == 2:
             vertices = np.concatenate((vertices, np.zeros((vertices.shape[0], 1), dtype=np.float32)), axis=1)
-        self.vertices = vertices
-
-        if self.allocated:
-            glBindBuffer(GL_ARRAY_BUFFER, self.vertex_buffer)
-            glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
-            glBindBuffer(GL_ARRAY_BUFFER, 0)
+        if self.vertices is not None and np.array_equal(self.vertices, vertices):
+            return
+        with self._mutex:
+            self.update_vertices = True
+            self.vertices = vertices
 
     def set_indices(self, indices: np.ndarray) -> None:
         self.indices = indices
-
-        if self.allocated:
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.index_buffer)
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
+        if self.indices is not None and np.array_equal(self.indices, indices):
+            return
+        with self._mutex:
+            self.update_indices = True
+            self.indices = self.indices.astype(np.uint32)
 
     def set_colors(self, colors: np.ndarray) -> None:
         if colors.ndim == 1:
             colors = np.repeat(colors[:, np.newaxis], 3, axis=1)
-        self.colors = colors
-
-        if self.allocated:
-            glBindBuffer(GL_ARRAY_BUFFER, self.color_buffer)
-            glBufferData(GL_ARRAY_BUFFER, self.colors.nbytes, self.colors, GL_STATIC_DRAW)
-            glBindBuffer(GL_ARRAY_BUFFER, 0)
+        if self.colors is not None and np.array_equal(self.colors, colors):
+            return
+        with self._mutex:
+            self.update_colors = True
+            self.colors = colors
 
     def isInitialized(self) -> bool:
         return self.allocated and self.vertices is not None and self.indices is not None

@@ -15,13 +15,13 @@ class CamType(Enum):
     IMAGE   = 4
 
 class DepthPose():
-    def __init__(self, path: str, fps: int, color: bool, stereo: bool, person: bool, lowres: bool, showLeft: bool, lightning: bool, noPose:bool) -> None:
+    def __init__(self, path: str, fps: int, numPlayers: int, color: bool, stereo: bool, person: bool, lowres: bool, showLeft: bool, lightning: bool, noPose:bool) -> None:
         self.path: str =    path
         modelPath: str =    os.path.join(path, 'models')
         self.noPose: bool = noPose
 
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
-        self.render = Render(1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
+        self.render = Render(1, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
         self.camera = DepthCam(self.gui, modelPath, fps, color, stereo, person, lowres, showLeft)
 
         modelType: ModelType = ModelType.LIGHTNING if lightning else ModelType.THUNDER
@@ -29,7 +29,7 @@ class DepthPose():
             modelType = ModelType.NONE
         # self.detector = PoseDetection(modelPath, ModelType.LIGHTNING if lightning else ModelType.THUNDER)
 
-        self.detector = Manager(max_persons=6, num_cams=1, model_path=modelPath, model_type=modelType)
+        self.detector = Manager(max_persons=numPlayers, num_cams=1, model_path=modelPath, model_type=modelType)
 
         self.running: bool = False
 
@@ -41,13 +41,12 @@ class DepthPose():
         self.camera.open()
         self.camera.startCapture()
         self.camera.addFrameCallback(self.detector.set_image)
-        self.camera.addFrameCallback(self.render.set_camera_image)
+        self.camera.addFrameCallback(self.render.set_cam_image)
         self.camera.addTrackerCallback(self.detector.add_tracklet)
-
         self.camera.addTrackerCallback(self.render.add_tracklet)
 
         self.detector.start()
-        self.detector.addCallback(self.render.set_detection)
+        self.detector.addCallback(self.render.add_person)
 
         self.gui.exit_callback = self.stop
         self.gui.addFrame([self.camera.get_gui_color_frame(), self.camera.get_gui_depth_frame()])

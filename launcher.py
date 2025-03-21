@@ -13,6 +13,7 @@ from modules.DepthPose import DepthPose
 
 parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-fps',     '--fps',        type=int,   default=30,     help='frames per second')
+parser.add_argument('-pl',      '--players',    type=int,   default=6,      help='num players')
 parser.add_argument('-mono',    '--mono',       action='store_true',        help='use left mono input instead of color')
 parser.add_argument('-s',       '--stereo',     action='store_true',        help='do not use stereo depth')
 parser.add_argument('-ny',      '--noyolo',     action='store_true',        help='do not do yolo person detection')
@@ -24,7 +25,7 @@ args: Namespace = parser.parse_args()
 
 currentPath: str = path.dirname(__file__)
 
-app: DepthPose = DepthPose(currentPath, args.fps, not args.mono, args.stereo, not args.noyolo, args.lowres, args.showleft, args.lightning, args.nopose)
+app: DepthPose = DepthPose(currentPath, args.fps, args.players, not args.mono, args.stereo, not args.noyolo, args.lowres, args.showleft, args.lightning, args.nopose)
 app.start()
 
 def signal_handler_exit(sig, frame) -> None:

@@ -24,8 +24,13 @@ class Fbo(Texture):
 
     def begin(self)  -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
+        # Apply transformation to flip the y-coordinates
+        # glPushMatrix()
+        # glTranslatef(0, self.height, 0)
+        # glScalef(1, -1, 1)
 
     def end(self)  -> None:
+        # glPopMatrix()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
 class SwapFbo():
