@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Texture import Texture
+from modules.gl.Texture import Texture, draw_quad
 import numpy as np
 from threading import Lock
 
@@ -21,3 +21,8 @@ class Image(Texture):
             if self._needs_update and self._image is not None:
                 self.set_from_image(self._image)
                 self._needs_update = False
+
+    def draw(self, x, y, w, h) -> None : #override
+        self.bind()
+        draw_quad(x, y, w, h, True)
+        self.unbind()

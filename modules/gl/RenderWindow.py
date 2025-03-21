@@ -93,10 +93,10 @@ class RenderWindow(Thread):
         self.window_height = height
         self.setView(self.window_width, self.window_height)
 
-    def setView(self, width, height, flipH = False, flipV = False) -> None:
+    def setView(self, width, height) -> None:
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        glOrtho(width if flipH else 0, 0 if flipH else width, 0 if flipV else height, height if flipV else 0, -1, 1)
+        glOrtho(0, width, height, 0, -1, 1)
 
         glMatrixMode(GL_MODELVIEW)
         glViewport(0, 0, width, height)

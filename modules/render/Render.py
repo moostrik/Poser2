@@ -112,7 +112,7 @@ class Render(RenderWindow):
             fbo: Fbo = self.cam_fbos[i]
             tracklets: dict[int, Tracklet] = self.get_tracklets(i)
 
-            self.setView(fbo.width, fbo.height, False, False)
+            self.setView(fbo.width, fbo.height)
             fbo.begin()
             image.draw(0, 0, fbo.width, fbo.height)
             for tracklet in tracklets.values():
@@ -128,7 +128,6 @@ class Render(RenderWindow):
         for i in range(self.num_cams):
             x, y, w, h = self.composition[ImageType.CAM][i]
             self.cam_fbos[i].draw(x, y, w, h)
-            self.cam_images[i].draw(x, y, w/2, h/2)
 
         for i in range(self.num_persons):
             x, y, w, h = self.composition[ImageType.PERSON][i]
@@ -143,7 +142,7 @@ class Render(RenderWindow):
         h: float = fbo.height
         if do_fit:
             x, y, w, h = fit(tex.width, tex.height, fbo.width, fbo.height)
-        self.setView(fbo.width, fbo.height, False, True)
+        self.setView(fbo.width, fbo.height)
         fbo.begin()
         tex.draw(x, y, w, h)
         fbo.end()

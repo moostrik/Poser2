@@ -47,46 +47,47 @@ def get_internal_format(image: np.ndarray) -> Constant:
         return GL_RGBA8
     return GL_NONE
 
-def draw_quad(x: float, y: float, w: float, h: float) -> None :
+def draw_quad(x: float, y: float, w: float, h: float, flipV: bool = False) -> None :
     x0: float = x
     x1: float = x + w
     y0: float = y
     y1: float = y + h
 
-    # glBegin(GL_QUADS)
-    # glTexCoord2f(0.0, 0.0)
-
-    # glVertex2f(x0, y0)
-    # glTexCoord2f(1.0, 0.0)
-
-    # glVertex2f(x1, y0)
-    # glTexCoord2f(1.0, 1.0)
-
-    # glVertex2f(x1, y1)
-    # glTexCoord2f(0.0, 1.0)
-
-    # glVertex2f(x0, y1)
-    # glEnd()
-
-
-
     glBegin(GL_QUADS)
 
-    # Lower-left corner
-    glTexCoord2f(0.0, 1.0)
-    glVertex2f(x0, y0)
+    if flipV:
+        # Lower-left corner
+        glTexCoord2f(0.0, 0.0)
+        glVertex2f(x0, y0)
 
-    # Lower-right corner
-    glTexCoord2f(1.0, 1.0)
-    glVertex2f(x1, y0)
+        # Lower-right corner
+        glTexCoord2f(1.0, 0.0)
+        glVertex2f(x1, y0)
 
-    # Upper-right corner
-    glTexCoord2f(1.0, 0.0)
-    glVertex2f(x1, y1)
+        # Upper-right corner
+        glTexCoord2f(1.0, 1.0)
+        glVertex2f(x1, y1)
 
-    # Upper-left corner
-    glTexCoord2f(0.0, 0.0)
-    glVertex2f(x0, y1)
+        # Upper-left corner
+        glTexCoord2f(0.0, 1.0)
+        glVertex2f(x0, y1)
+
+    else:
+        # Lower-left corner
+        glTexCoord2f(0.0, 1.0)
+        glVertex2f(x0, y0)
+
+        # Lower-right corner
+        glTexCoord2f(1.0, 1.0)
+        glVertex2f(x1, y0)
+
+        # Upper-right corner
+        glTexCoord2f(1.0, 0.0)
+        glVertex2f(x1, y1)
+
+        # Upper-left corner
+        glTexCoord2f(0.0, 0.0)
+        glVertex2f(x0, y1)
 
     glEnd()
 
