@@ -116,6 +116,7 @@ class Render(RenderWindow):
 
             self.setView(fbo.width, fbo.height)
             fbo.begin()
+
             image.draw(0, 0, fbo.width, fbo.height)
             for tracklet in tracklets.values():
                 self.draw_tracklet(tracklet, 0, 0, fbo.width, fbo.height)
@@ -138,7 +139,23 @@ class Render(RenderWindow):
 
     def draw_persons(self) -> None:
         for i in range(self.num_persons):
-            self.draw_in_fbo(self.psn_images[i], self.psn_fbos[i])
+            image: Image = self.psn_images[i]
+            fbo: Fbo = self.psn_fbos[i]
+            person: Person | None = self.get_person(i)
+
+            self.setView(fbo.width, fbo.height)
+            fbo.begin()
+
+            image.draw(0, 0, fbo.width, fbo.height)
+            if person is not None and person.active:
+                self.draw_person(person, 0, 0, fbo.width, fbo.height)
+                mesh: Mesh = self.pose_meshes[person.id]
+                if mesh.isInitialized():
+                    mesh.draw(0, 0, fbo.width, fbo.height)
+
+            fbo.end()
+
+
 
     def draw_composition(self) -> None:
         self.setView(self.window_width, self.window_height)
