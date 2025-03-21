@@ -122,12 +122,11 @@ class Mesh:
             self.vertices = vertices
 
     def set_indices(self, indices: np.ndarray) -> None:
-        self.indices = indices
         if self.indices is not None and np.array_equal(self.indices, indices):
             return
         with self._mutex:
             self.update_indices = True
-            self.indices = self.indices.astype(np.uint32)
+            self.indices = indices.astype(np.uint32)
 
     def set_colors(self, colors: np.ndarray) -> None:
         if colors.ndim == 1:

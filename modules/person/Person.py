@@ -18,6 +18,7 @@ class Person():
         self.pose_rect: Rect | None =   None
         self.pose_image: np.ndarray | None = None
         self.pose: PoseList | None =    None
+        self.active: bool =             True
 
     @staticmethod
     def create_cam_id(cam_id: int, tracklet_id: int) -> str:

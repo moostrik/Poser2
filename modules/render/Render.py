@@ -12,7 +12,7 @@ from modules.gl.Mesh import Mesh
 from modules.gl.Utils import lfo, fit, fill
 from modules.gl.Image import Image
 
-from depthai import Tracklet
+from depthai import Rect, Tracklet
 from modules.pose.PoseDefinitions import Pose, PoseIndicesFlat
 from modules.person.Person import Person
 
@@ -89,22 +89,23 @@ class Render(RenderWindow):
     def draw(self) -> None: # override
         if not self.allocated: self.allocate()
 
-        self.update_tracklets()
-        self.update_persons()
-
         self.update_images()
-        self.update_meshes()
+        self.update_pose_meshes()
 
         self.draw_cams()
         self.draw_persons()
 
         self.draw_composition()
 
-    def update_tracklets(self) -> None:
-        pass
-
-    def update_persons(self) -> None:
-        pass
+    def update_pose_meshes(self) -> None:
+        for i in range(self.num_persons):
+            person: Person | None = self.get_person(i, clear=False)
+            if person is not None:
+                poses: list[Pose] | None = person.pose
+                if poses is not None and len(poses) > 0:
+                    self.pose_meshes[i].set_vertices(poses[0].getVertices())
+                    self.pose_meshes[i].set_colors(poses[0].getColors())
+                    self.pose_meshes[i].update()
 
     def draw_cams(self) -> None:
         for i in range(self.num_cams):
@@ -119,7 +120,20 @@ class Render(RenderWindow):
             for tracklet in tracklets.values():
                 self.draw_tracklet(tracklet, 0, 0, fbo.width, fbo.height)
             for person in persons:
-                self.draw_person(person, 0, 0, fbo.width, fbo.height)
+                if person.active:
+                    self.draw_person(person, 0, 0, fbo.width, fbo.height)
+
+                    id: int = person.id
+                    roi: Rect | None = person.pose_rect
+                    mesh: Mesh = self.pose_meshes[id]
+                    if roi is not None and mesh.isInitialized():
+                        x, y, w, h = roi.x, roi.y, roi.width, roi.height
+                        x *= fbo.width
+                        y *= fbo.height
+                        w *= fbo.width
+                        h *= fbo.height
+                        mesh.draw(x, y, w, h)
+
             fbo.end()
 
     def draw_persons(self) -> None:

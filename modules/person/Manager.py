@@ -104,6 +104,7 @@ class Manager(Thread):
             person = self.persons[key]
             if person.last_time < time() - 1.0:
                 self.person_id_pool.release(person.id)
+                person.active = False
 
             self.add_cropped_image(person)
             self.add_pose(person) # also handles callback
