@@ -97,7 +97,7 @@ class Manager(Thread):
                     continue
 
                 person.id = person_id
-                print('New person id:', person.id)
+                # print('New person id:', person.id)
                 self.persons[person_id] = person
 
         for key in self.persons.keys():
@@ -139,7 +139,7 @@ class Manager(Thread):
     def get_image(self, id: int) -> np.ndarray:
         with self.input_mutex:
             if self.input_frames.get(id) is None:
-                print('No image with id', id)
+                # print('No image with id', id)
                 return np.zeros((self.pose_detector_frame_size, self.pose_detector_frame_size, 3), np.uint8)
             return self.input_frames[id]
 
