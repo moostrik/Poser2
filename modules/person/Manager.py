@@ -109,14 +109,17 @@ class Manager(Thread):
             self.add_pose(person) # also handles callback
 
     def add_cropped_image(self, person: Person) -> None:
-        if person.image is not None:
+        if person.pose_image is not None:
             return
         roi: Rect = person.tracklet.roi
         image: np.ndarray = self.get_image(person.cam_id)
-        person.image = self.get_cropped_image(image, roi, self.pose_detector_frame_size)
+        h, w = image.shape[:2]
+        roi = self.get_crop_rect(w, h, roi)
+        person.pose_rect = roi
+        person.pose_image = self.get_cropped_image(image, roi, self.pose_detector_frame_size)
 
     def add_pose(self, person: Person) -> None:
-        if person.image is None:
+        if person.pose_image is None:
             print('No image for person', person.id)
             return
         if person.pose is not None:
@@ -163,6 +166,33 @@ class Manager(Thread):
         self.callbacks.clear()
 
     # STATIC METHODS
+    @staticmethod
+    def get_crop_rect(image_width: int, image_height: int, roi: Rect) -> Rect:
+       # Calculate the original ROI coordinates
+        img_x = int(roi.x * image_width)
+        img_y = int(roi.y * image_height)
+        img_w = int(roi.width * image_width)
+        img_h = int(roi.height * image_height)
+
+        # Determine the size of the square cutout based on the longest side of the ROI
+        img_wh: int = max(img_w, img_h)
+
+        # Calculate the new coordinates to center the square cutout around the original ROI
+        crop_center: int = img_x + img_w // 2
+        crop_center: int = img_y + img_h // 2
+        crop_x: int = crop_center - img_wh // 2
+        crop_y: int = crop_center - img_wh // 2
+        crop_w: int = img_wh
+        crop_h: int = img_wh
+
+        # convert back to normalized coordinates
+        norm_x: float = crop_x / image_width
+        norm_y: float = crop_y / image_height
+        norm_w: float = crop_w / image_width
+        norm_h: float = crop_h / image_height
+
+        return Rect(norm_x, norm_y, norm_w, norm_h)
+
     @staticmethod
     def get_cropped_image(image: np.ndarray, roi: Rect, size: int) -> np.ndarray:
         image_height, image_width = image.shape[:2]

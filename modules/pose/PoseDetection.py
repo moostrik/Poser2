@@ -281,7 +281,7 @@ class PoseDetection(Thread):
         while self._running:
             detection: Person | None = self.get_detection()
             if detection is not None:
-                image: np.ndarray | None = detection.image
+                image: np.ndarray | None = detection.pose_image
                 if image is not None:
                     Poses: PoseList = RunSession(PoseDetection.onnx_session, PoseDetection.onnx_size, image)
                     detection.pose = Poses

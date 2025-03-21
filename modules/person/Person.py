@@ -15,7 +15,8 @@ class Person():
         self.angle_pos: Point3f =       Point3f(0, 0, 0)
         self.start_time: float =        time()
         self.last_time: float =         time()
-        self.image: np.ndarray | None = None
+        self.pose_rect: Rect | None =   None
+        self.pose_image: np.ndarray | None = None
         self.pose: PoseList | None =    None
 
     @staticmethod

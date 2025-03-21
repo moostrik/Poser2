@@ -111,12 +111,15 @@ class Render(RenderWindow):
             image: Image = self.cam_images[i]
             fbo: Fbo = self.cam_fbos[i]
             tracklets: dict[int, Tracklet] = self.get_tracklets(i)
+            persons: list[Person] = self.get_persons_for_cam(i)
 
             self.setView(fbo.width, fbo.height)
             fbo.begin()
             image.draw(0, 0, fbo.width, fbo.height)
             for tracklet in tracklets.values():
                 self.draw_tracklet(tracklet, 0, 0, fbo.width, fbo.height)
+            for person in persons:
+                self.draw_person(person, 0, 0, fbo.width, fbo.height)
             fbo.end()
 
     def draw_persons(self) -> None:
@@ -200,11 +203,21 @@ class Render(RenderWindow):
                 self.input_persons[id] = None
             return ret_person
 
+    def get_persons_for_cam(self, cam_id: int) -> list[Person]:
+        with self.input_mutex:
+            persons: list[Person] = []
+            for person in self.input_persons.values():
+                if person is not None and person.cam_id == cam_id:
+                    persons.append(person)
+            return persons
+
+
+
     def add_person(self, person: Person) -> None:
         with self.input_mutex:
             self.input_persons[person.id] = person
 
-        image: np.ndarray | None = person.image
+        image: np.ndarray | None = person.pose_image
         if image is not None:
             self.set_psn_image(person.id, image)
 
@@ -248,7 +261,6 @@ class Render(RenderWindow):
         glVertex2f(x + w, y)    # Top left
         glEnd()                 # End drawing
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
-        # glFlush()               # Render now
 
         x += 9
         y += 15
@@ -258,6 +270,34 @@ class Render(RenderWindow):
         glRasterPos2f(0, 0)     # Reset position
 
         glFlush()               # Render now
+
+    @staticmethod
+    def draw_person(person: Person, x: float, y: float, w: float, h: float) -> None:
+        if person.pose_rect is None:
+            return
+
+        x = x + person.pose_rect.x * w
+        y = y + person.pose_rect.y * h
+        w = person.pose_rect.width * w
+        h = person.pose_rect.height * h
+
+        r: float = 0.0
+        g: float = 0.0
+        b: float = 0.0
+        a: float = 0.2
+
+        string: str = f'ID: {person.id}'
+        if person.angle_pos.z > 0:
+            string += f' Z: {person.angle_pos.z:.0f}'
+
+        glColor4f(r, g, b, a)
+        glBegin(GL_QUADS)
+        glVertex2f(x, y)        # Bottom left
+        glVertex2f(x, y + h)    # Bottom right
+        glVertex2f(x + w, y + h)# Top right
+        glVertex2f(x + w, y)    # Top left
+        glEnd()                 # End drawing
+        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
     @staticmethod
     def make_composition_subdivision(dst_width: int, dst_height: int,
