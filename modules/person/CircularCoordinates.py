@@ -3,8 +3,10 @@ from modules.person.Person import Person, PersonDict, CamTracklet, Tracklet, Rec
 CAMERA_ANGLE:float = 120.0
 
 ANGLE_RANGE:float = 10.0
-Y_RANGE:float = 0.1
-Z_RANGE:float = 0.1
+# Y_RANGE:float = 0.1 # without stereo: normalised coordinates
+# Z_RANGE:float = 0.1 # without stereo: normalised coordinates
+Y_RANGE:float = 200 # with stereo: coordinates in mm
+Z_RANGE:float = 200 # with stereo: coordinates in mm
 
 class CircularCoordinates():
     def __init__(self, num_cameras: int) -> None:
@@ -22,17 +24,19 @@ class CircularCoordinates():
     def add_angle_position(self, person: Person) -> None:
         tracklet: Tracklet = person.tracklet
         position: Point3f = Point3f(tracklet.roi.x, tracklet.roi.y, 0.0)
-        if tracklet.spatialCoordinates.z != 0:
-            position = tracklet.spatialCoordinates
+        # if tracklet.spatialCoordinates.z != 0:
+        #     position = tracklet.spatialCoordinates
         person.angle_pos = position
 
     def in_range(self, AP1: Point3f, AP2: Point3f) -> bool:
-        if abs(AP1.x - AP2.x) < self.angle_range and abs(AP1.y - AP2.y) < self.y_range and abs(AP1.z - AP2.z) < self.z_range:
+        # if abs(AP1.x - AP2.x) < self.angle_range and abs(AP1.y - AP2.y) < self.y_range and abs(AP1.z - AP2.z) < self.z_range:
+        if abs(AP1.x - AP2.x) < self.angle_range:
             return True
         return False
 
     def distance(self, AP1: Point3f, AP2: Point3f) -> float:
-        return ((AP1.x - AP2.x) ** 2 + (AP1.y - AP2.y) ** 2 + (AP1.z - AP2.z) ** 2) ** 0.5
+        # return ((AP1.x - AP2.x) ** 2 + (AP1.y - AP2.y) ** 2 + (AP1.z - AP2.z) ** 2) ** 0.5
+        return AP1.x - AP2.x
 
     def find(self, person: Person, person_dict: PersonDict) -> Person | None:
         person_list: list[Person] = []

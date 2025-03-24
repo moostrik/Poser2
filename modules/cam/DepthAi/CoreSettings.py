@@ -1,8 +1,8 @@
 from modules.cam.DepthAi.Core import *
 
 class DepthAiSettings(DepthAiCore):
-    def __init__(self, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> None:
-        super().__init__(modelPath, fps, doColor, doStereo, doPerson, lowres, showLeft)
+    def __init__(self, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showStereo: bool = False) -> None:
+        super().__init__(modelPath, fps, doColor, doStereo, doPerson, lowres, showStereo)
 
 
     # GENERAL SETTINGS

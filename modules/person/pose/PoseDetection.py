@@ -13,7 +13,7 @@ from threading import Thread, Lock
 import copy
 import os
 
-from modules.pose.PoseDefinitions import *
+from modules.person.pose.PoseDefinitions import *
 from modules.person.Person import Person
 
 class PoseDetection(Thread):

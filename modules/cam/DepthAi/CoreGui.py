@@ -15,9 +15,9 @@ def gsfr(range: tuple[int, int]) -> float:
     return getStepsFromRange(range)
 
 class DepthAiGui(DepthAiSettings):
-    def __init__(self, gui: Gui | None, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> None:
+    def __init__(self, gui: Gui | None, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showStereo: bool = False) -> None:
         self.gui: Gui | None = gui
-        super().__init__(modelPath, fps, doColor, doStereo, doPerson, lowres, showLeft)
+        super().__init__(modelPath, fps, doColor, doStereo, doPerson, lowres, showStereo)
 
         id: str = self.IDs
         elem: list = []

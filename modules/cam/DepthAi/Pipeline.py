@@ -18,7 +18,7 @@ def SetupPipeline(
     doStereo: bool = True,
     doPerson: bool = True,
     lowres: bool = False,
-    showMono: bool = False
+    showStereo: bool = False
     ) -> dai.RawStereoDepthConfig:
 
     stereoConfig: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
@@ -28,7 +28,7 @@ def SetupPipeline(
         'Stereo' if doStereo else '',
         'Yolo' if doPerson else '',
         'LowRes' if lowres else 'Highres',
-        'showMono' if showMono else ''
+        'showStereo' if showStereo else ''
     ]
     pipeline_description = "Depth Pipeline: " + " ".join(filter(None, options))
     print(pipeline_description)
@@ -37,9 +37,9 @@ def SetupPipeline(
         stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
         if doStereo:
             if doPerson:
-                SetupColorStereoPerson(pipeline, fps, lowres, showMono, modelPath)
+                SetupColorStereoPerson(pipeline, fps, lowres, showStereo, modelPath)
             else:
-                SetupColorStereo(pipeline, fps, lowres, showMono)
+                SetupColorStereo(pipeline, fps, lowres, showStereo)
         else:
             if doPerson:
                 SetupColorPerson(pipeline, fps, lowres, modelPath)
@@ -49,9 +49,9 @@ def SetupPipeline(
         stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT
         if doStereo:
             if doPerson:
-                SetupMonoStereoPerson(pipeline, fps, lowres, showMono, modelPath)
+                SetupMonoStereoPerson(pipeline, fps, lowres, showStereo, modelPath)
             else:
-                SetupMonoStereo(pipeline, fps, lowres, showMono)
+                SetupMonoStereo(pipeline, fps, lowres, showStereo)
         else:
             if doPerson:
                 SetupMonoPerson(pipeline, fps, lowres, modelPath)
@@ -137,9 +137,9 @@ class SetupColorPerson(SetupColor):
         self.objectTracker.out.link(self.trackerOut.input)
 
 class SetupColorStereo(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showMono:bool) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showStereo:bool) -> None:
         super().__init__(pipeline, fps, lowres)
-        self.showMono: bool = showMono
+        self.showStereo: bool = showStereo
 
         self.color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
 
@@ -151,15 +151,11 @@ class SetupColorStereo(SetupColor):
         self.left.setCamera("left")
         self.left.setResolution(resolution)
         self.left.setFps(fps)
-        if self.showMono:
-            self.left.out.link(self.sync.inputs["left"])
 
         self.right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.right.setCamera("right")
         self.right.setResolution(resolution)
         self.right.setFps(fps)
-        if self.showMono:
-            self.right.out.link(self.sync.inputs["right"])
 
         self.stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
         self.stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
@@ -171,16 +167,20 @@ class SetupColorStereo(SetupColor):
 
         self.left.out.link(self.stereo.left)
         self.right.out.link(self.stereo.right)
-        self.stereo.disparity.link(self.sync.inputs["stereo"])
+
+        if self.showStereo:
+            self.stereo.disparity.link(self.sync.inputs["stereo"])
+        self.stereo.rectifiedLeft.link(self.sync.inputs["left"])
+        self.stereo.rectifiedRight.link(self.sync.inputs["right"])
+
 
         self.monoControl.out.link(self.left.inputControl)
         self.monoControl.out.link(self.right.inputControl)
         self.stereoControl.out.link(self.stereo.inputConfig)
 
 class SetupColorStereoPerson(SetupColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showMono: bool, model_path) -> None:
-        # self.fps = 20
-        super().__init__(pipeline, fps, lowres, showMono)
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showStereo: bool, model_path) -> None:
+        super().__init__(pipeline, fps, lowres, showStereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(300, 300)
@@ -193,7 +193,7 @@ class SetupColorStereoPerson(SetupColorStereo):
         self.detectionNetwork.setBlobPath(nnPathDefault)
         self.detectionNetwork.setConfidenceThreshold(DETECTIONTHRESHOLD)
         self.detectionNetwork.setNumInferenceThreads(2)
-        # self.detectionNetwork.setBoundingBoxScaleFactor(1.0)
+        self.detectionNetwork.setBoundingBoxScaleFactor(0.5)
         self.detectionNetwork.setDepthLowerThreshold(500)
         self.detectionNetwork.setDepthUpperThreshold(10000)
         self.detectionNetwork.input.setBlocking(False)
@@ -269,9 +269,9 @@ class SetupMonoPerson(SetupMono):
         self.objectTracker.out.link(self.trackerOut.input)
 
 class SetupMonoStereo(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showMono: bool) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showStereo: bool) -> None:
         super().__init__(pipeline, fps, lowres)
-        self.showMono: bool = showMono
+        self.showStereo: bool = showStereo
 
         self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
@@ -280,15 +280,11 @@ class SetupMonoStereo(Setup):
         self.left.setCamera("left")
         self.left.setResolution(self.resolution)
         self.left.setFps(self.fps)
-        if self.showMono:
-            self.right.out.link(self.sync.inputs["left"])
 
         self.right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.right.setCamera("right")
         self.right.setResolution(self.resolution)
         self.right.setFps(fps)
-        if self.showMono:
-            self.right.out.link(self.sync.inputs["right"])
 
         self.stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
         self.stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
@@ -300,9 +296,11 @@ class SetupMonoStereo(Setup):
 
         self.left.out.link(self.stereo.left)
         self.right.out.link(self.stereo.right)
-        self.stereo.disparity.link(self.sync.inputs["stereo"])
 
-        self.stereo.rectifiedLeft.link(self.sync.inputs["video"])
+        if self.showStereo:
+            self.stereo.disparity.link(self.sync.inputs["stereo"])
+        self.stereo.rectifiedLeft.link(self.sync.inputs["left"]) # not video?
+        self.stereo.rectifiedRight.link(self.sync.inputs["right"])
 
         self.monoControl.out.link(self.left.inputControl)
         self.monoControl.out.link(self.right.inputControl)

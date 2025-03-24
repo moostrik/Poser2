@@ -2,7 +2,7 @@
 from modules.cam.DepthCam import DepthCam
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
-from modules.pose.PoseDetection import ModelType
+from modules.person.pose.PoseDetection import ModelType
 from modules.person.Manager import Person, PersonCallback, Manager
 
 import os
@@ -15,14 +15,14 @@ class CamType(Enum):
     IMAGE   = 4
 
 class DepthPose():
-    def __init__(self, path: str, fps: int, numPlayers: int, color: bool, stereo: bool, person: bool, lowres: bool, showLeft: bool, lightning: bool, noPose:bool) -> None:
+    def __init__(self, path: str, fps: int, numPlayers: int, color: bool, stereo: bool, person: bool, lowres: bool, showStereo: bool, lightning: bool, noPose:bool) -> None:
         self.path: str =    path
         modelPath: str =    os.path.join(path, 'models')
         self.noPose: bool = noPose
 
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(1, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
-        self.camera = DepthCam(self.gui, modelPath, fps, color, stereo, person, lowres, showLeft)
+        self.camera = DepthCam(self.gui, modelPath, fps, color, stereo, person, lowres, showStereo)
 
         modelType: ModelType = ModelType.LIGHTNING if lightning else ModelType.THUNDER
         if self.noPose:

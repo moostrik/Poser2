@@ -27,7 +27,7 @@ def fit(image: np.ndarray, width, height) -> np.ndarray:
 
 class DepthAiCore():
     _id_counter = 0
-    def __init__(self, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showLeft: bool = False) -> None:
+    def __init__(self, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showStereo: bool = False) -> None:
         self.ID: int =                  DepthAiCore._id_counter
         self.IDs: str =                 str(self.ID)
         DepthAiCore._id_counter +=      1
@@ -39,9 +39,7 @@ class DepthAiCore():
         self.doStereo: bool =           doStereo
         self.doPerson: bool =           doPerson
         self.lowres: bool =             lowres
-        self.showLeft: bool =           False
-        if self.doStereo and self.doColor and showLeft:
-            self.showLeft: bool =       True
+        self.showStereo: bool =         showStereo
 
         # GENERAL SETTINGS
         self.previewType =              PreviewType.VIDEO
@@ -109,7 +107,7 @@ class DepthAiCore():
         if self.deviceOpen: return True
 
         pipeline = dai.Pipeline()
-        self.stereoConfig = SetupPipeline(pipeline, self.modelpath, self.fps, self.doColor, self.doStereo, self.doPerson, self.lowres, self.showLeft)
+        self.stereoConfig = SetupPipeline(pipeline, self.modelpath, self.fps, self.doColor, self.doStereo, self.doPerson, self.lowres, self.showStereo)
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:

@@ -13,7 +13,7 @@ from modules.gl.Utils import lfo, fit, fill
 from modules.gl.Image import Image
 
 from depthai import Rect, Tracklet
-from modules.pose.PoseDefinitions import Pose, Indices
+from modules.person.pose.PoseDefinitions import Pose, Indices
 from modules.person.Person import Person
 
 
