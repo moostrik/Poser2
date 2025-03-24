@@ -49,7 +49,7 @@ class Mesh:
 
         if self.colors is not None:
             glBindBuffer(GL_ARRAY_BUFFER, self.color_buffer)
-            glColorPointer(3, GL_FLOAT, 0, None)
+            glColorPointer(4, GL_FLOAT, 0, None)
 
         if self.indices is not None:
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.index_buffer)
@@ -130,7 +130,7 @@ class Mesh:
 
     def set_colors(self, colors: np.ndarray) -> None:
         if colors.ndim == 1:
-            colors = np.repeat(colors[:, np.newaxis], 3, axis=1)
+            colors = np.repeat(colors[:, np.newaxis], 4, axis=1)
         if self.colors is not None and np.array_equal(self.colors, colors):
             return
         with self._mutex:

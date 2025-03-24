@@ -13,7 +13,7 @@ from modules.gl.Utils import lfo, fit, fill
 from modules.gl.Image import Image
 
 from depthai import Rect, Tracklet
-from modules.pose.PoseDefinitions import Pose, PoseIndicesFlat
+from modules.pose.PoseDefinitions import Pose, Indices
 from modules.person.Person import Person
 
 
@@ -55,7 +55,7 @@ class Render(RenderWindow):
             self.all_fbos.append(self.psn_fbos[i])
 
             self.pose_meshes[i] = Mesh()
-            self.pose_meshes[i].set_indices(PoseIndicesFlat)
+            self.pose_meshes[i].set_indices(Indices)
             self.all_meshes.append(self.pose_meshes[i])
 
         self.composition: Composition_Subdivision = self.make_composition_subdivision(window_width, window_height, num_cams, num_persons)
@@ -99,7 +99,7 @@ class Render(RenderWindow):
                 poses: list[Pose] | None = person.pose
                 if poses is not None and len(poses) > 0:
                     self.pose_meshes[i].set_vertices(poses[0].getVertices())
-                    self.pose_meshes[i].set_colors(poses[0].getColors())
+                    self.pose_meshes[i].set_colors(poses[0].getColors(threshold=0.0))
                     self.pose_meshes[i].update()
 
     def draw_cameras(self) -> None:
@@ -127,7 +127,7 @@ class Render(RenderWindow):
                         w *= fbo.width
                         h *= fbo.height
 
-                        self.draw_person(person, mesh, x, y, w, h, True)
+                        self.draw_person(person, mesh, x, y, w, h, False, True, False)
 
             fbo.end()
 
@@ -144,7 +144,7 @@ class Render(RenderWindow):
             if person is not None and person.active:
                 image.draw(0, 0, fbo.width, fbo.height)
                 mesh: Mesh = self.pose_meshes[person.id]
-                self.draw_person(person, mesh, 0, 0, fbo.width, fbo.height, False)
+                self.draw_person(person, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
 
             fbo.end()
 
@@ -250,7 +250,7 @@ class Render(RenderWindow):
         glFlush()               # Render now
 
     @staticmethod
-    def draw_person(person: Person, pose: Mesh, x: float, y: float, w: float, h: float, draw_box = False) -> None:
+    def draw_person(person: Person, pose: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
         if draw_box:
             r: float = 0.0
             g: float = 0.0
@@ -266,16 +266,17 @@ class Render(RenderWindow):
             glEnd()                 # End drawing
             glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
-        if pose.isInitialized():
+        if draw_pose and pose.isInitialized():
             pose.draw(x, y, w, h)
 
-        string: str = f'ID: {person.id} Cam: {person.cam_id} Age: {person.last_time - person.start_time:.2f}'
-        x += 9
-        y += 15
-        glRasterPos2f(x, y)     # Set position
-        for character in string:
-            glut.glutBitmapCharacter(glut.GLUT_BITMAP_9_BY_15, ord(character)) # type: ignore
-        glRasterPos2f(0, 0)     # Reset position
+        if draw_text:
+            string: str = f'ID: {person.id} Cam: {person.cam_id} Age: {person.last_time - person.start_time:.0f}'
+            x += 9
+            y += 15
+            glRasterPos2f(x, y)     # Set position
+            for character in string:
+                glut.glutBitmapCharacter(glut.GLUT_BITMAP_9_BY_15, ord(character)) # type: ignore
+            glRasterPos2f(0, 0)     # Reset position
 
         glFlush()               # Render now
 

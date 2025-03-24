@@ -53,7 +53,7 @@ class Keypoints(Enum):
 
 KeypointNames: list[str] = [e.name for e in Keypoints]
 
-PoseIndices: list[list[Keypoints]] = [
+KeypointList: list[list[Keypoints]] = [
     [Keypoints.nose, Keypoints.left_eye],
     [Keypoints.nose, Keypoints.right_eye],
     [Keypoints.left_eye, Keypoints.left_ear],
@@ -72,7 +72,10 @@ PoseIndices: list[list[Keypoints]] = [
 ]
 
 # convert PoseIndices to a 1 dimentional np.ndarray
-PoseIndicesFlat: np.ndarray = np.array([kp.value for pose in PoseIndices for kp in pose], dtype=np.int32)
+KeypointFlatList: np.ndarray = np.array([kp.value for pose in KeypointList for kp in pose], dtype=np.int32)
+
+# make an array of increasing indices with the length of KeypointFlatList
+Indices: np.ndarray = np.arange(len(KeypointFlatList), dtype=np.int32)
 
 class PoseBox():
     def __init__(self, xmin: float, ymin: float, xmax: float, ymax: float, score: float) -> None:
@@ -115,14 +118,40 @@ class Pose():
         self.keypoints: np.ndarray = keypoints
         self.box: PoseBox = box
 
-    def getVertices(self) -> np.ndarray:
-        vertices = self.keypoints[:, :2]
+    def getKeypoints(self) -> np.ndarray:
+        # get the first two columns of keypoints
+        kp: np.ndarray = self.keypoints[:, :2]
         # swap x and y
-        return np.flip(vertices, axis=1)
+        kp = np.flip(kp, axis=1)
+        return kp
 
-    def getColors(self) -> np.ndarray:
+    def getScores(self) -> np.ndarray:
         # return the last column of keypoints
         return self.keypoints[:, 2]
+
+    def getVertices(self) -> np.ndarray:
+        vertices: np.ndarray = np.zeros((len(KeypointFlatList), 2), dtype=np.float32)
+        keypoints: np.ndarray = self.getKeypoints()
+        for i in range(len(KeypointFlatList)):
+            vertices[i] = keypoints[KeypointFlatList[i]]
+        return vertices
+
+    def getColors(self, threshold: float = 0.0, r: float = 1.0, g:float = 1.0, b:float = 1.0, a:float = 1.0) -> np.ndarray:
+        colors: np.ndarray = np.zeros((len(KeypointFlatList), 4), dtype=np.float32)
+        scores: np.ndarray = self.getScores()
+        for i in range(len(KeypointList)):
+            kp1: int = KeypointList[i][0].value
+            kp2: int = KeypointList[i][1].value
+            s1: float = scores[kp1]
+            s2: float = scores[kp2]
+            score: float = min(s1, s2)
+            alpha: float = 0.0
+            if score > threshold:
+                alpha = (score - threshold) / (1 - threshold) * a
+            colors[i*2] = [r, g, b, alpha]
+            colors[i*2+1] = [r, g, b, alpha]
+        return colors
+
 
 PoseList = list[Pose]
 
