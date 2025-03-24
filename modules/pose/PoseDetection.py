@@ -17,34 +17,37 @@ from modules.pose.PoseDefinitions import *
 from modules.person.Person import Person
 
 class PoseDetection(Thread):
-    onnx_session: ort.InferenceSession | None = None
-    onnx_size: int = 256
-    model_multi: bool = False
+    _model_load_lock: Lock = Lock()
+    _model_loaded: bool =    False
+    _model_type: ModelType = ModelType.NONE
+    _model_path: str
+    _moodel_size: int
+    _model_session: ort.InferenceSession
 
     def __init__(self, path: str, model_type:ModelType) -> None:
         super().__init__()
-        self.path: str = path
-        self.modelType: ModelType = model_type
-        # if model_type is not ModelType.THUNDER and model_type is not ModelType.LIGHTNING:
-        #     print('PoseDetection ModelType must be THUNDER or LIGHTNING, defaulting to THUNDER', model_type)
-        self.modelType = ModelType.THUNDER
 
-        self._input_mutex: Lock = Lock()
-        self._image: np.ndarray | None = None
-        self._image_consumed: bool = True
+        if PoseDetection._model_type is ModelType.NONE:
+            PoseDetection._model_type = model_type
+            PoseDetection._model_path = path
+            PoseDetection._moodel_size = ModelInputSize[model_type.value]
+        else:
+            if PoseDetection._model_type is not model_type:
+                print('Pose Detection WARNING: ModelType is different from the first instance')
 
-        self._detection: Person | None = None
+        if PoseDetection._model_type is ModelType.NONE:
+            print('Pose Detection WARNING: ModelType is NONE')
 
         self._running: bool = False
+        self._input_mutex: Lock = Lock()
+        self._input_person: Person | None = None
         self._callbacks: set = set()
-        self._occupied: bool = False
 
     def stop(self) -> None:
         self._running = False
 
     def run(self) -> None:
-        if PoseDetection.onnx_session is None:
-            PoseDetection.onnx_session, PoseDetection.onnx_size, PoseDetection.model_multi = self.LoadSession(self.modelType, self.path)
+        self.load_model_once()
 
         self._running = True
         while self._running:
@@ -52,23 +55,30 @@ class PoseDetection(Thread):
             if detection is not None:
                 image: np.ndarray | None = detection.pose_image
                 if image is not None:
-                    Poses: PoseList = self.RunSession(PoseDetection.onnx_session, PoseDetection.onnx_size, PoseDetection.model_multi, image)
+                    Poses: PoseList = self.RunSession(PoseDetection._model_session, PoseDetection._moodel_size, image)
                     detection.pose = Poses
                     self.callback(detection)
             time.sleep(0.01)
 
+    def load_model_once(self) -> None:
+        with PoseDetection._model_load_lock:
+            if not PoseDetection._model_loaded:
+                PoseDetection._model_session, PoseDetection._moodel_size = self.LoadSession(self._model_type, PoseDetection._model_path)
+                PoseDetection._model_loaded = True
+
+    # GETTERS AND SETTERS
     def get_detection(self) -> Person | None:
         with self._input_mutex:
-            return_detection: Person | None = self._detection
-            self._detection = None
+            return_detection: Person | None = self._input_person
+            self._input_person = None
             return return_detection
 
     def set_detection(self, detection: Person) -> None:
         with self._input_mutex:
-            self._detection = detection
+            self._input_person = detection
 
     def get_frame_size(self) -> int:
-        return PoseDetection.onnx_size
+        return PoseDetection._moodel_size
 
     # CALLBACKS
     def callback(self, value: Person) -> None:
@@ -83,8 +93,7 @@ class PoseDetection(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def LoadSession(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSession, int, bool]:
-        print('Loading PoseDetection Model:', ModelTypeNames[model_type.value])
+    def LoadSession(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSession, int]:
         path: str = os.path.join(model_path, ModelFileNames[model_type.value])
         onnx_session = ort.InferenceSession(
             path,
@@ -94,11 +103,10 @@ class PoseDetection(Thread):
             ],
         )
         input_size: int = ModelInputSize[model_type.value]
-        model_multi: bool = model_type is ModelType.MULTI
-        return onnx_session, input_size, model_multi
+        return onnx_session, input_size
 
     @staticmethod
-    def RunSession(onnx_session: ort.InferenceSession, input_size: int, model_multi: bool, image: np.ndarray) -> PoseList:
+    def RunSession(onnx_session: ort.InferenceSession, input_size: int, image: np.ndarray) -> PoseList:
         height, width = image.shape[:2]
         if height != input_size or width != input_size:
             image = PoseDetection.resize_with_pad(image, input_size, input_size)
@@ -112,13 +120,13 @@ class PoseDetection(Thread):
         keypoints_with_scores: np.ndarray = outputs[0]
         keypoints_with_scores = np.squeeze(keypoints_with_scores)
 
-        if not model_multi:
+        if PoseDetection._model_type is ModelType.LIGHTNING or PoseDetection._model_type is ModelType.THUNDER:
             keypoints: np.ndarray = keypoints_with_scores[:, :2]
             keypoints = np.flip(keypoints, axis=1)
             scores: np.ndarray = keypoints_with_scores[:, 2]
             pose = Pose(keypoints, scores)
             return [pose]
-        else:
+        else: # ModelType.MULTI
             poses: PoseList = []
             for kps in keypoints_with_scores:
 

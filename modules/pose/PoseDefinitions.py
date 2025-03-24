@@ -77,41 +77,6 @@ KeypointFlatList: np.ndarray = np.array([kp.value for pose in KeypointList for k
 # make an array of increasing indices with the length of KeypointFlatList
 Indices: np.ndarray = np.arange(len(KeypointFlatList), dtype=np.int32)
 
-class PoseBox():
-    def __init__(self, xmin: float, ymin: float, xmax: float, ymax: float, score: float) -> None:
-        self._xmin: float =  xmin
-        self._ymin: float =  ymin
-        self._xmax: float =  xmax
-        self._ymax: float =  ymax
-        self._score: float = score
-
-    def getTopRight(self) -> tuple[float, float]:
-        return self._xmax, self._ymin
-    def getTopLeft(self) -> tuple[float, float]:
-        return self._xmin, self._ymin
-    def getBottomRight(self) -> tuple[float, float]:
-        return self._xmax, self._ymax
-    def getBottomLeft(self) -> tuple[float, float]:
-        return self._xmin, self._ymax
-    def getCenter(self) -> tuple[float, float]:
-        return (self._xmin + self._xmax) / 2, (self._ymin + self._ymax) / 2
-    def getWidth(self) -> float:
-        return self._xmax - self._xmin
-    def getHeight(self) -> float:
-        return self._ymax - self._ymin
-    def getSize(self) -> tuple[float, float]:
-        return self.getWidth(), self.getHeight()
-    def getScore(self) -> float:
-        return self._score
-    def getXmin(self) -> float:
-        return self._xmin
-    def getYmin(self) -> float:
-        return self._ymin
-    def getXmax(self) -> float:
-        return self._xmax
-    def getYmax(self) -> float:
-        return self._ymax
-
 
 class Pose():
     def __init__(self, keypoints: np.ndarray, scores: np.ndarray) -> None:
@@ -147,7 +112,6 @@ class Pose():
             colors[i*2] = [r, g, b, alpha]
             colors[i*2+1] = [r, g, b, alpha]
         return colors
-
 
 PoseList = list[Pose]
 

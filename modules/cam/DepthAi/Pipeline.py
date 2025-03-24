@@ -6,7 +6,7 @@ from pathlib import Path
 MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
 MODEL6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
 DETECTIONTHRESHOLD: float = 0.5
-TRACKERTYPE: dai.TrackerType = dai.TrackerType.ZERO_TERM_COLOR_HISTOGRAM
+TRACKERTYPE: dai.TrackerType = dai.TrackerType.ZERO_TERM_IMAGELESS
 # ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
 # ZERO_TERM_IMAGELESS slightly faster
 
