@@ -41,8 +41,6 @@ class Render(RenderWindow):
         self.all_fbos: list[Fbo | SwapFbo] = []
         self.all_meshes: list[Mesh] = []
 
-        self.composition: Composition_Subdivision = self.make_composition_subdivision(window_width, window_height, num_cams, num_persons)
-
         for i in range(self.num_cams):
             self.cam_images[i] = Image()
             self.all_images.append(self.cam_images[i])
@@ -60,6 +58,7 @@ class Render(RenderWindow):
             self.pose_meshes[i].set_indices(PoseIndicesFlat)
             self.all_meshes.append(self.pose_meshes[i])
 
+        self.composition: Composition_Subdivision = self.make_composition_subdivision(window_width, window_height, num_cams, num_persons)
         self.allocated = False
 
         self.input_mutex: Lock = Lock()
@@ -81,18 +80,14 @@ class Render(RenderWindow):
             x, y, w, h = self.composition[ImageType.PERSON][key]
             self.psn_fbos[key].allocate(w, h, GL_RGBA)
 
-    def allocate(self) -> None:
-        # for mesh in self.all_meshes: mesh.allocate()
-        self.reshape(self.window_width, self.window_height)
-        self.allocated = True
-
     def draw(self) -> None: # override
-        if not self.allocated: self.allocate()
+        if not self.allocated:
+            self.reshape(self.window_width, self.window_height)
+            self.allocated = True
 
-        self.update_images()
         self.update_pose_meshes()
 
-        self.draw_cams()
+        self.draw_cameras()
         self.draw_persons()
 
         self.draw_composition()
@@ -107,9 +102,10 @@ class Render(RenderWindow):
                     self.pose_meshes[i].set_colors(poses[0].getColors())
                     self.pose_meshes[i].update()
 
-    def draw_cams(self) -> None:
+    def draw_cameras(self) -> None:
         for i in range(self.num_cams):
             image: Image = self.cam_images[i]
+            image.update()
             fbo: Fbo = self.cam_fbos[i]
             tracklets: dict[int, Tracklet] = self.get_tracklets(i)
             persons: list[Person] = self.get_persons_for_cam(i)
@@ -122,40 +118,35 @@ class Render(RenderWindow):
                 self.draw_tracklet(tracklet, 0, 0, fbo.width, fbo.height)
             for person in persons:
                 if person.active:
-                    self.draw_person(person, 0, 0, fbo.width, fbo.height)
-
-                    id: int = person.id
                     roi: Rect | None = person.pose_rect
-                    mesh: Mesh = self.pose_meshes[id]
+                    mesh: Mesh = self.pose_meshes[person.id]
                     if roi is not None and mesh.isInitialized():
                         x, y, w, h = roi.x, roi.y, roi.width, roi.height
                         x *= fbo.width
                         y *= fbo.height
                         w *= fbo.width
                         h *= fbo.height
-                        mesh.draw(x, y, w, h)
+
+                        self.draw_person(person, mesh, x, y, w, h, True)
 
             fbo.end()
 
     def draw_persons(self) -> None:
         for i in range(self.num_persons):
             image: Image = self.psn_images[i]
+            image.update()
             fbo: Fbo = self.psn_fbos[i]
             person: Person | None = self.get_person(i)
 
             self.setView(fbo.width, fbo.height)
             fbo.begin()
 
-            image.draw(0, 0, fbo.width, fbo.height)
             if person is not None and person.active:
-                self.draw_person(person, 0, 0, fbo.width, fbo.height)
+                image.draw(0, 0, fbo.width, fbo.height)
                 mesh: Mesh = self.pose_meshes[person.id]
-                if mesh.isInitialized():
-                    mesh.draw(0, 0, fbo.width, fbo.height)
+                self.draw_person(person, mesh, 0, 0, fbo.width, fbo.height, False)
 
             fbo.end()
-
-
 
     def draw_composition(self) -> None:
         self.setView(self.window_width, self.window_height)
@@ -167,49 +158,7 @@ class Render(RenderWindow):
             x, y, w, h = self.composition[ImageType.PERSON][i]
             self.psn_fbos[i].draw(x, y, w, h)
 
-    def draw_in_fbo(self, tex: Texture | Fbo | SwapFbo, fbo: Fbo | SwapFbo, do_fit: bool = True) -> None:
-        if not tex.allocated or not fbo.allocated:
-            return
-        x: float = 0
-        y: float = 0
-        w: float = fbo.width
-        h: float = fbo.height
-        if do_fit:
-            x, y, w, h = fit(tex.width, tex.height, fbo.width, fbo.height)
-        self.setView(fbo.width, fbo.height)
-        fbo.begin()
-        tex.draw(x, y, w, h)
-        fbo.end()
-
-    # def draw_video(self, i: int) -> None:
-    #     self.setView(self.window_width, self.window_height)
-    #     tex: Image = self.images[ImageType.CAM][i]
-    #     if tex.width == 0 or tex.height == 0:
-    #         return
-
-    #     x, y, w, h = fit(tex.width, tex.height, self.window_width, self.window_height)
-    #     tex.draw(x, 0, w, h)
-
-    #     # self.half_fps_tracker = not self.half_fps_tracker
-    #     tracklets: dict[int, Tracklet] = self.get_tracklets(i)
-    #     for tracklet in tracklets.values():
-    #         draw_tracklet(tracklet, x, 0, w, h)
-
-    #     if  self.all_meshes[0].isInitialized():
-    #         self.all_meshes[0].draw(x, 0, w, h)
-
-    #     self.images[ImageType.PERSON][0].draw(0, h, 256, 256)
-
-
-    def update_images(self) -> None:
-        for image in self.all_images:
-            image.update()
-
-    def update_meshes(self) -> None:
-        for mesh in self.all_meshes:
-            mesh.update()
-
-
+    # SETTERS AND GETTERS
     def set_cam_image(self, cam_id: int, image: np.ndarray) -> None :
         self.cam_images[cam_id].set_image(image)
 
@@ -242,8 +191,6 @@ class Render(RenderWindow):
                     persons.append(person)
             return persons
 
-
-
     def add_person(self, person: Person) -> None:
         with self.input_mutex:
             self.input_persons[person.id] = person
@@ -257,6 +204,7 @@ class Render(RenderWindow):
         #     self.set_vertices(person.id, poses[0].getVertices())
         #     self.set_colors(person.id, poses[0].getColors())
 
+    # STATIC METHODS
     @staticmethod
     def draw_tracklet(tracklet: Tracklet, x: float, y: float, w: float, h: float) -> None:
         if tracklet.status == Tracklet.TrackingStatus.REMOVED:
@@ -280,10 +228,6 @@ class Render(RenderWindow):
         if tracklet.status == Tracklet.TrackingStatus.REMOVED:
             r, g, b, a = (1.0, 0.0, 0.0, 1.0)
 
-        string: str = f'ID: {tracklet.id} Age: {tracklet.age} C: {tracklet.srcImgDetection.confidence:.2f}'
-        if tracklet.spatialCoordinates.z > 0:
-            string += f' Z: {tracklet.spatialCoordinates.z:.0f}'
-
         glColor4f(r, g, b, a)   # Set color
         glBegin(GL_QUADS)       # Start drawing a quad
         glVertex2f(x, y)        # Bottom left
@@ -293,6 +237,9 @@ class Render(RenderWindow):
         glEnd()                 # End drawing
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
+        string: str = f'ID: {tracklet.id} Age: {tracklet.age} C: {tracklet.srcImgDetection.confidence:.2f}'
+        if tracklet.spatialCoordinates.z > 0:
+            string += f' Z: {tracklet.spatialCoordinates.z:.0f}'
         x += 9
         y += 15
         glRasterPos2f(x, y)     # Set position
@@ -303,32 +250,34 @@ class Render(RenderWindow):
         glFlush()               # Render now
 
     @staticmethod
-    def draw_person(person: Person, x: float, y: float, w: float, h: float) -> None:
-        if person.pose_rect is None:
-            return
+    def draw_person(person: Person, pose: Mesh, x: float, y: float, w: float, h: float, draw_box = False) -> None:
+        if draw_box:
+            r: float = 0.0
+            g: float = 0.0
+            b: float = 0.0
+            a: float = 0.2
 
-        x = x + person.pose_rect.x * w
-        y = y + person.pose_rect.y * h
-        w = person.pose_rect.width * w
-        h = person.pose_rect.height * h
+            glColor4f(r, g, b, a)
+            glBegin(GL_QUADS)
+            glVertex2f(x, y)        # Bottom left
+            glVertex2f(x, y + h)    # Bottom right
+            glVertex2f(x + w, y + h)# Top right
+            glVertex2f(x + w, y)    # Top left
+            glEnd()                 # End drawing
+            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
-        r: float = 0.0
-        g: float = 0.0
-        b: float = 0.0
-        a: float = 0.2
+        if pose.isInitialized():
+            pose.draw(x, y, w, h)
 
-        string: str = f'ID: {person.id}'
-        if person.angle_pos.z > 0:
-            string += f' Z: {person.angle_pos.z:.0f}'
+        string: str = f'ID: {person.id} Cam: {person.cam_id} Age: {person.last_time - person.start_time:.2f}'
+        x += 9
+        y += 15
+        glRasterPos2f(x, y)     # Set position
+        for character in string:
+            glut.glutBitmapCharacter(glut.GLUT_BITMAP_9_BY_15, ord(character)) # type: ignore
+        glRasterPos2f(0, 0)     # Reset position
 
-        glColor4f(r, g, b, a)
-        glBegin(GL_QUADS)
-        glVertex2f(x, y)        # Bottom left
-        glVertex2f(x, y + h)    # Bottom right
-        glVertex2f(x + w, y + h)# Top right
-        glVertex2f(x + w, y)    # Top left
-        glEnd()                 # End drawing
-        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+        glFlush()               # Render now
 
     @staticmethod
     def make_composition_subdivision(dst_width: int, dst_height: int,
