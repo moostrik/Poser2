@@ -114,20 +114,16 @@ class PoseBox():
 
 
 class Pose():
-    def __init__(self, keypoints: np.ndarray, box: PoseBox) -> None:
+    def __init__(self, keypoints: np.ndarray, scores: np.ndarray) -> None:
         self.keypoints: np.ndarray = keypoints
-        self.box: PoseBox = box
+        self.scores: np.ndarray = scores
+        self.mean_score = float(np.mean(scores))
 
     def getKeypoints(self) -> np.ndarray:
-        # get the first two columns of keypoints
-        kp: np.ndarray = self.keypoints[:, :2]
-        # swap x and y
-        kp = np.flip(kp, axis=1)
-        return kp
+        return self.keypoints
 
     def getScores(self) -> np.ndarray:
-        # return the last column of keypoints
-        return self.keypoints[:, 2]
+        return self.scores
 
     def getVertices(self) -> np.ndarray:
         vertices: np.ndarray = np.zeros((len(KeypointFlatList), 2), dtype=np.float32)
