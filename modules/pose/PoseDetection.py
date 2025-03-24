@@ -286,7 +286,7 @@ class PoseDetection(Thread):
                     Poses: PoseList = RunSession(PoseDetection.onnx_session, PoseDetection.onnx_size, image)
                     detection.pose = Poses
                     self.callback(detection)
-            time.sleep(0.1)
+            time.sleep(0.01)
 
     # # IMAGE INPUTS
     # def set_image(self, ID: int, image: np.ndarray | None) -> None:
