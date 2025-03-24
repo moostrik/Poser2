@@ -41,17 +41,8 @@ class DepthAiCore():
         self.lowres: bool =             lowres
         self.showStereo: bool =         showStereo
 
-        self.preview_types: list[PreviewType] = []
-        self.preview_types.append(PreviewType.NONE)
-        if self.doColor: self.preview_types.append(PreviewType.VIDEO)
-        if self.doStereo:
-            self.preview_types.append(PreviewType.LEFT)
-            self.preview_types.append(PreviewType.RIGHT)
-            if self.showStereo:
-                self.preview_types.append(PreviewType.STEREO)
-
         # GENERAL SETTINGS
-        self.previewType =              PreviewType.VIDEO
+        self.previewType =              FrameType.VIDEO
 
         # COLOR SETTINGS
         self.colorAutoExposure: bool =  True
@@ -94,10 +85,6 @@ class DepthAiCore():
         self.trackletQueue:             dai.DataOutputQueue
         self.trackletCallbackId:        int
 
-        # CALLBACKS
-        self.frameCallbacks: Set[FrameCallback] = set()
-        self.trackerCallbacks: Set[TrackerCallback] = set()
-
         # OTHER
         self.deviceOpen: bool =         False
         self.capturing:  bool =         False
@@ -108,6 +95,21 @@ class DepthAiCore():
         if self.lowres:
             self.errorFrame = cv2.resize(self.errorFrame, (640, 360))
         self.errorFrame[:,:,2] =        255
+
+        self.frame_types: set[FrameType] = set()
+        if self.doColor: self.frame_types.add(FrameType.VIDEO)
+        else: self.frame_types.add(FrameType.LEFT)
+        if self.doStereo:
+            self.frame_types.add(FrameType.LEFT)
+            self.frame_types.add(FrameType.RIGHT)
+
+        # CALLBACKS
+        self.previewCallbacks: Set[PreviewCallback] = set()
+        self.trackerCallbacks: Set[TrackerCallback] = set()
+        self.frameCallbacks: dict[FrameType, Set[FrameCallback]] = {}
+        for t in self.frame_types:
+            if t == FrameType.NONE: continue
+            self.frameCallbacks[t] = set()
 
     def __exit__(self) -> None:
         self.close()
@@ -147,6 +149,10 @@ class DepthAiCore():
         self.frameQueue.close()
         self.trackletQueue.close()
 
+        self.frameCallbacks.clear()
+        self.previewCallbacks.clear()
+        self.trackerCallbacks.clear()
+
     def startCapture(self) -> None:
         if not self.deviceOpen:
             print('CamDepthAi:start', 'device is not open')
@@ -162,54 +168,29 @@ class DepthAiCore():
 
     def updateFrames(self, daiMessages) -> None:
         self.updateFPS()
-        if self.previewType == PreviewType.NONE:
-            return
-        if len(self.frameCallbacks) == 0:
-            return
-
-        video_frame:  np.ndarray | None = None
-        stereo_frame: np.ndarray | None = None
-        left_frame:   np.ndarray | None = None
-        right_frame:  np.ndarray | None = None
-        mask_frame:   np.ndarray | None = None
-        masked_frame: np.ndarray | None = None
-
 
         for name, msg in daiMessages:
             if name == 'video':
-                video_frame = msg.getCvFrame() #type:ignore
                 self.updateColorControl(msg)
-            elif name == 'stereo':
-                stereo_frame = self.updateStereo(msg.getCvFrame()) #type:ignore
-                self.updateMonoControl(msg)
+                frame: np.ndarray = msg.getCvFrame() #type:ignore
+                self.updateCallbacks(FrameType.VIDEO, frame)
+
             elif name == 'left':
-                left_frame = msg.getCvFrame() #type:ignore
+                self.updateMonoControl(msg)
+                frame: np.ndarray = msg.getCvFrame() #type:ignore
+                self.updateCallbacks(FrameType.LEFT, frame)
+
             elif name == 'right':
-                right_frame = msg.getCvFrame() #type:ignore
+                frame = msg.getCvFrame() #type:ignore
+                self.updateCallbacks(FrameType.RIGHT, frame)
+
+            elif name == 'stereo':
+                frame = self.updateStereo(msg.getCvFrame()) #type:ignore
+                frame = cv2.applyColorMap(frame, cv2.COLORMAP_JET)
+                self.updateCallbacks(FrameType.STEREO, frame)
+
             else:
                 print('unknown message', name)
-
-        if stereo_frame is not None:
-            mask_frame = self.updateMask(stereo_frame)
-            stereo_frame = cv2.applyColorMap(stereo_frame, cv2.COLORMAP_JET)
-
-        if video_frame is not None and mask_frame is not None:
-            masked_frame = self.applyMask(video_frame, mask_frame)
-
-        return_frame: np.ndarray = self.errorFrame
-        if self.previewType == PreviewType.VIDEO and video_frame is not None:
-            return_frame = video_frame
-        if self.previewType == PreviewType.LEFT and left_frame is not None:
-            # return_frame = cv2.cvtColor(left_frame, cv2.COLOR_GRAY2RGB)
-            return_frame = left_frame
-        if self.previewType == PreviewType.RIGHT and right_frame is not None:
-            # return_frame = cv2.cvtColor(right_frame, cv2.COLOR_GRAY2RGB)
-            return_frame = right_frame
-        if self.previewType == PreviewType.STEREO and stereo_frame is not None:
-            return_frame = stereo_frame
-
-        for c in self.frameCallbacks:
-            c(self.ID, return_frame)
 
     def updateTracker(self, msg) -> None:
         self.updateTPS()
@@ -255,13 +236,27 @@ class DepthAiCore():
             self.monoExposure = frame.getExposureTime().total_seconds() * 1000000
             self.monoIso = frame.getSensitivity()
 
+    def updateCallbacks(self, frameType: FrameType, frame: np.ndarray) -> None:
+        for c in self.frameCallbacks[frameType]:
+            c(self.ID, frameType, frame)
+        if self.previewType == frameType:
+            for c in self.previewCallbacks:
+                c(self.ID, frame)
+
     # CALLBACKS
-    def addFrameCallback(self, callback: FrameCallback) -> None:
-        self.frameCallbacks.add(callback)
-    def discardFrameCallback(self, callback: FrameCallback) -> None:
-        self.frameCallbacks.discard(callback)
+    def addFrameCallback(self, frameType: FrameType, callback: FrameCallback) -> None:
+        self.frameCallbacks[frameType].add(callback)
+    def discardFrameCallback(self, frameType: FrameType, callback: FrameCallback) -> None:
+        self.frameCallbacks[frameType].discard(callback)
     def clearFrameCallbacks(self) -> None:
         self.frameCallbacks.clear()
+
+    def addPreviewCallback(self, callback: PreviewCallback) -> None:
+        self.previewCallbacks.add(callback)
+    def discardPreviewCallback(self, callback: PreviewCallback) -> None:
+        self.previewCallbacks.discard(callback)
+    def clearPreviewCallbacks(self) -> None:
+        self.previewCallbacks.clear()
 
     def addTrackerCallback(self, callback: TrackerCallback) -> None:
         self.trackerCallbacks.add(callback)

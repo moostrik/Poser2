@@ -6,18 +6,21 @@ from depthai import Tracklet, ImgDetection, Rect, Point3f
 # Detection = D
 # Detections = list[Detection]
 
-FrameCallback = Callable[[int, np.ndarray], None]
-DetectionCallback = Callable[[int, ImgDetection], None]
-TrackerCallback = Callable[[int, Tracklet], None]
 
-class PreviewType(Enum):
+class FrameType(Enum):
     NONE =  0
     VIDEO = 1
     LEFT =  2
     RIGHT = 3
     STEREO= 4
 
-PreviewTypeNames: list[str] = [e.name for e in PreviewType]
+FrameTypeNames: list[str] = [e.name for e in FrameType]
+
+FrameCallback = Callable[[int, FrameType, np.ndarray], None]
+PreviewCallback = Callable[[int, np.ndarray], None]
+DetectionCallback = Callable[[int, ImgDetection], None]
+TrackerCallback = Callable[[int, Tracklet], None]
+
 
 exposureRange:          tuple[int, int] = (1000, 33000)
 isoRange:               tuple[int, int] = ( 100, 1600 )

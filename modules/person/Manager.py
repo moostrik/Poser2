@@ -56,6 +56,8 @@ class Manager(Thread):
 
     def stop(self) -> None:
         self.running = False
+        self.join()
+        self.callbacks.clear()
 
     def run(self) -> None:
         self.running = True

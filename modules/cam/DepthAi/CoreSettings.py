@@ -1,5 +1,5 @@
 from modules.cam.DepthAi.Core import *
-from modules.cam.DepthAi.Definitions import PreviewType
+from modules.cam.DepthAi.Definitions import FrameType
 
 class DepthAiSettings(DepthAiCore):
     def __init__(self, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showStereo: bool = False) -> None:
@@ -7,17 +7,17 @@ class DepthAiSettings(DepthAiCore):
 
 
     # GENERAL SETTINGS
-    def setPreview(self, value: PreviewType | int | str) -> None:
-        if isinstance(value, str) and value in PreviewTypeNames:
-            self.previewType = PreviewType(PreviewTypeNames.index(value))
+    def setPreview(self, value: FrameType | int | str) -> None:
+        if isinstance(value, str) and value in FrameTypeNames:
+            self.previewType = FrameType(FrameTypeNames.index(value))
         else:
-            self.previewType = PreviewType(value)
+            self.previewType = FrameType(value)
 
-    def getPreviewTypes(self) -> list[PreviewType]:
-        return self.preview_types
+    def getFrameTypes(self) -> list[FrameType]:
+        return list(self.frame_types)
 
-    def getPreviewNames(self) -> list[str]:
-        ret: list[str] = [preview.name for preview in self.preview_types]
+    def getFrameNames(self) -> list[str]:
+        ret: list[str] = [preview.name for preview in self.frame_types]
         return ret
 
     # COLOR SETTINGS
