@@ -3,9 +3,9 @@ import depthai as dai
 from datetime import timedelta
 from pathlib import Path
 
-MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
-MODEL6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
-DETECTIONTHRESHOLD: float = 0.5
+DETECTION_MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
+DETECTION_MODEL6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
+DETECTION_THRESHOLD: float = 0.5
 TRACKERTYPE: dai.TrackerType = dai.TrackerType.ZERO_TERM_IMAGELESS
 # ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
 # ZERO_TERM_IMAGELESS slightly faster
@@ -30,6 +30,7 @@ def SetupPipeline(
         'LowRes' if lowres else 'Highres',
         'showStereo' if showStereo else ''
     ]
+
     pipeline_description = "Depth Pipeline: " + " ".join(filter(None, options))
     print(pipeline_description)
 
@@ -115,9 +116,9 @@ class SetupColorPerson(SetupColor):
         self.color.video.link(self.manip.inputImage)
 
         self.detectionNetwork: dai.node.MobileNetDetectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
-        nnPathDefault: Path = (Path(model_path) / MODEL6S).resolve().absolute()
+        nnPathDefault: Path = (Path(model_path) / DETECTION_MODEL6S).resolve().absolute()
         self.detectionNetwork.setBlobPath(nnPathDefault)
-        self.detectionNetwork.setConfidenceThreshold(DETECTIONTHRESHOLD)
+        self.detectionNetwork.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detectionNetwork.setNumInferenceThreads(2)
         self.detectionNetwork.input.setBlocking(False)
         self.manip.out.link(self.detectionNetwork.input)
@@ -189,9 +190,9 @@ class SetupColorStereoPerson(SetupColorStereo):
         self.color.video.link(self.manip.inputImage)
 
         self.detectionNetwork: dai.node.MobileNetSpatialDetectionNetwork = pipeline.create(dai.node.MobileNetSpatialDetectionNetwork)
-        nnPathDefault: Path = (Path(model_path) / MODEL5S).resolve().absolute()
+        nnPathDefault: Path = (Path(model_path) / DETECTION_MODEL5S).resolve().absolute()
         self.detectionNetwork.setBlobPath(nnPathDefault)
-        self.detectionNetwork.setConfidenceThreshold(DETECTIONTHRESHOLD)
+        self.detectionNetwork.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detectionNetwork.setNumInferenceThreads(2)
         self.detectionNetwork.setBoundingBoxScaleFactor(0.5)
         self.detectionNetwork.setDepthLowerThreshold(500)
@@ -239,9 +240,9 @@ class SetupMonoPerson(SetupMono):
         self.left.out.link(self.manip.inputImage)
 
         self.detectionNetwork: dai.node.MobileNetDetectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
-        nnPathDefault: Path = (Path(model_path) / MODEL6S).resolve().absolute()
+        nnPathDefault: Path = (Path(model_path) / DETECTION_MODEL6S).resolve().absolute()
         self.detectionNetwork.setBlobPath(nnPathDefault)
-        self.detectionNetwork.setConfidenceThreshold(DETECTIONTHRESHOLD)
+        self.detectionNetwork.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detectionNetwork.setNumInferenceThreads(2)
         self.detectionNetwork.input.setBlocking(False)
         self.manip.out.link(self.detectionNetwork.input)
@@ -317,9 +318,9 @@ class SetupMonoStereoPerson(SetupMonoStereo):
         self.stereo.rectifiedLeft.link(self.manip.inputImage)
 
         self.detectionNetwork: dai.node.MobileNetSpatialDetectionNetwork = pipeline.create(dai.node.MobileNetSpatialDetectionNetwork)
-        nnPathDefault: Path = (Path(model_path) / MODEL5S).resolve().absolute()
+        nnPathDefault: Path = (Path(model_path) / DETECTION_MODEL5S).resolve().absolute()
         self.detectionNetwork.setBlobPath(nnPathDefault)
-        self.detectionNetwork.setConfidenceThreshold(DETECTIONTHRESHOLD)
+        self.detectionNetwork.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detectionNetwork.setNumInferenceThreads(2)
         self.detectionNetwork.setBoundingBoxScaleFactor(0.5)
         self.detectionNetwork.setDepthLowerThreshold(100)

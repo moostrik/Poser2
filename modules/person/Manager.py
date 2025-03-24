@@ -197,6 +197,7 @@ class Manager(Thread):
     @staticmethod
     def get_cropped_image(image: np.ndarray, roi: Rect, size: int) -> np.ndarray:
         image_height, image_width = image.shape[:2]
+        image_channels = image.shape[2] if len(image.shape) > 2 else 1
 
         # Calculate the original ROI coordinates
         x: int = int(roi.x * image_width)
@@ -211,6 +212,9 @@ class Manager(Thread):
         img_h: int = min(h, image_height - y)
 
         crop: np.ndarray = image[img_y:img_y + img_h, img_x:img_x + img_w]
+
+        if image_channels == 1:
+            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2RGB)
 
         # Apply padding if the roi is outside the image bounds
         left_padding: int = -min(0, x)

@@ -37,7 +37,7 @@ class DepthAiGui(DepthAiSettings):
                      E(eT.SLDR, 'C_Saturation'+id,      super().setColorSaturation,     saturationRange[0],     saturationRange,    gsfr(saturationRange)),
                      E(eT.TEXT, ' Sharpness'),
                      E(eT.SLDR, 'C_Sharpness'+id,       super().setColorSharpness,      sharpnessRange[0],      sharpnessRange,     gsfr(sharpnessRange))])
-        elem.append([E(eT.CMBO, 'Preview',              super().setPreview,             PreviewTypeNames[0],    PreviewTypeNames,   expand=False),
+        elem.append([E(eT.CMBO, 'Preview',              super().setPreview,             self.getPreviewNames()[0],  self.getPreviewNames(),   expand=False),
                      E(eT.CHCK, 'AutoExposure'+id,      super().setColorAutoExposure,   True),
                      E(eT.CHCK, 'AutoBalance'+id,       super().setColorAutoBalance,    True),
                      E(eT.SLDR, 'FPS'+id,               None,                           0,    [0,60],  1)])

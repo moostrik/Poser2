@@ -16,8 +16,6 @@ class PreviewType(Enum):
     LEFT =  2
     RIGHT = 3
     STEREO= 4
-    MASK =  5
-    MASKED= 6
 
 PreviewTypeNames: list[str] = [e.name for e in PreviewType]
 

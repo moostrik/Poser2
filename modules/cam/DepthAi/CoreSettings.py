@@ -1,4 +1,5 @@
 from modules.cam.DepthAi.Core import *
+from modules.cam.DepthAi.Definitions import PreviewType
 
 class DepthAiSettings(DepthAiCore):
     def __init__(self, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showStereo: bool = False) -> None:
@@ -12,11 +13,12 @@ class DepthAiSettings(DepthAiCore):
         else:
             self.previewType = PreviewType(value)
 
-    def setFlipH(self, flipH: bool) -> None:
-        self.flipH = flipH
+    def getPreviewTypes(self) -> list[PreviewType]:
+        return self.preview_types
 
-    def setFlipV(self, flipV: bool) -> None:
-        self.flipV = flipV
+    def getPreviewNames(self) -> list[str]:
+        ret: list[str] = [preview.name for preview in self.preview_types]
+        return ret
 
     # COLOR SETTINGS
     def setColorAutoExposure(self, value) -> None:

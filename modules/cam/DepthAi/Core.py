@@ -41,6 +41,15 @@ class DepthAiCore():
         self.lowres: bool =             lowres
         self.showStereo: bool =         showStereo
 
+        self.preview_types: list[PreviewType] = []
+        self.preview_types.append(PreviewType.NONE)
+        if self.doColor: self.preview_types.append(PreviewType.VIDEO)
+        if self.doStereo:
+            self.preview_types.append(PreviewType.LEFT)
+            self.preview_types.append(PreviewType.RIGHT)
+            if self.showStereo:
+                self.preview_types.append(PreviewType.STEREO)
+
         # GENERAL SETTINGS
         self.previewType =              PreviewType.VIDEO
 
@@ -191,15 +200,13 @@ class DepthAiCore():
         if self.previewType == PreviewType.VIDEO and video_frame is not None:
             return_frame = video_frame
         if self.previewType == PreviewType.LEFT and left_frame is not None:
-            return_frame = cv2.cvtColor(left_frame, cv2.COLOR_GRAY2RGB)
+            # return_frame = cv2.cvtColor(left_frame, cv2.COLOR_GRAY2RGB)
+            return_frame = left_frame
         if self.previewType == PreviewType.RIGHT and right_frame is not None:
-            return_frame = cv2.cvtColor(right_frame, cv2.COLOR_GRAY2RGB)
+            # return_frame = cv2.cvtColor(right_frame, cv2.COLOR_GRAY2RGB)
+            return_frame = right_frame
         if self.previewType == PreviewType.STEREO and stereo_frame is not None:
             return_frame = stereo_frame
-        if self.previewType == PreviewType.MASK and mask_frame is not None:
-            return_frame = cv2.cvtColor(mask_frame, cv2.COLOR_GRAY2RGB)
-        if self.previewType == PreviewType.MASKED and masked_frame is not None:
-            return_frame = masked_frame
 
         for c in self.frameCallbacks:
             c(self.ID, return_frame)
