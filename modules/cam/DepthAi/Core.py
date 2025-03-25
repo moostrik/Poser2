@@ -72,7 +72,7 @@ class DepthAiCore():
         self.depthTresholdMax:  int =   255
 
         # TRACKER SETTINGS
-        self.numTracklets: int =           0
+        self.numTracklets: int =        0
         self.numDetections: int =       0
 
         # DAI
@@ -88,8 +88,8 @@ class DepthAiCore():
         # OTHER
         self.deviceOpen: bool =         False
         self.capturing:  bool =         False
-        self.fps_counter =              FPS()
-        self.tps_counter =              FPS()
+        self.fps_counter =              FPS(120)
+        self.tps_counter =              FPS(120)
 
         self.errorFrame: np.ndarray =   np.zeros((720, 1280, 3), dtype=np.uint8)
         if self.lowres:
@@ -106,6 +106,7 @@ class DepthAiCore():
         # CALLBACKS
         self.previewCallbacks: Set[PreviewCallback] = set()
         self.trackerCallbacks: Set[TrackerCallback] = set()
+        self.fpsCallbacks: Set[FPSCallback] = set()
         self.frameCallbacks: dict[FrameType, Set[FrameCallback]] = {}
         for t in self.frame_types:
             if t == FrameType.NONE: continue
@@ -166,10 +167,10 @@ class DepthAiCore():
         self.frameQueue.removeCallback(self.frameCallbackId)
         self.trackletQueue.removeCallback(self.trackletCallbackId)
 
-    def updateFrames(self, daiMessages) -> None:
+    def updateFrames(self, messageGroup: dai.MessageGroup) -> None:
         self.updateFPS()
 
-        for name, msg in daiMessages:
+        for name, msg in messageGroup:
             if name == 'video':
                 self.updateColorControl(msg)
                 frame: np.ndarray = msg.getCvFrame() #type:ignore
@@ -265,9 +266,18 @@ class DepthAiCore():
     def clearTrackerCallbacks(self) -> None:
         self.trackerCallbacks.clear()
 
+    def addFPSCallback(self, callback: FPSCallback) -> None:
+        self.fpsCallbacks.add(callback)
+    def discardFPSCallback(self, callback: FPSCallback) -> None:
+        self.fpsCallbacks.discard(callback)
+    def clearFPSCallbacks(self) -> None:
+        self.fpsCallbacks.clear()
+
     # FPS
     def updateFPS(self) -> None:
         self.fps_counter.processed()
+        for c in self.fpsCallbacks:
+            c(self.ID, self.fps_counter.get_rate_average())
     def getFPS(self) -> float:
         return self.fps_counter.get_rate_average()
     def updateTPS(self) -> None:

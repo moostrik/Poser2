@@ -20,6 +20,7 @@ FrameCallback = Callable[[int, FrameType, np.ndarray], None]
 PreviewCallback = Callable[[int, np.ndarray], None]
 DetectionCallback = Callable[[int, ImgDetection], None]
 TrackerCallback = Callable[[int, Tracklet], None]
+FPSCallback = Callable[[int, float], None]
 
 
 exposureRange:          tuple[int, int] = (1000, 33000)
