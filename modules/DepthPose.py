@@ -1,6 +1,6 @@
 
 from modules.cam.DepthCam import DepthCam
-from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
+from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder, EncoderType
 from modules.cam.DepthAi.Definitions import FrameType
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
@@ -26,7 +26,7 @@ class DepthPose():
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(1, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
         self.camera = DepthCam(self.gui, modelPath, fps, color, stereo, person, lowres, showStereo)
-        self.recorder = Recorder(self.gui, recorderPath, self.camera.getFrameTypes(), 10.0)
+        self.recorder = Recorder(self.gui, recorderPath, 4, self.camera.getFrameTypes(), 10.0, EncoderType.iGPU)
 
         modelType: ModelType = ModelType.LIGHTNING if lightning else ModelType.THUNDER
         if self.noPose:

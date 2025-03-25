@@ -1,28 +1,34 @@
-from modules.cam.recorder.Recorder import Recorder
+from modules.cam.recorder.Recorder import Recorder, EncoderType
 import time
 import os
 from threading import Thread, Event
 
-from modules.cam.DepthAi.Definitions import FrameType, FrameTypeNames
+from modules.cam.DepthAi.Definitions import FrameType
+
+FrameTypeString: dict[FrameType, str] = {
+    FrameType.VIDEO: 'C',
+    FrameType.LEFT:  'L',
+    FrameType.RIGHT: 'R'
+}
 
 class SyncRecorder(Thread):
-    def __init__(self, output_path: str, types: list[FrameType], chunk_duration: float) -> None:
+    def __init__(self, output_path: str, num_cams: int, types: list[FrameType], chunk_duration: float, encoder: EncoderType) -> None:
         super().__init__()
         self.output_path: str = output_path
+        self.num_cams: int = num_cams
         self.types: list[FrameType] = types
-        self.recorders: dict[FrameType, Recorder] = {}
-        self.paths: dict[FrameType, str] = {}
+        self.recorders: dict[int, dict[FrameType, Recorder]] = {}
+        self.path: str = ''
 
         if FrameType.NONE in self.types:
             self.types.remove(FrameType.NONE)
         if FrameType.STEREO in self.types:
             self.types.remove(FrameType.STEREO)
 
-        # self.types: list[FrameType] = [FrameType.VIDEO]
-
-        for t in types:
-            self.recorders[t] = Recorder()
-            self.paths[t] = ''
+        for c in range(num_cams):
+            self.recorders[c] = {}
+            for t in types:
+                self.recorders[c][t] = Recorder(encoder)
 
         self.chunk_duration: float = chunk_duration
         self.start_time: float
@@ -59,20 +65,18 @@ class SyncRecorder(Thread):
     def _start_recording(self) -> None:
         if self.recording:
             return
-        print('Start recording')
 
         self.rec_name = time.strftime("%Y%m%d-%H%M%S")
-        path: str = self.output_path + '/' + self.rec_name
+        self.path: str = self.output_path + '/' + self.rec_name + '/'
+        os.makedirs(self.path , exist_ok = True)
 
         self.chunk_index = 0
-        chunk_name: str =  f"{self.chunk_index:04d}"
+        chunk_name: str =  f"_{self.chunk_index:03d}"
 
-        for t in self.types:
-            self.paths[t] = path + '/' + t.name + '/'
-            os.makedirs(self.paths[t] , exist_ok=False)
-            full_path: str = self.paths[t] + chunk_name + '.mp4'
-            print(full_path)
-            self.recorders[t].start(full_path, self.fps)
+        for c in range(self.num_cams):
+            for t in self.types:
+                path: str = self.path + f"{c}_{FrameTypeString[t]}" + chunk_name + '.mp4'
+                self.recorders[c][t].start(path, self.fps)
 
         self.start_time = time.time()
         self.recording = True
@@ -80,35 +84,35 @@ class SyncRecorder(Thread):
     def _stop_recording(self) -> None:
         if not self.recording:
             return
-        print('Stop recording')
         self.recording = False
-        for t in self.types:
-            self.recorders[t].stop()
+
+        for c in range(self.num_cams):
+            for t in self.types:
+                self.recorders[c][t].stop()
 
     def _update_recording(self) -> None:
         if self.recording:
             if time.time() - self.start_time > self.chunk_duration:
                 self.chunk_index += 1
-                chunk_name: str = f"{self.chunk_index:04d}"
+                chunk_name: str = f"_{self.chunk_index:03d}"
 
-                for t in self.types:
-                    self.recorders[t].stop()
-                    full_path: str = self.paths[t] + chunk_name + '.mp4'
-                    self.recorders[t].start(full_path, 30)
+                for c in range(self.num_cams):
+                    for t in self.types:
+                        self.recorders[c][t].stop()
+                        path: str = self.path + f"{c}_{FrameTypeString[t]}" + chunk_name + '.mp4'
+                        self.recorders[c][t].start(path, self.fps)
                 self.start_time += self.chunk_duration
 
     # EXTERNAL METHODS
     def add_frame(self, cam_id: int, t: FrameType, frame) -> None:
-        self.recorders[t].add_frame(frame)
+        self.recorders[cam_id][t].add_frame(frame)
 
     def set_fps(self, cam_id: int, fps: float) -> None:
         self.fps = fps
 
     def start_recording(self) -> None:
-        print('Start')
         self.start_recording_event.set()
 
     def stop_recording(self) -> None:
-        print('Stop')
         self.stop_recording_event.set()
 
