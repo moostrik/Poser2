@@ -61,7 +61,7 @@ class DepthPose():
         self.gui.start()
         self.gui.bringToFront()
 
-        self.recorder.start()
+        self.recorder.start() # start after gui to prevent record at startup
 
         self.running = True
 

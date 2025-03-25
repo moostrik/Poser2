@@ -6,6 +6,9 @@ import time
 from modules.cam.recorder.Recorder import Recorder, EncoderType
 from modules.cam.DepthAi.Definitions import FrameType, FrameTypeString
 
+def make_path(path: Path, c: int, t: FrameType, chunk: int) -> Path:
+    return path / f"{c}_{FrameTypeString[t]}_{chunk:03d}.mp4"
+
 class SyncRecorder(Thread):
     def __init__(self, output_path: str, num_cams: int, types: list[FrameType], chunk_duration: float, encoder: EncoderType) -> None:
         super().__init__()
@@ -37,6 +40,15 @@ class SyncRecorder(Thread):
         self.recording = False
         self.running = False
 
+    def start(self) -> None: # override
+        self.start_recording_event.clear()
+        self.stop_recording_event.clear()
+        super().start()
+
+    def stop(self) -> None:
+        self.stop_event.set()
+        self.join()
+
     def run(self) -> None:
         self.running = True
 
@@ -53,24 +65,20 @@ class SyncRecorder(Thread):
             self._update_recording()
             time.sleep(0.01)
 
-    def stop(self) -> None:
-        self.stop_event.set()
-        self.join()
-
     def _start_recording(self) -> None:
         if self.recording:
             return
 
-        self.rec_name = time.strftime("%Y%m%d-%H%M%S")
+        self.rec_name = time.strftime("%Y%m%d-%H%M%S") + '_C' + str(self.num_cams) + '_'.join([FrameTypeString[t] for t in self.types])
+
         self.path = self.output_path / self.rec_name
         self.path.mkdir(parents=True, exist_ok=True)
 
         self.chunk_index = 0
-        chunk_name: str = f"_{self.chunk_index:03d}"
 
         for c in range(self.num_cams):
             for t in self.types:
-                path: Path = self.path / f"{c}_{FrameTypeString[t]}{chunk_name}.mp4"
+                path: Path = make_path(self.path, c, t, self.chunk_index)
                 self.recorders[c][t].start(str(path), self.fps)
 
         self.start_time = time.time()
@@ -89,12 +97,11 @@ class SyncRecorder(Thread):
         if self.recording:
             if time.time() - self.start_time > self.chunk_duration:
                 self.chunk_index += 1
-                chunk_name: str = f"_{self.chunk_index:03d}"
 
                 for c in range(self.num_cams):
                     for t in self.types:
                         self.recorders[c][t].stop()
-                        path: Path = self.path / f"{c}_{FrameTypeString[t]}{chunk_name}.mp4"
+                        path: Path = make_path(self.path, c, t, self.chunk_index)
                         self.recorders[c][t].start(str(path), self.fps)
                 self.start_time += self.chunk_duration
 
