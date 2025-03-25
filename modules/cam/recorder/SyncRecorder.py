@@ -1,16 +1,10 @@
-from modules.cam.recorder.Recorder import Recorder, EncoderType
-import time
-import os
+
 from threading import Thread, Event
 from pathlib import Path
+import time
 
-from modules.cam.DepthAi.Definitions import FrameType
-
-FrameTypeString: dict[FrameType, str] = {
-    FrameType.VIDEO: 'C',
-    FrameType.LEFT:  'L',
-    FrameType.RIGHT: 'R'
-}
+from modules.cam.recorder.Recorder import Recorder, EncoderType
+from modules.cam.DepthAi.Definitions import FrameType, FrameTypeString
 
 class SyncRecorder(Thread):
     def __init__(self, output_path: str, num_cams: int, types: list[FrameType], chunk_duration: float, encoder: EncoderType) -> None:

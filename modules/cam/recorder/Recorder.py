@@ -24,7 +24,6 @@ class Recorder:
         self.thread = None
         self.vcodec: str = EncoderString[encoder]
 
-
     def start(self, output_file: str, fps: float) -> None:
         if self.is_recording:
             print('Already recording')

@@ -2,9 +2,6 @@ import numpy as np
 from enum import Enum
 from typing import Callable
 from depthai import Tracklet, ImgDetection, Rect, Point3f
-# Tracklet = T
-# Detection = D
-# Detections = list[Detection]
 
 
 class FrameType(Enum):
@@ -15,6 +12,14 @@ class FrameType(Enum):
     STEREO= 4
 
 FrameTypeNames: list[str] = [e.name for e in FrameType]
+
+FrameTypeString: dict[FrameType, str] = {
+    FrameType.NONE:   'N',
+    FrameType.VIDEO:  'C',
+    FrameType.LEFT:   'L',
+    FrameType.RIGHT:  'R',
+    FrameType.STEREO: 'S'
+}
 
 FrameCallback = Callable[[int, FrameType, np.ndarray], None]
 PreviewCallback = Callable[[int, np.ndarray], None]
