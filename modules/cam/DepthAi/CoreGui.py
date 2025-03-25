@@ -40,9 +40,9 @@ class DepthAiGui(DepthAiSettings):
         elem.append([E(eT.CMBO, 'Preview',              super().setPreview,             self.getFrameNames()[0],  self.getFrameNames(),   expand=False),
                      E(eT.CHCK, 'AutoExposure'+id,      super().setColorAutoExposure,   True),
                      E(eT.CHCK, 'AutoBalance'+id,       super().setColorAutoBalance,    True),
-                     E(eT.SLDR, 'FPS'+id,               None,                           0,    [0,60],  1)])
-        elem.append([ E(eT.SLDR, 'NumTracklets'+id,      None,                           0,    [0,6],  1),
-                     E(eT.SLDR, 'TPS'+id,               None,                           0,    [0,60],  1)])
+                     E(eT.SLDR, 'FPS'+id,               None,                           0,    [0,60],   0.1)])
+        elem.append([ E(eT.SLDR, 'NumTracklets'+id,     None,                           0,    [0,6],    1),
+                     E(eT.SLDR, 'TPS'+id,               None,                           0,    [0,60],   0.1)])
 
 
         self.color_frame = Frame('CAMERA COLOR', elem, 240)
