@@ -1,6 +1,6 @@
 
 from modules.cam.DepthCam import DepthCam
-from modules.cam.recorder.SyncRecorder import SyncRecorder
+from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.DepthAi.Definitions import FrameType
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
@@ -26,7 +26,7 @@ class DepthPose():
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(1, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
         self.camera = DepthCam(self.gui, modelPath, fps, color, stereo, person, lowres, showStereo)
-        self.recorder = SyncRecorder(recorderPath, self.camera.getFrameTypes(), 10.0)
+        self.recorder = Recorder(self.gui, recorderPath, self.camera.getFrameTypes(), 10.0)
 
         modelType: ModelType = ModelType.LIGHTNING if lightning else ModelType.THUNDER
         if self.noPose:
@@ -41,7 +41,6 @@ class DepthPose():
         self.render.addKeyboardCallback(self.render_keyboard_callback)
         self.render.start()
 
-        self.recorder.start()
 
         self.camera.open()
         self.camera.startCapture()
@@ -51,14 +50,18 @@ class DepthPose():
         self.camera.addTrackerCallback(self.render.add_tracklet)
         for T in self.recorder.types:
             self.camera.addFrameCallback(T, self.recorder.add_frame)
+            self.camera.addFPSCallback(self.recorder.set_fps)
 
         self.detector.start()
         self.detector.addCallback(self.render.add_person)
 
         self.gui.exit_callback = self.stop
         self.gui.addFrame([self.camera.get_gui_color_frame(), self.camera.get_gui_depth_frame()])
+        self.gui.addFrame([self.recorder.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
+
+        self.recorder.start()
 
         self.running = True
 

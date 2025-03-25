@@ -6,3 +6,4 @@ depthai==2.29.0.0
 watchdog==6.0.0
 tensorflow==2.10.0
 onnxruntime-gpu==1.18.1
+ffmpeg-python

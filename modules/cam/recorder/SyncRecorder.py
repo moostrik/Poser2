@@ -18,6 +18,8 @@ class SyncRecorder(Thread):
         if FrameType.STEREO in self.types:
             self.types.remove(FrameType.STEREO)
 
+        # self.types: list[FrameType] = [FrameType.VIDEO]
+
         for t in types:
             self.recorders[t] = Recorder()
             self.paths[t] = ''
@@ -26,6 +28,7 @@ class SyncRecorder(Thread):
         self.start_time: float
         self.chunk_index = 0
         self.rec_name: str
+        self.fps: float = 30.0
 
         self.start_recording_event = Event()
         self.stop_recording_event = Event()
@@ -56,6 +59,7 @@ class SyncRecorder(Thread):
     def _start_recording(self) -> None:
         if self.recording:
             return
+        print('Start recording')
 
         self.rec_name = time.strftime("%Y%m%d-%H%M%S")
         path: str = self.output_path + '/' + self.rec_name
@@ -68,7 +72,7 @@ class SyncRecorder(Thread):
             os.makedirs(self.paths[t] , exist_ok=False)
             full_path: str = self.paths[t] + chunk_name + '.mp4'
             print(full_path)
-            self.recorders[t].start(full_path, 30)
+            self.recorders[t].start(full_path, self.fps)
 
         self.start_time = time.time()
         self.recording = True
@@ -76,6 +80,7 @@ class SyncRecorder(Thread):
     def _stop_recording(self) -> None:
         if not self.recording:
             return
+        print('Stop recording')
         self.recording = False
         for t in self.types:
             self.recorders[t].stop()
@@ -96,8 +101,14 @@ class SyncRecorder(Thread):
     def add_frame(self, cam_id: int, t: FrameType, frame) -> None:
         self.recorders[t].add_frame(frame)
 
+    def set_fps(self, cam_id: int, fps: float) -> None:
+        self.fps = fps
+
     def start_recording(self) -> None:
+        print('Start')
         self.start_recording_event.set()
 
     def stop_recording(self) -> None:
+        print('Stop')
         self.stop_recording_event.set()
+
