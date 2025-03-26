@@ -1,7 +1,7 @@
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
 from modules.cam.recorder.SyncRecorder import SyncRecorder, EncoderType
-from modules.cam.DepthAi.Definitions import FrameType, FrameTypeNames
+from modules.cam.DepthAi.Definitions import FrameType
 
 class SyncRecorderGui(SyncRecorder):
     def __init__(self, gui: Gui | None, output_path: str, num_cams: int, types: list[FrameType], chunk_duration: float, encoder: EncoderType) -> None:

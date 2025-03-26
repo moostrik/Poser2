@@ -26,7 +26,7 @@ class DepthPose():
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(1, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
         self.camera = DepthCam(self.gui, modelPath, fps, color, stereo, person, lowres, showStereo)
-        self.recorder = Recorder(self.gui, recorderPath, 4, self.camera.getFrameTypes(), 10.0, EncoderType.iGPU)
+        self.recorder = Recorder(self.gui, recorderPath, 4, self.camera.get_frame_types(), 10.0, EncoderType.iGPU)
 
         modelType: ModelType = ModelType.LIGHTNING if lightning else ModelType.THUNDER
         if self.noPose:
@@ -42,15 +42,15 @@ class DepthPose():
         self.render.start()
 
 
-        self.camera.open()
-        self.camera.startCapture()
-        self.camera.addPreviewCallback(self.detector.set_image)
-        self.camera.addPreviewCallback(self.render.set_cam_image)
-        self.camera.addTrackerCallback(self.detector.add_tracklet)
-        self.camera.addTrackerCallback(self.render.add_tracklet)
+        self.camera._open()
+        self.camera._start_capture()
+        self.camera.add_preview_callback(self.detector.set_image)
+        self.camera.add_preview_callback(self.render.set_cam_image)
+        self.camera.add_tracker_callback(self.detector.add_tracklet)
+        self.camera.add_tracker_callback(self.render.add_tracklet)
         for T in self.recorder.types:
-            self.camera.addFrameCallback(T, self.recorder.add_frame)
-            self.camera.addFPSCallback(self.recorder.set_fps)
+            self.camera.add_frame_callback(T, self.recorder.add_frame)
+            self.camera.add_fps_callback(self.recorder.set_fps)
 
         self.detector.start()
         self.detector.addCallback(self.render.add_person)
@@ -71,8 +71,8 @@ class DepthPose():
     def stop(self) -> None:
         self.detector.stop()
 
-        self.camera.stopCapture()
-        self.camera.close()
+        self.camera._stop_capture()
+        self.camera._close()
 
         self.recorder.stop()
 

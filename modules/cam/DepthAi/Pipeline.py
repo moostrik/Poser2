@@ -2,6 +2,7 @@
 import depthai as dai
 from datetime import timedelta
 from pathlib import Path
+from modules.cam.DepthAi.Definitions import FrameType
 
 DETECTION_MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
 DETECTION_MODEL6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
@@ -10,7 +11,22 @@ TRACKERTYPE: dai.TrackerType = dai.TrackerType.ZERO_TERM_IMAGELESS
 # ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
 # ZERO_TERM_IMAGELESS slightly faster
 
-def SetupPipeline(
+def get_frame_types(do_color: bool, do_stereo: bool, show_stereo) -> list[FrameType]:
+    frame_types: list[FrameType] = [FrameType.NONE]
+    if do_color:
+        frame_types.append(FrameType.VIDEO)
+    else:
+        frame_types.append(FrameType.LEFT)
+    if do_stereo:
+        if do_color:
+            frame_types.append(FrameType.LEFT)
+        frame_types.append(FrameType.RIGHT)
+        if show_stereo:
+            frame_types.append(FrameType.STEREO)
+    return frame_types
+
+
+def setup_pipeline(
     pipeline : dai.Pipeline,
     modelPath:str,
     fps: int = 30,

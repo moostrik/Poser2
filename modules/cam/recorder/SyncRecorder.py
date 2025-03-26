@@ -6,10 +6,10 @@ from enum import Enum, auto
 from queue import Queue, Empty
 
 from modules.cam.recorder.Recorder import Recorder, EncoderType
-from modules.cam.DepthAi.Definitions import FrameType, FrameTypeString
+from modules.cam.DepthAi.Definitions import FrameType, FRAME_TYPE_LABEL_DICT
 
 def make_path(path: Path, c: int, t: FrameType, chunk: int) -> Path:
-    return path / f"{c}_{FrameTypeString[t]}_{chunk:03d}.mp4"
+    return path / f"{c}_{FRAME_TYPE_LABEL_DICT[t]}_{chunk:03d}.mp4"
 
 class RecState(Enum):
     IDLE =  auto()
@@ -72,7 +72,7 @@ class SyncRecorder(Thread):
         self._stop_recording()
 
     def _start_recording(self) -> None:
-        self.rec_name = time.strftime("%Y%m%d-%H%M%S") + '_' + str(self.num_cams) + '_' + '_'.join([FrameTypeString[t] for t in self.types])
+        self.rec_name = time.strftime("%Y%m%d-%H%M%S") + '_' + str(self.num_cams) + '_' + '_'.join([FRAME_TYPE_LABEL_DICT[t] for t in self.types])
 
         self.path = self.output_path / self.rec_name
         self.path.mkdir(parents=True, exist_ok=True)

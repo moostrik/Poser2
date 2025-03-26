@@ -2,184 +2,188 @@ from modules.cam.DepthAi.Core import *
 from modules.cam.DepthAi.Definitions import FrameType
 
 class DepthAiSettings(DepthAiCore):
-    def __init__(self, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showStereo: bool = False) -> None:
-        super().__init__(modelPath, fps, doColor, doStereo, doPerson, lowres, showStereo)
+    def __init__(self, model_path:str, fps: int = 30, do_color: bool = True, do_stereo: bool = True, do_person: bool = True, lowres: bool = False, show_stereo: bool = False) -> None:
+        super().__init__(model_path, fps, do_color, do_stereo, do_person, lowres, show_stereo)
 
 
     # GENERAL SETTINGS
-    def setPreview(self, value: FrameType | int | str) -> None:
-        if isinstance(value, str) and value in FrameTypeNames:
-            self.previewType = FrameType(FrameTypeNames.index(value))
+    def set_preview(self, value: FrameType | int | str) -> None:
+        if isinstance(value, str) and value in FRAME_TYPE_NAMES:
+            self.preview_type = FrameType(FRAME_TYPE_NAMES.index(value))
         else:
-            self.previewType = FrameType(value)
+            self.preview_type = FrameType(value)
 
-    def getFrameTypes(self) -> list[FrameType]:
+    def get_frame_types(self) -> list[FrameType]:
         return list(self.frame_types)
 
-    def getFrameNames(self) -> list[str]:
-        type_list: list[FrameType] = self.getFrameTypes()
+    def get_frame_type_names(self) -> list[str]:
+        type_list: list[FrameType] = self.get_frame_types()
         type_list.sort(key=lambda x: x.value)
         return [preview.name for preview in type_list]
 
     # COLOR SETTINGS
-    def setColorAutoExposure(self, value) -> None:
-        if not self.deviceOpen: return
-        self.colorAutoExposure = value
+    def set_color_auto_exposure(self, value) -> None:
+        if not self.device_open: return
+        self.color_auto_exposure = value
         if value == False:
-            self.setExposureIso(self.colorExposure, self.colorIso)
+            self.set_color_exposure_iso(self.color_exposure, self.color_iso)
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoExposureEnable()
-        self.colorControl.send(ctrl)
+        self.color_control.send(ctrl)
 
-    def setColorAutoBalance(self, value) -> None:
-        if not self.deviceOpen: return
-        self.colorAutoBalance = value
+    def set_color_auto_balance(self, value) -> None:
+        if not self.device_open: return
+        self.color_auto_balance = value
         if value == False:
-            self.setColorBalance(self.colorBalance)
+            self.set_color_balance(self.color_balance)
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoWhiteBalanceMode(dai.CameraControl.AutoWhiteBalanceMode.AUTO)
-        self.colorControl.send(ctrl)
+        self.color_control.send(ctrl)
 
-    def setExposureIso(self, exposure: int, iso: int) -> None:
-        if not self.deviceOpen: return
-        self.colorAutoExposure = False
-        self.colorExposure = int(clamp(exposure, exposureRange))
-        self.colorIso = int(clamp(iso, isoRange))
+    def set_color_exposure_iso(self, exposure: int, iso: int) -> None:
+        if not self.device_open: return
+        self.color_auto_exposure = False
+        self.color_exposure = int(self.clamp(exposure, EXPOSURE_RANGE))
+        self.color_iso = int(self.clamp(iso, ISO_RANGE))
         ctrl = dai.CameraControl()
-        ctrl.setManualExposure(self.colorExposure, self.colorIso)
-        self.colorControl.send(ctrl)
+        ctrl.setManualExposure(self.color_exposure, self.color_iso)
+        self.color_control.send(ctrl)
 
-    def setColorExposure(self, value : int) -> None:
-        self.setExposureIso(value, self.colorIso)
+    def set_color_exposure(self, value : int) -> None:
+        self.set_color_exposure_iso(value, self.color_iso)
 
-    def setColorIso(self, value: int) -> None:
-        self.setExposureIso(self.colorExposure, value)
+    def set_color_iso(self, value: int) -> None:
+        self.set_color_exposure_iso(self.color_exposure, value)
 
-    def setColorBalance(self, value: int) -> None:
-        if not self.deviceOpen: return
-        self.colorAutoBalance = False
+    def set_color_balance(self, value: int) -> None:
+        if not self.device_open: return
+        self.color_auto_balance = False
         ctrl = dai.CameraControl()
-        self.colorBalance = int(clamp(value, balanceRange))
-        ctrl.setManualWhiteBalance(self.colorBalance)
-        self.colorControl.send(ctrl)
+        self.color_balance = int(self.clamp(value, BALANCE_RANGE))
+        ctrl.setManualWhiteBalance(self.color_balance)
+        self.color_control.send(ctrl)
 
-    def setColorContrast(self, value: int) -> None:
-        if not self.deviceOpen: return
+    def set_color_contrast(self, value: int) -> None:
+        if not self.device_open: return
         ctrl = dai.CameraControl()
-        self.colorContrast = int(clamp(value, contrastRange))
-        ctrl.setContrast(self.colorContrast)
-        self.colorControl.send(ctrl)
+        self.color_contrast = int(self.clamp(value, CONTRAST_RANGE))
+        ctrl.setContrast(self.color_contrast)
+        self.color_control.send(ctrl)
 
-    def setColorBrightness(self, value: int) -> None:
-        if not self.deviceOpen: return
+    def set_color_brightness(self, value: int) -> None:
+        if not self.device_open: return
         ctrl = dai.CameraControl()
-        self.colorBrightness = int(clamp(value, brightnessRange))
-        ctrl.setBrightness(self.colorBrightness)
-        self.colorControl.send(ctrl)
+        self.color_brightness = int(self.clamp(value, BRIGHTNESS_RANGE))
+        ctrl.setBrightness(self.color_brightness)
+        self.color_control.send(ctrl)
 
-    def setColorDenoise(self, value: int) -> None:
-        if not self.deviceOpen: return
+    def set_color_denoise(self, value: int) -> None:
+        if not self.device_open: return
         ctrl = dai.CameraControl()
-        self.colorLumaDenoise = int(clamp(value, lumaDenoiseRange))
-        ctrl.setLumaDenoise(self.colorLumaDenoise)
-        self.colorControl.send(ctrl)
+        self.color_luma_denoise = int(self.clamp(value, LUMA_DENOISE_RANGE))
+        ctrl.setLumaDenoise(self.color_luma_denoise)
+        self.color_control.send(ctrl)
 
-    def setColorSaturation(self, value: int) -> None:
-        if not self.deviceOpen: return
+    def set_color_saturation(self, value: int) -> None:
+        if not self.device_open: return
         ctrl = dai.CameraControl()
-        self.colorSaturation = int(clamp(value, saturationRange))
-        ctrl.setSaturation(self.colorSaturation)
-        self.colorControl.send(ctrl)
+        self.color_saturation = int(self.clamp(value, SATURATION_RANGE))
+        ctrl.setSaturation(self.color_saturation)
+        self.color_control.send(ctrl)
 
-    def setColorSharpness(self, value: int) -> None:
-        if not self.deviceOpen: return
+    def set_color_sharpness(self, value: int) -> None:
+        if not self.device_open: return
         ctrl = dai.CameraControl()
-        self.colorSharpness = int(clamp(value, sharpnessRange))
-        ctrl.setSharpness(self.colorSharpness)
-        self.colorControl.send(ctrl)
+        self.color_sharpness = int(self.clamp(value, SHARPNESS_RANGE))
+        ctrl.setSharpness(self.color_sharpness)
+        self.color_control.send(ctrl)
 
     # MONO SETTINGS
-    def setMonoAutoExposure(self, value) -> None:
-        if not self.deviceOpen: return
-        self.monoAutoExposure = value
+    def set_mono_auto_exposure(self, value) -> None:
+        if not self.device_open: return
+        self.mono_auto_exposure = value
         if value == False:
-            self.setMonoExposureIso(self.monoExposure, self.monoIso)
+            self.set_mono_exposure_iso(self.mono_exposure, self.mono_iso)
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoExposureEnable()
-        self.monoControl.send(ctrl)
+        self.mono_control.send(ctrl)
 
-    def setMonoExposureIso(self, exposure: int, iso: int) -> None:
-        if not self.deviceOpen: return
-        self.monoAutoExposure = False
-        self.monoExposure = int(clamp(exposure, exposureRange))
-        self.monoIso = int(clamp(iso, isoRange))
+    def set_mono_exposure_iso(self, exposure: int, iso: int) -> None:
+        if not self.device_open: return
+        self.mono_auto_exposure = False
+        self.mono_exposure = int(self.clamp(exposure, EXPOSURE_RANGE))
+        self.mono_iso = int(self.clamp(iso, ISO_RANGE))
         ctrl = dai.CameraControl()
-        ctrl.setManualExposure(self.monoExposure, self.monoIso)
-        self.monoControl.send(ctrl)
+        ctrl.setManualExposure(self.mono_exposure, self.mono_iso)
+        self.mono_control.send(ctrl)
 
-    def setMonoExposure(self, value : int) -> None:
-        self.setMonoExposureIso(value, self.monoIso)
+    def set_mono_exposure(self, value : int) -> None:
+        self.set_mono_exposure_iso(value, self.mono_iso)
 
-    def setMonoIso(self, value: int) -> None:
-        self.setMonoExposureIso(self.monoExposure, value)
+    def set_mono_iso(self, value: int) -> None:
+        self.set_mono_exposure_iso(self.mono_exposure, value)
 
     # STEREO SETTINGS
-    def setDepthTresholdMin(self, value: int) -> None:
-        if not self.deviceOpen: return
-        v: int = int(clamp(value, stereoDepthRange))
-        self.stereoConfig.postProcessing.thresholdFilter.minRange = int(v)
-        self.stereoControl.send(self.stereoConfig)
+    def set_depth_treshold_min(self, value: int) -> None:
+        if not self.device_open: return
+        v: int = int(self.clamp(value, STEREO_DEPTH_RANGE))
+        self.stereo_config.postProcessing.thresholdFilter.minRange = int(v)
+        self.stereo_control.send(self.stereo_config)
 
-    def setDepthTresholdMax(self, value: int) -> None:
-        if not self.deviceOpen: return
-        v: int = int(clamp(value, stereoDepthRange))
-        self.stereoConfig.postProcessing.thresholdFilter.maxRange = int(v)
-        self.stereoControl.send(self.stereoConfig)
+    def set_depth_treshold_max(self, value: int) -> None:
+        if not self.device_open: return
+        v: int = int(self.clamp(value, STEREO_DEPTH_RANGE))
+        self.stereo_config.postProcessing.thresholdFilter.maxRange = int(v)
+        self.stereo_control.send(self.stereo_config)
 
-    def setStereoMinBrightness(self, value: int) -> None:
-        if not self.deviceOpen: return
-        v: int = int(clamp(value, stereoBrightnessRange))
-        self.stereoConfig.postProcessing.brightnessFilter.minBrightness = int(v)
-        self.stereoControl.send(self.stereoConfig)
+    def set_stereo_min_brightness(self, value: int) -> None:
+        if not self.device_open: return
+        v: int = int(self.clamp(value, STEREO_BRIGHTNESS_RANGE))
+        self.stereo_config.postProcessing.brightnessFilter.minBrightness = int(v)
+        self.stereo_control.send(self.stereo_config)
 
-    def setStereoMaxBrightness(self, value: int) -> None:
-        if not self.deviceOpen: return
-        v: int = int(clamp(value, stereoBrightnessRange))
-        self.stereoConfig.postProcessing.brightnessFilter.maxBrightness = int(v)
-        self.stereoControl.send(self.stereoConfig)
+    def set_stereo_max_brightness(self, value: int) -> None:
+        if not self.device_open: return
+        v: int = int(self.clamp(value, STEREO_BRIGHTNESS_RANGE))
+        self.stereo_config.postProcessing.brightnessFilter.maxBrightness = int(v)
+        self.stereo_control.send(self.stereo_config)
 
-    def setStereoMedianFilter(self, value: StereoMedianFilterType | int | str) -> None:
-        if not self.deviceOpen: return
+    def set_stereo_median_filter(self, value: StereoMedianFilterType | int | str) -> None:
+        if not self.device_open: return
         if isinstance(value, str):
-            if value in StereoMedianFilterTypeNames:
-                self.setStereoMedianFilter(StereoMedianFilterType(StereoMedianFilterTypeNames.index(value)))
+            if value in STEREO_FILTER_NAMES:
+                self.set_stereo_median_filter(StereoMedianFilterType(STEREO_FILTER_NAMES.index(value)))
             else:
                 print('setStereoMedianFilter wrong type', value)
             return
 
         if value == StereoMedianFilterType.OFF:
-            self.stereoConfig.postProcessing.median = dai.MedianFilter.MEDIAN_OFF
+            self.stereo_config.postProcessing.median = dai.MedianFilter.MEDIAN_OFF
         elif value == StereoMedianFilterType.KERNEL_3x3:
-            self.stereoConfig.postProcessing.median = dai.MedianFilter.KERNEL_3x3
+            self.stereo_config.postProcessing.median = dai.MedianFilter.KERNEL_3x3
         elif value == StereoMedianFilterType.KERNEL_5x5:
-            self.stereoConfig.postProcessing.median = dai.MedianFilter.KERNEL_5x5
+            self.stereo_config.postProcessing.median = dai.MedianFilter.KERNEL_5x5
         elif value == StereoMedianFilterType.KERNEL_7x7:
-            self.stereoConfig.postProcessing.median = dai.MedianFilter.KERNEL_7x7
-        self.stereoControl.send(self.stereoConfig)
+            self.stereo_config.postProcessing.median = dai.MedianFilter.KERNEL_7x7
+        self.stereo_control.send(self.stereo_config)
 
     # IR SETTINGS
-    def setIrFloodLight(self, value: float) -> None:
-        if not self.deviceOpen: return
-        v: float = clamp(value, (0.0, 1.0))
+    def set_ir_flood_light(self, value: float) -> None:
+        if not self.device_open: return
+        v: float = self.clamp(value, (0.0, 1.0))
         self.device.setIrFloodLightIntensity(v)
 
-    def setIrGridLight(self, value: float) -> None:
-        if not self.deviceOpen: return
-        v: float = clamp(value, (0.0, 1.0))
+    def set_ir_grid_light(self, value: float) -> None:
+        if not self.device_open: return
+        v: float = self.clamp(value, (0.0, 1.0))
         self.device.setIrLaserDotProjectorIntensity(v)
+
+    @staticmethod
+    def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | float:
+        return max(size[0], min(num, size[1]))
 
 
 

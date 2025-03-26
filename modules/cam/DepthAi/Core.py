@@ -2,125 +2,95 @@
 # https://oak-web.readthedocs.io/
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
-import cv2
-import numpy as np
 import depthai as dai
+from cv2 import applyColorMap, COLORMAP_JET
+from numpy import ndarray
 from typing import Set
-from PIL import Image, ImageOps
 
-from modules.cam.DepthAi.Pipeline import SetupPipeline
+from modules.cam.DepthAi.Pipeline import setup_pipeline, get_frame_types
 from modules.cam.DepthAi.Definitions import *
 from modules.utils.FPS import FPS
 
-
-def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | float:
-    return max(size[0], min(num, size[1]))
-
-def fit(image: np.ndarray, width, height) -> np.ndarray:
-    h, w = image.shape[:2]
-    if w == width and h == height:
-        return image
-    pil_image: Image.Image = Image.fromarray(image)
-    size: tuple[int, int] = (width, height)
-    fit_image: Image.Image = ImageOps.fit(pil_image, size)
-    return np.asarray(fit_image)
-
 class DepthAiCore():
     _id_counter = 0
-    def __init__(self, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showStereo: bool = False) -> None:
-        self.ID: int =                  DepthAiCore._id_counter
-        self.IDs: str =                 str(self.ID)
+
+    def __init__(self, model_path:str, fps: int = 30, do_color: bool = True, do_stereo: bool = True, do_person: bool = True, lowres: bool = False, show_stereo: bool = False) -> None:
+        self.id: int =                  DepthAiCore._id_counter
+        self.id_string: str =           str(self.id)
         DepthAiCore._id_counter +=      1
 
         # FIXED SETTINGS
-        self.modelpath: str =           modelPath
+        self.model_path: str =          model_path
         self.fps: int =                 fps
-        self.doColor: bool =            doColor
-        self.doStereo: bool =           doStereo
-        self.doPerson: bool =           doPerson
+        self.do_color: bool =           do_color
+        self.do_stereo: bool =          do_stereo
+        self.do_person: bool =          do_person
         self.lowres: bool =             lowres
-        self.showStereo: bool =         showStereo
+        self.show_stereo: bool =        show_stereo
 
         # GENERAL SETTINGS
-        self.previewType =              FrameType.VIDEO
+        self.preview_type =             FrameType.VIDEO
 
         # COLOR SETTINGS
-        self.colorAutoExposure: bool =  True
-        self.colorAutoFocus: bool =     True
-        self.colorAutoBalance: bool =   True
-        self.colorExposure: int =       0
-        self.colorIso: int =            0
-        self.colorFocus: int =          0
-        self.colorBalance: int =        0
-        self.colorContrast: int =       0
-        self.colorBrightness: int =     0
-        self.colorLumaDenoise: int =    0
-        self.colorSaturation: int =     0
-        self.colorSharpness: int =      0
+        self.color_auto_exposure: bool= True
+        self.color_auto_focus: bool =   True
+        self.color_auto_balance: bool = True
+        self.color_exposure: int =      0
+        self.color_iso: int =           0
+        self.color_focus: int =         0
+        self.color_balance: int =       0
+        self.color_contrast: int =      0
+        self.color_brightness: int =    0
+        self.color_luma_denoise: int =  0
+        self.color_saturation: int =    0
+        self.color_sharpness: int =     0
 
         # MONO SETTINGS
-        self.monoAutoExposure: bool =   True
-        self.monoAutoFocus: bool =      True
-        self.monoExposure: int =        0
-        self.monoIso: int =             0
+        self.mono_auto_exposure: bool = True
+        self.mono_auto_focus: bool =    True
+        self.mono_exposure: int =       0
+        self.mono_iso: int =            0
 
         # STEREO SETTINGS
-        self.stereoConfig: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
-
-        # MASK SETTINGS
-        self.depthTresholdMin:  int =   0
-        self.depthTresholdMax:  int =   255
-
-        # TRACKER SETTINGS
-        self.numTracklets: int =        0
-        self.numDetections: int =       0
+        self.stereo_config: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
 
         # DAI
         self.device:                    dai.Device
-        self.colorControl:              dai.DataInputQueue
-        self.monoControl:               dai.DataInputQueue
-        self.stereoControl:             dai.DataInputQueue
-        self.frameQueue:                dai.DataOutputQueue
-        self.frameCallbackId:           int
-        self.trackletQueue:             dai.DataOutputQueue
-        self.trackletCallbackId:        int
-
-        # OTHER
-        self.deviceOpen: bool =         False
-        self.capturing:  bool =         False
+        self.color_control:             dai.DataInputQueue
+        self.mono_control:              dai.DataInputQueue
+        self.stereo_control:            dai.DataInputQueue
+        self.frame_queue:               dai.DataOutputQueue
+        self.frame_callback_id:         int
+        self.tracklet_queue:            dai.DataOutputQueue
+        self.tracklet_callback_id:      int
+        self.device_open: bool =        False
+        self.capturing: bool =          False
+        self.num_tracklets: int =       0
+        # FPS
         self.fps_counter =              FPS(120)
         self.tps_counter =              FPS(120)
 
-        self.errorFrame: np.ndarray =   np.zeros((720, 1280, 3), dtype=np.uint8)
-        if self.lowres:
-            self.errorFrame = cv2.resize(self.errorFrame, (640, 360))
-        self.errorFrame[:,:,2] =        255
-
-        self.frame_types: set[FrameType] = set()
-        if self.doColor: self.frame_types.add(FrameType.VIDEO)
-        else: self.frame_types.add(FrameType.LEFT)
-        if self.doStereo:
-            self.frame_types.add(FrameType.LEFT)
-            self.frame_types.add(FrameType.RIGHT)
-            if self.showStereo: self.frame_types.add(FrameType.STEREO)
+        # FRAME TYPES
+        self.frame_types: list[FrameType] = get_frame_types(do_color, do_stereo, show_stereo)
+        self.frame_types.sort(key=lambda x: x.value)
 
         # CALLBACKS
-        self.previewCallbacks: Set[PreviewCallback] = set()
-        self.trackerCallbacks: Set[TrackerCallback] = set()
-        self.fpsCallbacks: Set[FPSCallback] = set()
-        self.frameCallbacks: dict[FrameType, Set[FrameCallback]] = {}
+        self.preview_callbacks: Set[PreviewCallback] = set()
+        self.tracker_callbacks: Set[TrackerCallback] = set()
+        self.fps_callbacks: Set[FPSCallback] = set()
+        self.frame_callbacks: dict[FrameType, Set[FrameCallback]] = {}
         for t in self.frame_types:
             if t == FrameType.NONE: continue
-            self.frameCallbacks[t] = set()
+            self.frame_callbacks[t] = set()
 
     def __exit__(self) -> None:
-        self.close()
+        self._close()
 
-    def open(self) -> bool:
-        if self.deviceOpen: return True
+    def _open(self) -> bool:
+        if self.device_open: return True
 
         pipeline = dai.Pipeline()
-        self.stereoConfig = SetupPipeline(pipeline, self.modelpath, self.fps, self.doColor, self.doStereo, self.doPerson, self.lowres, self.showStereo)
+        self.stereo_config = setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:
@@ -130,160 +100,148 @@ class DepthAiCore():
                 print('still could not open camera, error', e)
                 return False
 
-        self.frameQueue =       self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
-        self.trackletQueue =    self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
-        self.colorControl =     self.device.getInputQueue('color_control')
-        self.monoControl =      self.device.getInputQueue('mono_control')
-        self.stereoControl =    self.device.getInputQueue('stereo_control')
+        self.frame_queue =       self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
+        self.tracklet_queue =    self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
+        self.color_control =     self.device.getInputQueue('color_control')
+        self.mono_control =      self.device.getInputQueue('mono_control')
+        self.stereo_control =    self.device.getInputQueue('stereo_control')
 
-        self.deviceOpen = True
+        self.device_open = True
         return True
 
-    def close(self) -> None:
-        if not self.deviceOpen: return
-        if self.capturing: self.stopCapture()
-        self.deviceOpen = False
+    def _close(self) -> None:
+        if not self.device_open: return
+        if self.capturing: self._stop_capture()
+        self.device_open = False
 
         self.device.close()
-        self.stereoControl.close()
-        self.monoControl.close()
-        self.colorControl.close()
-        self.frameQueue.close()
-        self.trackletQueue.close()
+        self.stereo_control.close()
+        self.mono_control.close()
+        self.color_control.close()
+        self.frame_queue.close()
+        self.tracklet_queue.close()
 
-        self.frameCallbacks.clear()
-        self.previewCallbacks.clear()
-        self.trackerCallbacks.clear()
+        self.frame_callbacks.clear()
+        self.preview_callbacks.clear()
+        self.tracker_callbacks.clear()
 
-    def startCapture(self) -> None:
-        if not self.deviceOpen:
+    def _start_capture(self) -> None:
+        if not self.device_open:
             print('CamDepthAi:start', 'device is not open')
             return
         if self.capturing: return
-        self.frameCallbackId = self.frameQueue.addCallback(self.updateFrames)
-        self.trackletCallbackId = self.trackletQueue.addCallback(self.updateTracker)
+        self.frame_callback_id = self.frame_queue.addCallback(self._update_frames)
+        self.tracklet_callback_id = self.tracklet_queue.addCallback(self._updateTracker)
 
-    def stopCapture(self) -> None:
+    def _stop_capture(self) -> None:
         if not self.capturing: return
-        self.frameQueue.removeCallback(self.frameCallbackId)
-        self.trackletQueue.removeCallback(self.trackletCallbackId)
+        self.frame_queue.removeCallback(self.frame_callback_id)
+        self.tracklet_queue.removeCallback(self.tracklet_callback_id)
 
-    def updateFrames(self, messageGroup: dai.MessageGroup) -> None:
-        self.updateFPS()
+    def _update_frames(self, message_group: dai.MessageGroup) -> None:
+        self._update_fps()
 
-        for name, msg in messageGroup:
+        for name, msg in message_group:
             if name == 'video':
-                self.updateColorControl(msg)
-                frame: np.ndarray = msg.getCvFrame() #type:ignore
-                self.updateCallbacks(FrameType.VIDEO, frame)
+                self._update_color_control(msg)
+                frame: ndarray = msg.getCvFrame() #type:ignore
+                self._update_callbacks(FrameType.VIDEO, frame)
 
             elif name == 'left':
-                self.updateMonoControl(msg)
-                frame: np.ndarray = msg.getCvFrame() #type:ignore
-                self.updateCallbacks(FrameType.LEFT, frame)
+                self._update_mono_control(msg)
+                frame: ndarray = msg.getCvFrame() #type:ignore
+                self._update_callbacks(FrameType.LEFT, frame)
 
             elif name == 'right':
                 frame = msg.getCvFrame() #type:ignore
-                self.updateCallbacks(FrameType.RIGHT, frame)
+                self._update_callbacks(FrameType.RIGHT, frame)
 
             elif name == 'stereo':
-                frame = self.updateStereo(msg.getCvFrame()) #type:ignore
-                frame = cv2.applyColorMap(frame, cv2.COLORMAP_JET)
-                self.updateCallbacks(FrameType.STEREO, frame)
+                frame = msg.getCvFrame() #type:ignore
+                frame = applyColorMap(frame, COLORMAP_JET)
+                self._update_callbacks(FrameType.STEREO, frame)
 
             else:
                 print('unknown message', name)
 
-    def updateTracker(self, msg) -> None:
-        self.updateTPS()
+    def _updateTracker(self, msg) -> None:
+        self._update_tps()
         Ts = msg.tracklets
-        self.numTracklets = len(Ts)
+        self.num_tracklets = len(Ts)
         for t in Ts:
             # tracklet: Tracklet = Tracklet.from_dai(t, self.ID)
-            for c in self.trackerCallbacks:
-                c(self.ID, t)
+            for c in self.tracker_callbacks:
+                c(self.id, t)
 
-    def updateStereo(self, frame: np.ndarray) -> np.ndarray:
-        return (frame * (255 / 95)).astype(np.uint8)
-
-    def updateMask(self, frame: np.ndarray) -> np.ndarray:
-        min: int = self.depthTresholdMin
-        max: int = self.depthTresholdMax
-        _, binary_mask = cv2.threshold(frame, min, max, cv2.THRESH_BINARY)
-        return binary_mask
-
-    def applyMask(self, color: np.ndarray, mask: np.ndarray) -> np.ndarray:
-        # resize color to mask size
-        color = fit(color, mask.shape[1], mask.shape[0])
-
-        return cv2.bitwise_and(color, color, mask=mask)
-
-    def iscapturing(self) ->bool:
+    def _iscapturing(self) ->bool:
         return self.capturing
 
-    def isOpen(self) -> bool:
-        return self.deviceOpen
+    def _isOpen(self) -> bool:
+        return self.device_open
 
-    def updateColorControl(self, frame) -> None:
-        if (self.colorAutoExposure):
-            self.colorExposure = frame.getExposureTime().total_seconds() * 1000000
-            self.colorIso = frame.getSensitivity()
-        if (self.colorAutoFocus):
-            self.colorFocus = frame.getLensPosition()
-        if (self.colorAutoBalance):
-            self.colorBalance = frame.getColorTemperature()
+    def _update_color_control(self, frame) -> None:
+        if (self.color_auto_exposure):
+            self.color_exposure = frame.getExposureTime().total_seconds() * 1000000
+            self.color_iso = frame.getSensitivity()
+        if (self.color_auto_focus):
+            self.color_focus = frame.getLensPosition()
+        if (self.color_auto_balance):
+            self.color_balance = frame.getColorTemperature()
 
-    def updateMonoControl(self, frame) -> None:
-        if (self.monoAutoExposure):
-            self.monoExposure = frame.getExposureTime().total_seconds() * 1000000
-            self.monoIso = frame.getSensitivity()
+    def _update_mono_control(self, frame) -> None:
+        if (self.mono_auto_exposure):
+            self.mono_exposure = frame.getExposureTime().total_seconds() * 1000000
+            self.mono_iso = frame.getSensitivity()
 
-    def updateCallbacks(self, frameType: FrameType, frame: np.ndarray) -> None:
-        for c in self.frameCallbacks[frameType]:
-            c(self.ID, frameType, frame)
-        if self.previewType == frameType:
-            for c in self.previewCallbacks:
-                c(self.ID, frame)
+    def _update_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
+        for c in self.frame_callbacks[frame_type]:
+            c(self.id, frame_type, frame)
+        if self.preview_type == frame_type:
+            for c in self.preview_callbacks:
+                c(self.id, frame)
 
     # CALLBACKS
-    def addFrameCallback(self, frameType: FrameType, callback: FrameCallback) -> None:
-        self.frameCallbacks[frameType].add(callback)
-    def discardFrameCallback(self, frameType: FrameType, callback: FrameCallback) -> None:
-        self.frameCallbacks[frameType].discard(callback)
-    def clearFrameCallbacks(self) -> None:
-        self.frameCallbacks.clear()
+    def add_frame_callback(self, frame_type: FrameType, callback: FrameCallback) -> None:
+        self.frame_callbacks[frame_type].add(callback)
+    def discard_frame_callback(self, frameType: FrameType, callback: FrameCallback) -> None:
+        self.frame_callbacks[frameType].discard(callback)
+    def clear_frame_callbacks(self) -> None:
+        self.frame_callbacks.clear()
 
-    def addPreviewCallback(self, callback: PreviewCallback) -> None:
-        self.previewCallbacks.add(callback)
-    def discardPreviewCallback(self, callback: PreviewCallback) -> None:
-        self.previewCallbacks.discard(callback)
-    def clearPreviewCallbacks(self) -> None:
-        self.previewCallbacks.clear()
+    def add_preview_callback(self, callback: PreviewCallback) -> None:
+        self.preview_callbacks.add(callback)
+    def discard_preview_callback(self, callback: PreviewCallback) -> None:
+        self.preview_callbacks.discard(callback)
+    def clear_preview_callbacks(self) -> None:
+        self.preview_callbacks.clear()
 
-    def addTrackerCallback(self, callback: TrackerCallback) -> None:
-        self.trackerCallbacks.add(callback)
-    def discardTrackerCallback(self, callback: TrackerCallback) -> None:
-        self.trackerCallbacks.discard(callback)
-    def clearTrackerCallbacks(self) -> None:
-        self.trackerCallbacks.clear()
+    def add_tracker_callback(self, callback: TrackerCallback) -> None:
+        self.tracker_callbacks.add(callback)
+    def discard_tracker_callback(self, callback: TrackerCallback) -> None:
+        self.tracker_callbacks.discard(callback)
+    def clear_tracker_callbacks(self) -> None:
+        self.tracker_callbacks.clear()
 
-    def addFPSCallback(self, callback: FPSCallback) -> None:
-        self.fpsCallbacks.add(callback)
-    def discardFPSCallback(self, callback: FPSCallback) -> None:
-        self.fpsCallbacks.discard(callback)
-    def clearFPSCallbacks(self) -> None:
-        self.fpsCallbacks.clear()
+    def add_fps_callback(self, callback: FPSCallback) -> None:
+        self.fps_callbacks.add(callback)
+    def discard_fps_callback(self, callback: FPSCallback) -> None:
+        self.fps_callbacks.discard(callback)
+    def clear_fps_callbacks(self) -> None:
+        self.fps_callbacks.clear()
 
     # FPS
-    def updateFPS(self) -> None:
+    def _update_fps(self) -> None:
         self.fps_counter.processed()
-        for c in self.fpsCallbacks:
-            c(self.ID, self.fps_counter.get_rate_average())
-    def getFPS(self) -> float:
+        for c in self.fps_callbacks:
+            c(self.id, self.fps_counter.get_rate_average())
+
+    def get_fps(self) -> float:
         return self.fps_counter.get_rate_average()
-    def updateTPS(self) -> None:
+
+    def _update_tps(self) -> None:
         self.tps_counter.processed()
-    def getTPS(self) -> float:
+
+    def get_tps(self) -> float:
         return self.tps_counter.get_rate_average()
 
 
