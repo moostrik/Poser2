@@ -1,8 +1,5 @@
 # TODO
-# Draw Pose GL
-# Camera video stream
-# Camera person detection / tracking
-# Multi person pose
+# Save videos to temporary folder until finished
 
 from argparse import ArgumentParser, Namespace
 from os import path

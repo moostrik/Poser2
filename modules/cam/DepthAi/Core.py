@@ -40,15 +40,13 @@ class DepthAiCore(Thread):
         self.preview_type =             FrameType.VIDEO
 
         # DAI
+        self.device_open: bool =        False
         self.device:                    dai.Device
         self.color_control:             dai.DataInputQueue
         self.mono_control:              dai.DataInputQueue
         self.stereo_control:            dai.DataInputQueue
         self.frame_queue:               dai.DataOutputQueue
-        self.frame_callback_id:         int
         self.tracklet_queue:            dai.DataOutputQueue
-        self.tracklet_callback_id:      int
-        self.device_open: bool =        False
         self.num_tracklets: int =       0
 
         # FPS
@@ -77,27 +75,19 @@ class DepthAiCore(Thread):
 
     def run(self) -> None:
         while not self.stop_event.is_set():
-            if not self.device_open:
-                self._open()
+            self._open()
             self.stop_event.wait()
             self._close()
 
-    def _open(self) -> bool:
-        if self.device_open: return True
-
+    def _open(self) -> None:
         pipeline = dai.Pipeline()
         setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
 
-        try: self.device = dai.Device(pipeline)
+        try:
+            self.device = self._try_device(pipeline, num_tries=3)
         except Exception as e:
-            print('could not open camera:', e, '... Try again')
-            try: self.device = dai.Device(pipeline)
-            except Exception as e:
-                print('still could not open camera:', e, '... Try again')
-                try: self.device = dai.Device(pipeline)
-                except Exception as e:
-                    print('still could not open camera:', e, '... Giving up')
-                    return False
+            print(f'Could not open device: {e}')
+            return
 
         self.frame_queue =       self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
         self.tracklet_queue =    self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
@@ -108,8 +98,7 @@ class DepthAiCore(Thread):
         self.frame_callback_id = self.frame_queue.addCallback(self._frame_callback)
         self.tracklet_callback_id = self.tracklet_queue.addCallback(self._tracker_callback)
 
-        self.device_open = True
-        return True
+        self.device_open: bool =        True
 
     def _close(self) -> None:
         if not self.device_open: return
@@ -125,7 +114,6 @@ class DepthAiCore(Thread):
         self.frame_callbacks.clear()
         self.preview_callbacks.clear()
         self.tracker_callbacks.clear()
-
 
     def _frame_callback(self, message_group: dai.MessageGroup) -> None:
         self._update_fps()
@@ -213,6 +201,16 @@ class DepthAiCore(Thread):
     def clear_fps_callbacks(self) -> None:
         self.fps_callbacks.clear()
 
+    @staticmethod
+    def _try_device(pipeline: dai.Pipeline, num_tries: int) -> dai.Device:
+        for attempt in range(num_tries):
+            try:
+                device = dai.Device(pipeline)
+                return device
+            except Exception as e:
+                print (f'Attempt {attempt + 1}/{num_tries} - could not open camera: {e}')
+                continue
+        raise Exception('Failed to open device after multiple attempts')
 
 
 
