@@ -12,8 +12,12 @@ class SyncRecorderGui(SyncRecorder):
         elem.append([E(eT.CHCK, 'Rec',    self.record, False),
                      E(eT.TEXT, 'Rec_Text',    None)])
 
-
         self._frame = Frame('RECORDER', elem, 60)
 
     def get_gui_frame(self):
         return self._frame
+
+    def start(self) -> None: # override
+        if self.gui is not None:
+            self.gui.updateElement('Rec', False)
+        super().start()

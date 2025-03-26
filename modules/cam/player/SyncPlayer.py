@@ -69,7 +69,6 @@ class SyncPlayer(Thread):
                         self._stop_players()
                         self._start_players()
 
-
     def _start_players(self) -> None:
         for c in range(self.num_cams):
             for t in self.types:
