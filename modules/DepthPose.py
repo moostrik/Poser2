@@ -1,5 +1,6 @@
-
 from modules.cam.DepthCam import DepthCam
+from modules.cam.DepthAi.Pipeline import get_frame_types
+# get_frame_types
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder, EncoderType
 from modules.cam.DepthAi.Definitions import FrameType
 from modules.render.Render import Render
@@ -17,7 +18,7 @@ class CamType(Enum):
     IMAGE   = 4
 
 class DepthPose():
-    def __init__(self, path: str, fps: int, numPlayers: int, color: bool, stereo: bool, person: bool, lowres: bool, showStereo: bool, lightning: bool, noPose:bool) -> None:
+    def __init__(self, path: str, camera_list: list[str], fps: int, numPlayers: int, color: bool, stereo: bool, person: bool, lowres: bool, showStereo: bool, lightning: bool, noPose:bool) -> None:
         self.path: str =    path
         modelPath: str =    os.path.join(path, 'models')
         recorderPath: str = os.path.join(path, 'recordings')
@@ -25,8 +26,21 @@ class DepthPose():
 
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(1, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
-        self.camera = DepthCam(self.gui, modelPath, fps, color, stereo, person, lowres, showStereo)
-        self.recorder = Recorder(self.gui, recorderPath, 4, self.camera.get_frame_types(), 10.0, EncoderType.iGPU)
+
+        available: list[str] = DepthCam.get_device_list(verbose=True)
+        self.cameras: list[DepthCam] = []
+        for cam in camera_list:
+            if cam not in available:
+                print(f'Camera {cam} not available')
+            else:
+                camera = DepthCam(self.gui, modelPath, fps, color, stereo, person, lowres, showStereo)
+                self.cameras.append(camera)
+        if len(self.cameras) == 0:
+            print('No cameras available')
+            # raise Exception('No cameras available')
+
+        frame_types: list[FrameType] = get_frame_types(color, stereo, showStereo)
+        self.recorder = Recorder(self.gui, recorderPath, 4, frame_types, 10.0, EncoderType.iGPU)
 
         modelType: ModelType = ModelType.LIGHTNING if lightning else ModelType.THUNDER
         if self.noPose:
@@ -36,21 +50,21 @@ class DepthPose():
 
         self.running: bool = False
 
+
     def start(self) -> None:
         self.render.exit_callback = self.stop
         self.render.addKeyboardCallback(self.render_keyboard_callback)
         self.render.start()
 
-
-        self.camera._open()
-        self.camera._start_capture()
-        self.camera.add_preview_callback(self.detector.set_image)
-        self.camera.add_preview_callback(self.render.set_cam_image)
-        self.camera.add_tracker_callback(self.detector.add_tracklet)
-        self.camera.add_tracker_callback(self.render.add_tracklet)
-        for T in self.recorder.types:
-            self.camera.add_frame_callback(T, self.recorder.add_frame)
-            self.camera.add_fps_callback(self.recorder.set_fps)
+        for camera in self.cameras:
+            camera.start()
+            camera.add_preview_callback(self.detector.set_image)
+            camera.add_preview_callback(self.render.set_cam_image)
+            camera.add_tracker_callback(self.detector.add_tracklet)
+            camera.add_tracker_callback(self.render.add_tracklet)
+            for T in self.recorder.types:
+                camera.add_frame_callback(T, self.recorder.add_frame)
+                camera.add_fps_callback(self.recorder.set_fps)
 
         self.detector.start()
         self.detector.addCallback(self.render.add_person)
@@ -58,12 +72,15 @@ class DepthPose():
         self.recorder.start()
 
         self.gui.exit_callback = self.stop
-        self.gui.addFrame([self.camera.get_gui_color_frame(), self.camera.get_gui_depth_frame()])
+
+        for camera in self.cameras:
+            self.gui.addFrame([camera.get_gui_color_frame(), camera.get_gui_depth_frame()])
         self.gui.addFrame([self.recorder.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
 
-        self.camera.gui_check()
+        for camera in self.cameras:
+            camera.gui_check()
         self.recorder.gui_check() # start after gui to prevent record at startup
 
         self.running = True
@@ -71,8 +88,8 @@ class DepthPose():
     def stop(self) -> None:
         self.detector.stop()
 
-        self.camera._stop_capture()
-        self.camera._close()
+        for camera in self.cameras:
+            camera.stop()
 
         self.recorder.stop()
 

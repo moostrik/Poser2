@@ -1,6 +1,6 @@
 from modules.cam.DepthAi.Core import *
 from modules.cam.DepthAi.Definitions import FrameType
-from modules.cam.DepthAi.Pipeline import get_stereo_config
+from modules.cam.DepthAi.Pipeline import get_stereo_config, get_frame_types
 
 class DepthAiSettings(DepthAiCore):
     def __init__(self, model_path:str, fps: int = 30, do_color: bool = True, do_stereo: bool = True, do_person: bool = True, lowres: bool = False, show_stereo: bool = False) -> None:
@@ -28,6 +28,9 @@ class DepthAiSettings(DepthAiCore):
 
         # STEREO SETTINGS
         self.stereo_config: dai.RawStereoDepthConfig = get_stereo_config(self.do_color)
+
+        # FRAME TYPES
+        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo)
 
 
     def _update_color_control(self, frame) -> None: #override
@@ -233,6 +236,19 @@ class DepthAiSettings(DepthAiCore):
     @staticmethod
     def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | float:
         return max(size[0], min(num, size[1]))
+
+    @staticmethod
+    def get_device_list(verbose: bool = True) -> list[str]:
+        device_list: list[str] = []
+        if verbose:
+            print('-- CAMERAS --------------------------------------------------')
+        for device in dai.Device.getAllAvailableDevices():
+            device_list.append(device.getMxId())
+            if verbose:
+                print(f"Camera: {device.getMxId()} {device.state}")
+        if verbose:
+            print('-------------------------------------------------------------')
+        return device_list
 
 
 

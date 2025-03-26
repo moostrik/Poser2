@@ -25,7 +25,11 @@ args: Namespace = parser.parse_args()
 
 currentPath: str = path.dirname(__file__)
 
-app: DepthPose = DepthPose(currentPath, args.fps, args.players, not args.mono, not args.nostereo, not args.noyolo, not args.highres, args.showstereo, args.lightning, args.nopose)
+camera_list: list[str] = ['14442C10F124D9D600']
+
+app: DepthPose = DepthPose(currentPath, camera_list, args.fps, args.players,
+                           not args.mono, not args.nostereo, not args.noyolo, not args.highres, args.showstereo,
+                           args.lightning, args.nopose)
 app.start()
 
 def signal_handler_exit(sig, frame) -> None:

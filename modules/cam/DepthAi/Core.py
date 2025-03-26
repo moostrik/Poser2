@@ -6,15 +6,23 @@ import depthai as dai
 from cv2 import applyColorMap, COLORMAP_JET
 from numpy import ndarray
 from typing import Set
+from threading import Thread, Event
 
 from modules.cam.DepthAi.Pipeline import setup_pipeline, get_frame_types
 from modules.cam.DepthAi.Definitions import *
 from modules.utils.FPS import FPS
 
-class DepthAiCore():
+class DepthAiCore(Thread):
     _id_counter = 0
 
-    def __init__(self, model_path:str, fps: int = 30, do_color: bool = True, do_stereo: bool = True, do_person: bool = True, lowres: bool = False, show_stereo: bool = False) -> None:
+    def __init__(self, model_path:str, fps: int = 30,
+                 do_color: bool = True, do_stereo: bool = True, do_person: bool = True,
+                 lowres: bool = False, show_stereo: bool = False) -> None:
+
+        super().__init__()
+        self.stop_event = Event()
+
+        # ID
         self.id: int =                  DepthAiCore._id_counter
         self.id_string: str =           str(self.id)
         DepthAiCore._id_counter +=      1
@@ -41,7 +49,6 @@ class DepthAiCore():
         self.tracklet_queue:            dai.DataOutputQueue
         self.tracklet_callback_id:      int
         self.device_open: bool =        False
-        self.capturing: bool =          False
         self.num_tracklets: int =       0
 
         # FPS
@@ -49,20 +56,31 @@ class DepthAiCore():
         self.tps_counter =              FPS(120)
 
         # FRAME TYPES
-        self.frame_types: list[FrameType] = get_frame_types(do_color, do_stereo, show_stereo)
-        self.frame_types.sort(key=lambda x: x.value)
+        frame_types: list[FrameType] = get_frame_types(do_color, do_stereo, show_stereo)
+        frame_types.sort(key=lambda x: x.value)
 
         # CALLBACKS
         self.preview_callbacks: Set[PreviewCallback] = set()
         self.tracker_callbacks: Set[TrackerCallback] = set()
         self.fps_callbacks: Set[FPSCallback] = set()
         self.frame_callbacks: dict[FrameType, Set[FrameCallback]] = {}
-        for t in self.frame_types:
+        for t in frame_types:
             if t == FrameType.NONE: continue
             self.frame_callbacks[t] = set()
 
     def __exit__(self) -> None:
         self._close()
+
+    def stop(self) -> None:
+        self.stop_event.set()
+        self.join()
+
+    def run(self) -> None:
+        while not self.stop_event.is_set():
+            if not self.device_open:
+                self._open()
+            self.stop_event.wait()
+            self._close()
 
     def _open(self) -> bool:
         if self.device_open: return True
@@ -72,11 +90,14 @@ class DepthAiCore():
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:
-            print('could not open camera, error', e, 'try again')
+            print('could not open camera:', e, '... Try again')
             try: self.device = dai.Device(pipeline)
             except Exception as e:
-                print('still could not open camera, error', e)
-                return False
+                print('still could not open camera:', e, '... Try again')
+                try: self.device = dai.Device(pipeline)
+                except Exception as e:
+                    print('still could not open camera:', e, '... Giving up')
+                    return False
 
         self.frame_queue =       self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
         self.tracklet_queue =    self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
@@ -84,12 +105,14 @@ class DepthAiCore():
         self.mono_control =      self.device.getInputQueue('mono_control')
         self.stereo_control =    self.device.getInputQueue('stereo_control')
 
+        self.frame_callback_id = self.frame_queue.addCallback(self._frame_callback)
+        self.tracklet_callback_id = self.tracklet_queue.addCallback(self._tracker_callback)
+
         self.device_open = True
         return True
 
     def _close(self) -> None:
         if not self.device_open: return
-        if self.capturing: self._stop_capture()
         self.device_open = False
 
         self.device.close()
@@ -103,18 +126,6 @@ class DepthAiCore():
         self.preview_callbacks.clear()
         self.tracker_callbacks.clear()
 
-    def _start_capture(self) -> None:
-        if not self.device_open:
-            print('CamDepthAi:start', 'device is not open')
-            return
-        if self.capturing: return
-        self.frame_callback_id = self.frame_queue.addCallback(self._frame_callback)
-        self.tracklet_callback_id = self.tracklet_queue.addCallback(self._tracker_callback)
-
-    def _stop_capture(self) -> None:
-        if not self.capturing: return
-        self.frame_queue.removeCallback(self.frame_callback_id)
-        self.tracklet_queue.removeCallback(self.tracklet_callback_id)
 
     def _frame_callback(self, message_group: dai.MessageGroup) -> None:
         self._update_fps()
