@@ -17,7 +17,6 @@ class SyncRecorderGui(SyncRecorder):
     def get_gui_frame(self):
         return self._frame
 
-    def start(self) -> None: # override
+    def gui_check(self) -> None:
         if self.gui is not None:
             self.gui.updateElement('Rec', False)
-        super().start()

@@ -37,7 +37,7 @@ class DepthAiGui(DepthAiSettings):
                      E(eT.SLDR, 'C_Saturation'+id,      super().setColorSaturation,     saturationRange[0],     saturationRange,    gsfr(saturationRange)),
                      E(eT.TEXT, ' Sharpness'),
                      E(eT.SLDR, 'C_Sharpness'+id,       super().setColorSharpness,      sharpnessRange[0],      sharpnessRange,     gsfr(sharpnessRange))])
-        elem.append([E(eT.CMBO, 'Preview',              super().setPreview,             self.getFrameNames()[0],  self.getFrameNames(),   expand=False),
+        elem.append([E(eT.CMBO, 'Preview'+id,           super().setPreview,             self.getFrameNames()[0],  self.getFrameNames(),   expand=False),
                      E(eT.CHCK, 'AutoExposure'+id,      super().setColorAutoExposure,   True),
                      E(eT.CHCK, 'AutoBalance'+id,       super().setColorAutoBalance,    True),
                      E(eT.SLDR, 'FPS'+id,               None,                           0,    [0,60],   0.1)])
@@ -159,4 +159,12 @@ class DepthAiGui(DepthAiSettings):
           return self.color_frame
 
     def get_gui_depth_frame(self):
-          return self.depth_frame
+        return self.depth_frame
+
+    def gui_check(self) -> None:
+        if not self.gui: return
+        e: str = 'Preview'+self.IDs
+        if not self.gui.getStringValue(e) in self.getFrameNames():
+            p: str = self.getFrameNames()[0]
+            self.gui.updateElement(e, p)
+            self.setPreview(p)

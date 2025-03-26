@@ -17,8 +17,9 @@ class DepthAiSettings(DepthAiCore):
         return list(self.frame_types)
 
     def getFrameNames(self) -> list[str]:
-        ret: list[str] = [preview.name for preview in self.frame_types]
-        return ret
+        type_list: list[FrameType] = self.getFrameTypes()
+        type_list.sort(key=lambda x: x.value)
+        return [preview.name for preview in type_list]
 
     # COLOR SETTINGS
     def setColorAutoExposure(self, value) -> None:

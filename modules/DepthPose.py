@@ -55,13 +55,16 @@ class DepthPose():
         self.detector.start()
         self.detector.addCallback(self.render.add_person)
 
+        self.recorder.start()
+
         self.gui.exit_callback = self.stop
         self.gui.addFrame([self.camera.get_gui_color_frame(), self.camera.get_gui_depth_frame()])
         self.gui.addFrame([self.recorder.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
 
-        self.recorder.start() # start after gui to prevent record at startup
+        self.camera.gui_check()
+        self.recorder.gui_check() # start after gui to prevent record at startup
 
         self.running = True
 

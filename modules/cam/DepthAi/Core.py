@@ -102,6 +102,7 @@ class DepthAiCore():
         if self.doStereo:
             self.frame_types.add(FrameType.LEFT)
             self.frame_types.add(FrameType.RIGHT)
+            if self.showStereo: self.frame_types.add(FrameType.STEREO)
 
         # CALLBACKS
         self.previewCallbacks: Set[PreviewCallback] = set()

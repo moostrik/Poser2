@@ -225,7 +225,7 @@ class SetupMono(Setup):
         self.left.setResolution(self.resolution)
         self.left.setFps(self.fps)
 
-        self.left.out.link(self.sync.inputs["video"])
+        self.left.out.link(self.sync.inputs["left"])
 
         self.monoControl.out.link(self.left.inputControl)
 
@@ -269,18 +269,10 @@ class SetupMonoPerson(SetupMono):
 
         self.objectTracker.out.link(self.trackerOut.input)
 
-class SetupMonoStereo(Setup):
+class SetupMonoStereo(SetupMono):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showStereo: bool) -> None:
         super().__init__(pipeline, fps, lowres)
         self.showStereo: bool = showStereo
-
-        self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
-        self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
-        if self.lowres:
-            self.resolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
-        self.left.setCamera("left")
-        self.left.setResolution(self.resolution)
-        self.left.setFps(self.fps)
 
         self.right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.right.setCamera("right")
@@ -300,10 +292,11 @@ class SetupMonoStereo(Setup):
 
         if self.showStereo:
             self.stereo.disparity.link(self.sync.inputs["stereo"])
-        self.stereo.rectifiedLeft.link(self.sync.inputs["left"]) # not video?
+
+        self.left.out.unlink(self.sync.inputs["left"])
+        self.stereo.rectifiedLeft.link(self.sync.inputs["left"])
         self.stereo.rectifiedRight.link(self.sync.inputs["right"])
 
-        self.monoControl.out.link(self.left.inputControl)
         self.monoControl.out.link(self.right.inputControl)
         self.stereoControl.out.link(self.stereo.inputConfig)
 
