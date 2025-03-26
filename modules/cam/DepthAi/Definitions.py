@@ -1,8 +1,15 @@
 import numpy as np
 from enum import Enum
 from typing import Callable
-from depthai import Tracklet, ImgDetection, Rect, Point3f
+from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f
 
+
+DETECTION_MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
+DETECTION_MODEL6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
+DETECTION_THRESHOLD: float = 0.5
+TRACKERTYPE: TrackerType = TrackerType.ZERO_TERM_IMAGELESS
+# ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
+# ZERO_TERM_IMAGELESS slightly faster
 
 class FrameType(Enum):
     NONE =  0
@@ -40,6 +47,7 @@ class StereoMedianFilterType(Enum):
     KERNEL_7x7 = 3
 
 STEREO_FILTER_NAMES: list[str] = [e.name for e in StereoMedianFilterType]
+
 
 FrameCallback = Callable[[int, FrameType, np.ndarray], None]
 PreviewCallback = Callable[[int, np.ndarray], None]

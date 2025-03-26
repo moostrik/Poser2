@@ -2,14 +2,7 @@
 import depthai as dai
 from datetime import timedelta
 from pathlib import Path
-from modules.cam.DepthAi.Definitions import FrameType
-
-DETECTION_MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
-DETECTION_MODEL6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
-DETECTION_THRESHOLD: float = 0.5
-TRACKERTYPE: dai.TrackerType = dai.TrackerType.ZERO_TERM_IMAGELESS
-# ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
-# ZERO_TERM_IMAGELESS slightly faster
+from modules.cam.DepthAi.Definitions import *
 
 def get_frame_types(do_color: bool, do_stereo: bool, show_stereo) -> list[FrameType]:
     frame_types: list[FrameType] = [FrameType.NONE]
@@ -25,6 +18,13 @@ def get_frame_types(do_color: bool, do_stereo: bool, show_stereo) -> list[FrameT
             frame_types.append(FrameType.STEREO)
     return frame_types
 
+def get_stereo_config(do_color: bool) -> dai.RawStereoDepthConfig:
+    stereoConfig: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
+    if do_color:
+        stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
+    else:
+        stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT
+    return stereoConfig
 
 def setup_pipeline(
     pipeline : dai.Pipeline,
@@ -35,9 +35,7 @@ def setup_pipeline(
     doPerson: bool = True,
     lowres: bool = False,
     showStereo: bool = False
-    ) -> dai.RawStereoDepthConfig:
-
-    stereoConfig: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
+    ) -> None:
 
     options: list[str] = [
         'Color' if doColor else 'Mono',
@@ -51,7 +49,6 @@ def setup_pipeline(
     print(pipeline_description)
 
     if doColor:
-        stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.CENTER
         if doStereo:
             if doPerson:
                 SetupColorStereoPerson(pipeline, fps, lowres, showStereo, modelPath)
@@ -63,7 +60,6 @@ def setup_pipeline(
             else:
                 SetupColor(pipeline, fps, lowres)
     else:
-        stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT
         if doStereo:
             if doPerson:
                 SetupMonoStereoPerson(pipeline, fps, lowres, showStereo, modelPath)
@@ -75,7 +71,6 @@ def setup_pipeline(
             else:
                 SetupMono(pipeline, fps, lowres)
 
-    return stereoConfig
 
 class Setup():
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool = False) -> None:
@@ -189,7 +184,6 @@ class SetupColorStereo(SetupColor):
             self.stereo.disparity.link(self.sync.inputs["stereo"])
         self.stereo.rectifiedLeft.link(self.sync.inputs["left"])
         self.stereo.rectifiedRight.link(self.sync.inputs["right"])
-
 
         self.monoControl.out.link(self.left.inputControl)
         self.monoControl.out.link(self.right.inputControl)

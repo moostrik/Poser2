@@ -31,29 +31,6 @@ class DepthAiCore():
         # GENERAL SETTINGS
         self.preview_type =             FrameType.VIDEO
 
-        # COLOR SETTINGS
-        self.color_auto_exposure: bool= True
-        self.color_auto_focus: bool =   True
-        self.color_auto_balance: bool = True
-        self.color_exposure: int =      0
-        self.color_iso: int =           0
-        self.color_focus: int =         0
-        self.color_balance: int =       0
-        self.color_contrast: int =      0
-        self.color_brightness: int =    0
-        self.color_luma_denoise: int =  0
-        self.color_saturation: int =    0
-        self.color_sharpness: int =     0
-
-        # MONO SETTINGS
-        self.mono_auto_exposure: bool = True
-        self.mono_auto_focus: bool =    True
-        self.mono_exposure: int =       0
-        self.mono_iso: int =            0
-
-        # STEREO SETTINGS
-        self.stereo_config: dai.RawStereoDepthConfig = dai.RawStereoDepthConfig()
-
         # DAI
         self.device:                    dai.Device
         self.color_control:             dai.DataInputQueue
@@ -66,6 +43,7 @@ class DepthAiCore():
         self.device_open: bool =        False
         self.capturing: bool =          False
         self.num_tracklets: int =       0
+
         # FPS
         self.fps_counter =              FPS(120)
         self.tps_counter =              FPS(120)
@@ -90,7 +68,7 @@ class DepthAiCore():
         if self.device_open: return True
 
         pipeline = dai.Pipeline()
-        self.stereo_config = setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
+        setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
 
         try: self.device = dai.Device(pipeline)
         except Exception as e:
@@ -130,15 +108,15 @@ class DepthAiCore():
             print('CamDepthAi:start', 'device is not open')
             return
         if self.capturing: return
-        self.frame_callback_id = self.frame_queue.addCallback(self._update_frames)
-        self.tracklet_callback_id = self.tracklet_queue.addCallback(self._updateTracker)
+        self.frame_callback_id = self.frame_queue.addCallback(self._frame_callback)
+        self.tracklet_callback_id = self.tracklet_queue.addCallback(self._tracker_callback)
 
     def _stop_capture(self) -> None:
         if not self.capturing: return
         self.frame_queue.removeCallback(self.frame_callback_id)
         self.tracklet_queue.removeCallback(self.tracklet_callback_id)
 
-    def _update_frames(self, message_group: dai.MessageGroup) -> None:
+    def _frame_callback(self, message_group: dai.MessageGroup) -> None:
         self._update_fps()
 
         for name, msg in message_group:
@@ -164,7 +142,7 @@ class DepthAiCore():
             else:
                 print('unknown message', name)
 
-    def _updateTracker(self, msg) -> None:
+    def _tracker_callback(self, msg) -> None:
         self._update_tps()
         Ts = msg.tracklets
         self.num_tracklets = len(Ts)
@@ -173,26 +151,22 @@ class DepthAiCore():
             for c in self.tracker_callbacks:
                 c(self.id, t)
 
-    def _iscapturing(self) ->bool:
-        return self.capturing
-
-    def _isOpen(self) -> bool:
-        return self.device_open
-
     def _update_color_control(self, frame) -> None:
-        if (self.color_auto_exposure):
-            self.color_exposure = frame.getExposureTime().total_seconds() * 1000000
-            self.color_iso = frame.getSensitivity()
-        if (self.color_auto_focus):
-            self.color_focus = frame.getLensPosition()
-        if (self.color_auto_balance):
-            self.color_balance = frame.getColorTemperature()
+        pass
 
     def _update_mono_control(self, frame) -> None:
-        if (self.mono_auto_exposure):
-            self.mono_exposure = frame.getExposureTime().total_seconds() * 1000000
-            self.mono_iso = frame.getSensitivity()
+        pass
 
+    # FPS
+    def _update_fps(self) -> None:
+        self.fps_counter.processed()
+        for c in self.fps_callbacks:
+            c(self.id, self.fps_counter.get_rate_average())
+
+    def _update_tps(self) -> None:
+        self.tps_counter.processed()
+
+    # CALLBACKS
     def _update_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
         for c in self.frame_callbacks[frame_type]:
             c(self.id, frame_type, frame)
@@ -200,7 +174,6 @@ class DepthAiCore():
             for c in self.preview_callbacks:
                 c(self.id, frame)
 
-    # CALLBACKS
     def add_frame_callback(self, frame_type: FrameType, callback: FrameCallback) -> None:
         self.frame_callbacks[frame_type].add(callback)
     def discard_frame_callback(self, frameType: FrameType, callback: FrameCallback) -> None:
@@ -228,26 +201,6 @@ class DepthAiCore():
         self.fps_callbacks.discard(callback)
     def clear_fps_callbacks(self) -> None:
         self.fps_callbacks.clear()
-
-    # FPS
-    def _update_fps(self) -> None:
-        self.fps_counter.processed()
-        for c in self.fps_callbacks:
-            c(self.id, self.fps_counter.get_rate_average())
-
-    def get_fps(self) -> float:
-        return self.fps_counter.get_rate_average()
-
-    def _update_tps(self) -> None:
-        self.tps_counter.processed()
-
-    def get_tps(self) -> float:
-        return self.tps_counter.get_rate_average()
-
-
-
-
-
 
 
 

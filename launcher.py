@@ -15,7 +15,7 @@ parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-fps',     '--fps',        type=int,   default=30,     help='frames per second')
 parser.add_argument('-pl',      '--players',    type=int,   default=6,      help='num players')
 parser.add_argument('-mono',    '--mono',       action='store_true',        help='use left mono input instead of color')
-parser.add_argument('-low',     '--lowres',     action='store_true',        help='low resolution camera (400p instead of 720p)')
+parser.add_argument('-high',    '--highres',    action='store_true',        help='high resolution mono (720p instead of 400p)')
 parser.add_argument('-ss',      '--showstereo', action='store_true',        help='queue stereo frames')
 parser.add_argument('-ll',      '--lightning',  action='store_true',        help='use low latency movenet model')
 parser.add_argument('-ns',      '--nostereo',   action='store_true',        help='do not use stereo depth')
@@ -25,7 +25,7 @@ args: Namespace = parser.parse_args()
 
 currentPath: str = path.dirname(__file__)
 
-app: DepthPose = DepthPose(currentPath, args.fps, args.players, not args.mono, not args.nostereo, not args.noyolo, args.lowres, args.showstereo, args.lightning, args.nopose)
+app: DepthPose = DepthPose(currentPath, args.fps, args.players, not args.mono, not args.nostereo, not args.noyolo, not args.highres, args.showstereo, args.lightning, args.nopose)
 app.start()
 
 def signal_handler_exit(sig, frame) -> None:

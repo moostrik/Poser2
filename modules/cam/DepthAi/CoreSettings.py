@@ -1,9 +1,50 @@
 from modules.cam.DepthAi.Core import *
 from modules.cam.DepthAi.Definitions import FrameType
+from modules.cam.DepthAi.Pipeline import get_stereo_config
 
 class DepthAiSettings(DepthAiCore):
     def __init__(self, model_path:str, fps: int = 30, do_color: bool = True, do_stereo: bool = True, do_person: bool = True, lowres: bool = False, show_stereo: bool = False) -> None:
         super().__init__(model_path, fps, do_color, do_stereo, do_person, lowres, show_stereo)
+
+        # COLOR SETTINGS
+        self.color_auto_exposure: bool= True
+        self.color_auto_focus: bool =   True
+        self.color_auto_balance: bool = True
+        self.color_exposure: int =      0
+        self.color_iso: int =           0
+        self.color_focus: int =         0
+        self.color_balance: int =       0
+        self.color_contrast: int =      0
+        self.color_brightness: int =    0
+        self.color_luma_denoise: int =  0
+        self.color_saturation: int =    0
+        self.color_sharpness: int =     0
+
+        # MONO SETTINGS
+        self.mono_auto_exposure: bool = True
+        self.mono_auto_focus: bool =    True
+        self.mono_exposure: int =       0
+        self.mono_iso: int =            0
+
+        # STEREO SETTINGS
+        self.stereo_config: dai.RawStereoDepthConfig = get_stereo_config(self.do_color)
+
+
+    def _update_color_control(self, frame) -> None: #override
+        super()._update_color_control(frame)
+        if (self.color_auto_exposure):
+            self.color_exposure = frame.getExposureTime().total_seconds() * 1000000
+            self.color_iso = frame.getSensitivity()
+        if (self.color_auto_focus):
+            self.color_focus = frame.getLensPosition()
+        if (self.color_auto_balance):
+            self.color_balance = frame.getColorTemperature()
+
+    def _update_mono_control(self, frame) -> None: #override
+        super()._update_mono_control(frame)
+        if (self.mono_auto_exposure):
+            self.mono_exposure = frame.getExposureTime().total_seconds() * 1000000
+            self.mono_iso = frame.getSensitivity()
 
 
     # GENERAL SETTINGS
@@ -181,6 +222,14 @@ class DepthAiSettings(DepthAiCore):
         v: float = self.clamp(value, (0.0, 1.0))
         self.device.setIrLaserDotProjectorIntensity(v)
 
+    # FPS
+    def get_fps(self) -> float:
+        return self.fps_counter.get_rate_average()
+
+    def get_tps(self) -> float:
+        return self.tps_counter.get_rate_average()
+
+    # STATIC METHODS
     @staticmethod
     def clamp(num: int | float, size: tuple[int | float, int | float]) -> int | float:
         return max(size[0], min(num, size[1]))
