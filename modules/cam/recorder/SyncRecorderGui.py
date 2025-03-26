@@ -9,7 +9,7 @@ class SyncRecorderGui(SyncRecorder):
         super().__init__(output_path, num_cams, types, chunk_duration, encoder)
 
         elem: list = []
-        elem.append([E(eT.CHCK, 'Rec',    self.check_recording, False),
+        elem.append([E(eT.CHCK, 'Rec',    self.record, False),
                      E(eT.TEXT, 'Rec_Text',    None)])
 
 
@@ -17,9 +17,3 @@ class SyncRecorderGui(SyncRecorder):
 
     def get_gui_frame(self):
         return self._frame
-
-    def check_recording(self, value) -> None:
-        if value:
-            self.start_recording()
-        if not value:
-            self.stop_recording()

@@ -11,7 +11,7 @@ from modules.cam.DepthAi.Definitions import FrameType, FrameTypeString
 def make_path(path: Path, c: int, t: FrameType, chunk: int) -> Path:
     return path / f"{c}_{FrameTypeString[t]}_{chunk:03d}.mp4"
 
-class RecorderState(Enum):
+class RecState(Enum):
     IDLE =  auto()
     START = auto()
     SPLIT = auto()
@@ -42,7 +42,7 @@ class SyncRecorder(Thread):
         self.rec_name: str
         self.fps: float = 30.0
 
-        self.state: RecorderState = RecorderState.IDLE
+        self.state: RecState = RecState.IDLE
         self.state_lock = Lock()
 
         self.settings_lock = Lock()
@@ -56,16 +56,17 @@ class SyncRecorder(Thread):
     def run(self) -> None:
         while not self.stop_event.is_set():
 
-            if self._get_state() == RecorderState.STOP:
+            if self._get_state() == RecState.STOP:
                 self._stop_recording()
-                self._set_state(RecorderState.IDLE)
-            if self._get_state() == RecorderState.SPLIT:
+                self._set_state(RecState.IDLE)
+            if self._get_state() == RecState.SPLIT:
                 self._update_recording()
-            if self._get_state() == RecorderState.START:
+            if self._get_state() == RecState.START:
                 self._start_recording()
-                self._set_state(RecorderState.SPLIT)
+                self._set_state(RecState.SPLIT)
 
             time.sleep(0.01)
+
         self._stop_recording()
 
     def _start_recording(self) -> None:
@@ -101,12 +102,17 @@ class SyncRecorder(Thread):
                     self.recorders[c][t].start(str(path), fps)
             self.start_time += self.chunk_duration
 
-    def _get_state(self) -> RecorderState:
+    def _get_state(self) -> RecState:
         with self.state_lock:
             return self.state
 
-    def _set_state(self, state: RecorderState) -> None:
+    def _set_state(self, state: RecState) -> None:
         with self.state_lock:
+            if state == RecState.START and self.state != RecState.IDLE:
+                return
+            if  state != RecState.IDLE and self.state == RecState.STOP:
+                return
+
             self.state = state
 
     # EXTERNAL METHODS
@@ -121,10 +127,9 @@ class SyncRecorder(Thread):
         with self.settings_lock:
             return self.fps
 
-    def start_recording(self) -> None:
-        if self._get_state() == RecorderState.IDLE:
-            self._set_state(RecorderState.START)
-
-    def stop_recording(self) -> None:
-        self._set_state(RecorderState.STOP)
+    def record(self, value: bool) -> None:
+        if value:
+            self._set_state(RecState.START)
+        else:
+            self._set_state(RecState.STOP)
 
