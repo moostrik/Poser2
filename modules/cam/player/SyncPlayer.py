@@ -1,8 +1,7 @@
 from threading import Thread, Event
 from pathlib import Path
 import numpy as np
-from pathlib import Path
-from typing import Set
+from typing import Set, Callable, Dict
 import time
 from enum import Enum, auto
 
@@ -14,7 +13,7 @@ class PlayerState(Enum):
     IDLE = auto()
     PLAYING = auto()
     STOPPED = auto()
-    NEXT = auto()
+    NEXT_CHUNK = auto()
 
 class SyncPlayer(Thread):
     def __init__(self, input_path: str, num_cams: int, types: list[FrameType], decoder: DecoderType) -> None:
@@ -30,29 +29,31 @@ class SyncPlayer(Thread):
         self.playback_path: Path = Path()
         self.chunk: int = 0
 
-        self.folders: dict[Path, int] = self._get_video_folders(self.input_path)
+        self.folders: Dict[Path, int] = self._get_video_folders(self.input_path)
 
-        self.players: dict[int, dict[FrameType, Player]] = {}
-        for c in range(self.num_cams):
-            self.players[c] = {}
-            for t in self.types:
-                self.players[c][t] = Player(c, t, self._frame_callback, self._stop_callback, decoder)
+        self.players: Dict[int, Dict[FrameType, Player]] = {
+            c: {t: Player(c, t, self._frame_callback, self._stop_callback, decoder) for t in self.types}
+            for c in range(self.num_cams)
+        }
 
-        self.frameCallbacks: dict[FrameType, Set[FrameCallback]] = {}
+        self.frameCallbacks: Dict[FrameType, Set[FrameCallback]] = {t: set() for t in self.types}
 
     def run(self) -> None:
         while not self.stop_event.is_set():
+            self.state_event.wait()
+            self.state_event.clear()
+
             if self.state == PlayerState.PLAYING:
                 self._start_players()
-                self.state_event.wait()
-                self.state_event.clear()
             elif self.state == PlayerState.STOPPED:
                 self._stop_players()
                 self.state = PlayerState.IDLE
-            elif self.state == PlayerState.NEXT:
+            elif self.state == PlayerState.NEXT_CHUNK:
                 self._stop_players()
+                self.chunk = (self.chunk + 1) % (max(self.folders.values()) + 1)
                 self._start_players()
                 self.state = PlayerState.PLAYING
+
             time.sleep(0.01)
 
     def stop(self) -> None:
@@ -79,16 +80,12 @@ class SyncPlayer(Thread):
                     player.stop()
 
     def _frame_callback(self, cam_id: int, frameType: FrameType, frame: np.ndarray) -> None:
-        for c in self.frameCallbacks[frameType]:
-            c(cam_id, frameType, frame)
+        for callback in self.frameCallbacks[frameType]:
+            callback(cam_id, frameType, frame)
 
     def _stop_callback(self, chunk_id: int) -> None:
         if chunk_id == self.chunk:
-            self.chunk += 1
-            if self.chunk > self.folders[self.playback_path]:
-                self.state = PlayerState.STOPPED
-            else:
-                self.state = PlayerState.NEXT
+            self.state = PlayerState.NEXT_CHUNK
             self.state_event.set()
 
     # EXTERNAL METHODS
@@ -107,6 +104,10 @@ class SyncPlayer(Thread):
         self.state_event.set()
 
     def stop_playback(self) -> None:
+        if self.state != PlayerState.PLAYING:
+            print('Not playing')
+            return
+
         self.state = PlayerState.STOPPED
         self.state_event.set()
 
@@ -114,9 +115,7 @@ class SyncPlayer(Thread):
         return [str(f) for f in self.folders.keys()]
 
     def get_chunks(self, folder: str) -> int:
-        if folder in self.folders:
-            return self.folders[Path(folder)]
-        return 0
+        return self.folders.get(Path(folder), 0)
 
     # CALLBACKS
     def addFrameCallback(self, frameType: FrameType, callback: FrameCallback) -> None:
@@ -128,21 +127,14 @@ class SyncPlayer(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _get_video_folders(path: Path) -> dict[Path, int]:
-        folders: dict[Path, int] = {}
-        chuncks: int = 0
+    def _get_video_folders(path: Path) -> Dict[Path, int]:
+        folders: Dict[Path, int] = {}
         for folder in path.iterdir():
             if folder.is_dir():
-                files = list(folder.iterdir())
-                for file in files:
-                    if file.is_file():
-                        if file.name.endswith('.mp4'):
-                            segments: list[str] = file.name.split('_')
-                            if len(segments) == 3:
-                                if segments[2].isdigit():
-                                    d = int(segments[2])
-                                    if d > chuncks:
-                                        chuncks = d
-                if chuncks > 0:
-                    folders[folder] = chuncks
+                max_chunk: int = max(
+                    (int(file.name.split('_')[2]) for file in folder.iterdir() if file.is_file() and file.name.endswith('.mp4') and file.name.split('_')[2].isdigit()),
+                    default=0
+                )
+                if max_chunk > 0:
+                    folders[folder] = max_chunk
         return folders

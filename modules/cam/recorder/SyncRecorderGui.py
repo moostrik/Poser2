@@ -19,7 +19,7 @@ class SyncRecorderGui(SyncRecorder):
         return self._frame
 
     def check_recording(self, value) -> None:
-        if value and not self.recording:
+        if value:
             self.start_recording()
-        if not value and self.recording:
+        if not value:
             self.stop_recording()

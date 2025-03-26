@@ -1,13 +1,21 @@
 
-from threading import Thread, Event
+from threading import Thread, Lock, Event
 from pathlib import Path
 import time
+from enum import Enum, auto
+from queue import Queue, Empty
 
 from modules.cam.recorder.Recorder import Recorder, EncoderType
 from modules.cam.DepthAi.Definitions import FrameType, FrameTypeString
 
 def make_path(path: Path, c: int, t: FrameType, chunk: int) -> Path:
     return path / f"{c}_{FrameTypeString[t]}_{chunk:03d}.mp4"
+
+class RecorderState(Enum):
+    IDLE =  auto()
+    START = auto()
+    SPLIT = auto()
+    STOP =  auto()
 
 class SyncRecorder(Thread):
     def __init__(self, output_path: str, num_cams: int, types: list[FrameType], chunk_duration: float, encoder: EncoderType) -> None:
@@ -34,42 +42,34 @@ class SyncRecorder(Thread):
         self.rec_name: str
         self.fps: float = 30.0
 
-        self.start_recording_event = Event()
-        self.stop_recording_event = Event()
-        self.stop_event = Event()
-        self.recording = False
-        self.running = False
+        self.state: RecorderState = RecorderState.IDLE
+        self.state_lock = Lock()
 
-    def start(self) -> None: # override
-        self.start_recording_event.clear()
-        self.stop_recording_event.clear()
-        super().start()
+        self.settings_lock = Lock()
+
+        self.stop_event = Event()
 
     def stop(self) -> None:
         self.stop_event.set()
         self.join()
 
     def run(self) -> None:
-        self.running = True
+        while not self.stop_event.is_set():
 
-        while self.running:
-            if self.stop_event.is_set():
-                self.stop_recording_event.set()
-                self.running = False
-            if self.start_recording_event.is_set():
-                self.start_recording_event.clear()
-                self._start_recording()
-            if self.stop_recording_event.is_set():
-                self.stop_recording_event.clear()
+            if self._get_state() == RecorderState.STOP:
                 self._stop_recording()
-            self._update_recording()
+                self._set_state(RecorderState.IDLE)
+            if self._get_state() == RecorderState.SPLIT:
+                self._update_recording()
+            if self._get_state() == RecorderState.START:
+                self._start_recording()
+                self._set_state(RecorderState.SPLIT)
+
             time.sleep(0.01)
+        self._stop_recording()
 
     def _start_recording(self) -> None:
-        if self.recording:
-            return
-
-        self.rec_name = time.strftime("%Y%m%d-%H%M%S") + '_C' + str(self.num_cams) + '_'.join([FrameTypeString[t] for t in self.types])
+        self.rec_name = time.strftime("%Y%m%d-%H%M%S") + '_' + str(self.num_cams) + '_' + '_'.join([FrameTypeString[t] for t in self.types])
 
         self.path = self.output_path / self.rec_name
         self.path.mkdir(parents=True, exist_ok=True)
@@ -85,36 +85,46 @@ class SyncRecorder(Thread):
         self.recording = True
 
     def _stop_recording(self) -> None:
-        if not self.recording:
-            return
-        self.recording = False
-
         for c in range(self.num_cams):
             for t in self.types:
                 self.recorders[c][t].stop()
 
     def _update_recording(self) -> None:
-        if self.recording:
-            if time.time() - self.start_time > self.chunk_duration:
-                self.chunk_index += 1
+        if time.time() - self.start_time > self.chunk_duration:
+            self.chunk_index += 1
+            fps: float = self.get_fps()
 
-                for c in range(self.num_cams):
-                    for t in self.types:
-                        self.recorders[c][t].stop()
-                        path: Path = make_path(self.path, c, t, self.chunk_index)
-                        self.recorders[c][t].start(str(path), self.fps)
-                self.start_time += self.chunk_duration
+            for c in range(self.num_cams):
+                for t in self.types:
+                    self.recorders[c][t].stop()
+                    path: Path = make_path(self.path, c, t, self.chunk_index)
+                    self.recorders[c][t].start(str(path), fps)
+            self.start_time += self.chunk_duration
+
+    def _get_state(self) -> RecorderState:
+        with self.state_lock:
+            return self.state
+
+    def _set_state(self, state: RecorderState) -> None:
+        with self.state_lock:
+            self.state = state
 
     # EXTERNAL METHODS
     def add_frame(self, cam_id: int, t: FrameType, frame) -> None:
         self.recorders[cam_id][t].add_frame(frame)
 
     def set_fps(self, cam_id: int, fps: float) -> None:
-        self.fps = fps
+        with self.settings_lock:
+            self.fps = fps
+
+    def get_fps(self) -> float:
+        with self.settings_lock:
+            return self.fps
 
     def start_recording(self) -> None:
-        self.start_recording_event.set()
+        if self._get_state() == RecorderState.IDLE:
+            self._set_state(RecorderState.START)
 
     def stop_recording(self) -> None:
-        self.stop_recording_event.set()
+        self._set_state(RecorderState.STOP)
 
