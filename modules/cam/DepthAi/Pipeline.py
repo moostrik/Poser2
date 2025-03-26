@@ -136,7 +136,7 @@ class SetupColorPerson(SetupColor):
 
         self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
         self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
-        self.objectTracker.setTrackerType(TRACKERTYPE)
+        self.objectTracker.setTrackerType(TRACKER_TYPE)
         self.objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
         if self.lowres:
@@ -204,16 +204,16 @@ class SetupColorStereoPerson(SetupColorStereo):
         self.detectionNetwork.setBlobPath(nnPathDefault)
         self.detectionNetwork.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detectionNetwork.setNumInferenceThreads(2)
-        self.detectionNetwork.setBoundingBoxScaleFactor(0.5)
-        self.detectionNetwork.setDepthLowerThreshold(500)
-        self.detectionNetwork.setDepthUpperThreshold(10000)
+        self.detectionNetwork.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
+        self.detectionNetwork.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
+        self.detectionNetwork.setDepthUpperThreshold(DEPTH_TRACKER_MAX_DEPTH)
         self.detectionNetwork.input.setBlocking(False)
         self.manip.out.link(self.detectionNetwork.input)
         self.stereo.depth.link(self.detectionNetwork.inputDepth)
 
         self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
         self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
-        self.objectTracker.setTrackerType(TRACKERTYPE)
+        self.objectTracker.setTrackerType(TRACKER_TYPE)
         self.objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
         self.detectionNetwork.passthrough.link(self.objectTracker.inputTrackerFrame)
@@ -259,7 +259,7 @@ class SetupMonoPerson(SetupMono):
 
         self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
         self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
-        self.objectTracker.setTrackerType(TRACKERTYPE)
+        self.objectTracker.setTrackerType(TRACKER_TYPE)
         self.objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
         if self.lowres:
@@ -325,16 +325,16 @@ class SetupMonoStereoPerson(SetupMonoStereo):
         self.detectionNetwork.setBlobPath(nnPathDefault)
         self.detectionNetwork.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detectionNetwork.setNumInferenceThreads(2)
-        self.detectionNetwork.setBoundingBoxScaleFactor(0.5)
-        self.detectionNetwork.setDepthLowerThreshold(100)
-        self.detectionNetwork.setDepthUpperThreshold(5000)
+        self.detectionNetwork.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
+        self.detectionNetwork.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
+        self.detectionNetwork.setDepthUpperThreshold(DEPTH_TRACKER_MAX_DEPTH)
         self.detectionNetwork.input.setBlocking(False)
         self.manip.out.link(self.detectionNetwork.input)
         self.stereo.depth.link(self.detectionNetwork.inputDepth)
 
         self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
         self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
-        self.objectTracker.setTrackerType(TRACKERTYPE)
+        self.objectTracker.setTrackerType(TRACKER_TYPE)
         self.objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
         self.detectionNetwork.passthrough.link(self.objectTracker.inputTrackerFrame)

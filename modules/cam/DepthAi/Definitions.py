@@ -7,9 +7,12 @@ from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f
 DETECTION_MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
 DETECTION_MODEL6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
 DETECTION_THRESHOLD: float = 0.5
-TRACKERTYPE: TrackerType = TrackerType.ZERO_TERM_IMAGELESS
+TRACKER_TYPE: TrackerType = TrackerType.ZERO_TERM_IMAGELESS
 # ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
 # ZERO_TERM_IMAGELESS slightly faster
+DEPTH_TRACKER_BOX_SCALE: float = 0.5
+DEPTH_TRACKER_MIN_DEPTH: int = 500
+DEPTH_TRACKER_MAX_DEPTH: int = 10000
 
 class FrameType(Enum):
     NONE =  0
