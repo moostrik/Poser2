@@ -8,11 +8,11 @@ from numpy import ndarray
 from typing import Set
 from threading import Thread, Event
 
-from modules.cam.DepthAi.Pipeline import setup_pipeline, get_frame_types
-from modules.cam.DepthAi.Definitions import *
+from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types
+from modules.cam.depthcam.Definitions import *
 from modules.utils.FPS import FPS
 
-class DepthAiCore(Thread):
+class Core(Thread):
     _id_counter = 0
 
     def __init__(self, model_path:str, fps: int = 30,
@@ -23,9 +23,9 @@ class DepthAiCore(Thread):
         self.stop_event = Event()
 
         # ID
-        self.id: int =                  DepthAiCore._id_counter
+        self.id: int =                  Core._id_counter
         self.id_string: str =           str(self.id)
-        DepthAiCore._id_counter +=      1
+        Core._id_counter +=      1
 
         # FIXED SETTINGS
         self.model_path: str =          model_path

@@ -6,7 +6,7 @@ from enum import Enum, auto
 from queue import Queue, Empty
 
 from modules.cam.recorder.Recorder import Recorder, EncoderType
-from modules.cam.DepthAi.Definitions import FrameType, FRAME_TYPE_LABEL_DICT
+from modules.cam.depthcam.Definitions import FrameType, FRAME_TYPE_LABEL_DICT
 
 def make_path(path: Path, c: int, t: FrameType, chunk: int) -> Path:
     return path / f"{c}_{FRAME_TYPE_LABEL_DICT[t]}_{chunk:03d}.mp4"

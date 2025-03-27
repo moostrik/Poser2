@@ -1,6 +1,6 @@
 import math
 
-from modules.cam.DepthAi.CoreSettings import *
+from modules.cam.depthcam.CoreSettings import *
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
 
@@ -14,7 +14,7 @@ def get_steps_from_range(range: tuple[int, int]) -> float:
 def gsfr(range: tuple[int, int]) -> float:
     return get_steps_from_range(range)
 
-class DepthAiGui(DepthAiSettings):
+class CoreGui(CoreSettings):
     def __init__(self, gui: Gui | None, modelPath:str, fps: int = 30, doColor: bool = True, doStereo: bool = True, doPerson: bool = True, lowres: bool = False, showStereo: bool = False) -> None:
         self.gui: Gui | None = gui
         super().__init__(modelPath, fps, doColor, doStereo, doPerson, lowres, showStereo)

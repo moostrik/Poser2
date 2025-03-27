@@ -2,7 +2,7 @@
 import depthai as dai
 from datetime import timedelta
 from pathlib import Path
-from modules.cam.DepthAi.Definitions import *
+from modules.cam.depthcam.Definitions import *
 
 def get_frame_types(do_color: bool, do_stereo: bool, show_stereo) -> list[FrameType]:
     frame_types: list[FrameType] = [FrameType.NONE]

@@ -4,7 +4,7 @@ from threading import Thread, Lock
 from time import time, sleep
 
 from modules.person.Person import Person, PersonDict, PersonCallback, CamTracklet
-from modules.cam.DepthAi.Definitions import Tracklet, Rect, Point3f
+from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f
 from modules.person.pose.PoseDetection import PoseDetection, ModelType, ModelTypeNames
 from modules.person.CircularCoordinates import CircularCoordinates
 

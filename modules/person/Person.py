@@ -2,7 +2,7 @@ import numpy as np
 from time import time
 
 from typing import Callable
-from modules.cam.DepthAi.Definitions import Tracklet, Rect, Point3f
+from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f
 from modules.person.pose.PoseDefinitions import PoseList
 
 class Person():

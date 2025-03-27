@@ -1,12 +1,12 @@
 from modules.cam.DepthCam import DepthCam
-from modules.cam.DepthAi.Pipeline import get_frame_types
-# get_frame_types
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder, EncoderType
-from modules.cam.DepthAi.Definitions import FrameType
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.pose.PoseDetection import ModelType
-from modules.person.Manager import Person, PersonCallback, Manager
+from modules.person.Manager import Manager
+
+from modules.cam.depthcam.Definitions import FrameType
+from modules.cam.depthcam.Pipeline import get_frame_types
 
 import os
 from enum import Enum
