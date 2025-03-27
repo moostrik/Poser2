@@ -17,8 +17,9 @@ from modules.utils.FPS import FPS
 
 class Core(Thread):
     _id_counter = 0
+    _pipeline: dai.Pipeline | None = None
 
-    def __init__(self, gui, model_path:str, fps: int = 30,
+    def __init__(self, gui, device_id: str, model_path:str, fps: int = 30,
                  do_color: bool = True, do_stereo: bool = True, do_person: bool = True,
                  lowres: bool = False, show_stereo: bool = False) -> None:
 
@@ -27,8 +28,9 @@ class Core(Thread):
 
         # ID
         self.id: int =                  Core._id_counter
+        Core._id_counter +=             1
         self.id_string: str =           str(self.id)
-        Core._id_counter +=      1
+        self.device_id: str =           device_id
 
         # FIXED SETTINGS
         self.model_path: str =          model_path
@@ -85,11 +87,18 @@ class Core(Thread):
             self._close()
 
     def _open(self) -> None:
-        pipeline = dai.Pipeline()
-        self._setup_pipeline(pipeline)
+        # check if camera exists
+        device_list: list[str] = Core.get_device_list(verbose=False)
+        if self.device_id not in device_list:
+            print(f'Camera {self.device_id} not available')
+            return
+
+        if Core._pipeline is None:
+            Core._pipeline = dai.Pipeline()
+            self._setup_pipeline(Core._pipeline)
 
         try:
-            self.device = self._try_device(pipeline, num_tries=3)
+            self.device = self._try_device(self.device_id, Core._pipeline, num_tries=3)
         except Exception as e:
             print(f'Could not open device: {e}')
             return
@@ -204,7 +213,8 @@ class Core(Thread):
         self.fps_callbacks.clear()
 
     @staticmethod
-    def _try_device(pipeline: dai.Pipeline, num_tries: int) -> dai.Device:
+    def _try_device(device_id: str, pipeline: dai.Pipeline, num_tries: int) -> dai.Device:
+        device_info = dai.DeviceInfo(device_id)
         for attempt in range(num_tries):
             try:
                 device = dai.Device(pipeline)

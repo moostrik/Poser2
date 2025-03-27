@@ -22,7 +22,10 @@ args: Namespace = parser.parse_args()
 
 currentPath: str = path.dirname(__file__)
 
-camera_list: list[str] = ['14442C10F124D9D600']
+camera_list: list[str] = ['14442C10F124D9D600',
+                          '14442C10F124D9D601',
+                          '14442C10F124D9D602',
+                          '14442C10F124D9D603']
 
 app: DepthPose = DepthPose(currentPath, camera_list, args.fps, args.players,
                            not args.mono, not args.nostereo, not args.noyolo, not args.highres, args.showstereo,

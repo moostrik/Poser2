@@ -6,15 +6,14 @@ from modules.cam.depthplayer.Player import DecoderType
 
 class CorePlayer(Core):
 
-    def __init__(self, gui, syncplayer: SyncPlayer, model_path:str, fps: int = 30,
+    def __init__(self, gui, syncplayer: SyncPlayer, device_id: str, model_path:str, fps: int = 30,
                  do_color: bool = True, do_stereo: bool = True, do_person: bool = True,
                  lowres: bool = False, show_stereo: bool = False) -> None:
-        super().__init__(gui, model_path, fps, do_color, do_stereo, do_person, lowres, show_stereo)
+        super().__init__(gui, device_id, model_path, fps, do_color, do_stereo, do_person, lowres, show_stereo)
 
         self.sync_player: SyncPlayer = syncplayer
 
     def start(self) -> None: # override
-        self.sync_player.start()
         self.sync_player.addFrameCallback(self._video_frame_callback)
         super().start()
 

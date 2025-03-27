@@ -1,2 +1,2 @@
 from modules.cam.depthcam.Core import Core as DepthCam
-from modules.cam.depthplayer.CorePlayerGui import CorePlayerGui as DepthPlayer
+from modules.cam.depthplayer.CorePlayer import CorePlayer as DepthSimulator

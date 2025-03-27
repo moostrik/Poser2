@@ -1,5 +1,6 @@
-from modules.cam.DepthCam import DepthCam
+from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder, EncoderType
+from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player, DecoderType
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.pose.PoseDetection import ModelType
@@ -24,23 +25,25 @@ class DepthPose():
         recorderPath: str = os.path.join(path, 'recordings')
         self.noPose: bool = noPose
 
-        self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
-        self.render = Render(1, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
+        frame_types: list[FrameType] = get_frame_types(color, stereo, showStereo)
+        num_cameras: int = len(camera_list)
 
-        available: list[str] = DepthCam.get_device_list(verbose=True)
-        self.cameras: list[DepthCam] = []
-        for cam in camera_list:
-            if cam not in available:
-                print(f'Camera {cam} not available')
-            else:
-                camera = DepthCam(self.gui, modelPath, fps, color, stereo, person, lowres, showStereo)
-                self.cameras.append(camera)
+        self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
+        self.render = Render(num_cameras, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
+
+        self.recorder = Recorder(self.gui, recorderPath, num_cameras, frame_types, 10.0, EncoderType.iGPU)
+        self.player: Player = Player(recorderPath, num_cameras, frame_types, DecoderType.iGPU)
+
+        # self.cameras: list[DepthCam] = []
+        # for cam_id in camera_list:
+        #     camera = DepthCam(self.gui, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo)
+        #     self.cameras.append(camera)
+        self.cameras: list[DepthSimulator] = []
+        for cam_id in camera_list:
+            self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo))
+
         if len(self.cameras) == 0:
             print('No cameras available')
-            # raise Exception('No cameras available')
-
-        frame_types: list[FrameType] = get_frame_types(color, stereo, showStereo)
-        self.recorder = Recorder(self.gui, recorderPath, 4, frame_types, 10.0, EncoderType.iGPU)
 
         modelType: ModelType = ModelType.LIGHTNING if lightning else ModelType.THUNDER
         if self.noPose:
@@ -70,12 +73,13 @@ class DepthPose():
         self.detector.addCallback(self.render.add_person)
 
         self.recorder.start()
+        self.player.start()
 
         self.gui.exit_callback = self.stop
 
         for camera in self.cameras:
             self.gui.addFrame([camera.gui.get_gui_color_frame(), camera.gui.get_gui_depth_frame()])
-        self.gui.addFrame([self.recorder.get_gui_frame()])
+        self.gui.addFrame([self.recorder.get_gui_frame(), self.player.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
 
