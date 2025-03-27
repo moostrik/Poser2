@@ -74,13 +74,13 @@ class DepthPose():
         self.gui.exit_callback = self.stop
 
         for camera in self.cameras:
-            self.gui.addFrame([camera.get_gui_color_frame(), camera.get_gui_depth_frame()])
+            self.gui.addFrame([camera.gui.get_gui_color_frame(), camera.gui.get_gui_depth_frame()])
         self.gui.addFrame([self.recorder.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
 
         for camera in self.cameras:
-            camera.gui_check()
+            camera.gui.gui_check()
         self.recorder.gui_check() # start after gui to prevent record at startup
 
         self.running = True

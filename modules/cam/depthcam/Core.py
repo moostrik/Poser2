@@ -2,6 +2,7 @@
 # https://oak-web.readthedocs.io/
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
+from __future__ import annotations
 import depthai as dai
 from cv2 import applyColorMap, COLORMAP_JET
 from numpy import ndarray
@@ -10,12 +11,14 @@ from threading import Thread, Event
 
 from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types
 from modules.cam.depthcam.Definitions import *
+from modules.cam.depthcam.Settings import Settings
+from modules.cam.depthcam.Gui import Gui
 from modules.utils.FPS import FPS
 
 class Core(Thread):
     _id_counter = 0
 
-    def __init__(self, model_path:str, fps: int = 30,
+    def __init__(self, gui, model_path:str, fps: int = 30,
                  do_color: bool = True, do_stereo: bool = True, do_person: bool = True,
                  lowres: bool = False, show_stereo: bool = False) -> None:
 
@@ -36,9 +39,6 @@ class Core(Thread):
         self.lowres: bool =             lowres
         self.show_stereo: bool =        show_stereo
 
-        # GENERAL SETTINGS
-        self.preview_type =             FrameType.VIDEO
-
         # DAI
         self.device_open: bool =        False
         self.device:                    dai.Device
@@ -54,17 +54,22 @@ class Core(Thread):
         self.tps_counter =              FPS(120)
 
         # FRAME TYPES
-        frame_types: list[FrameType] = get_frame_types(do_color, do_stereo, show_stereo)
-        frame_types.sort(key=lambda x: x.value)
+        self.frame_types: list[FrameType] = get_frame_types(do_color, do_stereo, show_stereo)
+        self.frame_types.sort(key=lambda x: x.value)
 
         # CALLBACKS
         self.preview_callbacks: Set[PreviewCallback] = set()
         self.tracker_callbacks: Set[TrackerCallback] = set()
         self.fps_callbacks: Set[FPSCallback] = set()
         self.frame_callbacks: dict[FrameType, Set[FrameCallback]] = {}
-        for t in frame_types:
+        for t in self.frame_types:
             if t == FrameType.NONE: continue
             self.frame_callbacks[t] = set()
+
+        # SETTINGS
+        self.preview_type =             FrameType.VIDEO
+        self.settings: Settings =       Settings(self)
+        self.gui: Gui =                 Gui(gui, self.settings)
 
     def __exit__(self) -> None:
         self._close()
@@ -89,11 +94,11 @@ class Core(Thread):
             print(f'Could not open device: {e}')
             return
 
-        self.frame_queue =       self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
-        self.tracklet_queue =    self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
-        self.color_control =     self.device.getInputQueue('color_control')
-        self.mono_control =      self.device.getInputQueue('mono_control')
-        self.stereo_control =    self.device.getInputQueue('stereo_control')
+        self.frame_queue =      self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
+        self.tracklet_queue =   self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
+        self.color_control =    self.device.getInputQueue('color_control')
+        self.mono_control =     self.device.getInputQueue('mono_control')
+        self.stereo_control =   self.device.getInputQueue('stereo_control')
 
         self.frame_callback_id = self.frame_queue.addCallback(self._frame_callback)
         self.tracklet_callback_id = self.tracklet_queue.addCallback(self._tracker_callback)
@@ -119,42 +124,36 @@ class Core(Thread):
         self._update_fps()
 
         for name, msg in message_group:
-            if name == 'video':
-                self._update_color_control(msg)
-                frame: ndarray = msg.getCvFrame() #type:ignore
-                self._update_callbacks(FrameType.VIDEO, frame)
+            if type(msg) == dai.ImgFrame:
+                frame: ndarray = msg.getCvFrame()
+                if name == 'video':
+                    self.settings.update_color_control(msg)
+                    self._update_callbacks(FrameType.VIDEO, frame)
 
-            elif name == 'left':
-                self._update_mono_control(msg)
-                frame: ndarray = msg.getCvFrame() #type:ignore
-                self._update_callbacks(FrameType.LEFT, frame)
+                elif name == 'left':
+                    self.settings.update_mono_control(msg)
+                    self._update_callbacks(FrameType.LEFT, frame)
 
-            elif name == 'right':
-                frame = msg.getCvFrame() #type:ignore
-                self._update_callbacks(FrameType.RIGHT, frame)
+                elif name == 'right':
+                    self._update_callbacks(FrameType.RIGHT, frame)
 
-            elif name == 'stereo':
-                frame = msg.getCvFrame() #type:ignore
-                frame = applyColorMap(frame, COLORMAP_JET)
-                self._update_callbacks(FrameType.STEREO, frame)
+                elif name == 'stereo':
+                    frame = applyColorMap(frame, COLORMAP_JET)
+                    self._update_callbacks(FrameType.STEREO, frame)
+
+                self.gui.update_from_frame()
 
             else:
                 print('unknown message', name)
 
-    def _tracker_callback(self, msg) -> None:
+    def _tracker_callback(self, msg: dai.RawTracklets) -> None:
         self._update_tps()
-        Ts = msg.tracklets
+        Ts: list[Tracklet] = msg.tracklets
         self.num_tracklets = len(Ts)
+        self.gui.update_from_tracker()
         for t in Ts:
-            # tracklet: Tracklet = Tracklet.from_dai(t, self.ID)
             for c in self.tracker_callbacks:
                 c(self.id, t)
-
-    def _update_color_control(self, frame) -> None:
-        pass
-
-    def _update_mono_control(self, frame) -> None:
-        pass
 
     # FPS
     def _update_fps(self) -> None:
@@ -211,6 +210,21 @@ class Core(Thread):
                 print (f'Attempt {attempt + 1}/{num_tries} - could not open camera: {e}')
                 continue
         raise Exception('Failed to open device after multiple attempts')
+
+    @staticmethod
+    def get_device_list(verbose: bool = True) -> list[str]:
+        device_list: list[str] = []
+        if verbose:
+            print('-- CAMERAS --------------------------------------------------')
+        for device in dai.Device.getAllAvailableDevices():
+            device_list.append(device.getMxId())
+            if verbose:
+                print(f"Camera: {device.getMxId()} {device.state}")
+        if verbose:
+            print('-------------------------------------------------------------')
+        return device_list
+
+
 
 
 
