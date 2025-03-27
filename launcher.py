@@ -18,6 +18,7 @@ parser.add_argument('-ll',      '--lightning',  action='store_true',        help
 parser.add_argument('-ns',      '--nostereo',   action='store_true',        help='do not use stereo depth')
 parser.add_argument('-ny',      '--noyolo',     action='store_true',        help='do not do yolo person detection')
 parser.add_argument('-np',      '--nopose',     action='store_true',        help='do not do pose detection')
+parser.add_argument('-sim',     '--simulation', action='store_true',        help='use simulated depth camera')
 args: Namespace = parser.parse_args()
 
 currentPath: str = path.dirname(__file__)
@@ -27,9 +28,11 @@ camera_list: list[str] = ['14442C10F124D9D600',
                           '14442C10F124D9D602',
                           '14442C10F124D9D603']
 
+camera_list: list[str] = ['14442C10F124D9D600']
+
 app: DepthPose = DepthPose(currentPath, camera_list, args.fps, args.players,
                            not args.mono, not args.nostereo, not args.noyolo, not args.highres, args.showstereo,
-                           args.lightning, args.nopose)
+                           args.lightning, args.nopose, args.simulation)
 app.start()
 
 def signal_handler_exit(sig, frame) -> None:

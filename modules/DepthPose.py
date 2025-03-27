@@ -19,7 +19,9 @@ class CamType(Enum):
     IMAGE   = 4
 
 class DepthPose():
-    def __init__(self, path: str, camera_list: list[str], fps: int, numPlayers: int, color: bool, stereo: bool, person: bool, lowres: bool, showStereo: bool, lightning: bool, noPose:bool) -> None:
+    def __init__(self, path: str, camera_list: list[str], fps: int, numPlayers: int,
+                 color: bool, stereo: bool, person: bool, lowres: bool, showStereo: bool,
+                 lightning: bool, noPose:bool, simulation: bool) -> None:
         self.path: str =    path
         modelPath: str =    os.path.join(path, 'models')
         recorderPath: str = os.path.join(path, 'recordings')
@@ -27,20 +29,22 @@ class DepthPose():
 
         frame_types: list[FrameType] = get_frame_types(color, stereo, showStereo)
         num_cameras: int = len(camera_list)
+        print(f'num_cameras: {num_cameras}')
 
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(num_cameras, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
 
         self.recorder = Recorder(self.gui, recorderPath, num_cameras, frame_types, 10.0, EncoderType.iGPU)
-        self.player: Player = Player(recorderPath, num_cameras, frame_types, DecoderType.iGPU)
+        self.player: Player = Player(recorderPath, num_cameras, frame_types, DecoderType.CPU)
 
-        # self.cameras: list[DepthCam] = []
-        # for cam_id in camera_list:
-        #     camera = DepthCam(self.gui, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo)
-        #     self.cameras.append(camera)
-        self.cameras: list[DepthSimulator] = []
-        for cam_id in camera_list:
-            self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo))
+        self.cameras: list[DepthCam | DepthSimulator] = []
+        if simulation:
+            for cam_id in camera_list:
+                self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo))
+        else:
+            for cam_id in camera_list:
+                camera = DepthCam(self.gui, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo)
+                self.cameras.append(camera)
 
         if len(self.cameras) == 0:
             print('No cameras available')

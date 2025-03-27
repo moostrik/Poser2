@@ -20,6 +20,14 @@ class StateMessage():
         self.state: State = state
         self.value = value
 
+class Folder():
+    def __init__(self, name: str, path: str, chunks: int) -> None:
+        self.name: str = name
+        self.path: str = path
+        self.chunks: int = chunks
+
+FolderDict = Dict[str, Folder]
+
 class SyncPlayer(Thread):
     def __init__(self, input_path: str, num_cams: int, types: list[FrameType], decoder: DecoderType) -> None:
         super().__init__()
@@ -32,9 +40,11 @@ class SyncPlayer(Thread):
         self.stop_event = Event()
 
         self.playback_path: Path = Path()
+        self.playback_name: str = ''
         self.chunk: int = -1
+        self.max_chunk: int = -1
 
-        self.folders: Dict[Path, int] = self._get_video_folders(self.input_path)
+        self.folders: FolderDict = self._get_video_folders(self.input_path)
 
         self.players: Dict[int, Dict[FrameType, Player]] = {
             c: {t: Player(c, t, self._frame_callback, self._stop_callback, decoder) for t in self.types}
@@ -51,12 +61,15 @@ class SyncPlayer(Thread):
     def run(self) -> None:
         while not self.stop_event.is_set() and self.state_messages.empty():
             state_message: StateMessage = self.state_messages.get()
-
+            print(state_message.state)
             if state_message.state == State.PLAY:
                 if type(state_message.value) is str:
+                    name: str = state_message.value
                     self.chunk = 0
-                    self.playback_path = Path(state_message.value)
+                    self.max_chunk = self.folders[name].chunks
+                    self.playback_path = Path(self.folders[name].path)
                     self._start_players()
+                    print(f"Playing {name}")
             elif state_message.state == State.STOP:
                 self.chunk = -1
                 self._stop_players()
@@ -64,8 +77,8 @@ class SyncPlayer(Thread):
                 if type(state_message.value) is int:
                     chunk: int = state_message.value
                     if self.chunk == chunk:
-                        max_chunk: int = self.folders[self.playback_path]
-                        self.chunk = (self.chunk + 1) % (max_chunk + 1)
+                        self.chunk = (self.chunk + 1) % (self.max_chunk + 1)
+                        print(f"Chunk {self.chunk}")
                         self._stop_players()
                         self._start_players()
 
@@ -96,21 +109,22 @@ class SyncPlayer(Thread):
         self.state_messages.put(message)
 
     # EXTERNAL METHODS
-    def play(self, value: bool, path: str = '') -> None:
+    def play(self, value: bool, name: str = '') -> None:
         if value:
-            if not path in self.folders:
-                print(f"Folder {path} not found")
+            if not name in self.folders:
+                print(f"Folder {name} not found")
                 return
-            message: StateMessage = StateMessage(State.PLAY, path)
+            message: StateMessage = StateMessage(State.PLAY, name)
         else:
             message: StateMessage = StateMessage(State.STOP)
+        print('sending message', message.state)
         self.state_messages.put(message)
 
     def get_folders(self) -> list[str]:
-        return [str(f) for f in self.folders.keys()]
+        return list(self.folders.keys())
 
-    def get_chunks(self, folder: str) -> int:
-        return self.folders.get(Path(folder), 0)
+    # def get_chunks(self, folder: str) -> int:
+    #     return self.folders.get(Path(folder), 0)
 
     # CALLBACKS
     def addFrameCallback(self, callback: FrameCallback) -> None:
@@ -122,14 +136,16 @@ class SyncPlayer(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _get_video_folders(path: Path) -> Dict[Path, int]:
-        folders: Dict[Path, int] = {}
-        for folder in path.iterdir():
-            if folder.is_dir():
-                max_chunk: int = max(
-                    (int(file.name.split('_')[2]) for file in folder.iterdir() if file.is_file() and file.name.endswith('.mp4') and file.name.split('_')[2].isdigit()),
-                    default=0
-                )
+    def _get_video_folders(path: Path) -> FolderDict :
+        folders: FolderDict = {}
+        for paths in path.iterdir():
+            if paths.is_dir():
+                max_chunk: int = 0
+                for file in paths.iterdir():
+                    if file.is_file() and file.name.endswith('.mp4'):
+                        n: str = file.stem.split('_')[2]
+                        if n.isdigit():
+                            max_chunk = max(max_chunk, int(n))
                 if max_chunk > 0:
-                    folders[folder] = max_chunk
+                    folders[paths.name] = (Folder(paths.name, str(paths), max_chunk))
         return folders

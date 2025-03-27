@@ -3,6 +3,8 @@ import numpy as np
 from threading import Thread, Event
 from typing import Callable
 from enum import Enum
+from cv2 import cvtColor, COLOR_RGB2BGR
+
 
 from modules.cam.depthcam.Definitions import FrameType
 
@@ -65,25 +67,39 @@ class Player:
             return
 
         pix_fmt: str = 'rgb24' if self.frameType == FrameType.VIDEO else 'gray'
+        bytes_per_frame = width * height * (3 if self.frameType == FrameType.VIDEO else 1)
+
+
+        print(f'Playing video with {width}x{height} {pix_fmt} frames')
 
         process = (
             ffmpeg
-            .input(self.video_file, re=None) # re: Read input at native frame rate. This is equivalent to setting -readrate 1.
-            .output('pipe:', format='rawvideo', pix_fmt=pix_fmt, vcodec=self.vcodec)
+            .input(self.video_file, re=None, hwaccel='d3d12va', hwaccel_device='1')  # Use Intel iGPU (device 1)
+            .output('pipe:', format='rawvideo', pix_fmt=pix_fmt)
+            .global_args('-loglevel', 'quiet')
             .run_async(pipe_stdout=True)
         )
 
         while self.is_playing and not self.stop_event.is_set():
-            in_bytes = process.stdout.read(width * height * (3 if self.frameType == FrameType.VIDEO else 1))
+            in_bytes = process.stdout.read(bytes_per_frame)
             if not in_bytes:
                 self.is_playing = False
                 self.end_callback(self.chunk_id)
                 break
-            frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([height, width, 3])
+
+            if pix_fmt == 'rgb24':
+                frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([height, width, 3])
+                frame = cvtColor(frame, COLOR_RGB2BGR)
+            else:
+                frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([height, width])
+
             self.frame_callback(self.cam_id, self.frameType, frame)
 
+        print("Cleaning up...")
         process.stdout.close()
+        print("Cleaning up... 2")
         process.wait()
+        print("Cleaning up... 3")
 
     def _get_video_dimensions(self, video_file: str) -> tuple:
         probe = ffmpeg.probe(video_file)

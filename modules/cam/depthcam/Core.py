@@ -87,10 +87,9 @@ class Core(Thread):
             self._close()
 
     def _open(self) -> None:
-        # check if camera exists
         device_list: list[str] = Core.get_device_list(verbose=False)
         if self.device_id not in device_list:
-            print(f'Camera {self.device_id} not available')
+            print(f'Camera: {self.device_id} NOT AVAILABLE')
             return
 
         if Core._pipeline is None:
@@ -113,6 +112,7 @@ class Core(Thread):
         self.tracklet_queue.addCallback(self._tracker_callback)
 
         self.device_open: bool =        True
+        print(f'Camera: {self.device_id} OPEN')
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
         setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
@@ -217,7 +217,7 @@ class Core(Thread):
         device_info = dai.DeviceInfo(device_id)
         for attempt in range(num_tries):
             try:
-                device = dai.Device(pipeline)
+                device = dai.Device(pipeline, device_info)
                 return device
             except Exception as e:
                 print (f'Attempt {attempt + 1}/{num_tries} - could not open camera: {e}')
