@@ -4,7 +4,7 @@ from threading import Thread, Event
 from typing import Callable
 from enum import Enum
 
-from modules.cam.DepthAi.Definitions import FrameType
+from modules.cam.depthcam.Definitions import FrameType
 
 class DecoderType(Enum):
     CPU =   0

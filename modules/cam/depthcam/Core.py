@@ -86,7 +86,7 @@ class Core(Thread):
 
     def _open(self) -> None:
         pipeline = dai.Pipeline()
-        setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
+        self._setup_pipeline(pipeline)
 
         try:
             self.device = self._try_device(pipeline, num_tries=3)
@@ -100,10 +100,13 @@ class Core(Thread):
         self.mono_control =     self.device.getInputQueue('mono_control')
         self.stereo_control =   self.device.getInputQueue('stereo_control')
 
-        self.frame_callback_id = self.frame_queue.addCallback(self._frame_callback)
-        self.tracklet_callback_id = self.tracklet_queue.addCallback(self._tracker_callback)
+        self.frame_queue.addCallback(self._frame_callback)
+        self.tracklet_queue.addCallback(self._tracker_callback)
 
         self.device_open: bool =        True
+
+    def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
+        setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
 
     def _close(self) -> None:
         if not self.device_open: return

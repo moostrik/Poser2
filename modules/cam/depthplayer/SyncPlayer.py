@@ -5,8 +5,8 @@ from typing import Set, Dict
 from enum import Enum, auto
 from queue import Queue
 
-from modules.cam.DepthAi.Definitions import FrameType, FrameCallback
-from modules.cam.player.Player import Player, DecoderType
+from modules.cam.depthcam.Definitions import FrameType, FrameCallback
+from modules.cam.depthplayer.Player import Player, DecoderType
 from modules.cam.recorder.SyncRecorder import make_path
 
 class State(Enum):
@@ -41,7 +41,7 @@ class SyncPlayer(Thread):
             for c in range(self.num_cams)
         }
 
-        self.frameCallbacks: Dict[FrameType, Set[FrameCallback]] = {t: set() for t in self.types}
+        self.frameCallbacks: Set[FrameCallback] = set()
 
     def stop(self) -> None:
         self.play(False)
@@ -88,7 +88,7 @@ class SyncPlayer(Thread):
                     player.stop()
 
     def _frame_callback(self, cam_id: int, frameType: FrameType, frame: ndarray) -> None:
-        for callback in self.frameCallbacks[frameType]:
+        for callback in self.frameCallbacks:
             callback(cam_id, frameType, frame)
 
     def _stop_callback(self, chunk_id: int) -> None:
@@ -113,10 +113,10 @@ class SyncPlayer(Thread):
         return self.folders.get(Path(folder), 0)
 
     # CALLBACKS
-    def addFrameCallback(self, frameType: FrameType, callback: FrameCallback) -> None:
-        self.frameCallbacks[frameType].add(callback)
-    def discardFrameCallback(self, frameType: FrameType, callback: FrameCallback) -> None:
-        self.frameCallbacks[frameType].discard(callback)
+    def addFrameCallback(self, callback: FrameCallback) -> None:
+        self.frameCallbacks.add(callback)
+    def discardFrameCallback(self, callback: FrameCallback) -> None:
+        self.frameCallbacks.discard(callback)
     def clearFrameCallbacks(self) -> None:
         self.frameCallbacks.clear()
 

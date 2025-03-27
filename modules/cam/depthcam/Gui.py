@@ -48,7 +48,6 @@ class Gui():
         elem.append([ E(eT.SLDR, 'NumTracklets'+id,     None,                               0,  [0,6],    1),
                      E(eT.SLDR, 'TPS'+id,               None,                               0,  [0,60],   0.1)])
 
-
         self.color_frame = Frame('CAMERA COLOR', elem, 240)
 
         elem: list = []
