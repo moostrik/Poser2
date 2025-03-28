@@ -4,33 +4,37 @@ from threading import Thread, Event
 from typing import Callable
 from enum import Enum
 from cv2 import cvtColor, COLOR_RGB2BGR
+import time
 
 
 from modules.cam.depthcam.Definitions import FrameType
 
-class DecoderType(Enum):
+class HwAccelerationType(Enum):
     CPU =   0
     GPU =   1
     iGPU =  2
 
-DecoderString: dict[DecoderType, str] = {
-    DecoderType.CPU:  'h264',
-    DecoderType.GPU:  'h264_cuvid',
-    DecoderType.iGPU: 'h264_qsv'
+HwaccelString: dict[HwAccelerationType, str] = {
+    HwAccelerationType.GPU:  'd3d12va',
+    HwAccelerationType.iGPU: 'd3d12va'
+}
+
+HwaccelDeviceString: dict[HwAccelerationType, str] = {
+    HwAccelerationType.GPU:  '0',
+    HwAccelerationType.iGPU: '1'
 }
 
 PlayerCallback = Callable[[int, FrameType, np.ndarray], None]
 EndCallback = Callable[[int], None]
 
 class Player:
-    def __init__(self, cam_id: int, frameType: FrameType, frameCallback: PlayerCallback, endCallback: EndCallback, decoder: DecoderType) -> None:
+    def __init__(self, cam_id: int, frameType: FrameType, frameCallback: PlayerCallback, endCallback: EndCallback, hw_acceleration: HwAccelerationType) -> None:
         self.frame_callback: PlayerCallback = frameCallback
         self.end_callback: EndCallback = endCallback
 
-
         self.cam_id: int = cam_id
         self.frameType: FrameType = frameType
-        self.vcodec: str = DecoderString[decoder]
+        self.hw_acceleration: HwAccelerationType = hw_acceleration
 
         self.is_playing = False
         self.thread = None
@@ -54,6 +58,7 @@ class Player:
         self.thread.start()
 
     def stop(self) -> None:
+        print('Stopping player', self.cam_id, self.frameType)
         self.is_playing = False
         self.stop_event.set()
         if self.thread is not None:
@@ -69,9 +74,7 @@ class Player:
         pix_fmt: str = 'rgb24' if self.frameType == FrameType.VIDEO else 'gray'
         bytes_per_frame = width * height * (3 if self.frameType == FrameType.VIDEO else 1)
 
-
-        print(f'Playing video with {width}x{height} {pix_fmt} frames')
-
+        T: float = time.time()
         process = (
             ffmpeg
             .input(self.video_file, re=None, hwaccel='d3d12va', hwaccel_device='1')  # Use Intel iGPU (device 1)
@@ -79,9 +82,14 @@ class Player:
             .global_args('-loglevel', 'quiet')
             .run_async(pipe_stdout=True)
         )
+        # print(T - time.time())
+        p = True
 
         while self.is_playing and not self.stop_event.is_set():
             in_bytes = process.stdout.read(bytes_per_frame)
+            if p:
+                # print(T - time.time())
+                p = False
             if not in_bytes:
                 self.is_playing = False
                 self.end_callback(self.chunk_id)
@@ -95,11 +103,10 @@ class Player:
 
             self.frame_callback(self.cam_id, self.frameType, frame)
 
-        print("Cleaning up...")
+        print('Closing', self.cam_id, self.frameType)
         process.stdout.close()
-        print("Cleaning up... 2")
         process.wait()
-        print("Cleaning up... 3")
+        print('Closed', self.cam_id, self.frameType)
 
     def _get_video_dimensions(self, video_file: str) -> tuple:
         probe = ffmpeg.probe(video_file)

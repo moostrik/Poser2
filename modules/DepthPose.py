@@ -1,6 +1,6 @@
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder, EncoderType
-from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player, DecoderType
+from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player, HwAccelerationType
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.pose.PoseDetection import ModelType
@@ -35,7 +35,7 @@ class DepthPose():
         self.render = Render(num_cameras, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
 
         self.recorder = Recorder(self.gui, recorderPath, num_cameras, frame_types, 10.0, EncoderType.iGPU)
-        self.player: Player = Player(recorderPath, num_cameras, frame_types, DecoderType.CPU)
+        self.player: Player = Player(recorderPath, num_cameras, frame_types, HwAccelerationType.CPU)
 
         # DepthCam.get_device_list(verbose=True)
 
@@ -96,16 +96,23 @@ class DepthPose():
         self.running = True
 
     def stop(self) -> None:
+        print('stop Player')
+        self.player.stop()
+
+        print ('stop Cameras')
         for camera in self.cameras:
             camera.stop()
 
-        self.player.stop()
+        print('stop Detector')
         self.detector.stop()
+        print('stop Recorder')
         self.recorder.stop()
 
+        print('stop GUI')
         self.gui.exit_callback = None
         self.gui.stop()
 
+        print('Join Threads')
         self.detector.join()
         self.recorder.join()
         self.player.join()

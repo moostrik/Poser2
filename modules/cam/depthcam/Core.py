@@ -90,7 +90,7 @@ class Core(Thread):
 
         if Core._pipeline is None:
             Core._pipeline = dai.Pipeline()
-            self._setup_pipeline(Core._pipeline)
+            setup_pipeline(Core._pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
 
         try:
             self.device = self._try_device(self.device_id, Core._pipeline, num_tries=3)
@@ -109,9 +109,6 @@ class Core(Thread):
 
         print(f'Camera: {self.device_id} OPEN')
         self.device_open: bool =        True
-
-    def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
-        setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
 
     def _close(self) -> None:
         if not self.device_open: return

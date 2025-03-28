@@ -4,10 +4,10 @@ from modules.gui.PyReallySimpleGui import Element as E, Frame
 
 class SyncPlayerGui(SyncPlayer):
 
-    def __init__(self, input_path: str, num_cams: int, types: list[FrameType], decoder: DecoderType) -> None:
+    def __init__(self, input_path: str, num_cams: int, types: list[FrameType], decoder: HwAccelerationType) -> None:
         super().__init__(input_path, num_cams, types, decoder)
 
-        folders: list[str] = self.get_folders()
+        folders: list[str] = self.get_folder_names()
         f: str = folders[0] if len(folders) > 0 else ''
 
         elem: list = []
