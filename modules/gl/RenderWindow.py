@@ -80,6 +80,7 @@ class RenderWindow(Thread):
     def stop(self) -> None:
         if self._is_allocated:
             glut.glutLeaveMainLoop()
+            # self._is_allocated = False
 
     def initGL(self) -> None:
         glEnable(GL_TEXTURE_2D)
@@ -139,7 +140,6 @@ class RenderWindow(Thread):
         self._is_allocated = True
 
     def closeWindow(self,) -> None:
-        self._is_allocated = False
         if self.exit_callback: self.exit_callback()
 
     def draw(self) -> None:
@@ -147,8 +147,7 @@ class RenderWindow(Thread):
 
     def keyboardCallback(self, key, x, y) -> None:
         if key == b'\x1b': # escape
-            if self._is_allocated: # redundant?
-                glut.glutLeaveMainLoop()
+            if self.exit_callback: self.exit_callback()
         for c in self.key_callbacks:
             c(key, x, y)
 

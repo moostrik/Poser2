@@ -73,12 +73,8 @@ class Core(Thread):
         self.settings: Settings =       Settings(self)
         self.gui: Gui =                 Gui(gui, self.settings)
 
-    def __exit__(self) -> None:
-        self._close()
-
     def stop(self) -> None:
         self.stop_event.set()
-        self.join()
 
     def run(self) -> None:
         while not self.stop_event.is_set():
@@ -111,8 +107,8 @@ class Core(Thread):
         self.frame_queue.addCallback(self._frame_callback)
         self.tracklet_queue.addCallback(self._tracker_callback)
 
-        self.device_open: bool =        True
         print(f'Camera: {self.device_id} OPEN')
+        self.device_open: bool =        True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
         setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
@@ -131,6 +127,8 @@ class Core(Thread):
         self.frame_callbacks.clear()
         self.preview_callbacks.clear()
         self.tracker_callbacks.clear()
+
+        print(f'Camera: {self.device_id} CLOSED')
 
     def _frame_callback(self, message_group: dai.MessageGroup) -> None:
         self._update_fps()
@@ -225,7 +223,7 @@ class Core(Thread):
         raise Exception('Failed to open device after multiple attempts')
 
     @staticmethod
-    def get_device_list(verbose: bool = True) -> list[str]:
+    def get_device_list(verbose: bool = False) -> list[str]:
         device_list: list[str] = []
         if verbose:
             print('-- CAMERAS --------------------------------------------------')

@@ -51,7 +51,6 @@ class SyncRecorder(Thread):
 
     def stop(self) -> None:
         self.stop_event.set()
-        self.join()
 
     def run(self) -> None:
         self._set_state(RecState.IDLE)

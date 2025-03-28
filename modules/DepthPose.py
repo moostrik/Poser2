@@ -37,6 +37,8 @@ class DepthPose():
         self.recorder = Recorder(self.gui, recorderPath, num_cameras, frame_types, 10.0, EncoderType.iGPU)
         self.player: Player = Player(recorderPath, num_cameras, frame_types, DecoderType.CPU)
 
+        # DepthCam.get_device_list(verbose=True)
+
         self.cameras: list[DepthCam | DepthSimulator] = []
         if simulation:
             for cam_id in camera_list:
@@ -94,18 +96,24 @@ class DepthPose():
         self.running = True
 
     def stop(self) -> None:
-        self.detector.stop()
-
         for camera in self.cameras:
             camera.stop()
 
+        self.detector.stop()
         self.recorder.stop()
-
-        self.render.exit_callback = None
-        self.render.stop()
 
         self.gui.exit_callback = None
         self.gui.stop()
+
+        self.detector.join()
+        self.recorder.join()
+        for camera in self.cameras:
+            camera.join()
+
+
+        self.render.exit_callback = None
+        self.render.stop()
+        # self.render.join()
 
         self.running = False
 
