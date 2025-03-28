@@ -16,10 +16,12 @@ class CorePlayer(Core):
     def start(self) -> None: # override
         self.sync_player.addFrameCallback(self._video_frame_callback)
         super().start()
+        # Thread.start(self)
 
     def stop(self) -> None: # override
-        self.sync_player.stop()
+        self.sync_player.discardFrameCallback(self._video_frame_callback)
         super().stop()
+        # pass
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None: # override
         setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)

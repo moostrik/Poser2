@@ -99,6 +99,7 @@ class DepthPose():
         for camera in self.cameras:
             camera.stop()
 
+        self.player.stop()
         self.detector.stop()
         self.recorder.stop()
 
@@ -107,6 +108,7 @@ class DepthPose():
 
         self.detector.join()
         self.recorder.join()
+        self.player.join()
         for camera in self.cameras:
             camera.join()
 
