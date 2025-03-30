@@ -134,6 +134,7 @@ class Core(Thread):
             if type(msg) == dai.ImgFrame:
                 frame: ndarray = msg.getCvFrame()
                 if name == 'video':
+                    # print(msg.getTimestamp(), 'hgv', msg.getTimestampDevice())
                     self.settings.update_color_control(msg)
                     self._update_callbacks(FrameType.VIDEO, frame)
 

@@ -113,6 +113,18 @@ class Setup():
         self.outputImages: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.outputImages.setStreamName("output_images")
 
+        self.outputColor: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.outputColor.setStreamName("color")
+
+        self.outputColor: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.outputColor.setStreamName("left")
+
+        self.outputColor: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.outputColor.setStreamName("right")
+
+        self.outputColor: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.outputColor.setStreamName("stereo")
+
         self.trackerOut: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.trackerOut.setStreamName("tracklets")
 
