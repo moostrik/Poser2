@@ -63,7 +63,6 @@ class SyncPlayer(Thread):
                 state_message: StateMessage = self.state_messages.get(timeout=0.1)
             except Exception as e:
                 continue
-            print(state_message.state)
             if state_message.state == State.PLAY:
                 if type(state_message.value) is str:
                     self.playback_chunk = 0

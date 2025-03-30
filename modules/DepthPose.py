@@ -11,6 +11,7 @@ from modules.cam.depthcam.Pipeline import get_frame_types
 
 import os
 from enum import Enum
+import time
 
 class CamType(Enum):
     DEPTH   = 1
@@ -96,8 +97,11 @@ class DepthPose():
         self.running = True
 
     def stop(self) -> None:
+        self.player.clearFrameCallbacks()
         print('stop Player')
         self.player.stop()
+
+        time.sleep(0.1)
 
         print ('stop Cameras')
         for camera in self.cameras:
@@ -112,10 +116,11 @@ class DepthPose():
         self.gui.exit_callback = None
         self.gui.stop()
 
-        print('Join Threads')
         self.detector.join()
         self.recorder.join()
+        print('Join Player')
         self.player.join()
+        print('Join Cameras')
         for camera in self.cameras:
             camera.join()
 

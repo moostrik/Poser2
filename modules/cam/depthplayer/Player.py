@@ -58,7 +58,7 @@ class Player:
         self.thread.start()
 
     def stop(self) -> None:
-        print('Stopping player', self.cam_id, self.frameType)
+        # print('Stopping player', self.cam_id, self.frameType)
         self.is_playing = False
         self.stop_event.set()
         if self.thread is not None:
@@ -103,10 +103,10 @@ class Player:
 
             self.frame_callback(self.cam_id, self.frameType, frame)
 
-        print('Closing', self.cam_id, self.frameType)
+        # print('Closing', self.cam_id, self.frameType)
         process.stdout.close()
-        process.wait()
-        print('Closed', self.cam_id, self.frameType)
+        # process.wait()
+        # print('Closed', self.cam_id, self.frameType)
 
     def _get_video_dimensions(self, video_file: str) -> tuple:
         probe = ffmpeg.probe(video_file)

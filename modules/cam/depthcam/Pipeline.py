@@ -80,7 +80,7 @@ def setup_pipeline(
                 if doPerson:
                     SetupColorStereoPerson(pipeline, fps, lowres, showStereo, modelPath)
                 else:
-                    SimulationColorStereo(pipeline, fps, lowres, showStereo)
+                    SimulationColorStereo2(pipeline, fps, lowres, showStereo)
             else:
                 if doPerson:
                     SimulationColorPerson(pipeline, fps, lowres, modelPath)
@@ -191,7 +191,7 @@ class SetupColorStereo(SetupColor):
         self.stereo.setLeftRightCheck(True)
         self.stereo.setExtendedDisparity(False)
         self.stereo.setSubpixel(False)
-        # self.stereo.setDepthAlign(dai.CameraBoardSocket.CENTER)
+        self.stereo.setDepthAlign(dai.CameraBoardSocket.CENTER)
 
         self.left.out.link(self.stereo.left)
         self.right.out.link(self.stereo.right)
@@ -454,21 +454,27 @@ class SimulationColorStereo(SetupColorStereo):
 
 class SimulationColorStereo2(Setup):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showStereo: bool) -> None:
+
+        self.fps = 20
         super().__init__(pipeline, fps, lowres)
         self.showStereo: bool = showStereo
+
+        self.sync.setSyncAttempts(0)
 
         self.ex_color: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_color.setStreamName("ex_video")
         self.ex_color.setMaxDataSize(1280*720*3)
-        self.ex_color.out.link(self.sync.inputs["video"])
+        # self.ex_color.out.link(self.sync.inputs["video"])
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_left")
         self.ex_left.setMaxDataSize(1280*720*3)
+        # self.ex_left.out.link(self.sync.inputs["left"])
 
         self.ex_right: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_right.setStreamName("ex_right")
         self.ex_right.setMaxDataSize(1280*720*3)
+        # self.ex_right.out.link(self.sync.inputs["right"])
 
         self.stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
         self.stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
@@ -483,7 +489,5 @@ class SimulationColorStereo2(Setup):
 
         if self.showStereo:
             self.stereo.disparity.link(self.sync.inputs["stereo"])
-        self.stereo.rectifiedLeft.link(self.sync.inputs["left"])
-        self.stereo.rectifiedRight.link(self.sync.inputs["right"])
 
         self.stereoControl.out.link(self.stereo.inputConfig)

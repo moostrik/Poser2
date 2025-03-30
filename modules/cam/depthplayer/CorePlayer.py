@@ -18,6 +18,8 @@ class CorePlayer(Core):
         self.ex_left:   dai.DataInputQueue
         self.ex_right:  dai.DataInputQueue
 
+        self.closing: bool = False
+
     def start(self) -> None: # override
         self.sync_player.addFrameCallback(self._video_frame_callback)
         super().start()
@@ -66,12 +68,16 @@ class CorePlayer(Core):
 
     def _close(self) -> None: # override
 
+        self.closing = True
         if not self.device_open: return
         print(f'Camera: {self.device_id} CLOSING')
         self.ex_video.close()
+        print('ex_video closed')
         if self.do_stereo:
             self.ex_left.close()
+            print('ex_left closed')
             self.ex_right.close()
+            print('ex_right closed')
         super()._close()
 
     # def _frame_callback(self, message_group: dai.MessageGroup) -> None: # override
@@ -83,7 +89,9 @@ class CorePlayer(Core):
 
     def _video_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
 
-        if not self.device_open:
+        if not self.device_open or self.closing:
+            print(f'Camera: {self.device_id} NOT OPEN', self.device_open, self.closing)
+
             return
         current_time: float = time.monotonic()
         height, width = frame.shape[:2]
@@ -100,10 +108,10 @@ class CorePlayer(Core):
 
                 self.ex_video.send(img)
 
-            if frame_type == FrameType.LEFT and self.do_stereo:
+            if frame_type == FrameType.LEFT:
                 img = dai.ImgFrame()
                 img.setType(dai.ImgFrame.Type.RAW8)
-                img.setInstanceNum(dai.CameraBoardSocket.CAM_A) # type: ignore
+                img.setInstanceNum(dai.CameraBoardSocket.CAM_B) # type: ignore
                 img.setData(frame.flatten())
                 img.setTimestamp(current_time) # type: ignore
                 img.setWidth(width)
@@ -115,13 +123,13 @@ class CorePlayer(Core):
             if frame_type == FrameType.RIGHT:
                 img = dai.ImgFrame()
                 img.setType(dai.ImgFrame.Type.RAW8)
-                img.setInstanceNum(dai.CameraBoardSocket.CAM_B) # type: ignore
+                img.setInstanceNum(dai.CameraBoardSocket.CAM_C) # type: ignore
                 img.setData(frame.flatten())
                 img.setTimestamp(current_time) # type: ignore
                 img.setWidth(width)
                 img.setHeight(height)
                 if self.do_stereo:
-                    self.ex_left.send(img)
+                    self.ex_right.send(img)
 
     @staticmethod
     def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:
