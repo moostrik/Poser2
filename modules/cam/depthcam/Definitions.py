@@ -16,7 +16,7 @@ DEPTH_TRACKER_MAX_DEPTH: int = 10000
 
 class FrameType(Enum):
     NONE =  0
-    COLOR = 1
+    VIDEO = 1
     LEFT =  2
     RIGHT = 3
     STEREO= 4
@@ -25,7 +25,7 @@ FRAME_TYPE_NAMES: list[str] = [e.name for e in FrameType]
 
 FRAME_TYPE_LABEL_DICT: dict[FrameType, str] = {
     FrameType.NONE:   'N',
-    FrameType.COLOR:  'C',
+    FrameType.VIDEO:  'C',
     FrameType.LEFT:   'L',
     FrameType.RIGHT:  'R',
     FrameType.STEREO: 'S'

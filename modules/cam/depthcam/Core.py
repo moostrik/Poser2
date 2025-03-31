@@ -20,12 +20,12 @@ class input(IntEnum):
     COLOR_CONTROL = auto()
     MONO_CONTROL = auto()
     STEREO_CONTROL = auto()
-    COLOR_FRAME_IN = auto()
+    VIDEO_FRAME_IN = auto()
     LEFT_FRAME_IN = auto()
     RIGHT_FRAME_IN = auto()
 
 class output(IntEnum):
-    COLOR_FRAME_OUT = auto()
+    VIDEO_FRAME_OUT = auto()
     LEFT_FRAME_OUT = auto()
     RIGHT_FRAME_OUT = auto()
     STEREO_FRAME_OUT = auto()
@@ -84,7 +84,7 @@ class Core(Thread):
             self.frame_callbacks[t] = set()
 
         # SETTINGS
-        self.preview_type =             FrameType.COLOR
+        self.preview_type =             FrameType.VIDEO
         self.settings: Settings =       Settings(self)
         self.gui: Gui =                 Gui(gui, self.settings)
 
@@ -124,15 +124,15 @@ class Core(Thread):
         elif self.do_color:
             color_control: dai.DataInputQueue =     self.device.getInputQueue('color_control')
             self.inputs[input.COLOR_CONTROL] =      color_control
-            color_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='color', maxSize=4, blocking=False)
-            self.outputs[output.COLOR_FRAME_OUT] =  color_queue
-            color_queue.addCallback(self._color_callback)
+            color_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='video', maxSize=4, blocking=False)
+            self.outputs[output.VIDEO_FRAME_OUT] =  color_queue
+            color_queue.addCallback(self._video_callback)
         else: # only mono
             mono_control: dai.DataInputQueue =      self.device.getInputQueue('mono_control')
             self.inputs[input.MONO_CONTROL] =       mono_control
-            left_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='left', maxSize=4, blocking=False)
-            self.outputs[output.LEFT_FRAME_OUT] =   left_queue
-            left_queue.addCallback(self._left_callback)
+            video_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='video', maxSize=4, blocking=False)
+            self.outputs[output.VIDEO_FRAME_OUT] =   video_queue
+            video_queue.addCallback(self._video_callback)
 
         if self.do_person:
             self.tracklet_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
@@ -158,20 +158,18 @@ class Core(Thread):
 
         print(f'Camera: {self.device_id} CLOSED')
 
-    def _color_callback(self, msg: dai.ImgFrame) -> None:
+    def _video_callback(self, msg: dai.ImgFrame) -> None:
         self._update_fps()
         self.gui.update_from_frame()
+        if self.do_color:
+            self.settings.update_color_control(msg)
+        if self.do_stereo or not self.do_color:
+            self.settings.update_mono_control(msg)
 
-        self.settings.update_color_control(msg)
         frame: ndarray = msg.getCvFrame()
-        self._update_callbacks(FrameType.COLOR, frame)
+        self._update_callbacks(FrameType.VIDEO, frame)
 
     def _left_callback(self, msg: dai.ImgFrame) -> None:
-        if not self.do_color:
-            self._update_fps()
-            self.gui.update_from_frame()
-
-        self.settings.update_mono_control(msg)
         frame: ndarray = msg.getCvFrame()
         self._update_callbacks(FrameType.LEFT, frame)
 
@@ -187,8 +185,8 @@ class Core(Thread):
     def _sync_callback(self, message_group: dai.MessageGroup) -> None:
         for name, msg in message_group:
             if type(msg) == dai.ImgFrame:
-                if name == 'color':
-                    self._color_callback(msg)
+                if name == 'video':
+                    self._video_callback(msg)
                 elif name == 'left':
                     self._left_callback(msg)
                 elif name == 'right':

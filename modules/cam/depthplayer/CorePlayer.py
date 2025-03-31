@@ -1,7 +1,7 @@
 
 from modules.cam.depthcam.Core import *
 from modules.cam.depthplayer.SyncPlayer import SyncPlayer
-from cv2 import resize
+from cv2 import resize, COLOR_RGB2GRAY, cvtColor
 from time import process_time
 from datetime import timedelta
 
@@ -53,6 +53,11 @@ class CorePlayer(Core):
             print(f'Could not open device: {e}')
             return
 
+        ex_video: dai.DataInputQueue =          self.device.getInputQueue(name='ex_video')
+        self.inputs[input.VIDEO_FRAME_IN] =     ex_video
+        video_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='video', maxSize=4, blocking=False)
+        self.outputs[output.VIDEO_FRAME_OUT] =  video_queue
+        video_queue.addCallback(self._video_callback)
         if self.do_stereo:
             stereo_control: dai.DataInputQueue =    self.device.getInputQueue('stereo_control')
             self.inputs[input.STEREO_CONTROL] =     stereo_control
@@ -60,9 +65,6 @@ class CorePlayer(Core):
             self.inputs[input.LEFT_FRAME_IN] =      ex_left
             ex_right: dai.DataInputQueue =          self.device.getInputQueue(name='ex_right')
             self.inputs[input.RIGHT_FRAME_IN] =     ex_right
-            color_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='color', maxSize=4, blocking=False)
-            self.outputs[output.COLOR_FRAME_OUT] =  color_queue
-            color_queue.addCallback(self._color_callback)
             left_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='left', maxSize=4, blocking=False)
             self.outputs[output.LEFT_FRAME_OUT] =   left_queue
             left_queue.addCallback(self._left_callback)
@@ -73,24 +75,6 @@ class CorePlayer(Core):
                 stereo_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='stereo', maxSize=4, blocking=False)
                 self.outputs[output.STEREO_FRAME_OUT] = stereo_queue
                 stereo_queue.addCallback(self._stereo_callback)
-        #     stereo_control: dai.DataInputQueue =    self.device.getInputQueue('stereo_control')
-        #     self.inputs[input.STEREO_CONTROL] =     stereo_control
-        #     sync_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='sync', maxSize=4, blocking=False)
-        #     self.outputs[output.SYNC_FRAMES_OUT] =  sync_queue
-        #     sync_queue.addCallback(self._sync_callback)
-        # elif self.do_color:
-        if self.do_color:
-            ex_color: dai.DataInputQueue =          self.device.getInputQueue(name='ex_color')
-            self.inputs[input.COLOR_FRAME_IN] =     ex_color
-            color_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='color', maxSize=4, blocking=False)
-            self.outputs[output.COLOR_FRAME_OUT] =  color_queue
-            color_queue.addCallback(self._color_callback)
-        if not self.do_stereo and not self.do_color: # only mono
-            ex_left: dai.DataInputQueue =           self.device.getInputQueue(name='ex_left')
-            self.inputs[input.LEFT_FRAME_IN] =      ex_left
-            left_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='left', maxSize=4, blocking=False)
-            self.outputs[output.LEFT_FRAME_OUT] =   left_queue
-            left_queue.addCallback(self._left_callback)
 
         if self.do_person:
             self.tracklet_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
@@ -107,15 +91,21 @@ class CorePlayer(Core):
         frame_time = timedelta(seconds = process_time())
         height, width = frame.shape[:2]
         if id == self.id:
-            if frame_type == FrameType.COLOR and input.COLOR_FRAME_IN in self.inputs:
+            if frame_type == FrameType.VIDEO and input.VIDEO_FRAME_IN in self.inputs:
                 img = dai.ImgFrame()
-                img.setType(dai.ImgFrame.Type.BGR888p)
-                img.setInstanceNum(int(dai.CameraBoardSocket.CAM_A))
-                img.setData(self.to_planar(frame, (width, height)))
+                # img.setInstanceNum(int(dai.CameraBoardSocket.CAM_A))
+                if self.do_color:
+                    img.setType(dai.ImgFrame.Type.BGR888p)
+                    img.setData(self.to_planar(frame, (width, height)))
+                else:
+                    img.setType(dai.ImgFrame.Type.RAW8)
+                    if frame.shape[2] == 3:
+                        frame = cvtColor(frame, COLOR_RGB2GRAY)
+                    img.setData(frame.flatten())
                 img.setTimestamp(frame_time)
                 img.setWidth(width)
                 img.setHeight(height)
-                self.inputs[input.COLOR_FRAME_IN].send(img)
+                self.inputs[input.VIDEO_FRAME_IN].send(img)
 
             if frame_type == FrameType.LEFT and input.LEFT_FRAME_IN in self.inputs:
                 img = dai.ImgFrame()
