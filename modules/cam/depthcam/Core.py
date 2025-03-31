@@ -8,12 +8,27 @@ from cv2 import applyColorMap, COLORMAP_JET
 from numpy import ndarray
 from typing import Set
 from threading import Thread, Event
+from enum import IntEnum, auto
 
 from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types
 from modules.cam.depthcam.Definitions import *
 from modules.cam.depthcam.Settings import Settings
 from modules.cam.depthcam.Gui import Gui
 from modules.utils.FPS import FPS
+
+class input(IntEnum):
+    COLOR_CONTROL = auto()
+    MONO_CONTROL = auto()
+    STEREO_CONTROL = auto()
+    COLOR_FRAME_IN = auto()
+    LEFT_FRAME_IN = auto()
+    RIGHT_FRAME_IN = auto()
+
+class output(IntEnum):
+    COLOR_FRAME_OUT = auto()
+    LEFT_FRAME_OUT = auto()
+    SYNC_FRAMES_OUT = auto()
+    TRACKLETS_OUT = auto()
 
 class Core(Thread):
     _id_counter = 0
@@ -44,11 +59,9 @@ class Core(Thread):
         # DAI
         self.device_open: bool =        False
         self.device:                    dai.Device
-        self.color_control:             dai.DataInputQueue
-        self.mono_control:              dai.DataInputQueue
-        self.stereo_control:            dai.DataInputQueue
-        self.frame_queue:               dai.DataOutputQueue
-        self.tracklet_queue:            dai.DataOutputQueue
+
+        self.inputs: dict[input, dai.DataInputQueue] = {}
+        self.outputs: dict[output, dai.DataOutputQueue] = {}
         self.num_tracklets: int =       0
 
         # FPS
@@ -98,14 +111,29 @@ class Core(Thread):
             print(f'Could not open device: {e}')
             return
 
-        self.frame_queue =      self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
-        self.tracklet_queue =   self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
-        self.color_control =    self.device.getInputQueue('color_control')
-        self.mono_control =     self.device.getInputQueue('mono_control')
-        self.stereo_control =   self.device.getInputQueue('stereo_control')
+        if self.do_stereo:
+            mono_control: dai.DataInputQueue =      self.device.getInputQueue('mono_control')
+            self.inputs[input.MONO_CONTROL] =       mono_control
+            sync_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='sync', maxSize=4, blocking=False)
+            self.outputs[output.SYNC_FRAMES_OUT] =  sync_queue
+            sync_queue.addCallback(self._sync_callback)
+        elif self.do_color:
+            color_control: dai.DataInputQueue =     self.device.getInputQueue('color_control')
+            self.inputs[input.COLOR_CONTROL] =      color_control
+            color_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='color', maxSize=4, blocking=False)
+            self.outputs[output.COLOR_FRAME_OUT] =  color_queue
+            color_queue.addCallback(self._color_callback)
+        else: # only mono
+            mono_control: dai.DataInputQueue =      self.device.getInputQueue('mono_control')
+            self.inputs[input.MONO_CONTROL] =       mono_control
+            left_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='left', maxSize=4, blocking=False)
+            self.outputs[output.LEFT_FRAME_OUT] =  left_queue
+            left_queue.addCallback(self._left_callback)
 
-        self.frame_queue.addCallback(self._frame_callback)
-        self.tracklet_queue.addCallback(self._tracker_callback)
+        if self.do_person:
+            self.tracklet_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
+            self.outputs[output.TRACKLETS_OUT] = self.tracklet_queue
+            self.tracklet_queue.addCallback(self._tracker_callback)
 
         print(f'Camera: {self.device_id} OPEN')
         self.device_open: bool =        True
@@ -115,11 +143,10 @@ class Core(Thread):
         self.device_open = False
 
         self.device.close()
-        self.stereo_control.close()
-        self.mono_control.close()
-        self.color_control.close()
-        self.frame_queue.close()
-        self.tracklet_queue.close()
+        for value in self.outputs.values():
+            value.close()
+        for value in self.inputs.values():
+            value.close()
 
         self.frame_callbacks.clear()
         self.preview_callbacks.clear()
@@ -127,32 +154,47 @@ class Core(Thread):
 
         print(f'Camera: {self.device_id} CLOSED')
 
-    def _frame_callback(self, message_group: dai.MessageGroup) -> None:
+    def _color_callback(self, msg: dai.ImgFrame) -> None:
         self._update_fps()
+        self.gui.update_from_frame()
 
+        self.settings.update_color_control(msg)
+        frame: ndarray = msg.getCvFrame()
+        self._update_callbacks(FrameType.VIDEO, frame)
+
+    def _left_callback(self, msg: dai.ImgFrame) -> None:
+        if not self.do_color:
+            self._update_fps()
+            self.gui.update_from_frame()
+
+        self.settings.update_mono_control(msg)
+        frame: ndarray = msg.getCvFrame()
+        self._update_callbacks(FrameType.LEFT, frame)
+
+    def _right_callback(self, msg: dai.ImgFrame) -> None:
+        frame: ndarray = msg.getCvFrame()
+        self._update_callbacks(FrameType.RIGHT, frame)
+
+    def _stereo_callback(self, msg: dai.ImgFrame) -> None:
+        frame: ndarray = msg.getCvFrame()
+        frame = applyColorMap(frame, COLORMAP_JET)
+        self._update_callbacks(FrameType.STEREO, frame)
+
+    def _sync_callback(self, message_group: dai.MessageGroup) -> None:
+        print('sync callback')
         for name, msg in message_group:
             if type(msg) == dai.ImgFrame:
-                frame: ndarray = msg.getCvFrame()
-                if name == 'video':
-                    # print(msg.getTimestamp(), 'hgv', msg.getTimestampDevice())
-                    self.settings.update_color_control(msg)
-                    self._update_callbacks(FrameType.VIDEO, frame)
-
+                if name == 'color':
+                    self._color_callback(msg)
                 elif name == 'left':
-                    self.settings.update_mono_control(msg)
-                    self._update_callbacks(FrameType.LEFT, frame)
-
+                    self._left_callback(msg)
                 elif name == 'right':
-                    self._update_callbacks(FrameType.RIGHT, frame)
-
+                    self._right_callback(msg)
                 elif name == 'stereo':
-                    frame = applyColorMap(frame, COLORMAP_JET)
-                    self._update_callbacks(FrameType.STEREO, frame)
-
-                self.gui.update_from_frame()
-
+                    self._stereo_callback(msg)
             else:
                 print('unknown message', name)
+
 
     def _tracker_callback(self, msg: dai.RawTracklets) -> None:
         self._update_tps()
@@ -171,6 +213,11 @@ class Core(Thread):
 
     def _update_tps(self) -> None:
         self.tps_counter.processed()
+
+    # CONTROL
+    def _send_control(self, input: input, control) -> None:
+        if input in self.inputs:
+            self.inputs[input].send(control)
 
     # CALLBACKS
     def _update_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
