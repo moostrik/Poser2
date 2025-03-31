@@ -1,3 +1,4 @@
+from depthai import DataInputQueue
 from modules.cam.depthcam.Core import *
 from modules.cam.depthcam.Definitions import FrameType
 from modules.cam.depthcam.Pipeline import get_stereo_config, get_frame_types
@@ -49,36 +50,46 @@ class CorePlayer(Core):
             print(f'Could not open device: {e}')
             return
 
-        self.frame_queue =      self.device.getOutputQueue(name='output_images', maxSize=4, blocking=False)
-        self.tracklet_queue =   self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
-        self.color_control =    self.device.getInputQueue(name='color_control')
-        self.mono_control =     self.device.getInputQueue(name='mono_control')
-        self.stereo_control =   self.device.getInputQueue(name='stereo_control')
-
-        self.ex_video =         self.device.getInputQueue(name='ex_video')
         if self.do_stereo:
-            self.ex_left =          self.device.getInputQueue(name='ex_left')
-            self.ex_right =         self.device.getInputQueue(name='ex_right')
+            stereo_control: dai.DataInputQueue =    self.device.getInputQueue('stereo_control')
+            self.inputs[input.STEREO_CONTROL] =     stereo_control
+            ex_left: dai.DataInputQueue =           self.device.getInputQueue(name='ex_left')
+            self.inputs[input.LEFT_FRAME_IN] =      ex_left
+            ex_right: dai.DataInputQueue =          self.device.getInputQueue(name='ex_right')
+            self.inputs[input.RIGHT_FRAME_IN] =     ex_right
+            color_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='color', maxSize=4, blocking=False)
+            self.outputs[output.COLOR_FRAME_OUT] =  color_queue
+            color_queue.addCallback(self._color_callback)
+            left_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='left', maxSize=4, blocking=False)
+            self.outputs[output.LEFT_FRAME_OUT] =   left_queue
+            left_queue.addCallback(self._left_callback)
+            right_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='right', maxSize=4, blocking=False)
+            self.outputs[output.RIGHT_FRAME_OUT] =  right_queue
+            right_queue.addCallback(self._right_callback)
+            if self.show_stereo:
+                stereo_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='stereo', maxSize=4, blocking=False)
+                self.outputs[output.STEREO_FRAME_OUT] = stereo_queue
+                stereo_queue.addCallback(self._stereo_callback)
+        if self.do_color:
+            ex_color: dai.DataInputQueue =          self.device.getInputQueue(name='ex_color')
+            self.inputs[input.COLOR_FRAME_IN] =     ex_color
+            color_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='color', maxSize=4, blocking=False)
+            self.outputs[output.COLOR_FRAME_OUT] =  color_queue
+            color_queue.addCallback(self._color_callback)
+        if not self.do_stereo and not self.do_color: # only mono
+            ex_left: dai.DataInputQueue =           self.device.getInputQueue(name='ex_left')
+            self.inputs[input.LEFT_FRAME_IN] =      ex_left
+            left_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='left', maxSize=4, blocking=False)
+            self.outputs[output.LEFT_FRAME_OUT] =   left_queue
+            left_queue.addCallback(self._left_callback)
 
-        self.frame_queue.addCallback(self._frame_callback)
-        self.tracklet_queue.addCallback(self._tracker_callback)
+        if self.do_person:
+            self.tracklet_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
+            self.outputs[output.TRACKLETS_OUT] = self.tracklet_queue
+            self.tracklet_queue.addCallback(self._tracker_callback)
 
         print(f'Camera: {self.device_id} OPEN')
         self.device_open: bool =        True
-
-    def _close(self) -> None: # override
-
-        self.closing = True
-        if not self.device_open: return
-        print(f'Camera: {self.device_id} CLOSING')
-        self.ex_video.close()
-        print('ex_video closed')
-        if self.do_stereo:
-            self.ex_left.close()
-            print('ex_left closed')
-            self.ex_right.close()
-            print('ex_right closed')
-        super()._close()
 
     # def _frame_callback(self, message_group: dai.MessageGroup) -> None: # override
     #     return
@@ -90,13 +101,13 @@ class CorePlayer(Core):
     def _video_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
 
         if not self.device_open or self.closing:
-            print(f'Camera: {self.device_id} NOT OPEN', self.device_open, self.closing)
-
+            # print(f'Camera: {self.device_id} NOT OPEN', self.device_open, self.closing)
             return
+
         current_time: float = time.monotonic()
         height, width = frame.shape[:2]
         if id == self.id:
-            if frame_type == FrameType.VIDEO:
+            if frame_type == FrameType.COLOR and input.COLOR_FRAME_IN in self.inputs:
 
                 img = dai.ImgFrame()
                 img.setType(dai.ImgFrame.Type.BGR888p)
@@ -106,9 +117,9 @@ class CorePlayer(Core):
                 img.setWidth(width)
                 img.setHeight(height)
 
-                self.ex_video.send(img)
+                self.inputs[input.COLOR_FRAME_IN].send(img)
 
-            if frame_type == FrameType.LEFT:
+            if frame_type == FrameType.LEFT and input.LEFT_FRAME_IN in self.inputs:
                 img = dai.ImgFrame()
                 img.setType(dai.ImgFrame.Type.RAW8)
                 img.setInstanceNum(dai.CameraBoardSocket.CAM_B) # type: ignore
@@ -117,10 +128,9 @@ class CorePlayer(Core):
                 img.setWidth(width)
                 img.setHeight(height)
 
-                if self.do_stereo:
-                    self.ex_left.send(img)
+                self.inputs[input.LEFT_FRAME_IN].send(img)
 
-            if frame_type == FrameType.RIGHT:
+            if frame_type == FrameType.RIGHT and input.RIGHT_FRAME_IN in self.inputs:
                 img = dai.ImgFrame()
                 img.setType(dai.ImgFrame.Type.RAW8)
                 img.setInstanceNum(dai.CameraBoardSocket.CAM_C) # type: ignore
@@ -128,8 +138,8 @@ class CorePlayer(Core):
                 img.setTimestamp(current_time) # type: ignore
                 img.setWidth(width)
                 img.setHeight(height)
-                if self.do_stereo:
-                    self.ex_right.send(img)
+
+                self.inputs[input.RIGHT_FRAME_IN].send(img)
 
     @staticmethod
     def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:

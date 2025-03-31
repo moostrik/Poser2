@@ -62,7 +62,7 @@ class Player:
         self.is_playing = False
         self.stop_event.set()
         if self.thread is not None:
-            self.thread.join()
+            self.thread.join(timeout=1)
 
     def _play(self) -> None:
         try:
@@ -71,8 +71,8 @@ class Player:
             self.is_playing = False
             return
 
-        pix_fmt: str = 'rgb24' if self.frameType == FrameType.VIDEO else 'gray'
-        bytes_per_frame = width * height * (3 if self.frameType == FrameType.VIDEO else 1)
+        pix_fmt: str = 'rgb24' if self.frameType == FrameType.COLOR else 'gray'
+        bytes_per_frame = width * height * (3 if self.frameType == FrameType.COLOR else 1)
 
         T: float = time.time()
         process = (

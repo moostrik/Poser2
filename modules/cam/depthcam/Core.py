@@ -27,6 +27,8 @@ class input(IntEnum):
 class output(IntEnum):
     COLOR_FRAME_OUT = auto()
     LEFT_FRAME_OUT = auto()
+    RIGHT_FRAME_OUT = auto()
+    STEREO_FRAME_OUT = auto()
     SYNC_FRAMES_OUT = auto()
     TRACKLETS_OUT = auto()
 
@@ -82,7 +84,7 @@ class Core(Thread):
             self.frame_callbacks[t] = set()
 
         # SETTINGS
-        self.preview_type =             FrameType.VIDEO
+        self.preview_type =             FrameType.COLOR
         self.settings: Settings =       Settings(self)
         self.gui: Gui =                 Gui(gui, self.settings)
 
@@ -114,6 +116,8 @@ class Core(Thread):
         if self.do_stereo:
             mono_control: dai.DataInputQueue =      self.device.getInputQueue('mono_control')
             self.inputs[input.MONO_CONTROL] =       mono_control
+            stereo_control: dai.DataInputQueue =    self.device.getInputQueue('stereo_control')
+            self.inputs[input.STEREO_CONTROL] =     stereo_control
             sync_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='sync', maxSize=4, blocking=False)
             self.outputs[output.SYNC_FRAMES_OUT] =  sync_queue
             sync_queue.addCallback(self._sync_callback)
@@ -127,7 +131,7 @@ class Core(Thread):
             mono_control: dai.DataInputQueue =      self.device.getInputQueue('mono_control')
             self.inputs[input.MONO_CONTROL] =       mono_control
             left_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='left', maxSize=4, blocking=False)
-            self.outputs[output.LEFT_FRAME_OUT] =  left_queue
+            self.outputs[output.LEFT_FRAME_OUT] =   left_queue
             left_queue.addCallback(self._left_callback)
 
         if self.do_person:
@@ -160,7 +164,7 @@ class Core(Thread):
 
         self.settings.update_color_control(msg)
         frame: ndarray = msg.getCvFrame()
-        self._update_callbacks(FrameType.VIDEO, frame)
+        self._update_callbacks(FrameType.COLOR, frame)
 
     def _left_callback(self, msg: dai.ImgFrame) -> None:
         if not self.do_color:
@@ -181,7 +185,6 @@ class Core(Thread):
         self._update_callbacks(FrameType.STEREO, frame)
 
     def _sync_callback(self, message_group: dai.MessageGroup) -> None:
-        print('sync callback')
         for name, msg in message_group:
             if type(msg) == dai.ImgFrame:
                 if name == 'color':

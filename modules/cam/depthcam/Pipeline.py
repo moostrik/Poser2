@@ -8,7 +8,7 @@ from modules.cam.depthcam.Definitions import *
 def get_frame_types(do_color: bool, do_stereo: bool, show_stereo) -> list[FrameType]:
     frame_types: list[FrameType] = [FrameType.NONE]
     if do_color:
-        frame_types.append(FrameType.VIDEO)
+        frame_types.append(FrameType.COLOR)
     else:
         frame_types.append(FrameType.LEFT)
     if do_stereo:
@@ -78,9 +78,9 @@ def setup_pipeline(
         if doColor:
             if doStereo:
                 if doPerson:
-                    SetupColorStereoPerson(pipeline, fps, lowres, showStereo, modelPath)
+                    SimulationColorStereoPerson(pipeline, fps, lowres, showStereo, modelPath)
                 else:
-                    SimulationColorStereo2(pipeline, fps, lowres, showStereo)
+                    SimulationColorStereo(pipeline, fps, lowres, showStereo)
             else:
                 if doPerson:
                     SimulationColorPerson(pipeline, fps, lowres, modelPath)
@@ -179,13 +179,14 @@ class SetupColorStereo(SetupColor):
         self.right.out.link(self.stereo.right)
 
         self.sync: dai.node.Sync = pipeline.create(dai.node.Sync)
-        syncThreshold = int(1250 / fps)
-        self.sync.setSyncAttempts(2)
-        self.sync.setSyncThreshold(timedelta(milliseconds=syncThreshold))
+        syncThreshold = timedelta(seconds=(1.0 / self.fps) * 0.5)
+        self.sync.setSyncThreshold(syncThreshold)
 
         self.color.video.link(self.sync.inputs["color"])
-        self.stereo.rectifiedLeft.link(self.sync.inputs["left"])
-        self.stereo.rectifiedRight.link(self.sync.inputs["right"])
+        # self.stereo.rectifiedLeft.link(self.sync.inputs["left"])
+        # self.stereo.rectifiedRight.link(self.sync.inputs["right"])
+        self.left.out.link(self.sync.inputs["left"])
+        self.right.out.link(self.sync.inputs["right"])
         if self.showStereo:
             self.stereo.disparity.link(self.sync.inputs["stereo"])
 
@@ -324,9 +325,8 @@ class SetupMonoStereo(SetupMono):
         self.right.out.link(self.stereo.right)
 
         self.sync: dai.node.Sync = pipeline.create(dai.node.Sync)
-        syncThreshold = int(1250 / fps)
-        self.sync.setSyncAttempts(0)
-        self.sync.setSyncThreshold(timedelta(milliseconds=syncThreshold))
+        syncThreshold = timedelta(seconds=(1.0 / self.fps) * 0.5)
+        self.sync.setSyncThreshold(syncThreshold)
 
         self.stereo.rectifiedLeft.link(self.sync.inputs["left"])
         self.stereo.rectifiedRight.link(self.sync.inputs["right"])
@@ -378,46 +378,7 @@ class SetupMonoStereoPerson(SetupMonoStereo):
         self.objectTracker.out.link(self.outputTracklets.input)
 
 
-class SimulationColor_O(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool) -> None:
-        super().__init__(pipeline, fps, lowres)
 
-        self.color: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-        self.color.setStreamName("video_in")
-        self.color.setMaxDataSize(1280*720*3)
-        self.color.out.link(self.sync.inputs["video"])
-
-class SimulationColorPerson_O(SimulationColor_O):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, model_path: str) -> None:
-        super().__init__(pipeline, fps, lowres)
-
-        self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(300, 300)
-        self.manip.initialConfig.setKeepAspectRatio(False)
-        self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-        self.color.out.link(self.manip.inputImage)
-
-        self.detectionNetwork: dai.node.MobileNetDetectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
-        nnPathDefault: Path = (Path(model_path) / DETECTION_MODEL6S).resolve().absolute()
-        self.detectionNetwork.setBlobPath(nnPathDefault)
-        self.detectionNetwork.setConfidenceThreshold(DETECTION_THRESHOLD)
-        self.detectionNetwork.setNumInferenceThreads(2)
-        self.detectionNetwork.input.setBlocking(False)
-        self.manip.out.link(self.detectionNetwork.input)
-
-        self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
-        self.objectTracker.setTrackerType(TRACKER_TYPE)
-        self.objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
-
-        if self.lowres:
-            self.detectionNetwork.passthrough.link(self.objectTracker.inputTrackerFrame)
-        else:
-            self.color.out.link(self.objectTracker.inputTrackerFrame)
-        self.detectionNetwork.passthrough.link(self.objectTracker.inputDetectionFrame)
-        self.detectionNetwork.out.link(self.objectTracker.inputDetections)
-
-        self.objectTracker.out.link(self.trackerOut.input)
 
 class SimulationColor(SetupColor):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool) -> None:
@@ -428,7 +389,8 @@ class SimulationColor(SetupColor):
         self.ex_color: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_color.setStreamName("ex_video")
         self.ex_color.setMaxDataSize(1280*720*3)
-        self.ex_color.out.link(self.sync.inputs["video"])
+
+        self.ex_color.out.link(self.outputColor.input)
 
 class SimulationColorPerson(SetupColorPerson):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, model_path: str) -> None:
@@ -439,36 +401,12 @@ class SimulationColorPerson(SetupColorPerson):
         self.ex_color: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_color.setStreamName("ex_video")
         self.ex_color.setMaxDataSize(1280*720*3)
-        self.ex_color.out.link(self.sync.inputs["video"])
+
         self.ex_color.out.link(self.manip.inputImage)
         if not self.lowres:
             self.color.video.link(self.objectTracker.inputTrackerFrame)
 
-class SimulationColorStereo(SetupColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showStereo: bool) -> None:
-        super().__init__(pipeline, fps, lowres, showStereo)
-
-        pipeline.remove(self.color)
-        pipeline.remove(self.left)
-        pipeline.remove(self.right)
-
-        self.stereo.setRectification(False)
-
-        self.ex_color: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-        self.ex_color.setStreamName("ex_video")
-        self.ex_color.setMaxDataSize(1280*720*3)
-        self.ex_color.out.link(self.sync.inputs["video"])
-
-        self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-        self.ex_left.setStreamName("ex_left")
-        self.ex_left.setMaxDataSize(1280*720*3)
-
-        self.ex_right: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-        self.ex_right.setStreamName("ex_right")
-        self.ex_right.setMaxDataSize(1280*720*3)
-
-        self.ex_left.out.link(self.stereo.left)
-        self.ex_right.out.link(self.stereo.right)
+        self.ex_color.out.link(self.outputColor.input)
 
 class SimulationColorStereo2(Setup):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showStereo: bool) -> None:
@@ -477,22 +415,24 @@ class SimulationColorStereo2(Setup):
         super().__init__(pipeline, fps, lowres)
         self.showStereo: bool = showStereo
 
-        self.sync.setSyncAttempts(0)
+        self.color: dai.node.Camera = pipeline.create(dai.node.Camera)
+        self.color.setCamera("color")
+        self.color.setSize(1280, 720)
+        self.color.setFps(self.fps)
+        # self.color.setMeshSource(dai.CameraProperties.WarpMeshSource.NONE)
+        self.color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
 
         self.ex_color: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-        self.ex_color.setStreamName("ex_video")
+        self.ex_color.setStreamName("ex_color")
         self.ex_color.setMaxDataSize(1280*720*3)
-        # self.ex_color.out.link(self.sync.inputs["video"])
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_left")
         self.ex_left.setMaxDataSize(1280*720*3)
-        # self.ex_left.out.link(self.sync.inputs["left"])
 
         self.ex_right: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_right.setStreamName("ex_right")
         self.ex_right.setMaxDataSize(1280*720*3)
-        # self.ex_right.out.link(self.sync.inputs["right"])
 
         self.stereo: dai.node.StereoDepth = pipeline.create(dai.node.StereoDepth)
         self.stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
@@ -500,12 +440,108 @@ class SimulationColorStereo2(Setup):
         self.stereo.setLeftRightCheck(True)
         self.stereo.setExtendedDisparity(False)
         self.stereo.setSubpixel(False)
-        self.stereo.setRectification(False)
+        self.stereo.setDepthAlign(dai.CameraBoardSocket.CENTER)
+        # self.stereo.setRectification(False)
+        self.ex_left.out.link(self.stereo.left)
+        self.ex_right.out.link(self.stereo.right)
+
+        self.outputColor: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.outputColor.setStreamName("color")
+        self.ex_color.out.link(self.outputColor.input)
+
+        self.outputLeft: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.outputLeft.setStreamName("left")
+        self.ex_left.out.link(self.outputLeft.input)
+
+        self.outputRight: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.outputRight.setStreamName("right")
+        self.ex_right.out.link(self.outputRight.input)
+
+        if self.showStereo:
+            self.outputStereo: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+            self.outputStereo.setStreamName("stereo")
+            self.stereo.disparity.link(self.outputStereo.input)
+
+        self.stereoControl: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+        self.stereoControl.setStreamName('stereo_control')
+        self.stereoControl.out.link(self.stereo.inputConfig)
+
+        # self.pipeline.remove(self.color)
+
+class SimulationColorStereo(SetupColorStereo):
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showStereo: bool) -> None:
+        super().__init__(pipeline, fps, lowres, showStereo)
+
+        pipeline.remove(self.left)
+        pipeline.remove(self.right)
+        pipeline.remove(self.sync)
+        pipeline.remove(self.outputSync)
+        pipeline.remove(self.colorControl)
+        pipeline.remove(self.monoControl)
+
+        self.ex_color: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+        self.ex_color.setStreamName("ex_color")
+        self.ex_color.setMaxDataSize(1280*720*3)
+
+        self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+        self.ex_left.setStreamName("ex_left")
+        self.ex_left.setMaxDataSize(1280*720*3)
+
+        self.ex_right: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+        self.ex_right.setStreamName("ex_right")
+        self.ex_right.setMaxDataSize(1280*720*3)
 
         self.ex_left.out.link(self.stereo.left)
         self.ex_right.out.link(self.stereo.right)
 
-        if self.showStereo:
-            self.stereo.disparity.link(self.sync.inputs["stereo"])
+        self.outputColor: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.outputColor.setStreamName("color")
+        self.ex_color.out.link(self.outputColor.input)
 
-        self.stereoControl.out.link(self.stereo.inputConfig)
+        self.outputLeft: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.outputLeft.setStreamName("left")
+        self.ex_left.out.link(self.outputLeft.input)
+
+        self.outputRight: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.outputRight.setStreamName("right")
+        self.ex_right.out.link(self.outputRight.input)
+
+        if self.showStereo:
+            self.outputStereo: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+            self.outputStereo.setStreamName("stereo")
+            self.stereo.disparity.link(self.outputStereo.input)
+
+class SimulationColorStereoPerson(SimulationColorStereo):
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showStereo: bool, model_path: str) -> None:
+        super().__init__(pipeline, fps, lowres, showStereo)
+
+        self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
+        self.manip.initialConfig.setResize(300, 300)
+        self.manip.initialConfig.setKeepAspectRatio(False)
+        self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
+        self.ex_color.out.link(self.manip.inputImage)
+
+        self.detectionNetwork: dai.node.MobileNetSpatialDetectionNetwork = pipeline.create(dai.node.MobileNetSpatialDetectionNetwork)
+        nnPathDefault: Path = (Path(model_path) / DETECTION_MODEL5S).resolve().absolute()
+        self.detectionNetwork.setBlobPath(nnPathDefault)
+        self.detectionNetwork.setConfidenceThreshold(DETECTION_THRESHOLD)
+        self.detectionNetwork.setNumInferenceThreads(2)
+        self.detectionNetwork.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
+        self.detectionNetwork.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
+        self.detectionNetwork.setDepthUpperThreshold(DEPTH_TRACKER_MAX_DEPTH)
+        self.detectionNetwork.input.setBlocking(False)
+        self.manip.out.link(self.detectionNetwork.input)
+        self.stereo.depth.link(self.detectionNetwork.inputDepth)
+
+        self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
+        self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
+        self.objectTracker.setTrackerType(TRACKER_TYPE)
+        self.objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
+
+        self.detectionNetwork.passthrough.link(self.objectTracker.inputTrackerFrame)
+        self.detectionNetwork.passthrough.link(self.objectTracker.inputDetectionFrame)
+        self.detectionNetwork.out.link(self.objectTracker.inputDetections)
+
+        self.trackerOut: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.trackerOut.setStreamName("tracklets")
+        self.objectTracker.out.link(self.trackerOut.input)
