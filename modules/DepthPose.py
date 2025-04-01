@@ -22,7 +22,7 @@ class CamType(Enum):
 class DepthPose():
     def __init__(self, path: str, camera_list: list[str], fps: int, numPlayers: int,
                  color: bool, stereo: bool, person: bool, lowres: bool, showStereo: bool,
-                 lightning: bool, noPose:bool, simulation: bool) -> None:
+                 lightning: bool, noPose:bool, simulation: bool, passthrough: bool) -> None:
         self.path: str =    path
         modelPath: str =    os.path.join(path, 'models')
         recorderPath: str = os.path.join(path, 'recordings')
@@ -30,7 +30,6 @@ class DepthPose():
 
         frame_types: list[FrameType] = get_frame_types(color, stereo, showStereo)
         num_cameras: int = len(camera_list)
-        print(f'num_cameras: {num_cameras}')
 
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(num_cameras, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
@@ -38,12 +37,10 @@ class DepthPose():
         self.recorder = Recorder(self.gui, recorderPath, num_cameras, frame_types, 10.0, EncoderType.iGPU)
         self.player: Player = Player(recorderPath, num_cameras, frame_types, HwAccelerationType.CPU)
 
-        # DepthCam.get_device_list(verbose=True)
-
         self.cameras: list[DepthCam | DepthSimulator] = []
-        if simulation:
+        if simulation or passthrough:
             for cam_id in camera_list:
-                self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo))
+                self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo, passthrough))
         else:
             for cam_id in camera_list:
                 camera = DepthCam(self.gui, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo)
@@ -98,29 +95,20 @@ class DepthPose():
 
     def stop(self) -> None:
         self.player.clearFrameCallbacks()
-        print('stop Player')
         self.player.stop()
+        self.player.join()
 
-        time.sleep(0.1)
-
-        print ('stop Cameras')
         for camera in self.cameras:
             camera.stop()
 
-        print('stop Detector')
         self.detector.stop()
-        print('stop Recorder')
         self.recorder.stop()
 
-        print('stop GUI')
         self.gui.exit_callback = None
         self.gui.stop()
 
         self.detector.join()
         self.recorder.join()
-        print('Join Player')
-        self.player.join()
-        print('Join Cameras')
         for camera in self.cameras:
             camera.join()
 

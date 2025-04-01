@@ -1,4 +1,4 @@
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 from pathlib import Path
 from numpy import ndarray
 from typing import Set, Dict
@@ -49,6 +49,7 @@ class SyncPlayer(Thread):
             for c in range(self.num_cams)
         }
 
+        self.callback_lock: Lock = Lock()
         self.frameCallbacks: Set[FrameCallback] = set()
 
     def stop(self) -> None:
@@ -104,8 +105,9 @@ class SyncPlayer(Thread):
                     player.stop()
 
     def _frame_callback(self, cam_id: int, frameType: FrameType, frame: ndarray) -> None:
-        for callback in self.frameCallbacks:
-            callback(cam_id, frameType, frame)
+        with self.callback_lock:
+            for callback in self.frameCallbacks:
+                callback(cam_id, frameType, frame)
 
     def _stop_callback(self, chunk_id: int) -> None:
         message: StateMessage = StateMessage(State.NEXT, chunk_id)
@@ -131,11 +133,14 @@ class SyncPlayer(Thread):
 
     # CALLBACKS
     def addFrameCallback(self, callback: FrameCallback) -> None:
-        self.frameCallbacks.add(callback)
+        with self.callback_lock:
+            self.frameCallbacks.add(callback)
     def discardFrameCallback(self, callback: FrameCallback) -> None:
-        self.frameCallbacks.discard(callback)
+        with self.callback_lock:
+            self.frameCallbacks.discard(callback)
     def clearFrameCallbacks(self) -> None:
-        self.frameCallbacks.clear()
+        with self.callback_lock:
+            self.frameCallbacks.clear()
 
     # STATIC METHODS
     @staticmethod

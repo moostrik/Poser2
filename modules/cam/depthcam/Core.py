@@ -105,7 +105,7 @@ class Core(Thread):
 
         if Core._pipeline is None:
             Core._pipeline = dai.Pipeline()
-            setup_pipeline(Core._pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo)
+            self._setup_pipeline(Core._pipeline)
 
         try:
             self.device = self._try_device(self.device_id, Core._pipeline, num_tries=3)
@@ -113,6 +113,15 @@ class Core(Thread):
             print(f'Could not open device: {e}')
             return
 
+        self._setup_queues()
+
+        print(f'Camera: {self.device_id} OPEN')
+        self.device_open: bool =        True
+
+    def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
+            setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo, simulate=False)
+
+    def _setup_queues(self) -> None:
         if self.do_stereo:
             mono_control: dai.DataInputQueue =      self.device.getInputQueue('mono_control')
             self.inputs[input.MONO_CONTROL] =       mono_control
@@ -133,14 +142,10 @@ class Core(Thread):
             video_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='video', maxSize=4, blocking=False)
             self.outputs[output.VIDEO_FRAME_OUT] =   video_queue
             video_queue.addCallback(self._video_callback)
-
         if self.do_person:
             self.tracklet_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
             self.outputs[output.TRACKLETS_OUT] = self.tracklet_queue
             self.tracklet_queue.addCallback(self._tracker_callback)
-
-        print(f'Camera: {self.device_id} OPEN')
-        self.device_open: bool =        True
 
     def _close(self) -> None:
         if not self.device_open: return
