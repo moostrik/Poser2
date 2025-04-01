@@ -8,21 +8,19 @@ from datetime import timedelta
 
 class CorePlayer(Core):
 
-    def __init__(self, gui, syncplayer: SyncPlayer, device_id: str, model_path:str, fps: int = 30,
-                 do_color: bool = True, do_stereo: bool = True, do_person: bool = True,
-                 lowres: bool = False, show_stereo: bool = False, passthrough: bool = False) -> None:
+    def __init__(self, gui, syncplayer: SyncPlayer, device_id: str, settings:GeneralSettings) -> None:
 
-        if do_stereo and not do_person:
+        if settings.stereo and not settings.person:
             show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
 
-        super().__init__(gui, device_id, model_path, fps, do_color, do_stereo, do_person, lowres, show_stereo)
+        super().__init__(gui, device_id, settings)
 
         self.sync_player: SyncPlayer = syncplayer
         self.ex_video:  dai.DataInputQueue
         self.ex_left:   dai.DataInputQueue
         self.ex_right:  dai.DataInputQueue
 
-        self.passthrough: bool = passthrough
+        self.passthrough: bool = settings.passthrough
 
     def start(self) -> None: # override
         if self.passthrough:

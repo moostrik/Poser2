@@ -7,6 +7,7 @@ from signal import signal, SIGINT
 from sys import exit
 from time import sleep
 from modules.DepthPose import DepthPose
+from modules.Settings import Settings
 
 parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-fps',     '--fps',        type=int,   default=30,     help='frames per second')
@@ -31,11 +32,26 @@ camera_list: list[str] = ['14442C10F124D9D600',
 
 camera_list: list[str] = ['14442C10F124D9D600']
 
+settings: Settings = Settings()
+settings.root_path =    currentPath
+settings.model_path =   path.join(currentPath, 'models')
+settings.video_path =   path.join(currentPath, 'recordings')
+settings.temp_path =    path.join(currentPath, 'temp')
+settings.file_path =    path.join(currentPath, 'files')
+settings.camera_list =  camera_list
+settings.fps =          args.fps
+settings.num_players =  args.players
+settings.color =    not args.mono
+settings.stereo =   not args.nostereo
+settings.lowres =   not args.highres
+settings.person =   not args.noyolo
+settings.show_stereo =  args.showstereo
+settings.lightning =    args.lightning
+settings.pose =     not args.nopose
+settings.simulation =   args.simulation
+settings.passthrough =  args.passthrough
 
-
-app: DepthPose = DepthPose(currentPath, camera_list, args.fps, args.players,
-                           not args.mono, not args.nostereo, not args.noyolo, not args.highres, args.showstereo,
-                           args.lightning, args.nopose, args.simulation, args.passthrough)
+app: DepthPose = DepthPose(settings)
 app.start()
 
 def signal_handler_exit(sig, frame) -> None:

@@ -1,3 +1,4 @@
+from modules.Settings import Settings
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder, EncoderType
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player, HwAccelerationType
@@ -13,47 +14,35 @@ import os
 from enum import Enum
 import time
 
-class CamType(Enum):
-    DEPTH   = 1
-    VIMBA   = 2
-    WEB     = 3
-    IMAGE   = 4
 
 class DepthPose():
-    def __init__(self, path: str, camera_list: list[str], fps: int, numPlayers: int,
-                 color: bool, stereo: bool, person: bool, lowres: bool, showStereo: bool,
-                 lightning: bool, noPose:bool, simulation: bool, passthrough: bool) -> None:
-        self.path: str =    path
-        modelPath: str =    os.path.join(path, 'models')
-        recorderPath: str = os.path.join(path, 'recordings')
-        self.noPose: bool = noPose
+    def __init__(self, settings: Settings) -> None:
 
-        frame_types: list[FrameType] = get_frame_types(color, stereo, showStereo)
-        num_cameras: int = len(camera_list)
+        frame_types: list[FrameType] = get_frame_types(settings.color, settings.stereo, settings.show_stereo)
+        num_cameras: int = len(settings.camera_list)
 
-        self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
-        self.render = Render(num_cameras, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
+        self.gui = Gui('DepthPose', settings.file_path, 'default')
+        self.render = Render(num_cameras, settings.num_players, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
 
-        self.recorder = Recorder(self.gui, recorderPath, num_cameras, frame_types, 4.0, EncoderType.iGPU)
-        self.player: Player = Player(recorderPath, num_cameras, frame_types, HwAccelerationType.CPU)
+        self.recorder = Recorder(self.gui, settings.video_path, settings.temp_path, num_cameras, frame_types, 4.0, EncoderType.iGPU)
+        self.player: Player = Player(settings.video_path, num_cameras, frame_types, HwAccelerationType.CPU)
 
         self.cameras: list[DepthCam | DepthSimulator] = []
-        if simulation or passthrough:
-            for cam_id in camera_list:
-                self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo, passthrough))
+        if settings.simulation or settings.passthrough:
+            for cam_id in settings.camera_list:
+                self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, settings))
         else:
-            for cam_id in camera_list:
-                camera = DepthCam(self.gui, cam_id, modelPath, fps, color, stereo, person, lowres, showStereo)
+            for cam_id in settings.camera_list:
+                camera = DepthCam(self.gui, cam_id, settings)
                 self.cameras.append(camera)
 
         if len(self.cameras) == 0:
             print('No cameras available')
 
-        modelType: ModelType = ModelType.LIGHTNING if lightning else ModelType.THUNDER
-        if self.noPose:
+        modelType: ModelType = ModelType.LIGHTNING if settings.lightning else ModelType.THUNDER
+        if not settings.pose:
             modelType = ModelType.NONE
-
-        self.detector = Manager(max_persons=numPlayers, num_cams=1, model_path=modelPath, model_type=modelType)
+        self.detector = Manager(settings.num_players, num_cameras, settings.model_path, modelType)
 
         self.running: bool = False
 

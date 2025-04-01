@@ -18,9 +18,10 @@ class RecState(Enum):
     STOP =  auto()
 
 class SyncRecorder(Thread):
-    def __init__(self, output_path: str, num_cams: int, types: list[FrameType], chunk_duration: float, encoder: EncoderType) -> None:
+    def __init__(self, output_path: str, temp_path: str,  num_cams: int, types: list[FrameType], chunk_duration: float, encoder: EncoderType) -> None:
         super().__init__()
         self.output_path: Path = Path(output_path)
+        self.temp_path: Path = Path(temp_path)
         self.num_cams: int = num_cams
         self.types: list[FrameType] = types
         self.recorders: dict[int, dict[FrameType, FFmpegRecorder]] = {}

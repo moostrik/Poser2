@@ -10,6 +10,7 @@ from typing import Set
 from threading import Thread, Event
 from enum import IntEnum, auto
 
+from modules.Settings import Settings as GeneralSettings
 from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types
 from modules.cam.depthcam.Definitions import *
 from modules.cam.depthcam.Settings import Settings
@@ -36,9 +37,7 @@ class Core(Thread):
     _id_counter = 0
     _pipeline: dai.Pipeline | None = None
 
-    def __init__(self, gui, device_id: str, model_path:str, fps: int = 30,
-                 do_color: bool = True, do_stereo: bool = True, do_person: bool = True,
-                 lowres: bool = False, show_stereo: bool = False) -> None:
+    def __init__(self, gui, device_id: str, general_settings:GeneralSettings) -> None:
 
         super().__init__()
         self.stop_event = Event()
@@ -50,13 +49,13 @@ class Core(Thread):
         self.device_id: str =           device_id
 
         # FIXED SETTINGS
-        self.model_path: str =          model_path
-        self.fps: int =                 fps
-        self.do_color: bool =           do_color
-        self.do_stereo: bool =          do_stereo
-        self.do_person: bool =          do_person
-        self.lowres: bool =             lowres
-        self.show_stereo: bool =        show_stereo
+        self.model_path: str =          general_settings.model_path
+        self.fps: int =                 general_settings.fps
+        self.do_color: bool =           general_settings.color
+        self.do_stereo: bool =          general_settings.stereo
+        self.do_person: bool =          general_settings.person
+        self.lowres: bool =             general_settings.lowres
+        self.show_stereo: bool =        general_settings.show_stereo
 
         # DAI
         self.device_open: bool =        False
@@ -71,7 +70,7 @@ class Core(Thread):
         self.tps_counter =              FPS(120)
 
         # FRAME TYPES
-        self.frame_types: list[FrameType] = get_frame_types(do_color, do_stereo, show_stereo)
+        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo)
         self.frame_types.sort(key=lambda x: x.value)
 
         # CALLBACKS
