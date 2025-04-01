@@ -5,7 +5,7 @@ import time
 from enum import Enum, auto
 from queue import Queue, Empty
 
-from modules.cam.recorder.Recorder import Recorder, EncoderType
+from modules.cam.recorder.FFmpegRecorder import FFmpegRecorder, EncoderType
 from modules.cam.depthcam.Definitions import FrameType, FRAME_TYPE_LABEL_DICT
 
 def make_path(path: Path, c: int, t: FrameType, chunk: int) -> Path:
@@ -23,7 +23,7 @@ class SyncRecorder(Thread):
         self.output_path: Path = Path(output_path)
         self.num_cams: int = num_cams
         self.types: list[FrameType] = types
-        self.recorders: dict[int, dict[FrameType, Recorder]] = {}
+        self.recorders: dict[int, dict[FrameType, FFmpegRecorder]] = {}
         self.path: Path = Path()
 
         if FrameType.NONE in self.types:
@@ -34,7 +34,7 @@ class SyncRecorder(Thread):
         for c in range(num_cams):
             self.recorders[c] = {}
             for t in types:
-                self.recorders[c][t] = Recorder(encoder)
+                self.recorders[c][t] = FFmpegRecorder(encoder)
 
         self.chunk_duration: float = chunk_duration
         self.start_time: float
@@ -98,9 +98,8 @@ class SyncRecorder(Thread):
 
             for c in range(self.num_cams):
                 for t in self.types:
-                    self.recorders[c][t].stop()
                     path: Path = make_path(self.path, c, t, self.chunk_index)
-                    self.recorders[c][t].start(str(path), fps)
+                    self.recorders[c][t].split(str(path), fps)
             self.start_time += self.chunk_duration
 
     def _get_state(self) -> RecState:

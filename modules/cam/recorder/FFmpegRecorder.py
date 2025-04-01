@@ -3,6 +3,7 @@ import ffmpeg
 import numpy as np
 from queue import Queue, Empty
 from enum import Enum
+from time import sleep
 
 class EncoderType(Enum):
     CPU =   0
@@ -15,38 +16,55 @@ EncoderString: dict[EncoderType, str] = {
     EncoderType.iGPU: 'h264_qsv'
 }
 
-class Recorder:
+class FFmpegRecorder:
     def __init__(self, encoder: EncoderType) -> None:
         self.output_file: str = ''
         self.fps: float = 30.0
         self.is_recording = False
+        self.is_receiving = False
         self.frames = Queue()
         self.thread = None
         self.vcodec: str = EncoderString[encoder]
 
     def start(self, output_file: str, fps: float) -> None:
         if self.is_recording:
-            print('Already recording')
             return
         self.fps = fps
         self.output_file = output_file
-        self.is_recording = True
+        self.is_receiving = True
         self.thread = Thread(target=self._record)
         self.thread.start()
 
     def stop(self) -> None:
+        if not self.is_recording:
+            return
+        self.is_receiving = False
+        while not self.frames.empty():
+            sleep(0.01)
+
         self.is_recording = False
         if self.thread is not None:
             self.thread.join()
 
-    def add_frame(self, frame) -> None:
+    def split(self, output_file: str, fps: float) -> None:
+        if not self.is_recording:
+            return
         if self.is_recording:
+            self.is_recording = False
+        if self.thread is not None:
+            self.thread.join()
+
+        self.start(output_file, fps)
+
+    def add_frame(self, frame) -> None:
+        if self.is_receiving:
             self.frames.put(frame)
 
     def _record(self) -> None:
+        self.is_recording = True
         process = None
 
-        while self.is_recording or not self.frames.empty():
+        while self.is_recording:
             frame: np.ndarray
             try:
                 frame = self.frames.get(timeout=.1)

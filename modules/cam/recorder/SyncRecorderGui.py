@@ -1,6 +1,7 @@
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
-from modules.cam.recorder.SyncRecorder import SyncRecorder, EncoderType
+from modules.cam.recorder.SyncRecorder import SyncRecorder
+from modules.cam.recorder.FFmpegRecorder import EncoderType
 from modules.cam.depthcam.Definitions import FrameType
 
 class SyncRecorderGui(SyncRecorder):

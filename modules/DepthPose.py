@@ -34,7 +34,7 @@ class DepthPose():
         self.gui = Gui('DepthPose', os.path.join(path, 'files'), 'default')
         self.render = Render(num_cameras, numPlayers, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
 
-        self.recorder = Recorder(self.gui, recorderPath, num_cameras, frame_types, 10.0, EncoderType.iGPU)
+        self.recorder = Recorder(self.gui, recorderPath, num_cameras, frame_types, 4.0, EncoderType.iGPU)
         self.player: Player = Player(recorderPath, num_cameras, frame_types, HwAccelerationType.CPU)
 
         self.cameras: list[DepthCam | DepthSimulator] = []
@@ -76,7 +76,6 @@ class DepthPose():
         self.detector.start()
         self.detector.addCallback(self.render.add_person)
 
-        self.recorder.start()
         self.player.start()
 
         self.gui.exit_callback = self.stop
@@ -90,6 +89,7 @@ class DepthPose():
         for camera in self.cameras:
             camera.gui.gui_check()
         self.recorder.gui_check() # start after gui to prevent record at startup
+        self.recorder.start()
 
         self.running = True
 
