@@ -38,18 +38,26 @@ settings.model_path =   path.join(currentPath, 'models')
 settings.video_path =   path.join(currentPath, 'recordings')
 settings.temp_path =    path.join(currentPath, 'temp')
 settings.file_path =    path.join(currentPath, 'files')
+
 settings.camera_list =  camera_list
 settings.fps =          args.fps
-settings.num_players =  args.players
 settings.color =    not args.mono
 settings.stereo =   not args.nostereo
 settings.lowres =   not args.highres
 settings.person =   not args.noyolo
 settings.show_stereo =  args.showstereo
-settings.lightning =    args.lightning
-settings.pose =     not args.nopose
 settings.simulation =   args.simulation
 settings.passthrough =  args.passthrough
+
+settings.num_players =  args.players
+settings.lightning =    args.lightning
+settings.pose =     not args.nopose
+
+settings.chunk_length = 4.0
+settings.encoder =      Settings.CoderType.iGPU
+settings.decoder =      Settings.CoderType.iGPU
+
+settings.check()
 
 app: DepthPose = DepthPose(settings)
 app.start()

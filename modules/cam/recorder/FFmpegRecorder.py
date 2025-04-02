@@ -5,26 +5,16 @@ from queue import Queue, Empty
 from enum import Enum
 from time import sleep
 
-class EncoderType(Enum):
-    CPU =   0
-    GPU =   1
-    iGPU =  2
-
-EncoderString: dict[EncoderType, str] = {
-    EncoderType.CPU:  'libx264',
-    EncoderType.GPU:  'h264_nvenc',
-    EncoderType.iGPU: 'h264_qsv'
-}
 
 class FFmpegRecorder:
-    def __init__(self, encoder: EncoderType) -> None:
+    def __init__(self, encoder_string: str) -> None:
         self.output_file: str = ''
         self.fps: float = 30.0
         self.is_recording = False
         self.is_receiving = False
         self.frames = Queue()
         self.thread = None
-        self.vcodec: str = EncoderString[encoder]
+        self.vcodec: str = encoder_string
 
     def start(self, output_file: str, fps: float) -> None:
         if self.is_recording:

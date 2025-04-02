@@ -1,13 +1,13 @@
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
 from modules.cam.recorder.SyncRecorder import SyncRecorder
-from modules.cam.recorder.FFmpegRecorder import EncoderType
 from modules.cam.depthcam.Definitions import FrameType
 
+from modules.Settings import Settings
 class SyncRecorderGui(SyncRecorder):
-    def __init__(self, gui: Gui | None, output_path: str, temp_path: str, num_cams: int, types: list[FrameType], chunk_duration: float, encoder: EncoderType) -> None:
+    def __init__(self, gui: Gui | None, settings: Settings, num_cams: int, types: list[FrameType]) -> None:
         self.gui: Gui | None = gui
-        super().__init__(output_path, temp_path, num_cams, types, chunk_duration, encoder)
+        super().__init__(settings, num_cams, types)
 
         elem: list = []
         elem.append([E(eT.CHCK, 'Rec',    self.record, False),

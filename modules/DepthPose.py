@@ -1,6 +1,6 @@
 from modules.Settings import Settings
 from modules.cam.DepthCam import DepthCam, DepthSimulator
-from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder, EncoderType
+from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player, HwAccelerationType
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
@@ -24,7 +24,7 @@ class DepthPose():
         self.gui = Gui('DepthPose', settings.file_path, 'default')
         self.render = Render(num_cameras, settings.num_players, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
 
-        self.recorder = Recorder(self.gui, settings.video_path, settings.temp_path, num_cameras, frame_types, 4.0, EncoderType.iGPU)
+        self.recorder = Recorder(self.gui, settings, num_cameras, frame_types)
         self.player: Player = Player(settings.video_path, num_cameras, frame_types, HwAccelerationType.CPU)
 
         self.cameras: list[DepthCam | DepthSimulator] = []

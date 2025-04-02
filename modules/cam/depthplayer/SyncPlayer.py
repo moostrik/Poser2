@@ -7,7 +7,7 @@ from queue import Queue
 
 from modules.cam.depthcam.Definitions import FrameType, FrameCallback
 from modules.cam.depthplayer.Player import Player, HwAccelerationType
-from modules.cam.recorder.SyncRecorder import make_path
+from modules.cam.recorder.SyncRecorder import make_file_name
 
 class State(Enum):
     IDLE = auto()
@@ -91,7 +91,7 @@ class SyncPlayer(Thread):
             for t in self.types:
                 player: Player | None = self.players[c].get(t)
                 if player:
-                    path: Path = make_path(folder_path, c, t, chunk)
+                    path: Path = folder_path / make_file_name(c, t, chunk)
                     if path.is_file():
                         player.start(str(path), chunk)
                     else:
