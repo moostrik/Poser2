@@ -47,6 +47,7 @@ class SyncRecorder(Thread):
 
         self.types: list[FrameType] = types
         self.recorders: dict[int, dict[FrameType, FFmpegRecorder]] = {}
+        self.fps: dict[int, float] = {}
         self.folder_path: Path = Path()
 
         if FrameType.NONE in self.types:
@@ -56,6 +57,7 @@ class SyncRecorder(Thread):
 
         for c in range(num_cams):
             self.recorders[c] = {}
+            self.fps[c] = settings.fps
             for t in types:
                 self.recorders[c][t] = FFmpegRecorder(EncoderString[settings.encoder])
 
@@ -63,7 +65,6 @@ class SyncRecorder(Thread):
         self.start_time: float
         self.chunk_index = 0
         self.rec_name: str
-        self.fps: float = 30.0
 
         self.state: RecState = RecState.IDLE
         self.state_lock = Lock()
@@ -102,9 +103,10 @@ class SyncRecorder(Thread):
         self.chunk_index = 0
 
         for c in range(self.num_cams):
+            fps: float = self.get_fps(c)
             for t in self.types:
                 path: Path = self.folder_path / make_file_name(c, t, self.chunk_index)
-                self.recorders[c][t].start(str(path), self.fps)
+                self.recorders[c][t].start(str(path), fps)
 
         self.start_time = time.time()
         self.recording = True
@@ -117,9 +119,9 @@ class SyncRecorder(Thread):
     def _update_recording(self) -> None:
         if time.time() - self.start_time > self.chunk_length:
             self.chunk_index += 1
-            fps: float = self.get_fps()
 
             for c in range(self.num_cams):
+                fps: float = self.get_fps(c)
                 for t in self.types:
                     path: Path = self.folder_path / make_file_name(c, t, self.chunk_index)
                     self.recorders[c][t].split(str(path), fps)
@@ -144,11 +146,11 @@ class SyncRecorder(Thread):
 
     def set_fps(self, cam_id: int, fps: float) -> None:
         with self.settings_lock:
-            self.fps = fps
+            self.fps[cam_id] = fps
 
-    def get_fps(self) -> float:
+    def get_fps(self, cam_id) -> float:
         with self.settings_lock:
-            return self.fps
+            return self.fps[cam_id]
 
     def record(self, value: bool) -> None:
         if value:
