@@ -82,11 +82,12 @@ class FFmpegPlayer:
         self._play_thread.start()
 
     def stop(self) -> None:
-        if self._play_thread is None:
-            return
-        self.stop_event.set()
-        self._play_thread.join()
-        self._play_thread = None
+        if self._load_thread is not None:
+            self._load_thread.join()
+        if self._play_thread is not None:
+            self.stop_event.set()
+            self._play_thread.join()
+            self._play_thread = None
 
     def _load(self, video_file: str, chunk_id: int) -> None:
         try:
@@ -144,9 +145,7 @@ class FFmpegPlayer:
 
             self.frame_callback(self.cam_id, self.frame_type, frame)
 
-        T: float = time.time()
         self.ffmpeg_process.stdout.close()
-        print('closing time:', time.time() - T)
 
     def _get_video_dimensions(self, video_file: str) -> tuple:
         probe = ffmpeg.probe(video_file)

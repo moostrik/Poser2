@@ -41,6 +41,7 @@ settings.temp_path =    path.join(currentPath, 'temp')
 settings.file_path =    path.join(currentPath, 'files')
 
 settings.camera_list =  camera_list
+settings.num_cams =     len(camera_list)
 settings.fps =          args.fps
 settings.color =    not args.mono
 settings.stereo =   not args.nostereo
@@ -52,11 +53,11 @@ settings.passthrough =  args.passthrough
 
 settings.num_players =  args.players
 settings.pose =     not args.nopose
-settings.model_type  = ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
+settings.model_type =   ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
 
 settings.chunk_length = 4.0
 settings.encoder =      Settings.CoderType.iGPU
-settings.decoder =      Settings.CoderType.iGPU
+settings.decoder =      Settings.CoderType.CPU
 settings.frame_types =  [FrameType.VIDEO, FrameType.LEFT, FrameType.RIGHT] if settings.stereo else [FrameType.VIDEO]
 
 settings.check_values()

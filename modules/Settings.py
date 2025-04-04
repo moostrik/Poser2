@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from enum import Enum
 
 from modules.cam.depthcam.Definitions import get_device_list
@@ -13,38 +14,38 @@ class Settings():
 
     def __init__(self) -> None:
         # PATHS
-        self.root_path: str
-        self.model_path: str
-        self.video_path: str
-        self.temp_path: str
-        self.file_path: str
+        self.root_path: str                 = None # type: ignore
+        self.model_path: str                = None # type: ignore
+        self.video_path: str                = None # type: ignore
+        self.temp_path: str                 = None # type: ignore
+        self.file_path: str                 = None # type: ignore
 
         # CAMERA SETTINGS
-        self.camera_list: list[str]
-        self.num_cams: int
-        self.fps: int
-        self.color: bool
-        self.stereo: bool
-        self.person: bool
-        self.lowres: bool
-        self.show_stereo: bool
-        self.simulation: bool
-        self.passthrough: bool
+        self.camera_list: list[str]         = None # type: ignore
+        self.num_cams: int                  = None # type: ignore
+        self.fps: int                       = None # type: ignore
+        self.color: bool                    = None # type: ignore
+        self.stereo: bool                   = None # type: ignore
+        self.person: bool                   = None # type: ignore
+        self.lowres: bool                   = None # type: ignore
+        self.show_stereo: bool              = None # type: ignore
+        self.simulation: bool               = None # type: ignore
+        self.passthrough: bool              = None # type: ignore
 
         # DETECTION SETTINGS
-        self.num_players: int
-        self.model_type: ModelType
-        self.pose: bool
-        self.num_cams: int
+        self.num_players: int               = None # type: ignore
+        self.model_type: ModelType          = None # type: ignore
+        self.pose: bool                     = None # type: ignore
 
         # RECORDER AND PLAYER SETTINGS
-        self.chunk_length: float
-        self.encoder: Settings.CoderType
-        self.decoder: Settings.CoderType
-        self.frame_types: list[FrameType]
+        self.chunk_length: float            = None # type: ignore
+        self.encoder: Settings.CoderType    = None # type: ignore
+        self.decoder: Settings.CoderType    = None # type: ignore
+        self.frame_types: list[FrameType]   = None # type: ignore
+
 
     def check_values(self) -> None:
-        for key, value in vars(self).items():
+         for key, value in vars(self).items():
             if value is None:
                 raise ValueError(f"'{key}' is not set")
 

@@ -27,7 +27,6 @@ class Main():
                 self.cameras.append(camera)
 
         self.detector = Detector(settings)
-
         self.running: bool = False
 
     def start(self) -> None:

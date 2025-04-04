@@ -85,19 +85,23 @@ class SyncPlayer(Thread):
 
     def run(self) -> None:
         state: State = State.IDLE
-        while True:
-            try:
-                message: Message = self.state_messages.get(block=False)
-            except Exception as e:
-                # print(f"Error getting message: {e}")
-                continue
 
-            if message.state == MessageType.START:
+        while True:
+            message: Message | None = None
+            try:
+                message = self.state_messages.get(block=False)
+            except Exception as e:
+                message = None
+
+            if message:
+                print(f"Message: {message.state}, {message.value}")
+
+            if message and message.state == MessageType.START:
                 # make thread safe
                     self.current_folder = message.value
                     self.playback_chunk = -1
                     state = State.LOAD
-            elif message.state == MessageType.STOP:
+            if message and message.state == MessageType.STOP:
                 state = State.STOP
 
             if state == State.LOAD:
@@ -113,12 +117,15 @@ class SyncPlayer(Thread):
                 self._load()
             if state == State.STOP:
                 self._stop()
-                self.state = State.STOPPING
+                state = State.STOPPING
             if state == State.STOPPING and self._finished_stopping():
                 state = State.IDLE
+            self.clean()
 
             if self.stop_event.is_set() and state == State.IDLE:
                 break
+
+            # print(state)
             sleep(0.01)
 
     def _load(self) -> None:
@@ -149,6 +156,11 @@ class SyncPlayer(Thread):
             self.closers.append(p)
         self.players.clear()
 
+    def clean(self) -> None:
+        for p in self.closers:
+            if not p.is_playing() and not p.is_loading():
+                self.closers.remove(p)
+
     def _finished_loading(self) -> bool:
         for p in self.loaders:
             if not p.is_loaded():
@@ -164,6 +176,7 @@ class SyncPlayer(Thread):
     def _finished_stopping(self) -> bool:
         for p in self.closers:
             if p.is_playing() or p.is_loading():
+
                 return False
         return True
 
