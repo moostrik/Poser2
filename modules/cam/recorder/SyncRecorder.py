@@ -14,15 +14,19 @@ def make_file_name(c: int, t: FrameType, chunk: int) -> str:
 def make_folder_name(num_cams: int, color: bool, stereo: bool, lowres: bool) -> str:
     return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_color' if color else '_mono') + ('_stereo' if stereo else '') + ('_lowres' if lowres else '_highres')
 
-def get_folder_name_settings(name: str) -> tuple[int, bool, bool, bool]:
-    parts = name.split('_')
+def is_folder_for_settings(name: str, settings: Settings) -> bool:
+    parts: list[str] = name.split('_')
     if not parts[1].isdigit() or not ('color' in parts or 'mono' in parts) or not  ('lowres' in parts or 'highres' in parts):
-        raise ValueError(f"Invalid folder name: {name}. Expected format: YYYYMMDD-HHMMSS_num_cams_color|mono_stereo|none_lowres|highres")
+        return False
     num_cams = int(parts[1])
     color: bool = 'color' in parts
     stereo: bool = 'stereo' in parts
     lowres: bool = 'lowres' in parts
-    return num_cams, color, stereo, lowres
+    if num_cams == settings.num_cams and color == settings.color and stereo == settings.stereo and lowres == settings.lowres:
+        return True
+    return False
+
+
 
 EncoderString: dict[Settings.CoderType, str] = {
     Settings.CoderType.CPU:  'libx264',

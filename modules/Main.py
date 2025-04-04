@@ -1,18 +1,10 @@
 from modules.Settings import Settings
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
-from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player, HwAccelerationType
+from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
-from modules.person.pose.PoseDetection import ModelType
 from modules.person.Manager import Manager as Detector
-
-from modules.cam.depthcam.Definitions import FrameType
-from modules.cam.depthcam.Pipeline import get_frame_types
-
-import os
-from enum import Enum
-import time
 
 
 class Main():
@@ -20,14 +12,16 @@ class Main():
         self.gui = Gui('DepthPose', settings.file_path, 'default')
         self.render = Render(settings.num_cams, settings.num_players, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
 
-        self.recorder = Recorder(self.gui, settings)
-        self.player: Player = Player(settings)
+        self.recorder: Recorder | None = None
+        self.player: Player | None = None
 
         self.cameras: list[DepthCam | DepthSimulator] = []
         if settings.simulation or settings.passthrough:
+            self.player = Player(self.gui, settings)
             for cam_id in settings.camera_list:
                 self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, settings))
         else:
+            self.recorder = Recorder(self.gui, settings)
             for cam_id in settings.camera_list:
                 camera = DepthCam(self.gui, cam_id, settings)
                 self.cameras.append(camera)
@@ -35,7 +29,6 @@ class Main():
         self.detector = Detector(settings)
 
         self.running: bool = False
-
 
     def start(self) -> None:
         self.render.exit_callback = self.stop
@@ -45,8 +38,9 @@ class Main():
         for camera in self.cameras:
             camera.add_preview_callback(self.render.set_cam_image)
             camera.add_frame_callback(self.detector.set_image)
-            camera.add_frame_callback(self.recorder.add_frame)
-            camera.add_fps_callback(self.recorder.set_fps)
+            if self.recorder:
+                camera.add_frame_callback(self.recorder.add_frame)
+                camera.add_fps_callback(self.recorder.set_fps)
             camera.add_tracker_callback(self.detector.add_tracklet)
             camera.add_tracker_callback(self.render.add_tracklet)
             camera.start()
@@ -54,39 +48,49 @@ class Main():
         self.detector.addCallback(self.render.add_person)
         self.detector.start()
 
-        self.player.start()
+        if self.player:
+            self.player.start()
 
         self.gui.exit_callback = self.stop
 
         for camera in self.cameras:
             self.gui.addFrame([camera.gui.get_gui_color_frame(), camera.gui.get_gui_depth_frame()])
-        self.gui.addFrame([self.recorder.get_gui_frame(), self.player.get_gui_frame()])
+        if self.player:
+            self.gui.addFrame([self.player.get_gui_frame()])
+        if self.recorder:
+            self.gui.addFrame([self.recorder.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
 
         for camera in self.cameras:
             camera.gui.gui_check()
-        self.recorder.gui_check()
-        self.recorder.start() # start after gui to prevent record at startup
+
+        if self.player:
+            self.player.gui_check()
+        if self.recorder:
+            self.recorder.gui_check()
+            self.recorder.start() # start after gui to prevent record at startup
 
         self.running = True
 
     def stop(self) -> None:
-        self.player.clearFrameCallbacks()
-        self.player.stop()
-        self.player.join()
+        if self.player:
+            self.player.clearFrameCallbacks()
+            self.player.stop()
+            self.player.join()
 
         for camera in self.cameras:
             camera.stop()
 
         self.detector.stop()
-        self.recorder.stop()
+        if self.recorder:
+            self.recorder.stop()
+            self.recorder.join()
 
         self.gui.exit_callback = None
         self.gui.stop()
 
         self.detector.join()
-        self.recorder.join()
         for camera in self.cameras:
             camera.join()
 

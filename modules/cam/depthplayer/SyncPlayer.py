@@ -4,16 +4,20 @@ from numpy import ndarray
 from typing import Set, Dict
 from enum import Enum, auto
 from queue import Queue
+from time import sleep
 
 from modules.Settings import Settings
 from modules.cam.depthcam.Definitions import FrameType, FrameCallback
-from modules.cam.depthplayer.Player import Player, HwAccelerationType
-from modules.cam.recorder.SyncRecorder import make_file_name
+from modules.cam.depthplayer.FFmpegPlayer import FFmpegPlayer
+from modules.cam.recorder.SyncRecorder import make_file_name, is_folder_for_settings
 
 class State(Enum):
     IDLE = auto()
-    PLAY = auto()
+    LOAD = auto()
+    LOADING = auto()
+    PLAYING = auto()
     STOP = auto()
+    STOPPING = auto()
     NEXT = auto()
 
 HwaccelString: dict[Settings.CoderType, str] = {
@@ -28,11 +32,15 @@ HwaccelDeviceString: dict[Settings.CoderType, str] = {
     Settings.CoderType.iGPU: '1'
 }
 
+class MessageType(Enum):
+    START = auto()
+    STOP = auto()
+    NEXT = auto()
 
-class StateMessage():
-    def __init__(self, state: State, value = None) -> None:
-        self.state: State = state
-        self.value = value
+class Message():
+    def __init__(self, state: MessageType, value: str = '') -> None:
+        self.state: MessageType = state
+        self.value: str = value
 
 class Folder():
     def __init__(self, name: str, path: Path, chunks: int) -> None:
@@ -49,19 +57,22 @@ class SyncPlayer(Thread):
         self.num_cams: int = settings.num_cams
         self.types: list[FrameType] = settings.frame_types
 
-        self.state_messages: Queue[StateMessage] = Queue()
+        self.state_messages: Queue[Message] = Queue()
 
         self.stop_event = Event()
 
         self.playback_name: str = ''
         self.playback_chunk: int = -1
 
-        self.folders: FolderDict = self._get_video_folders(self.input_path)
+        self.folders: FolderDict = self._get_video_folders(settings)
+        self.current_folder: str = ''
 
-        self.players: Dict[int, Dict[FrameType, Player]] = {
-            c: {t: Player(c, t, self._frame_callback, self._stop_callback, HwaccelString[settings.decoder], HwaccelDeviceString[settings.decoder]) for t in self.types}
-            for c in range(self.num_cams)
-        }
+        self.hwt: str = HwaccelString[settings.decoder]
+        self.hwd: str = HwaccelDeviceString[settings.decoder]
+
+        self.players: list[FFmpegPlayer] = []
+        self.loaders: list[FFmpegPlayer] = []
+        self.closers: list[FFmpegPlayer] = []
 
         self.callback_lock: Lock = Lock()
         self.frameCallbacks: Set[FrameCallback] = set()
@@ -73,57 +84,93 @@ class SyncPlayer(Thread):
         self.join()
 
     def run(self) -> None:
-        while not self.stop_event.is_set():
+        state: State = State.IDLE
+        while True:
             try:
-                state_message: StateMessage = self.state_messages.get(timeout=0.1)
+                message: Message = self.state_messages.get(block=False)
             except Exception as e:
+                # print(f"Error getting message: {e}")
                 continue
-            if state_message.state == State.PLAY:
-                if type(state_message.value) is str:
-                    self.playback_chunk = 0
-                    self.playback_name: str = state_message.value
-                    self._start_players(self.playback_name, self.playback_chunk)
-            elif state_message.state == State.STOP:
-                self.playback_chunk = -1
-                self._stop_players()
-            elif state_message.state == State.NEXT:
-                if type(state_message.value) is int:
-                    chunk: int = state_message.value
-                    if self.playback_chunk == chunk:
-                        max_chunk: int = self.folders[self.playback_name].chunks
-                        self.playback_chunk = (self.playback_chunk + 1) % (max_chunk + 1)
-                        self._stop_players()
-                        self._start_players(self.playback_name, self.playback_chunk)
 
-    def _start_players(self, name: str, chunk: int) -> None:
-        folder: Folder = self.folders[name]
-        folder_path: Path = Path(folder.path)
+            if message.state == MessageType.START:
+                # make thread safe
+                    self.current_folder = message.value
+                    self.playback_chunk = -1
+                    state = State.LOAD
+            elif message.state == MessageType.STOP:
+                state = State.STOP
+
+            if state == State.LOAD:
+                self._stop()
+                self._load()
+                state = State.LOADING
+            if state == State.LOADING and self._finished_loading():
+                self._start()
+                self._load()
+                state = State.PLAYING
+            if state == State.PLAYING and self._finished_playing() and self._finished_loading():
+                self._start()
+                self._load()
+            if state == State.STOP:
+                self._stop()
+                self.state = State.STOPPING
+            if state == State.STOPPING and self._finished_stopping():
+                state = State.IDLE
+
+            if self.stop_event.is_set() and state == State.IDLE:
+                break
+            sleep(0.01)
+
+    def _load(self) -> None:
+        folder: Folder = self.folders[self.current_folder]
+        self.playback_chunk = (self.playback_chunk + 1) % (folder.chunks + 1)
 
         for c in range(self.num_cams):
             for t in self.types:
-                player: Player | None = self.players[c].get(t)
-                if player:
-                    path: Path = folder_path / make_file_name(c, t, chunk)
-                    if path.is_file():
-                        player.start(str(path), chunk)
-                    else:
-                        print(f"File {path} not found")
+                path: Path = folder.path / make_file_name(c, t, self.playback_chunk)
+                if path.is_file():
+                    player: FFmpegPlayer = FFmpegPlayer(c, t, self._frame_callback, self.hwt, self.hwd)
+                    player.load(str(path), self.playback_chunk)
+                    self.loaders.append(player)
 
-    def _stop_players(self) -> None:
-        for c in range(self.num_cams):
-            for t in self.types:
-                player: Player | None = self.players[c].get(t)
-                if player:
-                    player.stop()
+    def _start(self) -> None:
+        for p in self.loaders:
+            p.play()
+            self.players.append(p)
+        self.loaders.clear()
+
+    def _stop(self) -> None:
+        for p in self.loaders:
+            p.stop()
+            self.closers.append(p)
+        self.players.clear()
+        for p in self.players:
+            p.stop()
+            self.closers.append(p)
+        self.players.clear()
+
+    def _finished_loading(self) -> bool:
+        for p in self.loaders:
+            if not p.is_loaded():
+                return False
+        return True
+
+    def _finished_playing(self) -> bool:
+        for p in self.players:
+            if not p.is_playing():
+                return True
+        return False
+
+    def _finished_stopping(self) -> bool:
+        for p in self.closers:
+            if p.is_playing() or p.is_loading():
+                return False
+        return True
 
     def _frame_callback(self, cam_id: int, frameType: FrameType, frame: ndarray) -> None:
         with self.callback_lock:
             for callback in self.frameCallbacks:
                 callback(cam_id, frameType, frame)
-
-    def _stop_callback(self, chunk_id: int) -> None:
-        message: StateMessage = StateMessage(State.NEXT, chunk_id)
-        self.state_messages.put(message)
 
     # EXTERNAL METHODS
     def play(self, value: bool, name: str = '') -> None:
@@ -131,10 +178,9 @@ class SyncPlayer(Thread):
             if not name in self.folders:
                 print(f"Folder {name} not found")
                 return
-            message: StateMessage = StateMessage(State.PLAY, name)
+            message: Message = Message(MessageType.START, name)
         else:
-            message: StateMessage = StateMessage(State.STOP)
-        # print('sending message', message.state)
+            message: Message = Message(MessageType.STOP)
         self.state_messages.put(message)
 
     def get_folder_names(self) -> list[str]:
@@ -142,6 +188,9 @@ class SyncPlayer(Thread):
 
     def get_chunks(self, folder: str) -> int:
         return self.folders[folder].chunks if folder in self.folders else 0
+
+    def get_current_chunk(self) -> int:
+        return self.playback_chunk
 
     # CALLBACKS
     def addFrameCallback(self, callback: FrameCallback) -> None:
@@ -156,16 +205,20 @@ class SyncPlayer(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _get_video_folders(path: Path) -> FolderDict :
+    def _get_video_folders(settings: Settings) -> FolderDict :
         folders: FolderDict = {}
-        for paths in path.iterdir():
-            if paths.is_dir():
+        video_path: Path = Path(settings.video_path)
+        for folder in video_path.iterdir():
+            if folder.is_dir():
+                if not is_folder_for_settings(str(folder), settings):
+                    continue
                 max_chunk: int = 0
-                for file in paths.iterdir():
+                for file in folder.iterdir():
                     if file.is_file() and file.name.endswith('.mp4'):
                         n: str = file.stem.split('_')[2]
                         if n.isdigit():
                             max_chunk = max(max_chunk, int(n))
                 if max_chunk > 0:
-                    folders[paths.name] = (Folder(paths.name, paths, max_chunk))
+                    folders[folder.name] = (Folder(folder.name, folder, max_chunk))
         return folders
+
