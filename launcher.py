@@ -6,7 +6,8 @@ from os import path
 from signal import signal, SIGINT
 from sys import exit
 from time import sleep
-from modules.DepthPose import DepthPose
+
+from modules.Main import Main
 from modules.Settings import Settings, ModelType, FrameType
 
 parser: ArgumentParser = ArgumentParser()
@@ -61,7 +62,7 @@ settings.frame_types =  [FrameType.VIDEO, FrameType.LEFT, FrameType.RIGHT] if se
 settings.check_values()
 settings.check_cameras()
 
-app: DepthPose = DepthPose(settings)
+app: Main = Main(settings)
 app.start()
 
 def signal_handler_exit(sig, frame) -> None:

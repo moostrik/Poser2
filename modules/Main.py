@@ -5,7 +5,7 @@ from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player, HwAcc
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.pose.PoseDetection import ModelType
-from modules.person.Manager import Manager
+from modules.person.Manager import Manager as Detector
 
 from modules.cam.depthcam.Definitions import FrameType
 from modules.cam.depthcam.Pipeline import get_frame_types
@@ -15,7 +15,7 @@ from enum import Enum
 import time
 
 
-class DepthPose():
+class Main():
     def __init__(self, settings: Settings) -> None:
         self.gui = Gui('DepthPose', settings.file_path, 'default')
         self.render = Render(settings.num_cams, settings.num_players, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
@@ -32,7 +32,7 @@ class DepthPose():
                 camera = DepthCam(self.gui, cam_id, settings)
                 self.cameras.append(camera)
 
-        self.detector = Manager(settings)
+        self.detector = Detector(settings)
 
         self.running: bool = False
 
@@ -43,16 +43,16 @@ class DepthPose():
         self.render.start()
 
         for camera in self.cameras:
-            camera.start()
-            camera.add_preview_callback(self.detector.set_image)
             camera.add_preview_callback(self.render.set_cam_image)
-            camera.add_tracker_callback(self.detector.add_tracklet)
-            camera.add_tracker_callback(self.render.add_tracklet)
+            camera.add_frame_callback(self.detector.set_image)
             camera.add_frame_callback(self.recorder.add_frame)
             camera.add_fps_callback(self.recorder.set_fps)
+            camera.add_tracker_callback(self.detector.add_tracklet)
+            camera.add_tracker_callback(self.render.add_tracklet)
+            camera.start()
 
-        self.detector.start()
         self.detector.addCallback(self.render.add_person)
+        self.detector.start()
 
         self.player.start()
 
@@ -66,8 +66,8 @@ class DepthPose():
 
         for camera in self.cameras:
             camera.gui.gui_check()
-        self.recorder.gui_check() # start after gui to prevent record at startup
-        self.recorder.start()
+        self.recorder.gui_check()
+        self.recorder.start() # start after gui to prevent record at startup
 
         self.running = True
 
@@ -90,10 +90,9 @@ class DepthPose():
         for camera in self.cameras:
             camera.join()
 
-
         self.render.exit_callback = None
         self.render.stop()
-        # self.render.join()
+        # self.render.join() # does not work
 
         self.running = False
 

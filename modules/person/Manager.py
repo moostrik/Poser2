@@ -136,6 +136,8 @@ class Manager(Thread):
 
     # INPUTS
     def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
+        if frame_type != FrameType.VIDEO:
+            return
         with self.input_mutex:
             self.input_frames[id] = image
     def get_image(self, id: int) -> np.ndarray:
