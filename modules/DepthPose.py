@@ -17,15 +17,11 @@ import time
 
 class DepthPose():
     def __init__(self, settings: Settings) -> None:
-
-        frame_types: list[FrameType] = get_frame_types(settings.color, settings.stereo, settings.show_stereo)
-        num_cameras: int = len(settings.camera_list)
-
         self.gui = Gui('DepthPose', settings.file_path, 'default')
-        self.render = Render(num_cameras, settings.num_players, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
+        self.render = Render(settings.num_cams, settings.num_players, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
 
-        self.recorder = Recorder(self.gui, settings, num_cameras, frame_types)
-        self.player: Player = Player(settings.video_path, num_cameras, frame_types, HwAccelerationType.CPU)
+        self.recorder = Recorder(self.gui, settings)
+        self.player: Player = Player(settings)
 
         self.cameras: list[DepthCam | DepthSimulator] = []
         if settings.simulation or settings.passthrough:
@@ -36,13 +32,7 @@ class DepthPose():
                 camera = DepthCam(self.gui, cam_id, settings)
                 self.cameras.append(camera)
 
-        if len(self.cameras) == 0:
-            print('No cameras available')
-
-        modelType: ModelType = ModelType.LIGHTNING if settings.lightning else ModelType.THUNDER
-        if not settings.pose:
-            modelType = ModelType.NONE
-        self.detector = Manager(settings.num_players, num_cameras, settings.model_path, modelType)
+        self.detector = Manager(settings)
 
         self.running: bool = False
 
@@ -58,9 +48,8 @@ class DepthPose():
             camera.add_preview_callback(self.render.set_cam_image)
             camera.add_tracker_callback(self.detector.add_tracklet)
             camera.add_tracker_callback(self.render.add_tracklet)
-            for T in self.recorder.types:
-                camera.add_frame_callback(T, self.recorder.add_frame)
-                camera.add_fps_callback(self.recorder.set_fps)
+            camera.add_frame_callback(self.recorder.add_frame)
+            camera.add_fps_callback(self.recorder.set_fps)
 
         self.detector.start()
         self.detector.addCallback(self.render.add_person)

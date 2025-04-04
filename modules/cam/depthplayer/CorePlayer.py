@@ -8,7 +8,7 @@ from datetime import timedelta
 
 class CorePlayer(Core):
 
-    def __init__(self, gui, syncplayer: SyncPlayer, device_id: str, settings:GeneralSettings) -> None:
+    def __init__(self, gui, syncplayer: SyncPlayer, device_id: str, settings:Settings) -> None:
 
         if settings.stereo and not settings.person:
             show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)

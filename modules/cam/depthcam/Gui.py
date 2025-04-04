@@ -1,6 +1,6 @@
 import math
 
-from modules.cam.depthcam.Settings import Settings
+from modules.cam.depthcam.CoreSettings import CoreSettings
 from modules.cam.depthcam.Definitions import *
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
@@ -16,9 +16,9 @@ def gsfr(range: tuple[int, int]) -> float:
     return get_steps_from_range(range)
 
 class Gui():
-    def __init__(self, gui: G, settings: Settings) -> None:
+    def __init__(self, gui: G, settings: CoreSettings) -> None:
         self.gui: G = gui
-        self.settings: Settings = settings
+        self.settings: CoreSettings = settings
 
         self.id: str = self.settings.get_id_string()
         self.ftn: list[str] = self.settings.get_frame_type_names()

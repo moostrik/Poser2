@@ -1,7 +1,7 @@
 import numpy as np
 from enum import Enum
 from typing import Callable
-from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f
+from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device
 
 
 DETECTION_MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
@@ -53,7 +53,18 @@ STEREO_FILTER_NAMES: list[str] = [e.name for e in StereoMedianFilterType]
 
 
 FrameCallback = Callable[[int, FrameType, np.ndarray], None]
-PreviewCallback = Callable[[int, np.ndarray], None]
 DetectionCallback = Callable[[int, ImgDetection], None]
 TrackerCallback = Callable[[int, Tracklet], None]
 FPSCallback = Callable[[int, float], None]
+
+def get_device_list(verbose: bool = False) -> list[str]:
+    device_list: list[str] = []
+    if verbose:
+        print('-- CAMERAS --------------------------------------------------')
+    for device in Device.getAllAvailableDevices():
+        device_list.append(device.getMxId())
+        if verbose:
+            print(f"Camera: {device.getMxId()} {device.state}")
+    if verbose:
+        print('-------------------------------------------------------------')
+    return device_list

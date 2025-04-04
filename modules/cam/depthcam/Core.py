@@ -10,10 +10,10 @@ from typing import Set
 from threading import Thread, Event
 from enum import IntEnum, auto
 
-from modules.Settings import Settings as GeneralSettings
+from modules.Settings import Settings
 from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types
 from modules.cam.depthcam.Definitions import *
-from modules.cam.depthcam.Settings import Settings
+from modules.cam.depthcam.CoreSettings import CoreSettings
 from modules.cam.depthcam.Gui import Gui
 from modules.utils.FPS import FPS
 
@@ -37,7 +37,7 @@ class Core(Thread):
     _id_counter = 0
     _pipeline: dai.Pipeline | None = None
 
-    def __init__(self, gui, device_id: str, general_settings:GeneralSettings) -> None:
+    def __init__(self, gui, device_id: str, general_settings:Settings) -> None:
 
         super().__init__()
         self.stop_event = Event()
@@ -74,17 +74,14 @@ class Core(Thread):
         self.frame_types.sort(key=lambda x: x.value)
 
         # CALLBACKS
-        self.preview_callbacks: Set[PreviewCallback] = set()
+        self.preview_callbacks: Set[FrameCallback] = set()
+        self.frame_callbacks: Set[FrameCallback] = set()
         self.tracker_callbacks: Set[TrackerCallback] = set()
         self.fps_callbacks: Set[FPSCallback] = set()
-        self.frame_callbacks: dict[FrameType, Set[FrameCallback]] = {}
-        for t in self.frame_types:
-            if t == FrameType.NONE: continue
-            self.frame_callbacks[t] = set()
 
         # SETTINGS
         self.preview_type =             FrameType.VIDEO
-        self.settings: Settings =       Settings(self)
+        self.settings: CoreSettings =       CoreSettings(self)
         self.gui: Gui =                 Gui(gui, self.settings)
 
     def stop(self) -> None:
@@ -97,7 +94,7 @@ class Core(Thread):
             self._close()
 
     def _open(self) -> None:
-        device_list: list[str] = Core.get_device_list(verbose=False)
+        device_list: list[str] = get_device_list(verbose=False)
         if self.device_id not in device_list:
             print(f'Camera: {self.device_id} NOT AVAILABLE')
             return
@@ -226,22 +223,22 @@ class Core(Thread):
 
     # CALLBACKS
     def _update_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
-        for c in self.frame_callbacks[frame_type]:
+        for c in self.frame_callbacks:
             c(self.id, frame_type, frame)
         if self.preview_type == frame_type:
             for c in self.preview_callbacks:
-                c(self.id, frame)
+                c(self.id, frame_type, frame)
 
-    def add_frame_callback(self, frame_type: FrameType, callback: FrameCallback) -> None:
-        self.frame_callbacks[frame_type].add(callback)
-    def discard_frame_callback(self, frameType: FrameType, callback: FrameCallback) -> None:
-        self.frame_callbacks[frameType].discard(callback)
+    def add_frame_callback(self, callback: FrameCallback) -> None:
+        self.frame_callbacks.add(callback)
+    def discard_frame_callback(self, callback: FrameCallback) -> None:
+        self.frame_callbacks.discard(callback)
     def clear_frame_callbacks(self) -> None:
         self.frame_callbacks.clear()
 
-    def add_preview_callback(self, callback: PreviewCallback) -> None:
+    def add_preview_callback(self, callback: FrameCallback) -> None:
         self.preview_callbacks.add(callback)
-    def discard_preview_callback(self, callback: PreviewCallback) -> None:
+    def discard_preview_callback(self, callback: FrameCallback) -> None:
         self.preview_callbacks.discard(callback)
     def clear_preview_callbacks(self) -> None:
         self.preview_callbacks.clear()
@@ -272,18 +269,7 @@ class Core(Thread):
                 continue
         raise Exception('Failed to open device after multiple attempts')
 
-    @staticmethod
-    def get_device_list(verbose: bool = False) -> list[str]:
-        device_list: list[str] = []
-        if verbose:
-            print('-- CAMERAS --------------------------------------------------')
-        for device in dai.Device.getAllAvailableDevices():
-            device_list.append(device.getMxId())
-            if verbose:
-                print(f"Camera: {device.getMxId()} {device.state}")
-        if verbose:
-            print('-------------------------------------------------------------')
-        return device_list
+
 
 
 

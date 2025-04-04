@@ -28,13 +28,16 @@ PlayerCallback = Callable[[int, FrameType, np.ndarray], None]
 EndCallback = Callable[[int], None]
 
 class Player:
-    def __init__(self, cam_id: int, frameType: FrameType, frameCallback: PlayerCallback, endCallback: EndCallback, hw_acceleration: HwAccelerationType) -> None:
+    def __init__(self, cam_id: int, frameType: FrameType,
+                 frameCallback: PlayerCallback, endCallback: EndCallback,
+                 hw_acceleration_type: str = '', hw_acceleration_device: str = '') -> None:
         self.frame_callback: PlayerCallback = frameCallback
         self.end_callback: EndCallback = endCallback
 
         self.cam_id: int = cam_id
         self.frameType: FrameType = frameType
-        self.hw_acceleration: HwAccelerationType = hw_acceleration
+        self.hw_acceleration_type: str = hw_acceleration_type
+        self.hw_acceleration_device: str = hw_acceleration_device
 
         self.is_playing = False
         self.thread = None

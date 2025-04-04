@@ -11,17 +11,18 @@ from modules.cam.depthcam.Definitions import FrameType, FRAME_TYPE_LABEL_DICT
 def make_file_name(c: int, t: FrameType, chunk: int) -> str:
     return f"{c}_{FRAME_TYPE_LABEL_DICT[t]}_{chunk:03d}.mp4"
 
-def make_folder_name(num_cams: int, color: bool, lowres: bool) -> str:
-    return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_color' if color else '_mono') + ('_lowres' if lowres else '_highres')
+def make_folder_name(num_cams: int, color: bool, stereo: bool, lowres: bool) -> str:
+    return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_color' if color else '_mono') + ('_stereo' if stereo else '') + ('_lowres' if lowres else '_highres')
 
-def get_folder_name_settings(name: str) -> tuple[int, bool, bool]:
+def get_folder_name_settings(name: str) -> tuple[int, bool, bool, bool]:
     parts = name.split('_')
-    if len(parts) != 4 or not parts[1].isdigit() or not parts[2] in ['color', 'mono'] or not parts[3] in ['lowres', 'highres']:
-        raise ValueError(f"Invalid folder name: {name}. Expected format: YYYYMMDD-HHMMSS_num_cams_mono|stereo_lowres|highres")
+    if not parts[1].isdigit() or not ('color' in parts or 'mono' in parts) or not  ('lowres' in parts or 'highres' in parts):
+        raise ValueError(f"Invalid folder name: {name}. Expected format: YYYYMMDD-HHMMSS_num_cams_color|mono_stereo|none_lowres|highres")
     num_cams = int(parts[1])
-    color: bool = parts[2] == 'color'
-    lowres: bool = parts[3] == 'lowres'
-    return num_cams, color, lowres
+    color: bool = 'color' in parts
+    stereo: bool = 'stereo' in parts
+    lowres: bool = 'lowres' in parts
+    return num_cams, color, stereo, lowres
 
 EncoderString: dict[Settings.CoderType, str] = {
     Settings.CoderType.CPU:  'libx264',
@@ -36,41 +37,30 @@ class RecState(Enum):
     STOP =  auto()
 
 class SyncRecorder(Thread):
-    def __init__(self, settings: Settings, num_cams: int, types: list[FrameType]) -> None:
+    def __init__(self, settings: Settings) -> None:
         super().__init__()
         self.output_path: Path = Path(settings.video_path)
         self.temp_path: Path = Path(settings.temp_path)
 
-        self.num_cams: int = num_cams
-        self.color: bool = settings.color
-        self.lowres: bool = settings.lowres
+        self.settings: Settings = settings
 
-        self.types: list[FrameType] = types
         self.recorders: dict[int, dict[FrameType, FFmpegRecorder]] = {}
         self.fps: dict[int, float] = {}
         self.folder_path: Path = Path()
 
-        if FrameType.NONE in self.types:
-            self.types.remove(FrameType.NONE)
-        if FrameType.STEREO in self.types:
-            self.types.remove(FrameType.STEREO)
-
-        for c in range(num_cams):
+        for c in range(settings.num_cams):
             self.recorders[c] = {}
             self.fps[c] = settings.fps
-            for t in types:
+            for t in self.settings.frame_types:
                 self.recorders[c][t] = FFmpegRecorder(EncoderString[settings.encoder])
 
-        self.chunk_length: float = settings.chunk_length
         self.start_time: float
         self.chunk_index = 0
         self.rec_name: str
 
         self.state: RecState = RecState.IDLE
         self.state_lock = Lock()
-
         self.settings_lock = Lock()
-
         self.stop_event = Event()
 
     def stop(self) -> None:
@@ -95,16 +85,15 @@ class SyncRecorder(Thread):
         self._stop_recording()
 
     def _start_recording(self) -> None:
-        self.rec_name = time.strftime("%Y%m%d-%H%M%S") + '_' + str(self.num_cams) + '_' + '_'.join([FRAME_TYPE_LABEL_DICT[t] for t in self.types])
 
-        self.folder_path = self.output_path / make_folder_name(self.num_cams, self.color, self.lowres)
+        self.folder_path = self.output_path / make_folder_name(self.settings.num_cams, self.settings.color, self.settings.stereo, self.settings.lowres)
         self.folder_path.mkdir(parents=True, exist_ok=True)
 
         self.chunk_index = 0
 
-        for c in range(self.num_cams):
+        for c in range(self.settings.num_cams):
             fps: float = self.get_fps(c)
-            for t in self.types:
+            for t in self.settings.frame_types:
                 path: Path = self.folder_path / make_file_name(c, t, self.chunk_index)
                 self.recorders[c][t].start(str(path), fps)
 
@@ -112,20 +101,20 @@ class SyncRecorder(Thread):
         self.recording = True
 
     def _stop_recording(self) -> None:
-        for c in range(self.num_cams):
-            for t in self.types:
+        for c in range(self.settings.num_cams):
+            for t in self.settings.frame_types:
                 self.recorders[c][t].stop()
 
     def _update_recording(self) -> None:
-        if time.time() - self.start_time > self.chunk_length:
+        if time.time() - self.start_time > self.settings.chunk_length:
             self.chunk_index += 1
 
-            for c in range(self.num_cams):
+            for c in range(self.settings.num_cams):
                 fps: float = self.get_fps(c)
-                for t in self.types:
+                for t in self.settings.frame_types:
                     path: Path = self.folder_path / make_file_name(c, t, self.chunk_index)
                     self.recorders[c][t].split(str(path), fps)
-            self.start_time += self.chunk_length
+            self.start_time += self.settings.chunk_length
 
     def _get_state(self) -> RecState:
         with self.state_lock:

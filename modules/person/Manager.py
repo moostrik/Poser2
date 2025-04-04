@@ -3,8 +3,9 @@ import numpy as np
 from threading import Thread, Lock
 from time import time, sleep
 
+from modules.Settings import Settings
 from modules.person.Person import Person, PersonDict, PersonCallback, CamTracklet
-from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f
+from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.pose.PoseDetection import PoseDetection, ModelType, ModelTypeNames
 from modules.person.CircularCoordinates import CircularCoordinates
 
@@ -29,28 +30,28 @@ class IdPool:
         return len(self._available)
 
 class Manager(Thread):
-    def __init__(self, max_persons: int, num_cams: int, model_path: str, model_type: ModelType) -> None:
+    def __init__(self, settings: Settings) -> None:
         super().__init__()
         self.input_mutex: Lock = Lock()
         self.running: bool = False
-        self.max_persons: int = max_persons
+        self.max_persons: int = settings.num_players
 
         self.pose_detectors: dict[int, PoseDetection] = {}
         self.pose_detector_frame_size: int = 256
-        if model_type == ModelType.NONE:
+        if not settings.pose:
             print('Pose Detection: Disabled')
         else:
-            for i in range(max_persons):
-                self.pose_detectors[i] = PoseDetection(model_path, model_type)
-            print('Pose Detection:', max_persons, 'six instances of model', ModelTypeNames[model_type.value])
+            for i in range(self.max_persons):
+                self.pose_detectors[i] = PoseDetection(settings.model_path, settings.model_type)
+            print('Pose Detection:', self.max_persons, 'six instances of model', ModelTypeNames[settings.model_type.value])
 
         self.input_frames: dict[int, np.ndarray] = {}
         self.input_tracklets: CamTrackletDict = {}
 
-        self.person_id_pool: IdPool = IdPool(max_persons)
+        self.person_id_pool: IdPool = IdPool(self.max_persons)
         self.persons: PersonDict = {}
 
-        self.circular_coordinates: CircularCoordinates = CircularCoordinates(num_cams)
+        self.circular_coordinates: CircularCoordinates = CircularCoordinates(settings.num_cams)
 
         self.callbacks: set[PersonCallback] = set()
 
@@ -134,7 +135,7 @@ class Manager(Thread):
 
 
     # INPUTS
-    def set_image(self, id: int, image: np.ndarray) -> None :
+    def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
         with self.input_mutex:
             self.input_frames[id] = image
     def get_image(self, id: int) -> np.ndarray:

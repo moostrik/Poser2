@@ -3,7 +3,7 @@ from modules.cam.depthcam.Core import *
 from modules.cam.depthcam.Definitions import FrameType
 from modules.cam.depthcam.Pipeline import get_stereo_config, get_frame_types
 
-class Settings():
+class CoreSettings():
     def __init__(self, core: Core) -> None:
         self.core: Core = core
 

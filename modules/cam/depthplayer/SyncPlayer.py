@@ -5,6 +5,7 @@ from typing import Set, Dict
 from enum import Enum, auto
 from queue import Queue
 
+from modules.Settings import Settings
 from modules.cam.depthcam.Definitions import FrameType, FrameCallback
 from modules.cam.depthplayer.Player import Player, HwAccelerationType
 from modules.cam.recorder.SyncRecorder import make_file_name
@@ -14,6 +15,19 @@ class State(Enum):
     PLAY = auto()
     STOP = auto()
     NEXT = auto()
+
+HwaccelString: dict[Settings.CoderType, str] = {
+    Settings.CoderType.CPU:  '',
+    Settings.CoderType.GPU:  'd3d12va',
+    Settings.CoderType.iGPU: 'd3d12va'
+}
+
+HwaccelDeviceString: dict[Settings.CoderType, str] = {
+    Settings.CoderType.CPU:  '',
+    Settings.CoderType.GPU:  '0',
+    Settings.CoderType.iGPU: '1'
+}
+
 
 class StateMessage():
     def __init__(self, state: State, value = None) -> None:
@@ -29,11 +43,11 @@ class Folder():
 FolderDict = Dict[str, Folder]
 
 class SyncPlayer(Thread):
-    def __init__(self, input_path: str, num_cams: int, types: list[FrameType], decoder: HwAccelerationType) -> None:
+    def __init__(self, settings: Settings) -> None:
         super().__init__()
-        self.input_path: Path = Path(input_path)
-        self.num_cams: int = num_cams
-        self.types: list[FrameType] = types
+        self.input_path: Path = Path(settings.video_path)
+        self.num_cams: int = settings.num_cams
+        self.types: list[FrameType] = settings.frame_types
 
         self.state_messages: Queue[StateMessage] = Queue()
 
@@ -45,7 +59,7 @@ class SyncPlayer(Thread):
         self.folders: FolderDict = self._get_video_folders(self.input_path)
 
         self.players: Dict[int, Dict[FrameType, Player]] = {
-            c: {t: Player(c, t, self._frame_callback, self._stop_callback, decoder) for t in self.types}
+            c: {t: Player(c, t, self._frame_callback, self._stop_callback, HwaccelString[settings.decoder], HwaccelDeviceString[settings.decoder]) for t in self.types}
             for c in range(self.num_cams)
         }
 
@@ -69,7 +83,6 @@ class SyncPlayer(Thread):
                     self.playback_chunk = 0
                     self.playback_name: str = state_message.value
                     self._start_players(self.playback_name, self.playback_chunk)
-                    # print(f"Playing {self.playback_name}")
             elif state_message.state == State.STOP:
                 self.playback_chunk = -1
                 self._stop_players()
@@ -79,7 +92,6 @@ class SyncPlayer(Thread):
                     if self.playback_chunk == chunk:
                         max_chunk: int = self.folders[self.playback_name].chunks
                         self.playback_chunk = (self.playback_chunk + 1) % (max_chunk + 1)
-                        # print(f"Chunk {self.playback_chunk}")
                         self._stop_players()
                         self._start_players(self.playback_name, self.playback_chunk)
 

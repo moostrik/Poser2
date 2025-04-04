@@ -12,7 +12,7 @@ from modules.gl.Mesh import Mesh
 from modules.gl.Utils import lfo, fit, fill
 from modules.gl.Image import Image
 
-from depthai import Rect, Tracklet
+from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.pose.PoseDefinitions import Pose, Indices
 from modules.person.Person import Person
 
@@ -159,7 +159,7 @@ class Render(RenderWindow):
             self.psn_fbos[i].draw(x, y, w, h)
 
     # SETTERS AND GETTERS
-    def set_cam_image(self, cam_id: int, image: np.ndarray) -> None :
+    def set_cam_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None :
         self.cam_images[cam_id].set_image(image)
 
     def set_psn_image(self, psn_id: int, image: np.ndarray) -> None :

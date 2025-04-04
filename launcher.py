@@ -7,7 +7,7 @@ from signal import signal, SIGINT
 from sys import exit
 from time import sleep
 from modules.DepthPose import DepthPose
-from modules.Settings import Settings
+from modules.Settings import Settings, ModelType, FrameType
 
 parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-fps',     '--fps',        type=int,   default=30,     help='frames per second')
@@ -50,14 +50,16 @@ settings.simulation =   args.simulation
 settings.passthrough =  args.passthrough
 
 settings.num_players =  args.players
-settings.lightning =    args.lightning
 settings.pose =     not args.nopose
+settings.model_type  = ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
 
 settings.chunk_length = 4.0
 settings.encoder =      Settings.CoderType.iGPU
 settings.decoder =      Settings.CoderType.iGPU
+settings.frame_types =  [FrameType.VIDEO, FrameType.LEFT, FrameType.RIGHT] if settings.stereo else [FrameType.VIDEO]
 
-settings.check()
+settings.check_values()
+settings.check_cameras()
 
 app: DepthPose = DepthPose(settings)
 app.start()

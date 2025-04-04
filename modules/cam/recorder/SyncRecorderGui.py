@@ -5,9 +5,9 @@ from modules.cam.depthcam.Definitions import FrameType
 
 from modules.Settings import Settings
 class SyncRecorderGui(SyncRecorder):
-    def __init__(self, gui: Gui | None, settings: Settings, num_cams: int, types: list[FrameType]) -> None:
+    def __init__(self, gui: Gui | None, settings: Settings) -> None:
         self.gui: Gui | None = gui
-        super().__init__(settings, num_cams, types)
+        super().__init__(settings)
 
         elem: list = []
         elem.append([E(eT.CHCK, 'Rec',    self.record, False),
