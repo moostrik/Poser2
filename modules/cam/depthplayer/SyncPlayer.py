@@ -98,9 +98,9 @@ class SyncPlayer(Thread):
 
             if message and message.state == MessageType.START:
                 # make thread safe
-                    self.current_folder = message.value
-                    self.playback_chunk = -1
-                    state = State.LOAD
+                self.current_folder = message.value
+                self.playback_chunk = -1
+                state = State.LOAD
             if message and message.state == MessageType.STOP:
                 state = State.STOP
 
@@ -125,7 +125,6 @@ class SyncPlayer(Thread):
             if self.stop_event.is_set() and state == State.IDLE:
                 break
 
-            # print(state)
             sleep(0.01)
 
     def _load(self) -> None:
@@ -141,6 +140,10 @@ class SyncPlayer(Thread):
                     self.loaders.append(player)
 
     def _start(self) -> None:
+        for p in self.players:
+            p.stop()
+            self.closers.append(p)
+        self.players.clear()
         for p in self.loaders:
             p.play()
             self.players.append(p)
@@ -150,16 +153,20 @@ class SyncPlayer(Thread):
         for p in self.loaders:
             p.stop()
             self.closers.append(p)
-        self.players.clear()
+        self.loaders.clear()
         for p in self.players:
             p.stop()
             self.closers.append(p)
         self.players.clear()
 
     def clean(self) -> None:
+        # if len(self.closers) > 0:
+            # print('Cleaning', len(self.loaders),  len(self.players), len(self.closers))
         for p in self.closers:
             if not p.is_playing() and not p.is_loading():
                 self.closers.remove(p)
+            else:
+                print(f"Weird {p.cam_id} {p.frame_type} {p.chunk_id}")
 
     def _finished_loading(self) -> bool:
         for p in self.loaders:

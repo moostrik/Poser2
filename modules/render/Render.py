@@ -290,8 +290,8 @@ class Render(RenderWindow):
         ret[ImageType.CAM] = {}
         ret[ImageType.PERSON] = {}
 
-        cam_rows: int = math.ceil(num_cams / 2)
-        cam_colums: int = math.ceil(num_cams / cam_rows)
+        cam_rows: int = max(math.ceil(num_cams / 2), 1)
+        cam_colums = max(math.ceil(num_cams / cam_rows), 1)
 
         dst_aspect_ratio: float = dst_width / dst_height
         cam_grid_aspect_ratio: float = cam_aspect_ratio * cam_colums / cam_rows

@@ -42,6 +42,7 @@ class FFmpegPlayer:
         self.bytes_per_frame: int = 0
         self.frame_width: int = 0
         self.frame_height: int = 0
+        self.frame_rate: float = 0.0
 
         self._load_lock: Lock = Lock()
         self._load_thread: Thread | None = None
@@ -62,11 +63,7 @@ class FFmpegPlayer:
         return self._play_thread is not None and self._play_thread.is_alive()
 
     def load(self, video_file: str, chunk_id: int) -> None:
-        if self.is_loading():
-            print('video already loading')
-            return
-        if self._load_thread is not None:
-            self._load_thread.join()
+        self.stop()
         self._load_thread = Thread(target=self._load, args=(video_file, chunk_id))
         self._load_thread.start()
 
@@ -84,6 +81,7 @@ class FFmpegPlayer:
     def stop(self) -> None:
         if self._load_thread is not None:
             self._load_thread.join()
+            self._load_thread = None
         if self._play_thread is not None:
             self.stop_event.set()
             self._play_thread.join()
@@ -91,12 +89,13 @@ class FFmpegPlayer:
 
     def _load(self, video_file: str, chunk_id: int) -> None:
         try:
-            self.frame_width, self.frame_height = self._get_video_dimensions(video_file)
+            self.frame_width, self.frame_height, self.frame_rate = self._get_video_dimensions(video_file)
         except Exception as e:
             print('Error getting video dimensions:', e)
             self.ffmpeg_process = None
             return
 
+        # print('load:', video_file)
         pix_fmt: str = 'rgb24' if self.frame_type == FrameType.VIDEO else 'gray'
         self.bytes_per_frame: int = self.frame_width * self.frame_height * (3 if self.frame_type == FrameType.VIDEO else 1)
 
@@ -105,7 +104,7 @@ class FFmpegPlayer:
             if self.hw_acceleration_device == '' or self.hw_acceleration_type == '':
                 ffmpeg_process = (
                     ffmpeg
-                    .input(video_file, re=None)
+                    .input(video_file)
                     .output('pipe:', format='rawvideo', pix_fmt=pix_fmt)
                     .global_args('-loglevel', 'quiet')
                     .run_async(pipe_stdout=True)
@@ -113,7 +112,7 @@ class FFmpegPlayer:
             else:
                 ffmpeg_process = (
                     ffmpeg
-                    .input(video_file, re=None, hwaccel=self.hw_acceleration_device, hwaccel_device=self.hw_acceleration_type)
+                    .input(video_file, hwaccel=self.hw_acceleration_device, hwaccel_device=self.hw_acceleration_type)
                     .output('pipe:', format='rawvideo', pix_fmt=pix_fmt)
                     .global_args('-loglevel', 'quiet')
                     .run_async(pipe_stdout=True)
@@ -130,14 +129,22 @@ class FFmpegPlayer:
         if self.ffmpeg_process is None:
             print('video not loaded')
             return
+        frame_interval: float = 1.0 / self.frame_rate
+
+        frame_counter: int = 0
 
         while not self.stop_event.is_set():
+            start_time: float = time.time()
             in_bytes = self.ffmpeg_process.stdout.read(self.bytes_per_frame)
             if not in_bytes:
+                # print('End of video stream', self.chunk_id)
                 # self.end_callback(self.chunk_id)
                 break
+                continue
 
             if self.frame_type == FrameType.VIDEO:
+                # print('frame:', frame_counter)
+                frame_counter += 1
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width, 3])
                 frame = cvtColor(frame, COLOR_RGB2BGR)
             else:
@@ -145,6 +152,9 @@ class FFmpegPlayer:
 
             self.frame_callback(self.cam_id, self.frame_type, frame)
 
+            elapsed_time: float = time.time() - start_time
+            sleep_time: float = max(0, frame_interval - elapsed_time)
+            time.sleep(sleep_time)
         self.ffmpeg_process.stdout.close()
 
     def _get_video_dimensions(self, video_file: str) -> tuple:
@@ -154,4 +164,9 @@ class FFmpegPlayer:
             raise Exception('No video stream found for file', video_file)
         width = int(video_stream['width'])
         height = int(video_stream['height'])
-        return width, height
+
+        frame_rate_str: str = video_stream.get('r_frame_rate', '30/1')
+        num, denom = map(int, frame_rate_str.split('/'))
+        frame_rate: float = num / denom if denom != 0 else 0
+
+        return width, height, frame_rate
