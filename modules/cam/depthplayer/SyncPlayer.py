@@ -201,9 +201,9 @@ class SyncPlayer(Thread):
             return self.load_folder
 
     def _frame_callback(self, cam_id: int, frameType: FrameType, frame: ndarray) -> None:
-        with self.callback_lock:
-            for callback in self.frameCallbacks:
-                callback(cam_id, frameType, frame)
+        # with self.callback_lock:
+        for callback in self.frameCallbacks:
+            callback(cam_id, frameType, frame)
 
     # EXTERNAL METHODS
     def play(self, value: bool, name: str = '') -> None:

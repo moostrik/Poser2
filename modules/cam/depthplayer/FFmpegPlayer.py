@@ -136,10 +136,17 @@ class FFmpegPlayer:
             return
         frame_interval: float = 1.0 / self.frame_rate
 
+        frame_count: int = 0
+
         while not self.stop_event.is_set():
             start_time: float = time.time()
-            in_bytes = self.ffmpeg_process.stdout.read(self.bytes_per_frame)
-            if not in_bytes:
+            try:
+                in_bytes = self.ffmpeg_process.stdout.read(self.bytes_per_frame)
+                if not in_bytes:
+                    print ('End of stream', self.frame_type)
+                    break
+            except ffmpeg.Error as e:
+                print('Error reading frame:', e)
                 break
 
             if self.frame_type == FrameType.VIDEO:
@@ -148,12 +155,15 @@ class FFmpegPlayer:
             else:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width])
 
-            self.frame_callback(self.cam_id, self.frame_type, frame)
+            self.frame_callback(self.cam_id, self.frame_type, frame, frame_count)
+            frame_count += 1
 
             elapsed_time: float = time.time() - start_time
             sleep_time: float = max(0, frame_interval - elapsed_time)
             time.sleep(sleep_time)
         self.ffmpeg_process.stdout.close()
+        self.ffmpeg_process.terminate()
+        self.ffmpeg_process = None
 
     def _get_video_dimensions(self, video_file: str) -> tuple:
         probe = ffmpeg.probe(video_file)
