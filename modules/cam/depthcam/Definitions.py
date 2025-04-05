@@ -15,20 +15,20 @@ DEPTH_TRACKER_MIN_DEPTH: int = 500
 DEPTH_TRACKER_MAX_DEPTH: int = 10000
 
 class FrameType(Enum):
-    NONE =  0
+    NONE_ = 0
     VIDEO = 1
-    LEFT =  2
+    LEFT_ = 2
     RIGHT = 3
-    STEREO= 4
+    DEPTH = 4
 
 FRAME_TYPE_NAMES: list[str] = [e.name for e in FrameType]
 
 FRAME_TYPE_LABEL_DICT: dict[FrameType, str] = {
-    FrameType.NONE:   'N',
-    FrameType.VIDEO:  'C',
-    FrameType.LEFT:   'L',
-    FrameType.RIGHT:  'R',
-    FrameType.STEREO: 'S'
+    FrameType.NONE_: 'N',
+    FrameType.VIDEO: 'C',
+    FrameType.LEFT_: 'L',
+    FrameType.RIGHT: 'R',
+    FrameType.DEPTH: 'S'
 }
 
 EXPOSURE_RANGE:     tuple[int, int] = (1000, 33000)
@@ -52,7 +52,7 @@ class StereoMedianFilterType(Enum):
 STEREO_FILTER_NAMES: list[str] = [e.name for e in StereoMedianFilterType]
 
 
-FrameCallback = Callable[[int, FrameType, np.ndarray], None]
+FrameCallback = Callable[[int, FrameType, np.ndarray, int], None]
 DetectionCallback = Callable[[int, ImgDetection], None]
 TrackerCallback = Callable[[int, Tracklet], None]
 FPSCallback = Callable[[int, float], None]

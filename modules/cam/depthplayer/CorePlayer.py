@@ -73,7 +73,7 @@ class CorePlayer(Core):
             self.outputs[output.TRACKLETS_OUT] = self.tracklet_queue
             self.tracklet_queue.addCallback(self._tracker_callback)
 
-    def _video_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
+    def _video_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray, frame_id: int = 0) -> None:
         if not self.device_open:
             return
 
@@ -96,7 +96,7 @@ class CorePlayer(Core):
                 img.setHeight(height)
                 self.inputs[input.VIDEO_FRAME_IN].send(img)
 
-            if frame_type == FrameType.LEFT and input.LEFT_FRAME_IN in self.inputs:
+            if frame_type == FrameType.LEFT_ and input.LEFT_FRAME_IN in self.inputs:
                 img = dai.ImgFrame()
                 img.setType(dai.ImgFrame.Type.RAW8)
                 img.setInstanceNum(int(dai.CameraBoardSocket.CAM_B))
@@ -116,7 +116,7 @@ class CorePlayer(Core):
                 img.setHeight(height)
                 self.inputs[input.RIGHT_FRAME_IN].send(img)
 
-    def _passthrough_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
+    def _passthrough_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray, frame_id: int) -> None:
         if id != self.id:
             return
         self._update_callbacks(frame_type, frame)

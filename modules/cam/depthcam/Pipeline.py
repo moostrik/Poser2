@@ -6,13 +6,13 @@ from pathlib import Path
 from modules.cam.depthcam.Definitions import *
 
 def get_frame_types(do_color: bool, do_stereo: bool, show_stereo) -> list[FrameType]:
-    frame_types: list[FrameType] = [FrameType.NONE]
+    frame_types: list[FrameType] = [FrameType.NONE_]
     frame_types.append(FrameType.VIDEO)
     if do_stereo:
-        frame_types.append(FrameType.LEFT)
+        frame_types.append(FrameType.LEFT_)
         frame_types.append(FrameType.RIGHT)
         if show_stereo:
-            frame_types.append(FrameType.STEREO)
+            frame_types.append(FrameType.DEPTH)
     return frame_types
 
 def get_stereo_config(do_color: bool) -> dai.RawStereoDepthConfig:

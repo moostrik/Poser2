@@ -79,10 +79,8 @@ class SyncPlayer(Thread):
         self.frameCallbacks: Set[FrameCallback] = set()
 
     def stop(self) -> None:
-        self.clearFrameCallbacks()
         self.play(False)
         self.stop_event.set()
-        self.join()
 
     def run(self) -> None:
         state: State = State.IDLE
@@ -200,10 +198,11 @@ class SyncPlayer(Thread):
         with self.playback_lock:
             return self.load_folder
 
-    def _frame_callback(self, cam_id: int, frameType: FrameType, frame: ndarray) -> None:
+    def _frame_callback(self, cam_id: int, frame_type: FrameType, frame: ndarray, frame_id) -> None:
         # with self.callback_lock:
         for callback in self.frameCallbacks:
-            callback(cam_id, frameType, frame)
+            print(f"{frame_type} {frame_id}")
+            callback(cam_id, frame_type, frame, frame_id)
 
     # EXTERNAL METHODS
     def play(self, value: bool, name: str = '') -> None:
@@ -227,6 +226,10 @@ class SyncPlayer(Thread):
 
     def get_current_folder(self) -> str:
         return self._get_load_folder()
+
+    def clear_state_messages(self) -> None:
+        with self.state_messages.mutex:
+            self.state_messages.queue.clear()
 
     # CALLBACKS
     def addFrameCallback(self, callback: FrameCallback) -> None:

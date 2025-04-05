@@ -134,7 +134,7 @@ class SyncRecorder(Thread):
             self.state = state
 
     # EXTERNAL METHODS
-    def add_frame(self, cam_id: int, t: FrameType, frame) -> None:
+    def add_frame(self, cam_id: int, t: FrameType, frame, frame_id: int) -> None:
         self.recorders[cam_id][t].add_frame(frame)
 
     def set_fps(self, cam_id: int, fps: float) -> None:

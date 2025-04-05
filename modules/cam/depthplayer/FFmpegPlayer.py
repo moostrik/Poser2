@@ -7,7 +7,7 @@ from cv2 import cvtColor, COLOR_RGB2BGR
 import time
 
 
-from modules.cam.depthcam.Definitions import FrameType
+from modules.cam.depthcam.Definitions import FrameType, FrameCallback
 
 class HwAccelerationType(Enum):
     CPU =   0
@@ -24,14 +24,14 @@ HwaccelDeviceString: dict[HwAccelerationType, str] = {
     HwAccelerationType.iGPU: '1'
 }
 
-PlayerCallback = Callable[[int, FrameType, np.ndarray], None]
+# PlayerCallback = Callable[[int, FrameType, np.ndarray, ], None]
 EndCallback = Callable[[int], None]
 
 class FFmpegPlayer:
     def __init__(self, cam_id: int, frameType: FrameType,
-                 frameCallback: PlayerCallback,
+                 frameCallback: FrameCallback,
                  hw_acceleration_type: str = '', hw_acceleration_device: str = '') -> None:
-        self.frame_callback: PlayerCallback = frameCallback
+        self.frame_callback: FrameCallback = frameCallback
 
         self.cam_id: int = cam_id
         self.frame_type: FrameType = frameType
@@ -143,7 +143,7 @@ class FFmpegPlayer:
             try:
                 in_bytes = self.ffmpeg_process.stdout.read(self.bytes_per_frame)
                 if not in_bytes:
-                    print ('End of stream', self.frame_type)
+                    # print ('End of stream', self.frame_type)
                     break
             except ffmpeg.Error as e:
                 print('Error reading frame:', e)
@@ -155,7 +155,7 @@ class FFmpegPlayer:
             else:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width])
 
-            self.frame_callback(self.cam_id, self.frame_type, frame, frame_count)
+            self.frame_callback(self.cam_id, self.frame_type, frame, self.chunk_id)
             frame_count += 1
 
             elapsed_time: float = time.time() - start_time

@@ -47,9 +47,6 @@ class Main():
         self.detector.addCallback(self.render.add_person)
         self.detector.start()
 
-        if self.player:
-            self.player.start()
-
         self.gui.exit_callback = self.stop
 
         for camera in self.cameras:
@@ -66,6 +63,7 @@ class Main():
 
         if self.player:
             self.player.gui_check()
+            self.player.start()
         if self.recorder:
             self.recorder.gui_check()
             self.recorder.start() # start after gui to prevent record at startup
@@ -74,7 +72,6 @@ class Main():
 
     def stop(self) -> None:
         if self.player:
-            self.player.clearFrameCallbacks()
             self.player.stop()
             self.player.join()
 

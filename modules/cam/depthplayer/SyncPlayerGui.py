@@ -23,14 +23,19 @@ class SyncPlayerGui(SyncPlayer):
         return self.frame
 
     def gui_check(self) -> None:
-        if self.gui is not None:
-            self.gui.updateElement('Folders', '')
+        # if self.gui is not None:
+        #     self.gui.updateElement('Folders', '')
+        self.clear_state_messages()
 
     def set_folder(self, folder: str) -> None:
         self.play(True, folder)
 
     def set_start(self) -> None:
-        self.play(True, self.get_current_folder())
+        if self.gui is None:
+            return
+        f: str = self.gui.getStringValue('Folders')
+
+        self.play(True, f)
 
     def set_stop(self) -> None:
         self.play(False, '')

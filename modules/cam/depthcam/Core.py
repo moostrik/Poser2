@@ -172,7 +172,7 @@ class Core(Thread):
 
     def _left_callback(self, msg: dai.ImgFrame) -> None:
         frame: ndarray = msg.getCvFrame()
-        self._update_callbacks(FrameType.LEFT, frame)
+        self._update_callbacks(FrameType.LEFT_, frame)
 
     def _right_callback(self, msg: dai.ImgFrame) -> None:
         frame: ndarray = msg.getCvFrame()
@@ -181,7 +181,7 @@ class Core(Thread):
     def _stereo_callback(self, msg: dai.ImgFrame) -> None:
         frame: ndarray = msg.getCvFrame()
         frame = applyColorMap(frame, COLORMAP_JET)
-        self._update_callbacks(FrameType.STEREO, frame)
+        self._update_callbacks(FrameType.DEPTH, frame)
 
     def _sync_callback(self, message_group: dai.MessageGroup) -> None:
         for name, msg in message_group:
@@ -224,10 +224,10 @@ class Core(Thread):
     # CALLBACKS
     def _update_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
         for c in self.frame_callbacks:
-            c(self.id, frame_type, frame)
+            c(self.id, frame_type, frame, 0)
         if self.preview_type == frame_type:
             for c in self.preview_callbacks:
-                c(self.id, frame_type, frame)
+                c(self.id, frame_type, frame, 0)
 
     def add_frame_callback(self, callback: FrameCallback) -> None:
         self.frame_callbacks.add(callback)
