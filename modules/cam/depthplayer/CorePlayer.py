@@ -46,30 +46,30 @@ class CorePlayer(Core):
         setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo, simulate=True)
 
     def _setup_queues(self) -> None: # override
-        ex_video: dai.DataInputQueue =          self.device.getInputQueue(name='ex_video')
+        ex_video: dai.DataInputQueue =          self.device.getInputQueue(name='ex_video', maxSize=1, blocking=False)
         self.inputs[input.VIDEO_FRAME_IN] =     ex_video
-        video_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='video', maxSize=4, blocking=False)
+        video_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
         self.outputs[output.VIDEO_FRAME_OUT] =  video_queue
         video_queue.addCallback(self._video_callback)
         if self.do_stereo:
             stereo_control: dai.DataInputQueue =    self.device.getInputQueue('stereo_control')
             self.inputs[input.STEREO_CONTROL] =     stereo_control
-            ex_left: dai.DataInputQueue =           self.device.getInputQueue(name='ex_left')
+            ex_left: dai.DataInputQueue =           self.device.getInputQueue(name='ex_left', maxSize=1, blocking=False)
             self.inputs[input.LEFT_FRAME_IN] =      ex_left
-            ex_right: dai.DataInputQueue =          self.device.getInputQueue(name='ex_right')
+            ex_right: dai.DataInputQueue =          self.device.getInputQueue(name='ex_right', maxSize=1, blocking=False)
             self.inputs[input.RIGHT_FRAME_IN] =     ex_right
-            left_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='left', maxSize=4, blocking=False)
+            left_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='left', maxSize=1, blocking=False)
             self.outputs[output.LEFT_FRAME_OUT] =   left_queue
             left_queue.addCallback(self._left_callback)
-            right_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='right', maxSize=4, blocking=False)
+            right_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='right', maxSize=1, blocking=False)
             self.outputs[output.RIGHT_FRAME_OUT] =  right_queue
             right_queue.addCallback(self._right_callback)
             if self.show_stereo:
-                stereo_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='stereo', maxSize=4, blocking=False)
+                stereo_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='stereo', maxSize=1, blocking=False)
                 self.outputs[output.STEREO_FRAME_OUT] = stereo_queue
                 stereo_queue.addCallback(self._stereo_callback)
         if self.do_person:
-            self.tracklet_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
+            self.tracklet_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
             self.outputs[output.TRACKLETS_OUT] = self.tracklet_queue
             self.tracklet_queue.addCallback(self._tracker_callback)
 

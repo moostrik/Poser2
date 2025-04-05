@@ -72,9 +72,7 @@ class SyncPlayer(Thread):
         self.players: list[FFmpegPlayer] = []
         self.loaders: list[FFmpegPlayer] = []
         self.closers: list[FFmpegPlayer] = []
-        # self.closers: list[FFmpegPlayer] = []
 
-        self.callback_lock: Lock = Lock()
         self.playback_lock: Lock = Lock()
         self.frameCallbacks: Set[FrameCallback] = set()
 
@@ -159,8 +157,6 @@ class SyncPlayer(Thread):
             if p.is_stopped():
                 p.join()
                 self.closers.remove(p)
-            # else:
-            #     print(f"Wating to join {p.cam_id} {p.frame_type} {p.chunk_id}")
 
     def _finished_loading(self) -> bool:
         for p in self.loaders:
@@ -175,8 +171,6 @@ class SyncPlayer(Thread):
         return False
 
     def _finished_stopping(self) -> bool:
-        # if len(self.closers) > 0:
-        #     print('Cleaning', len(self.loaders),  len(self.players), len(self.closers))
         for p in self.closers:
             if not p.is_stopped():
                 return False
@@ -199,9 +193,7 @@ class SyncPlayer(Thread):
             return self.load_folder
 
     def _frame_callback(self, cam_id: int, frame_type: FrameType, frame: ndarray, frame_id) -> None:
-        # with self.callback_lock:
         for callback in self.frameCallbacks:
-            print(f"{frame_type} {frame_id}")
             callback(cam_id, frame_type, frame, frame_id)
 
     # EXTERNAL METHODS
@@ -233,14 +225,11 @@ class SyncPlayer(Thread):
 
     # CALLBACKS
     def addFrameCallback(self, callback: FrameCallback) -> None:
-        with self.callback_lock:
-            self.frameCallbacks.add(callback)
+        self.frameCallbacks.add(callback)
     def discardFrameCallback(self, callback: FrameCallback) -> None:
-        with self.callback_lock:
-            self.frameCallbacks.discard(callback)
+        self.frameCallbacks.discard(callback)
     def clearFrameCallbacks(self) -> None:
-        with self.callback_lock:
-            self.frameCallbacks.clear()
+        self.frameCallbacks.clear()
 
     # STATIC METHODS
     @staticmethod

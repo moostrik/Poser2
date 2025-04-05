@@ -58,7 +58,7 @@ settings.model_type =   ModelType.NONE if args.nopose else ModelType.LIGHTNING i
 settings.chunk_length = 4.0
 settings.encoder =      Settings.CoderType.iGPU
 settings.decoder =      Settings.CoderType.iGPU
-settings.frame_types =  [FrameType.VIDEO, FrameType.LEFT, FrameType.RIGHT] if settings.stereo else [FrameType.VIDEO]
+settings.frame_types =  [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIGHT] if settings.stereo else [FrameType.VIDEO]
 
 settings.check_values()
 settings.check_cameras()

@@ -26,8 +26,6 @@ def is_folder_for_settings(name: str, settings: Settings) -> bool:
         return True
     return False
 
-
-
 EncoderString: dict[Settings.CoderType, str] = {
     Settings.CoderType.CPU:  'libx264',
     Settings.CoderType.GPU:  'h264_nvenc',
@@ -135,6 +133,8 @@ class SyncRecorder(Thread):
 
     # EXTERNAL METHODS
     def add_frame(self, cam_id: int, t: FrameType, frame, frame_id: int) -> None:
+        if t not in self.settings.frame_types:
+            return
         self.recorders[cam_id][t].add_frame(frame)
 
     def set_fps(self, cam_id: int, fps: float) -> None:

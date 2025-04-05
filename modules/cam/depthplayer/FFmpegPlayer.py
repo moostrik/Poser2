@@ -155,7 +155,7 @@ class FFmpegPlayer:
             else:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width])
 
-            self.frame_callback(self.cam_id, self.frame_type, frame, self.chunk_id)
+            self.frame_callback(self.cam_id, self.frame_type, frame, frame_count)
             frame_count += 1
 
             elapsed_time: float = time.time() - start_time
