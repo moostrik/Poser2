@@ -106,7 +106,7 @@ class FFmpegPlayer:
 
         ffmpeg_process = None
         try:
-            if self.hw_acceleration_device == '' or self.hw_acceleration_type == '':
+            if self.hw_acceleration_type == '' or self.hw_acceleration_device == '':
                 ffmpeg_process = (
                     ffmpeg
                     .input(video_file)
@@ -117,7 +117,7 @@ class FFmpegPlayer:
             else:
                 ffmpeg_process = (
                     ffmpeg
-                    .input(video_file, hwaccel=self.hw_acceleration_device, hwaccel_device=self.hw_acceleration_type)
+                    .input(video_file, hwaccel=self.hw_acceleration_type, hwaccel_device=self.hw_acceleration_device)
                     .output('pipe:', format='rawvideo', pix_fmt=pix_fmt)
                     .global_args('-loglevel', 'quiet')
                     .run_async(pipe_stdout=True)
