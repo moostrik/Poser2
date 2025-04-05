@@ -62,6 +62,9 @@ class FFmpegPlayer:
     def is_playing(self) -> bool:
         return self._play_thread is not None and self._play_thread.is_alive()
 
+    def is_stopped(self) -> bool:
+        return not self.is_loading() and not self.is_playing()
+
     def load(self, video_file: str, chunk_id: int) -> None:
         self.stop()
         self._load_thread = Thread(target=self._load, args=(video_file, chunk_id))
@@ -79,11 +82,14 @@ class FFmpegPlayer:
         self._play_thread.start()
 
     def stop(self) -> None:
+        if self._play_thread is not None:
+            self.stop_event.set()
+
+    def join(self) -> None:
         if self._load_thread is not None:
             self._load_thread.join()
             self._load_thread = None
         if self._play_thread is not None:
-            self.stop_event.set()
             self._play_thread.join()
             self._play_thread = None
 
@@ -95,7 +101,6 @@ class FFmpegPlayer:
             self.ffmpeg_process = None
             return
 
-        # print('load:', video_file)
         pix_fmt: str = 'rgb24' if self.frame_type == FrameType.VIDEO else 'gray'
         self.bytes_per_frame: int = self.frame_width * self.frame_height * (3 if self.frame_type == FrameType.VIDEO else 1)
 
@@ -131,20 +136,13 @@ class FFmpegPlayer:
             return
         frame_interval: float = 1.0 / self.frame_rate
 
-        frame_counter: int = 0
-
         while not self.stop_event.is_set():
             start_time: float = time.time()
             in_bytes = self.ffmpeg_process.stdout.read(self.bytes_per_frame)
             if not in_bytes:
-                # print('End of video stream', self.chunk_id)
-                # self.end_callback(self.chunk_id)
                 break
-                continue
 
             if self.frame_type == FrameType.VIDEO:
-                # print('frame:', frame_counter)
-                frame_counter += 1
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width, 3])
                 frame = cvtColor(frame, COLOR_RGB2BGR)
             else:

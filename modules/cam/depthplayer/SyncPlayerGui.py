@@ -14,7 +14,8 @@ class SyncPlayerGui(SyncPlayer):
         elem: list = []
         elem.append([E(eT.TEXT, 'Folders '),
                      E(eT.CMBO, 'Folders', self.set_folder, f, folders),
-                     E(eT.BTTN, 'Stop Playback', self.set_stop)])
+                     E(eT.BTTN, 'Start', self.set_start),
+                     E(eT.BTTN, 'Stop', self.set_stop)])
 
         self.frame = Frame('CAMERA COLOR', elem, 240)
 
@@ -27,6 +28,9 @@ class SyncPlayerGui(SyncPlayer):
 
     def set_folder(self, folder: str) -> None:
         self.play(True, folder)
+
+    def set_start(self) -> None:
+        self.play(True, self.get_current_folder())
 
     def set_stop(self) -> None:
         self.play(False, '')

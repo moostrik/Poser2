@@ -61,11 +61,10 @@ class SyncPlayer(Thread):
 
         self.stop_event = Event()
 
-        self.playback_name: str = ''
-        self.playback_chunk: int = -1
+        self.load_chunk: int = -1
+        self.load_folder: str = ''
 
         self.folders: FolderDict = self._get_video_folders(settings)
-        self.current_folder: str = ''
 
         self.hwt: str = HwaccelString[settings.decoder]
         self.hwd: str = HwaccelDeviceString[settings.decoder]
@@ -73,8 +72,10 @@ class SyncPlayer(Thread):
         self.players: list[FFmpegPlayer] = []
         self.loaders: list[FFmpegPlayer] = []
         self.closers: list[FFmpegPlayer] = []
+        # self.closers: list[FFmpegPlayer] = []
 
         self.callback_lock: Lock = Lock()
+        self.playback_lock: Lock = Lock()
         self.frameCallbacks: Set[FrameCallback] = set()
 
     def stop(self) -> None:
@@ -93,13 +94,9 @@ class SyncPlayer(Thread):
             except Exception as e:
                 message = None
 
-            if message:
-                print(f"Message: {message.state}, {message.value}")
-
             if message and message.state == MessageType.START:
-                # make thread safe
-                self.current_folder = message.value
-                self.playback_chunk = -1
+                self._set_load_folder(message.value)
+                self._set_load_chunk(-1)
                 state = State.LOAD
             if message and message.state == MessageType.STOP:
                 state = State.STOP
@@ -128,15 +125,15 @@ class SyncPlayer(Thread):
             sleep(0.01)
 
     def _load(self) -> None:
-        folder: Folder = self.folders[self.current_folder]
-        self.playback_chunk = (self.playback_chunk + 1) % (folder.chunks + 1)
+        folder: Folder = self.folders[self.load_folder]
+        self._set_load_chunk((self._get_load_chunk() + 1) % (folder.chunks + 1))
 
         for c in range(self.num_cams):
             for t in self.types:
-                path: Path = folder.path / make_file_name(c, t, self.playback_chunk)
+                path: Path = folder.path / make_file_name(c, t, self.load_chunk)
                 if path.is_file():
                     player: FFmpegPlayer = FFmpegPlayer(c, t, self._frame_callback, self.hwt, self.hwd)
-                    player.load(str(path), self.playback_chunk)
+                    player.load(str(path), self.load_chunk)
                     self.loaders.append(player)
 
     def _start(self) -> None:
@@ -160,13 +157,12 @@ class SyncPlayer(Thread):
         self.players.clear()
 
     def clean(self) -> None:
-        # if len(self.closers) > 0:
-            # print('Cleaning', len(self.loaders),  len(self.players), len(self.closers))
         for p in self.closers:
-            if not p.is_playing() and not p.is_loading():
+            if p.is_stopped():
+                p.join()
                 self.closers.remove(p)
-            else:
-                print(f"Weird {p.cam_id} {p.frame_type} {p.chunk_id}")
+            # else:
+            #     print(f"Wating to join {p.cam_id} {p.frame_type} {p.chunk_id}")
 
     def _finished_loading(self) -> bool:
         for p in self.loaders:
@@ -181,11 +177,28 @@ class SyncPlayer(Thread):
         return False
 
     def _finished_stopping(self) -> bool:
+        # if len(self.closers) > 0:
+        #     print('Cleaning', len(self.loaders),  len(self.players), len(self.closers))
         for p in self.closers:
-            if p.is_playing() or p.is_loading():
-
+            if not p.is_stopped():
                 return False
         return True
+
+    def _set_load_chunk(self, value: int) -> None:
+        with self.playback_lock:
+            self.load_chunk = value
+
+    def _get_load_chunk(self) -> int:
+        with self.playback_lock:
+            return self.load_chunk
+
+    def _set_load_folder(self, value: str) -> None:
+        with self.playback_lock:
+            self.load_folder = value
+
+    def _get_load_folder(self) -> str:
+        with self.playback_lock:
+            return self.load_folder
 
     def _frame_callback(self, cam_id: int, frameType: FrameType, frame: ndarray) -> None:
         with self.callback_lock:
@@ -210,7 +223,10 @@ class SyncPlayer(Thread):
         return self.folders[folder].chunks if folder in self.folders else 0
 
     def get_current_chunk(self) -> int:
-        return self.playback_chunk
+        return max(self._get_load_chunk() - 1, 0)
+
+    def get_current_folder(self) -> str:
+        return self._get_load_folder()
 
     # CALLBACKS
     def addFrameCallback(self, callback: FrameCallback) -> None:
