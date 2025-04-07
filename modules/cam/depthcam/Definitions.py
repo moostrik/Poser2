@@ -1,5 +1,5 @@
 import numpy as np
-from enum import Enum
+from enum import Enum, IntEnum, auto
 from typing import Callable
 from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device
 
@@ -56,6 +56,22 @@ FrameCallback = Callable[[int, FrameType, np.ndarray, int], None]
 DetectionCallback = Callable[[int, ImgDetection], None]
 TrackerCallback = Callable[[int, Tracklet], None]
 FPSCallback = Callable[[int, float], None]
+
+class Input(IntEnum):
+    COLOR_CONTROL = auto()
+    MONO_CONTROL = auto()
+    STEREO_CONTROL = auto()
+    VIDEO_FRAME_IN = auto()
+    LEFT_FRAME_IN = auto()
+    RIGHT_FRAME_IN = auto()
+
+class Output(IntEnum):
+    VIDEO_FRAME_OUT = auto()
+    LEFT_FRAME_OUT = auto()
+    RIGHT_FRAME_OUT = auto()
+    STEREO_FRAME_OUT = auto()
+    SYNC_FRAMES_OUT = auto()
+    TRACKLETS_OUT = auto()
 
 def get_device_list(verbose: bool = False) -> list[str]:
     device_list: list[str] = []

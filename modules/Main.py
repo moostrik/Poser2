@@ -71,28 +71,37 @@ class Main():
         self.running = True
 
     def stop(self) -> None:
+
+        print ('stop gui')
+        self.gui.stop()
+        # self.gui.join() # does not work as stop can be called from gui's own thread
+
         if self.player:
+            print('stop and join player')
             self.player.stop()
             self.player.join()
 
+        print('stop cameras')
         for camera in self.cameras:
             camera.stop()
 
+        print('stop detector')
         self.detector.stop()
         if self.recorder:
+            print('stop recorder')
             self.recorder.stop()
             self.recorder.join()
 
-        self.gui.exit_callback = None
-        self.gui.stop()
-
+        print ('join detector')
         self.detector.join()
+        print ('join cameras')
         for camera in self.cameras:
-            camera.join()
+            camera.join(timeout=1.0)
 
+        print ('stop render')
         self.render.exit_callback = None
         self.render.stop()
-        # self.render.join() # does not work
+        # self.render.join() # does not work as stop can be called from render's own thread
 
         self.running = False
 

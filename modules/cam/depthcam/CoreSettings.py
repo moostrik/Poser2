@@ -76,7 +76,7 @@ class CoreSettings():
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoExposureEnable()
-        self.core._send_control(input.COLOR_CONTROL, ctrl)
+        self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_auto_balance(self, value) -> None:
         if not self.core.device_open: return
@@ -86,7 +86,7 @@ class CoreSettings():
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoWhiteBalanceMode(dai.CameraControl.AutoWhiteBalanceMode.AUTO)
-        self.core._send_control(input.COLOR_CONTROL, ctrl)
+        self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_exposure_iso(self, exposure: int, iso: int) -> None:
         if not self.core.device_open: return
@@ -95,7 +95,7 @@ class CoreSettings():
         self.color_iso = int(self.clamp(iso, ISO_RANGE))
         ctrl = dai.CameraControl()
         ctrl.setManualExposure(self.color_exposure, self.color_iso)
-        self.core._send_control(input.COLOR_CONTROL, ctrl)
+        self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_exposure(self, value : int) -> None:
         self.set_color_exposure_iso(value, self.color_iso)
@@ -109,42 +109,42 @@ class CoreSettings():
         ctrl = dai.CameraControl()
         self.color_balance = int(self.clamp(value, BALANCE_RANGE))
         ctrl.setManualWhiteBalance(self.color_balance)
-        self.core._send_control(input.COLOR_CONTROL, ctrl)
+        self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_contrast(self, value: int) -> None:
         if not self.core.device_open: return
         ctrl = dai.CameraControl()
         self.color_contrast = int(self.clamp(value, CONTRAST_RANGE))
         ctrl.setContrast(self.color_contrast)
-        self.core._send_control(input.COLOR_CONTROL, ctrl)
+        self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_brightness(self, value: int) -> None:
         if not self.core.device_open: return
         ctrl = dai.CameraControl()
         self.color_brightness = int(self.clamp(value, BRIGHTNESS_RANGE))
         ctrl.setBrightness(self.color_brightness)
-        self.core._send_control(input.COLOR_CONTROL, ctrl)
+        self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_denoise(self, value: int) -> None:
         if not self.core.device_open: return
         ctrl = dai.CameraControl()
         self.color_luma_denoise = int(self.clamp(value, LUMA_DENOISE_RANGE))
         ctrl.setLumaDenoise(self.color_luma_denoise)
-        self.core._send_control(input.COLOR_CONTROL, ctrl)
+        self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_saturation(self, value: int) -> None:
         if not self.core.device_open: return
         ctrl = dai.CameraControl()
         self.color_saturation = int(self.clamp(value, SATURATION_RANGE))
         ctrl.setSaturation(self.color_saturation)
-        self.core._send_control(input.COLOR_CONTROL, ctrl)
+        self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_sharpness(self, value: int) -> None:
         if not self.core.device_open: return
         ctrl = dai.CameraControl()
         self.color_sharpness = int(self.clamp(value, SHARPNESS_RANGE))
         ctrl.setSharpness(self.color_sharpness)
-        self.core._send_control(input.COLOR_CONTROL, ctrl)
+        self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     # MONO SETTINGS
     def set_mono_auto_exposure(self, value) -> None:
@@ -155,7 +155,7 @@ class CoreSettings():
             return
         ctrl = dai.CameraControl()
         ctrl.setAutoExposureEnable()
-        self.core._send_control(input.MONO_CONTROL, ctrl)
+        self.core._send_control(Input.MONO_CONTROL, ctrl)
 
     def set_mono_exposure_iso(self, exposure: int, iso: int) -> None:
         if not self.core.device_open: return
@@ -164,7 +164,7 @@ class CoreSettings():
         self.mono_iso = int(self.clamp(iso, ISO_RANGE))
         ctrl = dai.CameraControl()
         ctrl.setManualExposure(self.mono_exposure, self.mono_iso)
-        self.core._send_control(input.MONO_CONTROL, ctrl)
+        self.core._send_control(Input.MONO_CONTROL, ctrl)
 
     def set_mono_exposure(self, value : int) -> None:
         self.set_mono_exposure_iso(value, self.mono_iso)
@@ -177,25 +177,25 @@ class CoreSettings():
         if not self.core.device_open: return
         v: int = int(self.clamp(value, STEREO_DEPTH_RANGE))
         self.stereo_config.postProcessing.thresholdFilter.minRange = int(v)
-        self.core._send_control(input.STEREO_CONTROL, self.stereo_config)
+        self.core._send_control(Input.STEREO_CONTROL, self.stereo_config)
 
     def set_depth_treshold_max(self, value: int) -> None:
         if not self.core.device_open: return
         v: int = int(self.clamp(value, STEREO_DEPTH_RANGE))
         self.stereo_config.postProcessing.thresholdFilter.maxRange = int(v)
-        self.core._send_control(input.STEREO_CONTROL, self.stereo_config)
+        self.core._send_control(Input.STEREO_CONTROL, self.stereo_config)
 
     def set_stereo_min_brightness(self, value: int) -> None:
         if not self.core.device_open: return
         v: int = int(self.clamp(value, STEREO_BRIGHTNESS_RANGE))
         self.stereo_config.postProcessing.brightnessFilter.minBrightness = int(v)
-        self.core._send_control(input.STEREO_CONTROL, self.stereo_config)
+        self.core._send_control(Input.STEREO_CONTROL, self.stereo_config)
 
     def set_stereo_max_brightness(self, value: int) -> None:
         if not self.core.device_open: return
         v: int = int(self.clamp(value, STEREO_BRIGHTNESS_RANGE))
         self.stereo_config.postProcessing.brightnessFilter.maxBrightness = int(v)
-        self.core._send_control(input.STEREO_CONTROL, self.stereo_config)
+        self.core._send_control(Input.STEREO_CONTROL, self.stereo_config)
 
     def set_stereo_median_filter(self, value: StereoMedianFilterType | int | str) -> None:
         if not self.core.device_open: return
@@ -214,7 +214,7 @@ class CoreSettings():
             self.stereo_config.postProcessing.median = dai.MedianFilter.KERNEL_5x5
         elif value == StereoMedianFilterType.KERNEL_7x7:
             self.stereo_config.postProcessing.median = dai.MedianFilter.KERNEL_7x7
-        self.core._send_control(input.STEREO_CONTROL, self.stereo_config)
+        self.core._send_control(Input.STEREO_CONTROL, self.stereo_config)
 
     # IR SETTINGS
     def set_ir_flood_light(self, value: float) -> None:

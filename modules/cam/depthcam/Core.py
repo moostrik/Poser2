@@ -8,7 +8,6 @@ from cv2 import applyColorMap, COLORMAP_JET
 from numpy import ndarray
 from typing import Set
 from threading import Thread, Event
-from enum import IntEnum, auto
 
 from modules.Settings import Settings
 from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types
@@ -16,22 +15,6 @@ from modules.cam.depthcam.Definitions import *
 from modules.cam.depthcam.CoreSettings import CoreSettings
 from modules.cam.depthcam.Gui import Gui
 from modules.utils.FPS import FPS
-
-class input(IntEnum):
-    COLOR_CONTROL = auto()
-    MONO_CONTROL = auto()
-    STEREO_CONTROL = auto()
-    VIDEO_FRAME_IN = auto()
-    LEFT_FRAME_IN = auto()
-    RIGHT_FRAME_IN = auto()
-
-class output(IntEnum):
-    VIDEO_FRAME_OUT = auto()
-    LEFT_FRAME_OUT = auto()
-    RIGHT_FRAME_OUT = auto()
-    STEREO_FRAME_OUT = auto()
-    SYNC_FRAMES_OUT = auto()
-    TRACKLETS_OUT = auto()
 
 class Core(Thread):
     _id_counter = 0
@@ -61,8 +44,8 @@ class Core(Thread):
         self.device_open: bool =        False
         self.device:                    dai.Device
 
-        self.inputs: dict[input, dai.DataInputQueue] = {}
-        self.outputs: dict[output, dai.DataOutputQueue] = {}
+        self.inputs: dict[Input, dai.DataInputQueue] = {}
+        self.outputs: dict[Output, dai.DataOutputQueue] = {}
         self.num_tracklets: int =       0
 
         # FPS
@@ -118,30 +101,25 @@ class Core(Thread):
             setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo, simulate=False)
 
     def _setup_queues(self) -> None:
+        print(self.do_color)
         if self.do_stereo:
-            mono_control: dai.DataInputQueue =      self.device.getInputQueue('mono_control')
-            self.inputs[input.MONO_CONTROL] =       mono_control
-            stereo_control: dai.DataInputQueue =    self.device.getInputQueue('stereo_control')
-            self.inputs[input.STEREO_CONTROL] =     stereo_control
-            sync_queue: dai.DataOutputQueue =       self.device.getOutputQueue(name='sync', maxSize=4, blocking=False)
-            self.outputs[output.SYNC_FRAMES_OUT] =  sync_queue
-            sync_queue.addCallback(self._sync_callback)
+            if self.do_color:
+                self.inputs[Input.COLOR_CONTROL] =  self.device.getInputQueue('color_control')
+            self.inputs[Input.MONO_CONTROL] =       self.device.getInputQueue('mono_control')
+            self.inputs[Input.STEREO_CONTROL] =     self.device.getInputQueue('stereo_control')
+            self.outputs[Output.SYNC_FRAMES_OUT] =  self.device.getOutputQueue(name='sync', maxSize=1, blocking=False)
+            self.outputs[Output.SYNC_FRAMES_OUT].addCallback(self._sync_callback)
         elif self.do_color:
-            color_control: dai.DataInputQueue =     self.device.getInputQueue('color_control')
-            self.inputs[input.COLOR_CONTROL] =      color_control
-            color_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='video', maxSize=4, blocking=False)
-            self.outputs[output.VIDEO_FRAME_OUT] =  color_queue
-            color_queue.addCallback(self._video_callback)
+            self.inputs[Input.COLOR_CONTROL] =      self.device.getInputQueue('color_control')
+            self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
+            self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
         else: # only mono
-            mono_control: dai.DataInputQueue =      self.device.getInputQueue('mono_control')
-            self.inputs[input.MONO_CONTROL] =       mono_control
-            video_queue: dai.DataOutputQueue =      self.device.getOutputQueue(name='video', maxSize=4, blocking=False)
-            self.outputs[output.VIDEO_FRAME_OUT] =   video_queue
-            video_queue.addCallback(self._video_callback)
+            self.inputs[Input.MONO_CONTROL] =       self.device.getInputQueue('mono_control')
+            self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
+            self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
         if self.do_person:
-            self.tracklet_queue: dai.DataOutputQueue =   self.device.getOutputQueue(name='tracklets', maxSize=4, blocking=False)
-            self.outputs[output.TRACKLETS_OUT] = self.tracklet_queue
-            self.tracklet_queue.addCallback(self._tracker_callback)
+            self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
+            self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
 
     def _close(self) -> None:
         if not self.device_open: return
@@ -217,9 +195,12 @@ class Core(Thread):
         self.tps_counter.processed()
 
     # CONTROL
-    def _send_control(self, input: input, control) -> None:
+    def _send_control(self, input: Input, control) -> None:
+        print(f'send control {input} {control}')
         if input in self.inputs:
             self.inputs[input].send(control)
+        else:
+            print(f'input {input} not found in inputs')
 
     # CALLBACKS
     def _update_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:

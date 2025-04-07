@@ -1,5 +1,5 @@
 from enum import Enum
-from threading import Thread
+from threading import Thread, Lock
 from modules.gui.PySimpleGui import PySimpleGui as sg
 import os
 import glob
@@ -157,6 +157,7 @@ class Gui(Thread):
         self.windowName: str = name
         self.defaultSettingsName = defaultSettingsName
         self.settings: sg.UserSettings = sg.UserSettings(path = path, filename = defaultSettingsName + '.json')
+        self.exit_lock = Lock()
         self.exit_callback = exitCallback
         self.messageQueue: Queue = Queue()
         self.layout: list = []
@@ -169,7 +170,7 @@ class Gui(Thread):
         elem.append([Element(eType.TEXT, '© Matthias Oostrik 2025')])
         autograph = Frame('TITLE', elem, 60)
         elem = []
-        elem.append([Element(eType.BTTN, 'Exit', self.exit_callback),
+        elem.append([Element(eType.BTTN, 'Exit', self.call_exit_callback),
                      Element(eType.TEXT, ' '),
                      Element(eType.CMBO, 'SettingsFile', self.set_settings_name, self.defaultSettingsName, self.get_setting_names()),
                      Element(eType.BTTN, 'Save', self.saveSettings),
@@ -185,6 +186,10 @@ class Gui(Thread):
             sleep(0.01)
 
     def stop(self) -> None:
+        if self.running == False:
+            return
+        with self.exit_lock:
+            self.exit_callback = None
         self.running = False
 
     def run(self) -> None:
@@ -193,9 +198,9 @@ class Gui(Thread):
 
         while self.running:
             if UpdateWindow(self.window) == False:
+                self.call_exit_callback()
                 self.stop()
                 self.window.close()
-                if(self.exit_callback): self.exit_callback()
 
             while not self.messageQueue.empty():
                 m: qMessage = self.messageQueue.get(True)
@@ -276,6 +281,12 @@ class Gui(Thread):
 
     def isRunning(self) -> bool:
         return self.running
+
+    def call_exit_callback(self) -> None:
+        with self.exit_lock:
+            exit_callback = self.exit_callback
+        if exit_callback:
+            exit_callback()
 
     def getDefaultFrameWidth(self) -> int:
         return self.defaultFrameWidth
