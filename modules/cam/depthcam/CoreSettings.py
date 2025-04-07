@@ -228,8 +228,10 @@ class CoreSettings():
         self.core.device.setIrLaserDotProjectorIntensity(v)
 
     # FPS
-    def get_fps(self) -> float:
-        return self.core.fps_counter.get_rate_average()
+    def get_fps(self, frame_type: FrameType) -> float:
+        if frame_type in self.core.fps_counters:
+            return self.core.fps_counters[frame_type].get_rate_average()
+        return 0.0
 
     def get_tps(self) -> float:
         return self.core.tps_counter.get_rate_average()

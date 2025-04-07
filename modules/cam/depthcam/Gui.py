@@ -44,8 +44,12 @@ class Gui():
         elem.append([E(eT.CMBO, 'Preview'+id,           self.settings.set_preview,              self.ftn[0],            self.ftn,   expand=False),
                      E(eT.CHCK, 'AutoExposure'+id,      self.settings.set_color_auto_exposure,  True),
                      E(eT.CHCK, 'AutoBalance'+id,       self.settings.set_color_auto_balance,   True),
-                     E(eT.SLDR, 'FPS'+id,               None,                               0,  [0,60],   0.1)])
-        elem.append([ E(eT.SLDR, 'NumTracklets'+id,     None,                               0,  [0,6],    1),
+                     E(eT.SLDR, 'NumTracklets'+id,     None,                               0,  [0,6],    1)])
+        elem.append([E(eT.TEXT, 'FPS'),
+                     E(eT.SLDR, 'FPS_V'+id,             None,                               0,  [0,60],   0.1),
+                     E(eT.SLDR, 'FPS_L'+id,             None,                               0,  [0,60],   0.1),
+                     E(eT.SLDR, 'FPS_R'+id,             None,                               0,  [0,60],   0.1),
+                     E(eT.SLDR, 'FPS_D'+id,             None,                               0,  [0,60],   0.1),
                      E(eT.SLDR, 'TPS'+id,               None,                               0,  [0,60],   0.1)])
 
         self.color_frame = Frame('CAMERA COLOR', elem, 240)
@@ -123,7 +127,10 @@ class Gui():
                 self.gui.updateElement('M_Iso'+self.id, self.settings.mono_iso)
 
         # fps
-        self.gui.updateElement('FPS'+self.id, self.settings.get_fps())
+        self.gui.updateElement('FPS_V'+self.id, self.settings.get_fps(FrameType.VIDEO))
+        self.gui.updateElement('FPS_L'+self.id, self.settings.get_fps(FrameType.LEFT_))
+        self.gui.updateElement('FPS_R'+self.id, self.settings.get_fps(FrameType.RIGHT))
+        self.gui.updateElement('FPS_D'+self.id, self.settings.get_fps(FrameType.DEPTH))
 
     def update_from_tracker(self) -> None:
         if not self.gui.isRunning(): return

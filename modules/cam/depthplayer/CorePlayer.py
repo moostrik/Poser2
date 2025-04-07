@@ -49,6 +49,7 @@ class CorePlayer(Core):
         self.inputs[Input.VIDEO_FRAME_IN] =     self.device.getInputQueue(name='ex_video', maxSize=1, blocking=False)
         self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
         self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
+        self.fps_counters[FrameType.VIDEO] = FPS(120)
         if self.do_stereo:
             self.inputs[Input.STEREO_CONTROL] =     self.device.getInputQueue('stereo_control')
             self.inputs[Input.LEFT_FRAME_IN] =      self.device.getInputQueue(name='ex_left', maxSize=1, blocking=False)
@@ -57,9 +58,12 @@ class CorePlayer(Core):
             self.outputs[Output.LEFT_FRAME_OUT].addCallback(self._left_callback)
             self.outputs[Output.RIGHT_FRAME_OUT] =  self.device.getOutputQueue(name='right', maxSize=1, blocking=False)
             self.outputs[Output.RIGHT_FRAME_OUT].addCallback(self._right_callback)
+            self.fps_counters[FrameType.LEFT_] = FPS(120)
+            self.fps_counters[FrameType.RIGHT] = FPS(120)
             if self.show_stereo:
                 self.outputs[Output.STEREO_FRAME_OUT] = self.device.getOutputQueue(name='stereo', maxSize=1, blocking=False)
                 self.outputs[Output.STEREO_FRAME_OUT].addCallback(self._stereo_callback)
+                self.fps_counters[FrameType.DEPTH] = FPS(120)
         if self.do_person:
             self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)

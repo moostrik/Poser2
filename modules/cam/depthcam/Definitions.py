@@ -1,7 +1,7 @@
 import numpy as np
 from enum import Enum, IntEnum, auto
 from typing import Callable
-from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device
+from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device, SpatialLocationCalculatorAlgorithm
 
 
 DETECTION_MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
@@ -10,7 +10,8 @@ DETECTION_THRESHOLD: float = 0.5
 TRACKER_TYPE: TrackerType = TrackerType.ZERO_TERM_IMAGELESS
 # ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
 # ZERO_TERM_IMAGELESS slightly faster
-DEPTH_TRACKER_BOX_SCALE: float = 0.5
+DEPTH_TRACKER_LOCATION: SpatialLocationCalculatorAlgorithm = SpatialLocationCalculatorAlgorithm.MIN
+DEPTH_TRACKER_BOX_SCALE: float = 1.0
 DEPTH_TRACKER_MIN_DEPTH: int = 500
 DEPTH_TRACKER_MAX_DEPTH: int = 10000
 
@@ -50,7 +51,6 @@ class StereoMedianFilterType(Enum):
     KERNEL_7x7 = 3
 
 STEREO_FILTER_NAMES: list[str] = [e.name for e in StereoMedianFilterType]
-
 
 FrameCallback = Callable[[int, FrameType, np.ndarray, int], None]
 DetectionCallback = Callable[[int, ImgDetection], None]

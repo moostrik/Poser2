@@ -188,8 +188,9 @@ class SetupColorStereo(SetupColor):
         self.right.out.link(self.stereo.right)
 
         self.sync: dai.node.Sync = pipeline.create(dai.node.Sync)
-        sync_threshold = timedelta(seconds=(1.0 / self.fps) * 0.5)
+        sync_threshold = timedelta(seconds=(1.0 / self.fps) * 1.0)
         self.sync.setSyncThreshold(sync_threshold)
+        self.sync.setSyncAttempts(0)
 
         self.color.video.link(self.sync.inputs["video"])
         self.left.out.link(self.sync.inputs["left"])
@@ -226,6 +227,7 @@ class SetupColorStereoPerson(SetupColorStereo):
         self.detection_network.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detection_network.setNumInferenceThreads(2)
         self.detection_network.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
+        self.detection_network.setSpatialCalculationAlgorithm(DEPTH_TRACKER_LOCATION)
         self.detection_network.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
         self.detection_network.setDepthUpperThreshold(DEPTH_TRACKER_MAX_DEPTH)
         self.detection_network.input.setBlocking(False)
@@ -332,8 +334,9 @@ class SetupMonoStereo(SetupMono):
         self.right.out.link(self.stereo.right)
 
         self.sync: dai.node.Sync = pipeline.create(dai.node.Sync)
-        sync_threshold = timedelta(seconds=(1.0 / self.fps) * 0.5)
+        sync_threshold = timedelta(seconds=(1.0 / self.fps) * 1.0)
         self.sync.setSyncThreshold(sync_threshold)
+        self.sync.setSyncAttempts(0)
 
         self.stereo.rectifiedLeft.link(self.sync.inputs["video"])
         self.left.out.link(self.sync.inputs["left"])
@@ -366,6 +369,7 @@ class SetupMonoStereoPerson(SetupMonoStereo):
         self.detection_network.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detection_network.setNumInferenceThreads(2)
         self.detection_network.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
+        self.detection_network.setSpatialCalculationAlgorithm(DEPTH_TRACKER_LOCATION)
         self.detection_network.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
         self.detection_network.setDepthUpperThreshold(DEPTH_TRACKER_MAX_DEPTH)
         self.detection_network.input.setBlocking(False)
@@ -503,6 +507,7 @@ class SimulationColorStereoPerson(SimulationColorStereo):
         self.detection_network.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detection_network.setNumInferenceThreads(2)
         self.detection_network.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
+        self.detection_network.setSpatialCalculationAlgorithm(DEPTH_TRACKER_LOCATION)
         self.detection_network.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
         self.detection_network.setDepthUpperThreshold(DEPTH_TRACKER_MAX_DEPTH)
         self.detection_network.input.setBlocking(False)
@@ -620,6 +625,7 @@ class SimulationMonoStereoPerson(SimulationMonoStereo):
         self.detection_network.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detection_network.setNumInferenceThreads(2)
         self.detection_network.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
+        self.detection_network.setSpatialCalculationAlgorithm(DEPTH_TRACKER_LOCATION)
         self.detection_network.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
         self.detection_network.setDepthUpperThreshold(DEPTH_TRACKER_MAX_DEPTH)
         self.detection_network.input.setBlocking(False)

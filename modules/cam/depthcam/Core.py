@@ -49,7 +49,7 @@ class Core(Thread):
         self.num_tracklets: int =       0
 
         # FPS
-        self.fps_counter =              FPS(120)
+        self.fps_counters: dict[FrameType, FPS] = {}
         self.tps_counter =              FPS(120)
 
         # FRAME TYPES
@@ -64,7 +64,7 @@ class Core(Thread):
 
         # SETTINGS
         self.preview_type =             FrameType.VIDEO
-        self.settings: CoreSettings =       CoreSettings(self)
+        self.settings: CoreSettings =   CoreSettings(self)
         self.gui: Gui =                 Gui(gui, self.settings)
 
     def stop(self) -> None:
@@ -109,14 +109,21 @@ class Core(Thread):
             self.inputs[Input.STEREO_CONTROL] =     self.device.getInputQueue('stereo_control')
             self.outputs[Output.SYNC_FRAMES_OUT] =  self.device.getOutputQueue(name='sync', maxSize=1, blocking=False)
             self.outputs[Output.SYNC_FRAMES_OUT].addCallback(self._sync_callback)
+            self.fps_counters[FrameType.VIDEO] = FPS(120)
+            self.fps_counters[FrameType.LEFT_] = FPS(120)
+            self.fps_counters[FrameType.RIGHT] = FPS(120)
+            if self.show_stereo:
+                self.fps_counters[FrameType.DEPTH] = FPS(120)
         elif self.do_color:
             self.inputs[Input.COLOR_CONTROL] =      self.device.getInputQueue('color_control')
             self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
             self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
+            self.fps_counters[FrameType.VIDEO] = FPS(120)
         else: # only mono
             self.inputs[Input.MONO_CONTROL] =       self.device.getInputQueue('mono_control')
             self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
             self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
+            self.fps_counters[FrameType.VIDEO] = FPS(120)
         if self.do_person:
             self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
@@ -138,7 +145,7 @@ class Core(Thread):
         print(f'Camera: {self.device_id} CLOSED')
 
     def _video_callback(self, msg: dai.ImgFrame) -> None:
-        self._update_fps()
+        self._update_fps(FrameType.VIDEO)
         self.gui.update_from_frame()
         if self.do_color:
             self.settings.update_color_control(msg)
@@ -149,14 +156,17 @@ class Core(Thread):
         self._update_callbacks(FrameType.VIDEO, frame)
 
     def _left_callback(self, msg: dai.ImgFrame) -> None:
+        self._update_fps(FrameType.LEFT_)
         frame: ndarray = msg.getCvFrame()
         self._update_callbacks(FrameType.LEFT_, frame)
 
     def _right_callback(self, msg: dai.ImgFrame) -> None:
+        self._update_fps(FrameType.RIGHT)
         frame: ndarray = msg.getCvFrame()
         self._update_callbacks(FrameType.RIGHT, frame)
 
     def _stereo_callback(self, msg: dai.ImgFrame) -> None:
+        self._update_fps(FrameType.DEPTH)
         frame: ndarray = msg.getCvFrame()
         frame = applyColorMap(frame, COLORMAP_JET)
         self._update_callbacks(FrameType.DEPTH, frame)
@@ -172,8 +182,8 @@ class Core(Thread):
                     self._right_callback(msg)
                 elif name == 'stereo':
                     self._stereo_callback(msg)
-            else:
-                print('unknown message', name)
+                else:
+                    print('unknown message', name)
 
 
     def _tracker_callback(self, msg: dai.RawTracklets) -> None:
@@ -186,10 +196,11 @@ class Core(Thread):
                 c(self.id, t)
 
     # FPS
-    def _update_fps(self) -> None:
-        self.fps_counter.processed()
-        for c in self.fps_callbacks:
-            c(self.id, self.fps_counter.get_rate_average())
+    def _update_fps(self, fps_type: FrameType) -> None:
+        self.fps_counters[fps_type].processed()
+        if fps_type == FrameType.VIDEO:
+            for c in self.fps_callbacks:
+                c(self.id, self.fps_counters[fps_type].get_rate_average())
 
     def _update_tps(self) -> None:
         self.tps_counter.processed()
