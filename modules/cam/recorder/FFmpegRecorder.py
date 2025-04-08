@@ -68,7 +68,7 @@ class FFmpegRecorder:
                 process = (
                     ffmpeg
                     .input('pipe:', format='rawvideo', pix_fmt=pix_fmt, s=f'{width}x{height}', r=self.fps)
-                    .output(self.output_file, pix_fmt='yuv420p', vcodec=self.vcodec, r=self.fps)
+                    .output(self.output_file, pix_fmt='yuv420p', vcodec=self.vcodec, r=self.fps)# g=int(self.fps))
                     .overwrite_output()
                     .global_args('-loglevel', 'quiet')
                     .run_async(pipe_stdin=True)

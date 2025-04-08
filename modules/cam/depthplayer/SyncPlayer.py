@@ -63,6 +63,7 @@ class SyncPlayer(Thread):
 
         self.load_chunk: int = -1
         self.load_folder: str = ''
+        self.suffix: str = settings.format.value
 
         self.folders: FolderDict = self._get_video_folders(settings)
 
@@ -126,11 +127,15 @@ class SyncPlayer(Thread):
 
         for c in range(self.num_cams):
             for t in self.types:
-                path: Path = folder.path / make_file_name(c, t, self.load_chunk)
+                path: Path = folder.path / make_file_name(c, t, self.load_chunk, self.suffix)
+                print(f"Loading {path}")
                 if path.is_file():
+
                     player: FFmpegPlayer = FFmpegPlayer(c, t, self._frame_callback, self.hwt, self.hwd)
                     player.load(str(path), self.load_chunk)
                     self.loaders.append(player)
+                else:
+                    print(f"File {path} not found")
 
     def _start(self) -> None:
         for p in self.players:
@@ -166,9 +171,9 @@ class SyncPlayer(Thread):
 
     def _finished_playing(self) -> bool:
         for p in self.players:
-            if not p.is_playing():
-                return True
-        return False
+            if p.is_playing():
+                return False
+        return True
 
     def _finished_stopping(self) -> bool:
         for p in self.closers:
@@ -235,6 +240,7 @@ class SyncPlayer(Thread):
     @staticmethod
     def _get_video_folders(settings: Settings) -> FolderDict :
         folders: FolderDict = {}
+        suffix: str = settings.format.value
         video_path: Path = Path(settings.video_path)
         for folder in video_path.iterdir():
             if folder.is_dir():
@@ -242,7 +248,7 @@ class SyncPlayer(Thread):
                     continue
                 max_chunk: int = 0
                 for file in folder.iterdir():
-                    if file.is_file() and file.name.endswith('.mp4'):
+                    if file.is_file() and (file.name.endswith(Settings.CoderFormat.H264.value) or file.name.endswith(Settings.CoderFormat.H265.value)):
                         n: str = file.stem.split('_')[2]
                         if n.isdigit():
                             max_chunk = max(max_chunk, int(n))

@@ -10,8 +10,8 @@ from modules.Settings import Settings
 from modules.cam.recorder.FFmpegRecorder import FFmpegRecorder
 from modules.cam.depthcam.Definitions import FrameType, FRAME_TYPE_LABEL_DICT
 
-def make_file_name(c: int, t: FrameType, chunk: int) -> str:
-    return f"{c}_{FRAME_TYPE_LABEL_DICT[t]}_{chunk:03d}.mp4"
+def make_file_name(c: int, t: FrameType, chunk: int, format: str) -> str:
+    return f"{c}_{FRAME_TYPE_LABEL_DICT[t]}_{chunk:03d}{format}"
 
 def make_folder_name(num_cams: int, color: bool, stereo: bool, lowres: bool) -> str:
     return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_color' if color else '_mono') + ('_stereo' if stereo else '') + ('_lowres' if lowres else '_highres')
@@ -28,10 +28,17 @@ def is_folder_for_settings(name: str, settings: Settings) -> bool:
         return True
     return False
 
-EncoderString: dict[Settings.CoderType, str] = {
-    Settings.CoderType.CPU:  'libx264',
-    Settings.CoderType.GPU:  'h264_nvenc',
-    Settings.CoderType.iGPU: 'h264_qsv'
+EncoderString: dict[Settings.CoderFormat, dict[Settings.CoderType, str]] = {
+    Settings.CoderFormat.H264: {
+        Settings.CoderType.CPU:  'libx264',
+        Settings.CoderType.GPU:  'h264_nvenc',
+        Settings.CoderType.iGPU: 'h264_qsv'
+    },
+    Settings.CoderFormat.H265: {
+        Settings.CoderType.CPU:  'libx265',
+        Settings.CoderType.GPU:  'hevc_nvenc',
+        Settings.CoderType.iGPU: 'hevc_qsv'
+    }
 }
 
 class RecState(Enum):
@@ -58,11 +65,12 @@ class SyncRecorder(Thread):
             self.fps[c] = settings.fps
             self.frames[c] = Queue()
             for t in self.settings.frame_types:
-                self.recorders[c][t] = FFmpegRecorder(EncoderString[settings.encoder])
+                self.recorders[c][t] = FFmpegRecorder(EncoderString[settings.format][settings.encoder])
 
         self.start_time: float
         self.chunk_index = 0
         self.rec_name: str
+        self.suffix: str = settings.format.value
 
         self.state: RecState = RecState.IDLE
         self.state_lock = Lock()
@@ -100,7 +108,7 @@ class SyncRecorder(Thread):
         for c in range(self.settings.num_cams):
             fps: float = self.get_fps(c)
             for t in self.settings.frame_types:
-                path: Path = self.folder_path / make_file_name(c, t, self.chunk_index)
+                path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                 self.recorders[c][t].start(str(path), fps)
 
         self.start_time = time.time()
@@ -118,7 +126,7 @@ class SyncRecorder(Thread):
             for c in range(self.settings.num_cams):
                 fps: float = self.get_fps(c)
                 for t in self.settings.frame_types:
-                    path: Path = self.folder_path / make_file_name(c, t, self.chunk_index)
+                    path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                     self.recorders[c][t].split(str(path), fps)
             self.start_time += self.settings.chunk_length
 

@@ -11,6 +11,7 @@ class Main():
     def __init__(self, settings: Settings) -> None:
         self.gui = Gui('DepthPose', settings.file_path, 'default')
         self.render = Render(settings.num_cams, settings.num_players, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
+        # self.render = Render(4, settings.num_players, 1280, 720 + 256, 'Depth Pose', fullscreen=False, v_sync=True)
 
         self.recorder: Recorder | None = None
         self.player: Player | None = None
@@ -95,7 +96,7 @@ class Main():
         self.detector.join()
         # print ('join cameras')
         for camera in self.cameras:
-            camera.join(timeout=1.0)
+            camera.join()
 
         # print ('stop render')
         self.render.exit_callback = None

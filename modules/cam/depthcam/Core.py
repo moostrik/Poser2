@@ -105,7 +105,6 @@ class Core(Thread):
             setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo, simulate=False)
 
     def _setup_queues(self) -> None:
-        print(self.do_color)
         if self.do_stereo:
             if self.do_color:
                 self.inputs[Input.COLOR_CONTROL] =  self.device.getInputQueue('color_control')
@@ -231,6 +230,16 @@ class Core(Thread):
         if self.preview_type == frame_type:
             for c in self.preview_callbacks:
                 c(self.id, frame_type, frame, 0)
+
+        # if frame_type == FrameType.VIDEO:
+        #     for c in self.preview_callbacks:
+        #         c(2, FrameType.LEFT_, frame, 0)
+        # if frame_type == FrameType.LEFT_:
+        #     for c in self.preview_callbacks:
+        #         c(1, FrameType.LEFT_, frame, 0)
+        # if frame_type == FrameType.RIGHT:
+        #     for c in self.preview_callbacks:
+        #         c(3, FrameType.RIGHT, frame, 0)
 
     def _update_sync_callbacks(self, frames: dict[FrameType, ndarray], fps: float) -> None:
         if not self.running:

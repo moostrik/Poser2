@@ -12,6 +12,10 @@ class Settings():
         GPU =   1
         iGPU =  2
 
+    class CoderFormat(Enum):
+        H264 = '.mp4'
+        H265 = '.hevc'
+
     def __init__(self) -> None:
         # PATHS
         self.root_path: str                 = None # type: ignore
@@ -41,6 +45,7 @@ class Settings():
         self.chunk_length: float            = None # type: ignore
         self.encoder: Settings.CoderType    = None # type: ignore
         self.decoder: Settings.CoderType    = None # type: ignore
+        self.format: Settings.CoderFormat   = None # type: ignore
         self.frame_types: list[FrameType]   = None # type: ignore
 
 

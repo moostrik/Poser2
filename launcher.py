@@ -20,6 +20,7 @@ parser.add_argument('-ll',      '--lightning',  action='store_true',        help
 parser.add_argument('-ns',      '--nostereo',   action='store_true',        help='do not use stereo depth')
 parser.add_argument('-ny',      '--noyolo',     action='store_true',        help='do not do yolo person detection')
 parser.add_argument('-np',      '--nopose',     action='store_true',        help='do not do pose detection')
+parser.add_argument('-cl',      '--chunklength',type=float, default=6.0,    help='duration of video chunks in seconds')
 parser.add_argument('-sim',     '--simulation', action='store_true',        help='use prerecored video with camera')
 parser.add_argument('-pt',      '--passthrough',action='store_true',        help='use prerecored video without camera')
 args: Namespace = parser.parse_args()
@@ -55,9 +56,10 @@ settings.num_players =  args.players
 settings.pose =     not args.nopose
 settings.model_type =   ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
 
-settings.chunk_length = 4.0
+settings.chunk_length = args.chunklength
 settings.encoder =      Settings.CoderType.iGPU
 settings.decoder =      Settings.CoderType.iGPU
+settings.format =       Settings.CoderFormat.H265
 settings.frame_types =  [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIGHT] if settings.stereo else [FrameType.VIDEO]
 
 settings.check_values()
