@@ -122,9 +122,12 @@ class FFmpegPlayer:
                     .global_args('-loglevel', 'quiet')
                     .run_async(pipe_stdout=True)
                 )
+
         except ffmpeg.Error as e:
             print('Error loading:', e)
             self.ffmpeg_process = None
+
+        time.sleep(0.2)
 
         with self._load_lock:
             self.ffmpeg_process = ffmpeg_process

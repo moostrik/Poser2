@@ -32,7 +32,7 @@ camera_list: list[str] = ['14442C10F124D9D600',
                           '14442C101136D1D200',
                           '14442C1031DDD2D200']
 
-camera_list: list[str] = ['14442C10F124D9D600']
+# camera_list: list[str] = ['14442C10F124D9D600']
 
 settings: Settings = Settings()
 settings.root_path =    currentPath
@@ -59,7 +59,7 @@ settings.model_type =   ModelType.NONE if args.nopose else ModelType.LIGHTNING i
 settings.chunk_length = args.chunklength
 settings.encoder =      Settings.CoderType.iGPU
 settings.decoder =      Settings.CoderType.iGPU
-settings.format =       Settings.CoderFormat.H265
+settings.format =       Settings.CoderFormat.H264
 settings.frame_types =  [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIGHT] if settings.stereo else [FrameType.VIDEO]
 
 settings.check_values()

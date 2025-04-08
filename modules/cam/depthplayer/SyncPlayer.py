@@ -74,6 +74,11 @@ class SyncPlayer(Thread):
         self.loaders: list[FFmpegPlayer] = []
         self.closers: list[FFmpegPlayer] = []
 
+        self.sync_lock: Lock = Lock()
+        self.frame_sync_dict: Dict[int, Dict[int, Dict[FrameType, ndarray]]] = {}
+        for i in range(self.num_cams):
+            self.frame_sync_dict[i] = {}
+
         self.playback_lock: Lock = Lock()
         self.frameCallbacks: Set[FrameCallback] = set()
 
@@ -114,7 +119,7 @@ class SyncPlayer(Thread):
                 state = State.STOPPING
             if state == State.STOPPING and self._finished_stopping():
                 state = State.IDLE
-            self.clean()
+            self._clean()
 
             if self.stop_event.is_set() and state == State.IDLE:
                 break
@@ -128,7 +133,6 @@ class SyncPlayer(Thread):
         for c in range(self.num_cams):
             for t in self.types:
                 path: Path = folder.path / make_file_name(c, t, self.load_chunk, self.suffix)
-                print(f"Loading {path}")
                 if path.is_file():
 
                     player: FFmpegPlayer = FFmpegPlayer(c, t, self._frame_callback, self.hwt, self.hwd)
@@ -157,7 +161,7 @@ class SyncPlayer(Thread):
             self.closers.append(p)
         self.players.clear()
 
-    def clean(self) -> None:
+    def _clean(self) -> None:
         for p in self.closers:
             if p.is_stopped():
                 p.join()
@@ -198,8 +202,33 @@ class SyncPlayer(Thread):
             return self.load_folder
 
     def _frame_callback(self, cam_id: int, frame_type: FrameType, frame: ndarray, frame_id) -> None:
-        for callback in self.frameCallbacks:
-            callback(cam_id, frame_type, frame, frame_id)
+        with self.sync_lock:
+        #self.frame_sync_dict: Dict[int, Dict[int, Dict[FrameType, ndarray]]] = {}
+            cam_frames: Dict[int, Dict[FrameType, ndarray]] = self.frame_sync_dict[cam_id]
+            if frame_id not in cam_frames:
+                cam_frames[frame_id] = {}
+            cam_frames[frame_id][frame_type] = frame
+            for t in self.types:
+                if t not in cam_frames[frame_id]:
+                    return
+
+            for key in cam_frames.keys():
+                if key < frame_id:
+                    print(f"Frame {key} is older than {frame_id}, removing")
+                    del cam_frames[key]
+
+
+
+            for ft in cam_frames[frame_id].keys():
+                for callback in self.frameCallbacks:
+                    callback(cam_id, ft, cam_frames[frame_id][ft], frame_id)
+            del cam_frames[frame_id]
+
+
+
+
+        # for callback in self.frameCallbacks:
+        #     callback(cam_id, frame_type, frame, frame_id)
 
     # EXTERNAL METHODS
     def play(self, value: bool, name: str = '') -> None:

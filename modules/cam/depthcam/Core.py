@@ -218,8 +218,6 @@ class Core(Thread):
             return
         if input in self.inputs:
             self.inputs[input].send(control)
-        else:
-            print(f'input {input} not found in inputs')
 
     # CALLBACKS
     def _update_frame_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
