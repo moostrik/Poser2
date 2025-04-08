@@ -202,8 +202,8 @@ class SyncPlayer(Thread):
             return self.load_folder
 
     def _frame_callback(self, cam_id: int, frame_type: FrameType, frame: ndarray, frame_id) -> None:
+        sync_frames:Dict[FrameType, ndarray] = {}
         with self.sync_lock:
-        #self.frame_sync_dict: Dict[int, Dict[int, Dict[FrameType, ndarray]]] = {}
             cam_frames: Dict[int, Dict[FrameType, ndarray]] = self.frame_sync_dict[cam_id]
             if frame_id not in cam_frames:
                 cam_frames[frame_id] = {}
@@ -217,18 +217,14 @@ class SyncPlayer(Thread):
                     print(f"Frame {key} is older than {frame_id}, removing")
                     del cam_frames[key]
 
-
-
-            for ft in cam_frames[frame_id].keys():
-                for callback in self.frameCallbacks:
-                    callback(cam_id, ft, cam_frames[frame_id][ft], frame_id)
+            sync_frames = cam_frames[key]
             del cam_frames[frame_id]
 
+        print(cam_id, frame_id)
+        for ft in sync_frames.keys():
+            for callback in self.frameCallbacks:
+                callback(cam_id, ft, sync_frames[ft], frame_id)
 
-
-
-        # for callback in self.frameCallbacks:
-        #     callback(cam_id, frame_type, frame, frame_id)
 
     # EXTERNAL METHODS
     def play(self, value: bool, name: str = '') -> None:
