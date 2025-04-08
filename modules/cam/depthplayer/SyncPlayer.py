@@ -61,6 +61,7 @@ class SyncPlayer(Thread):
 
         self.stop_event = Event()
 
+        self.play_chunk: int = -1
         self.load_chunk: int = -1
         self.load_folder: str = ''
         self.suffix: str = settings.format.value
@@ -76,6 +77,7 @@ class SyncPlayer(Thread):
 
         self.sync_lock: Lock = Lock()
         self.frame_sync_dict: Dict[int, Dict[int, Dict[FrameType, ndarray]]] = {}
+        self.last_frame_id: Dict[int, int] = {}
         for i in range(self.num_cams):
             self.frame_sync_dict[i] = {}
 
@@ -99,6 +101,7 @@ class SyncPlayer(Thread):
             if message and message.state == MessageType.START:
                 self._set_load_folder(message.value)
                 self._set_load_chunk(-1)
+                self._set_play_chunk(-1)
                 state = State.LOAD
             if message and message.state == MessageType.STOP:
                 state = State.STOP
@@ -146,12 +149,17 @@ class SyncPlayer(Thread):
             p.stop()
             self.closers.append(p)
         self.players.clear()
+
+        self._clear_frame_sync()
+        self._set_play_chunk(self._get_load_chunk())
+
         for p in self.loaders:
             p.play()
             self.players.append(p)
         self.loaders.clear()
 
     def _stop(self) -> None:
+        self._set_play_chunk(-1)
         for p in self.loaders:
             p.stop()
             self.closers.append(p)
@@ -193,6 +201,14 @@ class SyncPlayer(Thread):
         with self.playback_lock:
             return self.load_chunk
 
+    def _set_play_chunk(self, value: int) -> None:
+        with self.playback_lock:
+            self.play_chunk = value
+
+    def _get_play_chunk(self) -> int:
+        with self.playback_lock:
+            return self.play_chunk
+
     def _set_load_folder(self, value: str) -> None:
         with self.playback_lock:
             self.load_folder = value
@@ -201,7 +217,10 @@ class SyncPlayer(Thread):
         with self.playback_lock:
             return self.load_folder
 
-    def _frame_callback(self, cam_id: int, frame_type: FrameType, frame: ndarray, frame_id) -> None:
+    def _frame_callback(self, cam_id: int, frame_type: FrameType, frame: ndarray, chunk_id: int, frame_id: int) -> None:
+        if chunk_id != self._get_play_chunk():
+            print(f"Chunk {chunk_id} does not match load chunk {self.get_current_chunk()}, ignoring frame")
+            return
         sync_frames:Dict[FrameType, ndarray] = {}
         with self.sync_lock:
             cam_frames: Dict[int, Dict[FrameType, ndarray]] = self.frame_sync_dict[cam_id]
@@ -212,19 +231,44 @@ class SyncPlayer(Thread):
                 if t not in cam_frames[frame_id]:
                     return
 
-            for key in cam_frames.keys():
-                if key < frame_id:
-                    print(f"Frame {key} is older than {frame_id}, removing")
-                    del cam_frames[key]
+            keys_to_delete: list[int] = []
 
-            sync_frames = cam_frames[key]
+            for key in cam_frames.keys():
+                if key < frame_id - 3:
+                    print(f"Frame {key} is older than {frame_id}, marking for removal")
+                    keys_to_delete.append(key)
+
+            for key in keys_to_delete:
+                del cam_frames[key]
+
+            # for key in cam_frames.keys():
+            #     if key < frame_id -1:
+            #         print(f"Frame {key} is older than {frame_id}, removing")
+            #         del cam_frames[key]
+
+            sync_frames = cam_frames[frame_id]
             del cam_frames[frame_id]
 
-        print(cam_id, frame_id)
+        # make thread safe and reset on start of new chunk
+        self.last_frame_id[cam_id] = frame_id
+        low_id: int = 9999
+        high_id: int = 0
+        for key in self.last_frame_id.keys():
+            if self.last_frame_id[key] < low_id:
+                low_id = self.last_frame_id[key]
+            if self.last_frame_id[key] > high_id:
+                high_id = self.last_frame_id[key]
+
+
+        print(high_id - low_id)
         for ft in sync_frames.keys():
             for callback in self.frameCallbacks:
-                callback(cam_id, ft, sync_frames[ft], frame_id)
+                callback(cam_id, ft, sync_frames[ft])
 
+    def _clear_frame_sync(self) -> None:
+        with self.sync_lock:
+            for i in range(self.num_cams):
+                self.frame_sync_dict[i].clear()
 
     # EXTERNAL METHODS
     def play(self, value: bool, name: str = '') -> None:

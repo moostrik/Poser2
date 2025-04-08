@@ -224,10 +224,10 @@ class Core(Thread):
         if not self.running:
             return
         for c in self.frame_callbacks:
-            c(self.id, frame_type, frame, 0)
+            c(self.id, frame_type, frame)
         if self.preview_type == frame_type:
             for c in self.preview_callbacks:
-                c(self.id, frame_type, frame, 0)
+                c(self.id, frame_type, frame)
 
         # if frame_type == FrameType.VIDEO:
         #     for c in self.preview_callbacks:

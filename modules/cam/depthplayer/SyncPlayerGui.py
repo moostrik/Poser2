@@ -15,7 +15,8 @@ class SyncPlayerGui(SyncPlayer):
         elem.append([E(eT.TEXT, 'Folders '),
                      E(eT.CMBO, 'Folders', self.set_folder, f, folders),
                      E(eT.BTTN, 'Start', self.set_start),
-                     E(eT.BTTN, 'Stop', self.set_stop)])
+                     E(eT.BTTN, 'Stop', self.set_stop),
+                     E(eT.ITXT, 'Chunks', None)])
 
         self.frame = Frame('CAMERA COLOR', elem, 240)
 
@@ -28,7 +29,10 @@ class SyncPlayerGui(SyncPlayer):
         self.clear_state_messages()
 
     def set_folder(self, folder: str) -> None:
+        if self.gui is None:
+            return
         self.play(True, folder)
+        self.gui.updateElement('Chunks', self.get_chunks(folder))
 
     def set_start(self) -> None:
         if self.gui is None:

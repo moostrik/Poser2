@@ -159,7 +159,7 @@ class Render(RenderWindow):
             self.psn_fbos[i].draw(x, y, w, h)
 
     # SETTERS AND GETTERS
-    def set_cam_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray, frame_id: int) -> None :
+    def set_cam_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None :
         self.cam_images[cam_id].set_image(image)
 
     def set_psn_image(self, psn_id: int, image: np.ndarray) -> None :
