@@ -3,6 +3,8 @@ from threading import Thread, Lock, Event
 from pathlib import Path
 import time
 from enum import Enum, auto
+from numpy import ndarray
+from queue import Queue, Empty
 
 from modules.Settings import Settings
 from modules.cam.recorder.FFmpegRecorder import FFmpegRecorder
@@ -35,7 +37,7 @@ EncoderString: dict[Settings.CoderType, str] = {
 class RecState(Enum):
     IDLE =  auto()
     START = auto()
-    SPLIT = auto()
+    REC =   auto()
     STOP =  auto()
 
 class SyncRecorder(Thread):
@@ -48,11 +50,13 @@ class SyncRecorder(Thread):
 
         self.recorders: dict[int, dict[FrameType, FFmpegRecorder]] = {}
         self.fps: dict[int, float] = {}
+        self.frames: dict[int, Queue[dict[FrameType, ndarray]]] = {}
         self.folder_path: Path = Path()
 
         for c in range(settings.num_cams):
             self.recorders[c] = {}
             self.fps[c] = settings.fps
+            self.frames[c] = Queue()
             for t in self.settings.frame_types:
                 self.recorders[c][t] = FFmpegRecorder(EncoderString[settings.encoder])
 
@@ -76,11 +80,11 @@ class SyncRecorder(Thread):
             if self._get_state() == RecState.STOP:
                 self._stop_recording()
                 self._set_state(RecState.IDLE)
-            if self._get_state() == RecState.SPLIT:
+            if self._get_state() == RecState.REC:
                 self._update_recording()
             if self._get_state() == RecState.START:
                 self._start_recording()
-                self._set_state(RecState.SPLIT)
+                self._set_state(RecState.REC)
 
             time.sleep(0.01)
 
@@ -118,6 +122,15 @@ class SyncRecorder(Thread):
                     self.recorders[c][t].split(str(path), fps)
             self.start_time += self.settings.chunk_length
 
+        for c in range(self.settings.num_cams):
+            try:
+                frames: dict[FrameType, ndarray] = self.frames[c].get(timeout=0.01)
+            except Empty:
+                continue
+            for t in self.settings.frame_types:
+                if t in frames:
+                    self.recorders[c][t].add_frame(frames[t])
+
     def _get_state(self) -> RecState:
         with self.state_lock:
             return self.state
@@ -132,10 +145,10 @@ class SyncRecorder(Thread):
             self.state = state
 
     # EXTERNAL METHODS
-    def add_frame(self, cam_id: int, t: FrameType, frame, frame_id: int) -> None:
-        if t not in self.settings.frame_types:
-            return
-        self.recorders[cam_id][t].add_frame(frame)
+    def add_synced_frames(self, cam_id: int, frames: dict[FrameType, ndarray], fps: float) -> None:
+        self.set_fps(cam_id, fps)
+        if self._get_state() == RecState.REC:
+            self.frames[cam_id].put(frames)
 
     def set_fps(self, cam_id: int, fps: float) -> None:
         with self.settings_lock:

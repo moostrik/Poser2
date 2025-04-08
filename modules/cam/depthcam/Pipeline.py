@@ -188,9 +188,9 @@ class SetupColorStereo(SetupColor):
         self.right.out.link(self.stereo.right)
 
         self.sync: dai.node.Sync = pipeline.create(dai.node.Sync)
-        sync_threshold = timedelta(seconds=(1.0 / self.fps) * 1.0)
+        sync_threshold = timedelta(seconds=(1.0 / self.fps) * 0.5)
+        self.sync.setSyncAttempts(-1)
         self.sync.setSyncThreshold(sync_threshold)
-        self.sync.setSyncAttempts(0)
 
         self.color.video.link(self.sync.inputs["video"])
         self.left.out.link(self.sync.inputs["left"])
@@ -334,9 +334,9 @@ class SetupMonoStereo(SetupMono):
         self.right.out.link(self.stereo.right)
 
         self.sync: dai.node.Sync = pipeline.create(dai.node.Sync)
-        sync_threshold = timedelta(seconds=(1.0 / self.fps) * 1.0)
+        sync_threshold = timedelta(seconds=(1.0 / self.fps) * 0.5)
+        self.sync.setSyncAttempts(-1)
         self.sync.setSyncThreshold(sync_threshold)
-        self.sync.setSyncAttempts(0)
 
         self.stereo.rectifiedLeft.link(self.sync.inputs["video"])
         self.left.out.link(self.sync.inputs["left"])
@@ -452,44 +452,17 @@ class SimulationColorStereo(SetupColorStereo):
         self.output_left: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.output_left.setStreamName("left")
         self.ex_left.out.link(self.output_left.input)
+        # self.stereo.syncedLeft.link(self.output_left.input)
 
         self.output_right: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.output_right.setStreamName("right")
         self.ex_right.out.link(self.output_right.input)
+        # self.stereo.syncedRight.link(self.output_right.input)
 
         if self.show_stereo:
             self.output_stereo: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
             self.output_stereo.setStreamName("stereo")
             self.stereo.disparity.link(self.output_stereo.input)
-
-class SimulationColorStereo_SYNC(SetupColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool) -> None:
-        super().__init__(pipeline, fps, lowres, show_stereo)
-
-        pipeline.remove(self.left)
-        pipeline.remove(self.right)
-        pipeline.remove(self.color_control)
-        pipeline.remove(self.mono_control)
-
-        self.ex_video: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-        self.ex_video.setStreamName("ex_video")
-        self.ex_video.setMaxDataSize(1280*720*3)
-
-        self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-        self.ex_left.setStreamName("ex_left")
-        self.ex_left.setMaxDataSize(1280*720*3)
-
-        self.ex_right: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-        self.ex_right.setStreamName("ex_right")
-        self.ex_right.setMaxDataSize(1280*720*3)
-
-        self.ex_left.out.link(self.stereo.left)
-        self.ex_right.out.link(self.stereo.right)
-
-        self.color.video.unlink(self.sync.inputs["color"])
-        # self.ex_video.out.link(self.sync.inputs["color"])
-        # self.ex_left.out.link(self.sync.inputs["left"])
-        # self.ex_right.out.link(self.sync.inputs["right"])
 
 class SimulationColorStereoPerson(SimulationColorStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, model_path: str) -> None:

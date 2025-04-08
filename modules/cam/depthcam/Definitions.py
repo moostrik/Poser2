@@ -53,6 +53,7 @@ class StereoMedianFilterType(Enum):
 STEREO_FILTER_NAMES: list[str] = [e.name for e in StereoMedianFilterType]
 
 FrameCallback = Callable[[int, FrameType, np.ndarray, int], None]
+SyncCallback = Callable[[int, dict[FrameType, np.ndarray], float], None]
 DetectionCallback = Callable[[int, ImgDetection], None]
 TrackerCallback = Callable[[int, Tracklet], None]
 FPSCallback = Callable[[int, float], None]

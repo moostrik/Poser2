@@ -11,7 +11,7 @@ class CorePlayer(Core):
     def __init__(self, gui, syncplayer: SyncPlayer, device_id: str, settings:Settings) -> None:
 
         if settings.stereo and not settings.person:
-            show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
+            settings.show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
 
         super().__init__(gui, device_id, settings)
 
@@ -69,7 +69,7 @@ class CorePlayer(Core):
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
 
     def _video_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray, frame_id: int = 0) -> None:
-        if not self.device_open:
+        if not self.running:
             return
 
         frame_time = timedelta(seconds = process_time())
@@ -112,9 +112,9 @@ class CorePlayer(Core):
                 self.inputs[Input.RIGHT_FRAME_IN].send(img)
 
     def _passthrough_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray, frame_id: int) -> None:
-        if id != self.id:
+        if not self.running or id != self.id:
             return
-        self._update_callbacks(frame_type, frame)
+        self._update_frame_callbacks(frame_type, frame)
 
     @staticmethod
     def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:

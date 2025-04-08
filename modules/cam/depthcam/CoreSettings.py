@@ -69,7 +69,7 @@ class CoreSettings():
 
     # COLOR SETTINGS
     def set_color_auto_exposure(self, value) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         self.color_auto_exposure = value
         if value == False:
             self.set_color_exposure_iso(self.color_exposure, self.color_iso)
@@ -79,7 +79,7 @@ class CoreSettings():
         self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_auto_balance(self, value) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         self.color_auto_balance = value
         if value == False:
             self.set_color_balance(self.color_balance)
@@ -89,7 +89,7 @@ class CoreSettings():
         self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_exposure_iso(self, exposure: int, iso: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         self.color_auto_exposure = False
         self.color_exposure = int(self.clamp(exposure, EXPOSURE_RANGE))
         self.color_iso = int(self.clamp(iso, ISO_RANGE))
@@ -104,7 +104,7 @@ class CoreSettings():
         self.set_color_exposure_iso(self.color_exposure, value)
 
     def set_color_balance(self, value: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         self.color_auto_balance = False
         ctrl = dai.CameraControl()
         self.color_balance = int(self.clamp(value, BALANCE_RANGE))
@@ -112,35 +112,35 @@ class CoreSettings():
         self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_contrast(self, value: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         ctrl = dai.CameraControl()
         self.color_contrast = int(self.clamp(value, CONTRAST_RANGE))
         ctrl.setContrast(self.color_contrast)
         self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_brightness(self, value: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         ctrl = dai.CameraControl()
         self.color_brightness = int(self.clamp(value, BRIGHTNESS_RANGE))
         ctrl.setBrightness(self.color_brightness)
         self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_denoise(self, value: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         ctrl = dai.CameraControl()
         self.color_luma_denoise = int(self.clamp(value, LUMA_DENOISE_RANGE))
         ctrl.setLumaDenoise(self.color_luma_denoise)
         self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_saturation(self, value: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         ctrl = dai.CameraControl()
         self.color_saturation = int(self.clamp(value, SATURATION_RANGE))
         ctrl.setSaturation(self.color_saturation)
         self.core._send_control(Input.COLOR_CONTROL, ctrl)
 
     def set_color_sharpness(self, value: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         ctrl = dai.CameraControl()
         self.color_sharpness = int(self.clamp(value, SHARPNESS_RANGE))
         ctrl.setSharpness(self.color_sharpness)
@@ -148,7 +148,7 @@ class CoreSettings():
 
     # MONO SETTINGS
     def set_mono_auto_exposure(self, value) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         self.mono_auto_exposure = value
         if value == False:
             self.set_mono_exposure_iso(self.mono_exposure, self.mono_iso)
@@ -158,7 +158,7 @@ class CoreSettings():
         self.core._send_control(Input.MONO_CONTROL, ctrl)
 
     def set_mono_exposure_iso(self, exposure: int, iso: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         self.mono_auto_exposure = False
         self.mono_exposure = int(self.clamp(exposure, EXPOSURE_RANGE))
         self.mono_iso = int(self.clamp(iso, ISO_RANGE))
@@ -174,31 +174,31 @@ class CoreSettings():
 
     # STEREO SETTINGS
     def set_depth_treshold_min(self, value: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         v: int = int(self.clamp(value, STEREO_DEPTH_RANGE))
         self.stereo_config.postProcessing.thresholdFilter.minRange = int(v)
         self.core._send_control(Input.STEREO_CONTROL, self.stereo_config)
 
     def set_depth_treshold_max(self, value: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         v: int = int(self.clamp(value, STEREO_DEPTH_RANGE))
         self.stereo_config.postProcessing.thresholdFilter.maxRange = int(v)
         self.core._send_control(Input.STEREO_CONTROL, self.stereo_config)
 
     def set_stereo_min_brightness(self, value: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         v: int = int(self.clamp(value, STEREO_BRIGHTNESS_RANGE))
         self.stereo_config.postProcessing.brightnessFilter.minBrightness = int(v)
         self.core._send_control(Input.STEREO_CONTROL, self.stereo_config)
 
     def set_stereo_max_brightness(self, value: int) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         v: int = int(self.clamp(value, STEREO_BRIGHTNESS_RANGE))
         self.stereo_config.postProcessing.brightnessFilter.maxBrightness = int(v)
         self.core._send_control(Input.STEREO_CONTROL, self.stereo_config)
 
     def set_stereo_median_filter(self, value: StereoMedianFilterType | int | str) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         if isinstance(value, str):
             if value in STEREO_FILTER_NAMES:
                 self.set_stereo_median_filter(StereoMedianFilterType(STEREO_FILTER_NAMES.index(value)))
@@ -218,12 +218,12 @@ class CoreSettings():
 
     # IR SETTINGS
     def set_ir_flood_light(self, value: float) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         v: float = self.clamp(value, (0.0, 1.0))
         self.core.device.setIrFloodLightIntensity(v)
 
     def set_ir_grid_light(self, value: float) -> None:
-        if not self.core.device_open: return
+        if not self.core.running: return
         v: float = self.clamp(value, (0.0, 1.0))
         self.core.device.setIrLaserDotProjectorIntensity(v)
 

@@ -38,8 +38,7 @@ class Main():
             camera.add_preview_callback(self.render.set_cam_image)
             camera.add_frame_callback(self.detector.set_image)
             if self.recorder:
-                camera.add_frame_callback(self.recorder.add_frame)
-                camera.add_fps_callback(self.recorder.set_fps)
+                camera.add_sync_callback(self.recorder.add_synced_frames)
             camera.add_tracker_callback(self.detector.add_tracklet)
             camera.add_tracker_callback(self.render.add_tracklet)
             camera.start()
@@ -72,33 +71,33 @@ class Main():
 
     def stop(self) -> None:
 
-        print ('stop gui')
+        # print ('stop gui')
         self.gui.stop()
         # self.gui.join() # does not work as stop can be called from gui's own thread
 
         if self.player:
-            print('stop and join player')
+            # print('stop and join player')
             self.player.stop()
             self.player.join()
 
-        print('stop cameras')
+        # print('stop cameras')
         for camera in self.cameras:
             camera.stop()
 
-        print('stop detector')
+        # print('stop detector')
         self.detector.stop()
         if self.recorder:
-            print('stop recorder')
+            # print('stop recorder')
             self.recorder.stop()
             self.recorder.join()
 
-        print ('join detector')
+        # print ('join detector')
         self.detector.join()
-        print ('join cameras')
+        # print ('join cameras')
         for camera in self.cameras:
             camera.join(timeout=1.0)
 
-        print ('stop render')
+        # print ('stop render')
         self.render.exit_callback = None
         self.render.stop()
         # self.render.join() # does not work as stop can be called from render's own thread

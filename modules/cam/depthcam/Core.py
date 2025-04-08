@@ -24,6 +24,7 @@ class Core(Thread):
 
         super().__init__()
         self.stop_event = Event()
+        self.running: bool = False
 
         # ID
         self.id: int =                  Core._id_counter
@@ -41,9 +42,7 @@ class Core(Thread):
         self.show_stereo: bool =        general_settings.show_stereo
 
         # DAI
-        self.device_open: bool =        False
         self.device:                    dai.Device
-
         self.inputs: dict[Input, dai.DataInputQueue] = {}
         self.outputs: dict[Output, dai.DataOutputQueue] = {}
         self.num_tracklets: int =       0
@@ -59,15 +58,20 @@ class Core(Thread):
         # CALLBACKS
         self.preview_callbacks: Set[FrameCallback] = set()
         self.frame_callbacks: Set[FrameCallback] = set()
+        self.sync_callbacks: Set[SyncCallback] = set()
         self.tracker_callbacks: Set[TrackerCallback] = set()
-        self.fps_callbacks: Set[FPSCallback] = set()
 
         # SETTINGS
         self.preview_type =             FrameType.VIDEO
         self.settings: CoreSettings =   CoreSettings(self)
         self.gui: Gui =                 Gui(gui, self.settings)
 
+        self.cntr: int = 0
+
     def stop(self) -> None:
+        if not self.running:
+            return
+        self.running = False
         self.stop_event.set()
 
     def run(self) -> None:
@@ -95,7 +99,7 @@ class Core(Thread):
         self._setup_queues()
 
         print(f'Camera: {self.device_id} OPEN')
-        self.device_open: bool =        True
+        self.running = True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
             setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo, simulate=False)
@@ -129,9 +133,6 @@ class Core(Thread):
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
 
     def _close(self) -> None:
-        if not self.device_open: return
-        self.device_open = False
-
         self.device.close()
         for value in self.outputs.values():
             value.close()
@@ -140,6 +141,7 @@ class Core(Thread):
 
         self.frame_callbacks.clear()
         self.preview_callbacks.clear()
+        self.sync_callbacks.clear()
         self.tracker_callbacks.clear()
 
         print(f'Camera: {self.device_id} CLOSED')
@@ -153,101 +155,119 @@ class Core(Thread):
             self.settings.update_mono_control(msg)
 
         frame: ndarray = msg.getCvFrame()
-        self._update_callbacks(FrameType.VIDEO, frame)
+        self._update_frame_callbacks(FrameType.VIDEO, frame)
 
     def _left_callback(self, msg: dai.ImgFrame) -> None:
         self._update_fps(FrameType.LEFT_)
         frame: ndarray = msg.getCvFrame()
-        self._update_callbacks(FrameType.LEFT_, frame)
+        self._update_frame_callbacks(FrameType.LEFT_, frame)
 
     def _right_callback(self, msg: dai.ImgFrame) -> None:
         self._update_fps(FrameType.RIGHT)
         frame: ndarray = msg.getCvFrame()
-        self._update_callbacks(FrameType.RIGHT, frame)
+        self._update_frame_callbacks(FrameType.RIGHT, frame)
 
     def _stereo_callback(self, msg: dai.ImgFrame) -> None:
         self._update_fps(FrameType.DEPTH)
         frame: ndarray = msg.getCvFrame()
         frame = applyColorMap(frame, COLORMAP_JET)
-        self._update_callbacks(FrameType.DEPTH, frame)
+        self._update_frame_callbacks(FrameType.DEPTH, frame)
 
     def _sync_callback(self, message_group: dai.MessageGroup) -> None:
+        frames = dict[FrameType, ndarray]()
         for name, msg in message_group:
             if type(msg) == dai.ImgFrame:
                 if name == 'video':
+                    # print(name, msg.getTimestampDevice(), message_group.getTimestampDevice(), msg.getSequenceNum(), self.cntr)
                     self._video_callback(msg)
+                    frames[FrameType.VIDEO] = msg.getCvFrame()
                 elif name == 'left':
+                    name = 'left_'
+                    # print(name, msg.getTimestampDevice(), message_group.getTimestampDevice(), msg.getSequenceNum(), self.cntr)
                     self._left_callback(msg)
+                    frames[FrameType.LEFT_] = msg.getCvFrame()
                 elif name == 'right':
+                    # print(name, msg.getTimestampDevice(), message_group.getTimestampDevice(), msg.getSequenceNum(), self.cntr)
                     self._right_callback(msg)
+                    frames[FrameType.RIGHT] = msg.getCvFrame()
                 elif name == 'stereo':
                     self._stereo_callback(msg)
                 else:
                     print('unknown message', name)
+        fps: float = self.fps_counters[FrameType.VIDEO].get_rate_average()
+        self._update_sync_callbacks(frames, fps)
 
+        self.cntr = self.cntr + 1
 
     def _tracker_callback(self, msg: dai.RawTracklets) -> None:
         self._update_tps()
         Ts: list[Tracklet] = msg.tracklets
         self.num_tracklets = len(Ts)
         self.gui.update_from_tracker()
-        for t in Ts:
-            for c in self.tracker_callbacks:
-                c(self.id, t)
+        self._update_tracker_callbacks(Ts)
 
     # FPS
     def _update_fps(self, fps_type: FrameType) -> None:
         self.fps_counters[fps_type].processed()
-        if fps_type == FrameType.VIDEO:
-            for c in self.fps_callbacks:
-                c(self.id, self.fps_counters[fps_type].get_rate_average())
 
     def _update_tps(self) -> None:
         self.tps_counter.processed()
 
     # CONTROL
     def _send_control(self, input: Input, control) -> None:
-        print(f'send control {input} {control}')
+        if not self.running:
+            return
         if input in self.inputs:
             self.inputs[input].send(control)
         else:
             print(f'input {input} not found in inputs')
 
     # CALLBACKS
-    def _update_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
+    def _update_frame_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
+        if not self.running:
+            return
         for c in self.frame_callbacks:
             c(self.id, frame_type, frame, 0)
         if self.preview_type == frame_type:
             for c in self.preview_callbacks:
                 c(self.id, frame_type, frame, 0)
 
+    def _update_sync_callbacks(self, frames: dict[FrameType, ndarray], fps: float) -> None:
+        if not self.running:
+            return
+        for c in self.sync_callbacks:
+            c(self.id, frames, fps)
+
+    def _update_tracker_callbacks(self, tracklets: list[Tracklet]) -> None:
+        if not self.running:
+            return
+        for c in self.tracker_callbacks:
+            for t in tracklets:
+                c(self.id, t)
+
     def add_frame_callback(self, callback: FrameCallback) -> None:
+        if self.running:
+            print('Camera: cannot add callback while camera is running')
+            return
         self.frame_callbacks.add(callback)
-    def discard_frame_callback(self, callback: FrameCallback) -> None:
-        self.frame_callbacks.discard(callback)
-    def clear_frame_callbacks(self) -> None:
-        self.frame_callbacks.clear()
+
+    def add_sync_callback(self, callback: SyncCallback) -> None:
+        if self.running:
+            print('Camera: cannot add callback while camera is running')
+            return
+        self.sync_callbacks.add(callback)
 
     def add_preview_callback(self, callback: FrameCallback) -> None:
+        if self.running:
+            print('Camera: cannot add callback while camera is running')
+            return
         self.preview_callbacks.add(callback)
-    def discard_preview_callback(self, callback: FrameCallback) -> None:
-        self.preview_callbacks.discard(callback)
-    def clear_preview_callbacks(self) -> None:
-        self.preview_callbacks.clear()
 
     def add_tracker_callback(self, callback: TrackerCallback) -> None:
+        if self.running:
+            print('Camera: cannot add callback while camera is running')
+            return
         self.tracker_callbacks.add(callback)
-    def discard_tracker_callback(self, callback: TrackerCallback) -> None:
-        self.tracker_callbacks.discard(callback)
-    def clear_tracker_callbacks(self) -> None:
-        self.tracker_callbacks.clear()
-
-    def add_fps_callback(self, callback: FPSCallback) -> None:
-        self.fps_callbacks.add(callback)
-    def discard_fps_callback(self, callback: FPSCallback) -> None:
-        self.fps_callbacks.discard(callback)
-    def clear_fps_callbacks(self) -> None:
-        self.fps_callbacks.clear()
 
     @staticmethod
     def _try_device(device_id: str, pipeline: dai.Pipeline, num_tries: int) -> dai.Device:
