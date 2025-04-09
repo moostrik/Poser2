@@ -202,7 +202,7 @@ class Gui(Thread):
                 self.stop()
                 self.window.close()
 
-            while not self.messageQueue.empty():
+            while not self.messageQueue.empty() and self.running:
                 m: qMessage = self.messageQueue.get(True)
                 if m.type == qMessageType.EVENT: UpdateEvent(self.window, m)
                 elif m.type == qMessageType.LOAD:
