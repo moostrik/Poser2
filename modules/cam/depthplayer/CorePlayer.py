@@ -29,12 +29,12 @@ class CorePlayer(Core):
             self.sync_player.addFrameCallback(self._video_frame_callback)
         super().start()
 
-    def stop(self) -> None: # override
-        if self.passthrough:
-            self.sync_player.discardFrameCallback(self._passthrough_frame_callback)
-        else:
-            self.sync_player.discardFrameCallback(self._video_frame_callback)
-        super().stop()
+    # def stop(self) -> None: # override
+    #     if self.passthrough:
+    #         self.sync_player.discardFrameCallback(self._passthrough_frame_callback)
+    #     else:
+    #         self.sync_player.discardFrameCallback(self._video_frame_callback)
+    #     super().stop()
 
     def run(self) -> None: # override
         if self.passthrough:
@@ -68,7 +68,7 @@ class CorePlayer(Core):
             self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
 
-    def _video_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray, frame_id: int = 0) -> None:
+    def _video_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
         if not self.running:
             return
 
@@ -111,7 +111,7 @@ class CorePlayer(Core):
                 img.setHeight(height)
                 self.inputs[Input.RIGHT_FRAME_IN].send(img)
 
-    def _passthrough_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray, frame_id: int) -> None:
+    def _passthrough_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
         if not self.running or id != self.id:
             return
         self._update_frame_callbacks(frame_type, frame)

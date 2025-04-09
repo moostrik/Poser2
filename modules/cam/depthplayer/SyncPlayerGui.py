@@ -15,24 +15,27 @@ class SyncPlayerGui(SyncPlayer):
         elem.append([E(eT.TEXT, 'Folders '),
                      E(eT.CMBO, 'Folders', self.set_folder, f, folders),
                      E(eT.BTTN, 'Start', self.set_start),
-                     E(eT.BTTN, 'Stop', self.set_stop),
-                     E(eT.ITXT, 'Chunks', None)])
+                     E(eT.BTTN, 'Stop', self.set_stop)])
+        elem.append([E(eT.TEXT, 'Chunks  '),
+                     E(eT.ITXT, 'Chunk', self.nothing, expand = False),
+                     E(eT.TEXT, 'of'),
+                     E(eT.ITXT, 'of Chunks', self.nothing, expand = False),
+                     E(eT.TEXT, 'Drift'),
+                     E(eT.ITXT, 'Drift', self.nothing, expand = False)])
 
-        self.frame = Frame('CAMERA COLOR', elem, 240)
+        self.frame = Frame('CAMERA COLOR', elem, 80)
 
     def get_gui_frame(self):
         return self.frame
 
     def gui_check(self) -> None:
-        # if self.gui is not None:
-        #     self.gui.updateElement('Folders', '')
         self.clear_state_messages()
 
     def set_folder(self, folder: str) -> None:
+        self.play(True, folder)
         if self.gui is None:
             return
-        self.play(True, folder)
-        self.gui.updateElement('Chunks', self.get_chunks(folder))
+        self.gui.updateElement('of Chunks', self.get_num_folder_chunks(folder) - 1)
 
     def set_start(self) -> None:
         if self.gui is None:
@@ -43,3 +46,13 @@ class SyncPlayerGui(SyncPlayer):
 
     def set_stop(self) -> None:
         self.play(False, '')
+
+    def update_gui(self) -> None: #override
+        if self.gui is None:
+            return
+        self.gui.updateElement('Chunk', self.get_current_chunk())
+        self.gui.updateElement('Drift', self.get_drift())
+
+    def nothing(self) -> None:
+        pass
+

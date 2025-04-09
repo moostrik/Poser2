@@ -72,10 +72,6 @@ class Main():
 
     def stop(self) -> None:
 
-        # print ('stop gui')
-        self.gui.stop()
-        # self.gui.join() # does not work as stop can be called from gui's own thread
-
         if self.player:
             # print('stop and join player')
             self.player.stop()
@@ -97,6 +93,10 @@ class Main():
         # print ('join cameras')
         for camera in self.cameras:
             camera.join()
+
+        # print ('stop gui')
+        self.gui.stop()
+        # self.gui.join() # does not work as stop can be called from gui's own thread
 
         # print ('stop render')
         self.render.exit_callback = None
