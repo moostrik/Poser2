@@ -29,13 +29,6 @@ class CorePlayer(Core):
             self.sync_player.addFrameCallback(self._video_frame_callback)
         super().start()
 
-    # def stop(self) -> None: # override
-    #     if self.passthrough:
-    #         self.sync_player.discardFrameCallback(self._passthrough_frame_callback)
-    #     else:
-    #         self.sync_player.discardFrameCallback(self._video_frame_callback)
-    #     super().stop()
-
     def run(self) -> None: # override
         if self.passthrough:
             self.stop_event.wait()
@@ -54,10 +47,11 @@ class CorePlayer(Core):
             self.inputs[Input.STEREO_CONTROL] =     self.device.getInputQueue('stereo_control')
             self.inputs[Input.LEFT_FRAME_IN] =      self.device.getInputQueue(name='ex_left', maxSize=1, blocking=False)
             self.inputs[Input.RIGHT_FRAME_IN] =     self.device.getInputQueue(name='ex_right', maxSize=1, blocking=False)
-            self.outputs[Output.LEFT_FRAME_OUT] =   self.device.getOutputQueue(name='left', maxSize=1, blocking=False)
-            self.outputs[Output.LEFT_FRAME_OUT].addCallback(self._left_callback)
-            self.outputs[Output.RIGHT_FRAME_OUT] =  self.device.getOutputQueue(name='right', maxSize=1, blocking=False)
-            self.outputs[Output.RIGHT_FRAME_OUT].addCallback(self._right_callback)
+            if not self.do_person:
+                self.outputs[Output.LEFT_FRAME_OUT] =   self.device.getOutputQueue(name='left', maxSize=1, blocking=False)
+                self.outputs[Output.LEFT_FRAME_OUT].addCallback(self._left_callback)
+                self.outputs[Output.RIGHT_FRAME_OUT] =  self.device.getOutputQueue(name='right', maxSize=1, blocking=False)
+                self.outputs[Output.RIGHT_FRAME_OUT].addCallback(self._right_callback)
             self.fps_counters[FrameType.LEFT_] = FPS(120)
             self.fps_counters[FrameType.RIGHT] = FPS(120)
             if self.show_stereo:

@@ -49,7 +49,7 @@ settings.stereo =   not args.nostereo
 settings.lowres =   not args.highres
 settings.person =   not args.noyolo
 settings.show_stereo =  args.showstereo
-settings.simulation =   args.simulation
+settings.simulation =   args.simulation or args.passthrough
 settings.passthrough =  args.passthrough
 
 settings.num_players =  args.players

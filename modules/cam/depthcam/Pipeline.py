@@ -5,12 +5,13 @@ from pathlib import Path
 
 from modules.cam.depthcam.Definitions import *
 
-def get_frame_types(do_color: bool, do_stereo: bool, show_stereo) -> list[FrameType]:
+def get_frame_types(do_color: bool, do_stereo: bool, show_stereo: bool, simulate: bool) -> list[FrameType]:
     frame_types: list[FrameType] = [FrameType.NONE_]
     frame_types.append(FrameType.VIDEO)
     if do_stereo:
-        frame_types.append(FrameType.LEFT_)
-        frame_types.append(FrameType.RIGHT)
+        if not simulate:
+            frame_types.append(FrameType.LEFT_)
+            frame_types.append(FrameType.RIGHT)
         if show_stereo:
             frame_types.append(FrameType.DEPTH)
     return frame_types
@@ -95,7 +96,6 @@ def setup_pipeline(
                     SimulationMono(pipeline, fps, lowres)
 
 
-
 class Setup():
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool = False) -> None:
         self.pipeline: dai.Pipeline = pipeline
@@ -138,21 +138,21 @@ class SetupColorPerson(SetupColor):
         self.detection_network.input.setBlocking(False)
         self.manip.out.link(self.detection_network.input)
 
-        self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
-        self.objectTracker.setTrackerType(TRACKER_TYPE)
-        self.objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
+        self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
+        self.object_tracker.setDetectionLabelsToTrack([15])  # track only person
+        self.object_tracker.setTrackerType(TRACKER_TYPE)
+        self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
         if self.lowres:
-            self.detection_network.passthrough.link(self.objectTracker.inputTrackerFrame)
+            self.detection_network.passthrough.link(self.object_tracker.inputTrackerFrame)
         else:
-            self.color.video.link(self.objectTracker.inputTrackerFrame)
-        self.detection_network.passthrough.link(self.objectTracker.inputDetectionFrame)
-        self.detection_network.out.link(self.objectTracker.inputDetections)
+            self.color.video.link(self.object_tracker.inputTrackerFrame)
+        self.detection_network.passthrough.link(self.object_tracker.inputDetectionFrame)
+        self.detection_network.out.link(self.object_tracker.inputDetections)
 
         self.outputTracklets: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.outputTracklets.setStreamName("tracklets")
-        self.objectTracker.out.link(self.outputTracklets.input)
+        self.object_tracker.out.link(self.outputTracklets.input)
 
 class SetupColorStereo(SetupColor):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo:bool) -> None:
@@ -414,7 +414,7 @@ class SimulationColorPerson(SetupColorPerson):
 
         self.ex_video.out.link(self.manip.inputImage)
         if not self.lowres:
-            self.color.video.link(self.objectTracker.inputTrackerFrame)
+            self.color.video.link(self.object_tracker.inputTrackerFrame)
 
         self.ex_video.out.link(self.output_video.input)
 
@@ -487,18 +487,23 @@ class SimulationColorStereoPerson(SimulationColorStereo):
         self.manip.out.link(self.detection_network.input)
         self.stereo.depth.link(self.detection_network.inputDepth)
 
-        self.objectTracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.objectTracker.setDetectionLabelsToTrack([15])  # track only person
-        self.objectTracker.setTrackerType(TRACKER_TYPE)
-        self.objectTracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
+        self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
+        self.object_tracker.setDetectionLabelsToTrack([15])  # track only person
+        self.object_tracker.setTrackerType(TRACKER_TYPE)
+        self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
-        self.detection_network.passthrough.link(self.objectTracker.inputTrackerFrame)
-        self.detection_network.passthrough.link(self.objectTracker.inputDetectionFrame)
-        self.detection_network.out.link(self.objectTracker.inputDetections)
+        self.detection_network.passthrough.link(self.object_tracker.inputTrackerFrame)
+        self.detection_network.passthrough.link(self.object_tracker.inputDetectionFrame)
+        self.detection_network.out.link(self.object_tracker.inputDetections)
 
         self.trackerOut: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.trackerOut.setStreamName("tracklets")
-        self.objectTracker.out.link(self.trackerOut.input)
+        self.object_tracker.out.link(self.trackerOut.input)
+
+        pipeline.remove(self.output_left)
+        pipeline.remove(self.output_right)
+        self.ex_video.out.unlink(self.output_video.input)
+        self.object_tracker.passthroughDetectionFrame.link(self.output_video.input)
 
 
 class SimulationMono(SetupMono):
@@ -534,6 +539,12 @@ class SimulationMonoPerson(SetupMonoPerson):
 class SimulationMonoStereo(SetupMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool) -> None:
         super().__init__(pipeline, fps, lowres, show_stereo)
+
+        self.color: dai.node.Camera = pipeline.create(dai.node.Camera)
+        self.color.setCamera("color")
+        self.color.setSize(1280, 720)
+        self.color.setFps(self.fps)
+        self.color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
 
         pipeline.remove(self.left)
         pipeline.remove(self.right)
@@ -580,12 +591,6 @@ class SimulationMonoStereoPerson(SimulationMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, model_path: str) -> None:
         super().__init__(pipeline, fps, lowres, show_stereo)
 
-        self.color: dai.node.Camera = pipeline.create(dai.node.Camera)
-        self.color.setCamera("color")
-        self.color.setSize(1280, 720)
-        self.color.setFps(self.fps)
-        self.color.setMeshSource(dai.CameraProperties.WarpMeshSource.CALIBRATION)
-
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(300, 300)
         self.manip.initialConfig.setKeepAspectRatio(False)
@@ -617,3 +622,8 @@ class SimulationMonoStereoPerson(SimulationMonoStereo):
         self.output_tracklets: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.output_tracklets.setStreamName("tracklets")
         self.object_tracker.out.link(self.output_tracklets.input)
+
+        pipeline.remove(self.output_left)
+        pipeline.remove(self.output_right)
+        self.ex_video.out.unlink(self.output_video.input)
+        self.object_tracker.passthroughDetectionFrame.link(self.output_video.input)

@@ -21,7 +21,6 @@ class Core(Thread):
     _pipeline: dai.Pipeline | None = None
 
     def __init__(self, gui, device_id: str, general_settings:Settings) -> None:
-
         super().__init__()
         self.stop_event = Event()
         self.running: bool = False
@@ -52,7 +51,7 @@ class Core(Thread):
         self.tps_counter =              FPS(120)
 
         # FRAME TYPES
-        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo)
+        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo, general_settings.simulation)
         self.frame_types.sort(key=lambda x: x.value)
 
         # CALLBACKS
@@ -146,6 +145,7 @@ class Core(Thread):
         print(f'Camera: {self.device_id} CLOSED')
 
     def _video_callback(self, msg: dai.ImgFrame) -> None:
+        # print('RV', msg.getTimestamp())
         self._update_fps(FrameType.VIDEO)
         self.gui.update_from_frame()
         if self.do_color:
@@ -199,6 +199,7 @@ class Core(Thread):
         self.cntr = self.cntr + 1
 
     def _tracker_callback(self, msg: dai.RawTracklets) -> None:
+        # print('RT', msg.getTimestamp()) # type: ignore
         self._update_tps()
         Ts: list[Tracklet] = msg.tracklets
         self.num_tracklets = len(Ts)
