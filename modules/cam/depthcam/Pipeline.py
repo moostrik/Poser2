@@ -48,50 +48,60 @@ def setup_pipeline(
     pipeline_description = "Depth Pipeline: " + " ".join(filter(None, options))
     print(pipeline_description)
 
+    nn_path: Path = (Path(model_path) / YOLOV8_WIDE_6S).resolve().absolute()
     if not simulate:
+        if do_stereo:
+            print('use model 5s')
+            nn_path: Path = (Path(model_path) / YOLOV8_WIDE_5S).resolve().absolute()
+
         if do_color:
             if do_stereo:
                 if do_person:
-                    SetupColorStereoPerson(pipeline, fps, lowres, show_stereo, model_path)
+                    SetupColorStereoPerson(pipeline, fps, lowres, show_stereo, nn_path)
                 else:
                     SetupColorStereo(pipeline, fps, lowres, show_stereo)
             else:
                 if do_person:
-                    SetupColorPerson(pipeline, fps, lowres, model_path)
+                    SetupColorPerson(pipeline, fps, lowres, nn_path)
                 else:
                     SetupColor(pipeline, fps, lowres)
         else:
             if do_stereo:
                 if do_person:
-                    SetupMonoStereoPerson(pipeline, fps, lowres, show_stereo, model_path)
+                    SetupMonoStereoPerson(pipeline, fps, lowres, show_stereo, nn_path)
                 else:
                     SetupMonoStereo(pipeline, fps, lowres, show_stereo)
             else:
                 if do_person:
-                    SetupMonoPerson(pipeline, fps, lowres, model_path)
+                    SetupMonoPerson(pipeline, fps, lowres, nn_path)
                 else:
                     SetupMono(pipeline, fps, lowres)
     else:
+        if do_stereo:
+            nn_path: Path = (Path(model_path) / YOLOV8_WIDE_5S).resolve().absolute()
+        else:
+            nn_path: Path = (Path(model_path) / YOLOV8_WIDE_7S).resolve().absolute()
+
         if do_color:
             if do_stereo:
                 if do_person:
-                    SimulationColorStereoPerson(pipeline, fps, lowres, show_stereo, model_path)
+                    SimulationColorStereoPerson(pipeline, fps, lowres, show_stereo, nn_path)
                 else:
                     SimulationColorStereo(pipeline, fps, lowres, show_stereo)
             else:
                 if do_person:
-                    SimulationColorPerson(pipeline, fps, lowres, model_path)
+                    SimulationColorPerson(pipeline, fps, lowres, nn_path)
                 else:
                     SimulationColor(pipeline, fps, lowres)
         else:
             if do_stereo:
                 if do_person:
-                    SimulationMonoStereoPerson(pipeline, fps, lowres, show_stereo, model_path)
+                    SimulationMonoStereoPerson(pipeline, fps, lowres, show_stereo, nn_path)
                 else:
                     SimulationMonoStereo(pipeline, fps, lowres, show_stereo)
             else:
                 if do_person:
-                    SimulationMonoPerson(pipeline, fps, lowres, model_path)
+                    SimulationMonoPerson(pipeline, fps, lowres, nn_path)
                 else:
                     SimulationMono(pipeline, fps, lowres)
 
@@ -121,32 +131,33 @@ class SetupColor(Setup):
         self.color_control.out.link(self.color.inputControl)
 
 class SetupColorPerson(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, model_path: str) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, lowres)
+        print('fps', fps)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(300, 300)
+
+        self.manip.initialConfig.setResize(640,352)
         self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.color.video.link(self.manip.inputImage)
 
-        self.detection_network: dai.node.MobileNetDetectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
-        nn_path: Path = (Path(model_path) / DETECTION_MODEL6S).resolve().absolute()
+        self.detection_network: dai.node.YoloDetectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork)
         self.detection_network.setBlobPath(nn_path)
-        self.detection_network.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detection_network.setNumInferenceThreads(2)
+        self.detection_network.setNumClasses(80)
+        self.detection_network.setCoordinateSize(4)
+        self.detection_network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
+        self.detection_network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
         self.detection_network.input.setBlocking(False)
         self.manip.out.link(self.detection_network.input)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([15])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
-        if self.lowres:
-            self.detection_network.passthrough.link(self.object_tracker.inputTrackerFrame)
-        else:
-            self.color.video.link(self.object_tracker.inputTrackerFrame)
+        self.detection_network.passthrough.link(self.object_tracker.inputTrackerFrame)
         self.detection_network.passthrough.link(self.object_tracker.inputDetectionFrame)
         self.detection_network.out.link(self.object_tracker.inputDetections)
 
@@ -212,20 +223,23 @@ class SetupColorStereo(SetupColor):
         self.stereo_control.out.link(self.stereo.inputConfig)
 
 class SetupColorStereoPerson(SetupColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, model_path: str) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, nn_path: Path) -> None:
+        print('SetupColorStereoPerson')
         super().__init__(pipeline, fps, lowres, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(300, 300)
+        self.manip.initialConfig.setResize(640,352)
         self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.color.video.link(self.manip.inputImage)
 
-        self.detection_network: dai.node.MobileNetSpatialDetectionNetwork = pipeline.create(dai.node.MobileNetSpatialDetectionNetwork)
-        nn_path: Path = (Path(model_path) / DETECTION_MODEL5S).resolve().absolute()
+        self.detection_network: dai.node.YoloSpatialDetectionNetwork = pipeline.create(dai.node.YoloSpatialDetectionNetwork)
         self.detection_network.setBlobPath(nn_path)
-        self.detection_network.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detection_network.setNumInferenceThreads(2)
+        self.detection_network.setNumClasses(80)
+        self.detection_network.setCoordinateSize(4)
+        self.detection_network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
+        self.detection_network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
         self.detection_network.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
         self.detection_network.setSpatialCalculationAlgorithm(DEPTH_TRACKER_LOCATION)
         self.detection_network.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
@@ -235,7 +249,7 @@ class SetupColorStereoPerson(SetupColorStereo):
         self.stereo.depth.link(self.detection_network.inputDepth)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([15])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
@@ -269,40 +283,31 @@ class SetupMono(Setup):
         self.mono_control.out.link(self.left.inputControl)
 
 class SetupMonoPerson(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, model_path: str) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, lowres)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(300, 300)
+        self.manip.initialConfig.setResize(640,352)
         self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.left.out.link(self.manip.inputImage)
 
-        self.detection_network: dai.node.MobileNetDetectionNetwork = pipeline.create(dai.node.MobileNetDetectionNetwork)
-        nn_path: Path = (Path(model_path) / DETECTION_MODEL6S).resolve().absolute()
+        self.detection_network: dai.node.YoloDetectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork)
         self.detection_network.setBlobPath(nn_path)
-        self.detection_network.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detection_network.setNumInferenceThreads(2)
+        self.detection_network.setNumClasses(80)
+        self.detection_network.setCoordinateSize(4)
+        self.detection_network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
+        self.detection_network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
         self.detection_network.input.setBlocking(False)
         self.manip.out.link(self.detection_network.input)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([15])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
-        if self.lowres:
-            self.manip.out.link(self.object_tracker.inputTrackerFrame)
-        else:
-            max_frame_size = 1280 * 720 * 3
-            self.manip2: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-            self.manip2.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-            self.manip2.initialConfig.setResize(1280, 720)
-            self.manip2.initialConfig.setKeepAspectRatio(False)
-            self.manip2.setMaxOutputFrameSize(max_frame_size)
-            self.left.out.link(self.manip2.inputImage)
-            self.manip2.out.link(self.object_tracker.inputTrackerFrame)
-
+        self.manip.out.link(self.object_tracker.inputTrackerFrame)
         self.detection_network.passthrough.link(self.object_tracker.inputDetectionFrame)
         self.detection_network.out.link(self.object_tracker.inputDetections)
 
@@ -354,20 +359,22 @@ class SetupMonoStereo(SetupMono):
         self.stereo_control.out.link(self.stereo.inputConfig)
 
 class SetupMonoStereoPerson(SetupMonoStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showMono: bool, model_path: str) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showMono: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, lowres, showMono)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(300, 300)
+        self.manip.initialConfig.setResize(640,352)
         self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.stereo.rectifiedLeft.link(self.manip.inputImage)
 
-        self.detection_network: dai.node.MobileNetSpatialDetectionNetwork = pipeline.create(dai.node.MobileNetSpatialDetectionNetwork)
-        nn_path: Path = (Path(model_path) / DETECTION_MODEL5S).resolve().absolute()
+        self.detection_network: dai.node.YoloSpatialDetectionNetwork = pipeline.create(dai.node.YoloSpatialDetectionNetwork)
         self.detection_network.setBlobPath(nn_path)
-        self.detection_network.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detection_network.setNumInferenceThreads(2)
+        self.detection_network.setNumClasses(80)
+        self.detection_network.setCoordinateSize(4)
+        self.detection_network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
+        self.detection_network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
         self.detection_network.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
         self.detection_network.setSpatialCalculationAlgorithm(DEPTH_TRACKER_LOCATION)
         self.detection_network.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
@@ -377,7 +384,7 @@ class SetupMonoStereoPerson(SetupMonoStereo):
         self.stereo.depth.link(self.detection_network.inputDepth)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([15])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
@@ -403,8 +410,8 @@ class SimulationColor(SetupColor):
         self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorPerson(SetupColorPerson):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, model_path: str) -> None:
-        super().__init__(pipeline, fps, lowres, model_path)
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, lowres, nn_path)
 
         pipeline.remove(self.color)
 
@@ -413,8 +420,8 @@ class SimulationColorPerson(SetupColorPerson):
         self.ex_video.setMaxDataSize(1280*720*3)
 
         self.ex_video.out.link(self.manip.inputImage)
-        if not self.lowres:
-            self.ex_video.out.link(self.object_tracker.inputTrackerFrame)
+        # if not self.lowres:
+        #     self.ex_video.out.link(self.object_tracker.inputTrackerFrame)
 
         self.ex_video.out.link(self.output_video.input)
 
@@ -465,20 +472,22 @@ class SimulationColorStereo(SetupColorStereo):
             self.stereo.disparity.link(self.output_stereo.input)
 
 class SimulationColorStereoPerson(SimulationColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, model_path: str) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, lowres, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(300, 300)
+        self.manip.initialConfig.setResize(640, 352)
         self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.ex_video.out.link(self.manip.inputImage)
 
-        self.detection_network: dai.node.MobileNetSpatialDetectionNetwork = pipeline.create(dai.node.MobileNetSpatialDetectionNetwork)
-        nn_path: Path = (Path(model_path) / DETECTION_MODEL5S).resolve().absolute()
+        self.detection_network: dai.node.YoloSpatialDetectionNetwork = pipeline.create(dai.node.YoloSpatialDetectionNetwork)
         self.detection_network.setBlobPath(nn_path)
-        self.detection_network.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detection_network.setNumInferenceThreads(2)
+        self.detection_network.setNumClasses(80)
+        self.detection_network.setCoordinateSize(4)
+        self.detection_network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
+        self.detection_network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
         self.detection_network.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
         self.detection_network.setSpatialCalculationAlgorithm(DEPTH_TRACKER_LOCATION)
         self.detection_network.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
@@ -488,7 +497,7 @@ class SimulationColorStereoPerson(SimulationColorStereo):
         self.stereo.depth.link(self.detection_network.inputDepth)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([15])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
@@ -520,8 +529,8 @@ class SimulationMono(SetupMono):
         self.ex_left.out.link(self.output_video.input)
 
 class SimulationMonoPerson(SetupMonoPerson):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, model_path: str) -> None:
-        super().__init__(pipeline, fps, lowres, model_path)
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, lowres, nn_path)
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
@@ -531,9 +540,6 @@ class SimulationMonoPerson(SetupMonoPerson):
         self.ex_left.setMaxDataSize(1280*720*3)
 
         self.ex_left.out.link(self.manip.inputImage)
-        if not self.lowres:
-            self.ex_left.out.link(self.object_tracker.inputTrackerFrame)
-
         self.ex_left.out.link(self.output_video.input)
 
 class SimulationMonoStereo(SetupMonoStereo):
@@ -588,20 +594,22 @@ class SimulationMonoStereo(SetupMonoStereo):
             self.stereo.disparity.link(self.output_stereo.input)
 
 class SimulationMonoStereoPerson(SimulationMonoStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, model_path: str) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, lowres, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setResize(300, 300)
+        self.manip.initialConfig.setResize(640, 352)
         self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.ex_video.out.link(self.manip.inputImage)
 
-        self.detection_network: dai.node.MobileNetSpatialDetectionNetwork = pipeline.create(dai.node.MobileNetSpatialDetectionNetwork)
-        nn_path: Path = (Path(model_path) / DETECTION_MODEL5S).resolve().absolute()
+        self.detection_network: dai.node.YoloSpatialDetectionNetwork = pipeline.create(dai.node.YoloSpatialDetectionNetwork)
         self.detection_network.setBlobPath(nn_path)
-        self.detection_network.setConfidenceThreshold(DETECTION_THRESHOLD)
         self.detection_network.setNumInferenceThreads(2)
+        self.detection_network.setNumClasses(80)
+        self.detection_network.setCoordinateSize(4)
+        self.detection_network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
+        self.detection_network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
         self.detection_network.setBoundingBoxScaleFactor(DEPTH_TRACKER_BOX_SCALE)
         self.detection_network.setSpatialCalculationAlgorithm(DEPTH_TRACKER_LOCATION)
         self.detection_network.setDepthLowerThreshold(DEPTH_TRACKER_MIN_DEPTH)
@@ -611,7 +619,7 @@ class SimulationMonoStereoPerson(SimulationMonoStereo):
         self.stereo.depth.link(self.detection_network.inputDepth)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([15])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 

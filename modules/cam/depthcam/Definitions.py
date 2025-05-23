@@ -4,12 +4,19 @@ from typing import Callable
 from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device, SpatialLocationCalculatorAlgorithm
 
 
-DETECTION_MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
-DETECTION_MODEL6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
-DETECTION_THRESHOLD: float = 0.1
+YOLOV8_WIDE_5S: str = "yolov8n_coco_640x352_5S.blob"
+YOLOV8_WIDE_6S: str = "yolov8n_coco_640x352_6S.blob"
+YOLOV8_WIDE_7S: str = "yolov8n_coco_640x352_7S.blob"
+YOLOV8_SQUARE_5S: str = "yolov8n_coco_640x352_5S.blob"
+YOLOV8_SQUARE_6S: str = "yolov8n_coco_640x352_6S.blob"
+YOLOV8_SQUARE_7S: str = "yolov8n_coco_640x352_7S.blob"
+YOLO_CONFIDENCE_THRESHOLD: float = 0.3
+YOLO_OVERLAP_THRESHOLD: float = 0.7
+
 TRACKER_TYPE: TrackerType = TrackerType.ZERO_TERM_IMAGELESS
 # ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
 # ZERO_TERM_IMAGELESS slightly faster
+
 DEPTH_TRACKER_LOCATION: SpatialLocationCalculatorAlgorithm = SpatialLocationCalculatorAlgorithm.MIN
 DEPTH_TRACKER_BOX_SCALE: float = 1.0
 DEPTH_TRACKER_MIN_DEPTH: int = 500
