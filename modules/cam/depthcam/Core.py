@@ -68,37 +68,37 @@ class Core(Thread):
         self.cntr: int = 0
 
     def stop(self) -> None:
-        if not self.running:
-            return
         self.running = False
         self.stop_event.set()
 
     def run(self) -> None:
         while not self.stop_event.is_set():
-            self._open()
+            if not self._open():
+                return
             self.stop_event.wait()
             self._close()
 
-    def _open(self) -> None:
+    def _open(self) -> bool:
         device_list: list[str] = get_device_list(verbose=False)
         if self.device_id not in device_list:
             print(f'Camera: {self.device_id} NOT AVAILABLE')
-            return
+            return False
 
         if Core._pipeline is None:
             Core._pipeline = dai.Pipeline()
             self._setup_pipeline(Core._pipeline)
 
         try:
-            self.device = self._try_device(self.device_id, Core._pipeline, num_tries=3)
+            self.device = self._try_device(self.device_id, Core._pipeline, num_tries=1)
         except Exception as e:
             print(f'Could not open device: {e}')
-            return
+            return False
 
         self._setup_queues()
 
         print(f'Camera: {self.device_id} OPEN')
         self.running = True
+        return True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
             setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo, simulate=False)

@@ -414,7 +414,7 @@ class SimulationColorPerson(SetupColorPerson):
 
         self.ex_video.out.link(self.manip.inputImage)
         if not self.lowres:
-            self.color.video.link(self.object_tracker.inputTrackerFrame)
+            self.ex_video.out.link(self.object_tracker.inputTrackerFrame)
 
         self.ex_video.out.link(self.output_video.input)
 

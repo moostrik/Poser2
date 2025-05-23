@@ -14,10 +14,10 @@ parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-fps',     '--fps',        type=int,   default=30,     help='frames per second')
 parser.add_argument('-pl',      '--players',    type=int,   default=6,      help='num players')
 parser.add_argument('-mono',    '--mono',       action='store_true',        help='use left mono input instead of color')
-parser.add_argument('-high',    '--highres',    action='store_true',        help='high resolution mono (720p instead of 400p)')
+parser.add_argument('-low',     '--lowres',     action='store_true',        help='low resolution mono (400p instead of 720p)')
 parser.add_argument('-ss',      '--showstereo', action='store_true',        help='queue stereo frames')
 parser.add_argument('-ll',      '--lightning',  action='store_true',        help='use low latency movenet model')
-parser.add_argument('-ns',      '--nostereo',   action='store_true',        help='do not use stereo depth')
+parser.add_argument('-st',      '--stereo',     action='store_true',        help='use stereo depth')
 parser.add_argument('-ny',      '--noyolo',     action='store_true',        help='do not do yolo person detection')
 parser.add_argument('-np',      '--nopose',     action='store_true',        help='do not do pose detection')
 parser.add_argument('-cl',      '--chunklength',type=float, default=6.0,    help='duration of video chunks in seconds')
@@ -32,7 +32,7 @@ camera_list: list[str] = ['14442C10F124D9D600',
                           '14442C101136D1D200',
                           '14442C1031DDD2D200']
 
-# camera_list: list[str] = ['14442C10F124D9D600']
+camera_list: list[str] = ['14442C10F124D9D600']
 
 settings: Settings = Settings()
 settings.root_path =    currentPath
@@ -45,8 +45,8 @@ settings.camera_list =  camera_list
 settings.num_cams =     len(camera_list)
 settings.fps =          args.fps
 settings.color =    not args.mono
-settings.stereo =   not args.nostereo
-settings.lowres =   not args.highres
+settings.stereo =       args.stereo
+settings.lowres =       args.lowres
 settings.person =   not args.noyolo
 settings.show_stereo =  args.showstereo
 settings.simulation =   args.simulation or args.passthrough

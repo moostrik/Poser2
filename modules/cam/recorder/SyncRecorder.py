@@ -24,7 +24,7 @@ def is_folder_for_settings(name: str, settings: Settings) -> bool:
     color: bool = 'color' in parts
     stereo: bool = 'stereo' in parts
     lowres: bool = 'lowres' in parts
-    if num_cams == settings.num_cams and color == settings.color and stereo == settings.stereo and lowres == settings.lowres:
+    if num_cams >= settings.num_cams and color == settings.color and stereo == settings.stereo and lowres == settings.lowres:
         return True
     return False
 

@@ -104,7 +104,7 @@ def UpdateWindow(window: sg.Window, exitCallback = None) -> bool:
 
 def UpdateEvent(window: sg.Window, message: qMessage) -> None:
     if type(window.find_element(message.key, True)) == sg.ErrorElement:
-        print('key not found', message.key)
+        # print('key not found', message.key)
         return
     element = window[message.key]
     if type(element) != sg.Button:
