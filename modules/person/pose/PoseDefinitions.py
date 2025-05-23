@@ -1,3 +1,8 @@
+# based on
+# https://www.tensorflow.org/hub/tutorials/movenet
+# https://github.com/Kazuhito00/MoveNet-Python-Example/tree/main
+# Lightning for low latency, Thunder for high accuracy
+
 from enum import Enum
 import numpy as np
 from typing import Callable

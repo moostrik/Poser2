@@ -1,3 +1,5 @@
+# https://blobconverter.luxonis.com/
+
 import numpy as np
 from enum import Enum, IntEnum, auto
 from typing import Callable

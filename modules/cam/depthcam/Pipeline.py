@@ -1,3 +1,6 @@
+# TODO
+# Remove Lowres, only use it with color + depth + yolo
+# Add Square
 
 import depthai as dai
 from datetime import timedelta

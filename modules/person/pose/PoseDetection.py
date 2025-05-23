@@ -1,9 +1,3 @@
-# based on
-# https://www.tensorflow.org/hub/tutorials/movenet
-# https://github.com/Kazuhito00/MoveNet-Python-Example/tree/main
-# Lightning for low latency, Thunder for high accuracy
-
-
 import cv2
 import numpy as np
 import time
