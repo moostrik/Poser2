@@ -11,7 +11,7 @@ from modules.Main import Main
 from modules.Settings import Settings, ModelType, FrameType
 
 parser: ArgumentParser = ArgumentParser()
-parser.add_argument('-fps',     '--fps',        type=int,   default=30,     help='frames per second')
+parser.add_argument('-fps',     '--fps',        type=int,   default=20,     help='frames per second')
 parser.add_argument('-pl',      '--players',    type=int,   default=6,      help='num players')
 parser.add_argument('-mono',    '--mono',       action='store_true',        help='use left mono input instead of color')
 parser.add_argument('-low',     '--lowres',     action='store_true',        help='low resolution mono (400p instead of 720p)')
