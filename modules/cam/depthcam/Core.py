@@ -222,8 +222,8 @@ class Core(Thread):
 
     # CALLBACKS
     def _update_frame_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
-        if not self.running:
-            return
+        # if not self.running:
+        #     return
         for c in self.frame_callbacks:
             c(self.id, frame_type, frame)
         if self.preview_type == frame_type:
@@ -235,8 +235,8 @@ class Core(Thread):
             self._update_sync_callbacks(frames, 30.0)
 
     def _update_sync_callbacks(self, frames: dict[FrameType, ndarray], fps: float) -> None:
-        if not self.running:
-            return
+        # if not self.running:
+        #     return
         for c in self.sync_callbacks:
             c(self.id, frames, fps)
 
