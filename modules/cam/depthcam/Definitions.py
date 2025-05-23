@@ -6,7 +6,7 @@ from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device, 
 
 DETECTION_MODEL5S: str = "mobilenet-ssd_openvino_2021.4_5shave.blob"
 DETECTION_MODEL6S: str = "mobilenet-ssd_openvino_2021.4_6shave.blob"
-DETECTION_THRESHOLD: float = 0.5
+DETECTION_THRESHOLD: float = 0.1
 TRACKER_TYPE: TrackerType = TrackerType.ZERO_TERM_IMAGELESS
 # ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
 # ZERO_TERM_IMAGELESS slightly faster

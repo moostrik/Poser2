@@ -16,35 +16,37 @@ def gsfr(range: tuple[int, int]) -> float:
     return get_steps_from_range(range)
 
 class Gui():
-    def __init__(self, gui: G, settings: CoreSettings) -> None:
+    def __init__(self, gui: G, settings: CoreSettings, all_settings: bool = True) -> None:
         self.gui: G = gui
         self.settings: CoreSettings = settings
 
         self.id: str = self.settings.get_id_string()
+        self.all_settings: bool = all_settings
         self.ftn: list[str] = self.settings.get_frame_type_names()
 
         id: str = self.id
         elem: list = []
-        elem.append([E(eT.TEXT, 'Exposure  '),
-                     E(eT.SLDR, 'C_Exposure'+id,        self.settings.set_color_exposure,       EXPOSURE_RANGE[0],      EXPOSURE_RANGE,     gsfr(EXPOSURE_RANGE)),
-                     E(eT.TEXT, '       Iso'),
-                     E(eT.SLDR, 'C_Iso'+id,             self.settings.set_color_iso,            ISO_RANGE[0],           ISO_RANGE,          gsfr(ISO_RANGE))])
-        elem.append([E(eT.TEXT, 'Balance   '),
-                     E(eT.SLDR, 'C_Balance'+id,         self.settings.set_color_balance,        BALANCE_RANGE[0],       BALANCE_RANGE,      gsfr(BALANCE_RANGE)),
-                     E(eT.TEXT, '  Contrast'),
-                     E(eT.SLDR, 'C_Contrast'+id,        self.settings.set_color_contrast,       CONTRAST_RANGE[0],      CONTRAST_RANGE,     gsfr(CONTRAST_RANGE))])
-        elem.append([E(eT.TEXT, 'Brightness'),
-                     E(eT.SLDR, 'C_Brightness'+id,      self.settings.set_color_brightness,     BRIGHTNESS_RANGE[0],    BRIGHTNESS_RANGE,   gsfr(BRIGHTNESS_RANGE)),
-                     E(eT.TEXT, '   Denoise'),
-                     E(eT.SLDR, 'C_Denoise'+id,         self.settings.set_color_denoise,        LUMA_DENOISE_RANGE[0],  LUMA_DENOISE_RANGE, gsfr(LUMA_DENOISE_RANGE))])
-        elem.append([E(eT.TEXT, 'Saturation'),
-                     E(eT.SLDR, 'C_Saturation'+id,      self.settings.set_color_saturation,     SATURATION_RANGE[0],    SATURATION_RANGE,   gsfr(SATURATION_RANGE)),
-                     E(eT.TEXT, ' Sharpness'),
-                     E(eT.SLDR, 'C_Sharpness'+id,       self.settings.set_color_sharpness,      SHARPNESS_RANGE[0],     SHARPNESS_RANGE,    gsfr(SHARPNESS_RANGE))])
-        elem.append([E(eT.CMBO, 'Preview'+id,           self.settings.set_preview,              self.ftn[0],            self.ftn,   expand=False),
-                     E(eT.CHCK, 'AutoExposure'+id,      self.settings.set_color_auto_exposure,  True),
-                     E(eT.CHCK, 'AutoBalance'+id,       self.settings.set_color_auto_balance,   True),
-                     E(eT.SLDR, 'NumTracklets'+id,     None,                               0,  [0,6],    1)])
+        if self.all_settings:
+            elem.append([E(eT.TEXT, 'Exposure  '),
+                         E(eT.SLDR, 'C_Exposure'+id,        self.settings.set_color_exposure,       EXPOSURE_RANGE[0],      EXPOSURE_RANGE,     gsfr(EXPOSURE_RANGE)),
+                         E(eT.TEXT, '       Iso'),
+                         E(eT.SLDR, 'C_Iso'+id,             self.settings.set_color_iso,            ISO_RANGE[0],           ISO_RANGE,          gsfr(ISO_RANGE))])
+            elem.append([E(eT.TEXT, 'Balance   '),
+                         E(eT.SLDR, 'C_Balance'+id,         self.settings.set_color_balance,        BALANCE_RANGE[0],       BALANCE_RANGE,      gsfr(BALANCE_RANGE)),
+                         E(eT.TEXT, '  Contrast'),
+                         E(eT.SLDR, 'C_Contrast'+id,        self.settings.set_color_contrast,       CONTRAST_RANGE[0],      CONTRAST_RANGE,     gsfr(CONTRAST_RANGE))])
+            elem.append([E(eT.TEXT, 'Brightness'),
+                         E(eT.SLDR, 'C_Brightness'+id,      self.settings.set_color_brightness,     BRIGHTNESS_RANGE[0],    BRIGHTNESS_RANGE,   gsfr(BRIGHTNESS_RANGE)),
+                         E(eT.TEXT, '   Denoise'),
+                         E(eT.SLDR, 'C_Denoise'+id,         self.settings.set_color_denoise,        LUMA_DENOISE_RANGE[0],  LUMA_DENOISE_RANGE, gsfr(LUMA_DENOISE_RANGE))])
+            elem.append([E(eT.TEXT, 'Saturation'),
+                         E(eT.SLDR, 'C_Saturation'+id,      self.settings.set_color_saturation,     SATURATION_RANGE[0],    SATURATION_RANGE,   gsfr(SATURATION_RANGE)),
+                         E(eT.TEXT, ' Sharpness'),
+                         E(eT.SLDR, 'C_Sharpness'+id,       self.settings.set_color_sharpness,      SHARPNESS_RANGE[0],     SHARPNESS_RANGE,    gsfr(SHARPNESS_RANGE))])
+            elem.append([E(eT.CMBO, 'Preview'+id,           self.settings.set_preview,              self.ftn[0],            self.ftn,   expand=False),
+                         E(eT.CHCK, 'AutoExposure'+id,      self.settings.set_color_auto_exposure,  True),
+                         E(eT.CHCK, 'AutoBalance'+id,       self.settings.set_color_auto_balance,   True),
+                         E(eT.SLDR, 'NumTracklets'+id,      None,                               0,  [0,6],    1)])
         elem.append([E(eT.TEXT, 'FPS'),
                      E(eT.SLDR, 'FPS_V'+id,             None,                               0,  [0,60],   0.1),
                      E(eT.SLDR, 'FPS_L'+id,             None,                               0,  [0,60],   0.1),
@@ -52,21 +54,25 @@ class Gui():
                      E(eT.SLDR, 'FPS_D'+id,             None,                               0,  [0,60],   0.1),
                      E(eT.SLDR, 'TPS'+id,               None,                               0,  [0,60],   0.1)])
 
-        self.color_frame = Frame('CAMERA COLOR', elem, 240)
+        if self.all_settings:
+            self.color_frame = Frame('CAMERA COLOR', elem, 240)
+        else:
+            self.color_frame = Frame('CAMERA COLOR', elem, 120)
 
         elem: list = []
-        elem.append([E(eT.TEXT, 'Exposure  '),
-                     E(eT.SLDR, 'M_Exposure'+id,        self.settings.set_mono_exposure,        EXPOSURE_RANGE[0],      EXPOSURE_RANGE,     gsfr(EXPOSURE_RANGE)),
-                     E(eT.TEXT, 'Iso'),
-                     E(eT.SLDR, 'M_Iso'+id,             self.settings.set_mono_iso,             ISO_RANGE[0],           ISO_RANGE,          gsfr(ISO_RANGE))])
-        elem.append([E(eT.TEXT, 'Depth Min '),
-                     E(eT.SLDR, 'S_Min'+id,             self.settings.set_depth_treshold_min,   STEREO_DEPTH_RANGE[0],  STEREO_DEPTH_RANGE, gsfr(STEREO_DEPTH_RANGE)),
-                     E(eT.TEXT, 'Max'),
-                     E(eT.SLDR, 'S_Max'+id,             self.settings.set_depth_treshold_max,   STEREO_DEPTH_RANGE[0],  STEREO_DEPTH_RANGE, gsfr(STEREO_DEPTH_RANGE))])
-        elem.append([E(eT.TEXT, 'Bright Min'),
-                     E(eT.SLDR, 'S_BrighnessMin'+id,    self.settings.set_stereo_min_brightness,STEREO_BRIGHTNESS_RANGE[0], STEREO_BRIGHTNESS_RANGE, gsfr(STEREO_BRIGHTNESS_RANGE)),
-                     E(eT.TEXT, 'Max'),
-                     E(eT.SLDR, 'S_BrighnessMax'+id,    self.settings.set_stereo_max_brightness,STEREO_BRIGHTNESS_RANGE[0], STEREO_BRIGHTNESS_RANGE, gsfr(STEREO_BRIGHTNESS_RANGE))])
+        if self.all_settings:
+            elem.append([E(eT.TEXT, 'Exposure  '),
+                         E(eT.SLDR, 'M_Exposure'+id,        self.settings.set_mono_exposure,        EXPOSURE_RANGE[0],      EXPOSURE_RANGE,     gsfr(EXPOSURE_RANGE)),
+                         E(eT.TEXT, 'Iso'),
+                         E(eT.SLDR, 'M_Iso'+id,             self.settings.set_mono_iso,             ISO_RANGE[0],           ISO_RANGE,          gsfr(ISO_RANGE))])
+            elem.append([E(eT.TEXT, 'Depth Min '),
+                         E(eT.SLDR, 'S_Min'+id,             self.settings.set_depth_treshold_min,   STEREO_DEPTH_RANGE[0],  STEREO_DEPTH_RANGE, gsfr(STEREO_DEPTH_RANGE)),
+                         E(eT.TEXT, 'Max'),
+                         E(eT.SLDR, 'S_Max'+id,             self.settings.set_depth_treshold_max,   STEREO_DEPTH_RANGE[0],  STEREO_DEPTH_RANGE, gsfr(STEREO_DEPTH_RANGE))])
+            elem.append([E(eT.TEXT, 'Bright Min'),
+                         E(eT.SLDR, 'S_BrighnessMin'+id,    self.settings.set_stereo_min_brightness,STEREO_BRIGHTNESS_RANGE[0], STEREO_BRIGHTNESS_RANGE, gsfr(STEREO_BRIGHTNESS_RANGE)),
+                         E(eT.TEXT, 'Max'),
+                         E(eT.SLDR, 'S_BrighnessMax'+id,    self.settings.set_stereo_max_brightness,STEREO_BRIGHTNESS_RANGE[0], STEREO_BRIGHTNESS_RANGE, gsfr(STEREO_BRIGHTNESS_RANGE))])
         elem.append([E(eT.TEXT, 'IR Grid   '),
                      E(eT.SLDR, 'L_Grid'+id,            self.set_ir_grid_light,                 0, [0,1], 0.05),
                      E(eT.TEXT, 'Fld'),
@@ -76,7 +82,10 @@ class Gui():
                      E(eT.TEXT, '              '),
                      E(eT.CHCK, 'M_AutoExposure'+id,    self.settings.set_mono_auto_exposure,   False)])
 
-        self.depth_frame = Frame('CAMERA DEPTH', elem, 200)
+        if self.all_settings:
+            self.depth_frame = Frame('CAMERA DEPTH', elem, 200)
+        else:
+            self.depth_frame = Frame('CAMERA DEPTH', elem, 120)
 
         self.prev_color_auto_exposure: bool =   self.settings.color_auto_exposure
         self.prev_color_exposure: int =         self.settings.color_exposure
@@ -90,6 +99,15 @@ class Gui():
     # COLOR
     def update_from_frame(self) -> None:
         if not self.gui.isRunning(): return
+
+        # fps
+        self.gui.updateElement('FPS_V'+self.id, self.settings.get_fps(FrameType.VIDEO))
+        self.gui.updateElement('FPS_L'+self.id, self.settings.get_fps(FrameType.LEFT_))
+        self.gui.updateElement('FPS_R'+self.id, self.settings.get_fps(FrameType.RIGHT))
+        self.gui.updateElement('FPS_D'+self.id, self.settings.get_fps(FrameType.DEPTH))
+
+        if not self.all_settings:
+            return
 
         # update color
         if (self.prev_color_auto_exposure != self.settings.color_auto_exposure) :
@@ -125,12 +143,6 @@ class Gui():
             if (self.prev_mono_iso != self.settings.mono_iso) :
                 self.prev_mono_iso = self.settings.mono_iso
                 self.gui.updateElement('M_Iso'+self.id, self.settings.mono_iso)
-
-        # fps
-        self.gui.updateElement('FPS_V'+self.id, self.settings.get_fps(FrameType.VIDEO))
-        self.gui.updateElement('FPS_L'+self.id, self.settings.get_fps(FrameType.LEFT_))
-        self.gui.updateElement('FPS_R'+self.id, self.settings.get_fps(FrameType.RIGHT))
-        self.gui.updateElement('FPS_D'+self.id, self.settings.get_fps(FrameType.DEPTH))
 
     def update_from_tracker(self) -> None:
         if not self.gui.isRunning(): return

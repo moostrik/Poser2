@@ -229,16 +229,10 @@ class Core(Thread):
         if self.preview_type == frame_type:
             for c in self.preview_callbacks:
                 c(self.id, frame_type, frame)
-
-        # if frame_type == FrameType.VIDEO:
-        #     for c in self.preview_callbacks:
-        #         c(2, FrameType.LEFT_, frame, 0)
-        # if frame_type == FrameType.LEFT_:
-        #     for c in self.preview_callbacks:
-        #         c(1, FrameType.LEFT_, frame, 0)
-        # if frame_type == FrameType.RIGHT:
-        #     for c in self.preview_callbacks:
-        #         c(3, FrameType.RIGHT, frame, 0)
+        if not self.do_stereo and frame_type == FrameType.VIDEO:
+            frames: dict[FrameType, ndarray] = {}
+            frames[frame_type] = frame
+            self._update_sync_callbacks(frames, 30.0)
 
     def _update_sync_callbacks(self, frames: dict[FrameType, ndarray], fps: float) -> None:
         if not self.running:
