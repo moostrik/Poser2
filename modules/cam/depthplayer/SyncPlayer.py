@@ -56,6 +56,7 @@ class SyncPlayer(Thread):
         self.input_path: Path = Path(settings.video_path)
         self.num_cams: int = settings.num_cams
         self.types: list[FrameType] = settings.frame_types
+        self.fps: float = settings.fps
 
         self.running: bool = False
         self.state_messages: Queue[Message] = Queue()
@@ -145,7 +146,7 @@ class SyncPlayer(Thread):
                 path: Path = folder.path / make_file_name(c, t, self.load_chunk, self.suffix)
                 if path.is_file():
 
-                    player: FFmpegPlayer = FFmpegPlayer(c, t, self._frame_sync_callback, self.hwt, self.hwd)
+                    player: FFmpegPlayer = FFmpegPlayer(c, t, self._frame_sync_callback, self.hwt, self.hwd, self.fps)
                     player.load(str(path), self.load_chunk)
                     self.loaders.append(player)
                 else:
@@ -349,13 +350,13 @@ class SyncPlayer(Thread):
             if folder.is_dir():
                 if not is_folder_for_settings(str(folder), settings):
                     continue
-                max_chunk: int = 0
+                max_chunk: int = -1
                 for file in folder.iterdir():
                     if file.is_file() and (file.name.endswith(Settings.CoderFormat.H264.value) or file.name.endswith(Settings.CoderFormat.H265.value)):
                         n: str = file.stem.split('_')[2]
                         if n.isdigit():
                             max_chunk = max(max_chunk, int(n))
-                if max_chunk > 0:
+                if max_chunk >= 0:
                     folders[folder.name] = (Folder(folder.name, folder, max_chunk))
         return folders
 

@@ -29,7 +29,7 @@ EndCallback = Callable[[int], None]
 
 class FFmpegPlayer:
     def __init__(self, cam_id: int, frameType: FrameType, frameCallback,
-                 hw_acceleration_type: str = '', hw_acceleration_device: str = '') -> None:
+                 hw_acceleration_type: str = '', hw_acceleration_device: str = '', fps: float = 0.0) -> None:
         self.frame_callback = frameCallback
 
         self.cam_id: int = cam_id
@@ -41,7 +41,7 @@ class FFmpegPlayer:
         self.bytes_per_frame: int = 0
         self.frame_width: int = 0
         self.frame_height: int = 0
-        self.frame_rate: float = 0.0
+        self.frame_rate: float = fps
 
         self._load_lock: Lock = Lock()
         self._load_thread: Thread | None = None
@@ -94,7 +94,9 @@ class FFmpegPlayer:
 
     def _load(self, video_file: str, chunk_id: int) -> None:
         try:
-            self.frame_width, self.frame_height, self.frame_rate = self._get_video_dimensions(video_file)
+            self.frame_width, self.frame_height, frame_rate = self._get_video_dimensions(video_file)
+            if self.frame_rate == 0.0:
+                self.frame_rate = frame_rate
         except Exception as e:
             print('Error getting video dimensions:', e)
             self.ffmpeg_process = None

@@ -106,7 +106,7 @@ class CorePlayer(Core):
                 self.inputs[Input.RIGHT_FRAME_IN].send(img)
 
     def _passthrough_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
-        if not self.running or id != self.id:
+        if id != self.id:
             return
         self._update_frame_callbacks(frame_type, frame)
 
