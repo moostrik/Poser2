@@ -212,8 +212,8 @@ class Manager(Thread):
         # Extract the roi without padding
         img_x: int = max(0, x)
         img_y: int = max(0, y)
-        img_w: int = min(w, image_width - x)
-        img_h: int = min(h, image_height - y)
+        img_w: int = min(w + min(0, x), image_width - img_x)
+        img_h: int = min(h + min(0, y), image_height - img_y)
 
         crop: np.ndarray = image[img_y:img_y + img_h, img_x:img_x + img_w]
 
