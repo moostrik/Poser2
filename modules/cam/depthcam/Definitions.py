@@ -9,9 +9,9 @@ from depthai import Tracklet, TrackerType, ImgDetection, Rect, Point3f, Device, 
 YOLOV8_WIDE_5S: str = "yolov8n_coco_640x352_5S.blob"
 YOLOV8_WIDE_6S: str = "yolov8n_coco_640x352_6S.blob"
 YOLOV8_WIDE_7S: str = "yolov8n_coco_640x352_7S.blob"
-YOLOV8_SQUARE_5S: str = "yolov8n_coco_640x352_5S.blob"
-YOLOV8_SQUARE_6S: str = "yolov8n_coco_640x352_6S.blob"
-YOLOV8_SQUARE_7S: str = "yolov8n_coco_640x352_7S.blob"
+YOLOV8_SQUARE_5S: str = "yolov8n_coco_416x416_5S.blob"
+YOLOV8_SQUARE_6S: str = "yolov8n_coco_416x416_6S.blob"
+YOLOV8_SQUARE_7S: str = "yolov8n_coco_416x416_7S.blob"
 YOLO_CONFIDENCE_THRESHOLD: float = 0.3
 YOLO_OVERLAP_THRESHOLD: float = 0.7
 

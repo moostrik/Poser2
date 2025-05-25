@@ -1,6 +1,5 @@
 # TODO
-# Remove Lowres, only use it with color + depth + yolo
-# Add Square
+# Complete Square
 
 import depthai as dai
 from datetime import timedelta
@@ -27,7 +26,13 @@ def get_stereo_config(do_color: bool) -> dai.RawStereoDepthConfig:
         stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT
     return stereoConfig
 
-def get_model_path(model_path: str, stereo: bool, simulate: bool) -> Path:
+def get_model_path(model_path: str, square: bool, stereo: bool, simulate: bool) -> Path:
+    if square:
+        if stereo:
+            return (Path(model_path) / YOLOV8_SQUARE_5S).resolve().absolute()
+        elif simulate:
+            return (Path(model_path) / YOLOV8_SQUARE_7S).resolve().absolute()
+        return (Path(model_path) / YOLOV8_SQUARE_6S).resolve().absolute()
     if stereo:
         return (Path(model_path) / YOLOV8_WIDE_5S).resolve().absolute()
     elif simulate:
@@ -48,25 +53,24 @@ def setup_pipeline(
     ) -> None:
 
     options: list[str] = [
-        'Square' if square else 'Wide',
-        'Color' if do_color else 'Mono',
-        'Stereo' if do_stereo else '',
-        'Yolo' if do_person else '',
-        'show_stereo' if show_stereo else '',
+        'Square,' if square else 'Wide,',
+        'Color,' if do_color else 'Mono,',
+        'Stereo (Show),' if do_stereo and show_stereo else 'Stereo (Hidden),' if do_stereo else '',
+        'Yolo,' if do_person else '',
         'Simulate' if simulate else ''
     ]
 
     pipeline_description = "Depth Pipeline: " + " ".join(filter(None, options))
     print(pipeline_description)
 
-    nn_path: Path = get_model_path(model_path, do_stereo, simulate)
+    nn_path: Path = get_model_path(model_path, square, do_stereo, simulate)
     if not simulate:
         if do_color:
             if do_stereo:
                 if do_person:
                     SetupColorStereoPerson(pipeline, fps, square, show_stereo, nn_path)
                 else:
-                    SetupColorStereo(pipeline, fps, square, show_stereo)
+                    SetupColorStereo(pipeline, fps, square, show_stereo = True)
             else:
                 if do_person:
                     SetupColorPerson(pipeline, fps, square, nn_path)
@@ -77,7 +81,7 @@ def setup_pipeline(
                 if do_person:
                     SetupMonoStereoPerson(pipeline, fps, square, show_stereo, nn_path)
                 else:
-                    SetupMonoStereo(pipeline, fps, square, show_stereo)
+                    SetupMonoStereo(pipeline, fps, square, show_stereo = True)
             else:
                 if do_person:
                     SetupMonoPerson(pipeline, fps, square, nn_path)
