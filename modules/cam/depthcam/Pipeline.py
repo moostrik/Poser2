@@ -27,23 +27,31 @@ def get_stereo_config(do_color: bool) -> dai.RawStereoDepthConfig:
         stereoConfig.algorithmControl.depthAlign = dai.RawStereoDepthConfig.AlgorithmControl.DepthAlign.RECTIFIED_LEFT
     return stereoConfig
 
+def get_model_path(model_path: str, stereo: bool, simulate: bool) -> Path:
+    if stereo:
+        return (Path(model_path) / YOLOV8_WIDE_5S).resolve().absolute()
+    elif simulate:
+        return (Path(model_path) / YOLOV8_WIDE_7S).resolve().absolute()
+    return (Path(model_path) / YOLOV8_WIDE_6S).resolve().absolute()
+
+
 def setup_pipeline(
     pipeline : dai.Pipeline,
     model_path:str,
-    fps: int = 30,
+    fps: float = 30.0,
+    square: bool = True,
     do_color: bool = True,
     do_stereo: bool = True,
     do_person: bool = True,
-    lowres: bool = False,
     show_stereo: bool = False,
     simulate: bool = False
     ) -> None:
 
     options: list[str] = [
+        'Square' if square else 'Wide',
         'Color' if do_color else 'Mono',
         'Stereo' if do_stereo else '',
         'Yolo' if do_person else '',
-        'LowRes' if lowres else 'Highres',
         'show_stereo' if show_stereo else '',
         'Simulate' if simulate else ''
     ]
@@ -51,74 +59,65 @@ def setup_pipeline(
     pipeline_description = "Depth Pipeline: " + " ".join(filter(None, options))
     print(pipeline_description)
 
-    nn_path: Path = (Path(model_path) / YOLOV8_WIDE_6S).resolve().absolute()
+    nn_path: Path = get_model_path(model_path, do_stereo, simulate)
     if not simulate:
-        if do_stereo:
-            print('use model 5s')
-            nn_path: Path = (Path(model_path) / YOLOV8_WIDE_5S).resolve().absolute()
-
         if do_color:
             if do_stereo:
                 if do_person:
-                    SetupColorStereoPerson(pipeline, fps, lowres, show_stereo, nn_path)
+                    SetupColorStereoPerson(pipeline, fps, square, show_stereo, nn_path)
                 else:
-                    SetupColorStereo(pipeline, fps, lowres, show_stereo)
+                    SetupColorStereo(pipeline, fps, square, show_stereo)
             else:
                 if do_person:
-                    SetupColorPerson(pipeline, fps, lowres, nn_path)
+                    SetupColorPerson(pipeline, fps, square, nn_path)
                 else:
-                    SetupColor(pipeline, fps, lowres)
+                    SetupColor(pipeline, fps, square)
         else:
             if do_stereo:
                 if do_person:
-                    SetupMonoStereoPerson(pipeline, fps, lowres, show_stereo, nn_path)
+                    SetupMonoStereoPerson(pipeline, fps, square, show_stereo, nn_path)
                 else:
-                    SetupMonoStereo(pipeline, fps, lowres, show_stereo)
+                    SetupMonoStereo(pipeline, fps, square, show_stereo)
             else:
                 if do_person:
-                    SetupMonoPerson(pipeline, fps, lowres, nn_path)
+                    SetupMonoPerson(pipeline, fps, square, nn_path)
                 else:
-                    SetupMono(pipeline, fps, lowres)
+                    SetupMono(pipeline, fps, square)
     else:
-        if do_stereo:
-            nn_path: Path = (Path(model_path) / YOLOV8_WIDE_5S).resolve().absolute()
-        else:
-            nn_path: Path = (Path(model_path) / YOLOV8_WIDE_7S).resolve().absolute()
-
         if do_color:
             if do_stereo:
                 if do_person:
-                    SimulationColorStereoPerson(pipeline, fps, lowres, show_stereo, nn_path)
+                    SimulationColorStereoPerson(pipeline, fps, square, show_stereo, nn_path)
                 else:
-                    SimulationColorStereo(pipeline, fps, lowres, show_stereo)
+                    SimulationColorStereo(pipeline, fps, square, show_stereo)
             else:
                 if do_person:
-                    SimulationColorPerson(pipeline, fps, lowres, nn_path)
+                    SimulationColorPerson(pipeline, fps, square, nn_path)
                 else:
-                    SimulationColor(pipeline, fps, lowres)
+                    SimulationColor(pipeline, fps, square)
         else:
             if do_stereo:
                 if do_person:
-                    SimulationMonoStereoPerson(pipeline, fps, lowres, show_stereo, nn_path)
+                    SimulationMonoStereoPerson(pipeline, fps, square, show_stereo, nn_path)
                 else:
-                    SimulationMonoStereo(pipeline, fps, lowres, show_stereo)
+                    SimulationMonoStereo(pipeline, fps, square, show_stereo)
             else:
                 if do_person:
-                    SimulationMonoPerson(pipeline, fps, lowres, nn_path)
+                    SimulationMonoPerson(pipeline, fps, square, nn_path)
                 else:
-                    SimulationMono(pipeline, fps, lowres)
+                    SimulationMono(pipeline, fps, square)
 
 
 class Setup():
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool = False) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool = False) -> None:
         self.pipeline: dai.Pipeline = pipeline
-        self.fps: int = fps
-        self.lowres: bool = lowres
+        self.fps: float = fps
+        self.square: bool = square
 
 
 class SetupColor(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool) -> None:
-        super().__init__(pipeline, fps, lowres)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
+        super().__init__(pipeline, fps, square)
         self.color: dai.node.Camera = pipeline.create(dai.node.Camera)
         self.color.setCamera("color")
         self.color.setSize(1280, 720)
@@ -134,8 +133,8 @@ class SetupColor(Setup):
         self.color_control.out.link(self.color.inputControl)
 
 class SetupColorPerson(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, lowres)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, square)
         print('fps', fps)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
@@ -169,8 +168,8 @@ class SetupColorPerson(SetupColor):
         self.object_tracker.out.link(self.outputTracklets.input)
 
 class SetupColorStereo(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo:bool) -> None:
-        super().__init__(pipeline, fps, lowres)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, show_stereo:bool, lowres: bool = False) -> None:
+        super().__init__(pipeline, fps, square)
         self.show_stereo: bool = show_stereo
 
         pipeline.remove(self.output_video)
@@ -226,9 +225,9 @@ class SetupColorStereo(SetupColor):
         self.stereo_control.out.link(self.stereo.inputConfig)
 
 class SetupColorStereoPerson(SetupColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, nn_path: Path) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, show_stereo: bool, nn_path: Path) -> None:
         print('SetupColorStereoPerson')
-        super().__init__(pipeline, fps, lowres, show_stereo)
+        super().__init__(pipeline, fps, square, show_stereo, lowres = True)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(640,352)
@@ -266,13 +265,11 @@ class SetupColorStereoPerson(SetupColorStereo):
 
 
 class SetupMono(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool) -> None:
-        super().__init__(pipeline, fps, lowres)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
+        super().__init__(pipeline, fps, square)
 
         self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
-        if self.lowres:
-            self.resolution = dai.MonoCameraProperties.SensorResolution.THE_400_P
         self.left.setCamera("left")
         self.left.setResolution(self.resolution)
         self.left.setFps(self.fps)
@@ -286,8 +283,8 @@ class SetupMono(Setup):
         self.mono_control.out.link(self.left.inputControl)
 
 class SetupMonoPerson(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, lowres)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, square)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(640,352)
@@ -319,8 +316,8 @@ class SetupMonoPerson(SetupMono):
         self.object_tracker.out.link(self.output_tracklets.input)
 
 class SetupMonoStereo(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool) -> None:
-        super().__init__(pipeline, fps, lowres)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, show_stereo: bool) -> None:
+        super().__init__(pipeline, fps, square)
         self.show_stereo: bool = show_stereo
 
         pipeline.remove(self.output_video)
@@ -362,8 +359,8 @@ class SetupMonoStereo(SetupMono):
         self.stereo_control.out.link(self.stereo.inputConfig)
 
 class SetupMonoStereoPerson(SetupMonoStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, showMono: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, lowres, showMono)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, show_stereo: bool, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, square, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(640,352)
@@ -401,8 +398,8 @@ class SetupMonoStereoPerson(SetupMonoStereo):
 
 
 class SimulationColor(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool) -> None:
-        super().__init__(pipeline, fps, lowres)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
+        super().__init__(pipeline, fps, square)
 
         pipeline.remove(self.color)
 
@@ -413,24 +410,20 @@ class SimulationColor(SetupColor):
         self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorPerson(SetupColorPerson):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, lowres, nn_path)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, square, nn_path)
 
         pipeline.remove(self.color)
 
         self.ex_video: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_video.setStreamName("ex_video")
         self.ex_video.setMaxDataSize(1280*720*3)
-
         self.ex_video.out.link(self.manip.inputImage)
-        # if not self.lowres:
-        #     self.ex_video.out.link(self.object_tracker.inputTrackerFrame)
-
         self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorStereo(SetupColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool) -> None:
-        super().__init__(pipeline, fps, lowres, show_stereo)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, show_stereo: bool) -> None:
+        super().__init__(pipeline, fps, square, show_stereo)
 
         pipeline.remove(self.left)
         pipeline.remove(self.right)
@@ -475,8 +468,8 @@ class SimulationColorStereo(SetupColorStereo):
             self.stereo.disparity.link(self.output_stereo.input)
 
 class SimulationColorStereoPerson(SimulationColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, lowres, show_stereo)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, show_stereo: bool, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, square, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(640, 352)
@@ -519,8 +512,8 @@ class SimulationColorStereoPerson(SimulationColorStereo):
 
 
 class SimulationMono(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool) -> None:
-        super().__init__(pipeline, fps, lowres)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
+        super().__init__(pipeline, fps, square)
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
@@ -532,8 +525,8 @@ class SimulationMono(SetupMono):
         self.ex_left.out.link(self.output_video.input)
 
 class SimulationMonoPerson(SetupMonoPerson):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, lowres, nn_path)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, square, nn_path)
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
@@ -546,8 +539,8 @@ class SimulationMonoPerson(SetupMonoPerson):
         self.ex_left.out.link(self.output_video.input)
 
 class SimulationMonoStereo(SetupMonoStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool) -> None:
-        super().__init__(pipeline, fps, lowres, show_stereo)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, show_stereo: bool) -> None:
+        super().__init__(pipeline, fps, square, show_stereo)
 
         self.color: dai.node.Camera = pipeline.create(dai.node.Camera)
         self.color.setCamera("color")
@@ -597,8 +590,8 @@ class SimulationMonoStereo(SetupMonoStereo):
             self.stereo.disparity.link(self.output_stereo.input)
 
 class SimulationMonoStereoPerson(SimulationMonoStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: int, lowres: bool, show_stereo: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, lowres, show_stereo)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, show_stereo: bool, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, square, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(640, 352)

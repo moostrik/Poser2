@@ -36,7 +36,7 @@ class CorePlayer(Core):
             super().run()
 
     def _setup_pipeline(self, pipeline: Pipeline) -> None: # override
-        setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo, simulate=True)
+        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_person, self.show_stereo, simulate=True)
 
     def _setup_queues(self) -> None: # override
         self.inputs[Input.VIDEO_FRAME_IN] =     self.device.getInputQueue(name='ex_video', maxSize=1, blocking=False)

@@ -34,10 +34,10 @@ class Core(Thread):
         # FIXED SETTINGS
         self.model_path: str =          general_settings.model_path
         self.fps: int =                 general_settings.fps
+        self.square: bool =             general_settings.square
         self.do_color: bool =           general_settings.color
         self.do_stereo: bool =          general_settings.stereo
         self.do_person: bool =          general_settings.person
-        self.lowres: bool =             general_settings.lowres
         self.show_stereo: bool =        general_settings.show_stereo
 
         # DAI
@@ -101,7 +101,7 @@ class Core(Thread):
         return True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
-            setup_pipeline(pipeline, self.model_path, self.fps, self.do_color, self.do_stereo, self.do_person, self.lowres, self.show_stereo, simulate=False)
+            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_person, self.show_stereo, simulate=False)
 
     def _setup_queues(self) -> None:
         if self.do_stereo:

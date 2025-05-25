@@ -28,10 +28,10 @@ class Settings():
         self.camera_list: list[str]         = None # type: ignore
         self.num_cams: int                  = None # type: ignore
         self.fps: int                       = None # type: ignore
+        self.square: bool                   = None # type: ignore
         self.color: bool                    = None # type: ignore
         self.stereo: bool                   = None # type: ignore
         self.person: bool                   = None # type: ignore
-        self.lowres: bool                   = None # type: ignore
         self.show_stereo: bool              = None # type: ignore
         self.simulation: bool               = None # type: ignore
         self.passthrough: bool              = None # type: ignore

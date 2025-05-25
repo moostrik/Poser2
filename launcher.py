@@ -11,10 +11,10 @@ from modules.Main import Main
 from modules.Settings import Settings, ModelType, FrameType
 
 parser: ArgumentParser = ArgumentParser()
-parser.add_argument('-fps',     '--fps',        type=int,   default=20,     help='frames per second')
+parser.add_argument('-fps',     '--fps',        type=float, default=23.0,   help='frames per second')
 parser.add_argument('-pl',      '--players',    type=int,   default=6,      help='num players')
 parser.add_argument('-mono',    '--mono',       action='store_true',        help='use left mono input instead of color')
-parser.add_argument('-low',     '--lowres',     action='store_true',        help='low resolution mono (400p instead of 720p)')
+parser.add_argument('-sq',      '--square',     action='store_true',        help='use centre square of the camera')
 parser.add_argument('-ss',      '--showstereo', action='store_true',        help='queue stereo frames')
 parser.add_argument('-ll',      '--lightning',  action='store_true',        help='use low latency movenet model')
 parser.add_argument('-st',      '--stereo',     action='store_true',        help='use stereo depth')
@@ -44,9 +44,9 @@ settings.file_path =    path.join(currentPath, 'files')
 settings.camera_list =  camera_list
 settings.num_cams =     len(camera_list)
 settings.fps =          args.fps
+settings.square =       args.square
 settings.color =    not args.mono
 settings.stereo =       args.stereo
-settings.lowres =       args.lowres
 settings.person =   not args.noyolo
 settings.show_stereo =  args.showstereo
 settings.simulation =   args.simulation or args.passthrough

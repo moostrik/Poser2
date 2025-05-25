@@ -13,18 +13,20 @@ from modules.cam.depthcam.Definitions import FrameType, FRAME_TYPE_LABEL_DICT
 def make_file_name(c: int, t: FrameType, chunk: int, format: str) -> str:
     return f"{c}_{FRAME_TYPE_LABEL_DICT[t]}_{chunk:03d}{format}"
 
-def make_folder_name(num_cams: int, color: bool, stereo: bool, lowres: bool) -> str:
-    return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_color' if color else '_mono') + ('_stereo' if stereo else '') + ('_lowres' if lowres else '_highres')
+def make_folder_name(num_cams: int, square: bool, color: bool, stereo: bool) -> str:
+    return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_square' if square else '_wide') + ('_color' if color else '_mono') + ('_stereo' if stereo else '')
 
 def is_folder_for_settings(name: str, settings: Settings) -> bool:
     parts: list[str] = name.split('_')
-    if not parts[1].isdigit() or not ('color' in parts or 'mono' in parts) or not  ('lowres' in parts or 'highres' in parts):
+    if len(parts) < 2:
+        return False
+    if not parts[1].isdigit() or not  ('wide' in parts or 'square' in parts) or not ('color' in parts or 'mono' in parts):
         return False
     num_cams = int(parts[1])
+    square: bool = 'square' in parts
     color: bool = 'color' in parts
     stereo: bool = 'stereo' in parts
-    lowres: bool = 'lowres' in parts
-    if num_cams >= settings.num_cams and color == settings.color and stereo == settings.stereo and lowres == settings.lowres:
+    if num_cams >= settings.num_cams and square == settings.square and color == settings.color and stereo == settings.stereo:
         return True
     return False
 
@@ -100,7 +102,7 @@ class SyncRecorder(Thread):
 
     def _start_recording(self) -> None:
 
-        self.folder_path = self.output_path / make_folder_name(self.settings.num_cams, self.settings.color, self.settings.stereo, self.settings.lowres)
+        self.folder_path = self.output_path / make_folder_name(self.settings.num_cams, self.settings.square, self.settings.color, self.settings.stereo)
         self.folder_path.mkdir(parents=True, exist_ok=True)
 
         self.chunk_index = 0
