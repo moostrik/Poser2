@@ -131,14 +131,15 @@ class SetupColor(Setup):
         self.color.setSize(1280, 720)
         self.color.setFps(self.fps)
         self.color.setMeshSource(dai.CameraProperties.WarpMeshSource.NONE)
-        if square:
-            self.color.setPreviewSize(720, 720)
-        else:
-            self.color.setPreviewSize(1280, 720)
 
         self.output_video: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.output_video.setStreamName("video")
-        self.color.preview.link(self.output_video.input)
+
+        if square:
+            self.color.setPreviewSize(720, 720)
+            self.color.preview.link(self.output_video.input)
+        else:
+            self.color.video.link(self.output_video.input)
 
         self.color_control: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.color_control.setStreamName('color_control')
@@ -282,20 +283,24 @@ class SetupColorStereoPerson(SetupColorStereo):
 class SetupMono(Setup):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
         super().__init__(pipeline, fps, square)
-
-        self.left: dai.node.Camera = pipeline.create(dai.node.Camera)
         self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
+
+        self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.left.setCamera("left")
-        self.left.setSize(1280, 720)
+        self.left.setResolution(self.resolution)
         self.left.setFps(self.fps)
-        if square:
-            self.left.setPreviewSize(720, 720)
-        else:
-            self.left.setPreviewSize(1280, 720)
 
         self.output_video: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.output_video.setStreamName("video")
-        self.left.preview.link(self.output_video.input)
+
+        if square:
+            self.left_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
+            self.left_manip.initialConfig.setResize(720, 720)
+            self.left_manip.initialConfig.setKeepAspectRatio(True)
+            self.left.out.link(self.left_manip.inputImage)
+            self.left_manip.out.link(self.output_video.input)
+        else:
+            self.left.out.link(self.output_video.input)
 
         self.mono_control: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.mono_control.setStreamName('mono_control')
@@ -313,7 +318,7 @@ class SetupMonoPerson(SetupMono):
             self.manip.initialConfig.setResize(640,352)
             self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-        self.left.video.link(self.manip.inputImage)
+        self.left.out.link(self.manip.inputImage)
 
         self.detection_network: dai.node.YoloDetectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork)
         self.detection_network.setBlobPath(nn_path)
@@ -338,17 +343,11 @@ class SetupMonoPerson(SetupMono):
         self.output_tracklets.setStreamName("tracklets")
         self.object_tracker.out.link(self.output_tracklets.input)
 
-class SetupMonoStereo(Setup):
+class SetupMonoStereo(SetupMono):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool) -> None:
         super().__init__(pipeline, fps, square = False)
         self.show_stereo: bool = show_stereo
-
-        self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
-
-        self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
-        self.left.setCamera("left")
-        self.left.setResolution(self.resolution)
-        self.left.setFps(self.fps)
+        pipeline.remove(self.output_video)
 
         self.right: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.right.setCamera("right")
@@ -381,11 +380,7 @@ class SetupMonoStereo(Setup):
         self.output_sync.setStreamName("sync")
         self.sync.out.link(self.output_sync.input)
 
-        self.mono_control: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-        self.mono_control.setStreamName('mono_control')
-        self.mono_control.out.link(self.left.inputControl)
         self.mono_control.out.link(self.right.inputControl)
-
         self.stereo_control: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.stereo_control.setStreamName('stereo_control')
         self.stereo_control.out.link(self.stereo.inputConfig)
