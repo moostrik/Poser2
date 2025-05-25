@@ -12,9 +12,10 @@ YOLOV8_WIDE_7S: str = "yolov8n_coco_640x352_7S.blob"
 YOLOV8_SQUARE_5S: str = "yolov8n_coco_416x416_5S.blob"
 YOLOV8_SQUARE_6S: str = "yolov8n_coco_416x416_6S.blob"
 YOLOV8_SQUARE_7S: str = "yolov8n_coco_416x416_7S.blob"
-YOLO_CONFIDENCE_THRESHOLD: float = 0.3
-YOLO_OVERLAP_THRESHOLD: float = 0.7
+YOLO_CONFIDENCE_THRESHOLD: float = 0.5
+YOLO_OVERLAP_THRESHOLD: float = 0.5
 
+TRACKER_PERSON_LABEL: int = 0
 TRACKER_TYPE: TrackerType = TrackerType.ZERO_TERM_IMAGELESS
 # ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
 # ZERO_TERM_IMAGELESS slightly faster

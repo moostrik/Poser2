@@ -117,15 +117,13 @@ def setup_pipeline(
 
 
 class Setup():
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool = False) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float) -> None:
         self.pipeline: dai.Pipeline = pipeline
         self.fps: float = fps
-        self.square: bool = square
-
 
 class SetupColor(Setup):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
-        super().__init__(pipeline, fps, square)
+        super().__init__(pipeline, fps)
         self.color: dai.node.Camera = pipeline.create(dai.node.Camera)
         self.color.setCamera("color")
         self.color.setSize(1280, 720)
@@ -171,7 +169,7 @@ class SetupColorPerson(SetupColor):
         self.manip.out.link(self.detection_network.input)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
@@ -242,7 +240,6 @@ class SetupColorStereo(SetupColor):
 
 class SetupColorStereoPerson(SetupColorStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool, nn_path: Path) -> None:
-        print('SetupColorStereoPerson')
         super().__init__(pipeline, fps, show_stereo, lowres = True)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
@@ -267,7 +264,7 @@ class SetupColorStereoPerson(SetupColorStereo):
         self.stereo.depth.link(self.detection_network.inputDepth)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
@@ -282,7 +279,7 @@ class SetupColorStereoPerson(SetupColorStereo):
 
 class SetupMono(Setup):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
-        super().__init__(pipeline, fps, square)
+        super().__init__(pipeline, fps)
         self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
 
         self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
@@ -331,7 +328,7 @@ class SetupMonoPerson(SetupMono):
         self.manip.out.link(self.detection_network.input)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
@@ -411,7 +408,7 @@ class SetupMonoStereoPerson(SetupMonoStereo):
         self.stereo.depth.link(self.detection_network.inputDepth)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
@@ -520,7 +517,7 @@ class SimulationColorStereoPerson(SimulationColorStereo):
         self.stereo.depth.link(self.detection_network.inputDepth)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
@@ -640,7 +637,7 @@ class SimulationMonoStereoPerson(SimulationMonoStereo):
         self.stereo.depth.link(self.detection_network.inputDepth)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([0])  # track only person
+        self.object_tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
         self.object_tracker.setTrackerType(TRACKER_TYPE)
         self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
 
