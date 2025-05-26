@@ -14,7 +14,7 @@ from modules.gl.Image import Image
 
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.pose.PoseDefinitions import Pose, Indices
-from modules.person.Person import Person
+from modules.person.Person import Person, PersonColor
 
 from modules.Settings import Settings
 
@@ -153,11 +153,17 @@ class Render(RenderWindow):
             fbo.end()
 
     def draw_sims(self) -> None:
-        return
-        for i in range(self.num_persons):
-            fbo: Fbo = self.psn_fbos[i]
-            self.setView(fbo.width, fbo.height)
+        fbo: Fbo = self.sim_fbos[SimType.RAW.value]
+        self.setView(fbo.width, fbo.height)
+        self.draw_raw_positions(self.input_persons, fbo)
 
+        fbo = self.sim_fbos[SimType.MAP.value]
+        self.setView(fbo.width, fbo.height)
+        self.draw_map_positions(self.input_persons, fbo)
+
+        fbo = self.sim_fbos[SimType.LGT.value]
+        self.setView(fbo.width, fbo.height)
+        self.draw_light(fbo)
 
     def draw_persons(self) -> None:
         for i in range(self.num_persons):
@@ -280,6 +286,44 @@ class Render(RenderWindow):
         glRasterPos2f(0, 0)     # Reset position
 
         glFlush()               # Render now
+
+    @staticmethod
+    def draw_raw_positions(persons: dict[int, Person | None], fbo: Fbo) -> None:
+        fbo.begin()
+        glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
+        glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
+
+        for person in persons.values():
+            if person is None or not person.active:
+                continue
+
+            id: int = person.cam_id
+            x: float = person.tracklet.roi.x * fbo.width
+            y: float = 0
+            w: float = person.tracklet.roi.width * fbo.width
+            h = float(fbo.height)
+            color = PersonColor(id, aplha=0.5)
+
+            glColor4f(*color)  # Reset color
+            glBegin(GL_QUADS)       # Start drawing a quad
+            glVertex2f(x, y)        # Bottom left
+            glVertex2f(x, y + h)    # Bottom right
+            glVertex2f(x + w, y + h)# Top right
+            glVertex2f(x + w, y)    # Top left
+            glEnd()                 # End drawing
+            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+
+        fbo.end()
+        glFlush()
+        return
+
+    @staticmethod
+    def draw_map_positions(persons: dict[int, Person | None], fbo: Fbo) -> None:
+        return
+
+    @staticmethod
+    def draw_light(fbo: Fbo) -> None:
+        return
 
     @staticmethod
     def draw_person(person: Person, pose: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
