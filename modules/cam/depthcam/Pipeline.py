@@ -219,7 +219,7 @@ class SetupColorStereo(SetupColor):
         self.sync.setSyncAttempts(-1)
         self.sync.setSyncThreshold(sync_threshold)
 
-        self.color.preview.link(self.sync.inputs["video"])
+        self.color.video.link(self.sync.inputs["video"])
         self.left.out.link(self.sync.inputs["left"])
         self.right.out.link(self.sync.inputs["right"])
         if self.show_stereo:
