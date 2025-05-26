@@ -5,7 +5,7 @@ from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.Manager import Manager as Detector
-
+from math import ceil
 
 class Main():
     def __init__(self, settings: Settings) -> None:
@@ -49,8 +49,13 @@ class Main():
 
         self.gui.exit_callback = self.stop
 
-        for camera in self.cameras:
-            self.gui.addFrame([camera.gui.get_gui_color_frame(), camera.gui.get_gui_depth_frame()])
+        for i in range(ceil(len(self.cameras) / 2.0)):
+            c = i * 2
+            if c + 1 < len(self.cameras):
+                self.gui.addFrame([self.cameras[c].gui.get_gui_frame(), self.cameras[c+1].gui.get_gui_frame()])
+            else:
+                self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
+
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame()])
         if self.recorder:
@@ -92,7 +97,7 @@ class Main():
         self.detector.join()
         # print ('join cameras')
         for camera in self.cameras:
-            camera.join(timeout=2)
+            camera.join(timeout=10)
 
         # print ('stop gui')
         self.gui.stop()

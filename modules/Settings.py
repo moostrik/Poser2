@@ -35,6 +35,7 @@ class Settings():
         self.show_stereo: bool              = None # type: ignore
         self.simulation: bool               = None # type: ignore
         self.passthrough: bool              = None # type: ignore
+        self.manual: bool          = None # type: ignore
 
         # DETECTION SETTINGS
         self.num_players: int               = None # type: ignore

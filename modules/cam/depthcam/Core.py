@@ -63,7 +63,7 @@ class Core(Thread):
         # SETTINGS
         self.preview_type =             FrameType.VIDEO
         self.settings: CoreSettings =   CoreSettings(self)
-        self.gui: Gui =                 Gui(gui, self.settings)
+        self.gui: Gui =                 Gui(gui, self.settings, general_settings)
 
         self.cntr: int = 0
 
