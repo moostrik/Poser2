@@ -16,12 +16,12 @@ class SyncPlayerGui(SyncPlayer):
                      E(eT.CMBO, 'Folders', self.set_folder, f, folders),
                      E(eT.BTTN, 'Start', self.set_start),
                      E(eT.BTTN, 'Stop', self.set_stop)])
-        # elem.append([E(eT.TEXT, 'Chunks  '),
-        #              E(eT.ITXT, 'Chunk', self.nothing, expand = False),
-        #              E(eT.TEXT, 'of'),
-        #              E(eT.ITXT, 'of Chunks', self.nothing, expand = False),
-        #              E(eT.TEXT, 'Drift'),
-        #              E(eT.ITXT, 'Drift', self.nothing, expand = False)])
+        elem.append([E(eT.TEXT, 'Chunks  '),
+                     E(eT.ITXT, 'Chunk', self.nothing, expand = False),
+                     E(eT.TEXT, 'of'),
+                     E(eT.ITXT, 'of Chunks', self.nothing, expand = False),
+                     E(eT.TEXT, 'Drift'),
+                     E(eT.ITXT, 'Drift', self.nothing, expand = False)])
 
         self.frame = Frame('CAMERA COLOR', elem, 80)
 
@@ -53,6 +53,6 @@ class SyncPlayerGui(SyncPlayer):
         self.gui.updateElement('Chunk', self.get_current_chunk())
         self.gui.updateElement('Drift', self.get_drift())
 
-    def nothing(self) -> None:
+    def nothing(self, int) -> None:
         pass
 

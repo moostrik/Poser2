@@ -29,7 +29,7 @@ class Gui():
 
         id: str = self.id
         elm: list = []
-        elm.append([E(eT.CMBO, 'Preview'+id,           self.settings.set_preview,              self.ftn[0],            self.ftn,   expand=False),
+        elm.append([E(eT.CMBO, 'Preview'+id,           self.settings.set_preview,              self.ftn[1],            self.ftn,   expand=False),
                     E(eT.TEXT, '  FPS V'),
                     E(eT.SLDR, 'FPS_V'+id,             None,                               0,  [0,60],   0.1),
                     E(eT.TEXT, ' T'),
