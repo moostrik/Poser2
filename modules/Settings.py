@@ -35,7 +35,7 @@ class Settings():
         self.show_stereo: bool              = None # type: ignore
         self.simulation: bool               = None # type: ignore
         self.passthrough: bool              = None # type: ignore
-        self.manual: bool          = None # type: ignore
+        self.manual: bool                   = None # type: ignore
 
         # DETECTION SETTINGS
         self.num_players: int               = None # type: ignore
@@ -48,6 +48,16 @@ class Settings():
         self.decoder: Settings.CoderType    = None # type: ignore
         self.format: Settings.CoderFormat   = None # type: ignore
         self.frame_types: list[FrameType]   = None # type: ignore
+
+        # RENDER SETTINGS
+        self.render_title: str              = None # type: ignore
+        self.render_width: int              = None # type: ignore
+        self.render_height: int             = None # type: ignore
+        self.render_x: int                  = None # type: ignore
+        self.render_y: int                  = None # type: ignore
+        self.render_fullscreen: bool        = None # type: ignore
+        self.render_v_sync: bool            = None # type: ignore
+        self.cams_per_row: int              = None # type: ignore
 
 
     def check_values(self) -> None:

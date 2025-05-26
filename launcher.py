@@ -69,6 +69,15 @@ settings.decoder =      Settings.CoderType.iGPU
 settings.format =       Settings.CoderFormat.H264
 settings.frame_types =  [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIGHT] if settings.stereo else [FrameType.VIDEO]
 
+settings.render_title =  'DepthPose'
+settings.render_width =  1920
+settings.render_height = 1080
+settings.render_x =      0
+settings.render_y =      0
+settings.render_fullscreen = False
+settings.render_v_sync = True
+settings.cams_per_row =  2
+
 settings.check_values()
 settings.check_cameras()
 

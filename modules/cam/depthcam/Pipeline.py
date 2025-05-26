@@ -1,6 +1,3 @@
-# TODO
-# Complete Square
-
 import depthai as dai
 from datetime import timedelta
 from pathlib import Path

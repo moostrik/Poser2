@@ -16,24 +16,33 @@ from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.pose.PoseDefinitions import Pose, Indices
 from modules.person.Person import Person
 
+from modules.Settings import Settings
 
 class ImageType(Enum):
-    CAM = 0
-    PERSON = 1
+    TOT = 0
+    CAM = 1
+    SIM = 2
+    PSN = 3
+
+class SimType(Enum):
+    RAW = 0
+    MAP = 1
+    LGT = 2
 
 Composition_Subdivision = dict[ImageType, dict[int, tuple[int, int, int, int]]]
 
 class Render(RenderWindow):
-    def __init__(self, num_cams: int, num_persons: int, window_width: int, window_height: int, name: str, fullscreen: bool = False, v_sync = False) -> None:
-        super().__init__(window_width, window_height, name, fullscreen, v_sync)
+    def __init__(self, settings: Settings) -> None:
 
-        self.num_cams: int = num_cams
-        self.num_persons: int = num_persons
+        self.num_cams: int = settings.num_cams
+        self.num_sims: int = len(SimType)
+        self.num_persons: int = settings.num_players
 
         self.cam_images: dict[int, Image] = {}
         self.psn_images: dict[int, Image] = {}
 
         self.cam_fbos: dict[int, Fbo] = {}
+        self.sim_fbos: dict[int, Fbo] = {}
         self.psn_fbos: dict[int, Fbo] = {}
         self.pose_meshes: dict[int, Mesh] = {}
 
@@ -47,6 +56,10 @@ class Render(RenderWindow):
             self.cam_fbos[i] = Fbo()
             self.all_fbos.append(self.cam_fbos[i])
 
+        for i in range(self.num_sims):
+            self.sim_fbos[i] = Fbo()
+            self.all_fbos.append(self.sim_fbos[i])
+
         for i in range(self.num_persons):
             self.psn_images[i] = Image()
             self.all_images.append(self.psn_images[i])
@@ -58,26 +71,33 @@ class Render(RenderWindow):
             self.pose_meshes[i].set_indices(Indices)
             self.all_meshes.append(self.pose_meshes[i])
 
-        self.composition: Composition_Subdivision = self.make_composition_subdivision(window_width, window_height, num_cams, num_persons)
+        self.composition: Composition_Subdivision = self.make_composition_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.num_persons)
+
+        super().__init__(self.composition[ImageType.TOT][0][2], self.composition[ImageType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_x, settings.render_y)
+
         self.allocated = False
 
         self.input_mutex: Lock = Lock()
         self.input_tracklets: dict[int, dict[int, Tracklet]] = {}   # cam_id -> track_id -> Tracklet
         self.input_persons: dict[int, Person | None] = {}           # person_id -> Person
-        for i in range(num_persons):
+        for i in range(self.num_persons):
             self.input_tracklets[i] = {}
             self.input_persons[i] = None
 
     def reshape(self, width, height) -> None: # override
         super().reshape(width, height)
-        self.composition = self.make_composition_subdivision(width, height, self.num_cams, self.num_persons)
+        self.composition = self.make_composition_subdivision(width, height, self.num_cams, self.num_sims, self.num_persons)
 
         for key in self.cam_fbos.keys():
             x, y, w, h = self.composition[ImageType.CAM][key]
             self.cam_fbos[key].allocate(w, h, GL_RGBA)
 
+        for key in self.sim_fbos.keys():
+            x, y, w, h = self.composition[ImageType.SIM][key]
+            self.sim_fbos[key].allocate(w, h, GL_RGBA)
+
         for key in self.psn_fbos.keys():
-            x, y, w, h = self.composition[ImageType.PERSON][key]
+            x, y, w, h = self.composition[ImageType.PSN][key]
             self.psn_fbos[key].allocate(w, h, GL_RGBA)
 
     def draw(self) -> None: # override
@@ -88,6 +108,7 @@ class Render(RenderWindow):
         self.update_pose_meshes()
 
         self.draw_cameras()
+        self.draw_sims()
         self.draw_persons()
 
         self.draw_composition()
@@ -131,6 +152,13 @@ class Render(RenderWindow):
 
             fbo.end()
 
+    def draw_sims(self) -> None:
+        return
+        for i in range(self.num_persons):
+            fbo: Fbo = self.psn_fbos[i]
+            self.setView(fbo.width, fbo.height)
+
+
     def draw_persons(self) -> None:
         for i in range(self.num_persons):
             image: Image = self.psn_images[i]
@@ -154,8 +182,12 @@ class Render(RenderWindow):
             x, y, w, h = self.composition[ImageType.CAM][i]
             self.cam_fbos[i].draw(x, y, w, h)
 
+        for i in range(self.num_sims):
+            x, y, w, h = self.composition[ImageType.SIM][i]
+            self.sim_fbos[i].draw(x, y, w, h)
+
         for i in range(self.num_persons):
-            x, y, w, h = self.composition[ImageType.PERSON][i]
+            x, y, w, h = self.composition[ImageType.PSN][i]
             self.psn_fbos[i].draw(x, y, w, h)
 
     # SETTERS AND GETTERS
@@ -282,21 +314,26 @@ class Render(RenderWindow):
 
     @staticmethod
     def make_composition_subdivision(dst_width: int, dst_height: int,
-                                     num_cams: int, num_persons: int,
+                                     num_cams: int, num_sims: int, num_persons: int,
                                      cam_aspect_ratio: float = 16.0 / 9.0,
+                                     sim_aspect_ratio: float = 20.0,
                                      psn_aspect_ratio: float = 1.0) -> Composition_Subdivision:
 
         ret: Composition_Subdivision = {}
+        ret[ImageType.TOT] = {}
         ret[ImageType.CAM] = {}
-        ret[ImageType.PERSON] = {}
+        ret[ImageType.SIM] = {}
+        ret[ImageType.PSN] = {}
 
-        cam_rows: int = max(math.ceil(num_cams / 2), 1)
+        cams_per_row: int = 4
+        cam_rows: int = max(math.ceil(num_cams / cams_per_row), 1)
         cam_colums = max(math.ceil(num_cams / cam_rows), 1)
 
         dst_aspect_ratio: float = dst_width / dst_height
         cam_grid_aspect_ratio: float = cam_aspect_ratio * cam_colums / cam_rows
+        sim_grid_aspect_ratio: float = sim_aspect_ratio / num_sims
         psn_grid_aspect_ratio: float = psn_aspect_ratio * num_persons
-        tot_aspect_ratio: float = 1.0 / (1.0 / cam_grid_aspect_ratio + 1.0 / psn_grid_aspect_ratio)
+        tot_aspect_ratio: float = 1.0 / (1.0 / cam_grid_aspect_ratio + 1.0 / psn_grid_aspect_ratio + 1.0 / sim_grid_aspect_ratio)
 
         fit_width: float
         fit_height: float
@@ -309,8 +346,12 @@ class Render(RenderWindow):
         fit_x: float = (dst_width - fit_width) / 2.0
         fit_y: float = (dst_height - fit_height) / 2.0
 
+        ret[ImageType.TOT][0] = (0, 0, int(fit_width), int(fit_height))
+
         cam_width: float =  fit_width / cam_colums
         cam_height: float = cam_width / cam_aspect_ratio
+        sim_y_start: float = fit_y + cam_height * cam_rows
+        sim_height: float = fit_width / sim_aspect_ratio
         psn_width: float =  fit_width / num_persons
         psn_height: float = psn_width / psn_aspect_ratio
 
@@ -319,9 +360,13 @@ class Render(RenderWindow):
             cam_y: float = (i // cam_colums) * cam_height + fit_y
             ret[ImageType.CAM][i] = (int(cam_x), int(cam_y), int(cam_width), int(cam_height))
 
+        for i in range(num_sims):
+            sim_y: float = sim_y_start + i * sim_height
+            ret[ImageType.SIM][i] = (int(fit_x), int(sim_y), int(fit_width), int(sim_height))
+
         for i in range(num_persons):
             psn_x: float = i * psn_width + fit_x
             psn_y: float = fit_height - psn_height + fit_y
-            ret[ImageType.PERSON][i] = (int(psn_x), int(psn_y), int(psn_width), int(psn_height))
+            ret[ImageType.PSN][i] = (int(psn_x), int(psn_y), int(psn_width), int(psn_height))
 
         return ret

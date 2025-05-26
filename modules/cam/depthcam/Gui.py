@@ -82,7 +82,7 @@ class Gui():
                         E(eT.CMBO, 'Median'+id,            self.settings.set_stereo_median_filter, STEREO_FILTER_NAMES[0], STEREO_FILTER_NAMES, expand=False)])
 
         gui_height = len(elm) * 31 + 50
-        self.frame = Frame('CAMERA' + self.id, elm, gui_height)
+        self.frame = Frame('CAMERA ' + self.id, elm, gui_height)
 
         self.prev_color_auto_exposure: bool =   self.settings.color_auto_exposure
         self.prev_color_exposure: int =         self.settings.color_exposure
