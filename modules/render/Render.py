@@ -155,7 +155,7 @@ class Render(RenderWindow):
     def draw_sims(self) -> None:
         fbo: Fbo = self.sim_fbos[SimType.RAW.value]
         self.setView(fbo.width, fbo.height)
-        self.draw_raw_positions(self.input_persons, fbo)
+        self.draw_raw_positions(self.input_persons, self.num_cams, fbo)
 
         fbo = self.sim_fbos[SimType.MAP.value]
         self.setView(fbo.width, fbo.height)
@@ -288,9 +288,9 @@ class Render(RenderWindow):
         glFlush()               # Render now
 
     @staticmethod
-    def draw_raw_positions(persons: dict[int, Person | None], fbo: Fbo) -> None:
+    def draw_raw_positions(persons: dict[int, Person | None], num_cams: int, fbo: Fbo) -> None:
         fbo.begin()
-        glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
+        glClearColor(0.1, 0.0, 0.0, 1.0)  # Set background color to black
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
 
         for person in persons.values():
@@ -298,10 +298,10 @@ class Render(RenderWindow):
                 continue
 
             id: int = person.cam_id
-            x: float = person.tracklet.roi.x * fbo.width
-            y: float = 0
-            w: float = person.tracklet.roi.width * fbo.width
-            h = float(fbo.height)
+            w: float = person.tracklet.roi.width * fbo.width / num_cams
+            h: float = fbo.height * person.tracklet.roi.height
+            x: float = person.tracklet.roi.x * fbo.width / num_cams + (id * fbo.width / num_cams)
+            y: float = (fbo.height - h) * 0.5
             color = PersonColor(id, aplha=0.5)
 
             glColor4f(*color)  # Reset color
@@ -319,6 +319,32 @@ class Render(RenderWindow):
 
     @staticmethod
     def draw_map_positions(persons: dict[int, Person | None], fbo: Fbo) -> None:
+        fbo.begin()
+        glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
+        glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
+
+        for person in persons.values():
+            if person is None or not person.active:
+                continue
+
+            id: int = person.cam_id
+            w: float = person.angle_pos.size * fbo.width
+            h: float = fbo.height * person.angle_pos.y_pos
+            x: float = person.angle_pos.x_angle * fbo.width
+            y: float = (fbo.height - h) * 0.5
+            color = PersonColor(id, aplha=0.5)
+
+            glColor4f(*color)  # Reset color
+            glBegin(GL_QUADS)       # Start drawing a quad
+            glVertex2f(x, y)        # Bottom left
+            glVertex2f(x, y + h)    # Bottom right
+            glVertex2f(x + w, y + h)# Top right
+            glVertex2f(x + w, y)    # Top left
+            glEnd()                 # End drawing
+            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+
+        fbo.end()
+        glFlush()
         return
 
     @staticmethod

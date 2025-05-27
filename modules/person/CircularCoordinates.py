@@ -1,42 +1,65 @@
 
-from modules.person.Person import Person, PersonDict, CamTracklet, Tracklet, Rect, Point3f
-CAMERA_ANGLE:float = 120.0
+from modules.person.Person import Person, PersonDict, CamTracklet, Tracklet, Rect, Point3f, AnglePosition
+import numpy as np
 
-ANGLE_RANGE:float = 10.0
-# Y_RANGE:float = 0.1 # without stereo: normalised coordinates
-# Z_RANGE:float = 0.1 # without stereo: normalised coordinates
-Y_RANGE:float = 200 # with stereo: coordinates in mm
-Z_RANGE:float = 200 # with stereo: coordinates in mm
+CAMERA_FOV:float = 120.0
+TARGET_FOV:float = 90.0
+
+ANGLE_RANGE:float = 10
+VERTICAL_RANGE:float = 0.05
+SIZE_RANGE:float = 0.05
 
 class CircularCoordinates():
     def __init__(self, num_cameras: int) -> None:
-        self.num_cameras: int = num_cameras
-        self.angle: float = CAMERA_ANGLE
-        self.overlap: float = (self.angle * num_cameras - 360.0) / 2.0
+        self.num_cameras: int   = num_cameras
+        self.cam_fov: float     = CAMERA_FOV
+        self.target_fov: float  = 90.0
 
-        self.angle_range: float = ANGLE_RANGE
-        self.y_range: float = Y_RANGE
-        self.z_range: float = Z_RANGE
+        self.k1: float = 0.05  # Distortion coefficient k1
+        self.k2: float = 0.0  # Distortion coefficient k2
 
-    def get_angle(self, x: float, cam_id: int) -> float:
-        return x * self.angle - self.overlap
+        self.angle_range: float     = ANGLE_RANGE
+        self.vertical_range: float  = VERTICAL_RANGE
+        self.size_range: float      = SIZE_RANGE
 
-    def add_angle_position(self, person: Person) -> None:
-        tracklet: Tracklet = person.tracklet
-        position: Point3f = Point3f(tracklet.roi.x, tracklet.roi.y, 0.0)
-        # if tracklet.spatialCoordinates.z != 0:
-        #     position = tracklet.spatialCoordinates
-        person.angle_pos = position
+    def calc_angle_position(self, person: Person) -> AnglePosition:
+        x_angle: float = self._calc_angle(person)
+        y_pos: float = person.tracklet.roi.y
+        size: float = max(person.tracklet.roi.height, person.tracklet.roi.width) / 10.0
+        return AnglePosition(x_angle, y_pos, size)
 
-    def in_range(self, AP1: Point3f, AP2: Point3f) -> bool:
-        # if abs(AP1.x - AP2.x) < self.angle_range and abs(AP1.y - AP2.y) < self.y_range and abs(AP1.z - AP2.z) < self.z_range:
-        if abs(AP1.x - AP2.x) < self.angle_range:
-            return True
-        return False
+    def _calc_angle(self, person: Person) -> float:
+        normalized_x: float     = person.tracklet.roi.x * 2.0 - 1.0
+        undistorted_x: float    = self.undistort_x(normalized_x, self.k1, self.k2)
+        angle_overlap: float    = (self.cam_fov - self.target_fov) / 2.0
+        local_angle: float      = undistorted_x * (self.cam_fov / 2) - angle_overlap + self.target_fov / 2.0
+        world_angle: float      = self.target_fov * person.cam_id + local_angle
+        normalized_angle: float = world_angle / 360.0
+        return normalized_angle
 
-    def distance(self, AP1: Point3f, AP2: Point3f) -> float:
-        # return ((AP1.x - AP2.x) ** 2 + (AP1.y - AP2.y) ** 2 + (AP1.z - AP2.z) ** 2) ** 0.5
-        return AP1.x - AP2.x
+    @staticmethod
+    def undistort_x(x: float, k1: float, k2: float) -> float:
+        return x + k1 * x**3 + k2 * x**5
+
+
+
+
+
+
+
+
+    def in_range(self, AP1: AnglePosition, AP2: AnglePosition) -> bool:
+        normalized_angle_range: float = self.angle_range / 360.0
+        if abs(AP1.x_angle - AP2.x_angle) > normalized_angle_range:
+            return False
+        if abs(AP1.y_pos - AP2.y_pos) > self.vertical_range:
+            return False
+        if abs(AP1.size - AP2.size) > self.size_range:
+            return False
+        return True
+
+    def distance(self, AP1: AnglePosition, AP2: AnglePosition) -> float:
+        return ((AP1.x_angle - AP2.x_angle) ** 2 + (AP1.y_pos - AP2.y_pos) ** 2 + (AP1.size - AP2.size) ** 2) ** 0.5
 
     def find(self, person: Person, person_dict: PersonDict) -> Person | None:
         person_list: list[Person] = []

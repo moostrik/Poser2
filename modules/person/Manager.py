@@ -74,7 +74,6 @@ class Manager(Thread):
 
     def update_persons(self) -> None:
         tracklets: CamTrackletDict = self.get_tracklets()
-        # print number of tracklets
 
         for key in tracklets.keys():
             cam_id: int = tracklets[key].cam_id
@@ -82,7 +81,8 @@ class Manager(Thread):
             if tracklet.status == Tracklet.TrackingStatus.NEW or tracklet.status == Tracklet.TrackingStatus.TRACKED:
 
                 person: Person = Person(-1, cam_id, tracklet)
-                self.circular_coordinates.add_angle_position(person)
+
+                person.angle_pos = self.circular_coordinates.calc_angle_position(person)
                 person_found: Person | None = self.circular_coordinates.find(person, self.persons)
 
                 if person_found is not None:

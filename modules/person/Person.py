@@ -24,6 +24,12 @@ def PersonColor(id: int, aplha: float = 0.5) -> list[float]:
     rgb.append(aplha)
     return rgb
 
+class AnglePosition():
+    def __init__(self, x_angle: float, y_pos: float, size: float) -> None:
+        self.x_angle: float = x_angle   # normalised, 0.0 to 1.0
+        self.y_pos: float = y_pos       # normalised, 0.0 to 1.0
+        self.size: float = size         # max(height, width), normalised, 0.0 to 1.0
+
 class Person():
     _id_counter = 0
 
@@ -31,7 +37,7 @@ class Person():
         self.id: int =                  id
         self.cam_id: int =              cam_id
         self.tracklet: Tracklet =       tracklet
-        self.angle_pos: Point3f =       Point3f(0, 0, 0)
+        self.angle_pos: AnglePosition = AnglePosition(0, 0, 0)    # x: x_angle, y: , z: depth
         self.start_time: float =        time()
         self.last_time: float =         time()
         self.pose_rect: Rect | None =   None
