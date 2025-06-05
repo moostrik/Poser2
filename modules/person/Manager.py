@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import cv2
 import numpy as np
 from threading import Thread, Lock
 from time import time, sleep
 
 from modules.Settings import Settings
+from modules.person.Gui import Gui
 from modules.person.Person import Person, PersonDict, PersonCallback, CamTracklet
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.pose.PoseDetection import PoseDetection, ModelType, ModelTypeNames
@@ -30,8 +33,9 @@ class IdPool:
         return len(self._available)
 
 class Manager(Thread):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, gui, settings: Settings) -> None:
         super().__init__()
+
         self.input_mutex: Lock = Lock()
         self.running: bool = False
         self.max_persons: int = settings.num_players
@@ -54,6 +58,8 @@ class Manager(Thread):
         self.circular_coordinates: CircularCoordinates = CircularCoordinates(settings.num_cams)
 
         self.callbacks: set[PersonCallback] = set()
+
+        self.gui = Gui(gui, self, settings)
 
     def stop(self) -> None:
         self.running = False

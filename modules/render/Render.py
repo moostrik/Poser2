@@ -159,7 +159,7 @@ class Render(RenderWindow):
 
         fbo = self.sim_fbos[SimType.MAP.value]
         self.setView(fbo.width, fbo.height)
-        self.draw_map_positions(self.input_persons, fbo)
+        self.draw_map_positions(self.input_persons, self.num_cams, fbo)
 
         fbo = self.sim_fbos[SimType.LGT.value]
         self.setView(fbo.width, fbo.height)
@@ -299,9 +299,10 @@ class Render(RenderWindow):
 
             id: int = person.cam_id
             w: float = person.tracklet.roi.width * fbo.width / num_cams
-            h: float = fbo.height * person.tracklet.roi.height
+            h: float = person.tracklet.roi.height * fbo.height
             x: float = person.tracklet.roi.x * fbo.width / num_cams + (id * fbo.width / num_cams)
-            y: float = (fbo.height - h) * 0.5
+            y: float = person.tracklet.roi.y * fbo.height
+            # y: float = (fbo.height - h) * 0.5
             color = PersonColor(id, aplha=0.5)
 
             glColor4f(*color)  # Reset color
@@ -318,7 +319,7 @@ class Render(RenderWindow):
         return
 
     @staticmethod
-    def draw_map_positions(persons: dict[int, Person | None], fbo: Fbo) -> None:
+    def draw_map_positions(persons: dict[int, Person | None], num_cams: int, fbo: Fbo) -> None:
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
@@ -328,10 +329,10 @@ class Render(RenderWindow):
                 continue
 
             id: int = person.cam_id
-            w: float = person.angle_pos.size * fbo.width
-            h: float = fbo.height * person.angle_pos.y_pos
+            w: float = person.tracklet.roi.width * fbo.width / num_cams
+            h: float = person.tracklet.roi.height * fbo.height
             x: float = person.angle_pos.x_angle * fbo.width
-            y: float = (fbo.height - h) * 0.5
+            y: float = person.tracklet.roi.y * fbo.height
             color = PersonColor(id, aplha=0.5)
 
             glColor4f(*color)  # Reset color

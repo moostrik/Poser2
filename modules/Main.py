@@ -25,7 +25,7 @@ class Main():
                 camera = DepthCam(self.gui, cam_id, settings)
                 self.cameras.append(camera)
 
-        self.detector = Detector(settings)
+        self.detector = Detector(self.gui, settings)
         self.running: bool = False
 
     def start(self) -> None:
@@ -55,9 +55,9 @@ class Main():
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
         if self.player:
-            self.gui.addFrame([self.player.get_gui_frame()])
+            self.gui.addFrame([self.player.get_gui_frame(), self.detector.gui.get_gui_frame()])
         if self.recorder:
-            self.gui.addFrame([self.recorder.get_gui_frame()])
+            self.gui.addFrame([self.recorder.get_gui_frame(), self.detector.gui.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
 

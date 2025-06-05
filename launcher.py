@@ -12,7 +12,7 @@ from modules.Settings import Settings, ModelType, FrameType
 
 parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-fps',     '--fps',        type=float, default=23.0,   help='frames per second')
-parser.add_argument('-pl',      '--players',    type=int,   default=6,      help='number of players')
+parser.add_argument('-pl',      '--players',    type=int,   default=8,      help='number of players')
 parser.add_argument('-mono',    '--mono',       action='store_true',        help='use left mono input instead of color')
 parser.add_argument('-sq',      '--square',     action='store_true',        help='use centre square of the camera')
 parser.add_argument('-ss',      '--showstereo', action='store_true',        help='queue stereo frames')
