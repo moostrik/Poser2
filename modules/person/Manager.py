@@ -7,30 +7,15 @@ from time import time, sleep
 
 from modules.Settings import Settings
 from modules.person.Gui import Gui
-from modules.person.Person import Person, PersonDict, PersonCallback, CamTracklet
+from modules.person.Person import Person, PersonDict, PersonCallback
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.pose.PoseDetection import PoseDetection, ModelType, ModelTypeNames
 from modules.person.CircularCoordinates import CircularCoordinates
+from modules.person.Definitions import *
 
-CamTrackletDict = dict[str, CamTracklet]
+from modules.person.Utils import IdPool
 
-class IdPool:
-    def __init__(self, max_size: int) -> None:
-        self._available = set(range(max_size))
-        self._lock = Lock()
-
-    def acquire(self) -> int:
-        with self._lock:
-            if not self._available:
-                raise Exception("No more IDs available")
-            return self._available.pop()
-
-    def release(self, obj: int) -> None:
-        with self._lock:
-            self._available.add(obj)
-
-    def size(self) -> int:
-        return len(self._available)
+CamTrackletDict = dict[int, list[Tracklet]]
 
 class Manager(Thread):
     def __init__(self, gui, settings: Settings) -> None:
@@ -39,6 +24,14 @@ class Manager(Thread):
         self.input_mutex: Lock = Lock()
         self.running: bool = False
         self.max_persons: int = settings.num_players
+
+        self.input_frames: dict[int, np.ndarray] = {}
+        self.input_tracklets: CamTrackletDict = {}
+
+        self.person_id_pool: IdPool = IdPool(self.max_persons)
+        self.persons: PersonDict = {}
+
+        self.circular_coordinates: CircularCoordinates = CircularCoordinates(settings.num_cams)
 
         self.pose_detectors: dict[int, PoseDetection] = {}
         self.pose_detector_frame_size: int = 256
@@ -49,30 +42,31 @@ class Manager(Thread):
                 self.pose_detectors[i] = PoseDetection(settings.model_path, settings.model_type)
             print('Pose Detection:', self.max_persons, 'six instances of model', ModelTypeNames[settings.model_type.value])
 
-        self.input_frames: dict[int, np.ndarray] = {}
-        self.input_tracklets: CamTrackletDict = {}
 
-        self.person_id_pool: IdPool = IdPool(self.max_persons)
-        self.persons: PersonDict = {}
-
-        self.circular_coordinates: CircularCoordinates = CircularCoordinates(settings.num_cams)
+        self.roi_expansion: float = 0.1
+        self.activity_duration: float = 1.0  # seconds
 
         self.callbacks: set[PersonCallback] = set()
-
         self.gui = Gui(gui, self, settings)
 
-    def stop(self) -> None:
-        self.running = False
-        self.callbacks.clear()
-
-    def run(self) -> None:
-        self.running = True
+    def start(self) -> None:
+        if self.running:
+            return
 
         for detector in self.pose_detectors.values():
             detector.addMessageCallback(self.callback)
             detector.start()
             self.pose_detector_frame_size = detector.get_frame_size()
 
+        self.running = True
+
+        super().start()
+
+    def stop(self) -> None:
+        self.running = False
+        self.callbacks.clear()
+
+    def run(self) -> None:
         while self.running:
             self.update_persons()
             sleep(0.01)
@@ -80,65 +74,96 @@ class Manager(Thread):
 
     def update_persons(self) -> None:
         tracklets: CamTrackletDict = self.get_tracklets()
+        tracklet_persons: list[Person] = self.get_persons_from_tracklets(tracklets)
+        self.circular_coordinates.calc_angles(tracklet_persons)
 
-        for key in tracklets.keys():
-            cam_id: int = tracklets[key].cam_id
-            tracklet: Tracklet = tracklets[key].tracklet
-            if tracklet.status == Tracklet.TrackingStatus.NEW or tracklet.status == Tracklet.TrackingStatus.TRACKED:
+        self.find_unique_persons(self.persons, tracklet_persons, self.person_id_pool, self.circular_coordinates)
+        self.cleanup_inactive_persons(self.persons, self.person_id_pool, self.activity_duration)
 
-                person: Person = Person(-1, cam_id, tracklet)
+        for person in self.persons.values():
+            image: np.ndarray = self.get_image(person.cam_id)
+            person.set_pose_roi(image, self.roi_expansion)
+            person.set_pose_image(image)
+            detector: PoseDetection | None = self.pose_detectors.get(person.id, None)
+            self.detect_pose(person, detector, self.callback)
 
-                person.angle_pos = self.circular_coordinates.calc_angle_position(person)
-                person_found: Person | None = self.circular_coordinates.find(person, self.persons)
+    @staticmethod
+    def get_persons_from_tracklets(cam_tracklets: CamTrackletDict) -> list[Person]:
+        persons: list[Person] = []
+        for cam_id in cam_tracklets.keys():
+            tracklets: list[Tracklet] = cam_tracklets[cam_id]
+            for tracklet in tracklets:
+                if tracklet.status == Tracklet.TrackingStatus.NEW or tracklet.status == Tracklet.TrackingStatus.TRACKED:
+                    person: Person = Person(-1, cam_id, tracklet)
+                    persons.append(person)
+        return persons
 
-                if person_found is not None:
-                    person.id = person_found.id
-                    person.start_time = person_found.start_time
-                    person.last_time = time()
-                    self.persons[person.id] = person
-                    continue
+    @staticmethod
+    def find_unique_persons(active_persons: PersonDict, new_persons: list[Person], person_id_pool: IdPool, circular: CircularCoordinates) -> None:
+        # update existing persons
+        for person in active_persons.values():
+            same_person: Person | None = Manager.find_same_person(person, new_persons)
+            if same_person is not None:
+                new_persons.remove(same_person)
 
-                try:
-                    person_id: int = self.person_id_pool.acquire()
-                except:
-                    print('No more person ids available')
-                    continue
+                same_person.id = person.id
+                same_person.start_time = person.start_time
+                same_person.last_time = time()
+                active_persons[same_person.id] = same_person
 
-                person.id = person_id
-                # print('New person id:', person.id)
-                self.persons[person_id] = person
+        # check if persons are on the edge of the camera view
+        for person in active_persons.values():
+            if person.angle and circular.angle_in_overlap(person.angle, 0.4):
+                same_person: Person | None = None
+                for new_person in new_persons:
+                    angle_diff: float = abs(person.angle - new_person.angle)
+                    if angle_diff < 5:
+                        # also check roi
+                        same_person = new_person
+                if same_person is not None:
+                    new_persons.remove(same_person)
 
-        for key in self.persons.keys():
-            person = self.persons[key]
-            if person.last_time < time() - 1.0:
-                self.person_id_pool.release(person.id)
+                    same_person.id = person.id
+                    same_person.start_time = person.start_time
+                    same_person.last_time = time()
+                    active_persons[same_person.id] = same_person
+
+
+        for person in new_persons:
+            try:
+                person_id: int = person_id_pool.acquire()
+            except:
+                print('No more person ids available')
+                continue
+
+            person.id = person_id
+            active_persons[person_id] = person
+
+    @staticmethod
+    def find_same_person(person: Person, persons: list[Person]) -> Person | None:
+        for p in persons:
+            if person.cam_id == p.cam_id and person.tracklet.id == p.tracklet.id:
+                return p
+        return None
+
+    @ staticmethod
+    def cleanup_inactive_persons(persons: PersonDict, person_id_pool: IdPool, activity_duration: float = 1.0) -> None:
+        for key in persons.keys():
+            person: Person = persons[key]
+            person = persons[key]
+            if person.last_time < time() - activity_duration:
+                person_id_pool.release(person.id)
                 person.active = False
 
-            self.add_cropped_image(person)
-            self.add_pose(person) # also handles callback
+        # remove inactive persons
+        persons = {k: v for k, v in persons.items() if v.active}
 
-    def add_cropped_image(self, person: Person) -> None:
-        if person.pose_image is not None:
+    @ staticmethod
+    def detect_pose(person: Person, detector:PoseDetection | None, callback: PersonCallback) -> None:
+        if person.pose is not None or detector is None:
+            callback(person)
             return
-        image: np.ndarray = self.get_image(person.cam_id)
-        h, w = image.shape[:2]
-        roi: Rect = self.get_crop_rect(w, h, person.tracklet.roi)
-        person.pose_rect = roi
-        person.pose_image = self.get_cropped_image(image, roi, self.pose_detector_frame_size)
-
-    def add_pose(self, person: Person) -> None:
-        if person.pose_image is None:
-            print('No image for person', person.id)
-            return
-        if person.pose is not None:
-            return
-
-        detector: PoseDetection | None = self.pose_detectors.get(person.id)
-        if detector is not None:
-            detector.set_detection(person)
-        else:
-            self.callback(person)
-
+        detector.set_detection(person)
 
     # INPUTS
     def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
@@ -153,88 +178,25 @@ class Manager(Thread):
                 return np.zeros((self.pose_detector_frame_size, self.pose_detector_frame_size, 3), np.uint8)
             return self.input_frames[id]
 
+    def add_tracklet(self, cam_id: int, tracklet: Tracklet) -> None :
+        with self.input_mutex:
+            tracklets: list[Tracklet] = self.input_tracklets.get(cam_id, [])
+            tracklets.append(tracklet)
+            self.input_tracklets[cam_id] = tracklets
     def get_tracklets(self) -> CamTrackletDict:
         with self.input_mutex:
             tracklets: CamTrackletDict =  self.input_tracklets.copy()
             self.input_tracklets.clear()
             return tracklets
-    def add_tracklet(self, id: int, tracklet: Tracklet) -> None :
-        unique_id: str = Person.create_cam_id(id, tracklet.id)
-        with self.input_mutex:
-            self.input_tracklets[unique_id] = CamTracklet(id, tracklet)
 
     # CALLBACKS
     def callback(self, detection: Person) -> None:
         for c in self.callbacks:
             c(detection)
-
     def addCallback(self, callback: PersonCallback) -> None:
+        if self.running:
+            print('Manager is running, cannot add callback')
+            return
         self.callbacks.add(callback)
-    def discardCallback(self, callback: PersonCallback) -> None:
-        self.callbacks.discard(callback)
-    def clearCallbacks(self) -> None:
-        self.callbacks.clear()
 
-    # STATIC METHODS
-    @staticmethod
-    def get_crop_rect(image_width: int, image_height: int, roi: Rect, expansion = 0.0) -> Rect:
-       # Calculate the original ROI coordinates
-        img_x = int(roi.x * image_width)
-        img_y = int(roi.y * image_height)
-        img_w = int(roi.width * image_width)
-        img_h = int(roi.height * image_height)
-
-        # Determine the size of the square cutout based on the longest side of the ROI
-        img_wh: int = max(img_w, img_h)
-        img_wh += int(img_wh * expansion)
-
-        # Calculate the new coordinates to center the square cutout around the original ROI
-        crop_center_x: int = img_x + img_w // 2
-        crop_center_y: int = img_y + img_h // 2
-        crop_x: int = crop_center_x - img_wh // 2
-        crop_y: int = crop_center_y - img_wh // 2
-        crop_w: int = img_wh
-        crop_h: int = img_wh
-
-        # convert back to normalized coordinates
-        norm_x: float = crop_x / image_width
-        norm_y: float = crop_y / image_height
-        norm_w: float = crop_w / image_width
-        norm_h: float = crop_h / image_height
-
-        return Rect(norm_x, norm_y, norm_w, norm_h)
-
-    @staticmethod
-    def get_cropped_image(image: np.ndarray, roi: Rect, size: int) -> np.ndarray:
-        image_height, image_width = image.shape[:2]
-        image_channels = image.shape[2] if len(image.shape) > 2 else 1
-
-        # Calculate the original ROI coordinates
-        x: int = int(roi.x * image_width)
-        y: int = int(roi.y * image_height)
-        w: int = int(roi.width * image_width)
-        h: int = int(roi.height * image_height)
-
-        # Extract the roi without padding
-        img_x: int = max(0, x)
-        img_y: int = max(0, y)
-        img_w: int = min(w + min(0, x), image_width - img_x)
-        img_h: int = min(h + min(0, y), image_height - img_y)
-
-        crop: np.ndarray = image[img_y:img_y + img_h, img_x:img_x + img_w]
-
-        if image_channels == 1:
-            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2RGB)
-
-        # Apply padding if the roi is outside the image bounds
-        left_padding: int = -min(0, x)
-        top_padding: int = -min(0, y)
-        right_padding: int = max(0, x + w - image_width)
-        bottom_padding: int = max(0, y + h - image_height)
-
-        if left_padding + right_padding + top_padding + bottom_padding > 0:
-            crop = cv2.copyMakeBorder(crop, top_padding, bottom_padding, left_padding, right_padding, cv2.BORDER_CONSTANT, value=[0, 0, 0])
-
-        # Resize the cutout to the desired size
-        return cv2.resize(crop, (size, size), interpolation=cv2.INTER_AREA)
 

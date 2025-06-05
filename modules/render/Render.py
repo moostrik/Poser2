@@ -139,7 +139,7 @@ class Render(RenderWindow):
                 self.draw_tracklet(tracklet, 0, 0, fbo.width, fbo.height)
             for person in persons:
                 if person.active:
-                    roi: Rect | None = person.pose_rect
+                    roi: Rect | None = person.pose_roi
                     mesh: Mesh = self.pose_meshes[person.id]
                     if roi is not None and mesh.isInitialized():
                         x, y, w, h = roi.x, roi.y, roi.width, roi.height
@@ -233,7 +233,7 @@ class Render(RenderWindow):
         with self.input_mutex:
             self.input_persons[person.id] = person
 
-        image: np.ndarray | None = person.pose_image
+        image: np.ndarray | None = person.pose_roi_image
         if image is not None:
             self.set_psn_image(person.id, image)
 
@@ -331,7 +331,7 @@ class Render(RenderWindow):
             id: int = person.cam_id
             w: float = person.tracklet.roi.width * fbo.width / num_cams
             h: float = person.tracklet.roi.height * fbo.height
-            x: float = person.angle_pos.x_angle * fbo.width
+            x: float = person.angle / 360.0 * fbo.width
             y: float = person.tracklet.roi.y * fbo.height
             color = PersonColor(id, aplha=0.5)
 
