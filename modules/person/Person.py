@@ -5,6 +5,8 @@ from time import time
 from typing import Callable
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f
 from modules.person.pose.PoseDefinitions import PoseList
+from modules.person.Definitions import *
+
 
 PersonColors: dict[int, str] = {
     0: '#006400',   # darkgreen
@@ -25,23 +27,15 @@ def PersonColor(id: int, aplha: float = 0.5) -> list[float]:
     rgb.append(aplha)
     return rgb
 
-class AnglePosition():
-    def __init__(self, x_angle: float, y_pos: float, size: float) -> None:
-        self.x_angle: float = x_angle   # normalised, 0.0 to 1.0
-        self.y_pos: float = y_pos       # normalised, 0.0 to 1.0
-        self.size: float = size         # max(height, width), normalised, 0.0 to 1.0
-
-
 
 class Person():
-    _id_counter = 0
-
     def __init__(self, id, cam_id: int, tracklet: Tracklet) -> None:
         self.id: int =                  id
         self.cam_id: int =              cam_id
         self.tracklet: Tracklet =       tracklet
 
-        self.angle: float =             0.0
+        self.local_angle: float =       0.0
+        self.world_angle: float =       0.0
         self.pose_roi: Rect | None =    None
         self.pose_roi_image: np.ndarray | None = None
         self.pose: PoseList | None =    None
@@ -49,6 +43,22 @@ class Person():
         self.active: bool =             True
         self.start_time: float =        time()
         self.last_time: float =         time()
+
+        self.filter: FilterType =       FilterType.NONE
+
+    def from_person(self, other: 'Person') -> None:
+        # self.id = other.id
+        self.cam_id = other.cam_id
+        self.tracklet = other.tracklet
+        self.local_angle = other.local_angle
+        self.world_angle = other.world_angle
+        self.pose_roi = other.pose_roi
+        self.pose_roi_image = other.pose_roi_image
+        self.pose = other.pose
+        self.active = other.active
+        # self.start_time = other.start_time
+        self.last_time = time()
+        self.filter = other.filter
 
     def set_pose_roi(self, image: np.ndarray, roi_expansion) -> None:
         if self.pose_roi is not None:

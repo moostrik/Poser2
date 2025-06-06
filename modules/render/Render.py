@@ -15,6 +15,7 @@ from modules.gl.Image import Image
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.pose.PoseDefinitions import Pose, Indices
 from modules.person.Person import Person, PersonColor
+from modules.person.Definitions import *
 
 from modules.Settings import Settings
 
@@ -155,7 +156,7 @@ class Render(RenderWindow):
     def draw_sims(self) -> None:
         fbo: Fbo = self.sim_fbos[SimType.RAW.value]
         self.setView(fbo.width, fbo.height)
-        self.draw_raw_positions(self.input_persons, self.num_cams, fbo)
+        # self.draw_raw_positions(self.input_persons, self.num_cams, fbo)
 
         fbo = self.sim_fbos[SimType.MAP.value]
         self.setView(fbo.width, fbo.height)
@@ -303,7 +304,7 @@ class Render(RenderWindow):
             x: float = person.tracklet.roi.x * fbo.width / num_cams + (id * fbo.width / num_cams)
             y: float = person.tracklet.roi.y * fbo.height
             # y: float = (fbo.height - h) * 0.5
-            color = PersonColor(id, aplha=0.5)
+            color = PersonColor(person.id, aplha=0.5)
 
             glColor4f(*color)  # Reset color
             glBegin(GL_QUADS)       # Start drawing a quad
@@ -328,12 +329,13 @@ class Render(RenderWindow):
             if person is None or not person.active:
                 continue
 
-            id: int = person.cam_id
             w: float = person.tracklet.roi.width * fbo.width / num_cams
             h: float = person.tracklet.roi.height * fbo.height
-            x: float = person.angle / 360.0 * fbo.width
+            x: float = person.world_angle / 360.0 * fbo.width
             y: float = person.tracklet.roi.y * fbo.height
-            color = PersonColor(id, aplha=0.5)
+            color: list[float] = PersonColor(person.id, aplha=0.9)
+            if person.filter == FilterType.OVERLAP:
+                color[3] = 0.3
 
             glColor4f(*color)  # Reset color
             glBegin(GL_QUADS)       # Start drawing a quad
@@ -343,6 +345,24 @@ class Render(RenderWindow):
             glVertex2f(x + w, y)    # Top left
             glEnd()                 # End drawing
             glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+
+
+            string: str = f'A: {person.world_angle:.1f}'
+            x += 9
+            x = min(x, fbo.width - 100)  # Ensure text fits in the window
+            y = person.id * fbo.height / 9 + 15
+            glRasterPos2f(x, y)     # Set position
+            for character in string:
+                glut.glutBitmapCharacter(glut.GLUT_BITMAP_9_BY_15, ord(character)) # type: ignore
+
+            string = f'L: {person.local_angle:.1f}'
+            y += 15
+            glRasterPos2f(x, y)     # Set position
+            for character in string:
+                glut.glutBitmapCharacter(glut.GLUT_BITMAP_9_BY_15, ord(character)) # type: ignore
+            glRasterPos2f(0, 0)     # Reset position
+
+
 
         fbo.end()
         glFlush()

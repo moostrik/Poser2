@@ -74,10 +74,16 @@ class Manager(Thread):
 
     def update_persons(self) -> None:
         tracklets: CamTrackletDict = self.get_tracklets()
-        tracklet_persons: list[Person] = self.get_persons_from_tracklets(tracklets)
+        tracklet_persons: list[Person] = self.get_persons_from_tracklets(tracklets) # active tracklets pass filter included
+        self.filter_active(tracklet_persons)
+        self.filter_age(tracklet_persons, 4)
+        self.filter_size(tracklet_persons, 0.25)
         self.circular_coordinates.calc_angles(tracklet_persons)
-
-        self.find_unique_persons(self.persons, tracklet_persons, self.person_id_pool, self.circular_coordinates)
+        self.filter_edge(tracklet_persons, self.circular_coordinates, 0.5)
+        self.filter_and_update_active(self.persons, tracklet_persons)
+        self.filter_and_update_overlap(self.persons, tracklet_persons, self.circular_coordinates)
+        # self.filter_edge(tracklet_persons, self.circular_coordinates, 0.6)
+        self.add_persons(self.persons, tracklet_persons, self.person_id_pool)
         self.cleanup_inactive_persons(self.persons, self.person_id_pool, self.activity_duration)
 
         for person in self.persons.values():
@@ -93,58 +99,143 @@ class Manager(Thread):
         for cam_id in cam_tracklets.keys():
             tracklets: list[Tracklet] = cam_tracklets[cam_id]
             for tracklet in tracklets:
-                if tracklet.status == Tracklet.TrackingStatus.NEW or tracklet.status == Tracklet.TrackingStatus.TRACKED:
-                    person: Person = Person(-1, cam_id, tracklet)
-                    persons.append(person)
+                person: Person = Person(-1, cam_id, tracklet)
+                persons.append(person)
         return persons
 
     @staticmethod
-    def find_unique_persons(active_persons: PersonDict, new_persons: list[Person], person_id_pool: IdPool, circular: CircularCoordinates) -> None:
-        # update existing persons
+    def filter_active(persons: list[Person]) -> None:
+        rejected_persons: list[Person] = []
+        for person in persons:
+            if person.tracklet.status != Tracklet.TrackingStatus.TRACKED:
+                rejected_persons.append(person)
+        for person in rejected_persons:
+            persons.remove(person)
+
+    @staticmethod
+    def filter_age(persons: list[Person], age: int) -> None:
+        rejected_persons: list[Person] = []
+        for person in persons:
+            if person.tracklet.age <= age:
+                rejected_persons.append(person)
+        for person in rejected_persons:
+            persons.remove(person)
+
+    @staticmethod
+    def filter_size(persons: list[Person], size_range: float) -> None:
+        rejected_persons: list[Person] = []
+        for person in persons:
+            if person.tracklet.roi.height < size_range:
+                rejected_persons.append(person)
+        for person in rejected_persons:
+            persons.remove(person)
+
+    @staticmethod
+    def filter_edge(persons: list[Person], circular: CircularCoordinates, edge_range: float) -> None:
+        rejected_persons: list[Person] = []
+        for person in persons:
+            if circular.angle_in_edge(person.local_angle, edge_range):
+                rejected_persons.append(person)
+
+        for person in rejected_persons:
+            persons.remove(person)
+
+    @staticmethod
+    def filter_and_update_active(active_persons: PersonDict, new_persons: list[Person]) -> None:
+        def find_same_person(person: Person, persons: list[Person]) -> Person | None:
+            for p in persons:
+                if person.cam_id == p.cam_id and person.tracklet.id == p.tracklet.id:
+                    return p
+            return None
+
         for person in active_persons.values():
-            same_person: Person | None = Manager.find_same_person(person, new_persons)
+            same_person: Person | None = find_same_person(person, new_persons)
             if same_person is not None:
                 new_persons.remove(same_person)
+                person.from_person(same_person)
 
-                same_person.id = person.id
-                same_person.start_time = person.start_time
-                same_person.last_time = time()
-                active_persons[same_person.id] = same_person
+    @staticmethod
+    def filter_and_update_overlap_old(active_persons: PersonDict, new_persons: list[Person], circular: CircularCoordinates) -> None:
+        all_persons: list[Person] = list(active_persons.values()) + new_persons
 
-        # check if persons are on the edge of the camera view
+        for person in all_persons:
+            if person.world_angle and circular.angle_in_overlap(person.world_angle, 1.5):
+                person.filter = FilterType.OVERLAP
+
+
+        # update overlap persons
+        for A in active_persons.values():
+            angle_A: float = A.world_angle
+            for B in all_persons:
+                angle_B: float = B.world_angle
+                angle_Diff: float = abs(angle_A - angle_B)
+                angle_Diff = min(angle_Diff, 360 - angle_Diff)  # Ensure the angle difference is within 0 to 180 degrees
+                if angle_Diff < 20 and A.cam_id != B.cam_id:
+                    # Reject the person with the later start time
+                    if A.start_time < B.start_time:
+                        if B in new_persons:
+                            new_persons.remove(B)
+                        # A.from_person(B)
+                    else:
+                        if A in new_persons:
+                            new_persons.remove(A)
+                        A.from_person(B)
+
+    @staticmethod
+    def filter_and_update_overlap(active_persons: PersonDict, new_persons: list[Person], circular: CircularCoordinates) -> None:
+        for person in new_persons:
+            if person.world_angle and circular.angle_in_overlap(person.world_angle, 1.5):
+                person.filter = FilterType.OVERLAP
+
+        # update overlap persons
         for person in active_persons.values():
-            if person.angle and circular.angle_in_overlap(person.angle, 0.4):
-                same_person: Person | None = None
+            if circular.angle_in_overlap(person.world_angle, 1.5):
+                person.filter = FilterType.OVERLAP
+
+                overlap_persons: list[Person] = []
                 for new_person in new_persons:
-                    angle_diff: float = abs(person.angle - new_person.angle)
-                    if angle_diff < 5:
+                    angle_diff: float = abs(person.world_angle - new_person.world_angle)
+                    angle_diff = min(angle_diff, 360 - angle_diff)  # Ensure the angle difference is within 0 to 180 degrees
+                    if angle_diff < 20:
                         # also check roi
-                        same_person = new_person
-                if same_person is not None:
-                    new_persons.remove(same_person)
+                        overlap_persons.append(new_person)
 
-                    same_person.id = person.id
-                    same_person.start_time = person.start_time
-                    same_person.last_time = time()
-                    active_persons[same_person.id] = same_person
+                if overlap_persons:
+                    overlap_persons.sort(key=lambda p: abs(person.world_angle - p.world_angle), reverse=True)
+                    for p in overlap_persons:
+                        new_persons.remove(p)
+                    person.from_person(overlap_persons[0])
 
+    @staticmethod
+    def new_tricks(active_persons: PersonDict, new_persons: list[Person], circular: CircularCoordinates) -> None:
+        all_persons: list[Person] = list(active_persons.values()) + new_persons
 
+        rejected_persons: set[Person] = set()
+
+        for A in all_persons:
+            angle_A: float = A.world_angle
+            for B in all_persons:
+                angle_B: float = B.world_angle
+                angle_Diff: float = abs(angle_A - angle_B)
+                angle_Diff = min(angle_Diff, 360 - angle_Diff)  # Ensure the angle difference is within 0 to 180 degrees
+                if angle_Diff < 20 and A.cam_id != B.cam_id:
+                    rejected_persons.add(A if A.start_time < B.start_time else B)
+
+        for person in rejected_persons:
+            pass
+
+    @staticmethod
+    def add_persons(active_persons: PersonDict, new_persons: list[Person], person_id_pool: IdPool) -> None:
         for person in new_persons:
             try:
                 person_id: int = person_id_pool.acquire()
+                print('New person id:', person_id, 'for', person.cam_id, person.tracklet.id)
             except:
                 print('No more person ids available')
                 continue
 
             person.id = person_id
             active_persons[person_id] = person
-
-    @staticmethod
-    def find_same_person(person: Person, persons: list[Person]) -> Person | None:
-        for p in persons:
-            if person.cam_id == p.cam_id and person.tracklet.id == p.tracklet.id:
-                return p
-        return None
 
     @ staticmethod
     def cleanup_inactive_persons(persons: PersonDict, person_id_pool: IdPool, activity_duration: float = 1.0) -> None:
