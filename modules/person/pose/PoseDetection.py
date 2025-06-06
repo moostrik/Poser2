@@ -47,7 +47,7 @@ class PoseDetection(Thread):
         while self._running:
             detection: Person | None = self.get_detection()
             if detection is not None:
-                image: np.ndarray | None = detection.pose_roi_image
+                image: np.ndarray | None = detection.img
                 if image is not None:
                     Poses: PoseList = self.RunSession(PoseDetection._model_session, PoseDetection._moodel_size, image)
                     detection.pose = Poses

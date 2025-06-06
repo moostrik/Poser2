@@ -50,6 +50,8 @@ class CircularCoordinates():
             return True
         return False
 
+    def angle_from_edge(self, local_angle: float) -> float:
+        return min(local_angle, self.cam_fov - local_angle)
 
     @staticmethod
     def undistort_x(x: float, k1: float, k2: float) -> float:

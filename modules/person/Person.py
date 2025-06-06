@@ -36,15 +36,15 @@ class Person():
 
         self.local_angle: float =       0.0
         self.world_angle: float =       0.0
-        self.pose_roi: Rect | None =    None
-        self.pose_roi_image: np.ndarray | None = None
         self.pose: PoseList | None =    None
+        self.pose_roi: Rect | None =    None
+        self.img: np.ndarray | None =   None
 
         self.active: bool =             True
         self.start_time: float =        time()
         self.last_time: float =         time()
 
-        self.filter: FilterType =       FilterType.NONE
+        self.overlap: bool =            False
 
     def from_person(self, other: 'Person') -> None:
         # self.id = other.id
@@ -53,12 +53,12 @@ class Person():
         self.local_angle = other.local_angle
         self.world_angle = other.world_angle
         self.pose_roi = other.pose_roi
-        self.pose_roi_image = other.pose_roi_image
+        self.img = other.img
         self.pose = other.pose
         self.active = other.active
         # self.start_time = other.start_time
         self.last_time = time()
-        self.filter = other.filter
+        self.overlap = other.overlap
 
     def set_pose_roi(self, image: np.ndarray, roi_expansion) -> None:
         if self.pose_roi is not None:
@@ -69,7 +69,7 @@ class Person():
         self.pose_roi = self.get_crop_rect(w, h, self.tracklet.roi, roi_expansion)
 
     def set_pose_image(self, image: np.ndarray) -> None:
-        if self.pose_roi_image is not None:
+        if self.img is not None:
             # print(f"Warning: pose image already set for person {self.id} in camera {self.cam_id}.")
             return
 
@@ -77,7 +77,7 @@ class Person():
             print(f"Warning: pose rect not set for person {self.id} in camera {self.cam_id}.")
             return
 
-        self.pose_roi_image = self.get_cropped_image(image, self.pose_roi, 256)
+        self.img = self.get_cropped_image(image, self.pose_roi, 256)
 
     @staticmethod
     def create_cam_id(cam_id: int, tracklet_id: int) -> str:

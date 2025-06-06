@@ -12,7 +12,9 @@ class IdPool:
         with self._lock:
             if not self._available:
                 raise Exception("No more IDs available")
-            return self._available.pop()
+            min_id: int = min(self._available)
+            self._available.remove(min_id)
+            return min_id
 
     def release(self, obj: int) -> None:
         with self._lock:

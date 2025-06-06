@@ -234,7 +234,7 @@ class Render(RenderWindow):
         with self.input_mutex:
             self.input_persons[person.id] = person
 
-        image: np.ndarray | None = person.pose_roi_image
+        image: np.ndarray | None = person.img
         if image is not None:
             self.set_psn_image(person.id, image)
 
@@ -276,15 +276,14 @@ class Render(RenderWindow):
         glEnd()                 # End drawing
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
-        string: str = f'ID: {tracklet.id} Age: {tracklet.age} C: {tracklet.srcImgDetection.confidence:.2f}'
-        if tracklet.spatialCoordinates.z > 0:
-            string += f' Z: {tracklet.spatialCoordinates.z:.0f}'
+        string: str
         x += 9
-        y += 15
-        glRasterPos2f(x, y)     # Set position
-        for character in string:
-            glut.glutBitmapCharacter(glut.GLUT_BITMAP_9_BY_15, ord(character)) # type: ignore
-        glRasterPos2f(0, 0)     # Reset position
+        y += 14
+        string = f'ID: {tracklet.id}'
+        RenderWindow.draw_string(x, y, string)
+        y += 14
+        string = f'Age: {tracklet.age}'
+        RenderWindow.draw_string(x, y, string)
 
         glFlush()               # Render now
 
@@ -334,7 +333,7 @@ class Render(RenderWindow):
             x: float = person.world_angle / 360.0 * fbo.width
             y: float = person.tracklet.roi.y * fbo.height
             color: list[float] = PersonColor(person.id, aplha=0.9)
-            if person.filter == FilterType.OVERLAP:
+            if person.overlap == FilterType.OVERLAP:
                 color[3] = 0.3
 
             glColor4f(*color)  # Reset color
@@ -346,23 +345,14 @@ class Render(RenderWindow):
             glEnd()                 # End drawing
             glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
-
-            string: str = f'A: {person.world_angle:.1f}'
+            string: str
             x += 9
-            x = min(x, fbo.width - 100)  # Ensure text fits in the window
-            y = person.id * fbo.height / 9 + 15
-            glRasterPos2f(x, y)     # Set position
-            for character in string:
-                glut.glutBitmapCharacter(glut.GLUT_BITMAP_9_BY_15, ord(character)) # type: ignore
-
+            y += 14
+            string = f'A: {person.world_angle:.1f}'
+            RenderWindow.draw_string(x, y, string)
+            y += 14
             string = f'L: {person.local_angle:.1f}'
-            y += 15
-            glRasterPos2f(x, y)     # Set position
-            for character in string:
-                glut.glutBitmapCharacter(glut.GLUT_BITMAP_9_BY_15, ord(character)) # type: ignore
-            glRasterPos2f(0, 0)     # Reset position
-
-
+            RenderWindow.draw_string(x, y, string)
 
         fbo.end()
         glFlush()
@@ -396,10 +386,7 @@ class Render(RenderWindow):
             string: str = f'ID: {person.id} Cam: {person.cam_id} Age: {person.last_time - person.start_time:.0f}'
             x += 9
             y += 15
-            glRasterPos2f(x, y)     # Set position
-            for character in string:
-                glut.glutBitmapCharacter(glut.GLUT_BITMAP_9_BY_15, ord(character)) # type: ignore
-            glRasterPos2f(0, 0)     # Reset position
+            RenderWindow.draw_string(x, y, string)
 
         glFlush()               # Render now
 

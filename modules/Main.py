@@ -95,7 +95,7 @@ class Main():
         self.detector.join()
         # print ('join cameras')
         for camera in self.cameras:
-            camera.join(timeout=5)
+            camera.join(timeout=8)
 
         # print ('stop gui')
         self.gui.stop()

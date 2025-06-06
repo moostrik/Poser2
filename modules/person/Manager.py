@@ -155,81 +155,39 @@ class Manager(Thread):
                 person.from_person(same_person)
 
     @staticmethod
-    def filter_and_update_overlap_old(active_persons: PersonDict, new_persons: list[Person], circular: CircularCoordinates) -> None:
-        all_persons: list[Person] = list(active_persons.values()) + new_persons
-
-        for person in all_persons:
-            if person.world_angle and circular.angle_in_overlap(person.world_angle, 1.5):
-                person.filter = FilterType.OVERLAP
-
-
-        # update overlap persons
-        for A in active_persons.values():
-            angle_A: float = A.world_angle
-            for B in all_persons:
-                angle_B: float = B.world_angle
-                angle_Diff: float = abs(angle_A - angle_B)
-                angle_Diff = min(angle_Diff, 360 - angle_Diff)  # Ensure the angle difference is within 0 to 180 degrees
-                if angle_Diff < 20 and A.cam_id != B.cam_id:
-                    # Reject the person with the later start time
-                    if A.start_time < B.start_time:
-                        if B in new_persons:
-                            new_persons.remove(B)
-                        # A.from_person(B)
-                    else:
-                        if A in new_persons:
-                            new_persons.remove(A)
-                        A.from_person(B)
-
-    @staticmethod
     def filter_and_update_overlap(active_persons: PersonDict, new_persons: list[Person], circular: CircularCoordinates) -> None:
         for person in new_persons:
-            if person.world_angle and circular.angle_in_overlap(person.world_angle, 1.5):
-                person.filter = FilterType.OVERLAP
+            if person.world_angle and circular.angle_in_overlap(person.world_angle, 1.3):
+                person.overlap = False
 
         # update overlap persons
         for person in active_persons.values():
-            if circular.angle_in_overlap(person.world_angle, 1.5):
-                person.filter = FilterType.OVERLAP
+            if not circular.angle_in_overlap(person.world_angle, 1.3):
+                person.overlap = False
+            else:
+                person.overlap = True
 
                 overlap_persons: list[Person] = []
                 for new_person in new_persons:
                     angle_diff: float = abs(person.world_angle - new_person.world_angle)
                     angle_diff = min(angle_diff, 360 - angle_diff)  # Ensure the angle difference is within 0 to 180 degrees
-                    if angle_diff < 20:
+                    if angle_diff < 13:
                         # also check roi
                         overlap_persons.append(new_person)
 
                 if overlap_persons:
-                    overlap_persons.sort(key=lambda p: abs(person.world_angle - p.world_angle), reverse=True)
                     for p in overlap_persons:
                         new_persons.remove(p)
-                    person.from_person(overlap_persons[0])
-
-    @staticmethod
-    def new_tricks(active_persons: PersonDict, new_persons: list[Person], circular: CircularCoordinates) -> None:
-        all_persons: list[Person] = list(active_persons.values()) + new_persons
-
-        rejected_persons: set[Person] = set()
-
-        for A in all_persons:
-            angle_A: float = A.world_angle
-            for B in all_persons:
-                angle_B: float = B.world_angle
-                angle_Diff: float = abs(angle_A - angle_B)
-                angle_Diff = min(angle_Diff, 360 - angle_Diff)  # Ensure the angle difference is within 0 to 180 degrees
-                if angle_Diff < 20 and A.cam_id != B.cam_id:
-                    rejected_persons.add(A if A.start_time < B.start_time else B)
-
-        for person in rejected_persons:
-            pass
+                        # chose the person furthest away from the edge
+                        if (circular.angle_from_edge(person.local_angle) < circular.angle_from_edge(p.local_angle) * 0.9):
+                            person.from_person(overlap_persons[0])
 
     @staticmethod
     def add_persons(active_persons: PersonDict, new_persons: list[Person], person_id_pool: IdPool) -> None:
         for person in new_persons:
             try:
                 person_id: int = person_id_pool.acquire()
-                print('New person id:', person_id, 'for', person.cam_id, person.tracklet.id)
+                print('New person id:', person_id, 'for cam', person.cam_id, 'tracklet', person.tracklet.id, 'overlap:', person.overlap == FilterType.OVERLAP, 'angle:', person.local_angle, 'world:', person.world_angle)
             except:
                 print('No more person ids available')
                 continue
@@ -239,15 +197,19 @@ class Manager(Thread):
 
     @ staticmethod
     def cleanup_inactive_persons(persons: PersonDict, person_id_pool: IdPool, activity_duration: float = 1.0) -> None:
+        rejected_persons: list[Person] = []
         for key in persons.keys():
             person: Person = persons[key]
             person = persons[key]
             if person.last_time < time() - activity_duration:
                 person_id_pool.release(person.id)
+                rejected_persons.append(person)
                 person.active = False
 
         # remove inactive persons
-        persons = {k: v for k, v in persons.items() if v.active}
+        for person in rejected_persons:
+            persons.pop(person.id, None)
+            print('Remove inactive person id:', person.id, 'cam', person.cam_id, 'tracklet', person.tracklet.id, 'overlap:', person.overlap == FilterType.OVERLAP, 'angle:', person.local_angle, 'world:', person.world_angle)
 
     @ staticmethod
     def detect_pose(person: Person, detector:PoseDetection | None, callback: PersonCallback) -> None:
