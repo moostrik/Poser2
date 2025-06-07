@@ -65,6 +65,9 @@ class SyncPlayer(Thread):
 
         self.play_chunk: int = -1
         self.load_chunk: int = -1
+        self.num_chunks: int = 0
+        self.chunk_range_0: int = 0
+        self.chunk_range_1: int = 0
         self.load_folder: str = ''
         self.suffix: str = settings.format.value
 
@@ -139,7 +142,13 @@ class SyncPlayer(Thread):
 
     def _load(self) -> None:
         folder: Folder = self.folders[self.load_folder]
-        self._set_load_chunk((self._get_load_chunk() + 1) % (folder.chunks + 1))
+        LC: int = self._get_load_chunk() + 1
+        LC = max(LC, self.chunk_range_0)
+        LC = min(LC, self.chunk_range_1 + 1)
+        if LC > self.chunk_range_1:
+            LC = self.chunk_range_0
+
+        self._set_load_chunk(LC)
 
         for c in range(self.num_cams):
             for t in self.types:
@@ -311,6 +320,8 @@ class SyncPlayer(Thread):
             message: Message = Message(MessageType.START, name)
         else:
             message: Message = Message(MessageType.STOP)
+
+        self.num_chunks = self.get_num_folder_chunks(name)
         self.state_messages.put(message)
 
     def get_folder_names(self) -> list[str]:
@@ -328,6 +339,14 @@ class SyncPlayer(Thread):
     def clear_state_messages(self) -> None:
         with self.state_messages.mutex:
             self.state_messages.queue.clear()
+
+    def get_num_chunks(self) -> int:
+        return self.num_chunks
+
+    def set_chunk_range(self, R0: int, R1: int) -> None:
+        with self.playback_lock:
+            self.chunk_range_0 = R0
+            self.chunk_range_1 = R1
 
     def get_drift(self) -> int:
         with self.drift_lock:

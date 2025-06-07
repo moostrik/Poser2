@@ -40,14 +40,13 @@ class Manager(Thread):
                 self.pose_detectors[i] = Detection(settings.model_path, settings.model_type)
             print('Pose Detection:', self.max_persons, 'instances of model', ModelTypeNames[settings.model_type.value])
 
-        self.pose_roi_expansion: float = PERSON_ROI_EXPANSION
-        self.person_timeout: float = PERSON_TIMEOUT
-
-        self.min_tracklet_age: int = MIN_TRACKLET_AGE
-        self.min_tracklet_height: float = MIN_TRACKLET_HEIGHT
-        self.cam_360_edge_threshold: float = CAM_360_EDGE_THRESHOLD
+        self.min_tracklet_age: int =            MIN_TRACKLET_AGE
+        self.min_tracklet_height: float =       MIN_TRACKLET_HEIGHT
+        self.cam_360_edge_threshold: float =    CAM_360_EDGE_THRESHOLD
         self.cam_360_overlap_expansion: float = CAM_360_OVERLAP_EXPANSION
         self.cam_360_hysteresis_factor: float = CAM_360_HYSTERESIS_FACTOR
+        self.person_roi_expansion: float =      PERSON_ROI_EXPANSION
+        self.person_timeout: float =            PERSON_TIMEOUT
 
         self.callbacks: set[PersonCallback] = set()
         self.gui = Gui(gui, self, settings)
@@ -90,7 +89,7 @@ class Manager(Thread):
 
         for person in self.persons.values():
             image: np.ndarray = self.get_image(person.cam_id)
-            person.set_pose_roi(image, self.pose_roi_expansion)
+            person.set_pose_roi(image, self.person_roi_expansion)
             person.set_pose_image(image)
             detector: Detection | None = self.pose_detectors.get(person.id, None)
             self.detect_pose(person, detector, self.callback)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from modules.Settings import Settings
 
-from modules.person.Camera360Array import Camera360Array
 from modules.person.Definitions import *
 
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
@@ -21,6 +20,11 @@ class Gui():
                     E(eT.SLDR, 'edge',              self.set_edge_threshold,    CAM_360_EDGE_THRESHOLD,     [0,0.5],    0.1),
                     E(eT.TEXT, 'ovlp'),
                     E(eT.SLDR, 'ovlp',              self.set_overlap,           CAM_360_OVERLAP_EXPANSION,  [0,0.5],    0.1)])
+        elm.append([E(eT.TEXT, 'PERSON   '),
+                    E(eT.TEXT, 'roi'),
+                    E(eT.SLDR, 'roi exp',           self.set_roi_expansion,     PERSON_ROI_EXPANSION,       [0,0.5],    0.1),
+                    E(eT.TEXT, 'timeout'),
+                    E(eT.SLDR, 'timeout',           self.set_timeout,           PERSON_TIMEOUT,             [0.5,2.0],  0.1)])
 
         gui_height = len(elm) * 31 + 50
         self.frame = Frame('PERSON ', elm, gui_height)
@@ -38,3 +42,9 @@ class Gui():
 
     def set_overlap(self, value: float) -> None:
         self.manager.cam_360_overlap_expansion = value
+
+    def set_roi_expansion(self, value: float) -> None:
+        self.manager.person_roi_expansion = value
+
+    def set_timeout(self, value: float) -> None:
+        self.manager.person_timeout = value
