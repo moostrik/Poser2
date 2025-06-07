@@ -3,8 +3,8 @@ import numpy as np
 from time import time
 
 from typing import Callable
-from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f
-from modules.person.pose.PoseDefinitions import PoseList
+from modules.cam.depthcam.Definitions import Tracklet, Rect
+from modules.person.pose.Definitions import PoseList
 from modules.person.Definitions import *
 
 
@@ -46,7 +46,7 @@ class Person():
 
         self.overlap: bool =            False
 
-    def from_person(self, other: 'Person') -> None:
+    def update_from(self, other: 'Person') -> None:
         # self.id = other.id
         self.cam_id = other.cam_id
         self.tracklet = other.tracklet
@@ -60,7 +60,7 @@ class Person():
         self.last_time = time()
         self.overlap = other.overlap
 
-    def set_pose_roi(self, image: np.ndarray, roi_expansion) -> None:
+    def set_pose_roi(self, image: np.ndarray, roi_expansion: float) -> None:
         if self.pose_roi is not None:
             # print(f"Warning: pose rect already set for person {self.id} in camera {self.cam_id}.")
             return
@@ -84,7 +84,7 @@ class Person():
         return f"{cam_id}_{tracklet_id}"
 
     @staticmethod
-    def get_crop_rect(image_width: int, image_height: int, roi: Rect, expansion = 0.0) -> Rect:
+    def get_crop_rect(image_width: int, image_height: int, roi: Rect, expansion: float = 0.0) -> Rect:
         # Calculate the original ROI coordinates
         img_x = int(roi.x * image_width)
         img_y = int(roi.y * image_height)
@@ -112,7 +112,7 @@ class Person():
         return Rect(norm_x, norm_y, norm_w, norm_h)
 
     @staticmethod
-    def get_cropped_image(image: np.ndarray, roi: Rect, size: int) -> np.ndarray:
+    def get_cropped_image(image: np.ndarray, roi: Rect, output_size: int) -> np.ndarray:
         image_height, image_width = image.shape[:2]
         image_channels = image.shape[2] if len(image.shape) > 2 else 1
 
@@ -143,7 +143,16 @@ class Person():
             crop = cv2.copyMakeBorder(crop, top_padding, bottom_padding, left_padding, right_padding, cv2.BORDER_CONSTANT, value=[0, 0, 0])
 
         # Resize the cutout to the desired size
-        return cv2.resize(crop, (size, size), interpolation=cv2.INTER_AREA)
+        return cv2.resize(crop, (output_size, output_size), interpolation=cv2.INTER_AREA)
+
+    def is_expired(self, threshold) -> bool:
+        """Check if person hasn't been updated recently"""
+        return time() - self.last_time > threshold
+
+    @property
+    def age(self) -> float:
+        """Get how long this person has been tracked"""
+        return time() - self.start_time
 
 PersonCallback = Callable[[Person], None]
 PersonDict = dict[int, Person]

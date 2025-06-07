@@ -9,11 +9,9 @@ from modules.Settings import Settings
 from modules.person.Gui import Gui
 from modules.person.Person import Person, PersonDict, PersonCallback
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
-from modules.person.pose.PoseDetection import PoseDetection, ModelType, ModelTypeNames
-from modules.person.CircularCoordinates import CircularCoordinates
+from modules.person.pose.Detection import Detection, ModelType, ModelTypeNames
+from modules.person.Camera360Array import Camera360Array
 from modules.person.Definitions import *
-
-from modules.person.Utils import IdPool
 
 CamTrackletDict = dict[int, list[Tracklet]]
 
@@ -31,20 +29,25 @@ class Manager(Thread):
         self.person_id_pool: IdPool = IdPool(self.max_persons)
         self.persons: PersonDict = {}
 
-        self.circular_coordinates: CircularCoordinates = CircularCoordinates(settings.num_cams)
+        self.cam_360: Camera360Array = Camera360Array(settings.num_cams, CAM_360_FOV, CAM_360_TARGET_FOV)
 
-        self.pose_detectors: dict[int, PoseDetection] = {}
+        self.pose_detectors: dict[int, Detection] = {}
         self.pose_detector_frame_size: int = 256
         if not settings.pose:
             print('Pose Detection: Disabled')
         else:
             for i in range(self.max_persons):
-                self.pose_detectors[i] = PoseDetection(settings.model_path, settings.model_type)
-            print('Pose Detection:', self.max_persons, 'six instances of model', ModelTypeNames[settings.model_type.value])
+                self.pose_detectors[i] = Detection(settings.model_path, settings.model_type)
+            print('Pose Detection:', self.max_persons, 'instances of model', ModelTypeNames[settings.model_type.value])
 
+        self.pose_roi_expansion: float = PERSON_ROI_EXPANSION
+        self.person_timeout: float = PERSON_TIMEOUT
 
-        self.roi_expansion: float = 0.1
-        self.activity_duration: float = 1.0  # seconds
+        self.min_tracklet_age: int = MIN_TRACKLET_AGE
+        self.min_tracklet_height: float = MIN_TRACKLET_HEIGHT
+        self.cam_360_edge_threshold: float = CAM_360_EDGE_THRESHOLD
+        self.cam_360_overlap_expansion: float = CAM_360_OVERLAP_EXPANSION
+        self.cam_360_hysteresis_factor: float = CAM_360_HYSTERESIS_FACTOR
 
         self.callbacks: set[PersonCallback] = set()
         self.gui = Gui(gui, self, settings)
@@ -76,21 +79,20 @@ class Manager(Thread):
         tracklets: CamTrackletDict = self.get_tracklets()
         tracklet_persons: list[Person] = self.get_persons_from_tracklets(tracklets) # active tracklets pass filter included
         self.filter_active(tracklet_persons)
-        self.filter_age(tracklet_persons, 4)
-        self.filter_size(tracklet_persons, 0.25)
-        self.circular_coordinates.calc_angles(tracklet_persons)
-        self.filter_edge(tracklet_persons, self.circular_coordinates, 0.5)
+        self.filter_age(tracklet_persons, self.min_tracklet_age)
+        self.filter_size(tracklet_persons, self.min_tracklet_height)
+        self.cam_360.calc_angles(tracklet_persons)
+        self.filter_edge(tracklet_persons, self.cam_360, self.cam_360_edge_threshold)
         self.filter_and_update_active(self.persons, tracklet_persons)
-        self.filter_and_update_overlap(self.persons, tracklet_persons, self.circular_coordinates)
-        # self.filter_edge(tracklet_persons, self.circular_coordinates, 0.6)
+        self.filter_and_update_overlap(self.persons, tracklet_persons, self.cam_360, self.cam_360_overlap_expansion, self.cam_360_hysteresis_factor)
         self.add_persons(self.persons, tracklet_persons, self.person_id_pool)
-        self.cleanup_inactive_persons(self.persons, self.person_id_pool, self.activity_duration)
+        self.cleanup_inactive_persons(self.persons, self.person_id_pool, self.person_timeout)
 
         for person in self.persons.values():
             image: np.ndarray = self.get_image(person.cam_id)
-            person.set_pose_roi(image, self.roi_expansion)
+            person.set_pose_roi(image, self.pose_roi_expansion)
             person.set_pose_image(image)
-            detector: PoseDetection | None = self.pose_detectors.get(person.id, None)
+            detector: Detection | None = self.pose_detectors.get(person.id, None)
             self.detect_pose(person, detector, self.callback)
 
     @staticmethod
@@ -131,7 +133,7 @@ class Manager(Thread):
             persons.remove(person)
 
     @staticmethod
-    def filter_edge(persons: list[Person], circular: CircularCoordinates, edge_range: float) -> None:
+    def filter_edge(persons: list[Person], circular: Camera360Array, edge_range: float) -> None:
         rejected_persons: list[Person] = []
         for person in persons:
             if circular.angle_in_edge(person.local_angle, edge_range):
@@ -152,42 +154,43 @@ class Manager(Thread):
             same_person: Person | None = find_same_person(person, new_persons)
             if same_person is not None:
                 new_persons.remove(same_person)
-                person.from_person(same_person)
+                person.update_from(same_person)
 
     @staticmethod
-    def filter_and_update_overlap(active_persons: PersonDict, new_persons: list[Person], circular: CircularCoordinates) -> None:
+    def filter_and_update_overlap(active_persons: PersonDict, new_persons: list[Person], radial: Camera360Array,
+                                  overlap_expansion: float, hysteresis_factor: float) -> None:
+
         for person in new_persons:
-            if person.world_angle and circular.angle_in_overlap(person.world_angle, 1.3):
-                person.overlap = False
+            if radial.angle_in_overlap(person.world_angle, overlap_expansion):
+                person.overlap = True
 
         # update overlap persons
         for person in active_persons.values():
-            if not circular.angle_in_overlap(person.world_angle, 1.3):
+            if not radial.angle_in_overlap(person.world_angle, overlap_expansion):
                 person.overlap = False
             else:
                 person.overlap = True
 
                 overlap_persons: list[Person] = []
                 for new_person in new_persons:
-                    angle_diff: float = abs(person.world_angle - new_person.world_angle)
-                    angle_diff = min(angle_diff, 360 - angle_diff)  # Ensure the angle difference is within 0 to 180 degrees
-                    if angle_diff < 13:
-                        # also check roi
+                    angle_diff: float = radial.angle_diff(person.world_angle, new_person.world_angle)
+                    if angle_diff < radial.fov_overlap * (1.0 + overlap_expansion):
+                        # also check roi?
                         overlap_persons.append(new_person)
 
                 if overlap_persons:
                     for p in overlap_persons:
                         new_persons.remove(p)
                         # chose the person furthest away from the edge
-                        if (circular.angle_from_edge(person.local_angle) < circular.angle_from_edge(p.local_angle) * 0.9):
-                            person.from_person(overlap_persons[0])
+                        if (radial.angle_from_edge(person.local_angle) < radial.angle_from_edge(p.local_angle) * hysteresis_factor):
+                            person.update_from(overlap_persons[0])
 
     @staticmethod
     def add_persons(active_persons: PersonDict, new_persons: list[Person], person_id_pool: IdPool) -> None:
         for person in new_persons:
             try:
                 person_id: int = person_id_pool.acquire()
-                print('New person id:', person_id, 'for cam', person.cam_id, 'tracklet', person.tracklet.id, 'overlap:', person.overlap == FilterType.OVERLAP, 'angle:', person.local_angle, 'world:', person.world_angle)
+                # print('New person id:', person_id, 'for cam', person.cam_id, 'tracklet', person.tracklet.id, 'overlap:', person.overlap, 'angle:', person.local_angle, 'world:', person.world_angle)
             except:
                 print('No more person ids available')
                 continue
@@ -209,10 +212,10 @@ class Manager(Thread):
         # remove inactive persons
         for person in rejected_persons:
             persons.pop(person.id, None)
-            print('Remove inactive person id:', person.id, 'cam', person.cam_id, 'tracklet', person.tracklet.id, 'overlap:', person.overlap == FilterType.OVERLAP, 'angle:', person.local_angle, 'world:', person.world_angle)
+            # print('Remove inactive person id:', person.id, 'cam', person.cam_id, 'tracklet', person.tracklet.id, 'overlap:', person.overlap, 'angle:', person.local_angle, 'world:', person.world_angle)
 
     @ staticmethod
-    def detect_pose(person: Person, detector:PoseDetection | None, callback: PersonCallback) -> None:
+    def detect_pose(person: Person, detector:Detection | None, callback: PersonCallback) -> None:
         if person.pose is not None or detector is None:
             callback(person)
             return

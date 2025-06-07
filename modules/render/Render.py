@@ -13,7 +13,7 @@ from modules.gl.Utils import lfo, fit, fill
 from modules.gl.Image import Image
 
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
-from modules.person.pose.PoseDefinitions import Pose, Indices
+from modules.person.pose.Definitions import Pose, Indices
 from modules.person.Person import Person, PersonColor
 from modules.person.Definitions import *
 
@@ -333,7 +333,7 @@ class Render(RenderWindow):
             x: float = person.world_angle / 360.0 * fbo.width
             y: float = person.tracklet.roi.y * fbo.height
             color: list[float] = PersonColor(person.id, aplha=0.9)
-            if person.overlap == FilterType.OVERLAP:
+            if person.overlap == True:
                 color[3] = 0.3
 
             glColor4f(*color)  # Reset color

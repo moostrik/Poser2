@@ -2,15 +2,13 @@ import cv2
 import numpy as np
 import time
 import onnxruntime as ort
-from enum import Enum
 from threading import Thread, Lock
-import copy
 import os
 
-from modules.person.pose.PoseDefinitions import *
+from modules.person.pose.Definitions import *
 from modules.person.Person import Person
 
-class PoseDetection(Thread):
+class Detection(Thread):
     _model_load_lock: Lock = Lock()
     _model_loaded: bool =    False
     _model_type: ModelType = ModelType.NONE
@@ -21,15 +19,15 @@ class PoseDetection(Thread):
     def __init__(self, path: str, model_type:ModelType) -> None:
         super().__init__()
 
-        if PoseDetection._model_type is ModelType.NONE:
-            PoseDetection._model_type = model_type
-            PoseDetection._model_path = path
-            PoseDetection._moodel_size = ModelInputSize[model_type.value]
+        if Detection._model_type is ModelType.NONE:
+            Detection._model_type = model_type
+            Detection._model_path = path
+            Detection._moodel_size = ModelInputSize[model_type.value]
         else:
-            if PoseDetection._model_type is not model_type:
+            if Detection._model_type is not model_type:
                 print('Pose Detection WARNING: ModelType is different from the first instance')
 
-        if PoseDetection._model_type is ModelType.NONE:
+        if Detection._model_type is ModelType.NONE:
             print('Pose Detection WARNING: ModelType is NONE')
 
         self._running: bool = False
@@ -49,16 +47,16 @@ class PoseDetection(Thread):
             if detection is not None:
                 image: np.ndarray | None = detection.img
                 if image is not None:
-                    Poses: PoseList = self.RunSession(PoseDetection._model_session, PoseDetection._moodel_size, image)
+                    Poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
                     detection.pose = Poses
                     self.callback(detection)
             time.sleep(0.01)
 
     def load_model_once(self) -> None:
-        with PoseDetection._model_load_lock:
-            if not PoseDetection._model_loaded:
-                PoseDetection._model_session, PoseDetection._moodel_size = self.LoadSession(self._model_type, PoseDetection._model_path)
-                PoseDetection._model_loaded = True
+        with Detection._model_load_lock:
+            if not Detection._model_loaded:
+                Detection._model_session, Detection._moodel_size = self.LoadSession(self._model_type, Detection._model_path)
+                Detection._model_loaded = True
 
     # GETTERS AND SETTERS
     def get_detection(self) -> Person | None:
@@ -72,7 +70,7 @@ class PoseDetection(Thread):
             self._input_person = detection
 
     def get_frame_size(self) -> int:
-        return PoseDetection._moodel_size
+        return Detection._moodel_size
 
     # CALLBACKS
     def callback(self, value: Person) -> None:
@@ -103,7 +101,7 @@ class PoseDetection(Thread):
     def RunSession(onnx_session: ort.InferenceSession, input_size: int, image: np.ndarray) -> PoseList:
         height, width = image.shape[:2]
         if height != input_size or width != input_size:
-            image = PoseDetection.resize_with_pad(image, input_size, input_size)
+            image = Detection.resize_with_pad(image, input_size, input_size)
         input_image: np.ndarray = image.reshape(-1, input_size, input_size, 3)
         input_image = input_image.astype('int32')
 
@@ -114,7 +112,7 @@ class PoseDetection(Thread):
         keypoints_with_scores: np.ndarray = outputs[0]
         keypoints_with_scores = np.squeeze(keypoints_with_scores)
 
-        if PoseDetection._model_type is ModelType.LIGHTNING or PoseDetection._model_type is ModelType.THUNDER:
+        if Detection._model_type is ModelType.LIGHTNING or Detection._model_type is ModelType.THUNDER:
             keypoints: np.ndarray = keypoints_with_scores[:, :2]
             keypoints = np.flip(keypoints, axis=1)
             scores: np.ndarray = keypoints_with_scores[:, 2]

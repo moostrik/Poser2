@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from modules.Settings import Settings
 
-from modules.person.CircularCoordinates import CircularCoordinates
+from modules.person.Camera360Array import Camera360Array
 from modules.person.Definitions import *
 
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
@@ -14,14 +14,13 @@ class Gui():
         self.manager = manager
 
         elm: list = []
-        elm.append([E(eT.TEXT, '  FOV'),
-                    E(eT.SLDR, 'fov',               self.manager.circular_coordinates.set_fov,              CAMERA_FOV,     [90,130],   0.5),
-                    E(eT.TEXT, 'Angle'),
-                    E(eT.SLDR, 'angle range',       self.manager.circular_coordinates.set_angle_range,      ANGLE_RANGE,    [1,11],     0.5),
-                    E(eT.TEXT, 'Vrtcl'),
-                    E(eT.SLDR, 'vrtcl range',       self.manager.circular_coordinates.set_vertical_range,   VERTICAL_RANGE, [0,0.1],    0.01),
-                    E(eT.TEXT, ' Size'),
-                    E(eT.SLDR, 'size range',        self.manager.circular_coordinates.set_size_range,       SIZE_RANGE,     [0,0.1],    0.01)])
+        elm.append([E(eT.TEXT, 'CAM 360  '),
+                    E(eT.TEXT, 'fov'),
+                    E(eT.SLDR, 'fov',               self.set_fov,               CAM_360_FOV,                [90,130],   0.5),
+                    E(eT.TEXT, 'edge'),
+                    E(eT.SLDR, 'edge',              self.set_edge_threshold,    CAM_360_EDGE_THRESHOLD,     [0,0.5],    0.1),
+                    E(eT.TEXT, 'ovlp'),
+                    E(eT.SLDR, 'ovlp',              self.set_overlap,           CAM_360_OVERLAP_EXPANSION,  [0,0.5],    0.1)])
 
         gui_height = len(elm) * 31 + 50
         self.frame = Frame('PERSON ', elm, gui_height)
@@ -31,3 +30,11 @@ class Gui():
     def get_gui_frame(self):
           return self.frame
 
+    def set_fov(self, value: float) -> None:
+        self.manager.cam_360.set_fov(value)
+
+    def set_edge_threshold(self, value: float) -> None:
+        self.manager.cam_360_edge_threshold = value
+
+    def set_overlap(self, value: float) -> None:
+        self.manager.cam_360_overlap_expansion = value
