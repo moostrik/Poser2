@@ -98,6 +98,7 @@ class Core(Thread):
 
         print(f'Camera: {self.device_id} OPEN')
         self.running = True
+        self.settings.apply_settings()
         return True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:

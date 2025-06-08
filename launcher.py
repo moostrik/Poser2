@@ -13,7 +13,7 @@ from modules.Settings import Settings, ModelType, FrameType
 parser: ArgumentParser = ArgumentParser()
 parser.add_argument('-fps',     '--fps',        type=float, default=23.0,   help='frames per second')
 parser.add_argument('-pl',      '--players',    type=int,   default=8,      help='number of players')
-parser.add_argument('-mono',    '--mono',       action='store_true',        help='use left mono input instead of color')
+parser.add_argument('-c',       '--color',      action='store_true',        help='use color input instead of left mono')
 parser.add_argument('-sq',      '--square',     action='store_true',        help='use centre square of the camera')
 parser.add_argument('-ss',      '--showstereo', action='store_true',        help='queue stereo frames')
 parser.add_argument('-ll',      '--lightning',  action='store_true',        help='use low latency movenet model')
@@ -24,15 +24,15 @@ parser.add_argument('-cl',      '--chunklength',type=float, default=6.0,    help
 parser.add_argument('-sim',     '--simulation', action='store_true',        help='use prerecored video with camera')
 parser.add_argument('-pt',      '--passthrough',action='store_true',        help='use prerecored video without camera')
 parser.add_argument('-nc',      '--numcameras', type=int,   default=4,      help='number of cameras')
-parser.add_argument('-mc',      '--manual',     action='store_true',        help='camera manual settings')
+parser.add_argument('-as',      '--autoset',    action='store_true',        help='camera auto settings')
 args: Namespace = parser.parse_args()
 
 currentPath: str = path.dirname(__file__)
 
-camera_list: list[str] = ['14442C10F124D9D600',
-                          '14442C1031DDD2D200',
-                          '14442C101136D1D200',
-                          '14442C10110AD3D200']
+camera_list: list[str] = ['14442C101136D1D200',
+                          '14442C10F124D9D600',
+                          '14442C10110AD3D200',
+                          '14442C1031DDD2D200']
 
 if args.numcameras < len(camera_list):
     camera_list = camera_list[:args.numcameras]
@@ -50,13 +50,13 @@ settings.camera_list =  camera_list
 settings.num_cams =     len(camera_list)
 settings.fps =          args.fps
 settings.square =       args.square
-settings.color =    not args.mono
+settings.color =        args.color
 settings.stereo =       args.stereo
 settings.person =   not args.noyolo
 settings.show_stereo =  args.showstereo
 settings.simulation =   args.simulation or args.passthrough
 settings.passthrough =  args.passthrough
-settings.manual =       args.manual
+settings.manual =   not args.autoset
 
 
 settings.num_players =  args.players

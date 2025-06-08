@@ -4,7 +4,7 @@ from modules.Settings import Settings
 from modules.cam.depthcam.CoreSettings import CoreSettings
 from modules.cam.depthcam.Definitions import *
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
-from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
+from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
 
 def closest_log_value(number: float) -> float:
     return 10 ** round(math.log10(number))
@@ -64,11 +64,11 @@ class Gui():
                     E(eT.TEXT, 'Fld'),
                     E(eT.SLDR, 'L_Flood'+id,           self.set_ir_flood_light,                0, [0,1], 0.05)])
             if self.manual:
-                elm.append([E(eT.TEXT, 'Exposure  '),
+                elm.append([E(eT.CHCK, 'M_AE_'+id,    self.settings.set_mono_auto_exposure,  True),
                             E(eT.SLDR, 'M_Exposure'+id,        self.settings.set_mono_exposure,        EXPOSURE_RANGE[0],      EXPOSURE_RANGE,     gsfr(EXPOSURE_RANGE)),
                             E(eT.TEXT, 'Iso'),
                             E(eT.SLDR, 'M_Iso'+id,             self.settings.set_mono_iso,             ISO_RANGE[0],           ISO_RANGE,          gsfr(ISO_RANGE))])
-                elm.append([E(eT.CHCK, 'M_AutoExposure'+id,    self.settings.set_mono_auto_exposure,  True)])
+                # elm.append([E(eT.CHCK, 'M_AE'+id,    self.settings.set_mono_auto_exposure,  True)])
         if self.stereo:
             elm.append([E(eT.TEXT, 'Depth Min '),
                         E(eT.SLDR, 'S_Min'+id,             self.settings.set_depth_treshold_min,   STEREO_DEPTH_RANGE[0],  STEREO_DEPTH_RANGE, gsfr(STEREO_DEPTH_RANGE)),
@@ -81,7 +81,7 @@ class Gui():
             elm.append([E(eT.TEXT, 'Filter    '),
                         E(eT.CMBO, 'Median'+id,            self.settings.set_stereo_median_filter, STEREO_FILTER_NAMES[0], STEREO_FILTER_NAMES, expand=False)])
 
-        gui_height = len(elm) * 31 + 50
+        gui_height = len(elm) * ELEMHEIGHT + BASEHEIGHT
         self.frame = Frame('CAMERA ' + self.id, elm, gui_height)
 
         self.prev_color_auto_exposure: bool =   self.settings.color_auto_exposure
@@ -128,7 +128,7 @@ class Gui():
         if not self.color or self.stereo:
             if (self.prev_mono_auto_exposure != self.settings.mono_auto_exposure) :
                 self.prev_mono_auto_exposure = self.settings.mono_auto_exposure
-                self.gui.updateElement('M_AutoExposure'+self.id, self.settings.mono_auto_exposure)
+                self.gui.updateElement('M_AE_'+self.id, self.settings.mono_auto_exposure)
 
             if self.settings.mono_auto_exposure:
                 if (self.prev_mono_exposure != self.settings.mono_exposure) :

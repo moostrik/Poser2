@@ -1,6 +1,6 @@
 from modules.cam.depthplayer.SyncPlayer import *
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
-from modules.gui.PyReallySimpleGui import Element as E, Frame
+from modules.gui.PyReallySimpleGui import Element as E, Frame, BASEHEIGHT, ELEMHEIGHT
 
 class SyncPlayerGui(SyncPlayer):
 
@@ -25,7 +25,8 @@ class SyncPlayerGui(SyncPlayer):
                      E(eT.TEXT, 'to'),
                      E(eT.ITXT, 'C_R_1',    self.set_chunk_range_1, '0', expand = False)])
 
-        self.frame = Frame('CAMERA COLOR', elem, 80)
+        gui_height = len(elem) * ELEMHEIGHT + BASEHEIGHT
+        self.frame = Frame('PERSON ', elem, gui_height)
 
     def get_gui_frame(self):
         return self.frame

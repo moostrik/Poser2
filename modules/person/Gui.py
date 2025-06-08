@@ -5,7 +5,7 @@ from modules.Settings import Settings
 from modules.person.Definitions import *
 
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
-from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
+from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
 
 class Gui():
     def __init__(self, gui: G, manager, settings: Settings) -> None:
@@ -26,7 +26,7 @@ class Gui():
                     E(eT.TEXT, 'timeout'),
                     E(eT.SLDR, 'timeout',           self.set_timeout,           PERSON_TIMEOUT,             [0.5,2.0],  0.1)])
 
-        gui_height = len(elm) * 31 + 50
+        gui_height = len(elm) * ELEMHEIGHT + BASEHEIGHT
         self.frame = Frame('PERSON ', elm, gui_height)
 
 

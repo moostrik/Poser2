@@ -26,9 +26,8 @@ class ImageType(Enum):
     PSN = 3
 
 class SimType(Enum):
-    RAW = 0
-    MAP = 1
-    LGT = 2
+    MAP = 0
+    LGT = 1
 
 Composition_Subdivision = dict[ImageType, dict[int, tuple[int, int, int, int]]]
 
@@ -154,17 +153,13 @@ class Render(RenderWindow):
             fbo.end()
 
     def draw_sims(self) -> None:
-        fbo: Fbo = self.sim_fbos[SimType.RAW.value]
-        self.setView(fbo.width, fbo.height)
-        # self.draw_raw_positions(self.input_persons, self.num_cams, fbo)
-
-        fbo = self.sim_fbos[SimType.MAP.value]
-        self.setView(fbo.width, fbo.height)
-        self.draw_map_positions(self.input_persons, self.num_cams, fbo)
-
-        fbo = self.sim_fbos[SimType.LGT.value]
-        self.setView(fbo.width, fbo.height)
-        self.draw_light(fbo)
+        for i in range(self.num_sims):
+            fbo: Fbo = self.sim_fbos[i]
+            self.setView(fbo.width, fbo.height)
+            if i == SimType.MAP.value:
+                self.draw_map_positions(self.input_persons, self.num_cams, fbo)
+            elif i == SimType.LGT.value:
+                self.draw_light(fbo)
 
     def draw_persons(self) -> None:
         for i in range(self.num_persons):
@@ -394,7 +389,7 @@ class Render(RenderWindow):
     def make_composition_subdivision(dst_width: int, dst_height: int,
                                      num_cams: int, num_sims: int, num_persons: int,
                                      cam_aspect_ratio: float = 16.0 / 9.0,
-                                     sim_aspect_ratio: float = 20.0,
+                                     sim_aspect_ratio: float = 10.0,
                                      psn_aspect_ratio: float = 1.0) -> Composition_Subdivision:
 
         ret: Composition_Subdivision = {}
