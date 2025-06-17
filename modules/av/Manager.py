@@ -45,9 +45,11 @@ class Manager(Thread):
             # output.img[0, :, 1] = np.random.uniform(0.0, 255.0, self.resolution)
 
             # ramp from 0 to 255
-            output.img[0, :, 0] = np.linspace(0, 255, self.resolution)
+            output.img[0, :, 0] = np.linspace(0, 1.0, self.resolution)
             # ramp from 255 to 0
-            output.img[0, :, 1] = np.linspace(255, 0, self.resolution)
+            output.img[0, :, 1] = np.linspace(1.0, 0, self.resolution)
+
+            output.img[0, :, 2] = np.random.uniform(0.0, 1.0, self.resolution)
 
             self._output_callback(output)
 

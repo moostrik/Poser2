@@ -24,7 +24,7 @@ def get_data_type(internat_format) -> Constant:
     if internat_format == GL_RGB16F: return GL_FLOAT
     if internat_format == GL_RGB32F: return GL_FLOAT
     if internat_format == GL_RGBA: return GL_UNSIGNED_BYTE
-    if internat_format == GL_RGBA8: return GL_RGBA
+    if internat_format == GL_RGBA8: return GL_UNSIGNED_BYTE
     if internat_format == GL_RGBA16F: return GL_FLOAT
     if internat_format == GL_RGBA32F: return GL_FLOAT
     if internat_format == GL_R8: return GL_UNSIGNED_BYTE
@@ -35,16 +35,32 @@ def get_data_type(internat_format) -> Constant:
 
 def get_internal_format(image: np.ndarray) -> Constant:
     # only works for byte images (not float)
+    if image.dtype == np.uint8:
+        if len(image.shape) == 2:  # Grayscale image
+            return GL_R8
+        elif len(image.shape) == 3:
+            if image.shape[2] == 3:  # RGB image
+                return GL_RGB8
+            elif image.shape[2] == 4:  # RGBA image
+                return GL_RGBA8
+    elif image.dtype == np.float16:
+        if len(image.shape) == 2:  # Grayscale image
+            return GL_R16F
+        elif len(image.shape) == 3:
+            if image.shape[2] == 3:  # RGB image
+                return GL_RGB16F
+            elif image.shape[2] == 4:  # RGBA image
+                return GL_RGBA16F
+    elif image.dtype == np.float32:
+        if len(image.shape) == 2:  # Grayscale image
+            return GL_R32F
+        elif len(image.shape) == 3:
+            if image.shape[2] == 3:  # RGB image
+                return GL_RGB32F
+            elif image.shape[2] == 4:  # RGBA image
+                return GL_RGBA32F
 
-    channels: int = image.shape[-1] if len(image.shape) == 3 else 1
-    # channels: int = len(cv2.split(image))
-
-    if channels == 1:
-        return GL_R8
-    if channels == 3:
-        return GL_RGB8
-    if channels == 4:
-        return GL_RGBA8
+    print('GL_texture', 'image format not supported')
     return GL_NONE
 
 def draw_quad(x: float, y: float, w: float, h: float, flipV: bool = False) -> None :
