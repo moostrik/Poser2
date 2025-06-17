@@ -5,17 +5,18 @@ from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.Manager import Manager as Detector
+from modules.av.Composition import Composition
 from math import ceil
 
 class Main():
     def __init__(self, settings: Settings) -> None:
-        self.gui = Gui('DepthPose', settings.file_path, 'default')
+        self.gui = Gui(settings.render_title + ' GUI', settings.path_file, 'default')
         self.render = Render(settings)
         self.recorder: Recorder | None = None
         self.player: Player | None = None
 
         self.cameras: list[DepthCam | DepthSimulator] = []
-        if settings.simulation or settings.passthrough:
+        if settings.camera_simulation:
             self.player = Player(self.gui, settings)
             for cam_id in settings.camera_list:
                 self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, settings))
@@ -26,6 +27,7 @@ class Main():
                 self.cameras.append(camera)
 
         self.detector = Detector(self.gui, settings)
+        self.av: Composition = Composition(self.gui, settings)
         self.running: bool = False
 
     def start(self) -> None:
@@ -42,8 +44,11 @@ class Main():
             camera.add_tracker_callback(self.render.add_tracklet)
             camera.start()
 
-        self.detector.addCallback(self.render.add_person)
+        self.detector.add_person_callback(self.render.add_person)
+        self.detector.add_dict_callback(self.av.set_person_dict)
         self.detector.start()
+
+        self.av.start()
 
         self.gui.exit_callback = self.stop
 
@@ -86,14 +91,16 @@ class Main():
 
         # print('stop detector')
         self.detector.stop()
+        self.detector.join()
+
+        self.av.stop()
+        self.av.join()
+
         if self.recorder:
             # print('stop recorder')
             self.recorder.stop()
             self.recorder.join()
 
-        # print ('join detector')
-        self.detector.join()
-        # print ('join cameras')
         for camera in self.cameras:
             camera.join(timeout=8)
 

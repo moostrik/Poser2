@@ -18,46 +18,50 @@ class Settings():
 
     def __init__(self) -> None:
         # PATHS
-        self.root_path: str                 = None # type: ignore
-        self.model_path: str                = None # type: ignore
-        self.video_path: str                = None # type: ignore
-        self.temp_path: str                 = None # type: ignore
-        self.file_path: str                 = None # type: ignore
+        self.path_root: str                     = None # type: ignore
+        self.path_model: str                    = None # type: ignore
+        self.path_video: str                    = None # type: ignore
+        self.path_temp: str                     = None # type: ignore
+        self.path_file: str                     = None # type: ignore
 
         # CAMERA SETTINGS
-        self.camera_list: list[str]         = None # type: ignore
-        self.num_cams: int                  = None # type: ignore
-        self.fps: int                       = None # type: ignore
-        self.square: bool                   = None # type: ignore
-        self.color: bool                    = None # type: ignore
-        self.stereo: bool                   = None # type: ignore
-        self.person: bool                   = None # type: ignore
-        self.show_stereo: bool              = None # type: ignore
-        self.simulation: bool               = None # type: ignore
-        self.passthrough: bool              = None # type: ignore
-        self.manual: bool                   = None # type: ignore
+        self.camera_list: list[str]             = None # type: ignore
+        self.camera_num: int                    = None # type: ignore
+        self.camera_fps: int                    = None # type: ignore
+        self.camera_square: bool                = None # type: ignore
+        self.camera_color: bool                 = None # type: ignore
+        self.camera_stereo: bool                = None # type: ignore
+        self.camera_yolo: bool                  = None # type: ignore
+        self.camera_show_stereo: bool           = None # type: ignore
+        self.camera_simulation: bool            = None # type: ignore
+        self.camera_passthrough: bool           = None # type: ignore
+        self.camera_manual: bool                = None # type: ignore
 
         # DETECTION SETTINGS
-        self.num_players: int               = None # type: ignore
-        self.model_type: ModelType          = None # type: ignore
-        self.pose: bool                     = None # type: ignore
+        self.pose_num: int                      = None # type: ignore
+        self.pose_model_type: ModelType         = None # type: ignore
+        self.pose_active: bool                  = None # type: ignore
 
         # RECORDER AND PLAYER SETTINGS
-        self.chunk_length: float            = None # type: ignore
-        self.encoder: Settings.CoderType    = None # type: ignore
-        self.decoder: Settings.CoderType    = None # type: ignore
-        self.format: Settings.CoderFormat   = None # type: ignore
-        self.frame_types: list[FrameType]   = None # type: ignore
+        self.video_chunk_length: float          = None # type: ignore
+        self.video_encoder: Settings.CoderType  = None # type: ignore
+        self.video_decoder: Settings.CoderType  = None # type: ignore
+        self.video_format: Settings.CoderFormat = None # type: ignore
+        self.video_frame_types: list[FrameType] = None # type: ignore
 
         # RENDER SETTINGS
-        self.render_title: str              = None # type: ignore
-        self.render_width: int              = None # type: ignore
-        self.render_height: int             = None # type: ignore
-        self.render_x: int                  = None # type: ignore
-        self.render_y: int                  = None # type: ignore
-        self.render_fullscreen: bool        = None # type: ignore
-        self.render_v_sync: bool            = None # type: ignore
-        self.cams_per_row: int              = None # type: ignore
+        self.render_title: str                  = None # type: ignore
+        self.render_width: int                  = None # type: ignore
+        self.render_height: int                 = None # type: ignore
+        self.render_x: int                      = None # type: ignore
+        self.render_y: int                      = None # type: ignore
+        self.render_fullscreen: bool            = None # type: ignore
+        self.render_v_sync: bool                = None # type: ignore
+        self.render_cams_a_row: int             = None # type: ignore
+
+        # LIGHT SETTINGS
+        self.light_resolution: int              = None # type: ignore
+        self.light_rate: int                    = None # type: ignore
 
 
     def check_values(self) -> None:
@@ -74,6 +78,6 @@ class Settings():
             else:
                 selected.append(camera)
 
-        if not self.passthrough:
+        if not self.camera_passthrough:
             self.camera_list = selected
-            self.num_cams = len(self.camera_list)
+            self.camera_num = len(self.camera_list)

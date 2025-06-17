@@ -32,13 +32,14 @@ class Core(Thread):
         self.device_id: str =           device_id
 
         # FIXED SETTINGS
-        self.model_path: str =          general_settings.model_path
-        self.fps: int =                 general_settings.fps
-        self.square: bool =             general_settings.square
-        self.do_color: bool =           general_settings.color
-        self.do_stereo: bool =          general_settings.stereo
-        self.do_person: bool =          general_settings.person
-        self.show_stereo: bool =        general_settings.show_stereo
+        self.model_path: str =          general_settings.path_model
+        self.fps: int =                 general_settings.camera_fps
+        self.square: bool =             general_settings.camera_square
+        self.do_color: bool =           general_settings.camera_color
+        self.do_stereo: bool =          general_settings.camera_stereo
+        self.do_person: bool =          general_settings.camera_yolo
+        self.show_stereo: bool =        general_settings.camera_show_stereo
+        self.simulation: bool =         general_settings.camera_simulation
 
         # DAI
         self.device:                    dai.Device
@@ -51,7 +52,7 @@ class Core(Thread):
         self.tps_counter =              FPS(120)
 
         # FRAME TYPES
-        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo, general_settings.simulation)
+        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo, general_settings.camera_simulation)
         self.frame_types.sort(key=lambda x: x.value)
 
         # CALLBACKS

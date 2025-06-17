@@ -22,9 +22,10 @@ class Gui():
         self.settings: CoreSettings = settings
 
         self.id: str = self.settings.get_id_string()
-        self.manual: bool = general_settings.manual
-        self.color: bool = general_settings.color
-        self.stereo: bool = general_settings.stereo
+        self.simulation: bool = general_settings.camera_simulation
+        self.manual: bool = False if self.simulation else general_settings.camera_manual
+        self.color: bool = False if self.simulation else general_settings.camera_color
+        self.stereo: bool = general_settings.camera_stereo
         self.ftn: list[str] = self.settings.get_frame_type_names()
 
         id: str = self.id
@@ -59,10 +60,11 @@ class Gui():
                             E(eT.CHCK, 'AutoExposure'+id,      self.settings.set_color_auto_exposure,  True),
                             E(eT.CHCK, 'AutoBalance'+id,       self.settings.set_color_auto_balance,   True)])
         if not self.color or self.stereo:
-            elm.append([E(eT.TEXT, 'IR Grid   '),
-                    E(eT.SLDR, 'L_Grid'+id,            self.set_ir_grid_light,                 0, [0,1], 0.05),
-                    E(eT.TEXT, 'Fld'),
-                    E(eT.SLDR, 'L_Flood'+id,           self.set_ir_flood_light,                0, [0,1], 0.05)])
+            if not self.simulation:
+                elm.append([E(eT.TEXT, 'IR Grid   '),
+                            E(eT.SLDR, 'L_Grid'+id,            self.set_ir_grid_light,                 0, [0,1], 0.05),
+                            E(eT.TEXT, 'Fld'),
+                            E(eT.SLDR, 'L_Flood'+id,           self.set_ir_flood_light,                0, [0,1], 0.05)])
             if self.manual:
                 elm.append([E(eT.CHCK, 'M_AE_'+id,    self.settings.set_mono_auto_exposure,  True),
                             E(eT.SLDR, 'M_Exposure'+id,        self.settings.set_mono_exposure,        EXPOSURE_RANGE[0],      EXPOSURE_RANGE,     gsfr(EXPOSURE_RANGE)),

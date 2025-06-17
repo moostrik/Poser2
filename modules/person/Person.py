@@ -156,4 +156,5 @@ class Person():
 
 PersonCallback = Callable[[Person], None]
 PersonDict = dict[int, Person]
+PersonDictCallback = Callable[[PersonDict], None]
 

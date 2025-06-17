@@ -39,44 +39,47 @@ if args.numcameras < len(camera_list):
 
 # camera_list: list[str] = ['14442C10F124D9D600']
 
-settings: Settings = Settings()
-settings.root_path =    currentPath
-settings.model_path =   path.join(currentPath, 'models')
-settings.video_path =   path.join(currentPath, 'recordings')
-settings.temp_path =    path.join(currentPath, 'temp')
-settings.file_path =    path.join(currentPath, 'files')
+settings: Settings =            Settings()
 
-settings.camera_list =  camera_list
-settings.num_cams =     len(camera_list)
-settings.fps =          args.fps
-settings.square =       args.square
-settings.color =        args.color
-settings.stereo =       args.stereo
-settings.person =   not args.noyolo
-settings.show_stereo =  args.showstereo
-settings.simulation =   args.simulation or args.passthrough
-settings.passthrough =  args.passthrough
-settings.manual =   not args.autoset
+settings.path_root =            currentPath
+settings.path_file =            path.join(currentPath, 'files')
+settings.path_model =           path.join(currentPath, 'models')
+settings.path_video =           path.join(currentPath, 'recordings')
+settings.path_temp =            path.join(currentPath, 'temp')
 
+settings.camera_list =          camera_list
+settings.camera_num =           len(camera_list)
+settings.camera_fps =           args.fps
+settings.camera_square =        args.square
+settings.camera_color =         args.color
+settings.camera_stereo =        args.stereo
+settings.camera_yolo =      not args.noyolo
+settings.camera_show_stereo =   args.showstereo
+settings.camera_simulation =    args.simulation or args.passthrough
+settings.camera_passthrough =   args.passthrough
+settings.camera_manual =    not args.autoset
 
-settings.num_players =  args.players
-settings.pose =     not args.nopose
-settings.model_type =   ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
+settings.pose_num =             args.players
+settings.pose_active =      not args.nopose
+settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
 
-settings.chunk_length = args.chunklength
-settings.encoder =      Settings.CoderType.iGPU
-settings.decoder =      Settings.CoderType.iGPU
-settings.format =       Settings.CoderFormat.H264
-settings.frame_types =  [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIGHT] if settings.stereo else [FrameType.VIDEO]
+settings.video_chunk_length =   args.chunklength
+settings.video_encoder =        Settings.CoderType.iGPU
+settings.video_decoder =        Settings.CoderType.iGPU
+settings.video_format =         Settings.CoderFormat.H264
+settings.video_frame_types =    [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIGHT] if settings.camera_stereo else [FrameType.VIDEO]
 
-settings.render_title =  'DepthPose'
-settings.render_width =  1920
-settings.render_height = 1080
-settings.render_x =      0
-settings.render_y =      0
-settings.render_fullscreen = False
-settings.render_v_sync = True
-settings.cams_per_row =  2
+settings.render_title =         'White Space'
+settings.render_width =         1920
+settings.render_height =        1080
+settings.render_x =             0
+settings.render_y =             0
+settings.render_fullscreen=     False
+settings.render_v_sync =        True
+settings.render_cams_a_row=     2
+
+settings.light_resolution =     4000
+settings.light_rate =           30
 
 settings.check_values()
 # settings.check_cameras()

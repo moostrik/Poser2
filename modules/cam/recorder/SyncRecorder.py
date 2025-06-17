@@ -26,7 +26,7 @@ def is_folder_for_settings(name: str, settings: Settings) -> bool:
     square: bool = 'square' in parts
     color: bool = 'color' in parts
     stereo: bool = 'stereo' in parts
-    if num_cams >= settings.num_cams and square == settings.square and color == settings.color and stereo == settings.stereo:
+    if num_cams >= settings.camera_num and square == settings.camera_square and color == settings.camera_color and stereo == settings.camera_stereo:
         return True
     return False
 
@@ -52,8 +52,8 @@ class RecState(Enum):
 class SyncRecorder(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__()
-        self.output_path: Path = Path(settings.video_path)
-        self.temp_path: Path = Path(settings.temp_path)
+        self.output_path: Path = Path(settings.path_video)
+        self.temp_path: Path = Path(settings.path_temp)
 
         self.settings: Settings = settings
 
@@ -62,17 +62,17 @@ class SyncRecorder(Thread):
         self.frames: dict[int, Queue[dict[FrameType, ndarray]]] = {}
         self.folder_path: Path = Path()
 
-        for c in range(settings.num_cams):
+        for c in range(settings.camera_num):
             self.recorders[c] = {}
-            self.fps[c] = settings.fps
+            self.fps[c] = settings.camera_fps
             self.frames[c] = Queue()
-            for t in self.settings.frame_types:
-                self.recorders[c][t] = FFmpegRecorder(EncoderString[settings.format][settings.encoder])
+            for t in self.settings.video_frame_types:
+                self.recorders[c][t] = FFmpegRecorder(EncoderString[settings.video_format][settings.video_encoder])
 
         self.start_time: float
         self.chunk_index = 0
         self.rec_name: str
-        self.suffix: str = settings.format.value
+        self.suffix: str = settings.video_format.value
 
         self.state: RecState = RecState.IDLE
         self.state_lock = Lock()
@@ -102,14 +102,14 @@ class SyncRecorder(Thread):
 
     def _start_recording(self) -> None:
 
-        self.folder_path = self.output_path / make_folder_name(self.settings.num_cams, self.settings.square, self.settings.color, self.settings.stereo)
+        self.folder_path = self.output_path / make_folder_name(self.settings.camera_num, self.settings.camera_square, self.settings.camera_color, self.settings.camera_stereo)
         self.folder_path.mkdir(parents=True, exist_ok=True)
 
         self.chunk_index = 0
 
-        for c in range(self.settings.num_cams):
+        for c in range(self.settings.camera_num):
             fps: float = self.get_fps(c)
-            for t in self.settings.frame_types:
+            for t in self.settings.video_frame_types:
                 path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                 self.recorders[c][t].start(str(path), fps)
 
@@ -117,27 +117,27 @@ class SyncRecorder(Thread):
         self.recording = True
 
     def _stop_recording(self) -> None:
-        for c in range(self.settings.num_cams):
-            for t in self.settings.frame_types:
+        for c in range(self.settings.camera_num):
+            for t in self.settings.video_frame_types:
                 self.recorders[c][t].stop()
 
     def _update_recording(self) -> None:
-        if time.time() - self.start_time > self.settings.chunk_length:
+        if time.time() - self.start_time > self.settings.video_chunk_length:
             self.chunk_index += 1
 
-            for c in range(self.settings.num_cams):
+            for c in range(self.settings.camera_num):
                 fps: float = self.get_fps(c)
-                for t in self.settings.frame_types:
+                for t in self.settings.video_frame_types:
                     path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                     self.recorders[c][t].split(str(path), fps)
-            self.start_time += self.settings.chunk_length
+            self.start_time += self.settings.video_chunk_length
 
-        for c in range(self.settings.num_cams):
+        for c in range(self.settings.camera_num):
             try:
                 frames: dict[FrameType, ndarray] = self.frames[c].get(timeout=0.01)
             except Empty:
                 continue
-            for t in self.settings.frame_types:
+            for t in self.settings.video_frame_types:
                 if t in frames:
                     self.recorders[c][t].add_frame(frames[t])
 

@@ -279,6 +279,9 @@ class SetupMono(Setup):
         super().__init__(pipeline, fps)
         self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
 
+        # self.makelightwork: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+        # self.makelightwork.setCamera("left")
+
         self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.left.setCamera("left")
         self.left.setResolution(self.resolution)

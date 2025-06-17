@@ -53,10 +53,10 @@ FolderDict = Dict[str, Folder]
 class SyncPlayer(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__()
-        self.input_path: Path = Path(settings.video_path)
-        self.num_cams: int = settings.num_cams
-        self.types: list[FrameType] = settings.frame_types
-        self.fps: float = settings.fps
+        self.input_path: Path = Path(settings.path_video)
+        self.num_cams: int = settings.camera_num
+        self.types: list[FrameType] = settings.video_frame_types
+        self.fps: float = settings.camera_fps
 
         self.running: bool = False
         self.state_messages: Queue[Message] = Queue()
@@ -69,12 +69,12 @@ class SyncPlayer(Thread):
         self.chunk_range_0: int = 0
         self.chunk_range_1: int = 0
         self.load_folder: str = ''
-        self.suffix: str = settings.format.value
+        self.suffix: str = settings.video_format.value
 
         self.folders: FolderDict = self._get_video_folders(settings)
 
-        self.hwt: str = HwaccelString[settings.decoder]
-        self.hwd: str = HwaccelDeviceString[settings.decoder]
+        self.hwt: str = HwaccelString[settings.video_decoder]
+        self.hwd: str = HwaccelDeviceString[settings.video_decoder]
 
         self.players: list[FFmpegPlayer] = []
         self.loaders: list[FFmpegPlayer] = []
@@ -363,8 +363,8 @@ class SyncPlayer(Thread):
     @staticmethod
     def _get_video_folders(settings: Settings) -> FolderDict :
         folders: FolderDict = {}
-        suffix: str = settings.format.value
-        video_path: Path = Path(settings.video_path)
+        suffix: str = settings.video_format.value
+        video_path: Path = Path(settings.path_video)
         for folder in video_path.iterdir():
             if folder.is_dir():
                 if not is_folder_for_settings(str(folder), settings):

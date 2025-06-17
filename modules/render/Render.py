@@ -34,9 +34,9 @@ Composition_Subdivision = dict[ImageType, dict[int, tuple[int, int, int, int]]]
 class Render(RenderWindow):
     def __init__(self, settings: Settings) -> None:
 
-        self.num_cams: int = settings.num_cams
+        self.num_cams: int = settings.camera_num
         self.num_sims: int = len(SimType)
-        self.num_persons: int = settings.num_players
+        self.num_persons: int = settings.pose_num
 
         self.cam_images: dict[int, Image] = {}
         self.psn_images: dict[int, Image] = {}
@@ -163,10 +163,14 @@ class Render(RenderWindow):
 
     def draw_persons(self) -> None:
         for i in range(self.num_persons):
-            image: Image = self.psn_images[i]
-            image.update()
             fbo: Fbo = self.psn_fbos[i]
             person: Person | None = self.get_person(i)
+            if person is None or person.img is None or not person.active:
+                continue
+
+            image: Image = self.psn_images[i]
+            image.set_image(person.img)
+            image.update()
 
             self.setView(fbo.width, fbo.height)
             fbo.begin()
@@ -196,16 +200,12 @@ class Render(RenderWindow):
     def set_cam_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None :
         self.cam_images[cam_id].set_image(image)
 
-    def set_psn_image(self, psn_id: int, image: np.ndarray) -> None :
-        self.psn_images[psn_id].set_image(image)
-
     def get_tracklets(self, cam_id: int, clear: bool = False) -> dict[int, Tracklet]:
         with self.input_mutex:
             ret_person: dict[int, Tracklet] =  self.input_tracklets[cam_id].copy()
             if clear:
                 self.input_tracklets[cam_id].clear()
             return ret_person
-
     def add_tracklet(self, cam_id: int, tracklet: Tracklet) -> None :
         with self.input_mutex:
             self.input_tracklets[cam_id][tracklet.id] = tracklet
@@ -216,7 +216,6 @@ class Render(RenderWindow):
             if clear:
                 self.input_persons[id] = None
             return ret_person
-
     def get_persons_for_cam(self, cam_id: int) -> list[Person]:
         with self.input_mutex:
             persons: list[Person] = []
@@ -224,19 +223,9 @@ class Render(RenderWindow):
                 if person is not None and person.cam_id == cam_id:
                     persons.append(person)
             return persons
-
     def add_person(self, person: Person) -> None:
         with self.input_mutex:
             self.input_persons[person.id] = person
-
-        image: np.ndarray | None = person.img
-        if image is not None:
-            self.set_psn_image(person.id, image)
-
-        # poses: list[Pose] | None = person.pose
-        # if poses is not None and len(poses) > 0:
-        #     self.set_vertices(person.id, poses[0].getVertices())
-        #     self.set_colors(person.id, poses[0].getColors())
 
     # STATIC METHODS
     @staticmethod
