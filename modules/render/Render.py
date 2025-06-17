@@ -2,7 +2,7 @@ from OpenGL.GL import * # type: ignore
 import OpenGL.GLUT as glut
 from threading import Lock
 import numpy as np
-from enum import Enum
+from enum import Enum, IntEnum, auto
 import math
 
 from modules.gl.RenderWindow import RenderWindow
@@ -11,11 +11,13 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Mesh import Mesh
 from modules.gl.Utils import lfo, fit, fill
 from modules.gl.Image import Image
+from modules.gl.shaders.WS import WS, Shader
 
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.pose.Definitions import Pose, Indices
 from modules.person.Person import Person, PersonColor
 from modules.person.Definitions import *
+from modules.av.Definitions import AvOutput
 
 from modules.Settings import Settings
 
@@ -27,7 +29,8 @@ class ImageType(Enum):
 
 class SimType(Enum):
     MAP = 0
-    LGT = 1
+    LNS = auto()
+    LGT = auto()
 
 Composition_Subdivision = dict[ImageType, dict[int, tuple[int, int, int, int]]]
 
@@ -49,6 +52,7 @@ class Render(RenderWindow):
         self.all_images: list[Image] = []
         self.all_fbos: list[Fbo | SwapFbo] = []
         self.all_meshes: list[Mesh] = []
+        self.all_shaders: list[Shader] = []
 
         for i in range(self.num_cams):
             self.cam_images[i] = Image()
@@ -84,6 +88,12 @@ class Render(RenderWindow):
             self.input_tracklets[i] = {}
             self.input_persons[i] = None
 
+        self.av_image = Image()
+        self.all_images.append(self.av_image)
+        self.av_angle: float = 0.0
+        self.av_shader: WS = WS()
+        self.all_shaders.append(self.av_shader)
+
     def reshape(self, width, height) -> None: # override
         super().reshape(width, height)
         self.composition = self.make_composition_subdivision(width, height, self.num_cams, self.num_sims, self.num_persons)
@@ -94,7 +104,7 @@ class Render(RenderWindow):
 
         for key in self.sim_fbos.keys():
             x, y, w, h = self.composition[ImageType.SIM][key]
-            self.sim_fbos[key].allocate(w, h, GL_RGBA)
+            self.sim_fbos[key].allocate(w, h, GL_RGBA32F)
 
         for key in self.psn_fbos.keys():
             x, y, w, h = self.composition[ImageType.PSN][key]
@@ -103,6 +113,8 @@ class Render(RenderWindow):
     def draw(self) -> None: # override
         if not self.allocated:
             self.reshape(self.window_width, self.window_height)
+            for s in self.all_shaders:
+                s.allocate(True) # type: ignore
             self.allocated = True
 
         self.update_pose_meshes()
@@ -153,13 +165,15 @@ class Render(RenderWindow):
             fbo.end()
 
     def draw_sims(self) -> None:
+        self.av_image.update()
+
         for i in range(self.num_sims):
             fbo: Fbo = self.sim_fbos[i]
             self.setView(fbo.width, fbo.height)
             if i == SimType.MAP.value:
                 self.draw_map_positions(self.input_persons, self.num_cams, fbo)
             elif i == SimType.LGT.value:
-                self.draw_light(fbo)
+                self.draw_light(fbo, self.av_image, self.av_shader, self.av_angle)
 
     def draw_persons(self) -> None:
         for i in range(self.num_persons):
@@ -226,6 +240,10 @@ class Render(RenderWindow):
     def add_person(self, person: Person) -> None:
         with self.input_mutex:
             self.input_persons[person.id] = person
+
+    def set_av(self, value: AvOutput) -> None:
+        self.av_image.set_image(value.img)
+        self.av_angle = value.angle
 
     # STATIC METHODS
     @staticmethod
@@ -340,11 +358,20 @@ class Render(RenderWindow):
 
         fbo.end()
         glFlush()
-        return
 
     @staticmethod
-    def draw_light(fbo: Fbo) -> None:
-        return
+    def draw_light(fbo: Fbo, img: Image, shader: WS, angle: float) -> None:
+        # fbo.begin()
+        # glClearColor(1.0, 0.0, 0.0, 1.0)  # Set background color to black
+        # glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
+        # img.draw(0, 0, fbo.width, fbo.height)
+        # fbo.end()
+
+        scale: float = fbo.width / img.width
+        shader.use(fbo.fbo_id, img.tex_id, scale, angle)
+
+
+        glFlush()
 
     @staticmethod
     def draw_person(person: Person, pose: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:

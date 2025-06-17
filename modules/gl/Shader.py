@@ -106,8 +106,8 @@ class Shader():
 
         self.shader_program = shaders.compileProgram(self.vertex_shader, self.fragment_shader)
         self.allocated = True
-        if verbose:
-            print(self.shader_name, 'loaded')
+        # if verbose:
+        print(self.shader_name, 'loaded')
 
     def unload(self) -> None :
         if not self.allocated:

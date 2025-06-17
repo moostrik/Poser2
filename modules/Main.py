@@ -5,7 +5,7 @@ from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.Manager import Manager as Detector
-from modules.av.Composition import Composition
+from modules.av.Manager import Manager as AV
 from math import ceil
 
 class Main():
@@ -27,7 +27,7 @@ class Main():
                 self.cameras.append(camera)
 
         self.detector = Detector(self.gui, settings)
-        self.av: Composition = Composition(self.gui, settings)
+        self.av: AV = AV(self.gui, settings)
         self.running: bool = False
 
     def start(self) -> None:
@@ -48,6 +48,7 @@ class Main():
         self.detector.add_dict_callback(self.av.set_person_dict)
         self.detector.start()
 
+        self.av.add_output_callback(self.render.set_av)
         self.av.start()
 
         self.gui.exit_callback = self.stop
