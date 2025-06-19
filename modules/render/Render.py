@@ -368,7 +368,7 @@ class Render(RenderWindow):
         # fbo.end()
 
         scale: float = fbo.width / img.width
-        shader.use(fbo.fbo_id, img.tex_id, scale, angle)
+        shader.use(fbo.fbo_id, img.tex_id, img.width)
 
 
         glFlush()

@@ -4,7 +4,6 @@ import time
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-
 class FileModifiedHandler(FileSystemEventHandler):
     def __init__(self, callback):
         self.callback = callback
@@ -22,7 +21,6 @@ def monitor_path(path, callback):
     observer = Observer()
     observer.schedule(event_handler, path=path, recursive=False)
     observer.start()
-
 
 def read_shader_source(filename) -> str:
     try:
@@ -48,8 +46,8 @@ class Shader():
         self.allocated: bool = False
         self.shader_name: str = ''
         self.shader_path: str = 'modules/gl/shaders/'
-        self.vertex_suffix: str = '.vertex.glsl'
-        self.fragment_suffix: str = '.fragment.glsl'
+        self.vertex_suffix: str = '.vert'
+        self.fragment_suffix: str = '.frag'
         self.vertex_file_name: str = ''
         self.vertex_generic_file_name: str = f'{self.shader_path}_Generic{self.vertex_suffix}'
         self.fragment_file_name: str = ''
@@ -78,7 +76,7 @@ class Shader():
         self.unload()
 
         vertex_source: str = read_shader_source(self.vertex_file_name)
-        if not vertex_source: vertex_source = read_shader_source(f'modules/gl/shaders/_generic.vertex.glsl')
+        if not vertex_source: vertex_source = read_shader_source(self.vertex_generic_file_name)
         fragment_source: str = read_shader_source(self.fragment_file_name)
 
         if vertex_source == '' or fragment_source == '':

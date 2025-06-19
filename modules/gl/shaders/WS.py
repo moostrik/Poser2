@@ -9,7 +9,7 @@ class WS(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, tex0: int, scale: float, angle: float) -> None :
+    def use(self, fbo: int, tex0: int, width: float) -> None :
         super().use()
         if not self.allocated: return
         if not fbo or not tex0: return
@@ -20,8 +20,7 @@ class WS(Shader):
         s = self.shader_program
         glUseProgram(s)
         glUniform1i(glGetUniformLocation(s, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(s, "scale"), scale)
-        glUniform1f(glGetUniformLocation(s, "angle"), angle)
+        glUniform1f(glGetUniformLocation(s, "texWidth"), width)
 
         glBindFramebuffer(GL_FRAMEBUFFER, fbo)
         draw_quad()
