@@ -55,13 +55,16 @@ class Manager(Thread):
 
 
             # set each tenth pixel to 1
-            # output.img[0, ::10, 0] = 1.0
+            output.img[0, ::10, 1] = 1.0
 
             # set each blue pixel to 1 if random is above 0.9
             # output.img[0, :, 0] = np.where(np.random.uniform(0.0, 1.0, self.resolution) > 0.9, 1.0, 0.0)
 
             # make the blue pixels a gradient from 0 to 1
             output.img[0, :, 0] = np.linspace(0, 1.0, self.resolution)
+
+            # set all pixeld to 1
+            # output.img[0, :, 0] = 1.0
 
             self._output_callback(output)
 

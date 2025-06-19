@@ -11,7 +11,9 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Mesh import Mesh
 from modules.gl.Utils import lfo, fit, fill
 from modules.gl.Image import Image
-from modules.gl.shaders.WS import WS, Shader
+from modules.gl.Shader import Shader
+from modules.gl.shaders.WS_Angles import WS_Angles
+from modules.gl.shaders.WS_Lines import WS_Lines
 
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.pose.Definitions import Pose, Indices
@@ -26,11 +28,14 @@ class ImageType(Enum):
     CAM = 1
     SIM = 2
     PSN = 3
+    VIS = 4
 
 class SimType(Enum):
     MAP = 0
-    LNS = auto()
-    LGT = auto()
+
+class VisType(IntEnum):
+    LINES = 0
+    LIGHTS = 1
 
 Composition_Subdivision = dict[ImageType, dict[int, tuple[int, int, int, int]]]
 
@@ -39,6 +44,7 @@ class Render(RenderWindow):
 
         self.num_cams: int = settings.camera_num
         self.num_sims: int = len(SimType)
+        self.num_viss: int = len(VisType)
         self.num_persons: int = settings.pose_num
 
         self.cam_images: dict[int, Image] = {}
@@ -46,6 +52,7 @@ class Render(RenderWindow):
 
         self.cam_fbos: dict[int, Fbo] = {}
         self.sim_fbos: dict[int, Fbo] = {}
+        self.vis_fbos: dict[int, Fbo] = {}
         self.psn_fbos: dict[int, Fbo] = {}
         self.pose_meshes: dict[int, Mesh] = {}
 
@@ -64,6 +71,10 @@ class Render(RenderWindow):
             self.sim_fbos[i] = Fbo()
             self.all_fbos.append(self.sim_fbos[i])
 
+        for i in range(self.num_viss):
+            self.vis_fbos[i] = Fbo()
+            self.all_fbos.append(self.vis_fbos[i])
+
         for i in range(self.num_persons):
             self.psn_images[i] = Image()
             self.all_images.append(self.psn_images[i])
@@ -75,7 +86,7 @@ class Render(RenderWindow):
             self.pose_meshes[i].set_indices(Indices)
             self.all_meshes.append(self.pose_meshes[i])
 
-        self.composition: Composition_Subdivision = self.make_composition_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.num_persons)
+        self.composition: Composition_Subdivision = self.make_composition_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.num_persons, self.num_viss)
 
         super().__init__(self.composition[ImageType.TOT][0][2], self.composition[ImageType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_x, settings.render_y)
 
@@ -88,15 +99,18 @@ class Render(RenderWindow):
             self.input_tracklets[i] = {}
             self.input_persons[i] = None
 
-        self.av_image = Image()
-        self.all_images.append(self.av_image)
-        self.av_angle: float = 0.0
-        self.av_shader: WS = WS()
-        self.all_shaders.append(self.av_shader)
+        self.vis_width: int = settings.light_resolution
+        self.vis_height: int = 1
+        self.vis_image = Image()
+        self.all_images.append(self.vis_image)
+        self.vis_line_shader: WS_Lines = WS_Lines()
+        self.vis_angle_shader: WS_Angles = WS_Angles()
+        self.all_shaders.append(self.vis_line_shader)
+        self.all_shaders.append(self.vis_angle_shader)
 
     def reshape(self, width, height) -> None: # override
         super().reshape(width, height)
-        self.composition = self.make_composition_subdivision(width, height, self.num_cams, self.num_sims, self.num_persons)
+        self.composition = self.make_composition_subdivision(width, height, self.num_cams, self.num_sims, self.num_persons, self.num_viss)
 
         for key in self.cam_fbos.keys():
             x, y, w, h = self.composition[ImageType.CAM][key]
@@ -104,7 +118,7 @@ class Render(RenderWindow):
 
         for key in self.sim_fbos.keys():
             x, y, w, h = self.composition[ImageType.SIM][key]
-            self.sim_fbos[key].allocate(w, h, GL_RGBA32F)
+            self.sim_fbos[key].allocate(w, h, GL_RGBA)
 
         for key in self.psn_fbos.keys():
             x, y, w, h = self.composition[ImageType.PSN][key]
@@ -115,12 +129,15 @@ class Render(RenderWindow):
             self.reshape(self.window_width, self.window_height)
             for s in self.all_shaders:
                 s.allocate(True) # type: ignore
+            for fbo in self.vis_fbos.values():
+                fbo.allocate(self.vis_width, self.vis_height, GL_RGBA32F)
             self.allocated = True
 
         self.update_pose_meshes()
 
         self.draw_cameras()
         self.draw_sims()
+        self.draw_lights()
         self.draw_persons()
 
         self.draw_composition()
@@ -165,15 +182,24 @@ class Render(RenderWindow):
             fbo.end()
 
     def draw_sims(self) -> None:
-        self.av_image.update()
-
         for i in range(self.num_sims):
             fbo: Fbo = self.sim_fbos[i]
             self.setView(fbo.width, fbo.height)
             if i == SimType.MAP.value:
                 self.draw_map_positions(self.input_persons, self.num_cams, fbo)
-            elif i == SimType.LGT.value:
-                self.draw_light(fbo, self.av_image, self.av_shader, self.av_angle)
+
+    def draw_lights(self) -> None:
+        self.vis_image.update()
+
+        for i in range(self.num_viss):
+            fbo: Fbo = self.vis_fbos[i]
+            self.setView(fbo.width, fbo.height)
+            fbo.begin()
+            if i == VisType.LINES.value:
+                self.draw_light_lines(fbo, self.vis_image, self.vis_line_shader)
+            elif i == VisType.LIGHTS.value:
+                self.draw_light_angles(fbo, self.vis_image, self.vis_angle_shader)
+            fbo.end()
 
     def draw_persons(self) -> None:
         for i in range(self.num_persons):
@@ -210,6 +236,10 @@ class Render(RenderWindow):
             x, y, w, h = self.composition[ImageType.PSN][i]
             self.psn_fbos[i].draw(x, y, w, h)
 
+        for i in range(self.num_viss):
+            x, y, w, h = self.composition[ImageType.VIS][i]
+            self.vis_fbos[i].draw(x, y, w, h)
+
     # SETTERS AND GETTERS
     def set_cam_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None :
         self.cam_images[cam_id].set_image(image)
@@ -242,7 +272,7 @@ class Render(RenderWindow):
             self.input_persons[person.id] = person
 
     def set_av(self, value: AvOutput) -> None:
-        self.av_image.set_image(value.img)
+        self.vis_image.set_image(value.img)
         self.av_angle = value.angle
 
     # STATIC METHODS
@@ -360,17 +390,13 @@ class Render(RenderWindow):
         glFlush()
 
     @staticmethod
-    def draw_light(fbo: Fbo, img: Image, shader: WS, angle: float) -> None:
-        # fbo.begin()
-        # glClearColor(1.0, 0.0, 0.0, 1.0)  # Set background color to black
-        # glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
-        # img.draw(0, 0, fbo.width, fbo.height)
-        # fbo.end()
+    def draw_light_lines(fbo: Fbo, img: Image, shader: WS_Lines) -> None:
+        shader.use(fbo.fbo_id, img.tex_id)
+        glFlush()
 
-        scale: float = fbo.width / img.width
+    @staticmethod
+    def draw_light_angles(fbo: Fbo, img: Image, shader: WS_Angles) -> None:
         shader.use(fbo.fbo_id, img.tex_id, img.width)
-
-
         glFlush()
 
     @staticmethod
@@ -403,26 +429,29 @@ class Render(RenderWindow):
 
     @staticmethod
     def make_composition_subdivision(dst_width: int, dst_height: int,
-                                     num_cams: int, num_sims: int, num_persons: int,
+                                     num_cams: int, num_sims: int, num_persons: int, num_viss: int,
                                      cam_aspect_ratio: float = 16.0 / 9.0,
                                      sim_aspect_ratio: float = 10.0,
-                                     psn_aspect_ratio: float = 1.0) -> Composition_Subdivision:
+                                     psn_aspect_ratio: float = 1.0,
+                                     vis_aspect_ratio: float = 20.0) -> Composition_Subdivision:
 
         ret: Composition_Subdivision = {}
         ret[ImageType.TOT] = {}
         ret[ImageType.CAM] = {}
         ret[ImageType.SIM] = {}
         ret[ImageType.PSN] = {}
+        ret[ImageType.VIS] = {}
 
         cams_per_row: int = 4
         cam_rows: int = max(math.ceil(num_cams / cams_per_row), 1)
-        cam_colums = max(math.ceil(num_cams / cam_rows), 1)
+        cam_colums: int = max(math.ceil(num_cams / cam_rows), 1)
 
         dst_aspect_ratio: float = dst_width / dst_height
         cam_grid_aspect_ratio: float = cam_aspect_ratio * cam_colums / cam_rows
         sim_grid_aspect_ratio: float = sim_aspect_ratio / num_sims
+        vis_grid_aspect_ratio: float = vis_aspect_ratio / num_viss
         psn_grid_aspect_ratio: float = psn_aspect_ratio * num_persons
-        tot_aspect_ratio: float = 1.0 / (1.0 / cam_grid_aspect_ratio + 1.0 / psn_grid_aspect_ratio + 1.0 / sim_grid_aspect_ratio)
+        tot_aspect_ratio: float = 1.0 / (1.0 / cam_grid_aspect_ratio + 1.0 / sim_grid_aspect_ratio + 1.0 / vis_grid_aspect_ratio + 1.0 / psn_grid_aspect_ratio)
 
         fit_width: float
         fit_height: float
@@ -439,23 +468,37 @@ class Render(RenderWindow):
 
         cam_width: float =  fit_width / cam_colums
         cam_height: float = cam_width / cam_aspect_ratio
-        sim_y_start: float = fit_y + cam_height * cam_rows
         sim_height: float = fit_width / sim_aspect_ratio
         psn_width: float =  fit_width / num_persons
         psn_height: float = psn_width / psn_aspect_ratio
+        vis_height: float = fit_width / vis_aspect_ratio
+        y_start: float = fit_y
 
         for i in range(num_cams):
             cam_x: float = (i % cam_colums) * cam_width + fit_x
             cam_y: float = (i // cam_colums) * cam_height + fit_y
             ret[ImageType.CAM][i] = (int(cam_x), int(cam_y), int(cam_width), int(cam_height))
 
+        y_start += cam_height * cam_rows
         for i in range(num_sims):
-            sim_y: float = sim_y_start + i * sim_height
+            sim_y: float = y_start + i * sim_height
             ret[ImageType.SIM][i] = (int(fit_x), int(sim_y), int(fit_width), int(sim_height))
 
+        y_start += sim_height * num_sims
         for i in range(num_persons):
             psn_x: float = i * psn_width + fit_x
-            psn_y: float = fit_height - psn_height + fit_y
+            psn_y: float = y_start
             ret[ImageType.PSN][i] = (int(psn_x), int(psn_y), int(psn_width), int(psn_height))
+
+        y_start += psn_height
+        for i in range(num_viss):
+            sim_y: float = y_start + i * vis_height
+            ret[ImageType.VIS][i] = (int(fit_x), int(sim_y), int(fit_width), int(vis_height))
+
+        # Fill the last Vis till the bottom of the window
+        if num_viss > 0:
+            last_Vis = ret[ImageType.VIS][num_viss - 1]
+            if last_Vis[1] + last_Vis[3] < dst_height:
+                ret[ImageType.VIS][num_viss - 1] = (last_Vis[0], last_Vis[1], last_Vis[2], dst_height - last_Vis[1])
 
         return ret
