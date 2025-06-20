@@ -9,8 +9,8 @@ class TestPattern(IntEnum):
     FILL = 0
     PULSE = auto()
     CHASE = auto()
-    SINGLE = auto()
-    RANDOM = auto()
+    SNGLE = auto()
+    RNDOM = auto()
 
 TEST_PATTERN_NAMES: list[str] = [p.name for p in TestPattern]
 
@@ -48,16 +48,19 @@ class CompTest():
         )
 
     def make_pattern(self) -> np.ndarray:
-        if self.pattern == TestPattern.FILL:
-            return self.make_fill(self.resolution, self.white_strength, self.blue_strength)
-        if self.pattern == TestPattern.PULSE:
-            return self.make_pulse(self.resolution, self.white_strength, self.blue_strength, self.blue_phase, self.pulse_speed)
-        if self.pattern == TestPattern.CHASE:
-            return self.make_chase(self.resolution, self.white_strength, self.blue_strength, self.blue_phase, self.chase_speed, self.chase_amount)
-        if self.pattern == TestPattern.SINGLE:
-            return self.make_single(self.resolution, self.white_strength, self.blue_strength, self.blue_phase, self.single_speed, self.single_amount)
-        if self.pattern == TestPattern.RANDOM:
-            return self.make_random(self.resolution, self.white_strength, self.blue_strength, self.random_speed)
+        try:
+            if self.pattern == TestPattern.FILL:
+                return self.make_fill(self.resolution, self.white_strength, self.blue_strength)
+            if self.pattern == TestPattern.PULSE:
+                return self.make_pulse(self.resolution, self.white_strength, self.blue_strength, self.blue_phase, self.pulse_speed)
+            if self.pattern == TestPattern.CHASE:
+                return self.make_chase(self.resolution, self.white_strength, self.blue_strength, self.blue_phase, self.chase_speed, self.chase_amount)
+            if self.pattern == TestPattern.SNGLE:
+                return self.make_single(self.resolution, self.white_strength, self.blue_strength, self.blue_phase, self.single_speed, self.single_amount)
+            if self.pattern == TestPattern.RNDOM:
+                return self.make_random(self.resolution, self.white_strength, self.blue_strength, self.random_speed)
+        except Exception as e:
+            print(f"[CompTest] Error generating pattern: {e}")
 
         return np.zeros((1, self.resolution, 3), dtype=np.float16)
 
@@ -83,13 +86,13 @@ class CompTest():
         self.chase_speed = min(1.0, max(-1.0, speed))
 
     def set_chase_amount(self, amount: int) -> None:
-        self.chase_amount = max(0, min(self.resolution, amount))
+        self.chase_amount = max(1, amount)
 
     def set_single_speed(self, speed: float) -> None:
         self.single_speed = min(1.0, max(-1.0, speed))
 
     def set_single_amount(self, amount: int) -> None:
-        self.single_amount = max(0, min(self.resolution, amount))
+        self.single_amount = max(1, amount)
 
     def set_random_speed(self, speed: float) -> None:
         self.random_speed = max(0.0, speed)
@@ -119,10 +122,10 @@ class CompTest():
         """Placeholder"""
         return np.zeros((1, resolution, 3), dtype=np.float16)
 
-    @staticmethod
-    def lfo(time: float, Htz: float, phase: float) -> float:
-        return 0.5 * math.sin(time * math.pi * Htz + (0.75 + phase) * math.pi * 2) + 0.5
+    # @staticmethod
+    # def lfo(time: float, Htz: float, phase: float) -> float:
+    #     return 0.5 * math.sin(time * math.pi * Htz + (0.75 + phase) * math.pi * 2) + 0.5
 
-    @staticmethod
-    def lfor(time: float, Htz: float, phase: float, rangeMin: float, rangeMax: float) -> float:
-        return CompTest.lfo(time, Htz, phase) * (rangeMax - rangeMin) + rangeMin
+    # @staticmethod
+    # def lfor(time: float, Htz: float, phase: float, rangeMin: float, rangeMax: float) -> float:
+    #     return CompTest.lfo(time, Htz, phase) * (rangeMax - rangeMin) + rangeMin

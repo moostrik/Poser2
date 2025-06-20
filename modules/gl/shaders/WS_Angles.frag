@@ -1,7 +1,7 @@
 #version 460 core
 
 uniform sampler2D tex0;             // Nx1 texture, N lines for 360 degrees, default is 4000 lines
-uniform float beamAngle = 10;        // e.g., 3 degrees
+uniform float beamAngle = 3;        // e.g., 3 degrees
 uniform float texWidth = 4000;      // Width of the texture in pixels (N)
 
 in vec2 texCoord;

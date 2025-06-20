@@ -6,22 +6,31 @@ def make_fill(resolution: int, white_strength: float, blue_strength: float) -> n
     return np.full((1, resolution, 3), [white_strength, blue_strength, 0.0], dtype=np.float16)
 
 def make_pulse(resolution: int, white_strength: float, blue_strength: float, blue_phase: float, pulse_speed: float) -> np.ndarray:
-    T: float = time.time() * pulse_speed
+    def lfo(time_: float, Htz: float, phase: float) -> float:
+        return 0.5 * math.sin(time_ * math.pi * Htz + phase) + 0.5
+
+    T: float = time.time()
     img: np.ndarray = np.zeros((1, resolution, 3), dtype=np.float16)
-    img[0, :, 0] = lfo(T, 1.0 / 2.0, 0.0) * white_strength
-    img[0, :, 1] = lfo(T, 1.0 / 2.0, blue_phase) * blue_strength
+    freq = pulse_speed if pulse_speed > 0 else 0.0  # pulses per second
+    img[0, :, 0] = lfo(T, freq, 0.0) * white_strength
+    img[0, :, 1] = lfo(T, freq, blue_phase * 2 * math.pi) * blue_strength
     return img
 
 def make_chase(resolution: int, white_strength: float, blue_strength: float, blue_phase: float, chase_speed: float, chase_amount: int) -> np.ndarray:
     img: np.ndarray = np.zeros((1, resolution, 3), dtype=np.float16)
     if resolution == 0:
         return img
-    T: float = time.time()
-    W_P: float = 1.0 / resolution * chase_amount
-    B_P: float = 1.0 / resolution * chase_amount + blue_phase
+
+    # adjusted_speed = chase_speed * math.pow(chase_amount, 0.33)
+    adjusted_speed = chase_speed * math.log(chase_amount + 1)
+    wave_phase_per_pixel: float = chase_amount * 2 * math.pi / resolution
+    time_offset = time.time() * adjusted_speed * 2 * math.pi
+
     for i in range(resolution):
-        white_value: float = lfo(T, chase_speed / (math.pi * 2.0), i * W_P)
-        blue_value: float = lfo(T, chase_speed / (math.pi * 2.0), i * B_P)
+        WP: float = i * wave_phase_per_pixel - time_offset
+        BP: float = i * wave_phase_per_pixel - time_offset + blue_phase * 2 * math.pi
+        white_value: float = 0.5 * math.sin(WP) + 0.5
+        blue_value: float = 0.5 * math.sin(BP) + 0.5
         img[0, i, 0] = white_value * white_strength
         img[0, i, 1] = blue_value * blue_strength
     return img
@@ -50,9 +59,3 @@ def make_random(resolution: int, white_strength: float, blue_strength: float, ra
         if math.sin(T + i + 0.5) > 0.5:
             img[0, i, 1] = blue_strength
     return img
-
-def lfo(time_: float, Htz: float, phase: float) -> float:
-    return 0.5 * math.sin(time_ * math.pi * Htz + (0.75 + phase) * math.pi * 2) + 0.5
-
-def lfor(time_: float, Htz: float, phase: float, rangeMin: float, rangeMax: float) -> float:
-    return lfo(time_, Htz, phase) * (rangeMax - rangeMin) + rangeMin
