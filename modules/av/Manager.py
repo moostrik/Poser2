@@ -1,4 +1,4 @@
-from __future__ import annotations
+# from __future__ import annotations
 
 import cv2
 import numpy as np
@@ -8,6 +8,7 @@ from random import uniform
 
 from modules.av.Definitions import *
 from modules.av.Gui import Gui
+from modules.av.CompTest import CompTest
 
 from modules.Settings import Settings
 from modules.person.Person import Person, PersonDict
@@ -16,8 +17,6 @@ from modules.person.Person import Person, PersonDict
 class Manager(Thread):
     def __init__(self, gui, settings: Settings) -> None:
         super().__init__()
-
-        self.gui: Gui = gui
         self.settings: Settings = settings
 
         self.running: bool = False
@@ -30,45 +29,31 @@ class Manager(Thread):
         self.resolution: int = settings.light_resolution
         self.output: AvOutput = AvOutput(self.resolution)
 
+        self.comp_test: CompTest = CompTest(self.resolution)
+
         self.output_callbacks: list[AvOutputCallback] = []
+
+        self.gui: Gui = Gui(gui, self)
 
     def stop(self) -> None:
         self.running = False
 
     def run(self) -> None:
         self.running = True
-        self.last_update = time()
+        next_time: float = time()
         while self.running:
 
-            output: AvOutput = AvOutput(self.resolution)
-            # output.img[0, :, 0] = np.random.uniform(0.0, 255.0, self.resolution)
-            # output.img[0, :, 1] = np.random.uniform(0.0, 255.0, self.resolution)
+            self.output.img = self.comp_test.make_pattern()
 
-            # ramp from 0 to 255
-            # output.img[0, :, 0] = np.linspace(0, 1.0, self.resolution)
-            # # ramp from 255 to 0
-            # output.img[0, :, 1] = np.linspace(1.0, 0, self.resolution)
+            self._output_callback(self.output)
 
-
-
-            # output.img[0, :, 2] = np.random.uniform(0.0, 1.0, self.resolution)
-
-
-            # set each tenth pixel to 1
-            output.img[0, ::10, 1] = 1.0
-
-            # set each blue pixel to 1 if random is above 0.9
-            # output.img[0, :, 0] = np.where(np.random.uniform(0.0, 1.0, self.resolution) > 0.9, 1.0, 0.0)
-
-            # make the blue pixels a gradient from 0 to 1
-            output.img[0, :, 0] = np.linspace(0, 1.0, self.resolution)
-
-            # set all pixeld to 1
-            # output.img[0, :, 0] = 1.0
-
-            self._output_callback(output)
-
-            sleep(self.interval)
+            next_time += self.interval
+            sleep_time = next_time - time()
+            if sleep_time > 0:
+                sleep(sleep_time)
+            else:
+                next_time = time()
+                print(f"Manager fell behind by {-sleep_time:.2f} seconds")
 
     # STATIC METHODS
 

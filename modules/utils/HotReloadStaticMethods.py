@@ -8,31 +8,33 @@ from watchdog.events import FileSystemEventHandler
 from types import ModuleType
 import os
 import inspect
+import hashlib
 from typing import get_type_hints
 
 from watchdog.observers.api import BaseObserver
 
-class StaticMethodReloader:
+class HotReloadStaticMethods:
     def __init__(self, methods_file_path: str, target_class: type, method_types: Dict[str, Type[Callable]]) -> None:
-        self.methods_file_path: str = methods_file_path
+        self.methods_file_path: str = os.path.abspath(os.path.normcase(methods_file_path)).lower()
         self.target_class: type = target_class
         self.method_types: Dict[str, Type[Callable]] = method_types
         self.method_names: List[str] = list(method_types.keys())
-        self.module_name: str = "_hot_methods"
+        unique_hash: str = hashlib.md5(self.methods_file_path.encode()).hexdigest()
+        self.module_name: str = f"{self.__class__.__name__}_{unique_hash}"
         self.observer: Optional[BaseObserver] = None
+        self._last_method_codes: Dict[str, Any] = {}  # Store last code objects
         self._start_watching()
 
     def _start_watching(self) -> None:
-        event_handler: StaticMethodReloader.ReloadHandler = self.ReloadHandler(self)
+        event_handler: HotReloadStaticMethods.ReloadHandler = self.ReloadHandler(self)
         self.observer = Observer()
         self.observer.schedule(event_handler, os.path.dirname(self.methods_file_path) or ".", recursive=False)
         self.observer.daemon = True
         self.observer.start()
         # Initial load
-        self.reload_methods()
+        self.reload_methods(False)
 
-    def reload_methods(self) -> None:
-        print(f"[MethodReloader] Reloading methods from {self.methods_file_path}")
+    def reload_methods(self, verbose: bool = True) -> None:
         try:
             spec: Optional[ModuleSpec] = importlib.util.spec_from_file_location(self.module_name, self.methods_file_path)
             if spec is None or spec.loader is None:
@@ -67,9 +69,16 @@ class StaticMethodReloader:
                             print(f"[MethodReloader] Error: {name} return type {method_hints['return']} doesn't match expected {expected_type.__args__[-1]}")
                             continue  # Skip patching this method
 
-                        # Signature is valid, patch the method
-                        setattr(self.target_class, name, staticmethod(method))
-                        print(f"[MethodReloader] Patched method: {name}")
+                        # Only patch if method code has changed
+                        new_code = getattr(method, "__code__", None)
+                        last_code = self._last_method_codes.get(name)
+                        if new_code and new_code != last_code:
+                            setattr(self.target_class, name, staticmethod(method))
+                            self._last_method_codes[name] = new_code
+                            if verbose:
+                                print(f"[MethodReloader] Patched method: {name} for {self.target_class.__name__}")
+                        # else:
+                        #     print(f"[MethodReloader] Skipped patching {name} (no change)")
 
                     except (AttributeError, TypeError, ValueError) as type_error:
                         print(f"[MethodReloader] Error validating {name} signature: {type_error}")
@@ -77,7 +86,7 @@ class StaticMethodReloader:
                 else:
                     print(f"[MethodReloader] Method not found in module: {name}")
 
-            print(f"[MethodReloader] Reloaded methods from {self.methods_file_path}")
+            # print(f"[MethodReloader] Reloaded methods from {self.methods_file_path}")
         except Exception as e:
             print(f"[MethodReloader] Error reloading {self.methods_file_path}: {e}")
             traceback.print_exc()
@@ -89,8 +98,8 @@ class StaticMethodReloader:
         def on_modified(self, event) -> None:
             event_path = os.path.abspath(os.path.normcase(event.src_path)).lower()
             watched_path = os.path.abspath(os.path.normcase(self.reloader.methods_file_path)).lower()
-            if event_path == self.reloader.methods_file_path:
-                print(f"[MethodReloader] Detected change in {event.src_path}, reloading...")
+            if event_path == watched_path:
+                # print(f"[MethodReloader] Detected change in {event.src_path}, reloading...")
                 self.reloader.reload_methods()
 
 # Example usage:
@@ -98,4 +107,4 @@ class StaticMethodReloader:
 #     "make_fill": Callable[[int, float, float], np.ndarray],
 #     "make_pulse": Callable[[int, float, float, float, float], np.ndarray]
 # }
-# reloader = MethodReloader("custom_methods.py", CompTest,
+# reloader = MethodReloader("custom_methods.py", CompTest, method_types)

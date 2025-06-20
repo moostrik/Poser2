@@ -6,8 +6,8 @@ import glob
 from queue import Queue, Empty
 from time import sleep
 
-BASEHEIGHT = 32
-ELEMHEIGHT = 32
+BASEHEIGHT = 30
+ELEMHEIGHT = 33
 
 class eType(Enum):
     NONE = 0

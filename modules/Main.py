@@ -59,6 +59,7 @@ class Main():
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame(), self.cameras[c+1].gui.get_gui_frame()])
             else:
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
+        self.gui.addFrame([self.av.gui.get_gui_frame()])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.detector.gui.get_gui_frame()])
