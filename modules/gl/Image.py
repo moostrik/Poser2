@@ -12,15 +12,19 @@ class Image(Texture):
 
     def set_image(self, image: np.ndarray) -> None:
         with self._mutex:
-            if self._image is None or self._image is not image:
-                self._image = image
-                self._needs_update = True
+            self._image = image
+            self._needs_update = True
 
     def update(self) -> None:
+        image: None | np.ndarray = None
+        needs_update: bool = False
         with self._mutex:
-            if self._needs_update and self._image is not None:
-                self.set_from_image(self._image)
-                self._needs_update = False
+            image = self._image
+            needs_update = self._needs_update
+            self._needs_update = False
+
+        if needs_update and image is not None:
+            self.set_from_image(image)
 
     def draw(self, x, y, w, h) -> None : #override
         self.bind()

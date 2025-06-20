@@ -48,7 +48,7 @@ void main() {
     blue = blue / overlap;
 
     vec3 color = vec3(white, white, white);
-    color += vec3(0.0, 0.0, blue);
+    color += vec3(blue * 0.05,  0.0, blue);
 
     fragColor = vec4(vec3(clamp(color, 0.0, 1.0)), 1.0);
 }
