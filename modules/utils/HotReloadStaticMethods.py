@@ -49,7 +49,7 @@ class HotReloadStaticMethods:
 
             for name in self._method_types:
                 if not hasattr(module, name):
-                    print(f"[{HotReloadStaticMethods.__name__}] Method not found in module: {name}")
+                    print(f"[{HotReloadStaticMethods.__name__}]  {self._target_class.__name__} method not found: {name} ")
                     continue
 
                 method: Callable = getattr(module, name)
@@ -70,10 +70,10 @@ class HotReloadStaticMethods:
 
                 setattr(self._target_class, name, staticmethod(method))
                 if verbose:
-                    print(f"[{HotReloadStaticMethods.__name__}] Patched method: {name} for {self._target_class.__name__}")
+                    print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} method patched: {name}")
 
         except Exception as e:
-            print(f"[MethodReloader] Error reloading {self._methods_file_path}: {e}")
+            print(f"[{HotReloadStaticMethods.__name__}] Error reloading {self._methods_file_path}: {e}")
             traceback.print_exc()
 
     @staticmethod
@@ -161,22 +161,22 @@ class HotReloadStaticMethods:
         # Check if code content has changed
         # Compare bytecode
         if new_code.co_code != last_code.co_code:
-            print(f"[{HotReloadStaticMethods.__name__}] Bytecode changed for {name}")
+            # print(f"[{HotReloadStaticMethods.__name__}] Bytecode changed for {name}")
             return True, new_code
 
         # Compare constants (could contain different values)
         if new_code.co_consts != last_code.co_consts:
-            print(f"[{HotReloadStaticMethods.__name__}] Constants changed for {name}")
+            # print(f"[{HotReloadStaticMethods.__name__}] Constants changed for {name}")
             return True, new_code
 
         # Compare names (variable names, etc.)
         if new_code.co_names != last_code.co_names:
-            print(f"[{HotReloadStaticMethods.__name__}] Names changed for {name}")
+            # print(f"[{HotReloadStaticMethods.__name__}] Names changed for {name}")
             return True, new_code
 
         # Compare variable names
         if new_code.co_varnames != last_code.co_varnames:
-            print(f"[{HotReloadStaticMethods.__name__}] Variable names changed for {name}")
+            # print(f"[{HotReloadStaticMethods.__name__}] Variable names changed for {name}")
             return True, new_code
 
         # Code hasn't changed, no need to patch
