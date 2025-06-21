@@ -25,17 +25,25 @@ class HotReloadStaticMethods:
     def __init__(self, target_class: Type[Any], methods_file_path: str, ) -> None:
         self.methods_file_path: str = os.path.abspath(os.path.normcase(methods_file_path)).lower()
         self.target_class: type = target_class
-        self.method_types: MethodDict = self._get_static_methods_with_types(target_class)
+        self.method_types: MethodDict = self._collect_static_method_info(target_class)
         self.method_names: List[str] = list(self.method_types.keys())
         unique_hash: str = hashlib.md5(self.methods_file_path.encode()).hexdigest()
         self.module_name: str = f"{self.__class__.__name__}_{unique_hash}"
         self.observer: Optional[BaseObserver] = None
-        self._last_method_codes: Dict[str, Optional[CodeType]] = {}
-        self._start_watching()
+        self._cached_method_codes: Dict[str, Optional[CodeType]] = {}
+        self._start_file_watcher()
+
+    def _start_file_watcher(self) -> None:
+        event_handler: HotReloadStaticMethods.FileChangeHandler = self.FileChangeHandler(self)
+        self.observer = Observer()
+        self.observer.schedule(event_handler, os.path.dirname(self.methods_file_path) or ".", recursive=False)
+        self.observer.daemon = True
+        self.observer.start()
+        self.reload_methods(False)
 
     def reload_methods(self, verbose: bool = True) -> None:
         try:
-            module: Optional[ModuleType] = self._load_module()
+            module: Optional[ModuleType] = HotReloadStaticMethods._import_module_from_file(self.module_name, self.methods_file_path)
             if module is None:
                 return
 
@@ -46,14 +54,18 @@ class HotReloadStaticMethods:
                 method: Callable = getattr(module, name)
                 method_info: MethodInfo = self.method_types[name]
                 method_sig: inspect.Signature = inspect.signature(method)
-                if not self._validate_parameter_names(name, method_sig, method_info['params']):
+                if not HotReloadStaticMethods._check_parameter_names_match(name, method_sig, method_info['params']):
                     continue
-                if not self._validate_parameter_types(name, method_sig, method_info['params']):
+                if not HotReloadStaticMethods._check_parameter_types_match(name, method_sig, method_info['params']):
                     continue
-                if not self._validate_return_type(name, method, method_info['return_type']):
+                if not HotReloadStaticMethods._check_return_type_match(name, method, method_info['return_type']):
                     continue
-                if not self._validate_code_changed(name, method):
+
+                changed, new_code = HotReloadStaticMethods._has_code_changed(name, method, self._cached_method_codes.get(name))
+                if not changed or new_code is None:
                     continue
+                self._cached_method_codes[name] = new_code
+
                 setattr(self.target_class, name, staticmethod(method))
                 if verbose:
                     print(f"[MethodReloader] Patched method: {name} for {self.target_class.__name__}")
@@ -62,10 +74,11 @@ class HotReloadStaticMethods:
             print(f"[MethodReloader] Error reloading {self.methods_file_path}: {e}")
             traceback.print_exc()
 
-    def _get_static_methods_with_types(self, cls: Type[Any]) -> MethodDict:
+    @staticmethod
+    def _collect_static_method_info(target_class: Type[Any]) -> MethodDict:
         static_methods: MethodDict = {}
-        for name, method in inspect.getmembers(cls):
-            if isinstance(inspect.getattr_static(cls, name), staticmethod) and not name.startswith('__'):
+        for name, method in inspect.getmembers(target_class):
+            if isinstance(inspect.getattr_static(target_class, name), staticmethod) and not name.startswith('__'):
                 sig: inspect.Signature = inspect.signature(method)
                 params: list[tuple[str, inspect.Parameter]] = list(sig.parameters.items())
                 param_types: list[tuple[str, Type]] = [(name, param.annotation) for name, param in params]
@@ -77,32 +90,26 @@ class HotReloadStaticMethods:
                 }
         return static_methods
 
-    def _start_watching(self) -> None:
-        event_handler: HotReloadStaticMethods.ReloadHandler = self.ReloadHandler(self)
-        self.observer = Observer()
-        self.observer.schedule(event_handler, os.path.dirname(self.methods_file_path) or ".", recursive=False)
-        self.observer.daemon = True
-        self.observer.start()
-        self.reload_methods(False)
-
-    def _load_module(self) -> Optional[ModuleType]:
-        spec: Optional[ModuleSpec] = importlib.util.spec_from_file_location(self.module_name, self.methods_file_path)
+    @staticmethod
+    def _import_module_from_file(module_name: str, methods_file_path: str) -> Optional[ModuleType]:
+        spec: Optional[ModuleSpec] = importlib.util.spec_from_file_location(module_name, methods_file_path)
         if spec is None or spec.loader is None:
-            print(f"[MethodReloader] Could not load spec from {self.methods_file_path}")
+            print(f"[MethodReloader] Could not load spec from {methods_file_path}")
             return None
 
         module: ModuleType = importlib.util.module_from_spec(spec)
-        sys.modules[self.module_name] = module
+        sys.modules[module_name] = module
 
         try:
             spec.loader.exec_module(module)
         except Exception as e:
-            print(f"[MethodReloader] Error executing module {self.methods_file_path}: {e}")
+            print(f"[MethodReloader] Error executing module {methods_file_path}: {e}")
             traceback.print_exc()
             return None
         return module
 
-    def _validate_parameter_names(self, name: str, method_sig: inspect.Signature, expected_params: List[Tuple[str, Type]]) -> bool:
+    @staticmethod
+    def _check_parameter_names_match(name: str, method_sig: inspect.Signature, expected_params: List[Tuple[str, Type]]) -> bool:
         if len(method_sig.parameters) != len(expected_params):
             method_param_names: List[str] = list(method_sig.parameters.keys())
             expected_param_names: List[str] = [param[0] for param in expected_params]
@@ -120,7 +127,8 @@ class HotReloadStaticMethods:
             return False
         return True
 
-    def _validate_parameter_types(self, name: str, method_sig: inspect.Signature, expected_params: List[Tuple[str, Type]]) -> bool:
+    @staticmethod
+    def _check_parameter_types_match(name: str, method_sig: inspect.Signature, expected_params: List[Tuple[str, Type]]) -> bool:
         for i, (param_name, param) in enumerate(method_sig.parameters.items()):
             expected_name, expected_type = expected_params[i]
             if param.annotation != expected_type and param.annotation != inspect.Parameter.empty:
@@ -129,56 +137,50 @@ class HotReloadStaticMethods:
 
         return True
 
-    def _validate_return_type(self, name: str, method: Callable, expected_return: Type) -> bool:
+    @staticmethod
+    def _check_return_type_match(name: str, method: Callable, expected_return: Type) -> bool:
         method_hints: dict[str, Type] = get_type_hints(method)
         if 'return' in method_hints and method_hints['return'] != expected_return:
             print(f"[MethodReloader] Error: {name} return type {method_hints['return']} doesn't match expected {expected_return}")
             return False
         return True
 
-    def _validate_code_changed(self, name: str, method: Callable) -> bool:
-        """Validate if the method's code has changed since last reload.
-        Returns True if the code has changed or wasn't previously loaded."""
+    @staticmethod
+    def _has_code_changed(name: str, method: Callable, last_code: Optional[CodeType]) -> Tuple[bool, Optional[CodeType]]:
         new_code: Optional[CodeType] = getattr(method, "__code__", None)
         if not new_code:
             print(f"[MethodReloader] Error: {name} has no code object")
-            return False
+            return False, None
 
-        last_code: Optional[CodeType] = self._last_method_codes.get(name)
+        # If we have no previous code, definitely changed
+        if last_code is None:
+            return True, new_code
 
-        # If we have no previous code or the code has changed
-        if last_code is None or self._code_content_changed(new_code, last_code):
-            self._last_method_codes[name] = new_code
-            return True
-
-        # Code hasn't changed, no need to patch
-        return False
-
-    def _code_content_changed(self, new_code: CodeType, old_code: CodeType) -> bool:
-        """Compare relevant attributes of code objects to determine if content changed."""
+        # Check if code content has changed
         # Compare bytecode
-        if new_code.co_code != old_code.co_code:
-            print(f"[MethodReloader] Bytecode changed for {new_code.co_name}")
-            return True
+        if new_code.co_code != last_code.co_code:
+            print(f"[MethodReloader] Bytecode changed for {name}")
+            return True, new_code
 
-        # # Compare constants (could contain different values)
-        # if new_code.co_consts != old_code.co_consts:
-        #     print(f"[MethodReloader] Constants changed for {new_code.co_name}")
-        #     return True
+        # Compare constants (could contain different values)
+        if new_code.co_consts != last_code.co_consts:
+            print(f"[MethodReloader] Constants changed for {name}")
+            return True, new_code
 
         # Compare names (variable names, etc.)
-        if new_code.co_names != old_code.co_names:
-            print(f"[MethodReloader] Names changed for {new_code.co_name}")
-            return True
+        if new_code.co_names != last_code.co_names:
+            print(f"[MethodReloader] Names changed for {name}")
+            return True, new_code
 
         # Compare variable names
-        if new_code.co_varnames != old_code.co_varnames:
-            print(f"[MethodReloader] Variable names changed for {new_code.co_name}")
-            return True
+        if new_code.co_varnames != last_code.co_varnames:
+            print(f"[MethodReloader] Variable names changed for {name}")
+            return True, new_code
 
-        return False
+        # Code hasn't changed, no need to patch
+        return False, None
 
-    class ReloadHandler(FileSystemEventHandler):
+    class FileChangeHandler(FileSystemEventHandler):
         def __init__(self, reloader: 'HotReloadStaticMethods') -> None:
             self.reloader: HotReloadStaticMethods = reloader
             self.last_modified_time: float = 0
