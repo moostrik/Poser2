@@ -29,7 +29,7 @@ class CompTest():
         self.WP: TestParameters = TestParameters()
         self.BP: TestParameters = TestParameters()
 
-        self.hot_reloader = HotReloadStaticMethods(self.__class__, methods_path)
+        self.hot_reloader = HotReloadStaticMethods(self.__class__, methods_path, True)
 
 
     def make_pattern(self) -> np.ndarray:

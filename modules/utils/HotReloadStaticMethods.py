@@ -23,7 +23,7 @@ class MethodInfo(TypedDict):
 MethodDict = Dict[str, MethodInfo]
 
 class HotReloadStaticMethods:
-    def __init__(self, target_class: Type[Any], methods_file_path: str, ) -> None:
+    def __init__(self, target_class: Type[Any], methods_file_path: str, watch_file: bool) -> None:
         self._target_class: type = target_class
         self._methods_file_path: str = os.path.abspath(os.path.normcase(methods_file_path)).lower()
         self._method_types: MethodDict = self._collect_static_method_info(target_class)
@@ -31,7 +31,8 @@ class HotReloadStaticMethods:
         self._module_name: str = f"{self.__class__.__name__}_{file_hash}"
         self._observer: Optional[BaseObserver] = None
         self._cached_method_codes: Dict[str, Optional[CodeType]] = {}
-        self._start_file_watcher()
+        if watch_file:
+            self._start_file_watcher()
 
     def _start_file_watcher(self) -> None:
         event_handler: HotReloadStaticMethods.FileChangeHandler = self.FileChangeHandler(self)
@@ -49,7 +50,8 @@ class HotReloadStaticMethods:
 
             for name in self._method_types:
                 if not hasattr(module, name):
-                    print(f"[{HotReloadStaticMethods.__name__}]  {self._target_class.__name__} method not found: {name} ")
+                    if verbose:
+                        print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} method not found: {name} ")
                     continue
 
                 method: Callable = getattr(module, name)
@@ -63,8 +65,11 @@ class HotReloadStaticMethods:
                 if not HotReloadStaticMethods._check_return_type_match(name, method, method_info['return_type']):
                     continue
 
-                changed, new_code = HotReloadStaticMethods._has_code_changed(name, method, self._cached_method_codes.get(name))
-                if not changed or new_code is None:
+                new_code: Optional[CodeType] = getattr(method, "__code__", None)
+                if new_code is None:
+                    print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} method has no code object: {name}")
+                    continue
+                if not HotReloadStaticMethods._has_code_changed(name, new_code, self._cached_method_codes.get(name)):
                     continue
                 self._cached_method_codes[name] = new_code
 
@@ -73,7 +78,7 @@ class HotReloadStaticMethods:
                     print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} method patched: {name}")
 
         except Exception as e:
-            print(f"[{HotReloadStaticMethods.__name__}] Error reloading {self._methods_file_path}: {e}")
+            print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} Error loading {self._methods_file_path}: {e}")
             traceback.print_exc()
 
     @staticmethod
@@ -148,39 +153,38 @@ class HotReloadStaticMethods:
         return True
 
     @staticmethod
-    def _has_code_changed(name: str, method: Callable, last_code: Optional[CodeType]) -> Tuple[bool, Optional[CodeType]]:
-        new_code: Optional[CodeType] = getattr(method, "__code__", None)
+    def _has_code_changed(name: str, new_code: Optional[CodeType], last_code: Optional[CodeType]) -> bool:
         if not new_code:
             print(f"[{HotReloadStaticMethods.__name__}] Error: {name} has no code object")
-            return False, None
+            return False
 
         # If we have no previous code, definitely changed
         if last_code is None:
-            return True, new_code
+            return True
 
         # Check if code content has changed
         # Compare bytecode
         if new_code.co_code != last_code.co_code:
             # print(f"[{HotReloadStaticMethods.__name__}] Bytecode changed for {name}")
-            return True, new_code
+            return True
 
         # Compare constants (could contain different values)
         if new_code.co_consts != last_code.co_consts:
             # print(f"[{HotReloadStaticMethods.__name__}] Constants changed for {name}")
-            return True, new_code
+            return True
 
         # Compare names (variable names, etc.)
         if new_code.co_names != last_code.co_names:
             # print(f"[{HotReloadStaticMethods.__name__}] Names changed for {name}")
-            return True, new_code
+            return True
 
         # Compare variable names
         if new_code.co_varnames != last_code.co_varnames:
             # print(f"[{HotReloadStaticMethods.__name__}] Variable names changed for {name}")
-            return True, new_code
+            return True
 
         # Code hasn't changed, no need to patch
-        return False, None
+        return False
 
     class FileChangeHandler(FileSystemEventHandler):
         def __init__(self, reloader: 'HotReloadStaticMethods') -> None:
