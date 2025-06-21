@@ -78,7 +78,7 @@ settings.render_fullscreen=     False
 settings.render_v_sync =        True
 settings.render_cams_a_row=     2
 
-settings.light_resolution =     4000
+settings.light_resolution =     3840
 settings.light_rate =           30
 
 settings.check_values()

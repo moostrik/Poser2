@@ -1,26 +1,14 @@
-from typing import Any, Callable, Type
 from modules.av.Definitions import *
-import math
-import time
-
 from modules.utils.HotReloadStaticMethods import HotReloadStaticMethods
 
 class TestPattern(IntEnum):
     FILL = 0
     PULSE = auto()
     CHASE = auto()
-    SNGLE = auto()
+    LINES = auto()
     RNDOM = auto()
 
 TEST_PATTERN_NAMES: list[str] = [p.name for p in TestPattern]
-
-method_types: dict[str, Any] = {
-    "make_fill": Callable[[int, float, float], np.ndarray],
-    "make_pulse": Callable[[int, float, float, float, float], np.ndarray],
-    "make_chase": Callable[[int, float, float, float, float, int], np.ndarray],
-    "make_single": Callable[[int, float, float, float, float, int], np.ndarray],
-    "make_random": Callable[[int, float, float, float], np.ndarray]
-}
 
 methods_path: str = 'modules/av/CompTestMethods.py'
 
@@ -34,18 +22,18 @@ class CompTest():
         self.blue_phase: float = 0.0
 
         self.pulse_speed: float = 0.0
+
         self.chase_speed: float = 0.0
         self.chase_amount: int = 0
 
-        self.single_speed: float = 0.0
-        self.single_amount: int = 0
+        self.line_speed: float = 0.0
+        self.line_amount: int = 0
+        self.line_width: int = 3
+
         self.random_speed: float = 0.0
 
-        self.method_reloader: HotReloadStaticMethods = HotReloadStaticMethods(
-            methods_file_path=methods_path,
-            target_class=CompTest,
-            method_types=method_types
-        )
+        self.hot_reloader = HotReloadStaticMethods(self.__class__, methods_path)
+
 
     def make_pattern(self) -> np.ndarray:
         try:
@@ -55,8 +43,8 @@ class CompTest():
                 return self.make_pulse(self.resolution, self.white_strength, self.blue_strength, self.blue_phase, self.pulse_speed)
             if self.pattern == TestPattern.CHASE:
                 return self.make_chase(self.resolution, self.white_strength, self.blue_strength, self.blue_phase, self.chase_speed, self.chase_amount)
-            if self.pattern == TestPattern.SNGLE:
-                return self.make_single(self.resolution, self.white_strength, self.blue_strength, self.blue_phase, self.single_speed, self.single_amount)
+            if self.pattern == TestPattern.LINES:
+                return self.make_lines(self.resolution, self.white_strength, self.blue_strength, self.blue_phase, self.line_speed, self.line_amount, self.line_width)
             if self.pattern == TestPattern.RNDOM:
                 return self.make_random(self.resolution, self.white_strength, self.blue_strength, self.random_speed)
         except Exception as e:
@@ -86,19 +74,22 @@ class CompTest():
         self.chase_speed = min(1.0, max(-1.0, speed))
 
     def set_chase_amount(self, amount: int) -> None:
-        self.chase_amount = max(1, amount)
+        self.chase_amount = max(1, int(amount))
 
-    def set_single_speed(self, speed: float) -> None:
-        self.single_speed = min(1.0, max(-1.0, speed))
+    def set_line_speed(self, speed: float) -> None:
+        self.line_speed = min(1.0, max(-1.0, speed))
 
-    def set_single_amount(self, amount: int) -> None:
-        self.single_amount = max(1, amount)
+    def set_line_amount(self, amount: int) -> None:
+        self.line_amount = max(1, int(amount))
+
+    def set_line_width(self, amount: int) -> None:
+        self.line_width = max(1, int(amount))
 
     def set_random_speed(self, speed: float) -> None:
         self.random_speed = max(0.0, speed)
 
     @staticmethod
-    def make_fill(resolution: int, white_strength: float, blue_strength) -> np.ndarray:
+    def make_fill(resolution: int, white_strength: float, blue_strength: float) -> np.ndarray:
         """Placeholder"""
         return np.zeros((1, resolution, 3), dtype=np.float16)
 
@@ -113,7 +104,7 @@ class CompTest():
         return np.zeros((1, resolution, 3), dtype=np.float16)
 
     @staticmethod
-    def make_single(resolution: int, white_strength: float, blue_strength: float, blue_phase: float, single_speed: float, single_amount: int) -> np.ndarray:
+    def make_lines(resolution: int, white_strength: float, blue_strength: float, blue_phase: float, single_speed: float, single_amount: int, single_width: int) -> np.ndarray:
         """Placeholder"""
         return np.zeros((1, resolution, 3), dtype=np.float16)
 

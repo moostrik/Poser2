@@ -30,12 +30,14 @@ class Gui():
                     E(eT.TEXT, 'Speed'),
                     E(eT.SLDR, 'chse_speed',    manager.comp_test.set_chase_speed,      1., [-1., 1.],  0.01),
                     E(eT.TEXT, 'Amnt '),
-                    E(eT.SLDR, 'chse_amount',   manager.comp_test.set_chase_amount,     1,  [1, 360],    1)])
+                    E(eT.SLDR, 'chse_amount',   manager.comp_test.set_chase_amount,     1,  [1, 360],   1)])
         elm.append([E(eT.TEXT, 'Single '),
                     E(eT.TEXT, 'Speed'),
-                    E(eT.SLDR, 'sngl_speed',    manager.comp_test.set_single_speed,     1., [-1., 1.],  0.01),
+                    E(eT.SLDR, 'sngl_speed',    manager.comp_test.set_line_speed,       1., [-1., 1.],  0.01),
                     E(eT.TEXT, 'Amnt '),
-                    E(eT.SLDR, 'sngl_amount',   manager.comp_test.set_single_amount,    1,  [1, 360],    1)])
+                    E(eT.SLDR, 'sngl_amount',   manager.comp_test.set_line_amount,      1,  [1, 360],   1),
+                    E(eT.TEXT, 'Wdth '),
+                    E(eT.SLDR, 'sngl_width',    manager.comp_test.set_line_width,       1,  [1, 36],    1)])
         elm.append([E(eT.TEXT, 'Random '),
                     E(eT.TEXT, 'Speed'),
                     E(eT.SLDR, 'rndm_speed',    manager.comp_test.set_random_speed,     1., [0., 2.],   0.01)])
