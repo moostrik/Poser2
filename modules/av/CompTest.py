@@ -39,20 +39,20 @@ class CompTest():
             white: Optional[np.ndarray] = None
             blue: Optional[np.ndarray] = None
             if self.pattern == TestPattern.FILL:
-                white = self.make_fill(self.resolution, self.WP.strength)
-                blue = self.make_fill(self.resolution, self.BP.strength)
+                white = self.make_fill(self.resolution, self.WP)
+                blue = self.make_fill(self.resolution, self.BP)
             if self.pattern == TestPattern.PULSE:
-                white = self.make_pulse(self.resolution, self.WP.strength, self.WP.speed, self.WP.phase)
-                blue = self.make_pulse(self.resolution, self.BP.strength, self.BP.speed, self.BP.phase)
+                white = self.make_pulse(self.resolution, self.WP)
+                blue = self.make_pulse(self.resolution, self.BP)
             if self.pattern == TestPattern.CHASE:
-                white = self.make_chase(self.resolution, self.WP.strength, self.WP.speed, self.WP.phase, self.WP.amount)
-                blue = self.make_chase(self.resolution, self.BP.strength, self.BP.speed, self.BP.phase, self.BP.amount)
+                white = self.make_chase(self.resolution, self.WP)
+                blue = self.make_chase(self.resolution, self.BP)
             if self.pattern == TestPattern.LINES:
-                white = self.make_lines(self.resolution, self.WP.strength, self.WP.speed, self.WP.phase, self.WP.amount, self.WP.width)
-                blue = self.make_lines(self.resolution, self.BP.strength, self.BP.speed, self.BP.phase, self.BP.amount, self.BP.width)
+                white = self.make_lines(self.resolution, self.WP)
+                blue = self.make_lines(self.resolution, self.BP)
             if self.pattern == TestPattern.RNDOM:
-                white = self.make_random(self.resolution, self.WP.strength, self.WP.speed)
-                blue = self.make_random(self.resolution, self.BP.strength, self.BP.speed)
+                white = self.make_random(self.resolution, self.WP)
+                blue = self.make_random(self.resolution, self.BP)
             if white is not None and blue is not None:
                 img: np.ndarray = np.zeros((1, self.resolution, 3), dtype=np.float16)
                 img[0, :, 0] = white[0, :]  # White channel
@@ -104,62 +104,63 @@ class CompTest():
         self.BP.amount = max(1, int(value))
 
     @staticmethod
-    def make_fill(resolution: int, strength: float) -> np.ndarray:
-        return np.full((1, resolution), strength, dtype=np.float16)
+    def make_fill(resolution: int, P: TestParameters) -> np.ndarray:
+        return np.full((1, resolution), P.strength, dtype=np.float16) +0
+
 
     @staticmethod
-    def make_pulse(resolution: int, strength: float, speed: float, phase: float) -> np.ndarray:
+    def make_pulse(resolution: int, P: TestParameters) -> np.ndarray:
         def lfo(time_: float, Htz: float, phase: float) -> float:
             return 0.5 * math.sin(time_ * math.pi * Htz + phase) + 0.5
 
         T: float = time.time()
         img: np.ndarray = np.zeros((1, resolution), dtype=np.float16)
-        freq: float = speed
-        img[0, :] = lfo(T, freq, phase * 2 * math.pi) * strength
+        freq: float = P.speed
+        img[0, :] = lfo(T, freq, P.phase * 2 * math.pi) * P.strength
         return img
 
     @staticmethod
-    def make_chase(resolution: int, strength: float, speed: float, phase: float, amount: int) -> np.ndarray:
+    def make_chase(resolution: int, P: TestParameters) -> np.ndarray:
         img: np.ndarray = np.zeros((1, resolution), dtype=np.float16)
-        if resolution == 0 or amount == 0:
+        if resolution == 0 or P.amount == 0:
             return img
 
-        adjusted_speed: float = speed * amount / 10.0
-        wave_phase_per_pixel: float = amount * 2 * math.pi / resolution
+        adjusted_speed: float = P.speed * P.amount / 10.0
+        wave_phase_per_pixel: float = P.amount * 2 * math.pi / resolution
         time_offset: float = time.time() * adjusted_speed * 2 * math.pi
 
         for i in range(resolution):
-            P: float = i * wave_phase_per_pixel - time_offset + phase * 2 * math.pi
-            value: float = 0.5 * math.sin(P) + 0.5
-            img[0, i] = value * strength
+            phase: float = i * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi
+            value: float = 0.5 * math.sin(phase) + 0.5
+            img[0, i] = value * P.strength
         return img
 
     @staticmethod
-    def make_lines(resolution: int, strength: float, speed: float, phase: float, amount: int, width: float) -> np.ndarray:
+    def make_lines(resolution: int, P: TestParameters) -> np.ndarray:
         img: np.ndarray = np.zeros((1, resolution), dtype=np.float16)
-        if resolution == 0 or amount == 0:
+        if resolution == 0 or P.amount == 0:
             return img
 
-        adjusted_speed: float = speed * amount / 10.0
-        wave_phase_per_pixel: float = amount * 2 * math.pi / resolution
+        adjusted_speed: float = P.speed * P.amount / 10.0
+        wave_phase_per_pixel: float = P.amount * 2 * math.pi / resolution
         time_offset: float = time.time() * adjusted_speed * 2 * math.pi
 
         for i in range(resolution):
-            P: float = i * wave_phase_per_pixel - time_offset + phase * 2 * math.pi + math.pi
-            value: float = 0.5 * math.sin(P) + 0.5
-            value = 1.0 if value < width else 0.0
-            img[0, i] = value * strength
+            phase: float = i * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi + math.pi
+            value: float = 0.5 * math.sin(phase) + 0.5
+            value = 1.0 if value < P.width else 0.0
+            img[0, i] = value * P.strength
         return img
 
     @staticmethod
-    def make_random(resolution: int, strength: float, speed: float) -> np.ndarray:
+    def make_random(resolution: int, P: TestParameters) -> np.ndarray:
         img: np.ndarray = np.zeros((1, resolution), dtype=np.float16)
         if resolution == 0:
             return img
-        T: float = time.time() * speed
+        T: float = time.time() * P.speed
         for i in range(resolution):
             if math.sin(T + i) > 0.5:
-                img[0, i] = strength
+                img[0, i] = P.strength
         return img
 
     @staticmethod

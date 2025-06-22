@@ -15,117 +15,94 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
 
-class MethodInfo(TypedDict):
-    method: Callable
-    params: List[Tuple[str, Type]]
-    return_type: Type
-
-MethodDict = Dict[str, MethodInfo]
-
 class HotReloadStaticMethods:
     def __init__(self, target_class: Type[Any], watch_file: bool = True) -> None:
         if not inspect.isclass(target_class):
             raise ValueError(f"Expected a class, got {type(target_class).__name__}")
-
         self._target_class: Type[Any] = target_class
 
-        # Extract source file path from the target class's module
-        target_module: Optional[ModuleType] = inspect.getmodule(target_class)
-        if target_module is None or target_module.__file__ is None:
+        class_module: Optional[ModuleType] = inspect.getmodule(target_class)
+        if class_module is None or class_module.__file__ is None:
             raise ValueError(f"Could not determine module for class {target_class.__name__}")
+        self._file_module_path: str = os.path.abspath(os.path.normcase(class_module.__file__)).lower()
 
-        self._methods_file_path: str = os.path.abspath(os.path.normcase(target_module.__file__)).lower()
-        self._method_types: MethodDict = self._collect_static_method_info(target_class)
+        self._file_module_name: str = f"{self._target_class.__name__}_{hashlib.md5(self._file_module_path.encode()).hexdigest()}"
+        file_module: Optional[ModuleType]  = self._load_module(self._file_module_name, self._file_module_path)
 
-        # Extract class name automatically
-        self._source_class_name: str = target_class.__name__
+        if file_module is None:
+            raise ValueError(f"Could not load module {self._file_module_name} from {self._file_module_path}")
+        methods: Optional[Dict[str, Callable]] = self._get_static_methods_from_class(target_class)
 
-        file_hash: str = hashlib.md5(self._methods_file_path.encode()).hexdigest()
-        self._module_name: str = f"{self.__class__.__name__}_{file_hash}"
+        self._cached_method_code: Dict[str, CodeType] = {}
+        if methods:
+            self._cached_method_code: Dict[str, CodeType] = self._get_code_from_methods(methods)
+
         self._observer: Optional[BaseObserver] = None
-        self._cached_method_codes: Dict[str, Optional[CodeType]] = {}
-
         if watch_file:
             self._start_file_watcher()
 
     def _start_file_watcher(self) -> None:
         event_handler: HotReloadStaticMethods.FileChangeHandler = self.FileChangeHandler(self)
         self._observer = Observer()
-        self._observer.schedule(event_handler, os.path.dirname(self._methods_file_path) or ".", recursive=False)
+        self._observer.schedule(event_handler, os.path.dirname(self._file_module_path) or ".", recursive=False)
         self._observer.daemon = True
         self._observer.start()
-        self.reload_methods(False)
 
-    def reload_methods(self, verbose: bool = True) -> None:
+    def reload_methods(self) -> None:
         try:
-            module: Optional[ModuleType] = HotReloadStaticMethods._import_module_from_file(self._module_name, self._methods_file_path)
+            # Load the module from file
+            module: Optional[ModuleType] = self._load_module(self._file_module_name, self._file_module_path)
             if module is None:
                 return
 
-            # If source class name is provided, extract methods from that class
-            if self._source_class_name is not None:
-                source_methods = HotReloadStaticMethods._extract_static_methods_from_class(module, self._source_class_name)
-                if source_methods is None:
-                    return
+            # Get static methods from the updated class in the module
+            methods: Optional[Dict[str, Callable]] = self._get_static_methods_from_module(module, self._target_class.__name__)
+            if methods is None:
+                return
 
-                # Create a namespace with these methods at the module level
-                for name, method in source_methods.items():
-                    setattr(module, name, method)
+            new_method_code: Dict[str, CodeType] = self._get_code_from_methods(methods)
 
-            for name in self._method_types:
-                if not hasattr(module, name):
-                    if verbose:
-                        print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} method not found: {name} ")
-                    continue
+            # remove methods that no longer exist
+            for name in list(self._cached_method_code.keys()):
+                if name not in new_method_code:
+                    print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} remove method: {name}")
+                    if hasattr(self._target_class, name):
+                        method: Callable = getattr(self._target_class, name)
+                        if isinstance(inspect.getattr_static(self._target_class, name), staticmethod):
+                            print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} removed method: {name}")
+                            delattr(self._target_class, name)
+                        else:
+                            print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} method {name} is not a static method, skipping removal")
 
-                method: Callable = getattr(module, name)
-                method_info: MethodInfo = self._method_types[name]
-                method_sig: inspect.Signature = inspect.signature(method)
+            # update existing methods
+            for name, code in new_method_code.items():
+                if name in self._cached_method_code:
+                    # print(f"[{HotReloadStaticMethods.__name__}] Checking method: {name} in {self._target_class.__name__}")
+                    if self._has_code_changed(name, code, self._cached_method_code[name]):
+                        if hasattr(self._target_class, name):
+                            if isinstance(inspect.getattr_static(self._target_class, name), staticmethod):
+                                print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} patch method: {name}")
+                                setattr(self._target_class, name, staticmethod(methods[name]))
 
-                if not HotReloadStaticMethods._check_parameter_names_match(name, method_sig, method_info['params']):
-                    continue
-                if not HotReloadStaticMethods._check_parameter_types_match(name, method_sig, method_info['params']):
-                    continue
-                if not HotReloadStaticMethods._check_return_type_match(name, method, method_info['return_type']):
-                    continue
+            # add new methods that were added
+            for name, code in new_method_code.items():
+                if name not in self._cached_method_code:
+                    print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} add method: {name}")
+                    setattr(self._target_class, name, staticmethod(methods[name]))
 
-                new_code: Optional[CodeType] = getattr(method, "__code__", None)
-                if new_code is None:
-                    print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} method has no code object: {name}")
-                    continue
-                if not HotReloadStaticMethods._has_code_changed(name, new_code, self._cached_method_codes.get(name)):
-                    continue
-                self._cached_method_codes[name] = new_code
-
-                setattr(self._target_class, name, staticmethod(method))
-                if verbose:
-                    print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} method patched: {name}")
+            # Update cached method codes
+            self._cached_method_code = new_method_code
 
         except Exception as e:
-            print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} Error loading {self._methods_file_path}: {e}")
+            print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} Error loading {self._file_module_path}: {e}")
             traceback.print_exc()
 
     @staticmethod
-    def _collect_static_method_info(target_class: Type[Any]) -> MethodDict:
-        static_methods: MethodDict = {}
-        for name, method in inspect.getmembers(target_class):
-            if isinstance(inspect.getattr_static(target_class, name), staticmethod) and not name.startswith('__'):
-                sig: inspect.Signature = inspect.signature(method)
-                params: list[tuple[str, inspect.Parameter]] = list(sig.parameters.items())
-                param_types: list[tuple[str, Type]] = [(name, param.annotation) for name, param in params]
-                return_type: Type = sig.return_annotation
-                static_methods[name] = {
-                    'method': method,
-                    'params': param_types,
-                    'return_type': return_type
-                }
-        return static_methods
-
-    @staticmethod
-    def _import_module_from_file(module_name: str, methods_file_path: str) -> Optional[ModuleType]:
-        spec: Optional[ModuleSpec] = spec_from_file_location(module_name, methods_file_path)
+    def _load_module(module_name: str, file_path: str) -> Optional[ModuleType]:
+        """Load a Python module from a file path."""
+        spec: Optional[ModuleSpec] = spec_from_file_location(module_name, file_path)
         if spec is None or spec.loader is None:
-            print(f"[{HotReloadStaticMethods.__name__}] Could not load spec from {methods_file_path}")
+            print(f"[{HotReloadStaticMethods.__name__}] Could not load spec from {file_path}")
             return None
 
         module: ModuleType = module_from_spec(spec)
@@ -133,65 +110,47 @@ class HotReloadStaticMethods:
 
         try:
             spec.loader.exec_module(module)
+            return module
+
         except Exception as e:
-            print(f"[{HotReloadStaticMethods.__name__}] Error executing module {methods_file_path}: {e}")
+            print(f"[{HotReloadStaticMethods.__name__}] Error executing module {file_path}: {e}")
             traceback.print_exc()
             return None
-        return module
 
-    # Add this new method to extract static methods from a class in the loaded module
     @staticmethod
-    def _extract_static_methods_from_class(module: ModuleType, class_name: str) -> Optional[Dict[str, Callable]]:
-        """Extract static methods from a class in the loaded module."""
-        if not hasattr(module, class_name):
-            print(f"[{HotReloadStaticMethods.__name__}] Class {class_name} not found in module")
-            return None
-
-        class_obj = getattr(module, class_name)
-        methods = {}
-
-        for name, method in inspect.getmembers(class_obj):
-            if isinstance(inspect.getattr_static(class_obj, name), staticmethod) and not name.startswith('__'):
+    def _get_static_methods_from_class(obj: Type[Any]) -> Dict[str, Callable]:
+        """Extract static methods from a class."""
+        methods: Dict[str, Callable] = {}
+        for name, method in inspect.getmembers(obj):
+            if isinstance(inspect.getattr_static(obj, name), staticmethod) and not name.startswith('__'):
                 methods[name] = method
-
         return methods
 
     @staticmethod
-    def _check_parameter_names_match(name: str, method_sig: inspect.Signature, expected_params: List[Tuple[str, Type]]) -> bool:
-        if len(method_sig.parameters) != len(expected_params):
-            method_param_names: List[str] = list(method_sig.parameters.keys())
-            expected_param_names: List[str] = [param[0] for param in expected_params]
+    def _get_static_methods_from_module(module: ModuleType, class_name: str) -> Optional[Dict[str, Callable]]:
+        # Check if the class exists in the module
+        if not hasattr(module, class_name):
+            print(f"[{HotReloadStaticMethods.__name__}] Class {class_name} not found in module")
+            return None
+        # Get the class from the module
+        class_obj = getattr(module, class_name)
+        if not inspect.isclass(class_obj):
+            print(f"[{HotReloadStaticMethods.__name__}] {class_name} is not a class in module {module.__name__}")
+            return None
 
-            missing_params: List[str] = [p for p in expected_param_names if p not in method_param_names]
-            extra_params: List[str] = [p for p in method_param_names if p not in expected_param_names]
-
-            error_msg = f"[{HotReloadStaticMethods.__name__}] Error: {name} has {len(method_sig.parameters)} parameters, expected {len(expected_params)}."
-            if missing_params:
-                error_msg += f" Missing: {', '.join(missing_params)}."
-            if extra_params:
-                error_msg += f" Extra: {', '.join(extra_params)}."
-
-            print(error_msg)
-            return False
-        return True
+        return HotReloadStaticMethods._get_static_methods_from_class(class_obj)
 
     @staticmethod
-    def _check_parameter_types_match(name: str, method_sig: inspect.Signature, expected_params: List[Tuple[str, Type]]) -> bool:
-        for i, (param_name, param) in enumerate(method_sig.parameters.items()):
-            expected_name, expected_type = expected_params[i]
-            if param.annotation != expected_type and param.annotation != inspect.Parameter.empty:
-                print(f"[{HotReloadStaticMethods.__name__}] Error: {name} parameter {param_name} type {param.annotation} doesn't match expected {expected_type}")
-                return False
-
-        return True
-
-    @staticmethod
-    def _check_return_type_match(name: str, method: Callable, expected_return: Type) -> bool:
-        method_hints: dict[str, Type] = get_type_hints(method)
-        if 'return' in method_hints and method_hints['return'] != expected_return:
-            print(f"[{HotReloadStaticMethods.__name__}] Error: {name} return type {method_hints['return']} doesn't match expected {expected_return}")
-            return False
-        return True
+    def _get_code_from_methods(methods: Dict[str, Callable]) -> Dict[str, CodeType]:
+        """Extract code objects from static methods."""
+        code_dict: Dict[str, CodeType] = {}
+        for name, method in methods.items():
+            code: Optional[CodeType] = getattr(method, "__code__", None)
+            if code is not None:
+                code_dict[name] = code
+            else:
+                print(f"[{HotReloadStaticMethods.__name__}] Method {name} has no code object")
+        return code_dict
 
     @staticmethod
     def _has_code_changed(name: str, new_code: Optional[CodeType], last_code: Optional[CodeType]) -> bool:
@@ -245,7 +204,7 @@ class HotReloadStaticMethods:
                 src_path = event.src_path
 
             event_path: str = os.path.abspath(os.path.normcase(src_path)).lower()
-            watched_path: str = os.path.abspath(os.path.normcase(self._reloader._methods_file_path)).lower()
+            watched_path: str = os.path.abspath(os.path.normcase(self._reloader._file_module_path)).lower()
             if event_path == watched_path:
                 self._last_modified_time = current_time
                 self._reloader.reload_methods()
