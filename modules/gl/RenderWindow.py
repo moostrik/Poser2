@@ -29,13 +29,14 @@ class RenderWindow(Thread):
         self.v_sync: bool = v_sync
         # self.frame_interval = int(1000 / fps)  # Interval in milliseconds
         self.frame_interval: None | int = None
-        if fps:
+        if fps and fps > 0:
             self.frame_interval = int((1.0 / fps) * 1_000_000_000)
         self.last_time: int = time.time_ns()
         self.windowName: str = name
         self.fps = FpsCounter()
         self.window_x: int = posX
         self.window_y: int = posY
+        print(f"RenderWindow: {self.windowName} at {self.window_x}, {self.window_y} ({self.window_width}x{self.window_height})")
         self.mouse_x: float = 0.0
         self.mouse_y: float = 0.0
         self.mouse_callbacks: list[Callable] = []
@@ -114,7 +115,7 @@ class RenderWindow(Thread):
             # glut.glutSetCursor(glut.GLUT_CURSOR_NONE)
         else:
             glut.glutReshapeWindow(self.prev_window_width, self.prev_window_height)
-            glut.glutPositionWindow(100, 100)
+            # glut.glutPositionWindow(100, 100)
             # glut.glutSetCursor(glut.GLUT_CURSOR_LEFT_ARROW)
 
     def drawWindow(self) -> None:
@@ -148,6 +149,10 @@ class RenderWindow(Thread):
     def keyboardCallback(self, key, x, y) -> None:
         if key == b'\x1b': # escape
             if self.exit_callback: self.exit_callback()
+            # if key is f or F toggle fullscreen
+        elif key == b'f' or key == b'F':
+            self.setFullscreen(not self.fullscreen)
+            return
         for c in self.key_callbacks:
             c(key, x, y)
 

@@ -18,8 +18,8 @@ class TestParameters():
         self.strength: float =  0.5
         self.speed: float =     0.5
         self.phase: float =     0.0
+        self.width: float =     0.5
         self.amount: int =      36
-        self.width: int =       3
 
 class CompTest():
     def __init__(self, resolution: int) -> None:
@@ -85,10 +85,10 @@ class CompTest():
         self.WP.speed = min(1.0, max(-1.0, value))
     def set_white_phase(self, value: float) -> None:
         self.WP.phase = max(0.0, min(1.0, value))
+    def set_white_width(self, value: float) -> None:
+        self.WP.width = max(0.0, min(1.0, value))
     def set_white_amount(self, value: int) -> None:
         self.WP.amount = max(1, int(value))
-    def set_white_width(self, value: int) -> None:
-        self.WP.width = max(1, int(value))
 
     def set_blue_strength(self, value: float) -> None:
         self.BP.strength = max(0.0, min(1.0, value))
@@ -96,10 +96,10 @@ class CompTest():
         self.BP.speed = min(1.0, max(-1.0, value))
     def set_blue_phase(self, value: float) -> None:
         self.BP.phase = max(0.0, min(1.0, value))
+    def set_blue_width(self, value: float) -> None:
+        self.BP.width = max(0.0, min(1.0, value))
     def set_blue_amount(self, value: int) -> None:
         self.BP.amount = max(1, int(value))
-    def set_blue_width(self, value: int) -> None:
-        self.BP.width = max(1, int(value))
 
     @staticmethod
     def make_fill(resolution: int, strength: float) -> np.ndarray:
@@ -117,7 +117,7 @@ class CompTest():
         return np.zeros((1, resolution), dtype=np.float16)
 
     @staticmethod
-    def make_lines(resolution: int, strength: float, speed: float, phase: float, amount: int, width: int) -> np.ndarray:
+    def make_lines(resolution: int, strength: float, speed: float, phase: float, amount: int, width: float) -> np.ndarray:
         """Placeholder"""
         return np.zeros((1, resolution), dtype=np.float16)
 

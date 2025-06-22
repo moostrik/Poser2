@@ -87,8 +87,7 @@ class Render(RenderWindow):
             self.all_meshes.append(self.pose_meshes[i])
 
         self.composition: Composition_Subdivision = self.make_composition_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.num_persons, self.num_viss)
-
-        super().__init__(self.composition[ImageType.TOT][0][2], self.composition[ImageType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_x, settings.render_y)
+        super().__init__(self.composition[ImageType.TOT][0][2], self.composition[ImageType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_fps, settings.render_x, settings.render_y)
 
         self.allocated = False
 
@@ -443,11 +442,11 @@ class Render(RenderWindow):
         ret[ImageType.VIS] = {}
 
         cams_per_row: int = 4
-        cam_rows: int = max(math.ceil(num_cams / cams_per_row), 1)
-        cam_colums: int = max(math.ceil(num_cams / cam_rows), 1)
+        cam_rows: int = math.ceil(num_cams / cams_per_row)
+        cam_columns: int = 0 if cam_rows == 0 else math.ceil(num_cams / cam_rows)
 
         dst_aspect_ratio: float = dst_width / dst_height
-        cam_grid_aspect_ratio: float = cam_aspect_ratio * cam_colums / cam_rows
+        cam_grid_aspect_ratio: float = 100.0 if cam_rows == 0 else cam_aspect_ratio * cam_columns / cam_rows
         sim_grid_aspect_ratio: float = sim_aspect_ratio / num_sims
         vis_grid_aspect_ratio: float = vis_aspect_ratio / num_viss
         psn_grid_aspect_ratio: float = psn_aspect_ratio * num_persons
@@ -466,7 +465,7 @@ class Render(RenderWindow):
 
         ret[ImageType.TOT][0] = (0, 0, int(fit_width), int(fit_height))
 
-        cam_width: float =  fit_width / cam_colums
+        cam_width: float = fit_width if cam_columns == 0 else fit_width / cam_columns
         cam_height: float = cam_width / cam_aspect_ratio
         sim_height: float = fit_width / sim_aspect_ratio
         psn_width: float =  fit_width / num_persons
@@ -475,8 +474,8 @@ class Render(RenderWindow):
         y_start: float = fit_y
 
         for i in range(num_cams):
-            cam_x: float = (i % cam_colums) * cam_width + fit_x
-            cam_y: float = (i // cam_colums) * cam_height + fit_y
+            cam_x: float = (i % cam_columns) * cam_width + fit_x
+            cam_y: float = (i // cam_columns) * cam_height + fit_y
             ret[ImageType.CAM][i] = (int(cam_x), int(cam_y), int(cam_width), int(cam_height))
 
         y_start += cam_height * cam_rows

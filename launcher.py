@@ -75,6 +75,7 @@ settings.render_height =        1080
 settings.render_x =             0
 settings.render_y =             0
 settings.render_fullscreen=     False
+settings.render_fps =           0
 settings.render_v_sync =        True
 settings.render_cams_a_row=     2
 

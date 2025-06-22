@@ -35,16 +35,16 @@ class Gui():
                     E(eT.SLDR, 'W_phase',       manager.comp_test.set_white_phase,      0.0, [0., 1.],  0.01),
                     E(eT.TEXT, 'B'),
                     E(eT.SLDR, 'B_phase',       manager.comp_test.set_blue_phase,       0.5, [0., 1.],  0.01)])
+        elm.append([E(eT.TEXT, 'Width    '),
+                    E(eT.TEXT, 'W'),
+                    E(eT.SLDR, 'W_width',       manager.comp_test.set_white_width,      0.5, [0., 1.],  0.01),
+                    E(eT.TEXT, 'B'),
+                    E(eT.SLDR, 'B_width',       manager.comp_test.set_blue_width,       0.5, [0., 1.],  0.01)])
         elm.append([E(eT.TEXT, 'Amount   '),
                     E(eT.TEXT, 'W'),
                     E(eT.SLDR, 'W_amount',      manager.comp_test.set_white_amount,     36,  [1, 360],  1),
                     E(eT.TEXT, 'B'),
                     E(eT.SLDR, 'B_amount',      manager.comp_test.set_blue_amount,      36,  [1, 360],  1)])
-        elm.append([E(eT.TEXT, 'Width    '),
-                    E(eT.TEXT, 'W'),
-                    E(eT.SLDR, 'W_width',       manager.comp_test.set_white_width,      3,   [1, 36],   0.01),
-                    E(eT.TEXT, 'B'),
-                    E(eT.SLDR, 'B_width',       manager.comp_test.set_blue_width,       3,   [1, 36],   0.01)])
 
         gui_height = len(elm) * ELEMHEIGHT + BASEHEIGHT
         self.frame = Frame('COMP TEST', elm, gui_height)
