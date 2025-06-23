@@ -33,7 +33,6 @@ class CompTest():
 
         self.hot_reloader = HotReloadStaticMethods(self.__class__, True)
 
-
     def make_pattern(self) -> np.ndarray:
         try:
             white: Optional[np.ndarray] = None
@@ -55,8 +54,8 @@ class CompTest():
                 blue = self.make_random(self.resolution, self.BP)
             if white is not None and blue is not None:
                 img: np.ndarray = np.zeros((1, self.resolution, 3), dtype=np.float16)
-                img[0, :, 0] = white[0, :]  # White channel
-                img[0, :, 1] = blue[0, :]   # Blue channel
+                img[0, :, 0] = white[0, :]
+                img[0, :, 1] = blue[0, :]
                 return img
         except Exception as e:
             print(f"[CompTest] Error generating pattern: {e}")
