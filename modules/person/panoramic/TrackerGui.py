@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from modules.Settings import Settings
 
-from modules.person.Definitions import *
+from modules.person.panoramic.Definitions import *
 
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
 
-class Gui():
+class TrackerGui():
     def __init__(self, gui: G, manager, settings: Settings) -> None:
         self.gui: G = gui
         self.manager = manager

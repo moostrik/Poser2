@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 
 from modules.cam.depthcam.Definitions import get_device_list
-from modules.person.pose.Detection import ModelType
+from modules.pose.Detection import ModelType
 from modules.cam.depthcam.Definitions import FrameType
 
 class Settings():

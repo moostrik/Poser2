@@ -4,7 +4,7 @@ from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
-from modules.person.Manager import Manager as Detector
+from modules.person.panoramic.Tracker import Tracker as Detector
 from modules.av.Manager import Manager as AV
 from math import ceil
 

@@ -1,3 +1,7 @@
+# TODO:
+# Cleanup person class
+# Move Pose Detection to separate module
+
 from __future__ import annotations
 
 import cv2
@@ -6,16 +10,26 @@ from threading import Thread, Lock
 from time import time, sleep
 
 from modules.Settings import Settings
-from modules.person.Gui import Gui
-from modules.person.Person import Person, PersonDict, PersonCallback, PersonDictCallback
+from modules.person.panoramic.TrackerGui import TrackerGui
+from modules.person.Person import Person, PersonDict, PersonCallback, PersonDictCallback, PersonIdPool
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
-from modules.person.pose.Detection import Detection, ModelType, ModelTypeNames
-from modules.person.Camera360Array import Camera360Array
-from modules.person.Definitions import *
+from modules.person.panoramic.Geometry import Geometry
+from modules.person.panoramic.Definitions import *
+
+# from modules.pose.Definitions import ModelTypeNames
+# from modules.pose.Detection import Detection
+# from modules.pose.Window import Window
+
+class CamTracklet:
+    def __init__(self, cam_id: int, tracklet: Tracklet) -> None:
+        self.cam_id: int = cam_id
+        self.tracklet: Tracklet = tracklet
+        self.timestamp: float = time()
 
 CamTrackletDict = dict[int, list[Tracklet]]
 
-class Manager(Thread):
+
+class Tracker(Thread):
     def __init__(self, gui, settings: Settings) -> None:
         super().__init__()
 
@@ -26,19 +40,10 @@ class Manager(Thread):
         self.input_frames: dict[int, np.ndarray] = {}
         self.input_tracklets: CamTrackletDict = {}
 
-        self.person_id_pool: IdPool = IdPool(self.max_persons)
+        self.person_id_pool: PersonIdPool = PersonIdPool(self.max_persons)
         self.persons: PersonDict = {}
 
-        self.cam_360: Camera360Array = Camera360Array(settings.camera_num, CAM_360_FOV, CAM_360_TARGET_FOV)
-
-        self.pose_detectors: dict[int, Detection] = {}
-        self.pose_detector_frame_size: int = 256
-        if not settings.pose_active:
-            print('Pose Detection: Disabled')
-        else:
-            for i in range(self.max_persons):
-                self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type)
-            print('Pose Detection:', self.max_persons, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
+        self.cam_360: Geometry = Geometry(settings.camera_num, CAM_360_FOV, CAM_360_TARGET_FOV)
 
         self.min_tracklet_age: int =            MIN_TRACKLET_AGE
         self.min_tracklet_height: float =       MIN_TRACKLET_HEIGHT
@@ -50,19 +55,12 @@ class Manager(Thread):
 
         self.person_callbacks: set[PersonCallback] = set()
         self.dict_callbacks: set[PersonDictCallback] = set()
-        self.gui = Gui(gui, self, settings)
+        self.gui = TrackerGui(gui, self, settings)
 
     def start(self) -> None:
         if self.running:
             return
-
-        for detector in self.pose_detectors.values():
-            detector.addMessageCallback(self._person_callback)
-            detector.start()
-            self.pose_detector_frame_size = detector.get_frame_size()
-
         self.running = True
-
         super().start()
 
     def stop(self) -> None:
@@ -133,7 +131,7 @@ class Manager(Thread):
             persons.remove(person)
 
     @staticmethod
-    def filter_edge(persons: list[Person], circular: Camera360Array, edge_range: float) -> None:
+    def filter_edge(persons: list[Person], circular: Geometry, edge_range: float) -> None:
         rejected_persons: list[Person] = []
         for person in persons:
             if circular.angle_in_edge(person.local_angle, edge_range):
@@ -157,7 +155,7 @@ class Manager(Thread):
                 person.update_from(same_person)
 
     @staticmethod
-    def filter_and_update_overlap(active_persons: PersonDict, new_persons: list[Person], radial: Camera360Array,
+    def filter_and_update_overlap(active_persons: PersonDict, new_persons: list[Person], radial: Geometry,
                                   overlap_expansion: float, hysteresis_factor: float) -> None:
 
         for person in new_persons:
@@ -186,7 +184,7 @@ class Manager(Thread):
                             person.update_from(overlap_persons[0])
 
     @staticmethod
-    def add_persons(active_persons: PersonDict, new_persons: list[Person], person_id_pool: IdPool) -> None:
+    def add_persons(active_persons: PersonDict, new_persons: list[Person], person_id_pool: PersonIdPool) -> None:
         for person in new_persons:
             try:
                 person_id: int = person_id_pool.acquire()
@@ -199,7 +197,7 @@ class Manager(Thread):
             active_persons[person_id] = person
 
     @ staticmethod
-    def cleanup_inactive_persons(persons: PersonDict, person_id_pool: IdPool, activity_duration: float = 1.0) -> None:
+    def cleanup_inactive_persons(persons: PersonDict, person_id_pool: PersonIdPool, activity_duration: float = 1.0) -> None:
         rejected_persons: list[Person] = []
         for key in persons.keys():
             person: Person = persons[key]

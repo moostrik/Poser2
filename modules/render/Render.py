@@ -16,7 +16,7 @@ from modules.gl.shaders.WS_Angles import WS_Angles
 from modules.gl.shaders.WS_Lines import WS_Lines
 
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
-from modules.person.pose.Definitions import Pose, Indices
+from modules.pose.detection.Definitions import Pose, Indices
 from modules.person.Person import Person, PersonColor
 from modules.person.Definitions import *
 from modules.av.Definitions import AvOutput

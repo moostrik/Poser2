@@ -5,7 +5,7 @@ import onnxruntime as ort
 from threading import Thread, Lock
 import os
 
-from modules.person.pose.Definitions import *
+from modules.pose.Definitions import *
 from modules.person.Person import Person
 
 class Detection(Thread):
