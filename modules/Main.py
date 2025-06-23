@@ -1,21 +1,26 @@
-from modules.Settings import Settings
+from math import ceil
+from typing import Optional
+
+from modules.av.Manager import Manager as AV
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
-from modules.render.Render import Render
 from modules.gui.PyReallySimpleGui import Gui
-from modules.person.panoramic.Tracker import Tracker as Detector
-from modules.av.Manager import Manager as AV
-from math import ceil
+from modules.person.panoramic.Tracker import Tracker as PanoramicTracker
+from modules.pose.Pipeline import Pipeline
+from modules.render.Render import Render
+from modules.Settings import Settings
+
 
 class Main():
     def __init__(self, settings: Settings) -> None:
         self.gui = Gui(settings.render_title + ' GUI', settings.path_file, 'default')
+
         self.render = Render(settings)
-        self.recorder: Recorder | None = None
-        self.player: Player | None = None
 
         self.cameras: list[DepthCam | DepthSimulator] = []
+        self.recorder: Optional[Recorder] = None
+        self.player: Optional[Player] = None
         if settings.camera_simulation:
             self.player = Player(self.gui, settings)
             for cam_id in settings.camera_list:
@@ -26,7 +31,12 @@ class Main():
                 camera = DepthCam(self.gui, cam_id, settings)
                 self.cameras.append(camera)
 
-        self.detector = Detector(self.gui, settings)
+        self.panoramic_tracker = PanoramicTracker(self.gui, settings)
+
+        self.pose_pipeline: Optional[Pipeline] = None
+        if settings.pose_active:
+            self.pose_pipeline = Pipeline(settings)
+
         self.av: AV = AV(self.gui, settings)
         self.running: bool = False
 
@@ -37,16 +47,21 @@ class Main():
 
         for camera in self.cameras:
             camera.add_preview_callback(self.render.set_cam_image)
-            camera.add_frame_callback(self.detector.set_image)
+            camera.add_frame_callback(self.panoramic_tracker.set_image)
             if self.recorder:
                 camera.add_sync_callback(self.recorder.add_synced_frames)
-            camera.add_tracker_callback(self.detector.add_tracklet)
+            camera.add_tracker_callback(self.panoramic_tracker.add_tracklet)
             camera.add_tracker_callback(self.render.add_tracklet)
             camera.start()
 
-        self.detector.add_person_callback(self.render.add_person)
-        self.detector.add_dict_callback(self.av.set_person_dict)
-        self.detector.start()
+        if self.pose_pipeline:
+            self.panoramic_tracker.add_person_callback(self.pose_pipeline.person_input)
+            self.pose_pipeline.add_person_callback(self.render.add_person)
+            self.pose_pipeline.start()
+        else:
+            self.panoramic_tracker.add_person_callback(self.render.add_person)
+
+        self.panoramic_tracker.start()
 
         self.av.add_output_callback(self.render.set_av)
         self.av.start()
@@ -62,9 +77,9 @@ class Main():
         self.gui.addFrame([self.av.gui.get_gui_frame()])
 
         if self.player:
-            self.gui.addFrame([self.player.get_gui_frame(), self.detector.gui.get_gui_frame()])
+            self.gui.addFrame([self.player.get_gui_frame(), self.panoramic_tracker.gui.get_gui_frame()])
         if self.recorder:
-            self.gui.addFrame([self.recorder.get_gui_frame(), self.detector.gui.get_gui_frame()])
+            self.gui.addFrame([self.recorder.get_gui_frame(), self.panoramic_tracker.gui.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
 
@@ -92,8 +107,8 @@ class Main():
             camera.stop()
 
         # print('stop detector')
-        self.detector.stop()
-        self.detector.join()
+        self.panoramic_tracker.stop()
+        self.panoramic_tracker.join()
 
         self.av.stop()
         self.av.join()

@@ -87,7 +87,7 @@ class Pose():
     def __init__(self, keypoints: np.ndarray, scores: np.ndarray) -> None:
         self.keypoints: np.ndarray = keypoints
         self.scores: np.ndarray = scores
-        self.mean_score = float(np.mean(scores))
+        # self.mean_score = float(np.mean(scores))
 
     def getKeypoints(self) -> np.ndarray:
         return self.keypoints

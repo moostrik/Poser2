@@ -1,13 +1,10 @@
-# TODO:
-# Cleanup person class
-# Move Pose Detection to separate module
-
 from __future__ import annotations
 
 import cv2
 import numpy as np
 from threading import Thread, Lock
 from time import time, sleep
+from typing import Optional
 
 from modules.Settings import Settings
 from modules.person.panoramic.TrackerGui import TrackerGui
@@ -15,10 +12,6 @@ from modules.person.Person import Person, PersonDict, PersonCallback, PersonDict
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.panoramic.Geometry import Geometry
 from modules.person.panoramic.Definitions import *
-
-# from modules.pose.Definitions import ModelTypeNames
-# from modules.pose.Detection import Detection
-# from modules.pose.Window import Window
 
 class CamTracklet:
     def __init__(self, cam_id: int, tracklet: Tracklet) -> None:
@@ -53,8 +46,8 @@ class Tracker(Thread):
         self.person_roi_expansion: float =      PERSON_ROI_EXPANSION
         self.person_timeout: float =            PERSON_TIMEOUT
 
+        self.callback_lock = Lock()
         self.person_callbacks: set[PersonCallback] = set()
-        self.dict_callbacks: set[PersonDictCallback] = set()
         self.gui = TrackerGui(gui, self, settings)
 
     def start(self) -> None:
@@ -65,7 +58,9 @@ class Tracker(Thread):
 
     def stop(self) -> None:
         self.running = False
-        self.person_callbacks.clear()
+
+        with self.callback_lock:
+            self.person_callbacks.clear()
 
     def run(self) -> None:
         while self.running:
@@ -86,12 +81,19 @@ class Tracker(Thread):
         self.add_persons(self.persons, tracklet_persons, self.person_id_pool)
         self.cleanup_inactive_persons(self.persons, self.person_id_pool, self.person_timeout)
 
+        # find new persons that have no image, these are the only ones that need to be processed and send to the output
         for person in self.persons.values():
-            image: np.ndarray = self.get_image(person.cam_id)
+            if person.img is not None:
+                continue
+
+            image: Optional[np.ndarray] = self.get_image(person.cam_id)
+            if image is None:
+                print(f"Warning: No image available for person {person.id} in camera {person.cam_id}.")
+                continue
+
             person.set_pose_roi(image, self.person_roi_expansion)
             person.set_pose_image(image)
-            detector: Detection | None = self.pose_detectors.get(person.id, None)
-            self.detect_pose(person, detector, self._person_callback)
+            self._person_callback(person)
 
     @staticmethod
     def get_persons_from_tracklets(cam_tracklets: CamTrackletDict) -> list[Person]:
@@ -142,14 +144,14 @@ class Tracker(Thread):
 
     @staticmethod
     def filter_and_update_active(active_persons: PersonDict, new_persons: list[Person]) -> None:
-        def find_same_person(person: Person, persons: list[Person]) -> Person | None:
+        def find_same_person(person: Person, persons: list[Person]) -> Optional[Person]:
             for p in persons:
                 if person.cam_id == p.cam_id and person.tracklet.id == p.tracklet.id:
                     return p
             return None
 
         for person in active_persons.values():
-            same_person: Person | None = find_same_person(person, new_persons)
+            same_person: Optional[Person] = find_same_person(person, new_persons)
             if same_person is not None:
                 new_persons.remove(same_person)
                 person.update_from(same_person)
@@ -212,25 +214,16 @@ class Tracker(Thread):
             persons.pop(person.id, None)
             # print('Remove inactive person id:', person.id, 'cam', person.cam_id, 'tracklet', person.tracklet.id, 'overlap:', person.overlap, 'angle:', person.local_angle, 'world:', person.world_angle)
 
-    @ staticmethod
-    def detect_pose(person: Person, detector:Detection | None, callback: PersonCallback) -> None:
-        if person.pose is not None or detector is None:
-            callback(person)
-            return
-        detector.set_detection(person)
-
     # INPUTS
     def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
         if frame_type != FrameType.VIDEO:
             return
         with self.input_mutex:
             self.input_frames[id] = image
-    def get_image(self, id: int) -> np.ndarray:
+    def get_image(self, id: int) -> Optional[np.ndarray]:
         with self.input_mutex:
-            if self.input_frames.get(id) is None:
-                # print('No image with id', id)
-                return np.zeros((self.pose_detector_frame_size, self.pose_detector_frame_size, 3), np.uint8)
-            return self.input_frames[id]
+            if not self.input_frames.get(id) is None:
+                return self.input_frames[id]
 
     def add_tracklet(self, cam_id: int, tracklet: Tracklet) -> None :
         with self.input_mutex:
@@ -245,19 +238,11 @@ class Tracker(Thread):
 
     # CALLBACKS
     def _person_callback(self, person: Person) -> None:
-        for c in self.person_callbacks:
-            c(person)
+        with self.callback_lock:
+            for c in self.person_callbacks:
+                c(person)
     def add_person_callback(self, callback: PersonCallback) -> None:
         if self.running:
             print('Manager is running, cannot add callback')
             return
         self.person_callbacks.add(callback)
-
-    def _dict_callback(self, dict: PersonDict) -> None:
-        for c in self.dict_callbacks:
-            c(dict)
-    def add_dict_callback(self, callback: PersonDictCallback) -> None:
-        if self.running:
-            print('Manager is running, cannot add callback')
-            return
-        self.dict_callbacks.add(callback)
