@@ -33,6 +33,8 @@ class HotReloadStaticMethods:
         if methods:
             self._cached_method_code: Dict[str, CodeType] = self._get_code_from_methods(methods)
 
+        self._on_reload_callbacks: list[Callable[[], None]] = []
+
         self._observer: Optional[BaseObserver] = None
         if watch_file:
             self.start_file_watcher()
@@ -63,6 +65,7 @@ class HotReloadStaticMethods:
 
     def reload_methods(self) -> None:
         """Reload static methods from the target class's file and apply changes."""
+        print(f"[{HotReloadStaticMethods.__name__}] Reloading static methods for {self._target_class.__name__} from {self._file_module_path}")
         try:
             # Load the module from the file path
             module: Optional[ModuleType] = self._load_module(self._file_module_name, self._file_module_path)
@@ -76,11 +79,13 @@ class HotReloadStaticMethods:
 
             # Get code objects from the static methods
             new_method_code: Dict[str, CodeType] = self._get_code_from_methods(methods)
+            changed = False # Flag to track if any changes were made
 
             # Identify and remove deleted methods
             deleted_methods: List[str] = [name for name in self._cached_method_code if name not in new_method_code]
             if deleted_methods:
                 HotReloadStaticMethods._remove_methods(self._target_class, deleted_methods)
+                changed = True
 
             # Identify and update changed methods
             methods_to_update: Dict[str, Callable] = {}
@@ -90,18 +95,34 @@ class HotReloadStaticMethods:
                         methods_to_update[name] = methods[name]
             if methods_to_update:
                 HotReloadStaticMethods._update_methods(self._target_class, methods_to_update)
+                changed = True
 
             # Identify and add new methods
             new_methods: Dict[str, Callable] = {name: methods[name] for name in new_method_code if name not in self._cached_method_code}
             if new_methods:
                 HotReloadStaticMethods._add_methods(self._target_class, new_methods)
+                changed = True
 
             # Update cached method codes
             self._cached_method_code = new_method_code
 
+            if changed:
+                self._notify_reload_callbacks()
+
         except Exception as e:
             print(f"[{HotReloadStaticMethods.__name__}] {self._target_class.__name__} Error loading {self._file_module_path}: {e}")
             traceback.print_exc()
+
+    def add_reload_callback(self, callback: Callable[[], None]) -> None:
+        """Register a callback to be called after code reload."""
+        self._on_reload_callbacks.append(callback)
+
+    def _notify_reload_callbacks(self) -> None:
+        for callback in self._on_reload_callbacks:
+            try:
+                callback()
+            except Exception as e:
+                print(f"[{self.__class__.__name__}] Error in reload callback: {e}")
 
     @staticmethod
     def _load_module(module_name: str, file_path: str) -> Optional[ModuleType]:

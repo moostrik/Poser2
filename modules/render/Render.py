@@ -144,10 +144,10 @@ class Render(RenderWindow):
         for i in range(self.num_persons):
             person: Person | None = self.get_person(i, clear=False)
             if person is not None:
-                poses: list[Pose] | None = person.pose
-                if poses is not None and len(poses) > 0:
-                    self.pose_meshes[i].set_vertices(poses[0].getVertices())
-                    self.pose_meshes[i].set_colors(poses[0].getColors(threshold=0.0))
+                pose: Pose | None = person.pose
+                if pose is not None:
+                    self.pose_meshes[i].set_vertices(pose.getVertices())
+                    self.pose_meshes[i].set_colors(pose.getColors(threshold=0.0))
                     self.pose_meshes[i].update()
 
     def draw_cameras(self) -> None:

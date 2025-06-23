@@ -1,10 +1,15 @@
+# Standard library imports
+from time import time
+from typing import Optional
+from typing import Callable
+
+# Third-party imports
 import cv2
 import numpy as np
-from time import time
 
-from typing import Callable
+# Local application imports
 from modules.cam.depthcam.Definitions import Tracklet, Rect
-from modules.pose.Definitions import PoseList
+from modules.pose.Definitions import Pose
 
 
 PersonColors: dict[int, str] = {
@@ -35,9 +40,9 @@ class Person():
 
         self.local_angle: float =       0.0
         self.world_angle: float =       0.0
-        self.pose: PoseList | None =    None
-        self.pose_roi: Rect | None =    None
-        self.img: np.ndarray | None =   None
+        self.pose: Optional[Pose] =     None
+        self.pose_roi: Optional[Rect] = None
+        self.img: Optional[np.ndarray]= None
 
         self.active: bool =             True
         self.start_time: float =        time()

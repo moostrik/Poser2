@@ -1,16 +1,21 @@
-import cv2
-import numpy as np
+# Standard library imports
 import time
-import onnxruntime as ort
 from threading import Thread, Lock
 import os
+from typing import Optional
 
+# Third-party imports
+import cv2
+import numpy as np
+import onnxruntime as ort
+
+# Local application imports
 from modules.pose.Definitions import *
 from modules.person.Person import Person
 
 class Detection(Thread):
     _model_load_lock: Lock = Lock()
-    _model_loaded: bool =    False
+    _model_loaded: bool =  False
     _model_type: ModelType = ModelType.NONE
     _model_path: str
     _moodel_size: int
@@ -47,8 +52,9 @@ class Detection(Thread):
             if detection is not None:
                 image: np.ndarray | None = detection.img
                 if image is not None:
-                    Poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
-                    detection.pose = Poses
+                    poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
+                    if len(poses) > 0:
+                        detection.pose = poses[0]
                     self.callback(detection)
             time.sleep(0.01)
 

@@ -1,16 +1,16 @@
-from __future__ import annotations
-
-import cv2
-import numpy as np
+# Standard library imports
 import queue
 from threading import Thread, Lock
-from time import time, sleep
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Optional
 
+# Third-party imports
+
+# Local application imports
 from modules.Settings import Settings
 from modules.person.Person import Person, PersonCallback
 from modules.pose.Definitions import ModelTypeNames
 from modules.pose.Detection import Detection
+from modules.pose.KalmanFilter import KalmanFilter
 
 
 class Pipeline(Thread):
@@ -21,15 +21,18 @@ class Pipeline(Thread):
 
         # Input queue for persons to process
         self.person_queue: queue.Queue[Person] = queue.Queue()
-        self.max_persons: int = settings.pose_num
 
         # Pose detection components
         self.pose_detectors: dict[int, Detection] = {}
         self.pose_detector_frame_size: int = 256
-
-        for i in range(self.max_persons):
+        self.max_detectors: int = settings.pose_num
+        for i in range(self.max_detectors):
             self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type)
-        print('Pose Detection:', self.max_persons, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
+        print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
+
+        # Pose filter
+        self.kalman_filter: KalmanFilter = KalmanFilter()
+
 
         # Callbacks
         self.callback_lock = Lock()
@@ -53,7 +56,6 @@ class Pipeline(Thread):
         with self.callback_lock:
             self.person_output_callbacks.clear()
 
-        # Stop detectors
         for detector in self.pose_detectors.values():
             detector.stop()
 
@@ -80,6 +82,13 @@ class Pipeline(Thread):
             print(f"Pose detection failed for person {person.id}")
 
     def _pose_filter(self, person: Person) -> None:
+        if person.pose is not None:
+            try:
+                person.pose = self.kalman_filter.apply(person.pose)
+            except Exception as e:
+                print(f"Error applying Kalman filter to person {person.id}: {e}")
+                return
+
         self._person_output_callback(person)
 
     # External Input
