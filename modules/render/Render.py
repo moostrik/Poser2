@@ -16,7 +16,7 @@ from modules.gl.shaders.WS_Angles import WS_Angles
 from modules.gl.shaders.WS_Lines import WS_Lines
 
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
-from modules.pose.Definitions import Pose, Indices
+from modules.pose.Definitions import Pose, PoseEdgeIndices
 from modules.person.Person import Person, PersonColor
 from modules.av.Definitions import AvOutput
 
@@ -82,7 +82,7 @@ class Render(RenderWindow):
             self.all_fbos.append(self.psn_fbos[i])
 
             self.pose_meshes[i] = Mesh()
-            self.pose_meshes[i].set_indices(Indices)
+            self.pose_meshes[i].set_indices(PoseEdgeIndices)
             self.all_meshes.append(self.pose_meshes[i])
 
         self.composition: Composition_Subdivision = self.make_composition_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.num_persons, self.num_viss)

@@ -104,7 +104,7 @@ class CompTest():
 
     @staticmethod
     def make_fill(resolution: int, P: TestParameters) -> np.ndarray:
-        return np.full((1, resolution), P.strength, dtype=np.float16) +0
+        return np.full((1, resolution), P.strength, dtype=np.float16)
 
 
     @staticmethod

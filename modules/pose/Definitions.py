@@ -76,6 +76,12 @@ PoseEdgeList: list[list[Keypoints]] = [
     [Keypoints.right_knee, Keypoints.right_ankle]
 ]
 
+# convert PoseIndices to a 1 dimentional np.ndarray
+PoseEdgeFlatList: np.ndarray = np.array([kp.value for pose in PoseEdgeList for kp in pose], dtype=np.int32)
+
+# make an array of increasing indices with the length of KeypointFlatList
+PoseEdgeIndices: np.ndarray = np.arange(len(PoseEdgeFlatList), dtype=np.int32)
+
 PoseEdgeColors: list[tuple[float, float, float]] = [
     (1.0, 0.7, 0.4),   # nose-left_eye
     (0.4, 0.7, 1.0),   # nose-right_eye
@@ -94,11 +100,16 @@ PoseEdgeColors: list[tuple[float, float, float]] = [
     (0.6, 0.8, 1.0),   # right_knee-right_ankle
 ]
 
-# convert PoseIndices to a 1 dimentional np.ndarray
-KeypointFlatList: np.ndarray = np.array([kp.value for pose in PoseEdgeList for kp in pose], dtype=np.int32)
-
-# make an array of increasing indices with the length of KeypointFlatList
-Indices: np.ndarray = np.arange(len(KeypointFlatList), dtype=np.int32)
+PoseAngleDict: dict[str, tuple[Keypoints, Keypoints, Keypoints]] = {
+    Keypoints.left_elbow.name:     ( Keypoints.left_shoulder,  Keypoints.left_elbow,     Keypoints.left_wrist  ),
+    Keypoints.right_elbow.name:    ( Keypoints.right_shoulder, Keypoints.right_elbow,    Keypoints.right_wrist ),
+    Keypoints.left_shoulder.name:  ( Keypoints.left_hip,       Keypoints.left_shoulder,  Keypoints.left_elbow  ),
+    Keypoints.right_shoulder.name: ( Keypoints.right_hip,      Keypoints.right_shoulder, Keypoints.right_elbow ),
+    Keypoints.left_hip.name:       ( Keypoints.left_shoulder,  Keypoints.left_hip,       Keypoints.left_knee   ),
+    Keypoints.right_hip.name:      ( Keypoints.right_shoulder, Keypoints.right_hip,      Keypoints.right_knee  ),
+    Keypoints.left_knee.name:      ( Keypoints.left_hip,       Keypoints.left_knee,      Keypoints.left_ankle  ),
+    Keypoints.right_knee.name:     ( Keypoints.right_hip,      Keypoints.right_knee,     Keypoints.right_ankle ),
+}
 
 
 class Pose():
@@ -114,14 +125,14 @@ class Pose():
         return self.scores
 
     def getVertices(self) -> np.ndarray:
-        vertices: np.ndarray = np.zeros((len(KeypointFlatList), 2), dtype=np.float32)
+        vertices: np.ndarray = np.zeros((len(PoseEdgeFlatList), 2), dtype=np.float32)
         keypoints: np.ndarray = self.getKeypoints()
-        for i in range(len(KeypointFlatList)):
-            vertices[i] = keypoints[KeypointFlatList[i]]
+        for i in range(len(PoseEdgeFlatList)):
+            vertices[i] = keypoints[PoseEdgeFlatList[i]]
         return vertices
 
     def getColors(self, threshold: float = 0.0, r: float = 1.0, g:float = 1.0, b:float = 1.0, a:float = 1.0) -> np.ndarray:
-        colors: np.ndarray = np.zeros((len(KeypointFlatList), 4), dtype=np.float32)
+        colors: np.ndarray = np.zeros((len(PoseEdgeFlatList), 4), dtype=np.float32)
         scores: np.ndarray = self.getScores()
         for i in range(len(PoseEdgeList)):
             kp1: int = PoseEdgeList[i][0].value

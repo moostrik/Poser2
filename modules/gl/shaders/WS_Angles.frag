@@ -39,7 +39,6 @@ void main() {
             white += whiteValue * falloff;
             float blueValue = texture(tex0, vec2(float(i) / (texWidth - 1.0), 0.5)).g;
             blue += blueValue * falloff;
-
         }
     }
 

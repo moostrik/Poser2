@@ -9,6 +9,7 @@ from random import uniform
 from modules.av.Definitions import *
 from modules.av.Gui import Gui
 from modules.av.CompTest import CompTest
+from modules.av.UdpSender import UdpSender
 
 from modules.Settings import Settings
 from modules.person.Person import Person, PersonDict
@@ -33,9 +34,13 @@ class Manager(Thread):
 
         self.output_callbacks: list[AvOutputCallback] = []
 
+        self.udp_sender: UdpSender = UdpSender()
+        self.udp_sender.start()
+
         self.gui: Gui = Gui(gui, self)
 
     def stop(self) -> None:
+        self.udp_sender.stop()
         self.running = False
 
     def run(self) -> None:
@@ -46,14 +51,15 @@ class Manager(Thread):
             self.output.img = self.comp_test.make_pattern()
 
             self._output_callback(self.output)
+            self.udp_sender.send_message(self.output)
 
             next_time += self.interval
-            sleep_time = next_time - time()
+            sleep_time: float = next_time - time()
             if sleep_time > 0:
                 sleep(sleep_time)
             else:
                 next_time = time()
-                print(f"Manager fell behind by {-sleep_time:.2f} seconds")
+                print(f"Manager fell behind by {-sleep_time:.3f} seconds")
 
     # STATIC METHODS
 

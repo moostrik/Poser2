@@ -8,7 +8,7 @@ from typing import Optional
 # Local application imports
 from modules.Settings import Settings
 from modules.person.Person import Person, PersonCallback
-from modules.pose.Definitions import ModelTypeNames
+from modules.pose.Definitions import ModelTypeNames, PoseAngleDict
 from modules.pose.Detection import Detection
 from modules.pose.KalmanFilter import KalmanFilter
 
@@ -31,7 +31,9 @@ class Pipeline(Thread):
         print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
 
         # Pose filter
-        self.kalman_filter: KalmanFilter = KalmanFilter()
+        # self.kalman_filter: KalmanFilter = KalmanFilter()
+
+
 
 
         # Callbacks
@@ -82,14 +84,30 @@ class Pipeline(Thread):
             print(f"Pose detection failed for person {person.id}")
 
     def _pose_filter(self, person: Person) -> None:
-        if person.pose is not None:
-            try:
-                person.pose = self.kalman_filter.apply(person.pose)
-            except Exception as e:
-                print(f"Error applying Kalman filter to person {person.id}: {e}")
-                return
+        # if person.pose is not None:
+        #     try:
+        #         person.pose = self.kalman_filter.apply(person.pose)
+        #     except Exception as e:
+        #         print(f"Error applying Kalman filter to person {person.id}: {e}")
+        #         return
 
         self._person_output_callback(person)
+
+    def _pose_angles(self, person: Person) -> None:
+        """Calculate angles between keypoints in the pose"""
+        if person.pose is None:
+            self._person_output_callback(person)
+            return
+
+        # Iterate through the predefined angles in PoseAngleDict
+        # angles
+        # for angle_name, keypoints in PoseAngleDict.items():
+
+
+
+        # Placeholder for angle calculation logic
+        # This can be implemented based on the specific requirements of the application
+        pass
 
     # External Input
     def person_input(self, person: Person) -> None:
