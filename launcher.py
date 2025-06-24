@@ -80,7 +80,7 @@ settings.render_v_sync =        True
 settings.render_cams_a_row=     2
 
 settings.light_resolution =     3600
-settings.light_rate =           120
+settings.light_rate =           60
 
 settings.check_values()
 # settings.check_cameras()
