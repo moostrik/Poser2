@@ -37,9 +37,7 @@ camera_list: list[str] = ['14442C101136D1D200',
 if args.numcameras < len(camera_list):
     camera_list = camera_list[:args.numcameras]
 
-udp_list: list[str] = ['127.0.0.1',
-                       '192.101.0.1',
-                       '10.0.0.1',]
+udp_list: list[str] = ['127.0.0.1',]
 
 # camera_list: list[str] = ['14442C10F124D9D600']
 

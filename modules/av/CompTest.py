@@ -31,36 +31,49 @@ class CompTest():
         self.WP: TestParameters = TestParameters()
         self.BP: TestParameters = TestParameters()
 
+        # Pre-allocate arrays
+        self.white_array: np.ndarray = np.zeros((1, resolution), dtype=IMG_TYPE)
+        self.blue_array: np.ndarray = np.zeros((1, resolution), dtype=IMG_TYPE)
+        self.output_img: np.ndarray = np.zeros((1, resolution, 3), dtype=IMG_TYPE)
+
         self.hot_reloader = HotReloadStaticMethods(self.__class__, True)
 
     def make_pattern(self) -> np.ndarray:
         try:
-            white: Optional[np.ndarray] = None
-            blue: Optional[np.ndarray] = None
+            white_filled = False
+            blue_filled = False
+
             if self.pattern == TestPattern.FILL:
-                white = self.make_fill(self.resolution, self.WP)
-                blue = self.make_fill(self.resolution, self.BP)
-            if self.pattern == TestPattern.PULSE:
-                white = self.make_pulse(self.resolution, self.WP)
-                blue = self.make_pulse(self.resolution, self.BP)
-            if self.pattern == TestPattern.CHASE:
-                white = self.make_chase(self.resolution, self.WP)
-                blue = self.make_chase(self.resolution, self.BP)
-            if self.pattern == TestPattern.LINES:
-                white = self.make_lines(self.resolution, self.WP)
-                blue = self.make_lines(self.resolution, self.BP)
-            if self.pattern == TestPattern.RNDOM:
-                white = self.make_random(self.resolution, self.WP)
-                blue = self.make_random(self.resolution, self.BP)
-            if white is not None and blue is not None:
-                img: np.ndarray = np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
-                img[0, :, 0] = white[0, :]
-                img[0, :, 1] = blue[0, :]
-                return img
+                self.fill_array(self.white_array, self.WP)
+                self.fill_array(self.blue_array, self.BP)
+                white_filled = blue_filled = True
+            elif self.pattern == TestPattern.PULSE:
+                self.pulse_array(self.white_array, self.WP)
+                self.pulse_array(self.blue_array, self.BP)
+                white_filled = blue_filled = True
+            elif self.pattern == TestPattern.CHASE:
+                self.chase_array(self.white_array, self.WP)
+                self.chase_array(self.blue_array, self.BP)
+                white_filled = blue_filled = True
+            elif self.pattern == TestPattern.LINES:
+                self.lines_array(self.white_array, self.WP)
+                self.lines_array(self.blue_array, self.BP)
+                white_filled = blue_filled = True
+            elif self.pattern == TestPattern.RNDOM:
+                self.random_array(self.white_array, self.WP)
+                self.random_array(self.blue_array, self.BP)
+                white_filled = blue_filled = True
+
+            if white_filled and blue_filled:
+                # Copy data to output array
+                self.output_img[0, :, 0] = self.white_array[0, :]
+                self.output_img[0, :, 1] = self.blue_array[0, :]
         except Exception as e:
             print(f"[CompTest] Error generating pattern: {e}")
+            # Clear output image to be safe
+            self.output_img.fill(0)
 
-        return np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
+        return self.output_img
 
     def set_pattern(self, pattern: TestPattern | int | str) -> None:
         if isinstance(pattern, str) and pattern in TEST_PATTERN_NAMES:
@@ -140,7 +153,7 @@ class CompTest():
         if resolution == 0 or P.amount == 0:
             return img
 
-        adjusted_speed: float = P.speed * P.amount / 10.0
+        adjusted_speed: float = P.speed * P.amount / 10.0 * 8
         wave_phase_per_pixel: float = P.amount * 2 * math.pi / resolution
         time_offset: float = time.time() * adjusted_speed * 2 * math.pi
 
@@ -166,6 +179,49 @@ class CompTest():
     def lfo(time: float, Htz: float, phase: float) -> float:
         return 0.5 * math.sin(time * math.pi * Htz + (0.75 + phase) * math.pi * 2) + 0.5
 
-    # @staticmethod
-    # def lfor(time: float, Htz: float, phase: float, rangeMin: float, rangeMax: float) -> float:
-    #     return CompTest.lfo(time, Htz, phase) * (rangeMax - rangeMin) + rangeMin
+    def fill_array(self, array: np.ndarray, P: TestParameters) -> None:
+        array.fill(P.strength * IMG_MP)
+
+    def pulse_array(self, array: np.ndarray, P: TestParameters) -> None:
+        T: float = time.time()
+        freq: float = P.speed
+        value = self.lfo(T, freq, P.phase) * P.strength * IMG_MP
+        array.fill(value)
+
+    def chase_array(self, array: np.ndarray, P: TestParameters) -> None:
+        if self.resolution == 0 or P.amount == 0:
+            array.fill(0)
+            return
+
+        adjusted_speed: float = P.speed * P.amount / 10.0
+        wave_phase_per_pixel: float = P.amount * 2 * math.pi / self.resolution
+        time_offset: float = time.time() * adjusted_speed * 2 * math.pi
+
+        for i in range(self.resolution):
+            phase: float = i * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi
+            value: float = 0.5 * math.sin(phase) + 0.5
+            array[0, i] = value * P.strength * IMG_MP
+
+    def lines_array(self, array: np.ndarray, P: TestParameters) -> None:
+        if self.resolution == 0 or P.amount == 0:
+            array.fill(0)
+            return
+
+        adjusted_speed: float = P.speed * P.amount / 10.0 * 8
+        wave_phase_per_pixel: float = P.amount * 2 * math.pi / self.resolution
+        time_offset: float = time.time() * adjusted_speed * 2 * math.pi
+
+        for i in range(self.resolution):
+            phase: float = i * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi + math.pi
+            value: float = 0.5 * math.sin(phase) + 0.5
+            value = 1.0 if value < P.width else 0.0
+            array[0, i] = value * P.strength * IMG_MP
+
+    def random_array(self, array: np.ndarray, P: TestParameters) -> None:
+        if self.resolution == 0:
+            array.fill(0)
+            return
+            
+        T: float = time.time() * P.speed
+        for i in range(self.resolution):
+            array[0, i] = P.strength * IMG_MP if math.sin(T + i) > 0.5 else 0

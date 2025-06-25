@@ -59,7 +59,7 @@ class Manager(Thread):
                 sleep(sleep_time)
             else:
                 next_time = time()
-                print(f"Manager fell behind by {-sleep_time:.3f} seconds")
+                print(f"Manager fell behind by {-sleep_time:.4f} seconds, or: {-sleep_time / self.interval:.4f} frames")
 
     # STATIC METHODS
 
