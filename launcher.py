@@ -37,6 +37,10 @@ camera_list: list[str] = ['14442C101136D1D200',
 if args.numcameras < len(camera_list):
     camera_list = camera_list[:args.numcameras]
 
+udp_list: list[str] = ['127.0.0.1',
+                       '192.143.0.1',
+                       '10.0.0.1',]
+
 # camera_list: list[str] = ['14442C10F124D9D600']
 
 settings: Settings =            Settings()
@@ -81,6 +85,9 @@ settings.render_cams_a_row=     2
 
 settings.light_resolution =     3600
 settings.light_rate =           60
+
+settings.udp_port =             8888
+settings.udp_ip_addresses =     udp_list
 
 settings.check_values()
 # settings.check_cameras()

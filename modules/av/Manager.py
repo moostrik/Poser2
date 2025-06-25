@@ -34,7 +34,7 @@ class Manager(Thread):
 
         self.output_callbacks: list[AvOutputCallback] = []
 
-        self.udp_sender: UdpSender = UdpSender()
+        self.udp_sender: UdpSender = UdpSender(self.settings.light_resolution, self.settings.udp_port, self.settings.udp_ip_addresses)
         self.udp_sender.start()
 
         self.gui: Gui = Gui(gui, self)

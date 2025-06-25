@@ -12,11 +12,6 @@ ANGLE =         3.0
 RESOLUTION =    4000
 RATE =          30
 
-UDP_PORT = 8888
-UDP_IP_ADDRESSES: list[str] = [
-    '127.0.0.1',  # Localhost
-    '10.0.0.81'
-]
 
 class AvOutput():
     def __init__(self, resolution: int, angle: float = ANGLE) -> None:

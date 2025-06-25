@@ -36,7 +36,6 @@ class RenderWindow(Thread):
         self.fps = FpsCounter()
         self.window_x: int = posX
         self.window_y: int = posY
-        print(f"RenderWindow: {self.windowName} at {self.window_x}, {self.window_y} ({self.window_width}x{self.window_height})")
         self.mouse_x: float = 0.0
         self.mouse_y: float = 0.0
         self.mouse_callbacks: list[Callable] = []

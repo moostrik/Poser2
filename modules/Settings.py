@@ -64,6 +64,10 @@ class Settings():
         self.light_resolution: int              = None # type: ignore
         self.light_rate: int                    = None # type: ignore
 
+        # UDP SETTINGS
+        self.udp_port: int                      = None # type: ignore
+        self.udp_ip_addresses: list[str]        = None # type: ignore
+
 
     def check_values(self) -> None:
          for key, value in vars(self).items():

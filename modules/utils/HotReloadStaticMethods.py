@@ -91,8 +91,8 @@ class HotReloadStaticMethods:
             methods_to_update: Dict[str, Callable] = {}
             for name, code in new_method_code.items():
                 if name in self._cached_method_code:
-                    if HotReloadStaticMethods._is_different(code, self._cached_method_code[name]):
-                        methods_to_update[name] = methods[name]
+            #         if HotReloadStaticMethods._is_different(code, self._cached_method_code[name]):
+                    methods_to_update[name] = methods[name]
             if methods_to_update:
                 HotReloadStaticMethods._update_methods(self._target_class, methods_to_update)
                 changed = True
