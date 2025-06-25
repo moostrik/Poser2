@@ -53,14 +53,14 @@ class CompTest():
                 white = self.make_random(self.resolution, self.WP)
                 blue = self.make_random(self.resolution, self.BP)
             if white is not None and blue is not None:
-                img: np.ndarray = np.zeros((1, self.resolution, 3), dtype=np.float16)
+                img: np.ndarray = np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
                 img[0, :, 0] = white[0, :]
                 img[0, :, 1] = blue[0, :]
                 return img
         except Exception as e:
             print(f"[CompTest] Error generating pattern: {e}")
 
-        return np.zeros((1, self.resolution, 3), dtype=np.float16)
+        return np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
 
     def set_pattern(self, pattern: TestPattern | int | str) -> None:
         if isinstance(pattern, str) and pattern in TEST_PATTERN_NAMES:
@@ -104,7 +104,7 @@ class CompTest():
 
     @staticmethod
     def make_fill(resolution: int, P: TestParameters) -> np.ndarray:
-        return np.full((1, resolution), P.strength, dtype=np.float16)
+        return np.full((1, resolution), P.strength, dtype=IMG_TYPE)
 
 
     @staticmethod
@@ -113,14 +113,14 @@ class CompTest():
             return 0.5 * math.sin(time_ * math.pi * Htz + phase) + 0.5
 
         T: float = time.time()
-        img: np.ndarray = np.zeros((1, resolution), dtype=np.float16)
+        img: np.ndarray = np.zeros((1, resolution), dtype=IMG_TYPE)
         freq: float = P.speed
-        img[0, :] = lfo(T, freq, P.phase * 2 * math.pi) * P.strength
+        img[0, :] = lfo(T, freq, P.phase * 2 * math.pi) * P.strength * IMG_MP
         return img
 
     @staticmethod
     def make_chase(resolution: int, P: TestParameters) -> np.ndarray:
-        img: np.ndarray = np.zeros((1, resolution), dtype=np.float16)
+        img: np.ndarray = np.zeros((1, resolution), dtype=IMG_TYPE)
         if resolution == 0 or P.amount == 0:
             return img
 
@@ -131,12 +131,12 @@ class CompTest():
         for i in range(resolution):
             phase: float = i * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi
             value: float = 0.5 * math.sin(phase) + 0.5
-            img[0, i] = value * P.strength
+            img[0, i] = value * P.strength * IMG_MP
         return img
 
     @staticmethod
     def make_lines(resolution: int, P: TestParameters) -> np.ndarray:
-        img: np.ndarray = np.zeros((1, resolution), dtype=np.float16)
+        img: np.ndarray = np.zeros((1, resolution), dtype=IMG_TYPE)
         if resolution == 0 or P.amount == 0:
             return img
 
@@ -148,18 +148,18 @@ class CompTest():
             phase: float = i * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi + math.pi
             value: float = 0.5 * math.sin(phase) + 0.5
             value = 1.0 if value < P.width else 0.0
-            img[0, i] = value * P.strength
+            img[0, i] = value * P.strength * IMG_MP
         return img
 
     @staticmethod
     def make_random(resolution: int, P: TestParameters) -> np.ndarray:
-        img: np.ndarray = np.zeros((1, resolution), dtype=np.float16)
+        img: np.ndarray = np.zeros((1, resolution), dtype=IMG_TYPE)
         if resolution == 0:
             return img
         T: float = time.time() * P.speed
         for i in range(resolution):
             if math.sin(T + i) > 0.5:
-                img[0, i] = P.strength
+                img[0, i] = P.strength  * IMG_MP
         return img
 
     @staticmethod

@@ -4,22 +4,25 @@ import threading
 import socket
 import queue
 import numpy as np
-from typing import Optional
+from typing import Optional, Union
 
 # Third-party imports
 from pythonosc.udp_client import UDPClient
+from pythonosc.osc_message import OscMessage
 from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle import OscBundle
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 # Local application imports
-from modules.av.Definitions import AvOutput
+from modules.av.Definitions import AvOutput, IMG_TYPE
 from modules.utils.HotReloadStaticMethods import HotReloadStaticMethods
 
 # Constants
 UDP_MTU = 1500
 UDP_PORT = 8888
 UDP_IP_ADDRESSES: list[str] = ['127.0.0.1']  # Localhost
+
+OscMessageList = list[Union[OscMessage, OscBundle]]  # Type alias for OSC messages or bundles
 
 class UdpSender(threading.Thread):
     def __init__(self, resolution: int, port: int = UDP_PORT, ip_addresses: list[str] = UDP_IP_ADDRESSES, mtu: int = UDP_MTU) -> None:
@@ -30,7 +33,9 @@ class UdpSender(threading.Thread):
         self.resolution: int = resolution
         self.chunk_size: int
         self.num_chunks: int
-        self.chunk_size, self.num_chunks = self._calculate_optimal_chunks(resolution, mtu)
+        self.byte_size: int = 1
+
+        self.chunk_size, self.num_chunks = self._calculate_optimal_chunks(resolution, self.byte_size, mtu)
 
         self.running = False
         self.message_queue: queue.Queue[AvOutput] = queue.Queue()
@@ -57,20 +62,21 @@ class UdpSender(threading.Thread):
 
         for ip in valid_ips:
             self.osc_clients[ip] = UDPClient(ip, self.port)
-        print(f"Starting UdpSender on port {self.port} and addresses {valid_ips}. Data is split in {self.num_chunks} chunks of {self.chunk_size} bytes each.")
+        print(f"UDP SENDER: port {self.port} and addresses {valid_ips}. Data is split in {self.num_chunks} chunks of {self.chunk_size * self.byte_size} bytes each.")
 
         self.running = True
         while self.running:
             try:
                 # Block until a message is available or timeout occurs
                 av_output: AvOutput = self.message_queue.get(block=True, timeout=0.1)
-                message_bundle: Optional[OscBundle] = self._build_message(av_output, self.resolution, self.chunk_size, self.num_chunks)
-                if message_bundle:
+                message_list: Optional[OscMessageList] = self._build_message(av_output, self.resolution, self.chunk_size, self.num_chunks)
+                if message_list:
                     for ip in self.osc_clients:
-                        try:
-                            self.osc_clients[ip].send(message_bundle)
-                        except Exception as e:
-                            print(f"Error sending message to {ip}: {e}")
+                        for message in message_list:
+                            try:
+                                self.osc_clients[ip].send(message)
+                            except Exception as e:
+                                print(f"Error sending message to {ip}: {e}")
             except queue.Empty:
                 continue
 
@@ -79,12 +85,13 @@ class UdpSender(threading.Thread):
         self.message_queue.put(av_output)
 
     @staticmethod
-    def _build_message(av_output: AvOutput, resolution: int, chunk_size: int, num_chunks: int) -> Optional[OscBundle]:
+    def _build_message(av_output: AvOutput, resolution: int, chunk_size: int, num_chunks: int) -> Optional[OscMessageList]:
         """Send the AvOutput as OSC messages to all IP addresses using blob data."""
         try:
             if av_output.resolution != resolution:
                 raise Exception(f"Resolution mismatch: expected {resolution}, got {av_output.resolution}")
 
+            message_list: OscMessageList = []
             bundle = OscBundleBuilder(IMMEDIATELY)
 
             r_msgb = OscMessageBuilder("/WS/resolution")
@@ -99,33 +106,77 @@ class UdpSender(threading.Thread):
             cz_msgb.add_arg(num_chunks)
             bundle.add_content(cz_msgb.build()) # type: ignore
 
+            message_list.append(bundle.build())
+
             # Convert float16 to int8 (since values are normalized 0-1)
-            # white_channel: np.ndarray = ((av_output.img[0, :, 0] - 0.5) * 2 * 127).astype(np.int8)
-            # blue_channel: np.ndarray =  ((av_output.img[0, :, 1] - 0.5) * 2 * 127).astype(np.int8)
-            white_channel: np.ndarray = ((av_output.img[0, :, 0] - 0.5) * 2 * 127).astype(np.int8)
-            blue_channel: np.ndarray =  ((av_output.img[0, :, 1] - 0.5) * 2 * 127).astype(np.int8)
+            if IMG_TYPE == np.float32:
+                white_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 0])
+                blue_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 1])
+            elif IMG_TYPE == np.uint8:
+                white_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.img[0, :, 0])
+                blue_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.img[0, :, 1])
+
+            # white_channel: np.ndarray = av_output.img[0, :, 0].astype(np.float16)
+            # blue_channel: np.ndarray = av_output.img[0, :, 1].astype(np.float16)
+
             for i in range(num_chunks):
                 start_idx: int = i * chunk_size
                 end_idx: int = min((i + 1) * chunk_size, len(white_channel))
 
                 white_chunk_bytes: bytes = white_channel[start_idx:end_idx].tobytes()
                 wc_msgb = OscMessageBuilder(f"/WS/white/chunk/{i}")
-                wc_msgb.add_arg(white_chunk_bytes)
-                bundle.add_content(wc_msgb.build()) # type: ignore
+                wc_msgb.add_arg(white_chunk_bytes, 'b')
+                message_list.append(wc_msgb.build())
 
                 blue_chunk_bytes: bytes = blue_channel[start_idx:end_idx].tobytes()
                 bc_msgb = OscMessageBuilder(f"/WS/blue/chunk/{i}")
-                bc_msgb.add_arg(blue_chunk_bytes)
-                bundle.add_content(bc_msgb.build()) # type: ignore
+                bc_msgb.add_arg(blue_chunk_bytes, 'b')
+                message_list.append(bc_msgb.build())
 
-            return bundle.build()
+            return message_list
 
         except Exception as e:
             print(f"Error preparing data: {e}")
             return None
 
     @staticmethod
-    def _calculate_optimal_chunks(byte_length: int, MTU=1500) -> tuple[int, int]:
+    def float_to_int8(arr: np.ndarray) -> np.ndarray:
+        """
+        Convert a float32 array to int8 by clipping and scaling.
+
+        Args:
+            arr_float32: Input array of type float32
+
+        Returns:
+            Array of type int8 with values scaled to -128 to 127
+        """
+        if arr.dtype != np.float32:
+            raise ValueError("Input array must be of type float32")
+
+        # Convert to float16 for memory efficiency, then back to float32 for calculations
+        arr_clipped = np.clip(arr, 0.0, 1.0)
+        arr_scaled = arr_clipped * 255.0 - 128.0
+        return np.round(arr_scaled).astype(np.int8)
+
+    @staticmethod
+    def uint8_to_int8(arr: np.ndarray) -> np.ndarray:
+        """
+        Convert a uint8 array to int8 by shifting values.
+
+        Args:
+            arr_uint8: Input array of type uint8
+
+        Returns:
+            Array of type int8 with values shifted to -128 to 127
+        """
+        if arr.dtype != np.uint8:
+            raise ValueError("Input array must be of type uint8")
+
+        # Convert uint8 to int8 by subtracting 128
+        return (arr.astype(np.int8) - 128)
+
+    @staticmethod
+    def _calculate_optimal_chunks(byte_length: int, byte_size: int, MTU=1500) -> tuple[int, int]:
         """
         Calculate the optimal chunk size to evenly divide an array of given length.
 
@@ -137,7 +188,7 @@ class UdpSender(threading.Thread):
             The optimal chunk size
         """
         # Maximum size for a single chunk (accounting for OSC overhead)
-        max_chunk_size: int = MTU - 100  # Leave space for OSC overhead
+        max_chunk_size: int = int((MTU - 100) / byte_size)  # Leave space for OSC overhead
 
         # If the array fits in one chunk, return the array length
         if byte_length <= max_chunk_size:
@@ -154,7 +205,7 @@ class UdpSender(threading.Thread):
                     # print(f"Using perfect divisor: {divisor} chunks of size {chunk_size} bytes for {byte_length} bytes")
                     return chunk_size, divisor
 
-        print(f"No perfect divisor found for {byte_length} bytes, using maximum {min_chunks} chunks with a size of {max_chunk_size} bytes, totalling {min_chunks * max_chunk_size} bytes")
+        print(f"No perfect divisor found for {byte_length} bytes, using maximum {min_chunks} chunks with a size of {max_chunk_size} bytes, totalling {min_chunks * max_chunk_size * byte_size} bytes")
         return max_chunk_size, min_chunks
 
     @staticmethod
