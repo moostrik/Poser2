@@ -1,16 +1,14 @@
-# from __future__ import annotations
-
-import cv2
-import numpy as np
+# Standard library imports
 from threading import Thread, Lock
 from time import time, sleep
-from random import uniform
 
+# Third-party imports
+
+# Local application imports
 from modules.av.Definitions import *
 from modules.av.Gui import Gui
 from modules.av.CompTest import CompTest
 from modules.av.UdpSender import UdpSender
-
 from modules.Settings import Settings
 from modules.person.Person import Person, PersonDict
 

@@ -8,18 +8,15 @@ from typing import Optional
 # Local application imports
 from modules.Settings import Settings
 from modules.person.Person import Person, PersonCallback
-from modules.pose.Definitions import ModelTypeNames, PoseAngleDict
+from modules.pose.Definitions import ModelTypeNames
 from modules.pose.Detection import Detection
-from modules.pose.KalmanFilter import KalmanFilter
+from modules.pose.JointAngleCalculator import JointAngleCalculator
 
 
 class Pipeline(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__()
-
         self.running: bool = False
-
-        # Input queue for persons to process
         self.person_queue: queue.Queue[Person] = queue.Queue()
 
         # Pose detection components
@@ -30,11 +27,8 @@ class Pipeline(Thread):
             self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type)
         print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
 
-        # Pose filter
-        # self.kalman_filter: KalmanFilter = KalmanFilter()
-
-
-
+        # Pose angles calculator
+        self.joint_angles: JointAngleCalculator = JointAngleCalculator()
 
         # Callbacks
         self.callback_lock = Lock()
@@ -44,9 +38,13 @@ class Pipeline(Thread):
         if self.running:
             return
 
+
+        self.joint_angles.add_person_callback(self._person_output_callback)
+        self.joint_angles.start()
+
         # Start detectors
         for detector in self.pose_detectors.values():
-            detector.addMessageCallback(self._pose_detection_callback)
+            detector.addMessageCallback(self.joint_angles.person_input)
             detector.start()
             self.pose_detector_frame_size = detector.get_frame_size()
 
@@ -60,6 +58,8 @@ class Pipeline(Thread):
 
         for detector in self.pose_detectors.values():
             detector.stop()
+
+        self.joint_angles.stop()
 
     def run(self) -> None:
         while self.running:
@@ -79,35 +79,9 @@ class Pipeline(Thread):
     def _pose_detection_callback(self, person: Person) -> None:
         """Callback for pose detection completion"""
         if person.pose is not None:
-            self._pose_filter(person)
+            pass
         else:
             print(f"Pose detection failed for person {person.id}")
-
-    def _pose_filter(self, person: Person) -> None:
-        # if person.pose is not None:
-        #     try:
-        #         person.pose = self.kalman_filter.apply(person.pose)
-        #     except Exception as e:
-        #         print(f"Error applying Kalman filter to person {person.id}: {e}")
-        #         return
-
-        self._person_output_callback(person)
-
-    def _pose_angles(self, person: Person) -> None:
-        """Calculate angles between keypoints in the pose"""
-        if person.pose is None:
-            self._person_output_callback(person)
-            return
-
-        # Iterate through the predefined angles in PoseAngleDict
-        # angles
-        # for angle_name, keypoints in PoseAngleDict.items():
-
-
-
-        # Placeholder for angle calculation logic
-        # This can be implemented based on the specific requirements of the application
-        pass
 
     # External Input
     def person_input(self, person: Person) -> None:

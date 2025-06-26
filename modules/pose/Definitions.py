@@ -3,9 +3,9 @@
 # https://github.com/Kazuhito00/MoveNet-Python-Example/tree/main
 # Lightning for low latency, Thunder for high accuracy
 
-from enum import Enum
+from enum import Enum, IntEnum
 import numpy as np
-from typing import Callable
+from typing import TypedDict
 
 NUM_KEYPOINTS = 17
 NUM_KEYPOINT_VALUES = 3 # [y, x, score]
@@ -37,7 +37,7 @@ ModelInputSize: list[int] = [
     256,
 ]
 
-class Keypoints(Enum):
+class Keypoint(IntEnum):
     nose =          0
     left_eye =      1
     right_eye =     2
@@ -56,24 +56,24 @@ class Keypoints(Enum):
     left_ankle =    15
     right_ankle =   16
 
-KeypointNames: list[str] = [e.name for e in Keypoints]
+KeypointNames: list[str] = [e.name for e in Keypoint]
 
-PoseEdgeList: list[list[Keypoints]] = [
-    [Keypoints.nose, Keypoints.left_eye],
-    [Keypoints.nose, Keypoints.right_eye],
-    [Keypoints.left_eye, Keypoints.left_ear],
-    [Keypoints.right_eye, Keypoints.right_ear],
-    [Keypoints.left_shoulder, Keypoints.right_shoulder],
-    [Keypoints.left_shoulder, Keypoints.left_elbow],
-    [Keypoints.right_shoulder, Keypoints.right_elbow],
-    [Keypoints.left_elbow, Keypoints.left_wrist],
-    [Keypoints.right_elbow, Keypoints.right_wrist],
-    [Keypoints.left_shoulder, Keypoints.left_hip],
-    [Keypoints.right_shoulder, Keypoints.right_hip],
-    [Keypoints.left_hip, Keypoints.left_knee],
-    [Keypoints.right_hip, Keypoints.right_knee],
-    [Keypoints.left_knee, Keypoints.left_ankle],
-    [Keypoints.right_knee, Keypoints.right_ankle]
+PoseEdgeList: list[list[Keypoint]] = [
+    [Keypoint.nose, Keypoint.left_eye],
+    [Keypoint.nose, Keypoint.right_eye],
+    [Keypoint.left_eye, Keypoint.left_ear],
+    [Keypoint.right_eye, Keypoint.right_ear],
+    [Keypoint.left_shoulder, Keypoint.right_shoulder],
+    [Keypoint.left_shoulder, Keypoint.left_elbow],
+    [Keypoint.right_shoulder, Keypoint.right_elbow],
+    [Keypoint.left_elbow, Keypoint.left_wrist],
+    [Keypoint.right_elbow, Keypoint.right_wrist],
+    [Keypoint.left_shoulder, Keypoint.left_hip],
+    [Keypoint.right_shoulder, Keypoint.right_hip],
+    [Keypoint.left_hip, Keypoint.left_knee],
+    [Keypoint.right_hip, Keypoint.right_knee],
+    [Keypoint.left_knee, Keypoint.left_ankle],
+    [Keypoint.right_knee, Keypoint.right_ankle]
 ]
 
 # convert PoseIndices to a 1 dimentional np.ndarray
@@ -100,17 +100,22 @@ PoseEdgeColors: list[tuple[float, float, float]] = [
     (0.6, 0.8, 1.0),   # right_knee-right_ankle
 ]
 
-PoseAngleDict: dict[str, tuple[Keypoints, Keypoints, Keypoints]] = {
-    Keypoints.left_elbow.name:     ( Keypoints.left_shoulder,  Keypoints.left_elbow,     Keypoints.left_wrist  ),
-    Keypoints.right_elbow.name:    ( Keypoints.right_shoulder, Keypoints.right_elbow,    Keypoints.right_wrist ),
-    Keypoints.left_shoulder.name:  ( Keypoints.left_hip,       Keypoints.left_shoulder,  Keypoints.left_elbow  ),
-    Keypoints.right_shoulder.name: ( Keypoints.right_hip,      Keypoints.right_shoulder, Keypoints.right_elbow ),
-    Keypoints.left_hip.name:       ( Keypoints.left_shoulder,  Keypoints.left_hip,       Keypoints.left_knee   ),
-    Keypoints.right_hip.name:      ( Keypoints.right_shoulder, Keypoints.right_hip,      Keypoints.right_knee  ),
-    Keypoints.left_knee.name:      ( Keypoints.left_hip,       Keypoints.left_knee,      Keypoints.left_ankle  ),
-    Keypoints.right_knee.name:     ( Keypoints.right_hip,      Keypoints.right_knee,     Keypoints.right_ankle ),
+PoseAngleKeypoints: dict[Keypoint, tuple[Keypoint, Keypoint, Keypoint]] = {
+    Keypoint.left_elbow:     ( Keypoint.left_shoulder,  Keypoint.left_elbow,     Keypoint.left_wrist  ),
+    Keypoint.right_elbow:    ( Keypoint.right_shoulder, Keypoint.right_elbow,    Keypoint.right_wrist ),
+    Keypoint.left_shoulder:  ( Keypoint.left_hip,       Keypoint.left_shoulder,  Keypoint.left_elbow  ),
+    Keypoint.right_shoulder: ( Keypoint.right_hip,      Keypoint.right_shoulder, Keypoint.right_elbow ),
+    Keypoint.left_hip:       ( Keypoint.left_shoulder,  Keypoint.left_hip,       Keypoint.left_knee   ),
+    Keypoint.right_hip:      ( Keypoint.right_shoulder, Keypoint.right_hip,      Keypoint.right_knee  ),
+    Keypoint.left_knee:      ( Keypoint.left_hip,       Keypoint.left_knee,      Keypoint.left_ankle  ),
+    Keypoint.right_knee:     ( Keypoint.right_hip,      Keypoint.right_knee,     Keypoint.right_ankle ),
 }
 
+class JointAngle(TypedDict):
+    angle: float         # The computed joint angle (degrees, or np.nan if invalid)
+    confidence: float    # The minimum confidence score among the three keypoints
+
+JointAngleDict = dict[Keypoint, JointAngle]
 
 class Pose():
     def __init__(self, keypoints: np.ndarray, scores: np.ndarray) -> None:

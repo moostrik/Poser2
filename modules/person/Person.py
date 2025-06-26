@@ -9,7 +9,7 @@ import numpy as np
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet, Rect
-from modules.pose.Definitions import Pose
+from modules.pose.Definitions import Pose, JointAngleDict
 
 
 PersonColors: dict[int, str] = {
@@ -38,31 +38,34 @@ class Person():
         self.cam_id: int =              cam_id
         self.tracklet: Tracklet =       tracklet
 
-        self.local_angle: float =       0.0
-        self.world_angle: float =       0.0
-        self.pose: Optional[Pose] =     None
-        self.pose_roi: Optional[Rect] = None
-        self.img: Optional[np.ndarray]= None
-
         self.active: bool =             True
         self.start_time: float =        time()
         self.last_time: float =         time()
 
+        self.local_angle: float =       0.0
+        self.world_angle: float =       0.0
         self.overlap: bool =            False
+
+        self.img: Optional[np.ndarray]= None
+
+        self.pose_roi: Optional[Rect] = None
+        self.pose: Optional[Pose] =     None
+        self.pose_angles: Optional[JointAngleDict] = None
+
 
     def update_from(self, other: 'Person') -> None:
         # self.id = other.id
         self.cam_id = other.cam_id
         self.tracklet = other.tracklet
-        self.local_angle = other.local_angle
-        self.world_angle = other.world_angle
+        # self.local_angle = other.local_angle
+        # self.world_angle = other.world_angle
         self.pose_roi = other.pose_roi
         self.img = other.img
         self.pose = other.pose
         self.active = other.active
         # self.start_time = other.start_time
         self.last_time = time()
-        self.overlap = other.overlap
+        # self.overlap = other.overlap
 
     def set_pose_roi(self, image: np.ndarray, roi_expansion: float) -> None:
         if self.pose_roi is not None:
