@@ -23,7 +23,6 @@ class AnalysisPipeline(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__()
         self._stop_event = Event()
-        self.running: bool = False
 
         # Input
         self.person_input_queue: Queue[Person] = Queue()
@@ -36,15 +35,12 @@ class AnalysisPipeline(Thread):
         # Callbacks for analysis output
         self.callback_lock = Lock()
         self.analysis_output_callbacks: set[AnalysisCallback] = set()
+        self.visualisation_callbacks: set[VisualisationCallback] = set()
 
         hot_reloader = HotReloadStaticMethods(self.__class__, True)
 
-    def start(self) -> None:
-        self.running = True
-        super().start()  # This actually starts the thread!
-
     def stop(self) -> None:
-        self.running = False
+        self._stop_event.set()
         with self.callback_lock:
             self.analysis_output_callbacks.clear()
         self.angle_windows.clear()
@@ -101,15 +97,13 @@ class AnalysisPipeline(Thread):
         callback(angle_df_smooth, conf_df)
 
         # print head of the DataFrame for debugging
-        print(f"Processed angles for person {person.id}:\n{angle_df_smooth.head()}")
+        # print(f"Processed angles for person {person.id}:\n{angle_df_smooth.head()}")
 
 
     def add_analysis_callback(self, callback: AnalysisCallback) -> None:
         """ Register a callback to receive the current pandas DataFrame window. """
-        if self.running:
-            print('AnalysisPipeline is running, cannot add callback')
-            return
-        self.analysis_output_callbacks.add(callback)
+        with self.callback_lock:
+            self.analysis_output_callbacks.add(callback)
 
     def _analysis_callback(self, angles: pd.DataFrame, confidences: pd.DataFrame) -> None:
         self._visualisation_callback(angles, confidences)
@@ -118,6 +112,10 @@ class AnalysisPipeline(Thread):
             for callback in self.analysis_output_callbacks:
                 callback(angles)
 
+    def add_visualisation_callback(self, callback: VisualisationCallback) -> None:
+        """ Register a callback to receive the visualisation data. """
+        with self.callback_lock:
+            self.visualisation_callbacks.add(callback)
 
     def _visualisation_callback(self, angles: pd.DataFrame, confidences: pd.DataFrame) -> None:
         """ Handle the output of the visualisation. """
@@ -126,3 +124,5 @@ class AnalysisPipeline(Thread):
 
         # combine angles and confidences into a single array for visualisation
         visualisation_data: np.ndarray = np.concatenate((angles_np, conf_np), axis=1)
+        for callback in self.visualisation_callbacks:
+            callback(visualisation_data)

@@ -40,7 +40,7 @@ class Main():
         self.analysis_pipeline: Optional[AnalysisPipeline] = None
         if settings.pose_active:
             self.pose_pipeline = Pipeline(settings)
-            self.analysis_pipeline = AnalysisPipeline(settings.analysis_window_size)
+            self.analysis_pipeline = AnalysisPipeline(settings)
 
         self.av: AV = AV(self.gui, settings)
         self.running: bool = False
