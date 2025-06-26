@@ -13,7 +13,7 @@ from modules.person.Person import Person, PersonCallback
 from modules.utils.HotReloadStaticMethods import HotReloadStaticMethods
 
 
-class JointAngleCalculator(Thread):
+class PoseAngleCalculator(Thread):
     def __init__(self) -> None:
         """Initialize the JointAngles calculator."""
         super().__init__()
@@ -104,7 +104,7 @@ class JointAngleCalculator(Thread):
                 p1 = keypoints[idx1]
                 p2 = keypoints[idx2]
                 p3 = keypoints[idx3]
-                angle: float = JointAngleCalculator.calculate_angle(p1, p2, p3)
+                angle: float = PoseAngleCalculator.calculate_angle(p1, p2, p3)
                 confidence: float = min(scores[idx1], scores[idx2], scores[idx3])
                 # Store results
                 angles[joint_name] = JointAngle(angle = angle, confidence = confidence)

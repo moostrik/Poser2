@@ -8,7 +8,6 @@ import pandas as pd
 import numpy as np
 
 # Local application imports
-from modules.analysis.JointAngleWindow import JointAngleWindow
 from modules.person.Person import Person
 from modules.pose.PoseDefinitions import JointAngleDict
 from modules.Settings import Settings

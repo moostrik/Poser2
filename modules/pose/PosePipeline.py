@@ -9,7 +9,7 @@ from modules.Settings import Settings
 from modules.person.Person import Person, PersonCallback
 from modules.pose.PoseDefinitions import ModelTypeNames
 from modules.pose.PoseDetection import Detection
-from modules.pose.JointAngleCalculator import JointAngleCalculator
+from modules.pose.PoseAngleCalculator import PoseAngleCalculator
 
 
 class Pipeline:
@@ -24,7 +24,7 @@ class Pipeline:
         print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
 
         # Pose angles calculator
-        self.joint_angles: JointAngleCalculator = JointAngleCalculator()
+        self.joint_angles: PoseAngleCalculator = PoseAngleCalculator()
 
         # Callbacks
         self.callback_lock = Lock()
