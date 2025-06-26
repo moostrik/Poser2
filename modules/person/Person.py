@@ -9,7 +9,7 @@ import numpy as np
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet, Rect
-from modules.pose.Definitions import Pose, JointAngleDict
+from modules.pose.PoseDefinitions import Pose, JointAngleDict
 
 
 PersonColors: dict[int, str] = {

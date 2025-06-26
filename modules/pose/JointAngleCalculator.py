@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 # Local application imports
-from modules.pose.Definitions import *
+from modules.pose.PoseDefinitions import *
 from modules.person.Person import Person, PersonCallback
 
 from modules.utils.HotReloadStaticMethods import HotReloadStaticMethods
@@ -115,6 +115,7 @@ class JointAngleCalculator(Thread):
                 angles[joint_name] = JointAngle(angle = np.nan, confidence = 0.0)
 
         # Create DataFrame from angles
+        # print(f"Calculated angles for person {person.id}: {angles}")
         person.pose_angles = angles
         callback(person)
 

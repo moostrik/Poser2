@@ -1,13 +1,16 @@
+# Standard library imports
 from math import ceil
 from typing import Optional
 
+# Local application imports
+from modules.analysis.AnalysisPipeline import AnalysisPipeline
 from modules.av.Manager import Manager as AV
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.panoramic.Tracker import Tracker as PanoramicTracker
-from modules.pose.Pipeline import Pipeline
+from modules.pose.PosePipeline import Pipeline
 from modules.render.Render import Render
 from modules.Settings import Settings
 
@@ -34,8 +37,10 @@ class Main():
         self.panoramic_tracker = PanoramicTracker(self.gui, settings)
 
         self.pose_pipeline: Optional[Pipeline] = None
+        self.analysis_pipeline: Optional[AnalysisPipeline] = None
         if settings.pose_active:
             self.pose_pipeline = Pipeline(settings)
+            self.analysis_pipeline = AnalysisPipeline(settings.analysis_window_size)
 
         self.av: AV = AV(self.gui, settings)
         self.running: bool = False
@@ -56,6 +61,10 @@ class Main():
 
         if self.pose_pipeline:
             self.panoramic_tracker.add_person_callback(self.pose_pipeline.person_input)
+            if self.analysis_pipeline:
+                self.pose_pipeline.add_person_callback(self.analysis_pipeline.person_input)
+                # self.analysis_pipeline.add_analysis_callback(self.render.add_analysis)
+                self.analysis_pipeline.start()
             self.pose_pipeline.add_person_callback(self.render.add_person)
             self.pose_pipeline.start()
         else:
@@ -109,6 +118,12 @@ class Main():
         # print('stop detector')
         self.panoramic_tracker.stop()
         self.panoramic_tracker.join()
+
+        if self.pose_pipeline:
+            self.pose_pipeline.stop()
+
+        if self.analysis_pipeline:
+            self.analysis_pipeline.stop()
 
         self.av.stop()
         self.av.join()

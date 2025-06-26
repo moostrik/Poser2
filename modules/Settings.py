@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 
 from modules.cam.depthcam.Definitions import get_device_list
-from modules.pose.Detection import ModelType
+from modules.pose.PoseDetection import ModelType
 from modules.cam.depthcam.Definitions import FrameType
 
 class Settings():
@@ -37,17 +37,28 @@ class Settings():
         self.camera_passthrough: bool           = None # type: ignore
         self.camera_manual: bool                = None # type: ignore
 
-        # DETECTION SETTINGS
-        self.pose_num: int                      = None # type: ignore
-        self.pose_model_type: ModelType         = None # type: ignore
-        self.pose_active: bool                  = None # type: ignore
-
         # RECORDER AND PLAYER SETTINGS
         self.video_chunk_length: float          = None # type: ignore
         self.video_encoder: Settings.CoderType  = None # type: ignore
         self.video_decoder: Settings.CoderType  = None # type: ignore
         self.video_format: Settings.CoderFormat = None # type: ignore
         self.video_frame_types: list[FrameType] = None # type: ignore
+
+        # DETECTION SETTINGS
+        self.pose_num: int                      = None # type: ignore
+        self.pose_model_type: ModelType         = None # type: ignore
+        self.pose_active: bool                  = None # type: ignore
+
+        # ANALYSIS SETTINGS
+        self.analysis_window_size: int          = None # type: ignore
+
+        # LIGHT SETTINGS
+        self.light_resolution: int              = None # type: ignore
+        self.light_rate: int                    = None # type: ignore
+
+        # UDP SETTINGS
+        self.udp_port: int                      = None # type: ignore
+        self.udp_ip_addresses: list[str]        = None # type: ignore
 
         # RENDER SETTINGS
         self.render_title: str                  = None # type: ignore
@@ -59,14 +70,6 @@ class Settings():
         self.render_fps: int                    = None # type: ignore
         self.render_v_sync: bool                = None # type: ignore
         self.render_cams_a_row: int             = None # type: ignore
-
-        # LIGHT SETTINGS
-        self.light_resolution: int              = None # type: ignore
-        self.light_rate: int                    = None # type: ignore
-
-        # UDP SETTINGS
-        self.udp_port: int                      = None # type: ignore
-        self.udp_ip_addresses: list[str]        = None # type: ignore
 
 
     def check_values(self) -> None:

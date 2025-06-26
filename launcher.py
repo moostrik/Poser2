@@ -61,15 +61,23 @@ settings.camera_simulation =    args.simulation or args.passthrough
 settings.camera_passthrough =   args.passthrough
 settings.camera_manual =    not args.autoset
 
-settings.pose_num =             args.players
-settings.pose_active =      not args.nopose
-settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
-
 settings.video_chunk_length =   args.chunklength
 settings.video_encoder =        Settings.CoderType.iGPU
 settings.video_decoder =        Settings.CoderType.iGPU
 settings.video_format =         Settings.CoderFormat.H264
 settings.video_frame_types =    [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIGHT] if settings.camera_stereo else [FrameType.VIDEO]
+
+settings.pose_num =             args.players
+settings.pose_active =      not args.nopose
+settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
+
+settings.analysis_window_size = 10 # seconds
+
+settings.light_resolution =     3600
+settings.light_rate =           60
+
+settings.udp_port =             8888
+settings.udp_ip_addresses =     udp_list
 
 settings.render_title =         'White Space'
 settings.render_width =         1920
@@ -80,12 +88,6 @@ settings.render_fullscreen=     False
 settings.render_fps =           0
 settings.render_v_sync =        True
 settings.render_cams_a_row=     2
-
-settings.light_resolution =     3600
-settings.light_rate =           60
-
-settings.udp_port =             8888
-settings.udp_ip_addresses =     udp_list
 
 settings.check_values()
 # settings.check_cameras()

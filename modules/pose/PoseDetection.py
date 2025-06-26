@@ -10,7 +10,7 @@ import numpy as np
 import onnxruntime as ort
 
 # Local application imports
-from modules.pose.Definitions import *
+from modules.pose.PoseDefinitions import *
 from modules.person.Person import Person
 
 class Detection(Thread):

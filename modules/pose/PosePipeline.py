@@ -1,6 +1,5 @@
 # Standard library imports
-import queue
-from threading import Thread, Lock
+from threading import Lock
 from typing import Optional
 
 # Third-party imports
@@ -8,16 +7,13 @@ from typing import Optional
 # Local application imports
 from modules.Settings import Settings
 from modules.person.Person import Person, PersonCallback
-from modules.pose.Definitions import ModelTypeNames
-from modules.pose.Detection import Detection
+from modules.pose.PoseDefinitions import ModelTypeNames
+from modules.pose.PoseDetection import Detection
 from modules.pose.JointAngleCalculator import JointAngleCalculator
 
 
-class Pipeline(Thread):
+class Pipeline:
     def __init__(self, settings: Settings) -> None:
-        super().__init__()
-        self.running: bool = False
-        self.person_queue: queue.Queue[Person] = queue.Queue()
 
         # Pose detection components
         self.pose_detectors: dict[int, Detection] = {}
@@ -33,11 +29,11 @@ class Pipeline(Thread):
         # Callbacks
         self.callback_lock = Lock()
         self.person_output_callbacks: set[PersonCallback] = set()
+        self.running: bool = False
 
     def start(self) -> None:
         if self.running:
             return
-
 
         self.joint_angles.add_person_callback(self._person_output_callback)
         self.joint_angles.start()
@@ -49,7 +45,6 @@ class Pipeline(Thread):
             self.pose_detector_frame_size = detector.get_frame_size()
 
         self.running = True
-        super().start()
 
     def stop(self) -> None:
         self.running = False
@@ -61,34 +56,13 @@ class Pipeline(Thread):
 
         self.joint_angles.stop()
 
-    def run(self) -> None:
-        while self.running:
-            try:
-                person: Optional[Person] = self.person_queue.get(block=True, timeout=0.01)
-                if person is not None:
-                    self._pose_detection(person)
-                    self.person_queue.task_done()
-            except queue.Empty:
-                pass
-
-    def _pose_detection(self, person: Person) -> None:
-            detector: Optional[Detection] = self.pose_detectors.get(person.id)
-            if detector:
-                detector.set_detection(person)
-
-    def _pose_detection_callback(self, person: Person) -> None:
-        """Callback for pose detection completion"""
-        if person.pose is not None:
-            pass
-        else:
-            print(f"Pose detection failed for person {person.id}")
-
     # External Input
     def person_input(self, person: Person) -> None:
-        """Add a person to the processing queue"""
-        self.person_queue.put(person)
+        detector: Optional[Detection] = self.pose_detectors.get(person.id)
+        if detector:
+            detector.set_detection(person)
 
-    # External Output Calbacks
+    # External Output Callbacks
     def add_person_callback(self, callback: PersonCallback) -> None:
         """Add callback for processed persons"""
         if self.running:
