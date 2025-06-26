@@ -108,16 +108,12 @@ class UdpSender(threading.Thread):
 
             message_list.append(bundle.build())
 
-            # Convert float16 to int8 (since values are normalized 0-1)
             if IMG_TYPE == np.float32:
-                white_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 0])
-                blue_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 1])
+                white_channel: np.ndarray = UdpSender.float_to_uint8(av_output.img[0, :, 0])
+                blue_channel: np.ndarray = UdpSender.float_to_uint8(av_output.img[0, :, 1])
             elif IMG_TYPE == np.uint8:
-                white_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.img[0, :, 0])
-                blue_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.img[0, :, 1])
-
-            # white_channel: np.ndarray = av_output.img[0, :, 0].astype(np.float16)
-            # blue_channel: np.ndarray = av_output.img[0, :, 1].astype(np.float16)
+                white_channel: np.ndarray = UdpSender.float_to_uint8(av_output.img[0, :, 0])
+                blue_channel: np.ndarray = UdpSender.float_to_uint8(av_output.img[0, :, 1])
 
             for i in range(num_chunks):
                 start_idx: int = i * chunk_size
@@ -155,8 +151,27 @@ class UdpSender(threading.Thread):
 
         # Convert to float16 for memory efficiency, then back to float32 for calculations
         arr_clipped = np.clip(arr, 0.0, 1.0)
-        arr_scaled = arr_clipped * 255.0 - 128.0
+        arr_scaled = arr_clipped * 255.0 - 128.0    # Scale to -128 to 127 range
         return np.round(arr_scaled).astype(np.int8)
+    @staticmethod
+
+    def float_to_uint8(arr: np.ndarray) -> np.ndarray:
+        """
+        Convert a float32 array to int8 by clipping and scaling.
+
+        Args:
+            arr_float32: Input array of type float32
+
+        Returns:
+            Array of type int8 with values scaled to -128 to 127
+        """
+        if arr.dtype != np.float32:
+            raise ValueError("Input array must be of type float32")
+
+        # Convert to float16 for memory efficiency, then back to float32 for calculations
+        arr_clipped: np.ndarray = np.clip(arr, 0.0, 1.0)
+        arr_scaled = arr_clipped * 255.0    # Scale to 0 to 255 range
+        return np.round(arr_scaled).astype(np.uint8)
 
     @staticmethod
     def uint8_to_int8(arr: np.ndarray) -> np.ndarray:
