@@ -106,6 +106,13 @@ class Render(RenderWindow):
         self.all_shaders.append(self.vis_line_shader)
         self.all_shaders.append(self.vis_angle_shader)
 
+        self.analysis_images: dict[int, Image] = {}  # person_id -> Image
+        for i in range(self.num_persons):
+            self.analysis_images[i] = Image()
+            self.all_images.append(self.analysis_images[i])
+        # self.analysis_shader: WS_Angles = WS_Angles()
+        # self.all_shaders.append(self.analysis_shader)
+
     def reshape(self, width, height) -> None: # override
         super().reshape(width, height)
         self.composition = self.make_composition_subdivision(width, height, self.num_cams, self.num_sims, self.num_persons, self.num_viss)
@@ -210,11 +217,15 @@ class Render(RenderWindow):
             image.set_image(person.img)
             image.update()
 
+            analysis_image: Image = self.analysis_images[i]
+            analysis_image.update()
+
             self.setView(fbo.width, fbo.height)
             fbo.begin()
 
             if person is not None and person.active:
                 image.draw(0, 0, fbo.width, fbo.height)
+                analysis_image.draw(0, 0, fbo.width, fbo.height)
                 mesh: Mesh = self.pose_meshes[person.id]
                 self.draw_person(person, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
 
@@ -272,6 +283,12 @@ class Render(RenderWindow):
     def set_av(self, value: AvOutput) -> None:
         self.vis_image.set_image(value.img)
         self.av_angle = value.angle
+
+    def add_analysis(self, id, analysis: np.ndarray) -> None:
+        """ Set the analysis data for visualisation. """
+        # print(f"Adding analysis for person {id} with shape {analysis.shape}")
+        if analysis is not None:
+            self.analysis_images[id].set_image(analysis)
 
     # STATIC METHODS
     @staticmethod

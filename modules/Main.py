@@ -63,7 +63,7 @@ class Main():
             self.panoramic_tracker.add_person_callback(self.pose_pipeline.person_input)
             if self.analysis_pipeline:
                 self.pose_pipeline.add_person_callback(self.analysis_pipeline.person_input)
-                # self.analysis_pipeline.add_analysis_callback(self.render.add_analysis)
+                self.analysis_pipeline.add_visualisation_callback(self.render.add_analysis)
                 self.analysis_pipeline.start()
             self.pose_pipeline.add_person_callback(self.render.add_person)
             self.pose_pipeline.start()

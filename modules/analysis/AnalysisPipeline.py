@@ -16,7 +16,7 @@ from modules.utils.HotReloadStaticMethods import HotReloadStaticMethods
 
 # Type for analysis output callback
 AnalysisCallback = Callable[[pd.DataFrame], None]
-VisualisationCallback = Callable[[np.ndarray], None]
+VisualisationCallback = Callable[[int, np.ndarray], None]
 
 class AnalysisPipeline(Thread):
     def __init__(self, settings: Settings) -> None:
@@ -27,7 +27,7 @@ class AnalysisPipeline(Thread):
         self.person_input_queue: Queue[Person] = Queue()
 
         # Windowing for joint angles
-        self.window_size: int = settings.analysis_window_size
+        self.window_size: int = int(settings.analysis_window_size * settings.camera_fps)
         self.angle_windows: dict[int, pd.DataFrame] = {}
         self.conf_windows: dict[int, pd.DataFrame] = {}
 
@@ -81,7 +81,7 @@ class AnalysisPipeline(Thread):
             angle_df = angle_df.iloc[-window_size:]
         angles[person.id] = angle_df
 
-        # Update confidence window
+        # # Update confidence window
         conf_df = confidences.get(person.id, pd.DataFrame())
         conf_df = pd.concat([conf_df, pd.DataFrame([conf_row])], ignore_index=True)
         if len(conf_df) > window_size:
@@ -93,7 +93,7 @@ class AnalysisPipeline(Thread):
         angle_df_smooth = angle_df_interp.rolling(window=5, min_periods=1).mean()
 
         # Notify callbacks with both DataFrames
-        callback(angle_df_smooth, conf_df)
+        callback(person.id, angle_df_smooth, conf_df)
 
         # print head of the DataFrame for debugging
         # print(f"Processed angles for person {person.id}:\n{angle_df_smooth.head()}")
@@ -104,8 +104,8 @@ class AnalysisPipeline(Thread):
         with self.callback_lock:
             self.analysis_output_callbacks.add(callback)
 
-    def _analysis_callback(self, angles: pd.DataFrame, confidences: pd.DataFrame) -> None:
-        self._visualisation_callback(angles, confidences)
+    def _analysis_callback(self, id: int, angles: pd.DataFrame, confidences: pd.DataFrame) -> None:
+        self._visualisation_callback(id, angles, confidences)
         """ Handle the output of the analysis. """
         with self.callback_lock:
             for callback in self.analysis_output_callbacks:
@@ -116,12 +116,41 @@ class AnalysisPipeline(Thread):
         with self.callback_lock:
             self.visualisation_callbacks.add(callback)
 
-    def _visualisation_callback(self, angles: pd.DataFrame, confidences: pd.DataFrame) -> None:
+    def _visualisation_callback(self, id: int, angles: pd.DataFrame, confidences: pd.DataFrame) -> None:
         """ Handle the output of the visualisation. """
-        angles_np: np.ndarray = np.nan_to_num(angles.to_numpy(), nan=0.5)
+        vis: np.ndarray = self._create_visualisation_data(angles, confidences)
+        for callback in self.visualisation_callbacks:
+            callback(id, vis)
+
+    @staticmethod
+    def _create_visualisation_data(angles: pd.DataFrame, confidences: pd.DataFrame) -> np.ndarray:
+        """ Create visualisation data from angles and confidences. """
+        angles_np: np.ndarray = np.nan_to_num(angles.to_numpy(), nan=np.pi)
+        # Rotate and wrap, then map [0, 2pi] to [0, pi] up and [pi, 2pi] to [pi, 0] down
+        angles_np = (angles_np + np.pi * 0.5) % (2 * np.pi)
+        angles_np = np.abs(angles_np - np.pi)
+        # Normalize to [0, 1] for [0, pi]
+        angles_norm = np.clip(angles_np / np.pi, 0, 1)
         conf_np: np.ndarray = np.nan_to_num(confidences.to_numpy(), nan=0.0)
 
-        # combine angles and confidences into a single array for visualisation
-        visualisation_data: np.ndarray = np.concatenate((angles_np, conf_np), axis=1)
-        for callback in self.visualisation_callbacks:
-            callback(visualisation_data)
+        angles_norm = angles_norm[:, :4]
+        conf_np = conf_np[:, :4]
+
+        width, height = angles_norm.shape
+        img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
+
+        # BGR: Blue, Green, Red
+        img[..., 0] = angles_norm.T         # Blue channel: 0 (yellow) to 1 (cyan)
+        img[..., 1] = 1.0                   # Green channel: always 1
+        img[..., 2] = 1.0 - angles_norm.T   # Red channel: 1 (yellow) to 0 (cyan)
+        img[..., 3] = conf_np.T             # Alpha: confidence or 1.0
+
+        # Insert black row between every row, including top and bottom
+        black_row = np.zeros((1, width, 4), dtype=img.dtype)
+        img_with_black = [black_row]
+        for row in img:
+            img_with_black.append(row[np.newaxis, ...])
+            img_with_black.append(black_row)
+        img_final = np.vstack(img_with_black)
+
+        return img_final
