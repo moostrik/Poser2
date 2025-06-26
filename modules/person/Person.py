@@ -57,15 +57,15 @@ class Person():
         # self.id = other.id
         self.cam_id = other.cam_id
         self.tracklet = other.tracklet
-        # self.local_angle = other.local_angle
-        # self.world_angle = other.world_angle
+        self.local_angle = other.local_angle
+        self.world_angle = other.world_angle
         self.pose_roi = other.pose_roi
         self.img = other.img
         self.pose = other.pose
         self.active = other.active
-        # self.start_time = other.start_time
+        # self.start_time = other.start_time    # WHY NOT?
         self.last_time = time()
-        # self.overlap = other.overlap
+        self.overlap = other.overlap
 
     def set_pose_roi(self, image: np.ndarray, roi_expansion: float) -> None:
         if self.pose_roi is not None:
