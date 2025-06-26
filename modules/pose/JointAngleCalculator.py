@@ -1,11 +1,10 @@
 # Standard library imports
-import queue
+from queue import Empty, Queue
 from threading import Event, Lock, Thread
-from typing import Optional, Dict, Tuple, Union
+from typing import Optional
 
 # Third-party imports
 import numpy as np
-import pandas as pd
 
 # Local application imports
 from modules.pose.PoseDefinitions import *
@@ -21,7 +20,7 @@ class JointAngleCalculator(Thread):
         self._stop_event = Event()
 
         # Input
-        self.person_input_queue: queue.Queue[Person] = queue.Queue()
+        self.person_input_queue: Queue[Person] = Queue()
 
         # Parameters
         self.confidence_threshold: float = 0.3
@@ -48,7 +47,7 @@ class JointAngleCalculator(Thread):
                     except Exception as e:
                         print(f"Error processing person {person.id}: {e}")
                     self.person_input_queue.task_done()
-            except queue.Empty:
+            except Empty:
                 continue
 
     def person_input(self, person: Person) -> None:
