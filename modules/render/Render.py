@@ -1,26 +1,34 @@
-from OpenGL.GL import * # type: ignore
-import OpenGL.GLUT as glut
-from threading import Lock
+# Standard library imports
+import math
 import numpy as np
 from enum import Enum, IntEnum, auto
-import math
+from typing import Optional, Type, Any, Dict, Tuple
+from threading import Lock
 
-from modules.gl.RenderWindow import RenderWindow
-from modules.gl.Texture import Texture
+# Third-party imports
+from OpenGL.GL import * # type: ignore
+import OpenGL.GLUT as glut
+
+# Local application imports
 from modules.gl.Fbo import Fbo, SwapFbo
-from modules.gl.Mesh import Mesh
-from modules.gl.Utils import lfo, fit, fill
 from modules.gl.Image import Image
+from modules.gl.Mesh import Mesh
+from modules.gl.RenderWindow import RenderWindow
 from modules.gl.Shader import Shader
-from modules.gl.shaders.WS_Angles import WS_Angles
-from modules.gl.shaders.WS_Lines import WS_Lines
+from modules.gl.Texture import Texture
+from modules.gl.Utils import lfo, fit, fill
 
-from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
-from modules.pose.PoseDefinitions import Pose, PoseEdgeIndices
-from modules.person.Person import Person, PersonColor
 from modules.av.Definitions import AvOutput
-
+from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
+from modules.person.Person import Person, PersonColor
+from modules.pose.PoseDefinitions import Pose, PoseEdgeIndices
 from modules.Settings import Settings
+
+from modules.utils.HotReloadMethods import HotReloadMethods
+
+# Shaders
+from modules.render.shaders.WS_Angles import WS_Angles
+from modules.render.shaders.WS_Lines import WS_Lines
 
 class ImageType(Enum):
     TOT = 0
@@ -53,7 +61,9 @@ class Render(RenderWindow):
         self.sim_fbos: dict[int, Fbo] = {}
         self.vis_fbos: dict[int, Fbo] = {}
         self.psn_fbos: dict[int, Fbo] = {}
+
         self.pose_meshes: dict[int, Mesh] = {}
+        self.angle_meshes: dict[int, Mesh] = {}
 
         self.all_images: list[Image] = []
         self.all_fbos: list[Fbo | SwapFbo] = []
@@ -83,7 +93,9 @@ class Render(RenderWindow):
 
             self.pose_meshes[i] = Mesh()
             self.pose_meshes[i].set_indices(PoseEdgeIndices)
-            self.all_meshes.append(self.pose_meshes[i])
+
+            self.angle_meshes[i] = Mesh()
+            self.all_meshes.append(self.angle_meshes[i])
 
         self.composition: Composition_Subdivision = self.make_composition_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.num_persons, self.num_viss)
         super().__init__(self.composition[ImageType.TOT][0][2], self.composition[ImageType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_fps, settings.render_x, settings.render_y)
@@ -93,9 +105,11 @@ class Render(RenderWindow):
         self.input_mutex: Lock = Lock()
         self.input_tracklets: dict[int, dict[int, Tracklet]] = {}   # cam_id -> track_id -> Tracklet
         self.input_persons: dict[int, Person | None] = {}           # person_id -> Person
+        self.input_angle_window: dict[int, Optional[np.ndarray]] = {}          # person_id -> angles
         for i in range(self.num_persons):
             self.input_tracklets[i] = {}
             self.input_persons[i] = None
+            self.input_angle_window[i] = None
 
         self.vis_width: int = settings.light_resolution
         self.vis_height: int = 1
@@ -112,6 +126,8 @@ class Render(RenderWindow):
             self.all_images.append(self.analysis_images[i])
         # self.analysis_shader: WS_Angles = WS_Angles()
         # self.all_shaders.append(self.analysis_shader)
+
+        self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     def reshape(self, width, height) -> None: # override
         super().reshape(width, height)
@@ -138,12 +154,19 @@ class Render(RenderWindow):
                 fbo.allocate(self.vis_width, self.vis_height, GL_RGBA32F)
             self.allocated = True
 
-        self.update_pose_meshes()
+
 
         self.draw_cameras()
         self.draw_sims()
         self.draw_lights()
-        self.draw_persons()
+
+        try:
+            self.update_pose_meshes()
+            self.update_angle_meshes()
+            self.draw_persons()
+        except Exception as e:
+            print(f"Error in draw_persons: {e}")
+            # Optionally, you can log the error or handle it as needed
 
         self.draw_composition()
 
@@ -156,6 +179,61 @@ class Render(RenderWindow):
                     self.pose_meshes[i].set_vertices(pose.getVertices())
                     self.pose_meshes[i].set_colors(pose.getColors(threshold=0.0))
                     self.pose_meshes[i].update()
+
+    def update_angle_meshes(self) -> None:
+        for i in range(self.num_persons):
+            data: Optional[np.ndarray] = self.get_angle_window(i, clear=True)
+            if data is None:
+                continue
+
+            mesh: Mesh = self.angle_meshes[i]
+            num_frames, num_joints, _ = data.shape
+            num_joints = 4
+
+            angles_raw: np.ndarray = data[..., 0]
+            #print last 10 lines of angles_raw
+            # print(f"Angles raw for person {i}:\n{angles_raw[-5:]}")
+            confidences_np: np.ndarray = data[..., 1]
+            # Normalize angles as before
+            angles_np: np.ndarray = np.abs(angles_raw)
+            angles_np = np.clip(angles_np / np.pi, 0, 1)
+            # Normalize confidences if needed
+            confidences_np = np.clip(confidences_np, 0, 1)
+
+            joint_height: float = 1.0 / (num_joints + 2)
+
+            vertices: list[Any] = []
+            colors: list[Any] = []
+            indices: list[Any] = []
+            for joint in range(num_joints):
+                for frame in range(num_frames):
+                    x = frame / (num_frames - 1) if num_frames > 1 else 0.0
+                    y = (joint + 1.0) * joint_height + angles_np[frame, joint] * joint_height
+                    vertices.append([x, y, 0.0])
+                    alpha = confidences_np[frame, joint]
+                    if joint % 2 == 0:  # Even (left)
+                        if angles_raw[frame, joint] > 0:
+                            colors.append([1.0, 1.0, 0.2, alpha])  # Yellow
+                        else:
+                            colors.append([1.0, 0.2, 0.2, alpha])  # Red
+                    else:  # Odd (right)
+                        if angles_raw[frame, joint] > 0:
+                            colors.append([0.2, 0.6, 1.0, alpha])  # Blue
+                        else:
+                            colors.append([0.2, 1.0, 0.2, alpha])  # Green
+
+                base = joint * num_frames
+                indices += [[base + k, base + k + 1] for k in range(num_frames - 1)]
+
+            vertices_np: np.ndarray = np.array(vertices, dtype=np.float32)
+            colors_np: np.ndarray = np.array(colors, dtype=np.float32)
+            indices_np: np.ndarray = np.array(indices, dtype=np.uint32).flatten()
+
+            mesh.set_vertices(vertices_np)
+            mesh.set_colors(colors_np)
+            mesh.set_indices(indices_np)
+            mesh.update()
+
 
     def draw_cameras(self) -> None:
         for i in range(self.num_cams):
@@ -225,9 +303,12 @@ class Render(RenderWindow):
 
             if person is not None and person.active:
                 image.draw(0, 0, fbo.width, fbo.height)
-                analysis_image.draw(0, 0, fbo.width, fbo.height)
+                # analysis_image.draw(0, 0, fbo.width, fbo.height)
                 mesh: Mesh = self.pose_meshes[person.id]
                 self.draw_person(person, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
+                angle_mesh = self.angle_meshes[person.id]
+                if angle_mesh.isInitialized():
+                    angle_mesh.draw(0, 0, fbo.width, fbo.height)
 
             fbo.end()
 
@@ -284,11 +365,21 @@ class Render(RenderWindow):
         self.vis_image.set_image(value.img)
         self.av_angle = value.angle
 
-    def add_analysis(self, id, analysis: np.ndarray) -> None:
-        """ Set the analysis data for visualisation. """
-        # print(f"Adding analysis for person {id} with shape {analysis.shape}")
-        if analysis is not None:
-            self.analysis_images[id].set_image(analysis)
+
+    def get_angle_window(self, id: int, clear = False) -> Optional[np.ndarray]:
+        with self.input_mutex:
+            ret_analysis: Optional[np.ndarray] = self.input_angle_window[id]
+            if clear:
+                self.input_angle_window[id] = None
+            return ret_analysis
+    def add_angle_window(self, id, analysis: np.ndarray) -> None:
+        with self.input_mutex:
+            self.input_angle_window[id] = analysis
+
+        # """ Set the analysis data for visualisation. """
+        # # print(f"Adding analysis for person {id} with shape {analysis.shape}")
+        # if analysis is not None:
+        #     self.analysis_images[id].set_image(analysis)
 
     # STATIC METHODS
     @staticmethod

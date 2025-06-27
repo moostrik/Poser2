@@ -89,7 +89,7 @@ class PoseAngleCalculator(Thread):
         scores: np.ndarray = person.pose.getScores()
 
         # Calculate angles for each joint in PoseAngleDict
-        for joint_name, (kp1, kp2, kp3) in PoseAngleKeypoints.items():
+        for joint, (kp1, kp2, kp3) in PoseAngleKeypoints.items():
             # Get indices
             # idx1, idx2, idx3 = kp1.value, kp2.value, kp3.value
             idx1: int = kp1.value
@@ -104,14 +104,18 @@ class PoseAngleCalculator(Thread):
                 p1 = keypoints[idx1]
                 p2 = keypoints[idx2]
                 p3 = keypoints[idx3]
-                angle: float = PoseAngleCalculator.calculate_angle(p1, p2, p3)
+                if joint == Keypoint.left_shoulder or joint == Keypoint.right_shoulder:
+                    angle: float = PoseAngleCalculator.calculate_angle(p1, p2, p3)
+                else:
+                    angle: float = PoseAngleCalculator.calculate_angle(p1, p2, p3, np.pi)
+
                 confidence: float = min(scores[idx1], scores[idx2], scores[idx3])
                 # Store results
-                angles[joint_name] = JointAngle(angle = angle, confidence = confidence)
+                angles[joint] = JointAngle(angle = angle, confidence = confidence)
 
             else:
                 # Low confidence, set angle to NaN
-                angles[joint_name] = JointAngle(angle = np.nan, confidence = 0.0)
+                angles[joint] = JointAngle(angle = np.nan, confidence = 0.0)
 
         # Create DataFrame from angles
         # print(f"Calculated angles for person {person.id}: {angles}")
@@ -119,7 +123,7 @@ class PoseAngleCalculator(Thread):
         callback(person)
 
     @staticmethod
-    def calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> float:
+    def calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, rotate_by: float = 0) -> float:
         """
         Calculate the signed angle between three points in the 2D plane (0 to 2π radians).
 
@@ -129,16 +133,16 @@ class PoseAngleCalculator(Thread):
             p3: Third point coordinates [x, y]
 
         Returns:
-            Angle in radians, in the range [0, 2π)
+            Angle in radians, in the range [-π, π)
         """
         v1 = p1 - p2
         v2 = p3 - p2
 
         angle: float = np.arctan2(v2[1], v2[0]) - np.arctan2(v1[1], v1[0])
-        angle: float = angle % (2 * np.pi)  # Normalize to [0, 2π)
-
-        # angle = angle / (2 * np.pi)     # Normalize to [0, 1]
-        # angle = angle - np.pi           # Shift to [-π, π) range
+        # Rotate the angle by a specified amount (in radians)
+        angle += rotate_by
+        angle = angle % (2 * np.pi)  # Normalize to [0, 2π)
+        angle -= np.pi  # Shift to [-π, π)
 
         return angle
 

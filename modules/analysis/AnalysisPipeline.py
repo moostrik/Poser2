@@ -89,11 +89,11 @@ class AnalysisPipeline(Thread):
         confidences[person.id] = conf_df
 
         # Interpolate and smooth angles
-        angle_df_interp = angle_df.interpolate(method='linear')
-        angle_df_smooth = angle_df_interp.rolling(window=5, min_periods=1).mean()
+        angle_df = angle_df.interpolate(method='linear')
+        # angle_df = angle_df.rolling(window=5, min_periods=1).mean()
 
         # Notify callbacks with both DataFrames
-        callback(person.id, angle_df_smooth, conf_df)
+        callback(person.id, angle_df, conf_df)
 
         # print head of the DataFrame for debugging
         # print(f"Processed angles for person {person.id}:\n{angle_df_smooth.head()}")
@@ -124,33 +124,57 @@ class AnalysisPipeline(Thread):
 
     @staticmethod
     def _create_visualisation_data(angles: pd.DataFrame, confidences: pd.DataFrame) -> np.ndarray:
-        """ Create visualisation data from angles and confidences. """
-        angles_np: np.ndarray = np.nan_to_num(angles.to_numpy(), nan=np.pi)
-        # Rotate and wrap, then map [0, 2pi] to [0, pi] up and [pi, 2pi] to [pi, 0] down
-        angles_np = (angles_np + np.pi * 0.5) % (2 * np.pi)
-        angles_np = np.abs(angles_np - np.pi)
-        # Normalize to [0, 1] for [0, pi]
-        angles_norm = np.clip(angles_np / np.pi, 0, 1)
+        """
+        Prepare data for use in a GL mesh.
+        Each vertex will have [angle, confidence] for each joint, per frame.
+        Output shape: (num_frames, num_joints, 2)
+        """
+        # Convert DataFrames to numpy arrays, fill NaNs with safe defaults
+        angles_np: np.ndarray = np.nan_to_num(angles.to_numpy(), nan=0.0)
         conf_np: np.ndarray = np.nan_to_num(confidences.to_numpy(), nan=0.0)
 
-        angles_norm = angles_norm[:, :4]
-        conf_np = conf_np[:, :4]
+        # Ensure both arrays have the same shape
+        min_rows: int = min(angles_np.shape[0], conf_np.shape[0])
+        min_cols: int = min(angles_np.shape[1], conf_np.shape[1])
+        angles_np = angles_np[:min_rows, :min_cols]
 
-        width, height = angles_norm.shape
-        img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
+        conf_np = conf_np[:min_rows, :min_cols]
 
-        # BGR: Blue, Green, Red
-        img[..., 0] = angles_norm.T         # Blue channel: 0 (yellow) to 1 (cyan)
-        img[..., 1] = 1.0                   # Green channel: always 1
-        img[..., 2] = 1.0 - angles_norm.T   # Red channel: 1 (yellow) to 0 (cyan)
-        img[..., 3] = conf_np.T             # Alpha: confidence or 1.0
+        # Stack angle and confidence per joint as features
+        # Resulting shape: (num_frames, num_joints, 2)
+        mesh_data: np.ndarray = np.stack([angles_np, conf_np], axis=-1)
 
-        # Insert black row between every row, including top and bottom
-        black_row = np.zeros((1, width, 4), dtype=img.dtype)
-        img_with_black = [black_row]
-        for row in img:
-            img_with_black.append(row[np.newaxis, ...])
-            img_with_black.append(black_row)
-        img_final = np.vstack(img_with_black)
+        return mesh_data
 
-        return img_final
+    # @staticmethod
+    # def _create_visualisation_data(angles: pd.DataFrame, confidences: pd.DataFrame) -> np.ndarray:
+    #     """ Create visualisation data from angles and confidences. """
+    #     angles_np: np.ndarray = np.nan_to_num(angles.to_numpy(), nan=np.pi)
+    #     # Rotate and wrap, then map [0, 2pi] to [0, pi] up and [pi, 2pi] to [pi, 0] down
+    #     angles_np = (angles_np + np.pi * 0.5) % (2 * np.pi)
+    #     angles_np = np.abs(angles_np - np.pi)
+    #     # Normalize to [0, 1] for [0, pi]
+    #     angles_norm = np.clip(angles_np / np.pi, 0, 1)
+    #     conf_np: np.ndarray = np.nan_to_num(confidences.to_numpy(), nan=0.0)
+
+    #     angles_norm = angles_norm[:, :4]
+    #     conf_np = conf_np[:, :4]
+
+    #     width, height = angles_norm.shape
+    #     img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
+
+    #     # BGR: Blue, Green, Red
+    #     img[..., 0] = angles_norm.T         # Blue channel: 0 (yellow) to 1 (cyan)
+    #     img[..., 1] = 1.0                   # Green channel: always 1
+    #     img[..., 2] = 1.0 - angles_norm.T   # Red channel: 1 (yellow) to 0 (cyan)
+    #     img[..., 3] = conf_np.T             # Alpha: confidence or 1.0
+
+    #     # Insert black row between every row, including top and bottom
+    #     black_row = np.zeros((1, width, 4), dtype=img.dtype)
+    #     img_with_black = [black_row]
+    #     for row in img:
+    #         img_with_black.append(row[np.newaxis, ...])
+    #         img_with_black.append(black_row)
+    #     img_final = np.vstack(img_with_black)
+
+    #     return img_final

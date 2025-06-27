@@ -102,8 +102,8 @@ class HotReloadMethods:
                 if name in class_methods and class_methods[name].type == info.type:
                     module_code: Optional[CodeType] = getattr(info.func, "__code__", None)
                     class_code: Optional[CodeType] = getattr(class_methods[name].func, "__code__", None)
-                    if HotReloadMethods._is_different(module_code, class_code):
-                        methods_to_update[name] = info
+                    # if HotReloadMethods._is_different(module_code, class_code):
+                    methods_to_update[name] = info
             if methods_to_update:
                 HotReloadMethods._update_methods(self._target_class, methods_to_update)
                 changed = True
