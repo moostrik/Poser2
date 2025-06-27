@@ -31,7 +31,7 @@ MethodMap = Dict[str, MethodInfo] # Mapping of method names to MethodInfo
 
 
 class HotReloadMethods:
-    def __init__(self, target_class: Type[Any], watch_file: bool = True) -> None:
+    def __init__(self, target_class: Type[Any], watch_file: bool = True, reload_everything = True) -> None:
         if not inspect.isclass(target_class):
             raise ValueError(f"Expected a class, got {type(target_class).__name__}")
         self._target_class: Type[Any] = target_class
@@ -48,6 +48,8 @@ class HotReloadMethods:
         self._observer: Optional[BaseObserver] = None
         if watch_file:
             self.start_file_watcher()
+
+        self.reload_everything: bool = reload_everything
 
     def start_file_watcher(self) -> None:
         """Start watching the file for changes."""
@@ -102,7 +104,7 @@ class HotReloadMethods:
                 if name in class_methods and class_methods[name].type == info.type:
                     module_code: Optional[CodeType] = getattr(info.func, "__code__", None)
                     class_code: Optional[CodeType] = getattr(class_methods[name].func, "__code__", None)
-                    if HotReloadMethods._is_different(module_code, class_code):
+                    if HotReloadMethods._is_different(module_code, class_code) or self.reload_everything:
                         methods_to_update[name] = info
             if methods_to_update:
                 HotReloadMethods._update_methods(self._target_class, methods_to_update)
