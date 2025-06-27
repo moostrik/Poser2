@@ -27,8 +27,8 @@ from modules.Settings import Settings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
-from modules.render.shaders.WS_Angles import WS_Angles
-from modules.render.shaders.WS_Lines import WS_Lines
+from modules.gl.shaders.WS_Angles import WS_Angles
+from modules.gl.shaders.WS_Lines import WS_Lines
 
 class ImageType(Enum):
     TOT = 0
@@ -190,15 +190,13 @@ class Render(RenderWindow):
             num_frames, num_joints, _ = data.shape
             num_joints = 4
 
-            angles_raw: np.ndarray = data[..., 0]
-            #print last 10 lines of angles_raw
-            # print(f"Angles raw for person {i}:\n{angles_raw[-5:]}")
             confidences_np: np.ndarray = data[..., 1]
+
+            angles_raw: np.ndarray = data[..., 0]
             # Normalize angles as before
             angles_np: np.ndarray = np.abs(angles_raw)
             angles_np = np.clip(angles_np / np.pi, 0, 1)
             # Normalize confidences if needed
-            confidences_np = np.clip(confidences_np, 0, 1)
 
             joint_height: float = 1.0 / (num_joints + 2)
 
@@ -233,7 +231,6 @@ class Render(RenderWindow):
             mesh.set_colors(colors_np)
             mesh.set_indices(indices_np)
             mesh.update()
-
 
     def draw_cameras(self) -> None:
         for i in range(self.num_cams):
