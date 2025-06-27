@@ -231,7 +231,10 @@ class Render(RenderWindow):
             colors[odd_mask & ~angle_mask, :3] = [0.0, 1.0, 0.0]  # Green
 
             # Alpha from confidences
-            colors[:, 3] = confidences.T.flatten()
+
+            conf_flat: np.ndarray = confidences.T.flatten()
+            # colors[:, 3] = np.where(conf_flat > 0.0, 1.0, 0.0)
+            # colors[:, 3] = confidences.T.flatten()
             mesh.set_colors(colors)
 
             mesh.update()

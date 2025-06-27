@@ -89,7 +89,8 @@ class AnalysisPipeline(Thread):
         confidences[person.id] = conf_df
 
         # Interpolate and smooth angles
-        angle_df = angle_df.interpolate(method='linear')
+        angle_df.interpolate(method='linear', limit_direction='both', limit = 7, inplace=True)
+        angle_df = AnalysisPipeline.rolling_circular_mean(angle_df, window=7, min_periods=1)
         # angle_df = angle_df.rolling(window=5, min_periods=1).mean()
 
         # Notify callbacks with both DataFrames
@@ -97,6 +98,15 @@ class AnalysisPipeline(Thread):
 
         # print head of the DataFrame for debugging
         # print(f"Processed angles for person {person.id}:\n{angle_df_smooth.head()}")
+
+    @staticmethod
+    def rolling_circular_mean(df, window=5, min_periods=1):
+        # Unwrap angles to remove discontinuities
+        df_unwrapped = df.apply(np.unwrap)
+        # Rolling mean on unwrapped angles
+        df_smooth = df_unwrapped.rolling(window=window, min_periods=min_periods).mean()
+        # Wrap back to [-pi, pi]
+        return ((df_smooth + np.pi) % (2 * np.pi)) - np.pi
 
 
     def add_analysis_callback(self, callback: AnalysisCallback) -> None:
