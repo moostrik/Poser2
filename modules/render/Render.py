@@ -186,50 +186,78 @@ class Render(RenderWindow):
             if data is None:
                 continue
 
+            # get only the first 4 joints of the data
+            data = data[:, :4, :]
+
             mesh: Mesh = self.angle_meshes[i]
             num_frames, num_joints, _ = data.shape
-            num_joints = 4
+            if num_frames < 2 or num_joints < 1:
+                continue
 
-            confidences_np: np.ndarray = data[..., 1]
+            confidences_np:np.ndarray = np.clip(data[..., 1], 0, 1)
 
-            angles_raw: np.ndarray = data[..., 0]
-            # Normalize angles as before
+            angles_raw: np.ndarray = data[..., 0] # in -pi to pi range
             angles_np: np.ndarray = np.abs(angles_raw)
             angles_np = np.clip(angles_np / np.pi, 0, 1)
-            # Normalize confidences if needed
 
             joint_height: float = 1.0 / (num_joints + 2)
 
-            vertices: list[Any] = []
-            colors: list[Any] = []
-            indices: list[Any] = []
-            for joint in range(num_joints):
-                for frame in range(num_frames):
-                    x = frame / (num_frames - 1) if num_frames > 1 else 0.0
-                    y = (joint + 1.0) * joint_height + angles_np[frame, joint] * joint_height
-                    vertices.append([x, y, 0.0])
-                    alpha = confidences_np[frame, joint]
-                    if joint % 2 == 0:  # Even (left)
-                        if angles_raw[frame, joint] > 0:
-                            colors.append([1.0, 1.0, 0.2, alpha])  # Yellow
-                        else:
-                            colors.append([1.0, 0.2, 0.2, alpha])  # Red
-                    else:  # Odd (right)
-                        if angles_raw[frame, joint] > 0:
-                            colors.append([0.2, 0.6, 1.0, alpha])  # Blue
-                        else:
-                            colors.append([0.2, 1.0, 0.2, alpha])  # Green
+            # INDICES
+            base = np.arange(num_joints) * num_frames
+            frame_idx: np.ndarray = np.arange(num_frames - 1)
+            start = base[:, None] + frame_idx[None, :]
+            end = start + 1
+            indices: np.ndarray = np.stack([start, end], axis=-1).reshape(-1, 2).astype(np.uint32).flatten()
+            mesh.set_indices(indices)
 
-                base = joint * num_frames
-                indices += [[base + k, base + k + 1] for k in range(num_frames - 1)]
+            # VERTICES
+            frame_idx = np.arange(num_frames)
+            joint_idx: np.ndarray = np.arange(num_joints)
+            frame_grid, joint_grid = np.meshgrid(frame_idx, joint_idx, indexing='ij')  # shape: (num_frames, num_joints)
+            x: np.ndarray = frame_grid / (num_frames - 1)
+            y: np.ndarray = (joint_grid + 1.0) * joint_height + angles_np * joint_height
+            vertices: np.ndarray = np.zeros((num_frames * num_joints, 3), dtype=np.float32)
+            vertices[:, 0] = x.T.flatten()
+            vertices[:, 1] = y.T.flatten()
+            # Z stays zero (already initialized)
+            mesh.set_vertices(vertices)
 
-            vertices_np: np.ndarray = np.array(vertices, dtype=np.float32)
-            colors_np: np.ndarray = np.array(colors, dtype=np.float32)
-            indices_np: np.ndarray = np.array(indices, dtype=np.uint32).flatten()
+            # COLORS
+            # Mask for even (yellow/red) and odd (blue/green) joints
+            even_mask: np.ndarray = (np.arange(num_joints) % 2 == 0)
+            even_mask = np.repeat(even_mask, num_frames)  # shape: (num_joints * num_frames,)
+            odd_mask = ~even_mask
 
-            mesh.set_vertices(vertices_np)
-            mesh.set_colors(colors_np)
-            mesh.set_indices(indices_np)
+            # Mask for angle_raw < 0 (yellow or blue)
+            angle_mask: np.ndarray = (angles_raw > 0).T.flatten()  # shape: (num_joints * num_frames,)
+
+            colors: np.ndarray = np.ones((num_joints * num_frames, 4), dtype=np.float32)
+
+            # Even joints
+            # Yellow: [1.0, 1.0, 0.2, alpha]
+            colors[even_mask & angle_mask, 0] = 1.0
+            colors[even_mask & angle_mask, 1] = 1.0
+            colors[even_mask & angle_mask, 2] = 0.0
+            # Red: [1.0, 0.2, 0.2, alpha]
+            colors[even_mask & ~angle_mask, 0] = 1.0
+            colors[even_mask & ~angle_mask, 1] = 0.0
+            colors[even_mask & ~angle_mask, 2] = 0.0
+
+            # Odd joints
+            # Blue: [0.2, 0.6, 1.0, alpha]
+            colors[odd_mask & angle_mask, 0] = 0.0
+            colors[odd_mask & angle_mask, 1] = 0.7
+            colors[odd_mask & angle_mask, 2] = 1.0
+            # Green: [0.2, 1.0, 0.2, alpha]
+            colors[odd_mask & ~angle_mask, 0] = 0.0
+            colors[odd_mask & ~angle_mask, 1] = 1.0
+            colors[odd_mask & ~angle_mask, 2] = 0.0
+
+            # Alpha from confidences, matching order (joint outer, frame inner)
+            colors[:, 3] = confidences_np.T.flatten()
+            mesh.set_colors(colors)
+
+            # UPDATE
             mesh.update()
 
     def draw_cameras(self) -> None:
