@@ -10,7 +10,7 @@ import numpy as np
 from modules.pose.PoseDefinitions import *
 from modules.person.Person import Person, PersonCallback
 
-from modules.utils.HotReloadStaticMethods import HotReloadStaticMethods
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class PoseAngleCalculator(Thread):
@@ -29,7 +29,7 @@ class PoseAngleCalculator(Thread):
         self.callback_lock = Lock()
         self.person_output_callbacks: set[PersonCallback] = set()
 
-        self.hot_reload = HotReloadStaticMethods(self.__class__, True)
+        self.hot_reload = HotReloadMethods(self.__class__, True)
 
     def stop(self) -> None:
         self._stop_event.set()

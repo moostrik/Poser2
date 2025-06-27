@@ -12,7 +12,7 @@ from modules.person.Person import Person
 from modules.pose.PoseDefinitions import JointAngleDict
 from modules.Settings import Settings
 
-from modules.utils.HotReloadStaticMethods import HotReloadStaticMethods
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Type for analysis output callback
 AnalysisCallback = Callable[[pd.DataFrame], None]
@@ -36,7 +36,7 @@ class AnalysisPipeline(Thread):
         self.analysis_output_callbacks: set[AnalysisCallback] = set()
         self.visualisation_callbacks: set[VisualisationCallback] = set()
 
-        hot_reloader = HotReloadStaticMethods(self.__class__, True)
+        hot_reloader = HotReloadMethods(self.__class__, True)
 
     def stop(self) -> None:
         self._stop_event.set()

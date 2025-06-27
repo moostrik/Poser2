@@ -1,5 +1,5 @@
 from modules.av.Definitions import *
-from modules.utils.HotReloadStaticMethods import HotReloadStaticMethods
+from modules.utils.HotReloadMethods import HotReloadMethods
 from typing import Optional
 import math
 import time
@@ -37,7 +37,7 @@ class CompTest():
         self.output_img: np.ndarray = np.zeros((1, resolution, 3), dtype=IMG_TYPE)
         self.indices: np.ndarray = np.arange(resolution)
 
-        self.hot_reloader = HotReloadStaticMethods(self.__class__, True)
+        self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     def make_pattern(self) -> np.ndarray:
         try:

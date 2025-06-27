@@ -15,7 +15,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 # Local application imports
 from modules.av.Definitions import AvOutput, IMG_TYPE
-from modules.utils.HotReloadStaticMethods import HotReloadStaticMethods
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Constants
 UDP_MTU = 1500
@@ -43,7 +43,7 @@ class UdpSender(threading.Thread):
         # Create an OSC client for each IP address
         self.osc_clients: dict[str, UDPClient] = {}
 
-        self.HotReloadStaticMethods = HotReloadStaticMethods(self.__class__, True)
+        self.HotReloadStaticMethods = HotReloadMethods(self.__class__, True)
 
     def stop(self) -> None:
         """Stop the thread."""
