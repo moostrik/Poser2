@@ -7,6 +7,7 @@ from typing import Callable
 # Third-party imports
 import cv2
 import numpy as np
+from pandas import Timestamp
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet, Rect
@@ -33,17 +34,17 @@ def PersonColor(id: int, aplha: float = 0.5) -> list[float]:
     return rgb
 
 class TrackingStatus(Enum):
-    NONE = -1
     NEW = 0
     TRACKED = 1
     LOST = 2
     REMOVED = 3
 
 class Person():
-    def __init__(self, id, cam_id: int, tracklet: Tracklet) -> None:
+    def __init__(self, id, cam_id: int, tracklet: Tracklet, time_stamp: Timestamp) -> None:
         self.id: int =                  id
         self.cam_id: int =              cam_id
         self.tracklet: Tracklet =       tracklet
+        self.time_stamp: Timestamp =    time_stamp
 
         self.status: TrackingStatus =   TrackingStatus[tracklet.status.name]
         self.start_time: float =        time()
@@ -59,25 +60,24 @@ class Person():
         self.pose: Optional[Pose] =     None
         self.pose_angles: Optional[JointAngleDict] = None
 
+    @property
+    def is_active(self) -> bool:
+        return self.status in (TrackingStatus.NEW, TrackingStatus.TRACKED)
 
-    def update_from(self, other: 'Person') -> None:
-        # self.id = other.id    # WHY NOT? -> # id is set externally
-        self.cam_id = other.cam_id
-        self.tracklet = other.tracklet
+    def set_from_existing(self, other: 'Person') -> None:
+        if self.status == TrackingStatus.REMOVED:
+            print(f"Warning: Cannot set from existing. This person has id {self.id} and is not tracked, status is {self.status} .")
 
-        self.status = other.status
-        self.start_time = other.start_time    # WHY NOT?
-        # self.last_time = time()
+        # print(f"Setting person {self.id} from existing person {other.id} in camera {self.cam_id}.")
 
-        self.local_angle = other.local_angle
-        self.world_angle = other.world_angle
-        self.overlap = other.overlap
+        self.id = other.id
+        self.start_time = other.start_time
 
-        self.img = other.img
 
-        self.pose_roi = other.pose_roi
-        self.pose = other.pose
-        self.pose_angles = other.pose_angles
+        if self.status == TrackingStatus.NEW or self.status == TrackingStatus.TRACKED:
+            self.status = TrackingStatus.TRACKED
+            self.last_time = time()
+
 
     def set_pose_roi(self, image: np.ndarray, roi_expansion: float) -> None:
         if self.pose_roi is not None:
@@ -191,11 +191,19 @@ class PersonIdPool:
                 raise Exception("No more IDs available")
             min_id: int = min(self._available)
             self._available.remove(min_id)
+            # print(f"Acquired person ID {min_id}. Available IDs: {self._available}")
             return min_id
 
     def release(self, obj: int) -> None:
         with self._lock:
+            if obj in self._available:
+                raise Exception(f"ID {obj} is not currently in use and cannot be released. in use: {self._available}")
+            # print(f"Releasing person ID {obj}.")
             self._available.add(obj)
 
     def size(self) -> int:
         return len(self._available)
+
+    def is_available(self, obj: int) -> bool:
+        with self._lock:
+            return obj in self._available

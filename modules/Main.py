@@ -41,11 +41,11 @@ class Main():
 
         self.panoramic_tracker = PanoramicTracker(self.gui, settings)
 
-        self.pose_pipeline: Optional[PoseEstimation] = None
-        self.analysis_pipeline: Optional[PoseWindowBuffer] = None
+        self.pose_detection: Optional[PoseEstimation] = None
+        self.pose_window: Optional[PoseWindowBuffer] = None
         if settings.pose_active:
-            self.pose_pipeline = PoseEstimation(settings)
-            self.analysis_pipeline = PoseWindowBuffer(settings)
+            self.pose_detection = PoseEstimation(settings)
+            self.pose_window = PoseWindowBuffer(settings)
 
         self.av: AV = AV(self.gui, settings)
         self.running: bool = False
@@ -64,14 +64,14 @@ class Main():
             camera.add_tracker_callback(self.render.add_tracklet)
             camera.start()
 
-        if self.pose_pipeline:
-            self.panoramic_tracker.add_person_callback(self.pose_pipeline.person_input)
-            if self.analysis_pipeline:
-                self.pose_pipeline.add_person_callback(self.analysis_pipeline.person_input)
-                self.analysis_pipeline.add_visualisation_callback(self.render.add_angle_window)
-                self.analysis_pipeline.start()
-            self.pose_pipeline.add_person_callback(self.render.add_person)
-            self.pose_pipeline.start()
+        if self.pose_detection:
+            self.panoramic_tracker.add_person_callback(self.pose_detection.person_input)
+            if self.pose_window:
+                self.pose_detection.add_person_callback(self.pose_window.person_input)
+                self.pose_window.add_visualisation_callback(self.render.add_angle_window)
+                self.pose_window.start()
+            self.pose_detection.add_person_callback(self.render.add_person)
+            self.pose_detection.start()
         else:
             self.panoramic_tracker.add_person_callback(self.render.add_person)
 
@@ -124,11 +124,11 @@ class Main():
         self.panoramic_tracker.stop()
         self.panoramic_tracker.join()
 
-        if self.pose_pipeline:
-            self.pose_pipeline.stop()
+        if self.pose_detection:
+            self.pose_detection.stop()
 
-        if self.analysis_pipeline:
-            self.analysis_pipeline.stop()
+        if self.pose_window:
+            self.pose_window.stop()
 
         self.av.stop()
         self.av.join()

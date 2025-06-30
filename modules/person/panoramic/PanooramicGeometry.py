@@ -12,10 +12,10 @@ class PanoramicGeometry():
         self.k1: float = 0.05  # Distortion coefficient k1
         self.k2: float = 0.0  # Distortion coefficient k2
 
-    def calc_angles(self, persons: list[Person]) -> None:
-        for person in persons:
-            person.local_angle = self._calc_local_angle(person.tracklet.roi)
-            person.world_angle = self._calc_world_angle(person.local_angle, person.cam_id)
+    def calc_angle(self, roi: Rect, cam_id: int) -> tuple[float, float]:
+        local_angle: float = self._calc_local_angle(roi)
+        world_angle: float = self._calc_world_angle(local_angle, cam_id)
+        return local_angle, world_angle
 
     def _calc_local_angle(self, roi: Rect) -> float:
         normalized_x: float     = roi.x + roi.width / 2.0
@@ -33,7 +33,7 @@ class PanoramicGeometry():
         angle_overlap: float    = self.fov_overlap * (1.0 + expansion)
         local_angle: float      = world_angle % self.target_fov
 
-        if local_angle <= angle_overlap or local_angle >= self.target_fov - angle_overlap:
+        if local_angle <= angle_overlap or local_angle >= self.cam_fov - angle_overlap:
             return True
         return False
 

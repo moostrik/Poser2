@@ -19,7 +19,7 @@ class PanoramicTrackerGui():
                     E(eT.TEXT, 'edge'),
                     E(eT.SLDR, 'edge',              self.set_edge_threshold,    CAM_360_EDGE_THRESHOLD,     [0,0.5],    0.1),
                     E(eT.TEXT, 'ovlp'),
-                    E(eT.SLDR, 'ovlp',              self.set_overlap,           CAM_360_OVERLAP_EXPANSION,  [0,0.5],    0.1)])
+                    E(eT.SLDR, 'ovlp',              self.set_overlap,           CAM_360_OVERLAP_EXPANSION,  [0,1.0],    0.1)])
         elm.append([E(eT.TEXT, 'PERSON   '),
                     E(eT.TEXT, 'roi'),
                     E(eT.SLDR, 'roi exp',           self.set_roi_expansion,     PERSON_ROI_EXPANSION,       [0,0.5],    0.1),
@@ -35,7 +35,7 @@ class PanoramicTrackerGui():
           return self.frame
 
     def set_fov(self, value: float) -> None:
-        self.manager.cam_360.set_fov(value)
+        self.manager.geometry.set_fov(value)
 
     def set_edge_threshold(self, value: float) -> None:
         self.manager.cam_360_edge_threshold = value
