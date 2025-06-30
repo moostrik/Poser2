@@ -1,16 +1,21 @@
+# TODO
+# Person to window check, make sure window gets updated with nans if no pose is found
+# add Person state, NEW, TRACKED, LOST, REMOVED
+# make sure window gets cleared on person new or deleted
+
 # Standard library imports
 from math import ceil
 from typing import Optional
 
 # Local application imports
-from modules.analysis.AnalysisPipeline import AnalysisPipeline
+from modules.pose.PoseWindowBuffer import PoseWindowBuffer
 from modules.av.Manager import Manager as AV
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.gui.PyReallySimpleGui import Gui
-from modules.person.panoramic.Tracker import Tracker as PanoramicTracker
-from modules.pose.PosePipeline import Pipeline
+from modules.person.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
+from modules.pose.PoseEstimation import PoseEstimation
 from modules.render.Render import Render
 from modules.Settings import Settings
 
@@ -36,11 +41,11 @@ class Main():
 
         self.panoramic_tracker = PanoramicTracker(self.gui, settings)
 
-        self.pose_pipeline: Optional[Pipeline] = None
-        self.analysis_pipeline: Optional[AnalysisPipeline] = None
+        self.pose_pipeline: Optional[PoseEstimation] = None
+        self.analysis_pipeline: Optional[PoseWindowBuffer] = None
         if settings.pose_active:
-            self.pose_pipeline = Pipeline(settings)
-            self.analysis_pipeline = AnalysisPipeline(settings)
+            self.pose_pipeline = PoseEstimation(settings)
+            self.analysis_pipeline = PoseWindowBuffer(settings)
 
         self.av: AV = AV(self.gui, settings)
         self.running: bool = False

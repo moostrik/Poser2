@@ -15,10 +15,10 @@ from modules.Settings import Settings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Type for analysis output callback
-AnalysisCallback = Callable[[pd.DataFrame], None]
-VisualisationCallback = Callable[[int, np.ndarray], None]
+PoseWindowCallback = Callable[[pd.DataFrame], None]
+PoseWindowVisualisationCallback = Callable[[int, np.ndarray], None]
 
-class AnalysisPipeline(Thread):
+class PoseWindowBuffer(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__()
         self._stop_event = Event()
@@ -33,8 +33,8 @@ class AnalysisPipeline(Thread):
 
         # Callbacks for analysis output
         self.callback_lock = Lock()
-        self.analysis_output_callbacks: set[AnalysisCallback] = set()
-        self.visualisation_callbacks: set[VisualisationCallback] = set()
+        self.analysis_output_callbacks: set[PoseWindowCallback] = set()
+        self.visualisation_callbacks: set[PoseWindowVisualisationCallback] = set()
 
         hot_reloader = HotReloadMethods(self.__class__, True)
 
@@ -90,7 +90,7 @@ class AnalysisPipeline(Thread):
 
         # Interpolate and smooth angles
         angle_df.interpolate(method='linear', limit_direction='both', limit = 7, inplace=True)
-        angle_df = AnalysisPipeline.rolling_circular_mean(angle_df, window=7, min_periods=1)
+        angle_df = PoseWindowBuffer.rolling_circular_mean(angle_df, window=7, min_periods=1)
         # angle_df = angle_df.rolling(window=5, min_periods=1).mean()
 
         # Notify callbacks with both DataFrames
@@ -109,7 +109,7 @@ class AnalysisPipeline(Thread):
         return ((df_smooth + np.pi) % (2 * np.pi)) - np.pi
 
 
-    def add_analysis_callback(self, callback: AnalysisCallback) -> None:
+    def add_analysis_callback(self, callback: PoseWindowCallback) -> None:
         """ Register a callback to receive the current pandas DataFrame window. """
         with self.callback_lock:
             self.analysis_output_callbacks.add(callback)
@@ -121,7 +121,7 @@ class AnalysisPipeline(Thread):
             for callback in self.analysis_output_callbacks:
                 callback(angles)
 
-    def add_visualisation_callback(self, callback: VisualisationCallback) -> None:
+    def add_visualisation_callback(self, callback: PoseWindowVisualisationCallback) -> None:
         """ Register a callback to receive the visualisation data. """
         with self.callback_lock:
             self.visualisation_callbacks.add(callback)
@@ -156,35 +156,32 @@ class AnalysisPipeline(Thread):
 
         return mesh_data
 
-    # @staticmethod
-    # def _create_visualisation_data(angles: pd.DataFrame, confidences: pd.DataFrame) -> np.ndarray:
-    #     """ Create visualisation data from angles and confidences. """
-    #     angles_np: np.ndarray = np.nan_to_num(angles.to_numpy(), nan=np.pi)
-    #     # Rotate and wrap, then map [0, 2pi] to [0, pi] up and [pi, 2pi] to [pi, 0] down
-    #     angles_np = (angles_np + np.pi * 0.5) % (2 * np.pi)
-    #     angles_np = np.abs(angles_np - np.pi)
-    #     # Normalize to [0, 1] for [0, pi]
-    #     angles_norm = np.clip(angles_np / np.pi, 0, 1)
-    #     conf_np: np.ndarray = np.nan_to_num(confidences.to_numpy(), nan=0.0)
+    @staticmethod
+    def _create_visualisation_image(angles: pd.DataFrame, confidences: pd.DataFrame) -> np.ndarray:
+        """ Create visualisation image from angles and confidences. """
+        angles_np: np.ndarray = np.nan_to_num(angles.to_numpy(), nan=0.0)
+        angles_np = np.abs(angles_np - np.pi)
+        angles_norm: np.ndarray = np.clip(angles_np / np.pi, 0, 1)
+        conf_np: np.ndarray = np.nan_to_num(confidences.to_numpy(), nan=0.0)
 
-    #     angles_norm = angles_norm[:, :4]
-    #     conf_np = conf_np[:, :4]
+        angles_norm = angles_norm[:, :4]
+        conf_np = conf_np[:, :4]
 
-    #     width, height = angles_norm.shape
-    #     img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
+        width, height = angles_norm.shape
+        img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
 
-    #     # BGR: Blue, Green, Red
-    #     img[..., 0] = angles_norm.T         # Blue channel: 0 (yellow) to 1 (cyan)
-    #     img[..., 1] = 1.0                   # Green channel: always 1
-    #     img[..., 2] = 1.0 - angles_norm.T   # Red channel: 1 (yellow) to 0 (cyan)
-    #     img[..., 3] = conf_np.T             # Alpha: confidence or 1.0
+        # BGR: Blue, Green, Red
+        img[..., 0] = angles_norm.T         # Blue channel: 0 (yellow) to 1 (cyan)
+        img[..., 1] = 1.0                   # Green channel: always 1
+        img[..., 2] = 1.0 - angles_norm.T   # Red channel: 1 (yellow) to 0 (cyan)
+        img[..., 3] = conf_np.T             # Alpha: confidence or 1.0
 
-    #     # Insert black row between every row, including top and bottom
-    #     black_row = np.zeros((1, width, 4), dtype=img.dtype)
-    #     img_with_black = [black_row]
-    #     for row in img:
-    #         img_with_black.append(row[np.newaxis, ...])
-    #         img_with_black.append(black_row)
-    #     img_final = np.vstack(img_with_black)
+        # Insert black row between every row, including top and bottom
+        black_row: np.ndarray = np.zeros((1, width, 4), dtype=img.dtype)
+        img_with_black: list[np.ndarray] = [black_row]
+        for row in img:
+            img_with_black.append(row[np.newaxis, ...])
+            img_with_black.append(black_row)
+        img_final: np.ndarray = np.vstack(img_with_black)
 
-    #     return img_final
+        return img_final

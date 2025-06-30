@@ -1,4 +1,5 @@
 # Standard library imports
+from enum import Enum
 from time import time
 from typing import Optional
 from typing import Callable
@@ -31,6 +32,12 @@ def PersonColor(id: int, aplha: float = 0.5) -> list[float]:
     rgb.append(aplha)
     return rgb
 
+class TrackingStatus(Enum):
+    NONE = -1
+    NEW = 0
+    TRACKED = 1
+    LOST = 2
+    REMOVED = 3
 
 class Person():
     def __init__(self, id, cam_id: int, tracklet: Tracklet) -> None:
@@ -38,7 +45,7 @@ class Person():
         self.cam_id: int =              cam_id
         self.tracklet: Tracklet =       tracklet
 
-        self.active: bool =             True
+        self.status: TrackingStatus =   TrackingStatus[tracklet.status.name]
         self.start_time: float =        time()
         self.last_time: float =         time()
 
@@ -54,18 +61,23 @@ class Person():
 
 
     def update_from(self, other: 'Person') -> None:
-        # self.id = other.id
+        # self.id = other.id    # WHY NOT? -> # id is set externally
         self.cam_id = other.cam_id
         self.tracklet = other.tracklet
+
+        self.status = other.status
+        self.start_time = other.start_time    # WHY NOT?
+        # self.last_time = time()
+
         self.local_angle = other.local_angle
         self.world_angle = other.world_angle
-        self.pose_roi = other.pose_roi
-        self.img = other.img
-        self.pose = other.pose
-        self.active = other.active
-        # self.start_time = other.start_time    # WHY NOT?
-        self.last_time = time()
         self.overlap = other.overlap
+
+        self.img = other.img
+
+        self.pose_roi = other.pose_roi
+        self.pose = other.pose
+        self.pose_angles = other.pose_angles
 
     def set_pose_roi(self, image: np.ndarray, roi_expansion: float) -> None:
         if self.pose_roi is not None:

@@ -12,7 +12,7 @@ from modules.pose.PoseDetection import Detection
 from modules.pose.PoseAngleCalculator import PoseAngleCalculator
 
 
-class Pipeline:
+class PoseEstimation:
     def __init__(self, settings: Settings) -> None:
 
         # Pose detection components

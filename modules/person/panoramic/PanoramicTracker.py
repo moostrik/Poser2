@@ -1,17 +1,22 @@
 from __future__ import annotations
 
-import cv2
-import numpy as np
+# Standard library imports
 from threading import Thread, Lock
 from time import time, sleep
 from typing import Optional
 
+# Third-party imports
+import numpy as np
+
+# Local application imports
 from modules.Settings import Settings
-from modules.person.panoramic.TrackerGui import TrackerGui
-from modules.person.Person import Person, PersonDict, PersonCallback, PersonDictCallback, PersonIdPool
+from modules.person.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
+from modules.person.Person import Person, PersonDict, PersonCallback, PersonDictCallback, PersonIdPool, TrackingStatus
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
-from modules.person.panoramic.Geometry import Geometry
-from modules.person.panoramic.Definitions import *
+from modules.person.panoramic.PanooramicGeometry import PanoramicGeometry
+from modules.person.panoramic.PanoramicDefinitions import *
+
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 class CamTracklet:
     def __init__(self, cam_id: int, tracklet: Tracklet) -> None:
@@ -22,7 +27,7 @@ class CamTracklet:
 CamTrackletDict = dict[int, list[Tracklet]]
 
 
-class Tracker(Thread):
+class PanoramicTracker(Thread):
     def __init__(self, gui, settings: Settings) -> None:
         super().__init__()
 
@@ -36,7 +41,7 @@ class Tracker(Thread):
         self.person_id_pool: PersonIdPool = PersonIdPool(self.max_persons)
         self.persons: PersonDict = {}
 
-        self.cam_360: Geometry = Geometry(settings.camera_num, CAM_360_FOV, CAM_360_TARGET_FOV)
+        self.cam_360: PanoramicGeometry = PanoramicGeometry(settings.camera_num, CAM_360_FOV, CAM_360_TARGET_FOV)
 
         self.min_tracklet_age: int =            MIN_TRACKLET_AGE
         self.min_tracklet_height: float =       MIN_TRACKLET_HEIGHT
@@ -48,7 +53,9 @@ class Tracker(Thread):
 
         self.callback_lock = Lock()
         self.person_callbacks: set[PersonCallback] = set()
-        self.gui = TrackerGui(gui, self, settings)
+        self.gui = PanoramicTrackerGui(gui, self, settings)
+
+        hot_reload = HotReloadMethods(self.__class__)
 
     def start(self) -> None:
         if self.running:
@@ -64,29 +71,39 @@ class Tracker(Thread):
 
     def run(self) -> None:
         while self.running:
-            self.update_persons()
+            try:
+                self.update_persons()
+            except Exception as e:
+                print(f"Error in PanoramicTracker: {e}")
             sleep(0.01)
             pass
 
     def update_persons(self) -> None:
-        tracklets: CamTrackletDict = self.get_tracklets()
-        tracklet_persons: list[Person] = self.get_persons_from_tracklets(tracklets) # active tracklets pass filter included
-        self.filter_active(tracklet_persons)
-        self.filter_age(tracklet_persons, self.min_tracklet_age)
-        self.filter_size(tracklet_persons, self.min_tracklet_height)
+        # print(self.persons)
+
+        self._cleanup_inactive_persons(self.persons, self.person_id_pool, self.person_timeout)
+
+        tracklets: CamTrackletDict = self._get_tracklets()
+        tracklet_persons: list[Person] = self._get_persons_from_tracklets(tracklets) # active tracklets pass filter included
+        # if len(tracklet_persons):
+            # print(f"Found {len(tracklet_persons)} tracklets in {len(tracklets)} cameras.")
+        self._filter_tracking_status(tracklet_persons)
+        self._filter_age(tracklet_persons, self.min_tracklet_age)
+        self._filter_size(tracklet_persons, self.min_tracklet_height)
         self.cam_360.calc_angles(tracklet_persons)
-        self.filter_edge(tracklet_persons, self.cam_360, self.cam_360_edge_threshold)
-        self.filter_and_update_active(self.persons, tracklet_persons)
-        self.filter_and_update_overlap(self.persons, tracklet_persons, self.cam_360, self.cam_360_overlap_expansion, self.cam_360_hysteresis_factor)
-        self.add_persons(self.persons, tracklet_persons, self.person_id_pool)
-        self.cleanup_inactive_persons(self.persons, self.person_id_pool, self.person_timeout)
+        self._filter_edge(tracklet_persons, self.cam_360, self.cam_360_edge_threshold)
+        self._filter_and_update_active(self.persons, tracklet_persons)
+        self._filter_and_update_overlap(self.persons, tracklet_persons, self.cam_360, self.cam_360_overlap_expansion, self.cam_360_hysteresis_factor)
+        self._add_persons(self.persons, tracklet_persons, self.person_id_pool)
+
 
         # find new persons that have no image, these are the only ones that need to be processed and send to the output
         for person in self.persons.values():
             if person.img is not None:
                 continue
 
-            image: Optional[np.ndarray] = self.get_image(person.cam_id)
+            # person.status = TrackingStatus.NEW
+            image: Optional[np.ndarray] = self._get_image(person.cam_id)
             if image is None:
                 print(f"Warning: No image available for person {person.id} in camera {person.cam_id}.")
                 continue
@@ -96,26 +113,28 @@ class Tracker(Thread):
             self._person_callback(person)
 
     @staticmethod
-    def get_persons_from_tracklets(cam_tracklets: CamTrackletDict) -> list[Person]:
+    def _get_persons_from_tracklets(cam_tracklets: CamTrackletDict) -> list[Person]:
         persons: list[Person] = []
         for cam_id in cam_tracklets.keys():
             tracklets: list[Tracklet] = cam_tracklets[cam_id]
             for tracklet in tracklets:
                 person: Person = Person(-1, cam_id, tracklet)
+
+                # person.status = TrackingStatus[tracklet.status.name]
                 persons.append(person)
         return persons
 
     @staticmethod
-    def filter_active(persons: list[Person]) -> None:
+    def _filter_tracking_status(persons: list[Person]) -> None:
         rejected_persons: list[Person] = []
         for person in persons:
-            if person.tracklet.status != Tracklet.TrackingStatus.TRACKED:
+            if person.status == TrackingStatus.REMOVED:
                 rejected_persons.append(person)
         for person in rejected_persons:
             persons.remove(person)
 
     @staticmethod
-    def filter_age(persons: list[Person], age: int) -> None:
+    def _filter_age(persons: list[Person], age: int) -> None:
         rejected_persons: list[Person] = []
         for person in persons:
             if person.tracklet.age <= age:
@@ -124,7 +143,7 @@ class Tracker(Thread):
             persons.remove(person)
 
     @staticmethod
-    def filter_size(persons: list[Person], size_range: float) -> None:
+    def _filter_size(persons: list[Person], size_range: float) -> None:
         rejected_persons: list[Person] = []
         for person in persons:
             if person.tracklet.roi.height < size_range:
@@ -133,7 +152,7 @@ class Tracker(Thread):
             persons.remove(person)
 
     @staticmethod
-    def filter_edge(persons: list[Person], circular: Geometry, edge_range: float) -> None:
+    def _filter_edge(persons: list[Person], circular: PanoramicGeometry, edge_range: float) -> None:
         rejected_persons: list[Person] = []
         for person in persons:
             if circular.angle_in_edge(person.local_angle, edge_range):
@@ -143,21 +162,27 @@ class Tracker(Thread):
             persons.remove(person)
 
     @staticmethod
-    def filter_and_update_active(active_persons: PersonDict, new_persons: list[Person]) -> None:
+    def _filter_and_update_active(active_persons: PersonDict, new_persons: list[Person]) -> None:
         def find_same_person(person: Person, persons: list[Person]) -> Optional[Person]:
             for p in persons:
                 if person.cam_id == p.cam_id and person.tracklet.id == p.tracklet.id:
                     return p
             return None
 
+
         for person in active_persons.values():
             same_person: Optional[Person] = find_same_person(person, new_persons)
+            # print(same_person)
             if same_person is not None:
                 new_persons.remove(same_person)
+                # print(same_person.status, person.status)
                 person.update_from(same_person)
+                if same_person.status == TrackingStatus.TRACKED:
+                    person.last_time = time()
+                # person.status = TrackingStatus.TRACKED
 
     @staticmethod
-    def filter_and_update_overlap(active_persons: PersonDict, new_persons: list[Person], radial: Geometry,
+    def _filter_and_update_overlap(active_persons: PersonDict, new_persons: list[Person], radial: PanoramicGeometry,
                                   overlap_expansion: float, hysteresis_factor: float) -> None:
 
         for person in new_persons:
@@ -186,33 +211,43 @@ class Tracker(Thread):
                             person.update_from(overlap_persons[0])
 
     @staticmethod
-    def add_persons(active_persons: PersonDict, new_persons: list[Person], person_id_pool: PersonIdPool) -> None:
+    def _add_persons(active_persons: PersonDict, new_persons: list[Person], person_id_pool: PersonIdPool) -> None:
         for person in new_persons:
+
+            if person.status != TrackingStatus.NEW and person.status != TrackingStatus.TRACKED:
+                continue
+
             try:
                 person_id: int = person_id_pool.acquire()
-                # print('New person id:', person_id, 'for cam', person.cam_id, 'tracklet', person.tracklet.id, 'overlap:', person.overlap, 'angle:', person.local_angle, 'world:', person.world_angle)
             except:
                 print('No more person ids available')
                 continue
 
             person.id = person_id
+            person.status = TrackingStatus.NEW
             active_persons[person_id] = person
 
     @ staticmethod
-    def cleanup_inactive_persons(persons: PersonDict, person_id_pool: PersonIdPool, activity_duration: float = 1.0) -> None:
+    def _cleanup_inactive_persons(persons: PersonDict, person_id_pool: PersonIdPool, activity_duration: float = 1.0) -> None:
+
+        # remove inactive persons
         rejected_persons: list[Person] = []
+        for key, person in persons.items():
+            if person.status == TrackingStatus.REMOVED:
+                rejected_persons.append(person)
+                continue
+        for person in rejected_persons:
+            persons.pop(person.id, None)
+            print('Remove inactive person id:', person.id, 'cam', person.cam_id, 'tracklet', person.tracklet.id, 'overlap:', person.overlap, 'angle:', person.local_angle, 'world:', person.world_angle)
+
         for key in persons.keys():
             person: Person = persons[key]
             person = persons[key]
             if person.last_time < time() - activity_duration:
                 person_id_pool.release(person.id)
                 rejected_persons.append(person)
-                person.active = False
+                person.status = TrackingStatus.REMOVED
 
-        # remove inactive persons
-        for person in rejected_persons:
-            persons.pop(person.id, None)
-            # print('Remove inactive person id:', person.id, 'cam', person.cam_id, 'tracklet', person.tracklet.id, 'overlap:', person.overlap, 'angle:', person.local_angle, 'world:', person.world_angle)
 
     # INPUTS
     def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
@@ -220,17 +255,17 @@ class Tracker(Thread):
             return
         with self.input_mutex:
             self.input_frames[id] = image
-    def get_image(self, id: int) -> Optional[np.ndarray]:
+    def _get_image(self, id: int) -> Optional[np.ndarray]:
         with self.input_mutex:
             if not self.input_frames.get(id) is None:
                 return self.input_frames[id]
-
+            return None
     def add_tracklet(self, cam_id: int, tracklet: Tracklet) -> None :
         with self.input_mutex:
             tracklets: list[Tracklet] = self.input_tracklets.get(cam_id, [])
             tracklets.append(tracklet)
             self.input_tracklets[cam_id] = tracklets
-    def get_tracklets(self) -> CamTrackletDict:
+    def _get_tracklets(self) -> CamTrackletDict:
         with self.input_mutex:
             tracklets: CamTrackletDict =  self.input_tracklets.copy()
             self.input_tracklets.clear()

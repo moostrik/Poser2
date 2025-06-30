@@ -163,6 +163,8 @@ class HotReloadMethods:
         for name, member in inspect.getmembers(obj):
             if name.startswith('__'):
                 continue
+            if name not in obj.__dict__:
+                continue  # Skip inherited methods
             attr = inspect.getattr_static(obj, name)
             if isinstance(attr, staticmethod):
                 methods[name] = MethodInfo(MethodType.STATIC, member)

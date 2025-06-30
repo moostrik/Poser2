@@ -20,7 +20,7 @@ from modules.gl.Utils import lfo, fit, fill
 
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
-from modules.person.Person import Person, PersonColor
+from modules.person.Person import Person, PersonColor, TrackingStatus
 from modules.pose.PoseDefinitions import Pose, PoseEdgeIndices
 from modules.Settings import Settings
 
@@ -233,7 +233,7 @@ class Render(RenderWindow):
             # Alpha from confidences
 
             conf_flat: np.ndarray = confidences.T.flatten()
-            # colors[:, 3] = np.where(conf_flat > 0.0, 1.0, 0.0)
+            colors[:, 3] = np.where(conf_flat > 0.0, 1.0, 0.0)
             # colors[:, 3] = confidences.T.flatten()
             mesh.set_colors(colors)
 
@@ -254,17 +254,17 @@ class Render(RenderWindow):
             for tracklet in tracklets.values():
                 self.draw_tracklet(tracklet, 0, 0, fbo.width, fbo.height)
             for person in persons:
-                if person.active:
-                    roi: Rect | None = person.pose_roi
-                    mesh: Mesh = self.pose_meshes[person.id]
-                    if roi is not None and mesh.isInitialized():
-                        x, y, w, h = roi.x, roi.y, roi.width, roi.height
-                        x *= fbo.width
-                        y *= fbo.height
-                        w *= fbo.width
-                        h *= fbo.height
-
-                        self.draw_person(person, mesh, x, y, w, h, False, True, False)
+                if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.LOST:
+                    continue
+                roi: Rect | None = person.pose_roi
+                mesh: Mesh = self.pose_meshes[person.id]
+                if roi is not None and mesh.isInitialized():
+                    x, y, w, h = roi.x, roi.y, roi.width, roi.height
+                    x *= fbo.width
+                    y *= fbo.height
+                    w *= fbo.width
+                    h *= fbo.height
+                    self.draw_person(person, mesh, x, y, w, h, True, True, False)
 
             fbo.end()
 
@@ -292,7 +292,7 @@ class Render(RenderWindow):
         for i in range(self.num_persons):
             fbo: Fbo = self.psn_fbos[i]
             person: Person | None = self.get_person(i)
-            if person is None or person.img is None or not person.active:
+            if person is None or person.img is None:
                 continue
 
             image: Image = self.psn_images[i]
@@ -305,14 +305,18 @@ class Render(RenderWindow):
             self.setView(fbo.width, fbo.height)
             fbo.begin()
 
-            if person is not None and person.active:
+            if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.LOST:
+                glColor4f(1.0, 1.0, 1.0, 0.25)   # Set color
                 image.draw(0, 0, fbo.width, fbo.height)
-                # analysis_image.draw(0, 0, fbo.width, fbo.height)
-                mesh: Mesh = self.pose_meshes[person.id]
-                self.draw_person(person, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
-                angle_mesh = self.angle_meshes[person.id]
-                if angle_mesh.isInitialized():
-                    angle_mesh.draw(0, 0, fbo.width, fbo.height)
+                glColor4f(1.0, 1.0, 1.0, 1.0)   # Set color
+            else:
+                image.draw(0, 0, fbo.width, fbo.height)
+            # analysis_image.draw(0, 0, fbo.width, fbo.height)
+            mesh: Mesh = self.pose_meshes[person.id]
+            self.draw_person(person, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
+            angle_mesh = self.angle_meshes[person.id]
+            if angle_mesh.isInitialized():
+                angle_mesh.draw(0, 0, fbo.width, fbo.height)
 
             fbo.end()
 
@@ -436,7 +440,7 @@ class Render(RenderWindow):
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
 
         for person in persons.values():
-            if person is None or not person.active:
+            if person is None:
                 continue
 
             id: int = person.cam_id
@@ -467,7 +471,9 @@ class Render(RenderWindow):
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
 
         for person in persons.values():
-            if person is None or not person.active:
+            if person is None:
+                continue
+            if person.status != TrackingStatus.TRACKED and person.status != TrackingStatus.NEW:
                 continue
 
             w: float = person.tracklet.roi.width * fbo.width / num_cams
@@ -477,6 +483,8 @@ class Render(RenderWindow):
             color: list[float] = PersonColor(person.id, aplha=0.9)
             if person.overlap == True:
                 color[3] = 0.3
+            if person.status == TrackingStatus.NEW:
+                color = [1.0, 1.0, 1.0, 1.0]
 
             glColor4f(*color)  # Reset color
             glBegin(GL_QUADS)       # Start drawing a quad
@@ -510,7 +518,7 @@ class Render(RenderWindow):
         glFlush()
 
     @staticmethod
-    def draw_person(person: Person, pose: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
+    def draw_person(person: Person, pose_mesh: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
         if draw_box:
             r: float = 0.0
             g: float = 0.0
@@ -526,8 +534,8 @@ class Render(RenderWindow):
             glEnd()                 # End drawing
             glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
-        if draw_pose and pose.isInitialized():
-            pose.draw(x, y, w, h)
+        if draw_pose and pose_mesh.isInitialized():
+            pose_mesh.draw(x, y, w, h)
 
         if draw_text:
             string: str = f'ID: {person.id} Cam: {person.cam_id} Age: {person.last_time - person.start_time:.0f}'

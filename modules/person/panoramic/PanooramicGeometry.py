@@ -2,7 +2,7 @@
 from modules.person.Person import Person, Rect
 import numpy as np
 
-class Geometry():
+class PanoramicGeometry():
     def __init__(self, num_cameras: int, cam_fov: float, target_fov:float) -> None:
         self.num_cameras: int   = num_cameras
         self.cam_fov: float     = cam_fov
