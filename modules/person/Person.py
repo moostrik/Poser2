@@ -177,33 +177,3 @@ PersonCallback = Callable[[Person], None]
 PersonDict = dict[int, Person]
 PersonDictCallback = Callable[[PersonDict], None]
 
-
-from threading import Lock
-
-class PersonIdPool:
-    def __init__(self, max_size: int) -> None:
-        self._available = set(range(max_size))
-        self._lock = Lock()
-
-    def acquire(self) -> int:
-        with self._lock:
-            if not self._available:
-                raise Exception("No more IDs available")
-            min_id: int = min(self._available)
-            self._available.remove(min_id)
-            # print(f"Acquired person ID {min_id}. Available IDs: {self._available}")
-            return min_id
-
-    def release(self, obj: int) -> None:
-        with self._lock:
-            if obj in self._available:
-                raise Exception(f"ID {obj} is not currently in use and cannot be released. in use: {self._available}")
-            # print(f"Releasing person ID {obj}.")
-            self._available.add(obj)
-
-    def size(self) -> int:
-        return len(self._available)
-
-    def is_available(self, obj: int) -> bool:
-        with self._lock:
-            return obj in self._available
