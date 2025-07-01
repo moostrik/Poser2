@@ -368,6 +368,8 @@ class Render(RenderWindow):
     def add_person(self, person: Person) -> None:
         with self.input_mutex:
             self.input_persons[person.id] = person
+            if not person.is_active:
+                print(f"Render received person {person.id} with status {person.status.name}")
 
     def set_av(self, value: AvOutput) -> None:
         self.vis_image.set_image(value.img)
@@ -440,7 +442,7 @@ class Render(RenderWindow):
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
 
         for person in persons.values():
-            if person is None:
+            if person is None or person.status == TrackingStatus.REMOVED:
                 continue
 
             id: int = person.cam_id
