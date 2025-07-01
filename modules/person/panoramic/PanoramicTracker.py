@@ -123,13 +123,12 @@ class PanoramicTracker(Thread):
 
         # Add the new person to the tracker (if it is not lost)
         if existing_person is None and new_person.status != TrackingStatus.LOST:
+            new_person.status = TrackingStatus.NEW
             self.person_manager.add_person(new_person)
 
         # Remove persons that are not active anymore
         for person in self.person_manager.all_persons():
             if person.last_time < time() - self.person_timeout:
-
-                print(f"Removing person {person.id} from camera {person.cam_id} with status {person.status.name}")
                 self.remove_person(person)
 
         self.remove_overlapping_persons()
@@ -171,9 +170,11 @@ class PanoramicTracker(Thread):
 
             if not P_A.is_active and P_B.is_active:
                 overlaps.append((P_B.id, P_A.id))
+                continue
 
             elif not P_B.is_active and P_A.is_active:
                 overlaps.append((P_A.id, P_B.id))
+                continue
 
             if not P_A.is_active and not P_B.is_active:
                 continue
@@ -205,8 +206,10 @@ class PanoramicTracker(Thread):
             remove_id: int = self.person_manager.merge_persons(keep_person, remove_person)
 
             # If the merge was not successful, we create a dummy person to trigger the callback
-            dummy_person: Person = Person(remove_id, remove_person.cam_id, remove_person.tracklet, remove_person.time_stamp)
-            self._person_callback(dummy_person)
+            if remove_person.status != TrackingStatus.NEW:
+                dummy_person: Person = Person(remove_id, remove_person.cam_id, remove_person.tracklet, remove_person.time_stamp)
+                dummy_person.status = TrackingStatus.REMOVED
+                self._person_callback(dummy_person)
 
     def remove_person(self, person: Person) -> None:
         self.person_manager.remove_person(person.id)
@@ -230,7 +233,10 @@ class PanoramicTracker(Thread):
 
     # CALLBACKS
     def _person_callback(self, person: Person) -> None:
-        # print(f"Person callback for person {person.id} in camera {person.cam_id} with status {person.status.name}")
+        if person.status == TrackingStatus.REMOVED:
+            print(f"Person {person.id} in camera {person.cam_id} has been removed.")
+            print(self.person_manager._id_pool._available)
+
         with self.callback_lock:
             for c in self.person_callbacks:
                 c(person)

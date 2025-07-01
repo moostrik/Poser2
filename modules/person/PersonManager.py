@@ -31,6 +31,11 @@ class PersonIdPool:
         with self._lock:
             return obj in self._available
 
+    @property
+    def available(self) -> list[int]:
+        with self._lock:
+            return sorted(self._available)
+
 class PersonManager:
     def __init__(self, max_persons: int) -> None:
         self._persons: dict[int, Person] = {}
