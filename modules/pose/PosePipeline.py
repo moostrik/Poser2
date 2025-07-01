@@ -11,8 +11,10 @@ from modules.pose.PoseDefinitions import ModelTypeNames
 from modules.pose.PoseDetection import Detection
 from modules.pose.PoseAngleCalculator import PoseAngleCalculator
 
+from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PoseEstimation:
+
+class PosePipeline:
     def __init__(self, settings: Settings) -> None:
 
         # Pose detection components
@@ -30,6 +32,8 @@ class PoseEstimation:
         self.callback_lock = Lock()
         self.person_output_callbacks: set[PersonCallback] = set()
         self.running: bool = False
+
+        hot_reloader = HotReloadMethods(self.__class__)
 
     def start(self) -> None:
         if self.running:
@@ -59,6 +63,7 @@ class PoseEstimation:
     # External Input
     def person_input(self, person: Person) -> None:
         detector: Optional[Detection] = self.pose_detectors.get(person.id)
+
         if detector:
             # print(f'PoseEstimation: Adding person {person.id} with state {person.status.name}')
             detector.person_input(person)

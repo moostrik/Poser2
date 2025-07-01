@@ -55,7 +55,7 @@ class Detection(Thread):
                     poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
                     if len(poses) > 0:
                         person.pose = poses[0]
-                    self.callback(person)
+                self.callback(person)
             time.sleep(0.01)
 
     def load_model_once(self) -> None:

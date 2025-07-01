@@ -233,10 +233,6 @@ class PanoramicTracker(Thread):
 
     # CALLBACKS
     def _person_callback(self, person: Person) -> None:
-        if person.status == TrackingStatus.REMOVED:
-            print(f"Person {person.id} in camera {person.cam_id} has been removed.")
-            print(self.person_manager._id_pool.available)
-
         with self.callback_lock:
             for c in self.person_callbacks:
                 c(person)

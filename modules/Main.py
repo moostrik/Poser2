@@ -15,7 +15,7 @@ from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
-from modules.pose.PoseEstimation import PoseEstimation
+from modules.pose.PosePipeline import PosePipeline
 from modules.render.Render import Render
 from modules.Settings import Settings
 
@@ -41,10 +41,10 @@ class Main():
 
         self.panoramic_tracker = PanoramicTracker(self.gui, settings)
 
-        self.pose_detection: Optional[PoseEstimation] = None
+        self.pose_detection: Optional[PosePipeline] = None
         self.pose_window: Optional[PoseWindowBuffer] = None
         if settings.pose_active:
-            self.pose_detection = PoseEstimation(settings)
+            self.pose_detection = PosePipeline(settings)
             self.pose_window = PoseWindowBuffer(settings)
 
         self.av: AV = AV(self.gui, settings)

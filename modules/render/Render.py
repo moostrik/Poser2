@@ -368,8 +368,6 @@ class Render(RenderWindow):
     def add_person(self, person: Person) -> None:
         with self.input_mutex:
             self.input_persons[person.id] = person
-            if not person.is_active:
-                print(f"Render received person {person.id} with status {person.status.name}")
 
     def set_av(self, value: AvOutput) -> None:
         self.vis_image.set_image(value.img)
