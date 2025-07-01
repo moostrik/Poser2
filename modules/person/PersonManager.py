@@ -52,6 +52,7 @@ class PersonManager:
                 print(f"PersonManager: No more IDs available: {e}")
                 return None
             person.id = person_id
+            person.status = TrackingStatus.NEW
             self._persons[person_id] = person
             return person_id
 
@@ -69,6 +70,7 @@ class PersonManager:
     def remove_person(self, person_id: int) -> None:
         with self._lock:
             person: Person | None = self._persons.pop(person_id, None)
+            # person.status = TrackingStatus.REMOVED
             if person is not None:
                 self._id_pool.release(person_id)
             else:
@@ -110,6 +112,9 @@ class PersonManager:
             # Update status if needed
             if new_person.status == TrackingStatus.NEW:
                 new_person.status = TrackingStatus.TRACKED
+
+            if new_person.status == TrackingStatus.LOST:
+                new_person.last_time = old_person.last_time
 
             if new_person.status == TrackingStatus.REMOVED:
                 print(f"PersonManager: Attempted to replace person with ID {new_person.id} with status REMOVED. This should not happen.")
@@ -170,6 +175,8 @@ class PersonManager:
 
             # Copy all relevant fields from 'keep'
             merged_person.status = keep.status
+            if keep.status == TrackingStatus.NEW:
+                merged_person.status = TrackingStatus.TRACKED
             merged_person.last_time = keep.last_time
             merged_person.local_angle = keep.local_angle
             merged_person.world_angle = keep.world_angle

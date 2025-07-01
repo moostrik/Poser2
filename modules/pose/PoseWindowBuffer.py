@@ -8,8 +8,8 @@ import pandas as pd
 import numpy as np
 
 # Local application imports
-from modules.person.Person import Person
-from modules.pose.PoseDefinitions import JointAngleDict
+from modules.person.Person import Person, TrackingStatus
+from modules.pose.PoseDefinitions import JointAngleDict, PoseAngleKeypoints
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -51,7 +51,7 @@ class PoseWindowBuffer(Thread):
                 person: Optional[Person] = self.person_input_queue.get(block=True, timeout=0.01)
                 if person is not None:
                     try:
-                        self._process(person, self._analysis_callback, self.angle_windows, self.conf_windows, self.window_size)
+                        self._process(person)
                     except Exception as e:
                         print(f"Error processing person {person.id}: {e}")
                     self.person_input_queue.task_done()
@@ -61,40 +61,59 @@ class PoseWindowBuffer(Thread):
     def person_input(self, person: Person) -> None:
         self.person_input_queue.put(person)
 
-    @ staticmethod
-    def _process(person: Person, callback: Callable, angles: dict[int, pd.DataFrame], confidences: dict[int, pd.DataFrame], window_size: int) -> None:
+    def _process(self, person: Person) -> None:
         """ Process a person and update the joint angle windows. """
-        if person.pose_angles is None:
+        # if person.pose_angles is None:
+        #     return
+
+        if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.NEW:
+            # print(f"Skipping person {person.id} with status {person.status}")
+            # If the person is removed or lost, clear their angle and confidence windows
+            self.angle_windows.pop(person.id, None)
+            self.conf_windows.pop(person.id, None)
             return
+
+        if person.pose_angles is None:
+            # add a row with NaN values for angles and confidences NO TIMESTAMPS
+            angle_row: dict[str, float] = {}
+            conf_row: dict[str, float] = {}
+            for k in PoseAngleKeypoints.keys():
+                angle_row[f"{k.name}_angle"] = np.nan
+                conf_row[f"{k.name}_conf"] = np.nan
+
 
         # Flatten angles and confidences
         angle_row: dict[str, float] = {}
         conf_row: dict[str, float] = {}
-        for k, v in person.pose_angles.items():
-            angle_row[f"{k.name}_angle"] = v["angle"]
-            conf_row[f"{k.name}_conf"] = v["confidence"]
+        if person.pose_angles is None:
+            for k in PoseAngleKeypoints.keys():
+                angle_row[f"{k.name}_angle"] = np.nan
+                conf_row[f"{k.name}_conf"] = np.nan
+        else:
+            for k, v in person.pose_angles.items():
+                angle_row[f"{k.name}_angle"] = v["angle"]
+                conf_row[f"{k.name}_conf"] = v["confidence"]
 
         # Update angle window
-        angle_df = angles.get(person.id, pd.DataFrame())
+        angle_df: pd.DataFrame = self.angle_windows.get(person.id, pd.DataFrame())
         angle_df = pd.concat([angle_df, pd.DataFrame([angle_row])], ignore_index=True)
-        if len(angle_df) > window_size:
-            angle_df = angle_df.iloc[-window_size:]
-        angles[person.id] = angle_df
+        if len(angle_df) > self.window_size:
+            angle_df = angle_df.iloc[-self.window_size:]
+        self.angle_windows[person.id] = angle_df
 
         # # Update confidence window
-        conf_df = confidences.get(person.id, pd.DataFrame())
+        conf_df: pd.DataFrame = self.conf_windows.get(person.id, pd.DataFrame())
         conf_df = pd.concat([conf_df, pd.DataFrame([conf_row])], ignore_index=True)
-        if len(conf_df) > window_size:
-            conf_df = conf_df.iloc[-window_size:]
-        confidences[person.id] = conf_df
+        if len(conf_df) > self.window_size:
+            conf_df = conf_df.iloc[-self.window_size:]
+        self.conf_windows[person.id] = conf_df
 
         # Interpolate and smooth angles
         angle_df.interpolate(method='linear', limit_direction='both', limit = 7, inplace=True)
         angle_df = PoseWindowBuffer.rolling_circular_mean(angle_df, window=7, min_periods=1)
-        # angle_df = angle_df.rolling(window=5, min_periods=1).mean()
 
         # Notify callbacks with both DataFrames
-        callback(person.id, angle_df, conf_df)
+        self._analysis_callback(person.id, angle_df, conf_df)
 
         # print head of the DataFrame for debugging
         # print(f"Processed angles for person {person.id}:\n{angle_df_smooth.head()}")
@@ -107,7 +126,6 @@ class PoseWindowBuffer(Thread):
         df_smooth = df_unwrapped.rolling(window=window, min_periods=min_periods).mean()
         # Wrap back to [-pi, pi]
         return ((df_smooth + np.pi) % (2 * np.pi)) - np.pi
-
 
     def add_analysis_callback(self, callback: PoseWindowCallback) -> None:
         """ Register a callback to receive the current pandas DataFrame window. """

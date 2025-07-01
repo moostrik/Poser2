@@ -123,7 +123,6 @@ class PanoramicTracker(Thread):
 
         # Add the new person to the tracker (if it is not lost)
         if existing_person is None and new_person.status != TrackingStatus.LOST:
-            new_person.status = TrackingStatus.NEW
             self.person_manager.add_person(new_person)
 
         # Remove persons that are not active anymore

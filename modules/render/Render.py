@@ -374,7 +374,6 @@ class Render(RenderWindow):
         self.vis_image.set_image(value.img)
         self.av_angle = value.angle
 
-
     def get_angle_window(self, id: int, clear = False) -> Optional[np.ndarray]:
         with self.input_mutex:
             ret_analysis: Optional[np.ndarray] = self.input_angle_window[id]

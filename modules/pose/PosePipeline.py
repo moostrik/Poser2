@@ -65,7 +65,6 @@ class PosePipeline:
         detector: Optional[Detection] = self.pose_detectors.get(person.id)
 
         if detector:
-            # print(f'PoseEstimation: Adding person {person.id} with state {person.status.name}')
             detector.person_input(person)
 
     # External Output Callbacks
