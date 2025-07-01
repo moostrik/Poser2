@@ -1,8 +1,8 @@
 # Standard library imports
 from enum import Enum
 from time import time
-from typing import Optional
-from typing import Callable
+from threading import Lock
+from typing import Optional, Callable
 
 # Third-party imports
 import cv2
@@ -38,50 +38,88 @@ class TrackingStatus(Enum):
     TRACKED = 1
     LOST = 2
     REMOVED = 3
+    NONE = 4
 
 class Person():
     def __init__(self, id, cam_id: int, tracklet: Tracklet, time_stamp: Timestamp) -> None:
-        self.id: int =                  id
-        self.cam_id: int =              cam_id
-        self.tracklet: Tracklet =       tracklet
-        self.time_stamp: Timestamp =    time_stamp
+        self.id: int =                                  id
+        self.cam_id: int =                              cam_id
 
-        self.status: TrackingStatus =   TrackingStatus[tracklet.status.name]
-        self.start_time: float =        time()
-        self.last_time: float =         time()
+        self.tracklet: Tracklet =                       tracklet
+        self.time_stamp: Timestamp =                    time_stamp
+        self.status: TrackingStatus =                   TrackingStatus[tracklet.status.name]
 
-        self.local_angle: float =       0.0
-        self.world_angle: float =       0.0
-        self.overlap: bool =            False
+        self.start_time: float =                        time()
+        self.last_time: float =                         time()
 
-        self.img: Optional[np.ndarray]= None
+        self.local_angle: float =                       0.0
+        self.world_angle: float =                       0.0
+        self.overlap: bool =                            False
 
-        self.pose_roi: Optional[Rect] = None
-        self.pose: Optional[Pose] =     None
-        self.pose_angles: Optional[JointAngleDict] = None
+        self._img: Optional[np.ndarray]=                None
+
+        self._pose_roi: Optional[Rect] =                None
+        self._pose: Optional[Pose] =                    None
+        self._pose_angles: Optional[JointAngleDict] =   None
+
+        self._lock = Lock()
+
+    @property
+    def img(self) -> Optional[np.ndarray]:
+        with self._lock:
+            return self._img
+
+    @img.setter
+    def img(self, value: Optional[np.ndarray]) -> None:
+        with self._lock:
+            self._img = value
+
+    @property
+    def pose_roi(self) -> Optional[Rect]:
+        with self._lock:
+            return self._pose_roi
+
+    @pose_roi.setter
+    def pose_roi(self, value: Optional[Rect]) -> None:
+        with self._lock:
+            self._pose_roi = value
+
+    @property
+    def pose(self) -> Optional[Pose]:
+        with self._lock:
+            return self._pose
+
+    @pose.setter
+    def pose(self, value: Optional[Pose]) -> None:
+        with self._lock:
+            self._pose = value
+
+    @property
+    def pose_angles(self) -> Optional[JointAngleDict]:
+        with self._lock:
+            return self._pose_angles
+
+    @pose_angles.setter
+    def pose_angles(self, value: Optional[JointAngleDict]) -> None:
+        with self._lock:
+            self._pose_angles = value
 
     @property
     def is_active(self) -> bool:
         return self.status in (TrackingStatus.NEW, TrackingStatus.TRACKED)
 
-    def set_from_existing(self, other: 'Person') -> None:
-        if self.status == TrackingStatus.REMOVED:
-            print(f"Warning: Cannot set from existing. This person has id {self.id} and is not tracked, status is {self.status} .")
+    @property
+    def age(self) -> float:
+        """Get how long this person has been tracked"""
+        return time() - self.start_time
 
-        # print(f"Setting person {self.id} from existing person {other.id} in camera {self.cam_id}.")
-
-        self.id = other.id
-        self.start_time = other.start_time
-
-
-        if self.status == TrackingStatus.NEW or self.status == TrackingStatus.TRACKED:
-            self.status = TrackingStatus.TRACKED
-            self.last_time = time()
-
+    def is_expired(self, threshold) -> bool:
+        """Check if person hasn't been updated recently"""
+        return time() - self.last_time > threshold
 
     def set_pose_roi(self, image: np.ndarray, roi_expansion: float) -> None:
         if self.pose_roi is not None:
-            # print(f"Warning: pose rect already set for person {self.id} in camera {self.cam_id}.")
+            print(f"Warning: pose rect already set for person {self.id} in camera {self.cam_id}.")
             return
 
         h, w = image.shape[:2]
@@ -89,7 +127,7 @@ class Person():
 
     def set_pose_image(self, image: np.ndarray) -> None:
         if self.img is not None:
-            # print(f"Warning: pose image already set for person {self.id} in camera {self.cam_id}.")
+            print(f"Warning: pose image already set for person {self.id} in camera {self.cam_id}.")
             return
 
         if self.pose_roi is None:
@@ -97,10 +135,6 @@ class Person():
             return
 
         self.img = self.get_cropped_image(image, self.pose_roi, 256)
-
-    @staticmethod
-    def create_cam_id(cam_id: int, tracklet_id: int) -> str:
-        return f"{cam_id}_{tracklet_id}"
 
     @staticmethod
     def get_crop_rect(image_width: int, image_height: int, roi: Rect, expansion: float = 0.0) -> Rect:
@@ -164,15 +198,7 @@ class Person():
         # Resize the cutout to the desired size
         return cv2.resize(crop, (output_size, output_size), interpolation=cv2.INTER_AREA)
 
-    def is_expired(self, threshold) -> bool:
-        """Check if person hasn't been updated recently"""
-        return time() - self.last_time > threshold
-
-    @property
-    def age(self) -> float:
-        """Get how long this person has been tracked"""
-        return time() - self.start_time
-
+# Type Aliases
 PersonCallback = Callable[[Person], None]
 PersonDict = dict[int, Person]
 PersonDictCallback = Callable[[PersonDict], None]

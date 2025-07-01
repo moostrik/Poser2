@@ -119,9 +119,7 @@ class PanoramicTracker(Thread):
         # Check if the new person already exists in the tracker and update if necessary
         existing_person: Optional[Person] = self.person_manager.get_person_by_cam_and_tracklet(new_person.cam_id, new_person.tracklet.id)
         if existing_person is not None:
-            new_person.set_from_existing(existing_person)
-            self.person_manager.set_person(new_person)
-            # print(f"Person {new_person.id} already exists in camera {new_person.cam_id}, updating with new data.")
+            self.person_manager.replace_person(existing_person, new_person)
 
         # Add the new person to the tracker (if it is not lost)
         if existing_person is None and new_person.status != TrackingStatus.LOST:
@@ -130,12 +128,11 @@ class PanoramicTracker(Thread):
         # Remove persons that are not active anymore
         for person in self.person_manager.all_persons():
             if person.last_time < time() - self.person_timeout:
-                self.person_manager.remove_person(person.id)
-                self._person_callback(person)
 
+                print(f"Removing person {person.id} from camera {person.cam_id} with status {person.status.name}")
+                self.remove_person(person)
 
         self.remove_overlapping_persons()
-
 
         for person in self.person_manager.all_persons():
             if person.is_active and person.img is None:
@@ -149,8 +146,6 @@ class PanoramicTracker(Thread):
 
                 self._person_callback(person)
 
-
-
     def remove_overlapping_persons(self) -> None:
 
         persons: list[Person] = self.person_manager.all_persons()
@@ -159,52 +154,64 @@ class PanoramicTracker(Thread):
 
         overlaps: list[tuple[int, int]] = []
 
-        for P_A in persons:
-            if not P_A.overlap:
+        for P_A, P_B in combinations(persons, 2):
+            if not P_A.overlap or not P_B.overlap:
                 continue
-            for P_B in persons:
-                if not P_B.overlap:
-                    continue
-                if P_A.cam_id == P_B.cam_id:
-                    continue
+            if P_A.cam_id == P_B.cam_id:
+                continue
 
-                angle_diff: float = self.geometry.angle_diff(P_A.world_angle, P_B.world_angle)
-                if angle_diff < self.geometry.fov_overlap * (1.0 + self.cam_360_overlap_expansion):
-                    if P_A.start_time > P_B.start_time:
-                        newest, oldest = P_A, P_B
-                    else:
-                        newest, oldest = P_B, P_A
-                    edge_newest: float = self.geometry.angle_from_edge(newest.local_angle)
-                    edge_oldest: float = self.geometry.angle_from_edge(oldest.local_angle)
-                    # print(f"Comparing newest {newest.id} (edge {edge_newest}) to oldest {oldest.id} (edge {edge_oldest})")
-                    if edge_newest > edge_oldest / self.cam_360_hysteresis_factor:
-                        overlaps.append((newest.id, oldest.id))
-                    else:
-                        overlaps.append((oldest.id, newest.id))
+            angle_diff: float = self.geometry.angle_diff(P_A.world_angle, P_B.world_angle)
+            if angle_diff > self.geometry.fov_overlap * (1.0 + self.cam_360_overlap_expansion):
+                continue
+
+            # look at the hight of the trackets for extra filtering
+            height_diff: float = abs(P_A.tracklet.roi.height - P_B.tracklet.roi.height)
+            if height_diff > 0.1:
+                continue
+
+            if not P_A.is_active and P_B.is_active:
+                overlaps.append((P_B.id, P_A.id))
+
+            elif not P_B.is_active and P_A.is_active:
+                overlaps.append((P_A.id, P_B.id))
+
+            if not P_A.is_active and not P_B.is_active:
+                continue
+
+            # print(f"Comparing persons {P_A.id} and {P_B.id}: angle_diff={angle_diff:.2f}, height_diff={height_diff:.2f}")
+
+            if P_A.age < P_B.age:
+                newest, oldest = P_A, P_B
+            else:
+                newest, oldest = P_B, P_A
+            edge_newest: float = self.geometry.angle_from_edge(newest.local_angle)
+            edge_oldest: float = self.geometry.angle_from_edge(oldest.local_angle)
+            # print(f"Comparing newest {newest.id} (edge {edge_newest}) to oldest {oldest.id} (edge {edge_oldest})")
+            if edge_newest >= edge_oldest / self.cam_360_hysteresis_factor:
+                overlaps.append((newest.id, oldest.id))
+            else:
+                overlaps.append((oldest.id, newest.id))
 
         overlap_sets: set[tuple[int, int]] = set(overlaps)
-
-        # print(self.geometry.angle_from_edge(104))
 
         for overlap in overlap_sets:
             # print(f"Removing overlapping persons: {overlap}")
             keep_person: Optional[Person] = self.person_manager.get_person(overlap[0])
             remove_person: Optional[Person] = self.person_manager.get_person(overlap[1])
             if keep_person is None or remove_person is None:
-                print(f"Warning: One of the persons in the overlap {overlap} is None. Skipping removal.")
+                print(f"Warning: One of the persons in the overlap {overlap} is None sets{overlap_sets}. Skipping removal.")
                 continue
-            edge_keep: float = self.geometry.angle_from_edge(keep_person.local_angle)
-            edge_remove: float = self.geometry.angle_from_edge(remove_person.local_angle)
-            # print("keep", keep_person.id, edge_keep, keep_person.status,  "remove", remove_person.id, edge_remove , remove_person.status)
 
-            if keep_person.start_time < remove_person.start_time:
-                self.person_manager.remove_person(remove_person.id)
-            else:
-                self.person_manager.remove_person(keep_person.id)
-                keep_person.set_from_existing(remove_person)
-                self.person_manager.set_person(keep_person)
+            remove_id: int = self.person_manager.merge_persons(keep_person, remove_person)
 
+            # If the merge was not successful, we create a dummy person to trigger the callback
+            dummy_person: Person = Person(remove_id, remove_person.cam_id, remove_person.tracklet, remove_person.time_stamp)
+            self._person_callback(dummy_person)
 
+    def remove_person(self, person: Person) -> None:
+        self.person_manager.remove_person(person.id)
+        person.status = TrackingStatus.REMOVED
+        self._person_callback(person)
 
     # INPUTS
     def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
@@ -223,6 +230,7 @@ class PanoramicTracker(Thread):
 
     # CALLBACKS
     def _person_callback(self, person: Person) -> None:
+        # print(f"Person callback for person {person.id} in camera {person.cam_id} with status {person.status.name}")
         with self.callback_lock:
             for c in self.person_callbacks:
                 c(person)

@@ -48,14 +48,14 @@ class Detection(Thread):
 
         self._running = True
         while self._running:
-            detection: Person | None = self.get_detection()
-            if detection is not None:
-                image: np.ndarray | None = detection.img
+            person: Person | None = self.get_person()
+            if person is not None:
+                image: np.ndarray | None = person.img
                 if image is not None:
                     poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
                     if len(poses) > 0:
-                        detection.pose = poses[0]
-                    self.callback(detection)
+                        person.pose = poses[0]
+                    self.callback(person)
             time.sleep(0.01)
 
     def load_model_once(self) -> None:
@@ -65,13 +65,13 @@ class Detection(Thread):
                 Detection._model_loaded = True
 
     # GETTERS AND SETTERS
-    def get_detection(self) -> Person | None:
+    def get_person(self) -> Person | None:
         with self._input_mutex:
             return_detection: Person | None = self._input_person
             self._input_person = None
             return return_detection
 
-    def set_detection(self, detection: Person) -> None:
+    def person_input(self, detection: Person) -> None:
         with self._input_mutex:
             self._input_person = detection
 

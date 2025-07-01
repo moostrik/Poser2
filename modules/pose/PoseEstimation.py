@@ -60,7 +60,8 @@ class PoseEstimation:
     def person_input(self, person: Person) -> None:
         detector: Optional[Detection] = self.pose_detectors.get(person.id)
         if detector:
-            detector.set_detection(person)
+            # print(f'PoseEstimation: Adding person {person.id} with state {person.status.name}')
+            detector.person_input(person)
 
     # External Output Callbacks
     def add_person_callback(self, callback: PersonCallback) -> None:
