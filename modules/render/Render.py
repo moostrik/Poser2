@@ -292,12 +292,13 @@ class Render(RenderWindow):
         for i in range(self.num_persons):
             fbo: Fbo = self.psn_fbos[i]
             person: Person | None = self.get_person(i)
-            if person is None or person.img is None:
+            if person is None:
                 continue
 
             image: Image = self.psn_images[i]
-            image.set_image(person.img)
-            image.update()
+            if person.img is not None:
+                image.set_image(person.img)
+                image.update()
 
             analysis_image: Image = self.analysis_images[i]
             analysis_image.update()
