@@ -72,17 +72,15 @@ class PoseAngleCalculator(Thread):
 
     @staticmethod
     def _process(person: Person, confidence_threshold: float, callback:PersonCallback) -> None:
-        # callback(person)
-        # return
-        # Check if person has pose data
+
         if person.pose is None:
+            # return nan angles and 0 for confidence
+            angles: JointAngleDict = {}
+            for k in PoseAngleKeypoints.keys():
+                angles[k] = JointAngle(angle=np.nan, confidence=0.0)
+            person.pose_angles = angles
             callback(person)
             return
-
-        # if person.pose_angles is not None:
-        #     print(f"Pose angles already calculated for person {person.id}, skipping.")
-        #     callback(person)
-        #     return
 
         angles: JointAngleDict = {}
         keypoints: np.ndarray = person.pose.getKeypoints()

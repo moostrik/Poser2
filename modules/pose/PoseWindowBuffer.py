@@ -74,25 +74,15 @@ class PoseWindowBuffer(Thread):
             return
 
         if person.pose_angles is None:
-            # add a row with NaN values for angles and confidences NO TIMESTAMPS
-            angle_row: dict[str, float] = {}
-            conf_row: dict[str, float] = {}
-            for k in PoseAngleKeypoints.keys():
-                angle_row[f"{k.name}_angle"] = np.nan
-                conf_row[f"{k.name}_conf"] = np.nan
-
+            print(f"WINDOW: Skipping person {person.id} with no pose angles, this should not happen")
+            return
 
         # Flatten angles and confidences
         angle_row: dict[str, float] = {}
         conf_row: dict[str, float] = {}
-        if person.pose_angles is None:
-            for k in PoseAngleKeypoints.keys():
-                angle_row[f"{k.name}_angle"] = np.nan
-                conf_row[f"{k.name}_conf"] = np.nan
-        else:
-            for k, v in person.pose_angles.items():
-                angle_row[f"{k.name}_angle"] = v["angle"]
-                conf_row[f"{k.name}_conf"] = v["confidence"]
+        for k, v in person.pose_angles.items():
+            angle_row[f"{k.name}_angle"] = v["angle"]
+            conf_row[f"{k.name}_conf"] = v["confidence"]
 
         # Update angle window
         angle_df: pd.DataFrame = self.angle_windows.get(person.id, pd.DataFrame())

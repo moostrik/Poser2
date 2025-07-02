@@ -58,8 +58,8 @@ class SyncPlayerGui(SyncPlayer):
         if self.gui is None:
             return
         f: str = self.gui.getStringValue('Folders')
-
-        self.play(True, f)
+        if f != '':
+            self.play(True, f)
 
     def set_stop(self) -> None:
         self.play(False, '')
