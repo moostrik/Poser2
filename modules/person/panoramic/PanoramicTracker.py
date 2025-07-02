@@ -26,7 +26,7 @@ class CamTracklet:
     def __init__(self, cam_id: int, tracklet: Tracklet) -> None:
         self.cam_id: int = cam_id
         self.tracklet: Tracklet = tracklet
-        self.time_stamp: Timestamp = Timestamp.utcnow()
+        self.time_stamp: Timestamp = Timestamp.now()
 
 CamTrackletDict = dict[int, list[Tracklet]]
 

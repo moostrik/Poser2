@@ -73,7 +73,7 @@ settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIG
 settings.pose_window_size =     10 # seconds
 
 settings.analysis_rate_hz =     2.0
-settings.analysis_window_size = 10 # seconds
+settings.analysis_window_size = 3 # seconds
 
 settings.light_resolution =     3600
 settings.light_rate =           60

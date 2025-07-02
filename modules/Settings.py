@@ -51,8 +51,8 @@ class Settings():
         self.pose_window_size: int              = None # type: ignore
 
         # POSE ANALYSIS SETTINGS
-        self.analysis_rate_hz: float       = None # type: ignore
-        self.analysis_window_size: int     = None # type: ignore
+        self.analysis_rate_hz: float            = None # type: ignore
+        self.analysis_window_size: int          = None # type: ignore
 
         # LIGHT SETTINGS
         self.light_resolution: int              = None # type: ignore
