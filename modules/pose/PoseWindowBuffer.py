@@ -1,4 +1,5 @@
 # Standard library imports
+from dataclasses import dataclass
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
 from typing import Optional, Callable
@@ -15,8 +16,18 @@ from modules.Settings import Settings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Type for analysis output callback
-PoseWindowCallback = Callable[[pd.DataFrame], None]
-PoseWindowVisualisationCallback = Callable[[int, np.ndarray], None]
+@dataclass
+class PoseWindowData:
+    window_id: int
+    angles: pd.DataFrame
+    confidences: pd.DataFrame
+PoseWindowCallback = Callable[[PoseWindowData], None]
+
+@dataclass
+class PoseWindowVisualisationData:
+    window_id: int
+    mesh_data: np.ndarray  # shape: (num_frames, num_joints, 2)
+PoseWindowVisualisationCallback = Callable[[PoseWindowVisualisationData], None]
 
 class PoseWindowBuffer(Thread):
     def __init__(self, settings: Settings) -> None:
@@ -27,7 +38,7 @@ class PoseWindowBuffer(Thread):
         self.person_input_queue: Queue[Person] = Queue()
 
         # Windowing for joint angles
-        self.window_size: int = int(settings.analysis_window_size * settings.camera_fps)
+        self.window_size: int = int(settings.pose_window_size * settings.camera_fps)
         self.angle_windows: dict[int, pd.DataFrame] = {}
         self.conf_windows: dict[int, pd.DataFrame] = {}
 
@@ -58,7 +69,7 @@ class PoseWindowBuffer(Thread):
             except Empty:
                 continue
 
-    def person_input(self, person: Person) -> None:
+    def add_person(self, person: Person) -> None:
         self.person_input_queue.put(person)
 
     def _process(self, person: Person) -> None:
@@ -102,7 +113,7 @@ class PoseWindowBuffer(Thread):
         angle_df = PoseWindowBuffer.ewm_circular_mean(angle_df, span=7.0)
 
         # Notify callbacks with both DataFrames
-        self._analysis_callback(person.id, angle_df, conf_df)
+        self._analysis_callback(PoseWindowData(person.id, angle_df, conf_df))
 
     @staticmethod
     def rolling_circular_mean(df: pd.DataFrame, window: float = 0.3, min_periods: int = 1) -> pd.DataFrame:
@@ -133,24 +144,24 @@ class PoseWindowBuffer(Thread):
         with self.callback_lock:
             self.analysis_output_callbacks.add(callback)
 
-    def _analysis_callback(self, id: int, angles: pd.DataFrame, confidences: pd.DataFrame) -> None:
-        # return
-        self._visualisation_callback(id, angles, confidences)
+    def _analysis_callback(self, data: PoseWindowData) -> None:
+        self._visualisation_callback(data)
         """ Handle the output of the analysis. """
         with self.callback_lock:
             for callback in self.analysis_output_callbacks:
-                callback(angles)
+                callback(data)
 
     def add_visualisation_callback(self, callback: PoseWindowVisualisationCallback) -> None:
         """ Register a callback to receive the visualisation data. """
         with self.callback_lock:
             self.visualisation_callbacks.add(callback)
 
-    def _visualisation_callback(self, id: int, angles: pd.DataFrame, confidences: pd.DataFrame) -> None:
+    def _visualisation_callback(self, data: PoseWindowData) -> None:
         """ Handle the output of the visualisation. """
-        vis: np.ndarray = self._create_visualisation_data(angles, confidences)
+        vis: np.ndarray = self._create_visualisation_data(data.angles, data.confidences)
+        vis_data = PoseWindowVisualisationData(window_id=data.window_id, mesh_data=vis)
         for callback in self.visualisation_callbacks:
-            callback(id, vis)
+            callback(vis_data)
 
     @staticmethod
     def _create_visualisation_data(angles: pd.DataFrame, confidences: pd.DataFrame) -> np.ndarray:

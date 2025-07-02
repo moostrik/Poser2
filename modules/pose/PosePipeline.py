@@ -61,7 +61,7 @@ class PosePipeline:
         self.joint_angles.stop()
 
     # External Input
-    def person_input(self, person: Person) -> None:
+    def set_person(self, person: Person) -> None:
         detector: Optional[Detection] = self.pose_detectors.get(person.id)
 
         if detector:

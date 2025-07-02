@@ -70,7 +70,9 @@ settings.video_frame_types =    [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIG
 settings.pose_num =             args.players
 settings.pose_active =      not args.nopose
 settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
+settings.pose_window_size =     10 # seconds
 
+settings.analysis_rate_hz =     2.0
 settings.analysis_window_size = 10 # seconds
 
 settings.light_resolution =     3600

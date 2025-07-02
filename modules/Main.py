@@ -8,14 +8,15 @@ from math import ceil
 from typing import Optional
 
 # Local application imports
-from modules.pose.PoseWindowBuffer import PoseWindowBuffer
 from modules.av.Manager import Manager as AV
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
+from modules.pose.PoseAnalysis import PoseAnalysis
 from modules.pose.PosePipeline import PosePipeline
+from modules.pose.PoseWindowBuffer import PoseWindowBuffer
 from modules.render.Render import Render
 from modules.Settings import Settings
 
@@ -43,9 +44,11 @@ class Main():
 
         self.pose_detection: Optional[PosePipeline] = None
         self.pose_window: Optional[PoseWindowBuffer] = None
+        self.pose_analysis: Optional[PoseAnalysis] = None
         if settings.pose_active:
             self.pose_detection = PosePipeline(settings)
             self.pose_window = PoseWindowBuffer(settings)
+            self.pose_analysis = PoseAnalysis(settings)
 
         self.av: AV = AV(self.gui, settings)
         self.running: bool = False
@@ -59,21 +62,24 @@ class Main():
             camera.add_preview_callback(self.render.set_cam_image)
             camera.add_frame_callback(self.panoramic_tracker.set_image)
             if self.recorder:
-                camera.add_sync_callback(self.recorder.add_synced_frames)
+                camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_tracker_callback(self.panoramic_tracker.add_tracklet)
-            camera.add_tracker_callback(self.render.add_tracklet)
+            camera.add_tracker_callback(self.render.set_tracklet)
             camera.start()
 
         if self.pose_detection:
-            self.panoramic_tracker.add_person_callback(self.pose_detection.person_input)
+            self.panoramic_tracker.add_person_callback(self.pose_detection.set_person)
             if self.pose_window:
-                self.pose_detection.add_person_callback(self.pose_window.person_input)
-                self.pose_window.add_visualisation_callback(self.render.add_angle_window)
+                self.pose_detection.add_person_callback(self.pose_window.add_person)
+                self.pose_window.add_visualisation_callback(self.render.set_angle_window)
                 self.pose_window.start()
-            self.pose_detection.add_person_callback(self.render.add_person)
+                if self.pose_analysis:
+                    self.pose_window.add_analysis_callback(self.pose_analysis.set_window)
+                    self.pose_analysis.start()
+            self.pose_detection.add_person_callback(self.render.set_person)
             self.pose_detection.start()
         else:
-            self.panoramic_tracker.add_person_callback(self.render.add_person)
+            self.panoramic_tracker.add_person_callback(self.render.set_person)
 
         self.panoramic_tracker.start()
 
@@ -126,9 +132,10 @@ class Main():
 
         if self.pose_detection:
             self.pose_detection.stop()
-
         if self.pose_window:
             self.pose_window.stop()
+        if self.pose_analysis:
+            self.pose_analysis.stop()
 
         self.av.stop()
         self.av.join()

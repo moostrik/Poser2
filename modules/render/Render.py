@@ -22,6 +22,7 @@ from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.Person import Person, PersonColor, TrackingStatus
 from modules.pose.PoseDefinitions import Pose, PoseEdgeIndices
+from modules.pose.PoseWindowBuffer import PoseWindowVisualisationData
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -349,7 +350,7 @@ class Render(RenderWindow):
             if clear:
                 self.input_tracklets[cam_id].clear()
             return ret_person
-    def add_tracklet(self, cam_id: int, tracklet: Tracklet) -> None :
+    def set_tracklet(self, cam_id: int, tracklet: Tracklet) -> None :
         with self.input_mutex:
             self.input_tracklets[cam_id][tracklet.id] = tracklet
 
@@ -366,7 +367,7 @@ class Render(RenderWindow):
                 if person is not None and person.cam_id == cam_id:
                     persons.append(person)
             return persons
-    def add_person(self, person: Person) -> None:
+    def set_person(self, person: Person) -> None:
         with self.input_mutex:
             self.input_persons[person.id] = person
 
@@ -380,14 +381,9 @@ class Render(RenderWindow):
             if clear:
                 self.input_angle_window[id] = None
             return ret_analysis
-    def add_angle_window(self, id, analysis: np.ndarray) -> None:
+    def set_angle_window(self, data: PoseWindowVisualisationData) -> None:
         with self.input_mutex:
-            self.input_angle_window[id] = analysis
-
-        # """ Set the analysis data for visualisation. """
-        # # print(f"Adding analysis for person {id} with shape {analysis.shape}")
-        # if analysis is not None:
-        #     self.analysis_images[id].set_image(analysis)
+            self.input_angle_window[data.window_id] = data.mesh_data
 
     # STATIC METHODS
     @staticmethod

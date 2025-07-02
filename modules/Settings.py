@@ -44,13 +44,15 @@ class Settings():
         self.video_format: Settings.CoderFormat = None # type: ignore
         self.video_frame_types: list[FrameType] = None # type: ignore
 
-        # DETECTION SETTINGS
+        # POSE DETCTION SETTINGS
         self.pose_num: int                      = None # type: ignore
         self.pose_model_type: ModelType         = None # type: ignore
         self.pose_active: bool                  = None # type: ignore
+        self.pose_window_size: int              = None # type: ignore
 
-        # ANALYSIS SETTINGS
-        self.analysis_window_size: int          = None # type: ignore
+        # POSE ANALYSIS SETTINGS
+        self.analysis_rate_hz: float       = None # type: ignore
+        self.analysis_window_size: int     = None # type: ignore
 
         # LIGHT SETTINGS
         self.light_resolution: int              = None # type: ignore
