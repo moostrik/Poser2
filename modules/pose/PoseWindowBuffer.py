@@ -63,8 +63,6 @@ class PoseWindowBuffer(Thread):
 
     def _process(self, person: Person) -> None:
         """ Process a person and update the joint angle windows. """
-        # if person.pose_angles is None:
-        #     return
 
         if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.NEW:
             # print(f"Skipping person {person.id} with status {person.status}")
@@ -77,44 +75,57 @@ class PoseWindowBuffer(Thread):
             print(f"WINDOW: Skipping person {person.id} with no pose angles, this should not happen")
             return
 
-        # Flatten angles and confidences
-        angle_row: dict[str, float] = {}
-        conf_row: dict[str, float] = {}
-        for k, v in person.pose_angles.items():
-            angle_row[f"{k.name}_angle"] = v["angle"]
-            conf_row[f"{k.name}_conf"] = v["confidence"]
+        # Build angle/confidence dicts
+        angle_row: dict[str, float] = {f"{k}_angle": v["angle"] for k, v in person.pose_angles.items()}
+        conf_row: dict[str, float] = {f"{k}_conf": v["confidence"] for k, v in person.pose_angles.items()}
+        timestamp: pd.Timestamp = person.time_stamp  # Assume pd.Timestamp
 
         # Update angle window
         angle_df: pd.DataFrame = self.angle_windows.get(person.id, pd.DataFrame())
-        angle_df = pd.concat([angle_df, pd.DataFrame([angle_row])], ignore_index=True)
-        if len(angle_df) > self.window_size:
-            angle_df = angle_df.iloc[-self.window_size:]
+        angle_row_df = pd.DataFrame([angle_row], index=[timestamp])
+        angle_df = pd.concat([angle_df, angle_row_df])
+        angle_df.sort_index(inplace=True)
+        angle_df = angle_df.iloc[-self.window_size:]
         self.angle_windows[person.id] = angle_df
 
         # # Update confidence window
         conf_df: pd.DataFrame = self.conf_windows.get(person.id, pd.DataFrame())
-        conf_df = pd.concat([conf_df, pd.DataFrame([conf_row])], ignore_index=True)
-        if len(conf_df) > self.window_size:
-            conf_df = conf_df.iloc[-self.window_size:]
+        conf_row_df = pd.DataFrame([conf_row], index=[timestamp])
+        conf_df = pd.concat([conf_df, conf_row_df])
+        conf_df.sort_index(inplace=True)
+        conf_df = conf_df.iloc[-self.window_size:]
         self.conf_windows[person.id] = conf_df
 
         # Interpolate and smooth angles
-        angle_df.interpolate(method='linear', limit_direction='both', limit = 7, inplace=True)
-        angle_df = PoseWindowBuffer.rolling_circular_mean(angle_df, window=7, min_periods=1)
+        angle_df.interpolate(method='time', limit_direction='both', limit = 7, inplace=True)
+        # angle_df = PoseWindowBuffer.rolling_circular_mean(angle_df, window=0.4, min_periods=1)
+        angle_df = PoseWindowBuffer.ewm_circular_mean(angle_df, span=7.0)
 
         # Notify callbacks with both DataFrames
         self._analysis_callback(person.id, angle_df, conf_df)
 
-        # print head of the DataFrame for debugging
-        # print(f"Processed angles for person {person.id}:\n{angle_df_smooth.head()}")
+    @staticmethod
+    def rolling_circular_mean(df: pd.DataFrame, window: float = 0.3, min_periods: int = 1) -> pd.DataFrame:
+        """ Rolling mean on unwrapped angles to avoid discontinuities at ±π. """
+        window_str: str = f"{int(window * 1000)}ms"
+        # Unwrap angles to remove discontinuities
+        df_unwrapped: pd.DataFrame = df.apply(np.unwrap)
+        # Rolling mean on unwrapped angles
+        df_smooth: pd.DataFrame = df_unwrapped.rolling(window=window_str, min_periods=min_periods).mean()
+
+        # Wrap back to [-pi, pi]
+        return ((df_smooth + np.pi) % (2 * np.pi)) - np.pi
 
     @staticmethod
-    def rolling_circular_mean(df, window=5, min_periods=1):
-        # Unwrap angles to remove discontinuities
-        df_unwrapped = df.apply(np.unwrap)
-        # Rolling mean on unwrapped angles
-        df_smooth = df_unwrapped.rolling(window=window, min_periods=min_periods).mean()
-        # Wrap back to [-pi, pi]
+    def ewm_circular_mean(df: pd.DataFrame, span: float = 5.0) -> pd.DataFrame:
+        """Exponential moving average on unwrapped angles to avoid discontinuities at ±π."""
+        # Unwrap angles to avoid discontinuities at ±π
+        df_unwrapped: pd.DataFrame = df.apply(np.unwrap)
+
+        # Apply exponential moving average on unwrapped data
+        df_smooth: pd.DataFrame = df_unwrapped.ewm(span=span, adjust=False).mean()
+
+        # Wrap back to [-π, π]
         return ((df_smooth + np.pi) % (2 * np.pi)) - np.pi
 
     def add_analysis_callback(self, callback: PoseWindowCallback) -> None:
@@ -123,6 +134,7 @@ class PoseWindowBuffer(Thread):
             self.analysis_output_callbacks.add(callback)
 
     def _analysis_callback(self, id: int, angles: pd.DataFrame, confidences: pd.DataFrame) -> None:
+        # return
         self._visualisation_callback(id, angles, confidences)
         """ Handle the output of the analysis. """
         with self.callback_lock:

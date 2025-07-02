@@ -115,8 +115,6 @@ class PoseAngleCalculator(Thread):
                 # Low confidence, set angle to NaN
                 angles[joint] = JointAngle(angle = np.nan, confidence = 0.0)
 
-        # Create DataFrame from angles
-        # print(f"Calculated angles for person {person.id}: {angles}")
         person.pose_angles = angles
         callback(person)
 
