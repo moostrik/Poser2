@@ -21,11 +21,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 PoseWindowDict = dict[int, PoseWindowData]
 
 class CorrelationMethod(Enum):
-    DTW = "dtw"
-    PEARSON = "pearson"
-    COSINE = "cosine"
-    MSE = "mse"
-    CROSS_CORRELATION = "cross_correlation"
+    ANGULAR = "angular"
 
 class PoseCorrelation:
     def __init__(self, id_1: int, id_2: int, joint_correlations: dict[str, float]) -> None:
@@ -76,8 +72,8 @@ class AnglePair:
     id_2: int
     angles_1: pd.DataFrame
     angles_2: pd.DataFrame
-    confidences_1: Optional[pd.DataFrame]
-    confidences_2: Optional[pd.DataFrame]
+    confidences_1: pd.DataFrame
+    confidences_2: pd.DataFrame
 
 
 class PoseAnalysis(Thread):
@@ -92,7 +88,7 @@ class PoseAnalysis(Thread):
         self.analysis_window_size: int = min(int(settings.analysis_window_size * settings.camera_fps), self.max_window_size)
 
         self.align_tolerance = pd.Timedelta(f'{int(1000 / settings.camera_fps)}ms')  # Round to nearest 45ms
-        self.nan_ratio: float = 0.7  # Minimum valid ratio of non-NaN values in a window
+        self.maximum_nan_ratio: float = 0.15  # given (3 seconds at 23 FPS) with interpolation limit of 7 in the WindowBuffer, longet windows should have higher ratio
         self.max_age: float = 1.0
 
         hot_reloader = HotReloadMethods(self.__class__)
@@ -129,6 +125,7 @@ class PoseAnalysis(Thread):
         return windows
 
     def _analyse(self, angle_pairs: list[AnglePair]) -> PoseCorrelationBatch:
+        start_time: float = time.perf_counter()
         batch = PoseCorrelationBatch()
 
         for pair in angle_pairs:
@@ -144,25 +141,32 @@ class PoseAnalysis(Thread):
                     continue
 
                 # Get the angle sequences for this column (before dropna)
-                seq1_raw: pd.Series = pair.angles_1[column]
-                seq2_raw: pd.Series = pair.angles_2[column]
+                angles_1: pd.Series = pair.angles_1[column]
+                angles_2: pd.Series = pair.angles_2[column]
 
                 # Check NaN ratio before dropping NaN values
-                seq1_valid_ratio: float = seq1_raw.notna().sum() / len(seq1_raw) if len(seq1_raw) > 0.0 else 0.0
-                seq2_valid_ratio: float = seq2_raw.notna().sum() / len(seq2_raw) if len(seq2_raw) > 0.0 else 0.0
+                angles_1_nan_ratio: float = angles_1.isna().sum() / len(angles_1)
+                angles_2_nan_ratio: float = angles_2.isna().sum() / len(angles_2)
 
                 # Skip if either sequence has too many NaN values
-                if seq1_valid_ratio < self.nan_ratio or seq2_valid_ratio < self.nan_ratio:
-                    print(f"  Column {column}: Skipping due to low valid data ratio (seq1: {seq1_valid_ratio:.2f}, seq2: {seq2_valid_ratio:.2f})")
+                if angles_1_nan_ratio > self.maximum_nan_ratio or angles_2_nan_ratio > self.maximum_nan_ratio:
+                    print(f"  Column {column}: Skipping due to low valid data ratio (seq1: {angles_1_nan_ratio:.2f}, seq2: {angles_2_nan_ratio:.2f})")
+                    joint_correlations[column] = 0.0  # Add with zero similarity
                     continue
 
-                # Now get the clean sequences
-                seq1: np.ndarray = np.array(seq1_raw.dropna().values, dtype=float)
-                seq2: np.ndarray = np.array(seq2_raw.dropna().values, dtype=float)
+                # Build the sequences with confidences stacked
+                seq1: np.ndarray = np.column_stack([
+                    np.array(angles_1.values, dtype=float),
+                    np.array(pair.confidences_1[column].values, dtype=float)
+                ])
+                seq2: np.ndarray = np.column_stack([
+                    np.array(angles_2.values, dtype=float),
+                    np.array(pair.confidences_2[column].values, dtype=float)
+                ])
 
                 # Compute correlation using specified method
                 try:
-                    method = CorrelationMethod.DTW
+                    method = CorrelationMethod.ANGULAR
                     similarity: float = PoseAnalysis._compute_correlation(seq1, seq2, method=method)
                     joint_correlations[column] = similarity
                     # print(f"  {column}: {method} similarity = {similarity:.3f}")
@@ -187,6 +191,10 @@ class PoseAnalysis(Thread):
             if most_similar:
                 print(f"Most similar pair: {most_similar.id_1} ↔ {most_similar.id_2} (similarity: {most_similar.similarity_score:.3f})")
                 pass
+
+        end_time = time.perf_counter()
+        analysis_duration = end_time - start_time
+        print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs.")
 
         return batch
 
@@ -268,17 +276,20 @@ class PoseAnalysis(Thread):
     @staticmethod
     def _generate_asof_angle_pairs(windows: PoseWindowDict, tolerance: pd.Timedelta) -> list[AnglePair]:
         """
-        For each unique pair of PoseWindowData, align their angles DataFrames using merge_asof.
-        Returns a list of AnglePair(id1, id2, angles1_aligned, angles2_aligned).
+        For each unique pair of PoseWindowData, align their angles and confidences DataFrames using merge_asof.
+        Returns a list of AnglePair(id1, id2, angles1_aligned, angles2_aligned, confidences1_aligned, confidences2_aligned).
         """
         pairs: list[AnglePair] = []
         window_items: list[tuple[int, PoseWindowData]] = list(windows.items())
+
         for (id1, win1), (id2, win2) in combinations(window_items, 2):
-            # Sort indices for merge_asof
+            # Get the DataFrames
             angles_1: pd.DataFrame = win1.angles
             angles_2: pd.DataFrame = win2.angles
-            # Align win2 to win1's timestamps
+            confidences_1: pd.DataFrame = win1.confidences
+            confidences_2: pd.DataFrame = win2.confidences
 
+            # Align angles_2 to angles_1's timestamps
             angles_2_aligned: pd.DataFrame = pd.merge_asof(
                 angles_1.reset_index(),
                 angles_2.reset_index(),
@@ -288,118 +299,100 @@ class PoseAnalysis(Thread):
                 suffixes=('_1', '')
             ).set_index('index')
 
-            if len(angles_2_aligned) > 0:
+            # Align confidences_2 to angles_1's timestamps (same alignment as angles)
+            confidences_2_aligned: pd.DataFrame = pd.merge_asof(
+                angles_1.reset_index()[['index']],  # Only need the index column for alignment
+                confidences_2.reset_index(),
+                on='index',
+                direction='nearest',
+                tolerance=tolerance,
+                suffixes=('_1', '')
+            ).set_index('index')
+
+            # Only create pair if we have valid aligned data
+            if len(angles_2_aligned) > 0 and len(confidences_2_aligned) > 0:
                 pairs.append(
                     AnglePair(
                         id_1=id1,
                         id_2=id2,
                         angles_1=angles_1,
                         angles_2=angles_2_aligned,
-                        confidences_1=None,
-                        confidences_2=None
+                        confidences_1=confidences_1,
+                        confidences_2=confidences_2_aligned
                     )
-            )
+                )
+
         return pairs
 
     @staticmethod
-    def _compute_correlation(seq1: np.ndarray, seq2: np.ndarray, method: CorrelationMethod = CorrelationMethod.DTW) -> float:
+    def _compute_correlation(seq1: np.ndarray, seq2: np.ndarray, method: CorrelationMethod) -> float:
         """
-        Compute correlation between two angle sequences using specified method.
+        Compute correlation between two sequences using DTW with the specified method.
 
         Args:
-            seq1: First angle sequence in radians (numpy array, NaN-free)
-            seq2: Second angle sequence in radians (numpy array, NaN-free)
-            method: Correlation method from CorrelationMethod enum
+            seq1: First sequence as 2D array [angles, confidences]
+            seq2: Second sequence as 2D array [angles, confidences]
+            method: Correlation method to use
 
         Returns:
-            Similarity score between 0 and 1 (higher = more similar)
+            Similarity score between 0 and 1
         """
-        if method == CorrelationMethod.DTW:
-            return PoseAnalysis._compute_dtw_similarity(seq1, seq2)
-        elif method == CorrelationMethod.PEARSON:
-            return PoseAnalysis._compute_pearson_similarity(seq1, seq2)
-        elif method == CorrelationMethod.COSINE:
-            return PoseAnalysis._compute_cosine_similarity(seq1, seq2)
-        elif method == CorrelationMethod.MSE:
-            return PoseAnalysis._compute_mse_similarity(seq1, seq2)
-        elif method == CorrelationMethod.CROSS_CORRELATION:
-            return PoseAnalysis._compute_cross_correlation_similarity(seq1, seq2)
-        else:
+        # Map correlation methods to distance functions
+        distance_functions = {
+            CorrelationMethod.ANGULAR: lambda x, y: PoseAnalysis._angular_distance(x[0], x[1], y[0], y[1])
+        }
+
+        # Select the distance function
+        if method not in distance_functions:
             raise ValueError(f"Unknown correlation method: {method}")
 
-    @staticmethod
-    def _compute_dtw_similarity(seq1: np.ndarray, seq2: np.ndarray, radius: int = 3) -> float:
-        """DTW similarity - handles different length sequences"""
-        # Your existing DTW code
-        def angular_distance(x, y):
-            """Calculate the shortest angular distance between two angles in radians."""
-            diff = np.abs(x - y)
-            return np.minimum(diff, 2 * np.pi - diff)
+        distance_func: Callable = distance_functions[method]
 
+        # Compute DTW with the selected distance function
         distance, path = fastdtw.fastdtw(
-            seq1.reshape(-1, 1),  # Reshape to 2D for DTW
-            seq2.reshape(-1, 1),  # Reshape to 2D for DTW
-            radius=radius,
-            dist=lambda x, y: angular_distance(x[0], y[0])
+            seq1,  # Shape: (n_frames, 2) - [angle, confidence]
+            seq2,  # Shape: (n_frames, 2) - [angle, confidence]
+            radius=5,
+            dist=distance_func
         )
 
-        # Normalize by path length AND by π to get [0,1] range
-        normalized_distance = distance / (len(path) * np.pi)
+        # Normalize by path length (distance is already 0-1 from distance function)
+        normalized_distance: float =  (distance / len(path)) / np.pi
 
         # Convert distance to similarity (1 - distance)
-        similarity = 1.0 - normalized_distance
+        similarity: float = 1.0 - normalized_distance
 
-        return similarity
-
-    @staticmethod
-    def _compute_pearson_similarity(seq1: np.ndarray, seq2: np.ndarray) -> float:
-        """Pearson correlation - requires same length sequences"""
-        min_len = min(len(seq1), len(seq2))
-        seq1_trim = seq1[:min_len]
-        seq2_trim = seq2[:min_len]
-
-        correlation = np.corrcoef(seq1_trim, seq2_trim)[0, 1]
-        return (correlation + 1) / 2  # Convert [-1,1] to [0,1]
+        return max(0.0, min(1.0, similarity))  # Clamp to [0, 1]
 
     @staticmethod
-    def _compute_cosine_similarity(seq1: np.ndarray, seq2: np.ndarray) -> float:
-        """Cosine similarity - requires same length sequences"""
-        min_len = min(len(seq1), len(seq2))
-        seq1_trim = seq1[:min_len]
-        seq2_trim = seq2[:min_len]
+    def _angular_distance(angle_A, confidence_A, angle_B, confidence_B) -> float:
+        """
+        Calculate the shortest angular distance between two angles in radians,
+        weighted by their confidence values and handling NaN values.
 
-        dot_product = np.dot(seq1_trim, seq2_trim)
-        norm_product = np.linalg.norm(seq1_trim) * np.linalg.norm(seq2_trim)
+        Args:
+            angle_A: First angle in radians
+            confidence_A: Confidence value for first angle (0.0 to 1.0)
+            angle_B: Second angle in radians
+            confidence_B: Confidence value for second angle (0.0 to 1.0)
 
-        if norm_product == 0:
-            return 0.0
+        Returns:
+            Normalized weighted angular distance between 0 and 1
+        """
+        # Handle NaN values - return maximum distance if either angle is NaN
+        if np.isnan(angle_A) or np.isnan(angle_B):
+            return np.pi
 
-        cosine_sim = dot_product / norm_product
-        return (cosine_sim + 1) / 2  # Convert [-1,1] to [0,1]
+        # Calculate the shortest angular distance using basic math operations
+        diff: float = abs(angle_A - angle_B)
+        angular_dist: float = min(diff, 2 * np.pi - diff)
 
-    @staticmethod
-    def _compute_mse_similarity(seq1: np.ndarray, seq2: np.ndarray) -> float:
-        """MSE-based similarity with angular distance - requires same length"""
-        min_len = min(len(seq1), len(seq2))
-        seq1_trim = seq1[:min_len]
-        seq2_trim = seq2[:min_len]
+        # Weight the distance by confidence - lower confidence increases distance
+        min_confidence: float = min(confidence_A, confidence_B)
+        confidence_weight: float = 1.0 - min_confidence
 
-        # Use angular distance for MSE
-        angular_diffs = np.abs(seq1_trim - seq2_trim)
-        angular_diffs = np.minimum(angular_diffs, 2 * np.pi - angular_diffs)
+        # Apply confidence weighting: low confidence -> higher distance
+        weighted_distance: float = angular_dist * (1.0 + confidence_weight)
 
-        mse = np.mean(angular_diffs ** 2)
-        return np.exp(-mse)  # Convert to similarity [0,1]
-
-    @staticmethod
-    def _compute_cross_correlation_similarity(seq1: np.ndarray, seq2: np.ndarray) -> float:
-        """Cross-correlation similarity - handles different lengths"""
-        correlation = np.correlate(seq1, seq2, mode='full')
-        max_correlation = np.max(correlation)
-
-        # Normalize by sequence lengths
-        normalization = np.sqrt(np.sum(seq1**2) * np.sum(seq2**2))
-        if normalization == 0:
-            return 0.0
-
-        return max_correlation / normalization
+        # Ensure result stays within [0, π] range
+        return min(weighted_distance, 1.0, np.pi)

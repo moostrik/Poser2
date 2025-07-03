@@ -88,7 +88,7 @@ class PoseWindowBuffer(Thread):
 
         # Build angle/confidence dicts
         angle_row: dict[str, float] = {Keypoint(k).name: v["angle"] for k, v in person.pose_angles.items()}
-        conf_row: dict[str, float] = {f"{Keypoint(k).name}_conf": v["confidence"] for k, v in person.pose_angles.items()}
+        conf_row: dict[str, float] = {Keypoint(k).name: v["confidence"] for k, v in person.pose_angles.items()}
         timestamp: pd.Timestamp = person.time_stamp  # Assume pd.Timestamp
 
         # Update angle window
