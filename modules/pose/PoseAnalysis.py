@@ -3,11 +3,15 @@ import time
 from dataclasses import dataclass
 from itertools import combinations
 from threading import Event, Thread, Lock
+from typing import Optional, Callable
 
 # Third-party imports
+import numpy as np
 import pandas as pd
+import fastdtw
 
 # Local application imports
+from modules.pose.PoseDefinitions import Keypoint
 from modules.pose.PoseWindowBuffer import PoseWindowData
 from modules.Settings import Settings
 
@@ -15,14 +19,58 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 PoseWindowDict = dict[int, PoseWindowData]
 
+class PoseCorrelation:
+    def __init__(self, id_1: int, id_2: int, joint_correlations: dict[str, float]) -> None:
+        self.id_1 = id_1
+        self.id_2 = id_2
+        self.joint_correlations: dict[str, float] = joint_correlations
+        self.similarity_score: float = float(np.mean(list(joint_correlations.values()))) if joint_correlations else 0.0
+
+class PoseCorrelationBatch:
+    def __init__(self) -> None:
+        """Collection of DTW results from a single analysis run."""
+        self._pair_correlations: list[PoseCorrelation] = []
+        self._timestamp: pd.Timestamp = pd.Timestamp.now()
+        self._similarity: float = 0.0
+
+    @property
+    def is_empty(self) -> bool:
+        """Check if the batch has no results."""
+        return len(self._pair_correlations) == 0
+
+    @property
+    def count(self) -> int:
+        """Return the number of windows in the batch."""
+        return len(self._pair_correlations)
+
+    @property
+    def timestamp(self) -> pd.Timestamp:
+        return self._timestamp
+
+    @property
+    def similarity(self) -> float:
+        return self._similarity
+
+    def add_result(self, result: PoseCorrelation) -> None:
+        """Add a PoseCorrelation result to the batch."""
+        self._pair_correlations.append(result)
+        self._similarity = sum(r.similarity_score for r in self._pair_correlations) / len(self._pair_correlations)
+
+    def get_most_similar_pair(self) -> Optional[PoseCorrelation]:
+        """Return the pair with highest similarity score."""
+        if not self._pair_correlations:
+            return None
+        return max(self._pair_correlations, key=lambda r: r.similarity_score)
+
 @dataclass
 class AnglePair:
     id_1: int
     id_2: int
     angles_1: pd.DataFrame
     angles_2: pd.DataFrame
-    confidences_1: pd.DataFrame
-    confidences_2: pd.DataFrame
+    confidences_1: Optional[pd.DataFrame]
+    confidences_2: Optional[pd.DataFrame]
+
 
 class PoseAnalysis(Thread):
     def __init__(self, settings: Settings) -> None:
@@ -61,23 +109,79 @@ class PoseAnalysis(Thread):
                 continue
 
     def _prepare_windows(self, windows: PoseWindowDict) -> PoseWindowDict:
+
+        # print(windows[0].angles)
         """Filter windows based on time and length."""
         windows = self._filter_windows_by_time(windows, self.max_age)
         windows = self._filter_windows_by_length(windows, self.analysis_window_size)
         windows = self._trim_windows_to_length(windows, self.analysis_window_size)
-        windows = self._filter_windows_by_nan(windows, self.nan_ratio)
+        # windows = self._filter_windows_by_nan(windows, self.nan_ratio)
         # for data in windows.values():
         #     data.angles.index = pd.to_datetime(data.angles.index).round(self.round)
         #     data.confidences.index = pd.to_datetime(data.confidences.index).round(self.round)
         return windows
 
-    def _analyse(self, windows: PoseWindowDict) -> None:
-
-        angle_pairs: list[AnglePair] = self._generate_overlapping_angle_pairs(windows)
+    def _analyse(self, windows: PoseWindowDict) -> PoseCorrelationBatch:
+        angle_pairs: list[AnglePair] = self._generate_asof_angle_pairs(windows)
+        batch = PoseCorrelationBatch()
 
         for pair in angle_pairs:
-            print(f"Aligned {pair.id_1} and {pair.id_2}: {len(pair.angles_1)} overlapping frames, of {len(windows[pair.id_1].angles)} and {len(windows[pair.id_2].angles)} total frames")
+            distances: list[float] = []
+            joint_correlations: dict[str, float] = {}
 
+            # Get columns from angles_1 that are numeric and find corresponding _2 columns in angles_2
+            angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
+
+            for column in angles_columns:
+                # Check if corresponding _2 column exists in angles_2
+                if column not in pair.angles_2.columns:
+                    print(f"  Column {column} not found in angles_2")
+                    continue
+
+                # Get the angle sequences for this column
+                seq1: np.ndarray = np.array(pair.angles_1[column].dropna().values, dtype=float)
+                seq2: np.ndarray = np.array(pair.angles_2[column].dropna().values, dtype=float)
+
+                # Compute DTW distance using angular distance metric
+                try:
+                    # Define angular distance function for radians (without normalization)
+                    def angular_distance(x, y):
+                        """Calculate the shortest angular distance between two angles in radians."""
+                        diff = np.abs(x - y)
+                        return np.minimum(diff, 2 * np.pi - diff)
+
+                    distance, path = fastdtw.fastdtw(
+                        seq1.reshape(-1, 1), # Reshape to 2D for DTW
+                        seq2.reshape(-1, 1), # Reshape to 2D for DTW
+                        dist=lambda x, y: angular_distance(x[0], y[0])
+)
+                    # Normalize by path length AND by π to get [0,1] range
+                    normalized_distance = distance / (len(path) * np.pi)
+
+                    # Convert distance to similarity (1 - distance)
+                    similarity = 1.0 - normalized_distance
+
+                    joint_correlations[column] = similarity
+
+                    distances.append(normalized_distance)
+                    # print(f"{column}: DTW normalized distance = {normalized_distance:.3f} (raw: {distance:.1f}, path: {len(path)})")
+                except Exception as e:
+                    print(f"{column}: DTW failed - {e}")
+                    continue
+
+            # Create PoseCorrelation if we have valid results
+            if joint_correlations:
+                correlation = PoseCorrelation(
+                    id_1=pair.id_1,
+                    id_2=pair.id_2,
+                    joint_correlations=joint_correlations
+                )
+                batch.add_result(correlation)
+                # print(f"Overall similarity between {pair.id_1} and {pair.id_2}: {correlation.similarity_score:.3f}")
+            else:
+                print(f"No valid DTW results for {pair.id_1} and {pair.id_2}")
+
+        return batch
 
 
     @staticmethod
@@ -139,6 +243,9 @@ class PoseAnalysis(Thread):
             confidences1_overlap = win1.confidences.loc[(win1.confidences.index >= overlap_start) & (win1.confidences.index <= overlap_end)]
             confidences2_overlap = win2.confidences.loc[(win2.confidences.index >= overlap_start) & (win2.confidences.index <= overlap_end)]
 
+
+            print(len(angles1_overlap), len(angles2_overlap))
+
             angle_pairs.append(
                 AnglePair(
                     id_1=id1,
@@ -150,3 +257,39 @@ class PoseAnalysis(Thread):
                 )
             )
         return angle_pairs
+
+    @staticmethod
+    def _generate_asof_angle_pairs(windows: PoseWindowDict, tolerance=pd.Timedelta("50ms")) -> list[AnglePair]:
+        """
+        For each unique pair of PoseWindowData, align their angles DataFrames using merge_asof.
+        Returns a list of AnglePair(id1, id2, angles1_aligned, angles2_aligned).
+        """
+        pairs: list[AnglePair] = []
+        window_items: list[tuple[int, PoseWindowData]] = list(windows.items())
+        for (id1, win1), (id2, win2) in combinations(window_items, 2):
+            # Sort indices for merge_asof
+            angles_1: pd.DataFrame = win1.angles
+            angles_2: pd.DataFrame = win2.angles
+            # Align win2 to win1's timestamps
+
+            angles_2_aligned: pd.DataFrame = pd.merge_asof(
+                angles_1.reset_index(),
+                angles_2.reset_index(),
+                on='index',
+                direction='nearest',
+                tolerance=pd.Timedelta('50ms'),
+                suffixes=('_1', '')
+            ).set_index('index')
+
+            if len(angles_2_aligned) > 0:
+                pairs.append(
+                    AnglePair(
+                        id_1=id1,
+                        id_2=id2,
+                        angles_1=angles_1,
+                        angles_2=angles_2_aligned,
+                        confidences_1=None,
+                        confidences_2=None
+                    )
+            )
+        return pairs

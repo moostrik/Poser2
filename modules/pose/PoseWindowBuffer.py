@@ -10,7 +10,7 @@ import numpy as np
 
 # Local application imports
 from modules.person.Person import Person, TrackingStatus
-from modules.pose.PoseDefinitions import JointAngleDict, PoseAngleKeypoints
+from modules.pose.PoseDefinitions import JointAngleDict, PoseAngleKeypoints, Keypoint
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -87,8 +87,8 @@ class PoseWindowBuffer(Thread):
             return
 
         # Build angle/confidence dicts
-        angle_row: dict[str, float] = {f"{k}_angle": v["angle"] for k, v in person.pose_angles.items()}
-        conf_row: dict[str, float] = {f"{k}_conf": v["confidence"] for k, v in person.pose_angles.items()}
+        angle_row: dict[str, float] = {Keypoint(k).name: v["angle"] for k, v in person.pose_angles.items()}
+        conf_row: dict[str, float] = {f"{Keypoint(k).name}_conf": v["confidence"] for k, v in person.pose_angles.items()}
         timestamp: pd.Timestamp = person.time_stamp  # Assume pd.Timestamp
 
         # Update angle window

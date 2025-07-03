@@ -1,4 +1,5 @@
 depthai==2.29.0.0
+fastdtw==0.3.4
 ffmpeg-python
 numpy==1.24.1
 onnxruntime-gpu==1.18.1
