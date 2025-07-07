@@ -31,7 +31,7 @@ MethodMap = Dict[str, MethodInfo] # Mapping of method names to MethodInfo
 
 
 class HotReloadMethods:
-    def __init__(self, target_class: Type[Any], watch_file: bool = True, reload_everything = True) -> None:
+    def __init__(self, target_class: Type[Any], auto_reload: bool = True, reload_everything = True) -> None:
         if not inspect.isclass(target_class):
             raise ValueError(f"Expected a class, got {type(target_class).__name__}")
         self._target_class: Type[Any] = target_class
@@ -46,10 +46,20 @@ class HotReloadMethods:
         self._on_reload_callbacks: list[Callable[[], None]] = []
 
         self._observer: Optional[BaseObserver] = None
-        if watch_file:
-            self.start_file_watcher()
+
+        self.auto_reload: bool = auto_reload
+        # if watch_file:
+        self.start_file_watcher()
 
         self.reload_everything: bool = reload_everything
+
+        self._has_file_changed: bool = False
+
+    @property
+    def file_changed(self) -> bool:
+        return_value: bool = self._has_file_changed
+        self._has_file_changed = False  # Reset after checking
+        return return_value
 
     def start_file_watcher(self) -> None:
         """Start watching the file for changes."""
@@ -74,6 +84,16 @@ class HotReloadMethods:
     def is_file_watcher_active(self) -> bool:
         """Check if the file watcher is active."""
         return self._observer is not None and self._observer.is_alive()
+
+    def on_file_modified(self) -> None:
+        """Handle file modification event."""
+        # print(f"[{HotReloadMethods.__name__}] File modified: {self._file_module_path}")
+        if self.auto_reload:
+            self.reload_methods()
+
+        self._has_file_changed = True  # Set the flag to indicate a file change
+        self._notify_file_changed_callbacks()
+
 
     def reload_methods(self) -> None:
         """Reload methods from the target class's file and apply changes."""
@@ -117,7 +137,8 @@ class HotReloadMethods:
                 changed = True
 
             if changed:
-                self._notify_reload_callbacks()
+                pass
+                # self._notify_file_changed_callbacks()
             else:
                 print(f"[{HotReloadMethods.__name__}] {self._target_class.__name__} No changes")
 
@@ -125,11 +146,11 @@ class HotReloadMethods:
             print(f"[{HotReloadMethods.__name__}] {self._target_class.__name__} Error loading {self._file_module_path}: {e}")
             traceback.print_exc()
 
-    def add_reload_callback(self, callback: Callable[[], None]) -> None:
+    def add_file_changed_callback(self, callback: Callable[[], None]) -> None:
         """Register a callback to be called after code reload."""
         self._on_reload_callbacks.append(callback)
 
-    def _notify_reload_callbacks(self) -> None:
+    def _notify_file_changed_callbacks(self) -> None:
         for callback in self._on_reload_callbacks:
             try:
                 callback()
@@ -269,5 +290,5 @@ class HotReloadMethods:
             watched_path: str = os.path.abspath(os.path.normcase(self._reloader._file_module_path)).lower()
             if event_path == watched_path:
                 self._last_modified_time = current_time
-                self._reloader.reload_methods()
+                self._reloader.on_file_modified()
 

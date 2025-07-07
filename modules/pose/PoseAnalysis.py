@@ -5,9 +5,14 @@ from enum import Enum
 from itertools import combinations
 from threading import Event, Thread, Lock
 from typing import Optional, Callable
+import multiprocessing as mp
+from multiprocessing import Process, Queue, Event
+import pickle
+from concurrent.futures import Future, ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 # Third-party imports
 import numpy as np
+from numba import njit
 import pandas as pd
 import fastdtw
 
@@ -75,43 +80,170 @@ class AnglePair:
     confidences_1: pd.DataFrame
     confidences_2: pd.DataFrame
 
+def angular_cost(theta1: float, theta2: float):
+    diff: float = theta1 - theta2
+    # 1 - cos(diff) ∈ [0, 2], 0 if equal angles
+    return 1.0 - np.cos(diff)
 
-class PoseAnalysis(Thread):
+def dtw_angular_sakoe_chiba(x: np.ndarray, y: np.ndarray, band) -> float:
+    n, m = len(x), len(y)
+    dtw: np.ndarray = np.full((n+1, m+1), np.inf)
+    dtw[0, 0] = 0.0
+
+    for i in range(1, n+1):
+        j_start: int = max(1, i - band)
+        j_end: int = min(m+1, i + band + 1)
+        for j in range(j_start, j_end):
+            cost: float = angular_cost(x[i-1], y[j-1])
+            dtw[i, j] = cost + min(
+                dtw[i-1, j],    # insertion
+                dtw[i, j-1],    # deletion
+                dtw[i-1, j-1]   # match
+            )
+    return np.sqrt(dtw[n, m])
+
+@njit
+def angular_cost_njit(theta1: float, theta2: float):
+    diff: float = theta1 - theta2
+    # 1 - cos(diff) ∈ [0, 2], 0 if equal angles
+    return 1.0 - np.cos(diff)
+
+@njit
+def dtw_angular_sakoe_chiba_njit(x: np.ndarray, y: np.ndarray, band) -> float:
+    n, m = len(x), len(y)
+    dtw: np.ndarray = np.full((n+1, m+1), np.inf)
+    dtw[0, 0] = 0.0
+
+    for i in range(1, n+1):
+        j_start: int = max(1, i - band)
+        j_end: int = min(m+1, i + band + 1)
+        for j in range(j_start, j_end):
+            cost: float = angular_cost_njit(x[i-1], y[j-1])
+            dtw[i, j] = cost + min(
+                dtw[i-1, j],    # insertion
+                dtw[i, j-1],    # deletion
+                dtw[i-1, j-1]   # match
+            )
+    return np.sqrt(dtw[n, m])
+
+class PoseAnalysis(Process):  # Changed from Thread to Process
     def __init__(self, settings: Settings) -> None:
         super().__init__()
         self._stop_event = Event()
-        self.data_lock = Lock()
-        self.pose_windows: PoseWindowDict = {}
+
+        # Use multiprocessing Queue for thread-safe communication
+        self.input_queue = Queue(maxsize=24)
+        self.result_queue = Queue(maxsize=24)
 
         self.analysis_interval: float = 1.0 / settings.analysis_rate_hz
         self.max_window_size: int = int(settings.pose_window_size * settings.camera_fps)
         self.analysis_window_size: int = min(int(settings.analysis_window_size * settings.camera_fps), self.max_window_size)
 
-        self.align_tolerance = pd.Timedelta(f'{int(1000 / settings.camera_fps)}ms')  # Round to nearest 45ms
-        self.maximum_nan_ratio: float = 0.15  # given (3 seconds at 23 FPS) with interpolation limit of 7 in the WindowBuffer, longet windows should have higher ratio
+        self.align_tolerance = pd.Timedelta(f'{int(1000 / settings.camera_fps)}ms')
+        self.maximum_nan_ratio: float = 0.15
         self.max_age: float = 1.0
 
-        hot_reloader = HotReloadMethods(self.__class__)
+        # Add thread pool for DTW calculations within this process
+        self.max_workers = min(mp.cpu_count(), 10)
+
+
 
     def set_window(self, data: PoseWindowData) -> None:
-        with self.data_lock:
-            self.pose_windows[data.window_id] = data
+        """Non-blocking method to send data to the analysis process."""
+        try:
+            # Serialize the data to avoid pickle issues
+            serialized_data: bytes = pickle.dumps(data)
+            self.input_queue.put(serialized_data, block=False)
+        except:
+            # Queue is full, skip this update
+            pass
+
+    def get_results(self) -> Optional[PoseCorrelationBatch]:
+        """Non-blocking method to get results from the analysis process."""
+        try:
+            return self.result_queue.get(block=False)
+        except:
+            return None
 
     def stop(self) -> None:
         self._stop_event.set()
 
     def run(self) -> None:
-        while not self._stop_event.is_set():
-            time.sleep(self.analysis_interval)
-            with self.data_lock:
-                pose_windows: PoseWindowDict = self.pose_windows.copy()
-            try:
-                pose_windows = self._prepare_windows(pose_windows)
-                angle_pairs: list[AnglePair] = self._generate_asof_angle_pairs(pose_windows, self.align_tolerance)
-                self._analyse(angle_pairs)
-            except Exception as e:
-                print(f"Error during analysis: {e}")
-                continue
+        pose_windows: PoseWindowDict = {}
+        hot_reloader = HotReloadMethods(self.__class__, False, reload_everything=False)
+        process_pool = ProcessPoolExecutor(max_workers=self.max_workers)
+
+        try:
+            while not self._stop_event.is_set():
+                loop_start: float = time.perf_counter()
+
+                # Collect all pending window updates
+                while True:
+                    try:
+                        serialized_data: bytes = self.input_queue.get(block=False)
+                        data: PoseWindowData = pickle.loads(serialized_data)
+                        pose_windows[data.window_id] = data
+                    except:
+                        break
+
+                try:
+                    pose_windows = self._prepare_windows(pose_windows)
+                    angle_pairs: list[AnglePair] = self._generate_asof_angle_pairs(pose_windows, self.align_tolerance)
+
+                    if angle_pairs:
+                        start_time: float = time.perf_counter()
+                        batch = PoseCorrelationBatch()
+
+                        # Submit all pairs for analysis
+                        future_to_pair: dict[Future, AnglePair] = {}
+                        for pair in angle_pairs:
+                            future: Future[PoseCorrelation | None] = process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio)
+                            future_to_pair[future] = pair
+
+                        # Collect results
+                        for future in as_completed(future_to_pair):
+                            pair: AnglePair = future_to_pair[future]
+                            try:
+                                correlation: Optional[PoseCorrelation] = future.result()
+                                if correlation:
+                                    batch.add_result(correlation)
+                            except Exception as e:
+                                print(f"Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
+
+                        # Get most similar if we have results
+                        if not batch.is_empty:
+                            most_similar: Optional[PoseCorrelation] = batch.get_most_similar_pair()
+
+                        analysis_duration: float = time.perf_counter() - start_time
+                        print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs.")
+
+                        # Send results back to main process
+                        try:
+                            self.result_queue.put(batch, block=False)
+                        except:
+                            # Queue is full, skip this result
+                            pass
+
+                except Exception as e:
+                    print(f"Error during analysis: {e}")
+                    continue
+
+                if hot_reloader.file_changed:
+                    print(f"[{self.__class__.__name__}] Reloading methods due to file change")
+                    hot_reloader.reload_methods()
+
+                elapsed: float = time.perf_counter() - loop_start
+                sleep_time: float = self.analysis_interval - elapsed
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+
+        except KeyboardInterrupt:
+            print(f"[{self.__class__.__name__}] Received KeyboardInterrupt, shutting down...")
+        except Exception as e:
+            print(f"[{self.__class__.__name__}] Unexpected error: {e}")
+        finally:
+            process_pool.shutdown(wait=False)
+            hot_reloader.stop_file_watcher()
 
     def _prepare_windows(self, windows: PoseWindowDict) -> PoseWindowDict:
         """Filter windows based on time and length."""
@@ -124,80 +256,71 @@ class PoseAnalysis(Thread):
         #     data.confidences.index = pd.to_datetime(data.confidences.index).round(self.round)
         return windows
 
-    def _analyse(self, angle_pairs: list[AnglePair]) -> PoseCorrelationBatch:
-        start_time: float = time.perf_counter()
-        batch = PoseCorrelationBatch()
 
-        for pair in angle_pairs:
-            joint_correlations: dict[str, float] = {}
+    @staticmethod
+    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float) -> Optional[PoseCorrelation]:
+        """Analyse a single pair - designed for thread pool execution."""
+        joint_correlations: dict[str, float] = {}
+        angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
 
-            # Get columns from angles_1 that are numeric and find corresponding _2 columns in angles_2
-            angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
+        t0: float = time.perf_counter()
 
-            for column in angles_columns:
-                # Check if corresponding _2 column exists in angles_2
-                if column not in pair.angles_2.columns:
-                    print(f"  Column {column} not found in angles_2")
-                    continue
+        for column in angles_columns:
+            if column not in pair.angles_2.columns:
+                continue
 
-                # Get the angle sequences for this column (before dropna)
-                angles_1: pd.Series = pair.angles_1[column]
-                angles_2: pd.Series = pair.angles_2[column]
 
-                # Check NaN ratio before dropping NaN values
-                angles_1_nan_ratio: float = angles_1.isna().sum() / len(angles_1)
-                angles_2_nan_ratio: float = angles_2.isna().sum() / len(angles_2)
+            angles_1: pd.Series = pair.angles_1[column]
+            angles_2: pd.Series = pair.angles_2[column]
 
-                # Skip if either sequence has too many NaN values
-                if angles_1_nan_ratio > self.maximum_nan_ratio or angles_2_nan_ratio > self.maximum_nan_ratio:
-                    print(f"  Column {column}: Skipping due to low valid data ratio (seq1: {angles_1_nan_ratio:.2f}, seq2: {angles_2_nan_ratio:.2f})")
-                    joint_correlations[column] = 0.0  # Add with zero similarity
-                    continue
+            # Check NaN ratio
+            angles_1_nan_ratio: float = angles_1.isna().sum() / len(angles_1)
+            angles_2_nan_ratio: float = angles_2.isna().sum() / len(angles_2)
 
-                # Build the sequences with confidences stacked
-                seq1: np.ndarray = np.column_stack([
-                    np.array(angles_1.values, dtype=float),
-                    np.array(pair.confidences_1[column].values, dtype=float)
-                ])
-                seq2: np.ndarray = np.column_stack([
-                    np.array(angles_2.values, dtype=float),
-                    np.array(pair.confidences_2[column].values, dtype=float)
-                ])
+            if angles_1_nan_ratio > maximum_nan_ratio or angles_2_nan_ratio > maximum_nan_ratio:
+                joint_correlations[column] = 0.0
+                continue
 
-                # Compute correlation using specified method
-                try:
-                    method = CorrelationMethod.ANGULAR
-                    similarity: float = PoseAnalysis._compute_correlation(seq1, seq2, method=method)
-                    joint_correlations[column] = similarity
-                    # print(f"  {column}: {method} similarity = {similarity:.3f}")
-                except Exception as e:
-                    print(f"  {column}: {method.value} failed - {e}")
-                    continue
+            seq1: np.ndarray = angles_1.values.astype(float)
+            seq2: np.ndarray = angles_2.values.astype(float)
 
-            # Create PoseCorrelation if we have valid results
-            if joint_correlations:
-                correlation = PoseCorrelation(
-                    id_1=pair.id_1,
-                    id_2=pair.id_2,
-                    joint_correlations=joint_correlations
-                )
-                batch.add_result(correlation)
-                # print(f"Overall similarity between {pair.id_1} and {pair.id_2}: {correlation.similarity_score:.3f}")
-            else:
-                print(f"No valid results for {pair.id_1} and {pair.id_2}")
+            mask: np.ndarray = ~np.isnan(seq1) & ~np.isnan(seq2)
 
-        if not batch.is_empty:
-            most_similar: Optional[PoseCorrelation] = batch.get_most_similar_pair()
-            if most_similar:
-                print(f"Most similar pair: {most_similar.id_1} ↔ {most_similar.id_2} (similarity: {most_similar.similarity_score:.3f})")
-                pass
+            # apply mask to sequences
+            seq1 = seq1[mask]
+            seq2 = seq2[mask]
+            # print(len(angles_1), len(seq1))
 
-        end_time = time.perf_counter()
-        analysis_duration = end_time - start_time
-        print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs.")
 
-        return batch
+            # # Build sequences
+            # seq1: np.ndarray = np.column_stack([
+            #     np.array(angles_1.values, dtype=float),
+            #     np.array(pair.confidences_1[column].values, dtype=float)
+            # ])
+            # seq2: np.ndarray = np.column_stack([
+            #     np.array(angles_2.values, dtype=float),
+            #     np.array(pair.confidences_2[column].values, dtype=float)
+            # ])
+            # Compute correlation
 
+            try:
+                method = CorrelationMethod.ANGULAR
+                similarity: float = PoseAnalysis._compute_correlation(seq1, seq2, method=method)
+                joint_correlations[column] = similarity
+            except Exception as e:
+                print(f"  {column}: correlation failed - {e}")
+                continue
+
+        # Return correlation if we have valid results
+
+        # print(f"  {pair.id_1}-{pair.id_2} took {time.perf_counter() - t0:.2f}s, found {len(joint_correlations)} valid joints")
+        if joint_correlations:
+            return PoseCorrelation(
+                id_1=pair.id_1,
+                id_2=pair.id_2,
+                joint_correlations=joint_correlations
+            )
+        return None
 
     @staticmethod
     def _filter_windows_by_time(windows: PoseWindowDict, max_age_s: float = 2.0) -> PoseWindowDict:
@@ -311,8 +434,7 @@ class PoseAnalysis(Thread):
 
             # Only create pair if we have valid aligned data
             if len(angles_2_aligned) > 0 and len(confidences_2_aligned) > 0:
-                pairs.append(
-                    AnglePair(
+                P = AnglePair(
                         id_1=id1,
                         id_2=id2,
                         angles_1=angles_1,
@@ -320,7 +442,11 @@ class PoseAnalysis(Thread):
                         confidences_1=confidences_1,
                         confidences_2=confidences_2_aligned
                     )
-                )
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
 
         return pairs
 
@@ -330,8 +456,8 @@ class PoseAnalysis(Thread):
         Compute correlation between two sequences using DTW with the specified method.
 
         Args:
-            seq1: First sequence as 2D array [angles, confidences]
-            seq2: Second sequence as 2D array [angles, confidences]
+            seq1: First sequence as 1D array of angles
+            seq2: Second sequence as 1D array of angles
             method: Correlation method to use
 
         Returns:
@@ -339,7 +465,7 @@ class PoseAnalysis(Thread):
         """
         # Map correlation methods to distance functions
         distance_functions = {
-            CorrelationMethod.ANGULAR: lambda x, y: PoseAnalysis._angular_distance(x[0], x[1], y[0], y[1])
+            CorrelationMethod.ANGULAR: lambda x, y: PoseAnalysis._angular_distance(x, y)  # Remove [0] indexing
         }
 
         # Select the distance function
@@ -349,23 +475,29 @@ class PoseAnalysis(Thread):
         distance_func: Callable = distance_functions[method]
 
         # Compute DTW with the selected distance function
+
+        t0: float = time.perf_counter()
         distance, path = fastdtw.fastdtw(
-            seq1,  # Shape: (n_frames, 2) - [angle, confidence]
-            seq2,  # Shape: (n_frames, 2) - [angle, confidence]
-            radius=5,
+            seq1,  # Shape: (n_frames,) - just angles
+            seq2,  # Shape: (n_frames,) - just angles
+            # radius=10,
             dist=distance_func
         )
+        # print(f"DTW distance computed in {time.perf_counter() - t0:.2f}s")
+
+        # distance2: float = dtw_angular_sakoe_chiba(seq1, seq2, band=5)
+
 
         # Normalize by path length (distance is already 0-1 from distance function)
-        normalized_distance: float =  (distance / len(path)) / np.pi
+        normalized_distance: float = (distance / len(seq1)) / np.pi
 
         # Convert distance to similarity (1 - distance)
         similarity: float = 1.0 - normalized_distance
-
+        # print(f"DTW distance: {distance:.3f}, normalized: {normalized_distance:.3f}, similarity: {similarity:.3f}")
         return max(0.0, min(1.0, similarity))  # Clamp to [0, 1]
 
     @staticmethod
-    def _angular_distance(angle_A, confidence_A, angle_B, confidence_B) -> float:
+    def _angular_distance(angle_A, angle_B) -> float:
         """
         Calculate the shortest angular distance between two angles in radians,
         weighted by their confidence values and handling NaN values.
@@ -380,19 +512,21 @@ class PoseAnalysis(Thread):
             Normalized weighted angular distance between 0 and 1
         """
         # Handle NaN values - return maximum distance if either angle is NaN
-        if np.isnan(angle_A) or np.isnan(angle_B):
-            return np.pi
+        # if not mask:
+        #     return np.pi
 
         # Calculate the shortest angular distance using basic math operations
         diff: float = abs(angle_A - angle_B)
         angular_dist: float = min(diff, 2 * np.pi - diff)
 
         # Weight the distance by confidence - lower confidence increases distance
-        min_confidence: float = min(confidence_A, confidence_B)
-        confidence_weight: float = 1.0 - min_confidence
+        # min_confidence: float = min(confidence_A, confidence_B)
+        # confidence_weight: float = 1.0 - min_confidence
 
-        # Apply confidence weighting: low confidence -> higher distance
-        weighted_distance: float = angular_dist * (1.0 + confidence_weight)
+        # # Apply confidence weighting: low confidence -> higher distance
+        # weighted_distance: float = angular_dist * (1.0 + confidence_weight)
 
         # Ensure result stays within [0, π] range
-        return min(weighted_distance, 1.0, np.pi)
+        return min(angular_dist, 1.0, np.pi)
+
+
