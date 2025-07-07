@@ -1,14 +1,15 @@
 # Standard library imports
+# from multiprocessing.synchronize import Event
+
+import pickle
+import signal
 import time
+from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from enum import Enum
 from itertools import combinations
-from threading import Event, Thread, Lock
+from multiprocessing import Process, Queue, Event, cpu_count
 from typing import Optional, Callable
-import multiprocessing as mp
-from multiprocessing import Process, Queue, Event
-import pickle
-from concurrent.futures import Future, ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 # Third-party imports
 import numpy as np
@@ -17,7 +18,6 @@ import pandas as pd
 import fastdtw
 
 # Local application imports
-from modules.pose.PoseDefinitions import Keypoint
 from modules.pose.PoseWindowBuffer import PoseWindowData
 from modules.Settings import Settings
 
@@ -126,14 +126,17 @@ def dtw_angular_sakoe_chiba_njit(x: np.ndarray, y: np.ndarray, band) -> float:
             )
     return np.sqrt(dtw[n, m])
 
+def ignore_keyboard_interrupt():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
 class PoseAnalysis(Process):  # Changed from Thread to Process
     def __init__(self, settings: Settings) -> None:
         super().__init__()
         self._stop_event = Event()
 
         # Use multiprocessing Queue for thread-safe communication
-        self.input_queue = Queue(maxsize=24)
-        self.result_queue = Queue(maxsize=24)
+        self.input_queue: Queue = Queue(maxsize=240)
+        self.result_queue: Queue = Queue(maxsize=240)
 
         self.analysis_interval: float = 1.0 / settings.analysis_rate_hz
         self.max_window_size: int = int(settings.pose_window_size * settings.camera_fps)
@@ -143,10 +146,7 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
         self.maximum_nan_ratio: float = 0.15
         self.max_age: float = 1.0
 
-        # Add thread pool for DTW calculations within this process
-        self.max_workers = min(mp.cpu_count(), 10)
-
-
+        self.max_workers = min(cpu_count(), 10)
 
     def set_window(self, data: PoseWindowData) -> None:
         """Non-blocking method to send data to the analysis process."""
@@ -155,6 +155,7 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
             serialized_data: bytes = pickle.dumps(data)
             self.input_queue.put(serialized_data, block=False)
         except:
+            print(f"[{self.__class__.__name__}] Input queue is full, skipping window update for {data.window_id}")
             # Queue is full, skip this update
             pass
 
@@ -169,9 +170,10 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
         self._stop_event.set()
 
     def run(self) -> None:
+        ignore_keyboard_interrupt()
         pose_windows: PoseWindowDict = {}
         hot_reloader = HotReloadMethods(self.__class__, False, reload_everything=False)
-        process_pool = ProcessPoolExecutor(max_workers=self.max_workers)
+        process_pool = ProcessPoolExecutor(max_workers=self.max_workers, initializer=ignore_keyboard_interrupt)
 
         try:
             while not self._stop_event.is_set():
@@ -237,8 +239,8 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
                 if sleep_time > 0:
                     time.sleep(sleep_time)
 
-        except KeyboardInterrupt:
-            print(f"[{self.__class__.__name__}] Received KeyboardInterrupt, shutting down...")
+        # except KeyboardInterrupt:
+        #     print(f"[{self.__class__.__name__}] Received KeyboardInterrupt, shutting down...")
         except Exception as e:
             print(f"[{self.__class__.__name__}] Unexpected error: {e}")
         finally:
@@ -263,57 +265,39 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
         joint_correlations: dict[str, float] = {}
         angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
 
-        t0: float = time.perf_counter()
-
         for column in angles_columns:
             if column not in pair.angles_2.columns:
                 continue
 
+            # Get angle sequences as NumPy arrays
+            angles_1_nan: np.ndarray = pair.angles_1[column].values.astype(float)
+            angles_2_nan: np.ndarray = pair.angles_2[column].values.astype(float)
+            
+            # Create mask for non-NaN values
+            mask: np.ndarray = ~np.isnan(angles_1_nan) & ~np.isnan(angles_2_nan)
+            
+            # Apply mask to get valid angles
+            angles_1: np.ndarray = angles_1_nan[mask]
+            angles_2: np.ndarray = angles_2_nan[mask]
 
-            angles_1: pd.Series = pair.angles_1[column]
-            angles_2: pd.Series = pair.angles_2[column]
-
-            # Check NaN ratio
-            angles_1_nan_ratio: float = angles_1.isna().sum() / len(angles_1)
-            angles_2_nan_ratio: float = angles_2.isna().sum() / len(angles_2)
-
-            if angles_1_nan_ratio > maximum_nan_ratio or angles_2_nan_ratio > maximum_nan_ratio:
+            # Calculate NaN ratio
+            nan_ratio: float = 1.0 - (len(angles_1) / len(angles_1_nan))
+            
+            # Skip correlation if too many NaNs
+            if nan_ratio > maximum_nan_ratio:
                 joint_correlations[column] = 0.0
                 continue
 
-            seq1: np.ndarray = angles_1.values.astype(float)
-            seq2: np.ndarray = angles_2.values.astype(float)
-
-            mask: np.ndarray = ~np.isnan(seq1) & ~np.isnan(seq2)
-
-            # apply mask to sequences
-            seq1 = seq1[mask]
-            seq2 = seq2[mask]
-            # print(len(angles_1), len(seq1))
-
-
-            # # Build sequences
-            # seq1: np.ndarray = np.column_stack([
-            #     np.array(angles_1.values, dtype=float),
-            #     np.array(pair.confidences_1[column].values, dtype=float)
-            # ])
-            # seq2: np.ndarray = np.column_stack([
-            #     np.array(angles_2.values, dtype=float),
-            #     np.array(pair.confidences_2[column].values, dtype=float)
-            # ])
-            # Compute correlation
-
+            # Calculate similarity
             try:
                 method = CorrelationMethod.ANGULAR
-                similarity: float = PoseAnalysis._compute_correlation(seq1, seq2, method=method)
+                similarity: float = PoseAnalysis._compute_correlation(angles_1, angles_2, method=method)
                 joint_correlations[column] = similarity
             except Exception as e:
-                print(f"  {column}: correlation failed - {e}")
+                print(f"{column}: correlation failed - {e}")
                 continue
-
-        # Return correlation if we have valid results
-
-        # print(f"  {pair.id_1}-{pair.id_2} took {time.perf_counter() - t0:.2f}s, found {len(joint_correlations)} valid joints")
+        
+        # Return correlation object if we have results
         if joint_correlations:
             return PoseCorrelation(
                 id_1=pair.id_1,
@@ -447,6 +431,21 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
                 pairs.append(P)
                 pairs.append(P)
                 pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
+                pairs.append(P)
 
         return pairs
 
@@ -485,7 +484,7 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
         )
         # print(f"DTW distance computed in {time.perf_counter() - t0:.2f}s")
 
-        # distance2: float = dtw_angular_sakoe_chiba(seq1, seq2, band=5)
+        # distance: float = dtw_angular_sakoe_chiba(seq1, seq2, band=5)
 
 
         # Normalize by path length (distance is already 0-1 from distance function)
