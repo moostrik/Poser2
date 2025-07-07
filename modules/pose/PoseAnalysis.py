@@ -146,7 +146,7 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
         self.maximum_nan_ratio: float = 0.15
         self.max_age: float = 1.0
 
-        self.max_workers = min(cpu_count(), 10)
+        self.max_workers: int = min(cpu_count(), settings.analysis_workers)
 
     def set_window(self, data: PoseWindowData) -> None:
         """Non-blocking method to send data to the analysis process."""
@@ -171,9 +171,10 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
 
     def run(self) -> None:
         ignore_keyboard_interrupt()
-        pose_windows: PoseWindowDict = {}
-        hot_reloader = HotReloadMethods(self.__class__, False, reload_everything=False)
+
         process_pool = ProcessPoolExecutor(max_workers=self.max_workers, initializer=ignore_keyboard_interrupt)
+        hot_reloader = HotReloadMethods(self.__class__, False, reload_everything=False)
+        pose_windows: PoseWindowDict = {}
 
         try:
             while not self._stop_event.is_set():
@@ -189,7 +190,9 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
                         break
 
                 try:
-                    pose_windows = self._prepare_windows(pose_windows)
+                    pose_windows = self._filter_windows_by_time(pose_windows, self.max_age)
+                    pose_windows = self._filter_windows_by_length(pose_windows, self.analysis_window_size)
+                    pose_windows = self._trim_windows_to_length(pose_windows, self.analysis_window_size)
                     angle_pairs: list[AnglePair] = self._generate_asof_angle_pairs(pose_windows, self.align_tolerance)
 
                     if angle_pairs:
@@ -233,6 +236,8 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
                 if hot_reloader.file_changed:
                     print(f"[{self.__class__.__name__}] Reloading methods due to file change")
                     hot_reloader.reload_methods()
+                    process_pool.shutdown(wait=True)
+                    process_pool = ProcessPoolExecutor(max_workers=self.max_workers, initializer=ignore_keyboard_interrupt)
 
                 elapsed: float = time.perf_counter() - loop_start
                 sleep_time: float = self.analysis_interval - elapsed
@@ -246,65 +251,6 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
         finally:
             process_pool.shutdown(wait=False)
             hot_reloader.stop_file_watcher()
-
-    def _prepare_windows(self, windows: PoseWindowDict) -> PoseWindowDict:
-        """Filter windows based on time and length."""
-        windows = self._filter_windows_by_time(windows, self.max_age)
-        windows = self._filter_windows_by_length(windows, self.analysis_window_size)
-        windows = self._trim_windows_to_length(windows, self.analysis_window_size)
-        # windows = self._filter_windows_by_nan(windows, self.nan_ratio)
-        # for data in windows.values():
-        #     data.angles.index = pd.to_datetime(data.angles.index).round(self.round)
-        #     data.confidences.index = pd.to_datetime(data.confidences.index).round(self.round)
-        return windows
-
-
-    @staticmethod
-    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float) -> Optional[PoseCorrelation]:
-        """Analyse a single pair - designed for thread pool execution."""
-        joint_correlations: dict[str, float] = {}
-        angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
-
-        for column in angles_columns:
-            if column not in pair.angles_2.columns:
-                continue
-
-            # Get angle sequences as NumPy arrays
-            angles_1_nan: np.ndarray = pair.angles_1[column].values.astype(float)
-            angles_2_nan: np.ndarray = pair.angles_2[column].values.astype(float)
-            
-            # Create mask for non-NaN values
-            mask: np.ndarray = ~np.isnan(angles_1_nan) & ~np.isnan(angles_2_nan)
-            
-            # Apply mask to get valid angles
-            angles_1: np.ndarray = angles_1_nan[mask]
-            angles_2: np.ndarray = angles_2_nan[mask]
-
-            # Calculate NaN ratio
-            nan_ratio: float = 1.0 - (len(angles_1) / len(angles_1_nan))
-            
-            # Skip correlation if too many NaNs
-            if nan_ratio > maximum_nan_ratio:
-                joint_correlations[column] = 0.0
-                continue
-
-            # Calculate similarity
-            try:
-                method = CorrelationMethod.ANGULAR
-                similarity: float = PoseAnalysis._compute_correlation(angles_1, angles_2, method=method)
-                joint_correlations[column] = similarity
-            except Exception as e:
-                print(f"{column}: correlation failed - {e}")
-                continue
-        
-        # Return correlation object if we have results
-        if joint_correlations:
-            return PoseCorrelation(
-                id_1=pair.id_1,
-                id_2=pair.id_2,
-                joint_correlations=joint_correlations
-            )
-        return None
 
     @staticmethod
     def _filter_windows_by_time(windows: PoseWindowDict, max_age_s: float = 2.0) -> PoseWindowDict:
@@ -334,6 +280,14 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
             if total > 0 and (valid / total) >= min_valid_ratio:
                 filtered[wid] = data
         return filtered
+
+    @ staticmethod
+    def _remove_nans_from_windows(windows: PoseWindowDict) -> PoseWindowDict:
+        """Remove NaN values from angles and confidences DataFrames in each window."""
+        for data in windows.values():
+            data.angles = data.angles.dropna()
+            data.confidences = data.confidences.dropna()
+        return windows
 
     @staticmethod
     def _trim_windows_to_length(windows: PoseWindowDict, max_length: int ) -> PoseWindowDict:
@@ -448,6 +402,55 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
                 pairs.append(P)
 
         return pairs
+
+    @staticmethod
+    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float) -> Optional[PoseCorrelation]:
+        """Analyse a single pair - designed for thread pool execution."""
+        joint_correlations: dict[str, float] = {}
+        angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
+        start_time: float = time.perf_counter()
+
+        for column in angles_columns:
+            if column not in pair.angles_2.columns:
+                continue
+
+            # Get angle sequences as NumPy arrays
+            angles_1_nan: np.ndarray = pair.angles_1[column].values.astype(float)
+            angles_2_nan: np.ndarray = pair.angles_2[column].values.astype(float)
+
+            # Create mask for non-NaN values
+            mask: np.ndarray = ~np.isnan(angles_1_nan) & ~np.isnan(angles_2_nan)
+
+            # Apply mask to get valid angles
+            angles_1: np.ndarray = angles_1_nan[mask]
+            angles_2: np.ndarray = angles_2_nan[mask]
+
+            # Calculate NaN ratio
+            nan_ratio: float = 1.0 - (len(angles_1) / len(angles_1_nan))
+
+            # Skip correlation if too many NaNs
+            if nan_ratio > maximum_nan_ratio:
+                joint_correlations[column] = 0.0
+                continue
+
+            # Calculate similarity
+            try:
+                method = CorrelationMethod.ANGULAR
+                similarity: float = PoseAnalysis._compute_correlation(angles_1, angles_2, method=method)
+                joint_correlations[column] = similarity
+            except Exception as e:
+                print(f"{column}: correlation failed - {e}")
+                continue
+
+        # print(f"Pair {pair.id_1}-{pair.id_2} analysed in {time.perf_counter() - start_time:.2f}s, found {len(joint_correlations)} valid joints.")
+        # Return correlation object if we have results
+        if joint_correlations:
+            return PoseCorrelation(
+                id_1=pair.id_1,
+                id_2=pair.id_2,
+                joint_correlations=joint_correlations
+            )
+        return None
 
     @staticmethod
     def _compute_correlation(seq1: np.ndarray, seq2: np.ndarray, method: CorrelationMethod) -> float:

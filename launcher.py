@@ -29,6 +29,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     parser.add_argument('-pt',      '--passthrough',action='store_true',        help='use prerecored video without camera')
     parser.add_argument('-nc',      '--numcameras', type=int,   default=4,      help='number of cameras')
     parser.add_argument('-as',      '--autoset',    action='store_true',        help='camera auto settings')
+    parser.add_argument('-ad',      '--debug',      action='store_true',        help='run analysis in debug mode')
     args: Namespace = parser.parse_args()
 
     currentPath: str = path.dirname(__file__)
@@ -76,8 +77,9 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
     settings.pose_window_size =     10 # seconds
 
-    settings.analysis_rate_hz =     4
+    settings.analysis_rate_hz =     40
     settings.analysis_window_size = 5 # seconds
+    settings.analysis_workers =     10
 
     settings.light_resolution =     3600
     settings.light_rate =           60
