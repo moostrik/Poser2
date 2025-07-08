@@ -15,7 +15,6 @@ from typing import Optional, Callable
 import numpy as np
 from numba import njit
 import pandas as pd
-import fastdtw
 
 # Local application imports
 from modules.pose.PoseWindowBuffer import PoseWindowData
@@ -79,14 +78,15 @@ class AnglePair:
     id_2: int
     angles_1: pd.DataFrame
     angles_2: pd.DataFrame
-    confidences_1: pd.DataFrame
-    confidences_2: pd.DataFrame
+    confidences_1: Optional[pd.DataFrame]
+    confidences_2: Optional[pd.DataFrame]
 
-def angular_cost(theta1: float, theta2: float):
-    diff: float = theta1 - theta2
-    # 1 - cos(diff) ∈ [0, 2], 0 if equal angles
-    return 1.0 - np.cos(diff)
+@njit
+def angular_cost(theta1: float, theta2: float) -> float:
+    diff: float = abs(theta1 - theta2)
+    return min(diff, 2 * np.pi - diff)
 
+@njit
 def dtw_angular_sakoe_chiba(x: np.ndarray, y: np.ndarray, band) -> float:
     n, m = len(x), len(y)
     dtw: np.ndarray = np.full((n+1, m+1), np.inf)
@@ -102,31 +102,56 @@ def dtw_angular_sakoe_chiba(x: np.ndarray, y: np.ndarray, band) -> float:
                 dtw[i, j-1],    # deletion
                 dtw[i-1, j-1]   # match
             )
-    return np.sqrt(dtw[n, m])
+
+    return dtw[n, m]
 
 @njit
-def angular_cost_njit(theta1: float, theta2: float):
-    diff: float = theta1 - theta2
-    # 1 - cos(diff) ∈ [0, 2], 0 if equal angles
-    return 1.0 - np.cos(diff)
-
-@njit
-def dtw_angular_sakoe_chiba_njit(x: np.ndarray, y: np.ndarray, band) -> float:
+def dtw_angular_sakoe_chiba_path(x: np.ndarray, y: np.ndarray, band) -> tuple[float, int]:
     n, m = len(x), len(y)
     dtw: np.ndarray = np.full((n+1, m+1), np.inf)
+    # Track which direction we came from
+    path_choices = np.zeros((n+1, m+1), dtype=np.int32)
     dtw[0, 0] = 0.0
 
     for i in range(1, n+1):
         j_start: int = max(1, i - band)
         j_end: int = min(m+1, i + band + 1)
         for j in range(j_start, j_end):
-            cost: float = angular_cost_njit(x[i-1], y[j-1])
-            dtw[i, j] = cost + min(
-                dtw[i-1, j],    # insertion
-                dtw[i, j-1],    # deletion
-                dtw[i-1, j-1]   # match
-            )
-    return np.sqrt(dtw[n, m])
+            cost: float = angular_cost(x[i-1], y[j-1])
+
+            # Find minimum of three options
+            min_prev = min(dtw[i-1, j], dtw[i, j-1], dtw[i-1, j-1])
+            dtw[i, j] = cost + min_prev
+
+            # Track which direction had minimum (0=diagonal, 1=vertical, 2=horizontal)
+            if min_prev == dtw[i-1, j-1]:
+                path_choices[i, j] = 0  # diagonal
+            elif min_prev == dtw[i-1, j]:
+                path_choices[i, j] = 1  # vertical
+            else:
+                path_choices[i, j] = 2  # horizontal
+
+    # Trace back to find path length
+    i, j = n, m
+    path_length = 0
+    while i > 0 or j > 0:
+        path_length += 1
+        if i == 0:
+            j -= 1
+        elif j == 0:
+            i -= 1
+        else:
+            choice = path_choices[i, j]
+            if choice == 0:  # diagonal
+                i -= 1
+                j -= 1
+            elif choice == 1:  # vertical
+                i -= 1
+            else:  # horizontal
+                j -= 1
+
+    return dtw[n, m], path_length
+
 
 def ignore_keyboard_interrupt():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -141,6 +166,7 @@ class PoseAnalysis():
         self.align_tolerance = pd.Timedelta(f'{int(1000 / settings.camera_fps)}ms')
         self.maximum_nan_ratio: float = 0.15
         self.max_age: float = 1.0
+        self.dtw_band: int = 10
 
         # ANALYSIS THREAD
         self._max_workers: int = min(cpu_count(), settings.analysis_workers)
@@ -211,18 +237,16 @@ class PoseAnalysis():
                 pose_windows: PoseWindowDict= self._input_windows.copy()
 
             pose_windows = self._filter_windows_by_time(pose_windows, self.max_age)
-            pose_windows = self._filter_windows_by_length(pose_windows, self.analysis_window_size)
-            pose_windows = self._trim_windows_to_length(pose_windows, self.analysis_window_size)
-            angle_pairs: list[AnglePair] = self._generate_asof_angle_pairs(pose_windows, self.align_tolerance)
+            angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_windows, self.analysis_window_size)
 
             if angle_pairs:
                 start_time: float = time.perf_counter()
                 batch = PoseCorrelationBatch()
 
-                    # Submit all pairs for analysis
+                # Submit all pairs for analysis
                 future_to_pair: dict[Future, AnglePair] = {}
                 for pair in angle_pairs:
-                    future: Future[PoseCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio)
+                    future: Future[PoseCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band)
                     future_to_pair[future] = pair
 
                 # Collect results
@@ -240,7 +264,7 @@ class PoseAnalysis():
                     most_similar: Optional[PoseCorrelation] = batch.get_most_similar_pair()
 
                 analysis_duration: float = time.perf_counter() - start_time
-                print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs.")
+                print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs. Most similar: {most_similar.id_1}-{most_similar.id_2} with score {most_similar.similarity_score:.2f}" if most_similar else "No valid pairs found.")
 
                 self._callback(batch)
 
@@ -380,34 +404,72 @@ class PoseAnalysis():
                         confidences_2=confidences_2_aligned
                     )
                 pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
-                pairs.append(P)
 
         return pairs
 
     @staticmethod
-    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float) -> Optional[PoseCorrelation]:
+    def _generate_naive_angle_pairs(windows: PoseWindowDict, max_length: int) -> list[AnglePair]:
+        """
+        Generate angle pairs from windows,
+        Returns a list of AnglePair(id1, id2, angles1, angles2, confidences_1, confidences_2).
+        """
+        pairs: list[AnglePair] = []
+        window_items: list[tuple[int, PoseWindowData]] = list(windows.items())
+
+        for (id1, win1), (id2, win2) in combinations(window_items, 2):
+            # Get the DataFrames
+            angles_1: pd.DataFrame = win1.angles
+            angles_2: pd.DataFrame = win2.angles
+            confidences_1: pd.DataFrame = win1.confidences
+            confidences_2: pd.DataFrame = win2.confidences
+
+            # trim to max_length
+            if len(angles_1) < max_length:
+                continue
+            if len(angles_2) < max_length:
+                continue
+
+            angles_1 = angles_1.iloc[-max_length:]
+            angles_2 = angles_2.iloc[-max_length:]
+            confidences_1 = confidences_1.iloc[-max_length:]
+            confidences_2 = confidences_2.iloc[-max_length:]
+
+            P = AnglePair(
+                id_1=id1,
+                id_2=id2,
+                angles_1=angles_1.iloc[-max_length:],
+                angles_2=angles_2.iloc[-max_length:],
+                confidences_1=confidences_1.iloc[-max_length:],
+                confidences_2=confidences_2.iloc[-max_length:],
+            )
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+            pairs.append(P)
+
+        return pairs
+
+    @staticmethod
+    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int) -> Optional[PoseCorrelation]:
         """Analyse a single pair - designed for thread pool execution."""
         joint_correlations: dict[str, float] = {}
         angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
-        start_time: float = time.perf_counter()
 
         for column in angles_columns:
             if column not in pair.angles_2.columns:
@@ -417,32 +479,28 @@ class PoseAnalysis():
             angles_1_nan: np.ndarray = pair.angles_1[column].values.astype(float)
             angles_2_nan: np.ndarray = pair.angles_2[column].values.astype(float)
 
-            # Create mask for non-NaN values
-            mask: np.ndarray = ~np.isnan(angles_1_nan) & ~np.isnan(angles_2_nan)
+            # Remove NaNs independently
+            angles_1: np.ndarray = angles_1_nan[~np.isnan(angles_1_nan)]
+            angles_2: np.ndarray = angles_2_nan[~np.isnan(angles_2_nan)]
 
-            # Apply mask to get valid angles
-            angles_1: np.ndarray = angles_1_nan[mask]
-            angles_2: np.ndarray = angles_2_nan[mask]
-
-            # Calculate NaN ratio
-            nan_ratio: float = 1.0 - (len(angles_1) / len(angles_1_nan))
+            # Calculate NaN ratio for each sequence
+            nan_ratio_1: float = 1.0 - (len(angles_1) / len(angles_1_nan)) if len(angles_1_nan) > 0 else 1.0
+            nan_ratio_2: float = 1.0 - (len(angles_2) / len(angles_2_nan)) if len(angles_2_nan) > 0 else 1.0
 
             # Skip correlation if too many NaNs
-            if nan_ratio > maximum_nan_ratio:
+            if nan_ratio_1 > maximum_nan_ratio or nan_ratio_2 > maximum_nan_ratio:
                 joint_correlations[column] = 0.0
                 continue
 
             # Calculate similarity
             try:
                 method = CorrelationMethod.ANGULAR
-                similarity: float = PoseAnalysis._compute_correlation(angles_1, angles_2, method=method)
+                similarity: float = PoseAnalysis._compute_correlation(angles_1, angles_2, dtw_band)
                 joint_correlations[column] = similarity
             except Exception as e:
                 print(f"{column}: correlation failed - {e}")
                 continue
 
-        # print(f"Pair {pair.id_1}-{pair.id_2} analysed in {time.perf_counter() - start_time:.2f}s, found {len(joint_correlations)} valid joints.")
-        # Return correlation object if we have results
         if joint_correlations:
             return PoseCorrelation(
                 id_1=pair.id_1,
@@ -452,82 +510,11 @@ class PoseAnalysis():
         return None
 
     @staticmethod
-    def _compute_correlation(seq1: np.ndarray, seq2: np.ndarray, method: CorrelationMethod) -> float:
-        """
-        Compute correlation between two sequences using DTW with the specified method.
-
-        Args:
-            seq1: First sequence as 1D array of angles
-            seq2: Second sequence as 1D array of angles
-            method: Correlation method to use
-
-        Returns:
-            Similarity score between 0 and 1
-        """
-        # Map correlation methods to distance functions
-        distance_functions = {
-            CorrelationMethod.ANGULAR: lambda x, y: PoseAnalysis._angular_distance(x, y)  # Remove [0] indexing
-        }
-
-        # Select the distance function
-        if method not in distance_functions:
-            raise ValueError(f"Unknown correlation method: {method}")
-
-        distance_func: Callable = distance_functions[method]
-
-        # Compute DTW with the selected distance function
-
-        t0: float = time.perf_counter()
-        distance, path = fastdtw.fastdtw(
-            seq1,  # Shape: (n_frames,) - just angles
-            seq2,  # Shape: (n_frames,) - just angles
-            # radius=10,
-            dist=distance_func
-        )
-        # print(f"DTW distance computed in {time.perf_counter() - t0:.2f}s")
-
-        distance: float = dtw_angular_sakoe_chiba(seq1, seq2, band=5)
-
-
-        # Normalize by path length (distance is already 0-1 from distance function)
-        normalized_distance: float = (distance / len(seq1)) / np.pi
-
-        # Convert distance to similarity (1 - distance)
+    def _compute_correlation(seq1: np.ndarray, seq2: np.ndarray, band: int = 10) -> float:
+        distance, path_length = dtw_angular_sakoe_chiba_path(seq1, seq2, band=band)
+        normalized_distance: float = (distance / path_length) / np.pi
         similarity: float = 1.0 - normalized_distance
-        # print(f"DTW distance: {distance:.3f}, normalized: {normalized_distance:.3f}, similarity: {similarity:.3f}")
-        return max(0.0, min(1.0, similarity))  # Clamp to [0, 1]
+        return max(0.0, min(1.0, similarity))
 
-    @staticmethod
-    def _angular_distance(angle_A, angle_B) -> float:
-        """
-        Calculate the shortest angular distance between two angles in radians,
-        weighted by their confidence values and handling NaN values.
-
-        Args:
-            angle_A: First angle in radians
-            confidence_A: Confidence value for first angle (0.0 to 1.0)
-            angle_B: Second angle in radians
-            confidence_B: Confidence value for second angle (0.0 to 1.0)
-
-        Returns:
-            Normalized weighted angular distance between 0 and 1
-        """
-        # Handle NaN values - return maximum distance if either angle is NaN
-        # if not mask:
-        #     return np.pi
-
-        # Calculate the shortest angular distance using basic math operations
-        diff: float = abs(angle_A - angle_B)
-        angular_dist: float = min(diff, 2 * np.pi - diff)
-
-        # Weight the distance by confidence - lower confidence increases distance
-        # min_confidence: float = min(confidence_A, confidence_B)
-        # confidence_weight: float = 1.0 - min_confidence
-
-        # # Apply confidence weighting: low confidence -> higher distance
-        # weighted_distance: float = angular_dist * (1.0 + confidence_weight)
-
-        # Ensure result stays within [0, π] range
-        return min(angular_dist, 1.0, np.pi)
 
 

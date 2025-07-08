@@ -105,10 +105,10 @@ PoseAngleKeypoints: dict[Keypoint, tuple[Keypoint, Keypoint, Keypoint]] = {
     Keypoint.right_shoulder: ( Keypoint.right_hip,      Keypoint.right_shoulder, Keypoint.right_elbow ),
     Keypoint.left_elbow:     ( Keypoint.left_shoulder,  Keypoint.left_elbow,     Keypoint.left_wrist  ),
     Keypoint.right_elbow:    ( Keypoint.right_shoulder, Keypoint.right_elbow,    Keypoint.right_wrist ),
-    Keypoint.left_hip:       ( Keypoint.left_shoulder,  Keypoint.left_hip,       Keypoint.left_knee   ),
-    Keypoint.right_hip:      ( Keypoint.right_shoulder, Keypoint.right_hip,      Keypoint.right_knee  ),
-    Keypoint.left_knee:      ( Keypoint.left_hip,       Keypoint.left_knee,      Keypoint.left_ankle  ),
-    Keypoint.right_knee:     ( Keypoint.right_hip,      Keypoint.right_knee,     Keypoint.right_ankle ),
+    # Keypoint.left_hip:       ( Keypoint.left_shoulder,  Keypoint.left_hip,       Keypoint.left_knee   ),
+    # Keypoint.right_hip:      ( Keypoint.right_shoulder, Keypoint.right_hip,      Keypoint.right_knee  ),
+    # Keypoint.left_knee:      ( Keypoint.left_hip,       Keypoint.left_knee,      Keypoint.left_ankle  ),
+    # Keypoint.right_knee:     ( Keypoint.right_hip,      Keypoint.right_knee,     Keypoint.right_ankle ),
 }
 
 class JointAngle(TypedDict):
