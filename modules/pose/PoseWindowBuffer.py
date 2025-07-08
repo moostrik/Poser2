@@ -21,12 +21,14 @@ class PoseWindowData:
     window_id: int
     angles: pd.DataFrame
     confidences: pd.DataFrame
+
 PoseWindowCallback = Callable[[PoseWindowData], None]
 
 @dataclass
 class PoseWindowVisualisationData:
     window_id: int
     mesh_data: np.ndarray  # shape: (num_frames, num_joints, 2)
+
 PoseWindowVisualisationCallback = Callable[[PoseWindowVisualisationData], None]
 
 class PoseWindowBuffer(Thread):

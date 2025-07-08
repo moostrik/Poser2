@@ -1,14 +1,14 @@
 # Standard library imports
 # from multiprocessing.synchronize import Event
 
-import pickle
 import signal
 import time
+import threading
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from enum import Enum
 from itertools import combinations
-from multiprocessing import Process, Queue, Event, cpu_count
+from multiprocessing import cpu_count
 from typing import Optional, Callable
 
 # Third-party imports
@@ -71,6 +71,8 @@ class PoseCorrelationBatch:
             return None
         return max(self._pair_correlations, key=lambda r: r.similarity_score)
 
+PoseCorrelationBatchCallback = Callable[[Optional[PoseCorrelationBatch]], None]
+
 @dataclass
 class AnglePair:
     id_1: int
@@ -129,14 +131,8 @@ def dtw_angular_sakoe_chiba_njit(x: np.ndarray, y: np.ndarray, band) -> float:
 def ignore_keyboard_interrupt():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-class PoseAnalysis(Process):  # Changed from Thread to Process
+class PoseAnalysis():
     def __init__(self, settings: Settings) -> None:
-        super().__init__()
-        self._stop_event = Event()
-
-        # Use multiprocessing Queue for thread-safe communication
-        self.input_queue: Queue = Queue(maxsize=240)
-        self.result_queue: Queue = Queue(maxsize=240)
 
         self.analysis_interval: float = 1.0 / settings.analysis_rate_hz
         self.max_window_size: int = int(settings.pose_window_size * settings.camera_fps)
@@ -146,111 +142,114 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
         self.maximum_nan_ratio: float = 0.15
         self.max_age: float = 1.0
 
-        self.max_workers: int = min(cpu_count(), settings.analysis_workers)
+        # ANALYSIS THREAD
+        self._max_workers: int = min(cpu_count(), settings.analysis_workers)
+        self._process_pool = ProcessPoolExecutor(max_workers=self._max_workers, initializer=ignore_keyboard_interrupt)
+        self._analysis_thread = threading.Thread(target=self.run)
+        self._stop_event = threading.Event()
+
+        # INPUTS
+        self._input_lock = threading.Lock()
+        self._input_windows: PoseWindowDict = {}
+
+        # CALLBACKS
+        self._callback_lock = threading.Lock()
+        self._callbacks: set[PoseCorrelationBatchCallback] = set()
+
+        # HOT RELOADER
+        self.hot_reloader = HotReloadMethods(self.__class__, False, False)
+        self.hot_reloader.add_file_changed_callback(self.restart)
 
     def set_window(self, data: PoseWindowData) -> None:
-        """Non-blocking method to send data to the analysis process."""
-        try:
-            # Serialize the data to avoid pickle issues
-            serialized_data: bytes = pickle.dumps(data)
-            self.input_queue.put(serialized_data, block=False)
-        except:
-            print(f"[{self.__class__.__name__}] Input queue is full, skipping window update for {data.window_id}")
-            # Queue is full, skip this update
-            pass
+        with self._input_lock:
+            self._input_windows[data.window_id] = data
+        return
 
-    def get_results(self) -> Optional[PoseCorrelationBatch]:
-        """Non-blocking method to get results from the analysis process."""
-        try:
-            return self.result_queue.get(block=False)
-        except:
-            return None
+    def add_callback(self, callback: PoseCorrelationBatchCallback) -> None:
+        """ Register a callback to receive the current pandas DataFrame window. """
+        with self._callback_lock:
+            self._callbacks.add(callback)
+
+    def _callback(self, batch: Optional[PoseCorrelationBatch]) -> None:
+        """ Call all registered callbacks with the current batch. """
+        with self._callback_lock:
+            for callback in self._callbacks:
+                try:
+                    callback(batch)
+                except Exception as e:
+                    print(f"[{self.__class__.__name__}] Callback error: {e}")
+
+    def start(self) -> None:
+        self._analysis_thread.start()
 
     def stop(self) -> None:
         self._stop_event.set()
+        self._process_pool.shutdown(wait=False)
+        with self._callback_lock:
+            self._callbacks.clear()
+
+    def restart(self) -> None:
+        self._stop_event.set()
+        self._analysis_thread.join()
+        self._process_pool.shutdown(wait=True)
+
+        self.hot_reloader.reload_methods()
+
+        self._process_pool = ProcessPoolExecutor(max_workers=self._max_workers,initializer = ignore_keyboard_interrupt)
+        self._stop_event.clear()
+        self._analysis_thread = threading.Thread(target=self.run)
+        self._analysis_thread.start()
+
+    def join(self) -> None:
+        self._analysis_thread.join()
 
     def run(self) -> None:
-        ignore_keyboard_interrupt()
+        while not self._stop_event.is_set():
+            loop_start: float = time.perf_counter()
 
-        process_pool = ProcessPoolExecutor(max_workers=self.max_workers, initializer=ignore_keyboard_interrupt)
-        hot_reloader = HotReloadMethods(self.__class__, False, reload_everything=False)
-        pose_windows: PoseWindowDict = {}
+            with self._input_lock:
+                pose_windows: PoseWindowDict= self._input_windows.copy()
 
-        try:
-            while not self._stop_event.is_set():
-                loop_start: float = time.perf_counter()
+            pose_windows = self._filter_windows_by_time(pose_windows, self.max_age)
+            pose_windows = self._filter_windows_by_length(pose_windows, self.analysis_window_size)
+            pose_windows = self._trim_windows_to_length(pose_windows, self.analysis_window_size)
+            angle_pairs: list[AnglePair] = self._generate_asof_angle_pairs(pose_windows, self.align_tolerance)
 
-                # Collect all pending window updates
-                while True:
+            if angle_pairs:
+                start_time: float = time.perf_counter()
+                batch = PoseCorrelationBatch()
+
+                    # Submit all pairs for analysis
+                future_to_pair: dict[Future, AnglePair] = {}
+                for pair in angle_pairs:
+                    future: Future[PoseCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio)
+                    future_to_pair[future] = pair
+
+                # Collect results
+                for future in as_completed(future_to_pair):
+                    pair: AnglePair = future_to_pair[future]
                     try:
-                        serialized_data: bytes = self.input_queue.get(block=False)
-                        data: PoseWindowData = pickle.loads(serialized_data)
-                        pose_windows[data.window_id] = data
-                    except:
-                        break
+                        correlation: Optional[PoseCorrelation] = future.result()
+                        if correlation:
+                            batch.add_result(correlation)
+                    except Exception as e:
+                        print(f"Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
 
-                try:
-                    pose_windows = self._filter_windows_by_time(pose_windows, self.max_age)
-                    pose_windows = self._filter_windows_by_length(pose_windows, self.analysis_window_size)
-                    pose_windows = self._trim_windows_to_length(pose_windows, self.analysis_window_size)
-                    angle_pairs: list[AnglePair] = self._generate_asof_angle_pairs(pose_windows, self.align_tolerance)
+                # Get most similar if we have results
+                if not batch.is_empty:
+                    most_similar: Optional[PoseCorrelation] = batch.get_most_similar_pair()
 
-                    if angle_pairs:
-                        start_time: float = time.perf_counter()
-                        batch = PoseCorrelationBatch()
+                analysis_duration: float = time.perf_counter() - start_time
+                print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs.")
 
-                        # Submit all pairs for analysis
-                        future_to_pair: dict[Future, AnglePair] = {}
-                        for pair in angle_pairs:
-                            future: Future[PoseCorrelation | None] = process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio)
-                            future_to_pair[future] = pair
+                self._callback(batch)
 
-                        # Collect results
-                        for future in as_completed(future_to_pair):
-                            pair: AnglePair = future_to_pair[future]
-                            try:
-                                correlation: Optional[PoseCorrelation] = future.result()
-                                if correlation:
-                                    batch.add_result(correlation)
-                            except Exception as e:
-                                print(f"Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
 
-                        # Get most similar if we have results
-                        if not batch.is_empty:
-                            most_similar: Optional[PoseCorrelation] = batch.get_most_similar_pair()
+            elapsed: float = time.perf_counter() - loop_start
+            sleep_time: float = self.analysis_interval - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
 
-                        analysis_duration: float = time.perf_counter() - start_time
-                        print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs.")
-
-                        # Send results back to main process
-                        try:
-                            self.result_queue.put(batch, block=False)
-                        except:
-                            # Queue is full, skip this result
-                            pass
-
-                except Exception as e:
-                    print(f"Error during analysis: {e}")
-                    continue
-
-                if hot_reloader.file_changed:
-                    print(f"[{self.__class__.__name__}] Reloading methods due to file change")
-                    hot_reloader.reload_methods()
-                    process_pool.shutdown(wait=True)
-                    process_pool = ProcessPoolExecutor(max_workers=self.max_workers, initializer=ignore_keyboard_interrupt)
-
-                elapsed: float = time.perf_counter() - loop_start
-                sleep_time: float = self.analysis_interval - elapsed
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
-
-        # except KeyboardInterrupt:
-        #     print(f"[{self.__class__.__name__}] Received KeyboardInterrupt, shutting down...")
-        except Exception as e:
-            print(f"[{self.__class__.__name__}] Unexpected error: {e}")
-        finally:
-            process_pool.shutdown(wait=False)
-            hot_reloader.stop_file_watcher()
 
     @staticmethod
     def _filter_windows_by_time(windows: PoseWindowDict, max_age_s: float = 2.0) -> PoseWindowDict:
@@ -487,7 +486,7 @@ class PoseAnalysis(Process):  # Changed from Thread to Process
         )
         # print(f"DTW distance computed in {time.perf_counter() - t0:.2f}s")
 
-        # distance: float = dtw_angular_sakoe_chiba(seq1, seq2, band=5)
+        distance: float = dtw_angular_sakoe_chiba(seq1, seq2, band=5)
 
 
         # Normalize by path length (distance is already 0-1 from distance function)
