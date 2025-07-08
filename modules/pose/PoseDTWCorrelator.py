@@ -17,60 +17,12 @@ from numba import njit
 import pandas as pd
 
 # Local application imports
-from modules.pose.PoseWindowBuffer import PoseWindowData
+from modules.pose.PoseCorrelation import PosePairCorrelation, PoseCorrelationBatch, PairCorrelationBatchCallback
+from modules.pose.PoseWindowBuffer import PoseWindowData, PoseWindowDataDict
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-PoseWindowDict = dict[int, PoseWindowData]
-
-class CorrelationMethod(Enum):
-    ANGULAR = "angular"
-
-class PoseCorrelation:
-    def __init__(self, id_1: int, id_2: int, joint_correlations: dict[str, float]) -> None:
-        self.id_1 = id_1
-        self.id_2 = id_2
-        self.joint_correlations: dict[str, float] = joint_correlations
-        self.similarity_score: float = float(np.mean(list(joint_correlations.values()))) if joint_correlations else 0.0
-
-class PoseCorrelationBatch:
-    def __init__(self) -> None:
-        """Collection of DTW results from a single analysis run."""
-        self._pair_correlations: list[PoseCorrelation] = []
-        self._timestamp: pd.Timestamp = pd.Timestamp.now()
-        self._similarity: float = 0.0
-
-    @property
-    def is_empty(self) -> bool:
-        """Check if the batch has no results."""
-        return len(self._pair_correlations) == 0
-
-    @property
-    def count(self) -> int:
-        """Return the number of windows in the batch."""
-        return len(self._pair_correlations)
-
-    @property
-    def timestamp(self) -> pd.Timestamp:
-        return self._timestamp
-
-    @property
-    def similarity(self) -> float:
-        return self._similarity
-
-    def add_result(self, result: PoseCorrelation) -> None:
-        """Add a PoseCorrelation result to the batch."""
-        self._pair_correlations.append(result)
-        self._similarity = sum(r.similarity_score for r in self._pair_correlations) / len(self._pair_correlations)
-
-    def get_most_similar_pair(self) -> Optional[PoseCorrelation]:
-        """Return the pair with highest similarity score."""
-        if not self._pair_correlations:
-            return None
-        return max(self._pair_correlations, key=lambda r: r.similarity_score)
-
-PoseCorrelationBatchCallback = Callable[[Optional[PoseCorrelationBatch]], None]
 
 @dataclass
 class AnglePair:
@@ -152,11 +104,10 @@ def dtw_angular_sakoe_chiba_path(x: np.ndarray, y: np.ndarray, band) -> tuple[fl
 
     return dtw[n, m], path_length
 
-
-def ignore_keyboard_interrupt():
+def ignore_keyboard_interrupt() -> None:
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-class PoseAnalysis():
+class PoseDTWCorrelator():
     def __init__(self, settings: Settings) -> None:
 
         self.analysis_interval: float = 1.0 / settings.analysis_rate_hz
@@ -176,11 +127,11 @@ class PoseAnalysis():
 
         # INPUTS
         self._input_lock = threading.Lock()
-        self._input_windows: PoseWindowDict = {}
+        self._input_windows: PoseWindowDataDict = {}
 
         # CALLBACKS
         self._callback_lock = threading.Lock()
-        self._callbacks: set[PoseCorrelationBatchCallback] = set()
+        self._callbacks: set[PairCorrelationBatchCallback] = set()
 
         # HOT RELOADER
         self.hot_reloader = HotReloadMethods(self.__class__, False, False)
@@ -191,12 +142,12 @@ class PoseAnalysis():
             self._input_windows[data.window_id] = data
         return
 
-    def add_callback(self, callback: PoseCorrelationBatchCallback) -> None:
+    def add_correlation_callback(self, callback: PairCorrelationBatchCallback) -> None:
         """ Register a callback to receive the current pandas DataFrame window. """
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def _callback(self, batch: Optional[PoseCorrelationBatch]) -> None:
+    def _callback(self, batch: PoseCorrelationBatch) -> None:
         """ Call all registered callbacks with the current batch. """
         with self._callback_lock:
             for callback in self._callbacks:
@@ -234,7 +185,7 @@ class PoseAnalysis():
             loop_start: float = time.perf_counter()
 
             with self._input_lock:
-                pose_windows: PoseWindowDict= self._input_windows.copy()
+                pose_windows: PoseWindowDataDict= self._input_windows.copy()
 
             pose_windows = self._filter_windows_by_time(pose_windows, self.max_age)
             angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_windows, self.analysis_window_size)
@@ -246,14 +197,14 @@ class PoseAnalysis():
                 # Submit all pairs for analysis
                 future_to_pair: dict[Future, AnglePair] = {}
                 for pair in angle_pairs:
-                    future: Future[PoseCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band)
+                    future: Future[PosePairCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band)
                     future_to_pair[future] = pair
 
                 # Collect results
                 for future in as_completed(future_to_pair):
                     pair: AnglePair = future_to_pair[future]
                     try:
-                        correlation: Optional[PoseCorrelation] = future.result()
+                        correlation: Optional[PosePairCorrelation] = future.result()
                         if correlation:
                             batch.add_result(correlation)
                     except Exception as e:
@@ -261,7 +212,7 @@ class PoseAnalysis():
 
                 # Get most similar if we have results
                 if not batch.is_empty:
-                    most_similar: Optional[PoseCorrelation] = batch.get_most_similar_pair()
+                    most_similar: Optional[PosePairCorrelation] = batch.get_most_similar_pair()
 
                 analysis_duration: float = time.perf_counter() - start_time
                 print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs. Most similar: {most_similar.id_1}-{most_similar.id_2} with score {most_similar.similarity_score:.2f}" if most_similar else "No valid pairs found.")
@@ -276,10 +227,10 @@ class PoseAnalysis():
 
 
     @staticmethod
-    def _filter_windows_by_time(windows: PoseWindowDict, max_age_s: float = 2.0) -> PoseWindowDict:
+    def _filter_windows_by_time(windows: PoseWindowDataDict, max_age_s: float = 2.0) -> PoseWindowDataDict:
         """Return only windows whose last timestamp is within max_age_s seconds from now."""
         now: pd.Timestamp = pd.Timestamp.now()
-        filtered: PoseWindowDict = {}
+        filtered: PoseWindowDataDict = {}
         for window_id, data in windows.items():
             if not data.angles.empty:
                 last_time = data.angles.index[-1]
@@ -289,14 +240,14 @@ class PoseAnalysis():
         return filtered
 
     @staticmethod
-    def _filter_windows_by_length(windows: PoseWindowDict, min_length: int = 20) -> PoseWindowDict:
+    def _filter_windows_by_length(windows: PoseWindowDataDict, min_length: int = 20) -> PoseWindowDataDict:
         """Return only windows with at least min_length frames."""
         return {wid: data for wid, data in windows.items() if len(data.angles) >= min_length}
 
     @staticmethod
-    def _filter_windows_by_nan(windows: PoseWindowDict, min_valid_ratio: float = 0.7) -> PoseWindowDict:
+    def _filter_windows_by_nan(windows: PoseWindowDataDict, min_valid_ratio: float = 0.7) -> PoseWindowDataDict:
         """Return only windows where the ratio of non-NaN values is above min_valid_ratio."""
-        filtered: PoseWindowDict = {}
+        filtered: PoseWindowDataDict = {}
         for wid, data in windows.items():
             total: int = data.angles.size
             valid: int = data.angles.count().sum()
@@ -305,7 +256,7 @@ class PoseAnalysis():
         return filtered
 
     @ staticmethod
-    def _remove_nans_from_windows(windows: PoseWindowDict) -> PoseWindowDict:
+    def _remove_nans_from_windows(windows: PoseWindowDataDict) -> PoseWindowDataDict:
         """Remove NaN values from angles and confidences DataFrames in each window."""
         for data in windows.values():
             data.angles = data.angles.dropna()
@@ -313,7 +264,7 @@ class PoseAnalysis():
         return windows
 
     @staticmethod
-    def _trim_windows_to_length(windows: PoseWindowDict, max_length: int ) -> PoseWindowDict:
+    def _trim_windows_to_length(windows: PoseWindowDataDict, max_length: int ) -> PoseWindowDataDict:
         """ Trim each window's DataFrames to the last max_length frames. """
         for data in windows.values():
             if len(data.angles) > max_length:
@@ -322,7 +273,7 @@ class PoseAnalysis():
         return windows
 
     @staticmethod
-    def _generate_overlapping_angle_pairs(windows: PoseWindowDict) -> list[AnglePair]:
+    def _generate_overlapping_angle_pairs(windows: PoseWindowDataDict) -> list[AnglePair]:
         """Generate all unique pairs of windows with overlapping time ranges."""
         angle_pairs: list[AnglePair] = []
         window_items: list[tuple[int, PoseWindowData]] = list(windows.items())
@@ -358,7 +309,7 @@ class PoseAnalysis():
         return angle_pairs
 
     @staticmethod
-    def _generate_asof_angle_pairs(windows: PoseWindowDict, tolerance: pd.Timedelta) -> list[AnglePair]:
+    def _generate_asof_angle_pairs(windows: PoseWindowDataDict, tolerance: pd.Timedelta) -> list[AnglePair]:
         """
         For each unique pair of PoseWindowData, align their angles and confidences DataFrames using merge_asof.
         Returns a list of AnglePair(id1, id2, angles1_aligned, angles2_aligned, confidences1_aligned, confidences2_aligned).
@@ -408,7 +359,7 @@ class PoseAnalysis():
         return pairs
 
     @staticmethod
-    def _generate_naive_angle_pairs(windows: PoseWindowDict, max_length: int) -> list[AnglePair]:
+    def _generate_naive_angle_pairs(windows: PoseWindowDataDict, max_length: int) -> list[AnglePair]:
         """
         Generate angle pairs from windows,
         Returns a list of AnglePair(id1, id2, angles1, angles2, confidences_1, confidences_2).
@@ -443,30 +394,11 @@ class PoseAnalysis():
                 confidences_2=confidences_2.iloc[-max_length:],
             )
             pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
-            pairs.append(P)
 
         return pairs
 
     @staticmethod
-    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int) -> Optional[PoseCorrelation]:
+    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int) -> Optional[PosePairCorrelation]:
         """Analyse a single pair - designed for thread pool execution."""
         joint_correlations: dict[str, float] = {}
         angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
@@ -494,15 +426,14 @@ class PoseAnalysis():
 
             # Calculate similarity
             try:
-                method = CorrelationMethod.ANGULAR
-                similarity: float = PoseAnalysis._compute_correlation(angles_1, angles_2, dtw_band)
+                similarity: float = PoseDTWCorrelator._compute_correlation(angles_1, angles_2, dtw_band)
                 joint_correlations[column] = similarity
             except Exception as e:
                 print(f"{column}: correlation failed - {e}")
                 continue
 
         if joint_correlations:
-            return PoseCorrelation(
+            return PosePairCorrelation(
                 id_1=pair.id_1,
                 id_2=pair.id_2,
                 joint_correlations=joint_correlations

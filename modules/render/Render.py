@@ -21,6 +21,7 @@ from modules.gl.Utils import lfo, fit, fill
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.Person import Person, PersonColor, TrackingStatus
+from modules.pose.PoseDTWCorrelator import PosePairCorrelation, PoseCorrelationBatch
 from modules.pose.PoseDefinitions import Pose, PoseEdgeIndices
 from modules.pose.PoseWindowBuffer import PoseWindowVisualisationData
 from modules.Settings import Settings
@@ -384,6 +385,12 @@ class Render(RenderWindow):
     def set_angle_window(self, data: PoseWindowVisualisationData) -> None:
         with self.input_mutex:
             self.input_angle_window[data.window_id] = data.mesh_data
+
+    def add_correlation(self, batch: PoseCorrelationBatch) -> None:
+        """ Add a correlation value for a person. """
+        batch.timestamp
+        with self.input_mutex:
+            pass
 
     # STATIC METHODS
     @staticmethod

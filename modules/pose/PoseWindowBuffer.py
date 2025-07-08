@@ -23,6 +23,7 @@ class PoseWindowData:
     confidences: pd.DataFrame
 
 PoseWindowCallback = Callable[[PoseWindowData], None]
+PoseWindowDataDict = dict[int, PoseWindowData]
 
 @dataclass
 class PoseWindowVisualisationData:

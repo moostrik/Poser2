@@ -14,7 +14,7 @@ from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
-from modules.pose.PoseAnalysis import PoseAnalysis
+from modules.pose.PoseDTWCorrelator import PoseDTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseWindowBuffer import PoseWindowBuffer
 from modules.render.Render import Render
@@ -44,11 +44,11 @@ class Main():
 
         self.pose_detection: Optional[PosePipeline] = None
         self.pose_window: Optional[PoseWindowBuffer] = None
-        self.pose_analysis: Optional[PoseAnalysis] = None
+        self.pose_analysis: Optional[PoseDTWCorrelator] = None
         if settings.pose_active:
             self.pose_detection = PosePipeline(settings)
             self.pose_window = PoseWindowBuffer(settings)
-            self.pose_analysis = PoseAnalysis(settings)
+            self.pose_analysis = PoseDTWCorrelator(settings)
 
         self.av: AV = AV(self.gui, settings)
         self.running: bool = False
@@ -75,6 +75,7 @@ class Main():
                 self.pose_window.start()
                 if self.pose_analysis:
                     self.pose_window.add_analysis_callback(self.pose_analysis.set_window)
+                    self.pose_analysis.add_correlation_callback(self.render.add_correlation)
                     self.pose_analysis.start()
             self.pose_detection.add_person_callback(self.render.set_person)
             self.pose_detection.start()
@@ -136,6 +137,7 @@ class Main():
             self.pose_window.stop()
         if self.pose_analysis:
             self.pose_analysis.stop()
+            self.pose_analysis.join()
 
         self.av.stop()
         self.av.join()
