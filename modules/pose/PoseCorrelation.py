@@ -274,7 +274,6 @@ class PoseCorrelationWindow:
         """
         return (pair_id[0], pair_id[1]) if pair_id[0] <= pair_id[1] else (pair_id[1], pair_id[0])
 
-
     def add_update_callback(self, callback: Callable[['PoseCorrelationWindow'], None]) -> None:
         """ Register a callback to receive the current pandas DataFrame window. """
         with self._update_callbacks_lock:

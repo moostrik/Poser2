@@ -24,7 +24,7 @@ from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.Person import Person, PersonColor, TrackingStatus
 from modules.pose.PoseCorrelation import PoseCorrelationWindow, PoseCorrelationBatch
 from modules.pose.PoseDefinitions import Pose, PoseEdgeIndices
-from modules.pose.PoseWindowBuffer import PoseWindowData
+from modules.pose.PoseStreamProcessor import PoseStreamData
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -423,7 +423,7 @@ class Render(RenderWindow):
             if clear:
                 self.input_angle_windows[id] = None
             return ret_window
-    def set_pose_window(self, data: PoseWindowData) -> None:
+    def set_pose_stream(self, data: PoseStreamData) -> None:
         angles_np: np.ndarray = np.nan_to_num(data.angles.to_numpy(), nan=0.0)
         conf_np: np.ndarray = data.confidences.to_numpy()
         if angles_np.shape[0] != conf_np.shape[0] or angles_np.shape[1] != conf_np.shape[1]:
@@ -432,7 +432,7 @@ class Render(RenderWindow):
         mesh_data: np.ndarray = np.stack([angles_np, conf_np], axis=-1)
 
         with self.input_mutex:
-            self.input_angle_windows[data.window_id] = mesh_data
+            self.input_angle_windows[data.person_id] = mesh_data
 
     def get_correlation_windows(self) -> Optional[dict[Tuple[int, int], np.ndarray]]:
         with self.input_mutex:

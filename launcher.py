@@ -81,7 +81,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.pose_active =      not args.nopose
     settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
-    settings.pose_window_size =     10 # seconds
+    settings.pose_buffer_size =     10 # seconds
 
     settings.corr_rate_hz =         args.fps
     settings.corr_num_workers =     10

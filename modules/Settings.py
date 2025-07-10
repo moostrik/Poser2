@@ -56,7 +56,7 @@ class Settings():
         # POSE DETCTION SETTINGS
         self.pose_model_type: ModelType         = None # type: ignore
         self.pose_active: bool                  = None # type: ignore
-        self.pose_window_size: int              = None # type: ignore
+        self.pose_buffer_size: int              = None # type: ignore
 
         # POSE CORRELATION SETTINGS
         self.corr_rate_hz: float                = None # type: ignore

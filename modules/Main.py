@@ -16,7 +16,7 @@ from modules.gui.PyReallySimpleGui import Gui
 from modules.person.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
 from modules.pose.PoseDTWCorrelator import PoseDTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
-from modules.pose.PoseWindowBuffer import PoseWindowBuffer
+from modules.pose.PoseStreamProcessor import PoseStreamProcessor
 from modules.pose.PoseCorrelation import PoseCorrelationWindow
 from modules.render.Render import Render
 from modules.Settings import Settings
@@ -47,7 +47,7 @@ class Main():
 
         if self.settings.pose_active:
             self.pose_detection = PosePipeline(settings)
-            self.pose_window = PoseWindowBuffer(settings)
+            self.pose_streamer = PoseStreamProcessor(settings)
             self.pose_dtw_correlator = PoseDTWCorrelator(settings)
             self.pose_dtw_window = PoseCorrelationWindow(settings)
 
@@ -70,13 +70,13 @@ class Main():
 
         if self.settings.pose_active:
             self.panoramic_tracker.add_person_callback(self.pose_detection.set_person)
-            self.pose_detection.add_person_callback(self.pose_window.add_person)
+            self.pose_detection.add_person_callback(self.pose_streamer.add_person)
             self.pose_detection.add_person_callback(self.render.set_person)
             self.pose_detection.start()
 
-            self.pose_window.add_window_callback(self.pose_dtw_correlator.set_pose_window)
-            self.pose_window.add_window_callback(self.render.set_pose_window)
-            self.pose_window.start()
+            self.pose_streamer.add_window_callback(self.pose_dtw_correlator.set_pose_stream)
+            self.pose_streamer.add_window_callback(self.render.set_pose_stream)
+            self.pose_streamer.start()
 
             self.pose_dtw_correlator.add_correlation_callback(self.pose_dtw_window.add_batch)
             self.pose_dtw_window.add_update_callback(self.render.set_correlation_window)
@@ -138,8 +138,8 @@ class Main():
 
         if self.pose_detection:
             self.pose_detection.stop()
-        if self.pose_window:
-            self.pose_window.stop()
+        if self.pose_streamer:
+            self.pose_streamer.stop()
         if self.pose_dtw_correlator:
             self.pose_dtw_correlator.stop()
             self.pose_dtw_correlator.join()
