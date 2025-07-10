@@ -1,20 +1,20 @@
 import numpy as np
 import pandas as pd
-from collections import deque
-from typing import Callable, Optional, Dict, Tuple, Set
-from dataclasses import dataclass, field
+from threading import Lock
+from typing import Callable, Optional, Dict, Tuple
 
-class PosePairCorrelation:
+from modules.Settings import Settings
+
+class PoseCorrelation:
     def __init__(self, id_1: int, id_2: int, joint_correlations: dict[str, float]) -> None:
-        self.id_1 = id_1
-        self.id_2 = id_2
+        self.pair_id: Tuple[int, int] = (id_1, id_2) if id_1 <= id_2 else (id_2, id_1)
         self.joint_correlations: dict[str, float] = joint_correlations
         self.similarity_score: float = float(np.mean(list(joint_correlations.values()))) if joint_correlations else 0.0
 
 class PoseCorrelationBatch:
     def __init__(self) -> None:
         """Collection of DTW results from a single analysis run."""
-        self._pair_correlations: list[PosePairCorrelation] = []
+        self._pair_correlations: list[PoseCorrelation] = []
         self._timestamp: pd.Timestamp = pd.Timestamp.now()
         self._similarity: float = 0.0
 
@@ -36,7 +36,7 @@ class PoseCorrelationBatch:
     def similarity(self) -> float:
         return self._similarity
 
-    def add_result(self, result: PosePairCorrelation) -> None:
+    def add_result(self, result: PoseCorrelation) -> None:
         """Add a PoseCorrelation result to the batch."""
         self._pair_correlations.append(result)
         self._similarity = sum(r.similarity_score for r in self._pair_correlations) / len(self._pair_correlations)
@@ -44,180 +44,244 @@ class PoseCorrelationBatch:
         # Sort by similarity score
         self._pair_correlations.sort(key=lambda r: r.similarity_score, reverse=True)
 
-    def get_most_similar_pair(self) -> Optional[PosePairCorrelation]:
+    def get_most_similar_pair(self) -> Optional[PoseCorrelation]:
         """Return the pair with highest similarity score."""
         if not self._pair_correlations:
             return None
         return max(self._pair_correlations, key=lambda r: r.similarity_score)
 
-PairCorrelationBatchCallback = Callable[[PoseCorrelationBatch], None]
+PoseCorrelationBatchCallback = Callable[[PoseCorrelationBatch], None]
 
 
-@dataclass
-class PairData:
-    """Class for storing all data related to a pose pair."""
-    history: deque = field(default_factory=lambda: deque(maxlen=250))
-    activity_count: int = 0
-    last_active_time: pd.Timestamp = field(default_factory=pd.Timestamp.now)
+# PoseCorrelationWindowCallback = Callable[[Dict[Tuple[int, int], pd.DataFrame]], None]
 
-    @property
-    def avg_similarity(self) -> float:
-        """Calculate average similarity over history."""
-        if not self.history:
-            return 0.0
-        return float(np.mean([sim for _, sim in self.history]))
-
-    @property
-    def consistency(self) -> float:
-        """Calculate consistency (inverse of standard deviation)."""
-        if len(self.history) < 2:
-            return 0.0
-        similarities: list[float] = [sim for _, sim in self.history]
-        return float(1.0 / (np.std(similarities) + 0.001))
-
-class PoseCorrelationHistory:
-    def __init__(self, max_history: int = 250, inactive_timeout_seconds: float = 1.0):
+class PoseCorrelationWindow:
+    def __init__(self, settings: Settings, history_duration: float = 60.0) -> None:
         """
-        Tracks pose correlation batches over time in a rolling window.
+        Tracks pose correlation batches over time in a rolling window using pandas DataFrames.
 
         Args:
-            max_history: Maximum number of batches to store
-            inactive_timeout_seconds: Remove pairs inactive for this many seconds
+            history_duration: Duration in seconds to maintain history
         """
-        self.max_history: int = max_history
-        self.inactive_timeout = pd.Timedelta(seconds=inactive_timeout_seconds)
+        self.history_duration = pd.Timedelta(seconds=history_duration)
+        self._pair_history: Dict[Tuple[int, int], pd.DataFrame] = {}
 
-        self.batches: deque[PoseCorrelationBatch] = deque(maxlen=max_history)
-
-        # Single dictionary to store all pair data
-        self.pairs: dict[str, PairData] = {}  # Maps pair_id -> PairData
+        self._update_callbacks_lock = Lock()
+        self._update_callbacks: set[Callable[['PoseCorrelationWindow'], None]] = set()
 
     def add_batch(self, batch: PoseCorrelationBatch) -> None:
-        """Add a new correlation batch to the history."""
-        self.batches.append(batch)
-
-        # Track which pairs are active in this batch
-        active_pairs_in_batch: set[str] = set()
-
-        if not batch.is_empty:
-            # Update pair histories for pairs in this batch
-            for corr in batch._pair_correlations:
-                pair_id: str = self._get_pair_id(corr.id_1, corr.id_2)
-                active_pairs_in_batch.add(pair_id)
-
-                # Create entry if this is a new pair
-                if pair_id not in self.pairs:
-                    self.pairs[pair_id] = PairData(
-                        history=deque(maxlen=self.max_history),
-                        activity_count=0,
-                        last_active_time=batch.timestamp
-                    )
-
-                # Update pair data
-                self.pairs[pair_id].history.append((batch.timestamp, corr.similarity_score))
-                self.pairs[pair_id].activity_count += 1
-                self.pairs[pair_id].last_active_time = batch.timestamp
-
-        # Update inactivity for pairs not in this batch
-        inactive_pairs: Set[str] = set(self.pairs.keys()) - active_pairs_in_batch
-
-        # For inactive pairs, add a zero-similarity entry to maintain continuity
-        for pair_id in inactive_pairs:
-            # Add a placeholder with zero similarity to show inactivity
-            self.pairs[pair_id].history.append((batch.timestamp, 0.0))
-            # Note: We don't increment activity count for inactive pairs
-
-        # Prune inactive pairs
-        self._prune_inactive_pairs(batch.timestamp)
-
-    def _prune_inactive_pairs(self, current_time: pd.Timestamp) -> None:
         """
-        Remove pairs that have been inactive for too long.
+        Add a new batch to the history by extracting individual pair correlations.
 
         Args:
-            current_time: The timestamp of the current batch
+            batch: The PoseCorrelationBatch to process
         """
-        pairs_to_remove = []
+        if not batch.is_empty:
 
-        for pair_id, pair_data in self.pairs.items():
-            # Calculate how long the pair has been inactive
-            inactive_duration = current_time - pair_data.last_active_time
+            timestamp: pd.Timestamp = batch.timestamp
+            current_time: pd.Timestamp = pd.Timestamp.now()
+            cutoff_time: pd.Timestamp = current_time - self.history_duration
 
-            # If the pair has been inactive for longer than the timeout
-            if inactive_duration > self.inactive_timeout:
+            # Process each pair correlation in the batch
+            for pair_corr in batch._pair_correlations:
+                pair_id: Tuple[int, int] = pair_corr.pair_id
+
+                # Create a new row with the similarity score and joint correlations
+                new_data: Dict[str, float] = {'similarity': pair_corr.similarity_score}
+                new_data.update(pair_corr.joint_correlations)
+
+                # Create a DataFrame with one row
+                new_row = pd.DataFrame(new_data, index=[timestamp])
+
+                # Add to existing DataFrame or create a new one
+                if pair_id in self._pair_history:
+                    self._pair_history[pair_id] = pd.concat([self._pair_history[pair_id], new_row])
+                else:
+                    self._pair_history[pair_id] = new_row
+
+                # Ensure the DataFrame is sorted by timestamp
+                self._pair_history[pair_id] = self._pair_history[pair_id].sort_index()
+
+            # Prune old data
+            self._prune_history(cutoff_time)
+
+            self._notify_update_callbacks()
+
+
+    def _prune_history(self, cutoff_time: pd.Timestamp) -> None:
+        """
+        Remove data points older than the cutoff time from all pairs.
+
+        Args:
+            cutoff_time: Timestamp before which data should be removed
+        """
+        pairs_to_remove: list[Tuple[int,int]] = []
+
+        for pair_id, df in self._pair_history.items():
+            # Keep only rows with timestamps >= cutoff_time
+            pruned_df: pd.DataFrame = df[df.index >= cutoff_time]
+
+            if pruned_df.empty:
+                # All data is old, mark for removal
                 pairs_to_remove.append(pair_id)
+            else:
+                # Update with pruned data
+                self._pair_history[pair_id] = pruned_df
 
-        # Remove inactive pairs
+        # Remove pairs with no remaining data
         for pair_id in pairs_to_remove:
-            del self.pairs[pair_id]
+            del self._pair_history[pair_id]
 
-    def get_top_pairs(self, n: int = 5) -> Dict[str, float]:
-        """Get the top N pairs by average similarity over the entire history."""
-        if not self.pairs:
-            return {}
-
-        # Calculate average similarity for each pair
-        avg_similarities = {pair_id: pair_data.avg_similarity
-                           for pair_id, pair_data in self.pairs.items()}
-
-        # Sort by average similarity and return top N
-        sorted_pairs = sorted(avg_similarities.items(), key=lambda x: x[1], reverse=True)
-        return dict(sorted_pairs[:n])
-
-    def get_most_consistent_pairs(self, n: int = 5) -> Dict[str, float]:
-        """Get the N pairs with the most consistent similarity (lowest standard deviation)."""
-        if not self.pairs:
-            return {}
-
-        # Calculate consistency for each pair
-        consistency = {pair_id: pair_data.consistency
-                      for pair_id, pair_data in self.pairs.items()}
-
-        # Sort by consistency and return top N
-        sorted_pairs = sorted(consistency.items(), key=lambda x: x[1], reverse=True)
-        return dict(sorted_pairs[:n])
-
-    def get_pair_data_for_visualization(self) -> Dict[str, Dict]:
+    def get_top_pairs(self, n: int = 5, time_window: Optional[float] = None, min_similarity: Optional[float] = None) -> list[Tuple[int, int]]:
         """
-        Returns all pair data organized for visualization.
+        Get the top N most similar pose pairs based on average similarity scores.
+
+        Args:
+            n: Number of top pairs to return
+            time_window: If provided, only consider data from the last X seconds
+            min_similarity: If provided, only include pairs with similarity >= this value
 
         Returns:
-            Dict with timestamps as keys, containing all pair similarities for that time
+            List of tuples containing (id_1, id_2) sorted by similarity
         """
-        result = {}
+        result: list[Tuple[int, int, float]] = []
+        current_time: pd.Timestamp = pd.Timestamp.now()
 
-        # Collect all timestamps
-        all_timestamps = set()
-        for pair_data in self.pairs.values():
-            all_timestamps.update(ts for ts, _ in pair_data.history)
+        for pair_id, df in self._pair_history.items():
+            # Apply time window filter if specified
+            if time_window is not None:
+                window_cutoff: pd.Timestamp = current_time - pd.Timedelta(seconds=time_window)
+                filtered_df: pd.DataFrame = df[df.index >= window_cutoff]
 
-        # Sort timestamps
-        sorted_timestamps = sorted(all_timestamps)
+                # Skip if no data in the window
+                if filtered_df.empty:
+                    continue
 
-        # Create a dict with timestamps as keys
-        for ts in sorted_timestamps:
-            result[ts] = {"overall": 0.0, "pairs": {}}
+                avg_similarity: float = filtered_df['similarity'].mean()
+            else:
+                avg_similarity = df['similarity'].mean()
 
-        # Fill in pair data
-        for pair_id, pair_data in self.pairs.items():
-            for ts, sim in pair_data.history:
-                if ts in result:
-                    result[ts]["pairs"][pair_id] = sim
+            # Skip if below minimum similarity threshold
+            if min_similarity is not None and avg_similarity < min_similarity:
+                continue
 
-        # Calculate overall similarity for each timestamp
-        for ts in result:
-            if result[ts]["pairs"]:
-                result[ts]["overall"] = np.mean(list(result[ts]["pairs"].values()))
+            # Store as (id_1, id_2, avg_similarity)
+            result.append((pair_id[0], pair_id[1], avg_similarity))
 
-        return result
+        # Sort by similarity score (descending) and take top N
+        result.sort(key=lambda x: x[2], reverse=True)
+        return [(id1, id2) for id1, id2, _ in result[:n]]
+
+    def get_metric_window(self, pair_id: Tuple[int, int], metric_name: str = "similarity'", time_window: Optional[float] = None) -> Optional[np.ndarray]:
+        """
+        Get the time series data for a specific joint of a pose pair.
+
+        Args:
+            pair_id: Tuple containing (id_1, id_2)
+            joint: The joint to retrieve (default is 'similarity')
+            time_window: If provided, only return data from the last X seconds
+
+        Returns:
+            Numpy array of joint values over time, or None if the pair is not found
+        """
+        pair_id = self.get_canonical_pair_id(pair_id)
+        if pair_id not in self._pair_history:
+            return None
+
+        df: pd.DataFrame = self._pair_history[pair_id]
+
+        # Apply time window filter if specified
+        if time_window is not None:
+            window_cutoff = pd.Timestamp.now() - pd.Timedelta(seconds=time_window)
+            df = df[df.index >= window_cutoff]
+
+        # Return the joint values as a numpy array
+        return df[metric_name].to_numpy() if metric_name in df.columns else None
+
+    def get_dataframe(self, pair_id: Tuple[int,int], time_window: Optional[float] = None, resample: Optional[str] = None) -> Optional[pd.DataFrame]:
+        """
+        Get the correlation data for a specific pair.
+
+        Args:
+            id_1: First pose ID
+            id_2: Second pose ID
+            time_window: If provided, only return data from the last X seconds
+            resample: If provided, resample data to the specified frequency (e.g., '1s', '500ms')
+
+        Returns:
+            DataFrame with timestamps as index and columns for similarity and joints,
+            or None if the pair is not found
+        """
+        pair_id = self.get_canonical_pair_id(pair_id)
+        if pair_id not in self._pair_history:
+            return None
+
+        df: pd.DataFrame = self._pair_history[pair_id]
+
+        # Apply time window filter if specified
+        if time_window is not None:
+            window_cutoff = pd.Timestamp.now() - pd.Timedelta(seconds=time_window)
+            df = df[df.index >= window_cutoff]
+
+        # Apply resampling if specified
+        if resample is not None and not df.empty:
+            # Resample to the specified frequency
+            # For downsampling, use mean aggregation
+            df = df.resample(resample).mean()
+
+        return df
+
+    def get_metric_statistics(self, pair_id: Tuple[int,int], metric_name: Optional[str] = None, time_window: Optional[float] = None) -> Optional[Dict]:
+        """
+        Get statistics for a specific metric or all metrics for a pair.
+
+        Args:
+            pair_id: Tuple containing (id_1, id_2)
+            metric_name: If provided, only return stats for this metric (joint name or 'similarity')
+            time_window: If provided, only consider data from the last X seconds
+
+        Returns:
+            Dictionary with statistics (mean, std, min, max) for the specified metric(s)
+            or None if the pair is not found
+        """
+        pair_id = self.get_canonical_pair_id(pair_id)
+        df: Optional[pd.DataFrame] = self.get_dataframe(pair_id, time_window)
+
+        if df is None or df.empty:
+            return None
+
+        if metric_name is not None:
+            # Check if the metric exists
+            if metric_name not in df.columns:
+                return None
+
+            # Return statistics for a specific metric
+            stats = {
+                'mean': df[metric_name].mean(),
+                'std': df[metric_name].std(),
+                'min': df[metric_name].min(),
+                'max': df[metric_name].max()
+            }
+            return stats
+        else:
+            # Return statistics for all metrics (joints and similarity)
+            return df.describe().to_dict()
 
     @staticmethod
-    def _get_pair_id(id1: int, id2: int) -> str:
-        """Create a consistent string ID for a pair of IDs."""
-        return f"{min(id1, id2)}-{max(id1, id2)}"
+    def get_canonical_pair_id(pair_id: Tuple[int, int]) -> Tuple[int, int]:
+        """
+        Create a canonical pair ID by ensuring the smaller ID is always first.
+        """
+        return (pair_id[0], pair_id[1]) if pair_id[0] <= pair_id[1] else (pair_id[1], pair_id[0])
 
-    @staticmethod
-    def get_pair_ids_from_string(pair_id: str) -> Tuple[int, int]:
-        """Convert a pair ID string back to individual IDs."""
-        id1_str, id2_str = pair_id.split('-')
-        return int(id1_str), int(id2_str)
+
+    def add_update_callback(self, callback: Callable[['PoseCorrelationWindow'], None]) -> None:
+        """ Register a callback to receive the current pandas DataFrame window. """
+        with self._update_callbacks_lock:
+            self._update_callbacks.add(callback)
+
+    def _notify_update_callbacks(self) -> None:
+        """ Call all registered callbacks with the current batch. """
+        with self._update_callbacks_lock:
+            for callback in self._update_callbacks:
+                callback(self)

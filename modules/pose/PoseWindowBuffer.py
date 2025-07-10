@@ -47,15 +47,14 @@ class PoseWindowBuffer(Thread):
 
         # Callbacks for analysis output
         self.callback_lock = Lock()
-        self.analysis_output_callbacks: set[PoseWindowCallback] = set()
-        self.visualisation_callbacks: set[PoseWindowVisualisationCallback] = set()
+        self.output_callbacks: set[PoseWindowCallback] = set()
 
         hot_reloader = HotReloadMethods(self.__class__, True)
 
     def stop(self) -> None:
         self._stop_event.set()
         with self.callback_lock:
-            self.analysis_output_callbacks.clear()
+            self.output_callbacks.clear()
         self.angle_windows.clear()
         self.conf_windows.clear()
 
@@ -116,7 +115,7 @@ class PoseWindowBuffer(Thread):
         angle_df = PoseWindowBuffer.ewm_circular_mean(angle_df, span=7.0)
 
         # Notify callbacks with both DataFrames
-        self._analysis_callback(PoseWindowData(person.id, angle_df, conf_df))
+        self._notify_callbacks(PoseWindowData(person.id, angle_df, conf_df))
 
     @staticmethod
     def rolling_circular_mean(df: pd.DataFrame, window: float = 0.3, min_periods: int = 1) -> pd.DataFrame:
@@ -142,80 +141,13 @@ class PoseWindowBuffer(Thread):
         # Wrap back to [-π, π]
         return ((df_smooth + np.pi) % (2 * np.pi)) - np.pi
 
-    def add_analysis_callback(self, callback: PoseWindowCallback) -> None:
+    def add_window_callback(self, callback: PoseWindowCallback) -> None:
         """ Register a callback to receive the current pandas DataFrame window. """
         with self.callback_lock:
-            self.analysis_output_callbacks.add(callback)
+            self.output_callbacks.add(callback)
 
-    def _analysis_callback(self, data: PoseWindowData) -> None:
-        self._visualisation_callback(data)
+    def _notify_callbacks(self, data: PoseWindowData) -> None:
         """ Handle the output of the analysis. """
         with self.callback_lock:
-            for callback in self.analysis_output_callbacks:
+            for callback in self.output_callbacks:
                 callback(data)
-
-    def add_visualisation_callback(self, callback: PoseWindowVisualisationCallback) -> None:
-        """ Register a callback to receive the visualisation data. """
-        with self.callback_lock:
-            self.visualisation_callbacks.add(callback)
-
-    def _visualisation_callback(self, data: PoseWindowData) -> None:
-        """ Handle the output of the visualisation. """
-        vis: np.ndarray = self._create_visualisation_data(data.angles, data.confidences)
-        vis_data = PoseWindowVisualisationData(window_id=data.window_id, mesh_data=vis)
-        for callback in self.visualisation_callbacks:
-            callback(vis_data)
-
-    @staticmethod
-    def _create_visualisation_data(angles: pd.DataFrame, confidences: pd.DataFrame) -> np.ndarray:
-        """
-        Prepare data for use in a GL mesh.
-        Each vertex will have [angle, confidence] for each joint, per frame.
-        Output shape: (num_frames, num_joints, 2)
-        """
-        # Convert DataFrames to numpy arrays, fill NaNs with safe defaults
-        angles_np: np.ndarray = np.nan_to_num(angles.to_numpy(), nan=0.0)
-        conf_np: np.ndarray = np.nan_to_num(confidences.to_numpy(), nan=0.0)
-
-        # Ensure both arrays have the same shape
-        min_rows: int = min(angles_np.shape[0], conf_np.shape[0])
-        min_cols: int = min(angles_np.shape[1], conf_np.shape[1])
-        angles_np = angles_np[:min_rows, :min_cols]
-
-        conf_np = conf_np[:min_rows, :min_cols]
-
-        # Stack angle and confidence per joint as features
-        # Resulting shape: (num_frames, num_joints, 2)
-        mesh_data: np.ndarray = np.stack([angles_np, conf_np], axis=-1)
-
-        return mesh_data
-
-    @staticmethod
-    def _create_visualisation_image(angles: pd.DataFrame, confidences: pd.DataFrame) -> np.ndarray:
-        """ Create visualisation image from angles and confidences. """
-        angles_np: np.ndarray = np.nan_to_num(angles.to_numpy(), nan=0.0)
-        angles_np = np.abs(angles_np - np.pi)
-        angles_norm: np.ndarray = np.clip(angles_np / np.pi, 0, 1)
-        conf_np: np.ndarray = np.nan_to_num(confidences.to_numpy(), nan=0.0)
-
-        angles_norm = angles_norm[:, :4]
-        conf_np = conf_np[:, :4]
-
-        width, height = angles_norm.shape
-        img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
-
-        # BGR: Blue, Green, Red
-        img[..., 0] = angles_norm.T         # Blue channel: 0 (yellow) to 1 (cyan)
-        img[..., 1] = 1.0                   # Green channel: always 1
-        img[..., 2] = 1.0 - angles_norm.T   # Red channel: 1 (yellow) to 0 (cyan)
-        img[..., 3] = conf_np.T             # Alpha: confidence or 1.0
-
-        # Insert black row between every row, including top and bottom
-        black_row: np.ndarray = np.zeros((1, width, 4), dtype=img.dtype)
-        img_with_black: list[np.ndarray] = [black_row]
-        for row in img:
-            img_with_black.append(row[np.newaxis, ...])
-            img_with_black.append(black_row)
-        img_final: np.ndarray = np.vstack(img_with_black)
-
-        return img_final

@@ -17,6 +17,7 @@ from modules.person.panoramic.PanoramicTracker import PanoramicTracker as Panora
 from modules.pose.PoseDTWCorrelator import PoseDTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseWindowBuffer import PoseWindowBuffer
+from modules.pose.PoseCorrelation import PoseCorrelationWindow
 from modules.render.Render import Render
 from modules.Settings import Settings
 
@@ -24,6 +25,8 @@ from modules.Settings import Settings
 class Main():
     def __init__(self, settings: Settings) -> None:
         self.gui = Gui(settings.render_title + ' GUI', settings.path_file, 'default')
+
+        self.settings: Settings = settings
 
         self.render = Render(settings)
 
@@ -42,13 +45,11 @@ class Main():
 
         self.panoramic_tracker = PanoramicTracker(self.gui, settings)
 
-        self.pose_detection: Optional[PosePipeline] = None
-        self.pose_window: Optional[PoseWindowBuffer] = None
-        self.pose_analysis: Optional[PoseDTWCorrelator] = None
-        if settings.pose_active:
+        if self.settings.pose_active:
             self.pose_detection = PosePipeline(settings)
             self.pose_window = PoseWindowBuffer(settings)
-            self.pose_analysis = PoseDTWCorrelator(settings)
+            self.pose_dtw_correlator = PoseDTWCorrelator(settings)
+            self.pose_dtw_window = PoseCorrelationWindow(settings)
 
         self.av: AV = AV(self.gui, settings)
         self.running: bool = False
@@ -67,18 +68,20 @@ class Main():
             camera.add_tracker_callback(self.render.set_tracklet)
             camera.start()
 
-        if self.pose_detection:
+        if self.settings.pose_active:
             self.panoramic_tracker.add_person_callback(self.pose_detection.set_person)
-            if self.pose_window:
-                self.pose_detection.add_person_callback(self.pose_window.add_person)
-                self.pose_window.add_visualisation_callback(self.render.set_angle_window)
-                self.pose_window.start()
-                if self.pose_analysis:
-                    self.pose_window.add_analysis_callback(self.pose_analysis.set_window)
-                    self.pose_analysis.add_correlation_callback(self.render.add_correlation)
-                    self.pose_analysis.start()
+            self.pose_detection.add_person_callback(self.pose_window.add_person)
             self.pose_detection.add_person_callback(self.render.set_person)
             self.pose_detection.start()
+
+            self.pose_window.add_window_callback(self.pose_dtw_correlator.set_pose_window)
+            self.pose_window.add_window_callback(self.render.set_pose_window)
+            self.pose_window.start()
+
+            self.pose_dtw_correlator.add_correlation_callback(self.pose_dtw_window.add_batch)
+            self.pose_dtw_window.add_update_callback(self.render.set_correlation_window)
+            self.pose_dtw_correlator.start()
+
         else:
             self.panoramic_tracker.add_person_callback(self.render.set_person)
 
@@ -87,10 +90,11 @@ class Main():
         self.av.add_output_callback(self.render.set_av)
         self.av.start()
 
+        # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
         self.gui.exit_callback = self.stop
 
         for i in range(ceil(len(self.cameras) / 2.0)):
-            c = i * 2
+            c: int = i * 2
             if c + 1 < len(self.cameras):
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame(), self.cameras[c+1].gui.get_gui_frame()])
             else:
@@ -103,6 +107,7 @@ class Main():
             self.gui.addFrame([self.recorder.get_gui_frame(), self.panoramic_tracker.gui.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
+        # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
 
         for camera in self.cameras:
             camera.gui.gui_check()
@@ -135,9 +140,9 @@ class Main():
             self.pose_detection.stop()
         if self.pose_window:
             self.pose_window.stop()
-        if self.pose_analysis:
-            self.pose_analysis.stop()
-            self.pose_analysis.join()
+        if self.pose_dtw_correlator:
+            self.pose_dtw_correlator.stop()
+            self.pose_dtw_correlator.join()
 
         self.av.stop()
         self.av.join()

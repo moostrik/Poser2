@@ -17,7 +17,7 @@ from numba import njit
 import pandas as pd
 
 # Local application imports
-from modules.pose.PoseCorrelation import PosePairCorrelation, PoseCorrelationBatch, PairCorrelationBatchCallback
+from modules.pose.PoseCorrelation import PoseCorrelation, PoseCorrelationBatch, PoseCorrelationBatchCallback
 from modules.pose.PoseWindowBuffer import PoseWindowData, PoseWindowDataDict
 from modules.Settings import Settings
 
@@ -131,18 +131,18 @@ class PoseDTWCorrelator():
 
         # CALLBACKS
         self._callback_lock = threading.Lock()
-        self._callbacks: set[PairCorrelationBatchCallback] = set()
+        self._callbacks: set[PoseCorrelationBatchCallback] = set()
 
         # HOT RELOADER
         self.hot_reloader = HotReloadMethods(self.__class__, False, False)
         self.hot_reloader.add_file_changed_callback(self.restart)
 
-    def set_window(self, data: PoseWindowData) -> None:
+    def set_pose_window(self, data: PoseWindowData) -> None:
         with self._input_lock:
             self._input_windows[data.window_id] = data
         return
 
-    def add_correlation_callback(self, callback: PairCorrelationBatchCallback) -> None:
+    def add_correlation_callback(self, callback: PoseCorrelationBatchCallback) -> None:
         """ Register a callback to receive the current pandas DataFrame window. """
         with self._callback_lock:
             self._callbacks.add(callback)
@@ -191,31 +191,31 @@ class PoseDTWCorrelator():
             angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_windows, self.analysis_window_size)
 
             if angle_pairs:
-                start_time: float = time.perf_counter()
+                # start_time: float = time.perf_counter()
                 batch = PoseCorrelationBatch()
 
                 # Submit all pairs for analysis
                 future_to_pair: dict[Future, AnglePair] = {}
                 for pair in angle_pairs:
-                    future: Future[PosePairCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band)
+                    future: Future[PoseCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band)
                     future_to_pair[future] = pair
 
                 # Collect results
                 for future in as_completed(future_to_pair):
                     pair: AnglePair = future_to_pair[future]
                     try:
-                        correlation: Optional[PosePairCorrelation] = future.result()
+                        correlation: Optional[PoseCorrelation] = future.result()
                         if correlation:
                             batch.add_result(correlation)
                     except Exception as e:
                         print(f"Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
 
                 # Get most similar if we have results
-                if not batch.is_empty:
-                    most_similar: Optional[PosePairCorrelation] = batch.get_most_similar_pair()
+                # if not batch.is_empty:
+                #     most_similar: Optional[PoseCorrelation] = batch.get_most_similar_pair()
 
-                analysis_duration: float = time.perf_counter() - start_time
-                print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs. Most similar: {most_similar.id_1}-{most_similar.id_2} with score {most_similar.similarity_score:.2f}" if most_similar else "No valid pairs found.")
+                # analysis_duration: float = time.perf_counter() - start_time
+                # print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs. Most similar: {most_similar.pair_id[0]}-{most_similar.pair_id[1]} with score {most_similar.similarity_score:.2f}" if most_similar else "No valid pairs found.")
 
                 self._callback(batch)
 
@@ -398,7 +398,7 @@ class PoseDTWCorrelator():
         return pairs
 
     @staticmethod
-    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int) -> Optional[PosePairCorrelation]:
+    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int) -> Optional[PoseCorrelation]:
         """Analyse a single pair - designed for thread pool execution."""
         joint_correlations: dict[str, float] = {}
         angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
@@ -433,7 +433,7 @@ class PoseDTWCorrelator():
                 continue
 
         if joint_correlations:
-            return PosePairCorrelation(
+            return PoseCorrelation(
                 id_1=pair.id_1,
                 id_2=pair.id_2,
                 joint_correlations=joint_correlations

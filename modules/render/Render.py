@@ -1,7 +1,8 @@
 # Standard library imports
 import math
 import numpy as np
-from enum import Enum, IntEnum, auto
+from dataclasses import dataclass
+from enum import Enum
 from typing import Optional, Type, Any, Dict, Tuple
 from threading import Lock
 
@@ -21,9 +22,9 @@ from modules.gl.Utils import lfo, fit, fill
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.Person import Person, PersonColor, TrackingStatus
-from modules.pose.PoseDTWCorrelator import PosePairCorrelation, PoseCorrelationBatch
+from modules.pose.PoseCorrelation import PoseCorrelationWindow, PoseCorrelationBatch
 from modules.pose.PoseDefinitions import Pose, PoseEdgeIndices
-from modules.pose.PoseWindowBuffer import PoseWindowVisualisationData
+from modules.pose.PoseWindowBuffer import PoseWindowData
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -39,21 +40,23 @@ class ImageType(Enum):
     PSN = 3
     VIS = 4
 
-class SimType(Enum):
-    MAP = 0
+class DataVisType(Enum):
+    TRACKING = 0
+    R_PAIRS = 1
 
-class VisType(IntEnum):
+class LightVisType(Enum):
     LINES = 0
     LIGHTS = 1
 
 Composition_Subdivision = dict[ImageType, dict[int, tuple[int, int, int, int]]]
 
+
 class Render(RenderWindow):
     def __init__(self, settings: Settings) -> None:
 
         self.num_cams: int = settings.camera_num
-        self.num_sims: int = len(SimType)
-        self.num_viss: int = len(VisType)
+        self.num_sims: int = len(DataVisType)
+        self.num_viss: int = len(LightVisType)
         self.num_persons: int = settings.pose_num
 
         self.cam_images: dict[int, Image] = {}
@@ -64,12 +67,13 @@ class Render(RenderWindow):
         self.vis_fbos: dict[int, Fbo] = {}
         self.psn_fbos: dict[int, Fbo] = {}
 
+        self.R_meshes: dict[Tuple[int, int], Mesh] = {}  # pair_id -> Mesh
         self.pose_meshes: dict[int, Mesh] = {}
         self.angle_meshes: dict[int, Mesh] = {}
 
         self.all_images: list[Image] = []
         self.all_fbos: list[Fbo | SwapFbo] = []
-        self.all_meshes: list[Mesh] = []
+        # self.all_meshes: list[Mesh] = []
         self.all_shaders: list[Shader] = []
 
         for i in range(self.num_cams):
@@ -97,7 +101,7 @@ class Render(RenderWindow):
             self.pose_meshes[i].set_indices(PoseEdgeIndices)
 
             self.angle_meshes[i] = Mesh()
-            self.all_meshes.append(self.angle_meshes[i])
+            # self.all_meshes.append(self.angle_meshes[i])
 
         self.composition: Composition_Subdivision = self.make_composition_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.num_persons, self.num_viss)
         super().__init__(self.composition[ImageType.TOT][0][2], self.composition[ImageType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_fps, settings.render_x, settings.render_y)
@@ -106,12 +110,12 @@ class Render(RenderWindow):
 
         self.input_mutex: Lock = Lock()
         self.input_tracklets: dict[int, dict[int, Tracklet]] = {}   # cam_id -> track_id -> Tracklet
-        self.input_persons: dict[int, Person | None] = {}           # person_id -> Person
-        self.input_angle_window: dict[int, Optional[np.ndarray]] = {}          # person_id -> angles
+        self.input_persons: dict[int, Optional[Person]] = {}           # person_id -> Person
+        self.input_angle_windows: dict[int, Optional[np.ndarray]] = {}          # person_id -> angles
         for i in range(self.num_persons):
             self.input_tracklets[i] = {}
             self.input_persons[i] = None
-            self.input_angle_window[i] = None
+            self.input_angle_windows[i] = None
 
         self.vis_width: int = settings.light_resolution
         self.vis_height: int = 1
@@ -128,6 +132,9 @@ class Render(RenderWindow):
             self.all_images.append(self.analysis_images[i])
         # self.analysis_shader: WS_Angles = WS_Angles()
         # self.all_shaders.append(self.analysis_shader)
+
+        self.input_R_windows:dict[Tuple[int, int], np.ndarray] = {}
+        self.input_R_window_consumed: bool = True
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, False)
 
@@ -157,6 +164,8 @@ class Render(RenderWindow):
             self.allocated = True
 
         try:
+            self.update_R_meshes()
+
             self.draw_cameras()
             self.draw_sims()
             self.draw_lights()
@@ -168,6 +177,40 @@ class Render(RenderWindow):
             self.draw_composition()
         except Exception as e:
             print(f"Error in draw_persons: {e}")
+
+    def update_R_meshes(self) -> None:
+        R_windows: Optional[dict[Tuple[int, int], np.ndarray]] = self.get_correlation_windows()
+
+        if R_windows is None:
+            return
+
+        self.R_meshes.clear()
+
+        for pair_id, data in R_windows.items():
+            if data is None or len(data) < 2:
+                continue  # Need at least 2 points to draw a line
+
+            mesh = Mesh()
+            num_points = len(data)
+
+            # X: normalized time (0 to 1), Y: similarity value (assume in [0, 1])
+            x = np.linspace(0, 1, num_points, dtype=np.float32)
+            y = np.clip(data.astype(np.float32), 0.0, 1.0)
+            vertices = np.stack([x, y, np.zeros_like(x)], axis=1)  # shape (num_points, 3)
+
+            # Indices for line strip
+            indices = np.arange(num_points - 1, dtype=np.uint32)
+            indices = np.stack([indices, indices + 1], axis=1).flatten()
+
+            # Colors (e.g., white, or color by pair_id)
+            colors = np.ones((num_points, 4), dtype=np.float32)
+
+            mesh.set_vertices(vertices)
+            mesh.set_indices(indices)
+            mesh.set_colors(colors)
+            mesh.update()
+
+            self.R_meshes[pair_id] = mesh
 
     def update_pose_meshes(self) -> None:
         for i in range(self.num_persons):
@@ -181,7 +224,7 @@ class Render(RenderWindow):
 
     def update_angle_meshes(self) -> None:
         for i in range(self.num_persons):
-            data: Optional[np.ndarray] = self.get_angle_window(i, clear=True)
+            data: Optional[np.ndarray] = self.get_pose_window(i, clear=True)
             if data is None:
                 continue
 
@@ -274,8 +317,10 @@ class Render(RenderWindow):
         for i in range(self.num_sims):
             fbo: Fbo = self.sim_fbos[i]
             self.setView(fbo.width, fbo.height)
-            if i == SimType.MAP.value:
+            if i == DataVisType.TRACKING.value:
                 self.draw_map_positions(self.input_persons, self.num_cams, fbo)
+            elif i == DataVisType.R_PAIRS.value:
+                self.draw_R_pairs(self.R_meshes, fbo)
 
     def draw_lights(self) -> None:
         self.vis_image.update()
@@ -284,9 +329,9 @@ class Render(RenderWindow):
             fbo: Fbo = self.vis_fbos[i]
             self.setView(fbo.width, fbo.height)
             fbo.begin()
-            if i == VisType.LINES.value:
+            if i == LightVisType.LINES.value:
                 self.draw_light_lines(fbo, self.vis_image, self.vis_line_shader)
-            elif i == VisType.LIGHTS.value:
+            elif i == LightVisType.LIGHTS.value:
                 self.draw_light_angles(fbo, self.vis_image, self.vis_angle_shader)
             fbo.end()
 
@@ -372,25 +417,41 @@ class Render(RenderWindow):
         with self.input_mutex:
             self.input_persons[person.id] = person
 
+    def get_pose_window(self, id: int, clear = False) -> Optional[np.ndarray]:
+        with self.input_mutex:
+            ret_window: Optional[np.ndarray] = self.input_angle_windows[id]
+            if clear:
+                self.input_angle_windows[id] = None
+            return ret_window
+    def set_pose_window(self, data: PoseWindowData) -> None:
+        angles_np: np.ndarray = np.nan_to_num(data.angles.to_numpy(), nan=0.0)
+        conf_np: np.ndarray = data.confidences.to_numpy()
+        if angles_np.shape[0] != conf_np.shape[0] or angles_np.shape[1] != conf_np.shape[1]:
+            print(f"Angles shape {angles_np.shape} does not match confidences shape {conf_np.shape}")
+            return
+        mesh_data: np.ndarray = np.stack([angles_np, conf_np], axis=-1)
+
+        with self.input_mutex:
+            self.input_angle_windows[data.window_id] = mesh_data
+
+    def get_correlation_windows(self) -> Optional[dict[Tuple[int, int], np.ndarray]]:
+        with self.input_mutex:
+            if self.input_R_window_consumed:
+                return None
+            self.input_R_window_consumed = True
+            return self.input_R_windows.copy()
+    def set_correlation_window(self, window: PoseCorrelationWindow) -> None:
+        top_pairs: list[Tuple[int, int]] = window.get_top_pairs(n=3, time_window=0.5)
+        with self.input_mutex:
+            self.input_R_window_consumed = False
+            self.input_R_windows.clear()
+            for pair in top_pairs:
+                data: Optional[np.ndarray] = window.get_metric_window(pair, metric_name='similarity')
+                if data is not None:
+                    self.input_R_windows[pair] = data
+
     def set_av(self, value: AvOutput) -> None:
         self.vis_image.set_image(value.img)
-        self.av_angle = value.angle
-
-    def get_angle_window(self, id: int, clear = False) -> Optional[np.ndarray]:
-        with self.input_mutex:
-            ret_analysis: Optional[np.ndarray] = self.input_angle_window[id]
-            if clear:
-                self.input_angle_window[id] = None
-            return ret_analysis
-    def set_angle_window(self, data: PoseWindowVisualisationData) -> None:
-        with self.input_mutex:
-            self.input_angle_window[data.window_id] = data.mesh_data
-
-    def add_correlation(self, batch: PoseCorrelationBatch) -> None:
-        """ Add a correlation value for a person. """
-        batch.timestamp
-        with self.input_mutex:
-            pass
 
     # STATIC METHODS
     @staticmethod
@@ -506,6 +567,28 @@ class Render(RenderWindow):
             y += 14
             string = f'L: {person.local_angle:.1f}'
             RenderWindow.draw_string(x, y, string)
+
+        fbo.end()
+        glFlush()
+
+    @staticmethod
+    def draw_R_pairs(R_meshes: dict[Tuple[int, int], Mesh], fbo: Fbo) -> None:
+        fbo.begin()
+        glClearColor(0.1, 0.1, 0.1, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+        for pair_id, mesh in R_meshes.items():
+            if mesh.isInitialized():
+                draw_width: int = fbo.width - 80
+                mesh.draw(0, fbo.height, draw_width, -fbo.height)
+
+                vertices: Optional[np.ndarray] = mesh.vertices
+                if vertices is not None and len(vertices) > 0:
+                    # Get last vertex (normalized coordinates)
+                    last_vertex = vertices[-1]
+                    x = int(last_vertex[0] * draw_width + 10)
+                    y = int((1.0 - last_vertex[1]) * fbo.height + 7)
+                    text = f"{pair_id[0]}-{pair_id[1]}: {last_vertex[1]:.2f}"
+                    RenderWindow.draw_string(x, y, text)
 
         fbo.end()
         glFlush()
