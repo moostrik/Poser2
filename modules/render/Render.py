@@ -576,20 +576,55 @@ class Render(RenderWindow):
         fbo.begin()
         glClearColor(0.1, 0.1, 0.1, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        for pair_id, mesh in R_meshes.items():
-            if mesh.isInitialized():
-                draw_width: int = fbo.width - 80
-                mesh.draw(0, fbo.height, draw_width, -fbo.height)
 
-                vertices: Optional[np.ndarray] = mesh.vertices
-                if vertices is not None and len(vertices) > 0:
-                    # Get last vertex (normalized coordinates)
-                    last_vertex = vertices[-1]
-                    x = int(last_vertex[0] * draw_width + 10)
-                    y = int((1.0 - last_vertex[1]) * fbo.height + 7)
-                    text = f"{pair_id[0]}-{pair_id[1]}: {last_vertex[1]:.2f}"
-                    RenderWindow.draw_string(x, y, text)
+        num_pairs = len(R_meshes)
+        if num_pairs == 0:
+            fbo.end()
+            glFlush()
+            return
 
+        draw_width: int = fbo.width - 80
+        slice_height = fbo.height // num_pairs
+
+        for idx, (pair_id, mesh) in enumerate(R_meshes.items()):
+            if not mesh.isInitialized():
+                continue
+
+            # Color based on first half of pair_id
+            color_seed = pair_id[0] % 6
+            color_map = [
+                (1.0, 0.2, 0.2, 0.5),  # red
+                (0.2, 1.0, 0.2, 1.0),  # green
+                (0.2, 0.2, 1.0, 1.0),  # blue
+                (1.0, 1.0, 0.2, 1.0),  # yellow
+                (1.0, 0.2, 1.0, 1.0),  # magenta
+                (0.2, 1.0, 1.0, 1.0),  # cyan
+            ]
+            glColor4f(*color_map[color_seed])
+                # Draw background rect for this slice
+            y_offset = idx * slice_height
+            glBegin(GL_QUADS)
+            glVertex2f(0, y_offset)
+            glVertex2f(draw_width, y_offset)
+            glVertex2f(draw_width, y_offset + slice_height)
+            glVertex2f(0, y_offset + slice_height)
+            glEnd()
+
+            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+            # Compute vertical offset for this slice
+            y_offset = idx * slice_height
+            mesh.draw(0, y_offset + slice_height, draw_width, -slice_height)
+
+            # Draw pair label at the end of the line
+            vertices: Optional[np.ndarray] = mesh.vertices
+            if vertices is not None and len(vertices) > 0:
+                last_vertex = vertices[-1]
+                x = int(last_vertex[0] * draw_width + 10)
+                y = int(y_offset + (1.0 - last_vertex[1]) * slice_height + 7)
+                text = f"{pair_id[0]}-{pair_id[1]}: {last_vertex[1]:.2f}"
+                RenderWindow.draw_string(x, y, text)
+
+        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
         fbo.end()
         glFlush()
 
