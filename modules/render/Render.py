@@ -57,7 +57,7 @@ class Render(RenderWindow):
         self.num_cams: int = settings.camera_num
         self.num_sims: int = len(DataVisType)
         self.num_viss: int = len(LightVisType)
-        self.num_persons: int = settings.pose_num
+        self.num_persons: int = settings.max_players
 
         self.cam_images: dict[int, Image] = {}
         self.psn_images: dict[int, Image] = {}

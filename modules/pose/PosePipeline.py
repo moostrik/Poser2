@@ -20,7 +20,7 @@ class PosePipeline:
         # Pose detection components
         self.pose_detectors: dict[int, Detection] = {}
         self.pose_detector_frame_size: int = 256
-        self.max_detectors: int = settings.pose_num
+        self.max_detectors: int = settings.max_players
         for i in range(self.max_detectors):
             self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type)
         print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])

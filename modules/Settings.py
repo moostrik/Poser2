@@ -17,6 +17,9 @@ class Settings():
         H265 = '.hevc'
 
     def __init__(self) -> None:
+        # GENERAL
+        self.max_players: int                   = None # type: ignore
+
         # PATHS
         self.path_root: str                     = None # type: ignore
         self.path_model: str                    = None # type: ignore
@@ -44,16 +47,25 @@ class Settings():
         self.video_format: Settings.CoderFormat = None # type: ignore
         self.video_frame_types: list[FrameType] = None # type: ignore
 
+        # TRACKING SETTINGS
+        self.tracker_min_age: int               = None # type: ignore
+        self.tracker_min_height: float          = None # type: ignore
+        self.tracker_timeout: float             = None # type: ignore
+        self.tracker_roi_expansion: float       = None # type: ignore
+
         # POSE DETCTION SETTINGS
-        self.pose_num: int                      = None # type: ignore
         self.pose_model_type: ModelType         = None # type: ignore
         self.pose_active: bool                  = None # type: ignore
         self.pose_window_size: int              = None # type: ignore
 
-        # POSE ANALYSIS SETTINGS
-        self.analysis_rate_hz: float            = None # type: ignore
-        self.analysis_window_size: int          = None # type: ignore
-        self.analysis_workers: int              = None # type: ignore
+        # POSE CORRELATION SETTINGS
+        self.corr_rate_hz: float                = None # type: ignore
+        self.corr_num_workers: int              = None # type: ignore
+        self.corr_window_size: int              = None # type: ignore
+        self.corr_window_timeout: float         = None # type: ignore
+        self.corr_max_nan_ratio: float          = None # type: ignore
+        self.corr_dtw_band: int                 = None # type: ignore
+        self.corr_similarity_exp: float         = None # type: ignore
 
         # LIGHT SETTINGS
         self.light_resolution: int              = None # type: ignore

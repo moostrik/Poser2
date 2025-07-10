@@ -110,17 +110,18 @@ def ignore_keyboard_interrupt() -> None:
 class PoseDTWCorrelator():
     def __init__(self, settings: Settings) -> None:
 
-        self.analysis_interval: float = 1.0 / settings.analysis_rate_hz
+        self.interval: float = 1.0 / settings.corr_rate_hz
+
         self.max_window_size: int = int(settings.pose_window_size * settings.camera_fps)
-        self.analysis_window_size: int = min(int(settings.analysis_window_size * settings.camera_fps), self.max_window_size)
+        self.window_size: int = min(int(settings.corr_window_size * settings.camera_fps), self.max_window_size)
+        self.window_timeout: float = settings.corr_window_timeout
 
-        self.align_tolerance = pd.Timedelta(f'{int(1000 / settings.camera_fps)}ms')
-        self.maximum_nan_ratio: float = 0.15
-        self.max_age: float = 1.0
-        self.dtw_band: int = 10
+        self.maximum_nan_ratio: float = settings.corr_max_nan_ratio
+        self.dtw_band: int = settings.corr_dtw_band
+        self.similarity_exponent: float = settings.corr_similarity_exp
 
-        # ANALYSIS THREAD
-        self._max_workers: int = min(cpu_count(), settings.analysis_workers)
+        self._max_workers: int = max(min(cpu_count(), settings.corr_num_workers), 1)
+
         self._process_pool = ProcessPoolExecutor(max_workers=self._max_workers, initializer=ignore_keyboard_interrupt)
         self._analysis_thread = threading.Thread(target=self.run)
         self._stop_event = threading.Event()
@@ -187,17 +188,16 @@ class PoseDTWCorrelator():
             with self._input_lock:
                 pose_windows: PoseWindowDataDict= self._input_windows.copy()
 
-            pose_windows = self._filter_windows_by_time(pose_windows, self.max_age)
-            angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_windows, self.analysis_window_size)
+            pose_windows = self._filter_windows_by_time(pose_windows, self.window_timeout)
+            angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_windows, self.window_size)
 
             if angle_pairs:
-                # start_time: float = time.perf_counter()
                 batch = PoseCorrelationBatch()
 
                 # Submit all pairs for analysis
                 future_to_pair: dict[Future, AnglePair] = {}
                 for pair in angle_pairs:
-                    future: Future[PoseCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band)
+                    future: Future[PoseCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band, self.similarity_exponent)
                     future_to_pair[future] = pair
 
                 # Collect results
@@ -210,18 +210,11 @@ class PoseDTWCorrelator():
                     except Exception as e:
                         print(f"Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
 
-                # Get most similar if we have results
-                # if not batch.is_empty:
-                #     most_similar: Optional[PoseCorrelation] = batch.get_most_similar_pair()
-
-                # analysis_duration: float = time.perf_counter() - start_time
-                # print(f"Analysis completed in {analysis_duration:.2f} seconds, found {batch.count} pairs. Most similar: {most_similar.pair_id[0]}-{most_similar.pair_id[1]} with score {most_similar.similarity_score:.2f}" if most_similar else "No valid pairs found.")
-
                 self._callback(batch)
 
 
             elapsed: float = time.perf_counter() - loop_start
-            sleep_time: float = self.analysis_interval - elapsed
+            sleep_time: float = self.interval - elapsed
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
@@ -398,8 +391,28 @@ class PoseDTWCorrelator():
         return pairs
 
     @staticmethod
-    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int) -> Optional[PoseCorrelation]:
-        """Analyse a single pair - designed for thread pool execution."""
+    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int, similarity_exponent: float) -> Optional[PoseCorrelation]:
+        """
+        Analyse a single pair of angle sequences for all joints and compute their similarity.
+
+        For each numeric joint/column in the provided AnglePair, this method:
+        - Extracts the angle sequences from both windows and removes NaN values independently.
+        - Calculates the ratio of NaN values for each sequence and skips the joint if either exceeds the maximum allowed ratio.
+        - Computes the similarity between the two cleaned angle sequences using DTW with an angular cost, applying the specified Sakoe-Chiba band and similarity exponent.
+        - Collects the similarity scores for all valid joints into a dictionary.
+
+        Returns a PoseCorrelation object containing the per-joint similarity scores if any valid correlations are found, otherwise returns None.
+
+        Args:
+            pair (AnglePair): The pair of angle DataFrames and metadata to compare.
+            maximum_nan_ratio (float): Maximum allowed ratio of NaN values per sequence.
+            dtw_band (int): Sakoe-Chiba band width for DTW.
+            similarity_exponent (float): Exponent for similarity emphasis (e.g., 2.0 for quadratic).
+
+        Returns:
+            Optional[PoseCorrelation]: Correlation results for the pair, or None if no valid joints.
+        """
+
         joint_correlations: dict[str, float] = {}
         angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
 
@@ -426,7 +439,7 @@ class PoseDTWCorrelator():
 
             # Calculate similarity
             try:
-                similarity: float = PoseDTWCorrelator._compute_correlation(angles_1, angles_2, dtw_band)
+                similarity: float = PoseDTWCorrelator._compute_correlation(angles_1, angles_2, dtw_band, similarity_exponent)
                 joint_correlations[column] = similarity
             except Exception as e:
                 print(f"{column}: correlation failed - {e}")
@@ -441,10 +454,28 @@ class PoseDTWCorrelator():
         return None
 
     @staticmethod
-    def _compute_correlation(seq1: np.ndarray, seq2: np.ndarray, band: int = 10) -> float:
+    def _compute_correlation(seq1: np.ndarray, seq2: np.ndarray, band: int = 10, similarity_exponent: float = 2.0) -> float:
+        """
+        Compute the similarity between two angle sequences using DTW with an angular cost.
+
+        - Uses dtw_angular_sakoe_chiba_path to calculate the DTW distance and path length between the sequences.
+        - The distance is normalized by the path length and π, so 0 means identical angles, 1 means opposite.
+        - The similarity is then calculated as (1 - normalized_distance) raised to the given 'exponent' power.
+          This allows quadratic (2.0), cubic (3.0), or other power emphasis on high similarity.
+        - The result is clipped to [0.0, 1.0].
+
+        Args:
+            seq1 (np.ndarray): First angle sequence (in radians).
+            seq2 (np.ndarray): Second angle sequence (in radians).
+            band (int): Sakoe-Chiba band width for DTW.
+            similarity_exponent (float): Power applied to emphasize high similarity.
+
+        Returns:
+            float: Similarity score in [0.0, 1.0].
+        """
         distance, path_length = dtw_angular_sakoe_chiba_path(seq1, seq2, band=band)
         normalized_distance: float = (distance / path_length) / np.pi
-        similarity: float = 1.0 - normalized_distance
+        similarity: float = (1.0 - normalized_distance)**similarity_exponent
         return max(0.0, min(1.0, similarity))
 
 

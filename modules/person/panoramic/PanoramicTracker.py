@@ -37,7 +37,7 @@ class PanoramicTracker(Thread):
 
         self.input_mutex: Lock = Lock()
         self.running: bool = False
-        self.max_persons: int = settings.pose_num
+        self.max_persons: int = settings.max_players
         self.cleanup_interval: float = 1.0 / settings.camera_fps
 
         self.input_frames: dict[int, np.ndarray] = {}
@@ -47,13 +47,13 @@ class PanoramicTracker(Thread):
 
         self.geometry: PanoramicGeometry = PanoramicGeometry(settings.camera_num, CAM_360_FOV, CAM_360_TARGET_FOV)
 
-        self.min_tracklet_age: int =            MIN_TRACKLET_AGE
-        self.min_tracklet_height: float =       MIN_TRACKLET_HEIGHT
+        self.tracklet_min_age: int =            settings.tracker_min_age
+        self.tracklet_min_height: float =       settings.tracker_min_height
+        self.person_timeout: float =            settings.tracker_timeout
+        self.person_roi_expansion: float =      settings.tracker_roi_expansion
         self.cam_360_edge_threshold: float =    CAM_360_EDGE_THRESHOLD
         self.cam_360_overlap_expansion: float = CAM_360_OVERLAP_EXPANSION
         self.cam_360_hysteresis_factor: float = CAM_360_HYSTERESIS_FACTOR
-        self.person_roi_expansion: float =      PERSON_ROI_EXPANSION
-        self.person_timeout: float =            PERSON_TIMEOUT
 
         self.callback_lock = Lock()
         self.person_callbacks: set[PersonCallback] = set()
@@ -103,10 +103,10 @@ class PanoramicTracker(Thread):
         # Filter out invalid persons
         if new_person.status == TrackingStatus.REMOVED:
             return
-        if new_person.tracklet.age <= self.min_tracklet_age:
+        if new_person.tracklet.age <= self.tracklet_min_age:
             return
         # print(f"Updating person from camera {new_person.cam_id} with tracklet {new_person.tracklet.id} and status {new_person.status} ")
-        if new_person.tracklet.roi.height < self.min_tracklet_height:
+        if new_person.tracklet.roi.height < self.tracklet_min_height:
             return
 
         # Calculate the local and world angles for the new person

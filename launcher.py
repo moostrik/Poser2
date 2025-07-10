@@ -48,6 +48,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings: Settings =            Settings()
 
+    settings.max_players =          args.players
+
     settings.path_root =            currentPath
     settings.path_file =            path.join(currentPath, 'files')
     settings.path_model =           path.join(currentPath, 'models')
@@ -72,14 +74,22 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.video_format =         Settings.CoderFormat.H264
     settings.video_frame_types =    [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIGHT] if settings.camera_stereo else [FrameType.VIDEO]
 
-    settings.pose_num =             args.players
+    settings.tracker_min_age =      5 # in frames
+    settings.tracker_min_height =   0.25 # * height of the camera
+    settings.tracker_timeout =      1.0 # in seconds
+    settings.tracker_roi_expansion= 0.1 # * height of the camera
+
     settings.pose_active =      not args.nopose
     settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
     settings.pose_window_size =     10 # seconds
 
-    settings.analysis_rate_hz =     args.fps
-    settings.analysis_window_size = 3 # seconds
-    settings.analysis_workers =     10
+    settings.corr_rate_hz =         args.fps
+    settings.corr_num_workers =     10
+    settings.corr_window_size =     3 # seconds
+    settings.corr_window_timeout =  settings.tracker_timeout # seconds
+    settings.corr_max_nan_ratio =   0.15 # maximum ratio of NaN values in a window
+    settings.corr_dtw_band =        10 # maximum distance between two points in a window
+    settings.corr_similarity_exp =  2.0 # exponent for similarity calculation
 
     settings.light_resolution =     3600
     settings.light_rate =           60
