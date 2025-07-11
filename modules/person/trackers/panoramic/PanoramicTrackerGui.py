@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from modules.Settings import Settings
 
-from modules.person.panoramic.PanoramicDefinitions import *
+from modules.person.trackers.panoramic.PanoramicDefinitions import *
 
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT

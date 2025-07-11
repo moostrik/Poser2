@@ -1,34 +1,44 @@
 from __future__ import annotations
 
 # Standard library imports
+from dataclasses import dataclass, field
 from itertools import combinations
 from queue import Empty, Queue
 from threading import Thread, Lock
 from time import time, sleep
-from typing import Optional
+from typing import Optional, Protocol
 
 # Third-party imports
 import numpy as np
 from pandas import Timestamp
 
 # Local application imports
-from modules.Settings import Settings
-from modules.person.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
-from modules.person.Person import Person, PersonDict, PersonCallback, PersonDictCallback, TrackingStatus
+from modules.cam.depthcam.Definitions import Tracklet, FrameType
+from modules.person.Person import Person, PersonCallback, TrackingStatus
 from modules.person.PersonManager import PersonManager
-from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
-from modules.person.panoramic.PanoramicGeometry import PanoramicGeometry
-from modules.person.panoramic.PanoramicDefinitions import *
+from modules.person.trackers.BaseTracker import BaseTrackerInfo
+from modules.person.trackers.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
+from modules.person.trackers.panoramic.PanoramicGeometry import PanoramicGeometry
+from modules.person.trackers.panoramic.PanoramicDefinitions import *
+from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+@dataclass(frozen=True)
 class CamTracklet:
-    def __init__(self, cam_id: int, tracklet: Tracklet) -> None:
-        self.cam_id: int = cam_id
-        self.tracklet: Tracklet = tracklet
-        self.time_stamp: Timestamp = Timestamp.now()
+    cam_id: int
+    tracklet: Tracklet
+    time_stamp: Timestamp = field(default_factory=Timestamp.now)
 
 CamTrackletDict = dict[int, list[Tracklet]]
+
+
+
+@dataclass (frozen=True)
+class PanoramicTrackerInfo(BaseTrackerInfo):
+    local_angle: float
+    world_angle: float
+    overlap: bool
 
 
 class PanoramicTracker(Thread):
@@ -84,37 +94,32 @@ class PanoramicTracker(Thread):
                 # except Exception as e:
                 #     print(f"Error updating persons with tracklet from camera {tracklet.cam_id}: {e}")
             except Empty:
-                pass  # No more tracklets right now
-
-            # self.cleanup_persons()
-
-            # # Periodic tasks (e.g., cleanup)
-            # now: float = time()
-            # if now - last_cleanup >= self.cleanup_interval:
-            #     self.cleanup_persons()
-            #     last_cleanup = now
-
-            # sleep(0.01)  # Prevent busy-waiting
+                pass
 
     def update_persons(self, cam_tracklet: CamTracklet) -> None:
 
-        new_person: Optional[Person] = Person(-1, cam_tracklet.cam_id, cam_tracklet.tracklet, cam_tracklet.time_stamp)
-
+        tracklet: Tracklet = cam_tracklet.tracklet
         # Filter out invalid persons
-        if new_person.status == TrackingStatus.REMOVED:
+        if tracklet.status == TrackingStatus.REMOVED:
+        # if new_person.status == TrackingStatus.REMOVED:
             return
-        if new_person.tracklet.age <= self.tracklet_min_age:
+        if tracklet.age <= self.tracklet_min_age:
             return
         # print(f"Updating person from camera {new_person.cam_id} with tracklet {new_person.tracklet.id} and status {new_person.status} ")
-        if new_person.tracklet.roi.height < self.tracklet_min_height:
+        if tracklet.roi.height < self.tracklet_min_height:
             return
 
         # Calculate the local and world angles for the new person
-        new_person.local_angle, new_person.world_angle = self.geometry.calc_angle(new_person.tracklet.roi, new_person.cam_id)
+        local_angle, world_angle = self.geometry.calc_angle(tracklet.roi, cam_tracklet.cam_id)
 
         # Filter out persons that are too close to the edge of a camera's field of view
-        if self.geometry.angle_in_edge(new_person.local_angle, self.cam_360_edge_threshold):
+        if self.geometry.angle_in_edge(local_angle, self.cam_360_edge_threshold):
             return
+
+        in_overlap: bool = self.geometry.angle_in_overlap(local_angle, self.cam_360_overlap_expansion)
+        tracker_info = PanoramicTrackerInfo(local_angle, world_angle, in_overlap)
+
+        new_person: Optional[Person] = Person(-1, cam_tracklet.cam_id, cam_tracklet.tracklet, cam_tracklet.time_stamp, tracker_info)
 
         # Check if the new person already exists in the tracker and update if necessary
         existing_person: Optional[Person] = self.person_manager.get_person_by_cam_and_tracklet(new_person.cam_id, new_person.tracklet.id)
@@ -133,14 +138,13 @@ class PanoramicTracker(Thread):
         self.remove_overlapping_persons()
 
         for person in self.person_manager.all_persons():
-            if person.is_active and person.img is None:
+            if person.is_active and person.pose_image is None:
                 image: Optional[np.ndarray] = self._get_image(person.cam_id)
                 if image is None:
                     print(f"Warning: No image available for person {person.id} in camera {person.cam_id}.")
                     return
 
-                person.set_pose_roi(image, self.person_roi_expansion)
-                person.set_pose_image(image)
+                person.set_image_and_roi(image, self.person_roi_expansion)
 
                 self._person_callback(person)
 
@@ -148,17 +152,24 @@ class PanoramicTracker(Thread):
 
         persons: list[Person] = self.person_manager.all_persons()
         for person in persons:
-            person.overlap = self.geometry.angle_in_overlap(person.local_angle, self.cam_360_overlap_expansion)
+            # Reconstruct PanoramicTrackerInfo with updated overlap field
+            if isinstance(person.tracker_info, PanoramicTrackerInfo):
+                updated_overlap = self.geometry.angle_in_overlap(person.tracker_info.local_angle, self.cam_360_overlap_expansion)
+                person.tracker_info = PanoramicTrackerInfo(
+                    local_angle=person.tracker_info.local_angle,
+                    world_angle=person.tracker_info.world_angle,
+                    overlap=updated_overlap
+                )
 
         overlaps: list[tuple[int, int]] = []
 
         for P_A, P_B in combinations(persons, 2):
-            if not P_A.overlap or not P_B.overlap:
+            if not getattr(P_A.tracker_info, "overlap", False) or not getattr(P_B.tracker_info, "overlap", False):
                 continue
             if P_A.cam_id == P_B.cam_id:
                 continue
 
-            angle_diff: float = self.geometry.angle_diff(P_A.world_angle, P_B.world_angle)
+            angle_diff: float = self.geometry.angle_diff(getattr(P_A.tracker_info, "world_angle", 45.0), getattr(P_B.tracker_info, "world_angle", 45.0))
             if angle_diff > self.geometry.fov_overlap * (1.0 + self.cam_360_overlap_expansion):
                 continue
 
@@ -184,8 +195,8 @@ class PanoramicTracker(Thread):
                 newest, oldest = P_A, P_B
             else:
                 newest, oldest = P_B, P_A
-            edge_newest: float = self.geometry.angle_from_edge(newest.local_angle)
-            edge_oldest: float = self.geometry.angle_from_edge(oldest.local_angle)
+            edge_newest: float = self.geometry.angle_from_edge(getattr(newest.tracker_info, "local_angle", 45.0))
+            edge_oldest: float = self.geometry.angle_from_edge(getattr(oldest.tracker_info, "local_angle", 45.0))
             # print(f"Comparing newest {newest.id} (edge {edge_newest}) to oldest {oldest.id} (edge {edge_oldest})")
             if edge_newest >= edge_oldest / self.cam_360_hysteresis_factor:
                 overlaps.append((newest.id, oldest.id))
@@ -206,7 +217,13 @@ class PanoramicTracker(Thread):
 
             # If the merge was not successful, we create a dummy person to trigger the callback
             if remove_person.status != TrackingStatus.NEW:
-                dummy_person: Person = Person(remove_id, remove_person.cam_id, remove_person.tracklet, remove_person.time_stamp)
+                dummy_person: Person = Person(
+                    remove_id,
+                    remove_person.cam_id,
+                    remove_person.tracklet,
+                    remove_person.time_stamp,
+                    remove_person.tracker_info  # Pass the tracker_info from the removed person
+                )
                 dummy_person.status = TrackingStatus.REMOVED
                 self._person_callback(dummy_person)
 

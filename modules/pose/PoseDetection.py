@@ -50,7 +50,7 @@ class Detection(Thread):
         while self._running:
             person: Person | None = self.get_person()
             if person is not None:
-                image: np.ndarray | None = person.img
+                image: np.ndarray | None = person.pose_image
                 if image is not None:
                     poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
                     if len(poses) > 0:

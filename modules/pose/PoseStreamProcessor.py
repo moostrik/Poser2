@@ -16,7 +16,7 @@ from modules.Settings import Settings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Type for analysis output callback
-@dataclass
+@dataclass (frozen=False)
 class PoseStreamData:
     person_id: int
     angles: pd.DataFrame

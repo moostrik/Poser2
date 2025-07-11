@@ -13,7 +13,7 @@ from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.gui.PyReallySimpleGui import Gui
-from modules.person.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
+from modules.person.trackers.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
 from modules.correlation.DTWCorrelator import DTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseStreamProcessor import PoseStreamProcessor
@@ -79,7 +79,7 @@ class Main():
             self.pose_streamer.add_stream_callback(self.render.set_pose_stream)
             self.pose_streamer.start()
 
-            self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_batch)
+            self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_correlation)
             self.dtw_correlator.start()
 
             self.correlation_streamer.add_stream_callback(self.render.set_correlation_stream)

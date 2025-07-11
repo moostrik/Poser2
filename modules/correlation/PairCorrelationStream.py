@@ -96,7 +96,7 @@ class PairCorrelationStreamProcessor:
         """ Clean up resources if needed. Currently does nothing but can be extended in the future. """
         pass
 
-    def add_batch(self, batch: PairCorrelationBatch) -> None:
+    def add_correlation(self, batch: PairCorrelationBatch) -> None:
         """
         Add a new batch to the history by extracting individual pair correlations.
 

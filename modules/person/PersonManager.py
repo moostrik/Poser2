@@ -167,22 +167,21 @@ class PersonManager:
                 id=merged_id,
                 cam_id=keep.cam_id,
                 tracklet=keep.tracklet,
-                time_stamp=keep.time_stamp
+                time_stamp=keep.time_stamp,
+                tracker_info=keep.tracker_info,
             )
 
             # Set the id and start_time from the oldest
             merged_person.start_time = merged_start_time
 
             # Copy all relevant fields from 'keep'
+            merged_person.last_time = keep.last_time
             merged_person.status = keep.status
             if keep.status == TrackingStatus.NEW:
                 merged_person.status = TrackingStatus.TRACKED
-            merged_person.last_time = keep.last_time
-            merged_person.local_angle = keep.local_angle
-            merged_person.world_angle = keep.world_angle
-            merged_person.overlap = keep.overlap
-            merged_person.img = keep.img
-            merged_person.pose_roi = keep.pose_roi
+
+            merged_person.pose_crop_rect = keep.pose_crop_rect
+            merged_person.pose_image = keep.pose_image
             merged_person.pose = keep.pose
             merged_person.pose_angles = keep.pose_angles
 

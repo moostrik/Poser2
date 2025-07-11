@@ -301,7 +301,7 @@ class Render(RenderWindow):
             for person in persons:
                 if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.LOST:
                     continue
-                roi: Rect | None = person.pose_roi
+                roi: Rect | None = person.pose_crop_rect
                 mesh: Mesh = self.pose_meshes[person.id]
                 if roi is not None and mesh.isInitialized():
                     x, y, w, h = roi.x, roi.y, roi.width, roi.height
@@ -343,8 +343,8 @@ class Render(RenderWindow):
                 continue
 
             image: Image = self.psn_images[i]
-            if person.img is not None:
-                image.set_image(person.img)
+            if person.pose_image is not None:
+                image.set_image(person.pose_image)
                 image.update()
 
             analysis_image: Image = self.analysis_images[i]
@@ -540,12 +540,17 @@ class Render(RenderWindow):
             if person.status != TrackingStatus.TRACKED and person.status != TrackingStatus.NEW:
                 continue
 
+            world_angle: float = getattr(person.tracker_info, "world_angle", 0.0)
+            local_angle: float = getattr(person.tracker_info, "local_angle", 0.0)
+            overlap: bool = getattr(person.tracker_info, "overlap", False)
+
             w: float = person.tracklet.roi.width * fbo.width / num_cams
             h: float = person.tracklet.roi.height * fbo.height
-            x: float = person.world_angle / 360.0 * fbo.width
+            x: float = world_angle / 360.0 * fbo.width
+
             y: float = person.tracklet.roi.y * fbo.height
             color: list[float] = PersonColor(person.id, aplha=0.9)
-            if person.overlap == True:
+            if overlap == True:
                 color[3] = 0.3
             if person.status == TrackingStatus.NEW:
                 color = [1.0, 1.0, 1.0, 1.0]
@@ -562,10 +567,10 @@ class Render(RenderWindow):
             string: str
             x += 9
             y += 14
-            string = f'A: {person.world_angle:.1f}'
+            string = f'A: {world_angle:.1f}'
             RenderWindow.draw_string(x, y, string)
             y += 14
-            string = f'L: {person.local_angle:.1f}'
+            string = f'L: {local_angle:.1f}'
             RenderWindow.draw_string(x, y, string)
 
         fbo.end()
