@@ -51,9 +51,9 @@ class Settings():
         self.tracker_min_age: int               = None # type: ignore
         self.tracker_min_height: float          = None # type: ignore
         self.tracker_timeout: float             = None # type: ignore
-        self.tracker_roi_expansion: float       = None # type: ignore
 
         # POSE DETCTION SETTINGS
+        self.pose_crop_expansion: float         = None # type: ignore
         self.pose_model_type: ModelType         = None # type: ignore
         self.pose_active: bool                  = None # type: ignore
         self.pose_buffer_duration: int          = None # type: ignore

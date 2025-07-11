@@ -3,13 +3,15 @@ from threading import Lock
 from typing import Optional
 
 # Third-party imports
+import numpy as np
 
 # Local application imports
-from modules.Settings import Settings
+from modules.cam.depthcam.Definitions import FrameType
 from modules.person.Person import Person, PersonCallback
 from modules.pose.PoseDefinitions import ModelTypeNames
 from modules.pose.PoseDetection import Detection
 from modules.pose.PoseAngleCalculator import PoseAngleCalculator
+from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -17,13 +19,21 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class PosePipeline:
     def __init__(self, settings: Settings) -> None:
 
-        # Pose detection components
-        self.pose_detectors: dict[int, Detection] = {}
+        self.pose_active: bool = settings.pose_active
         self.pose_detector_frame_size: int = 256
+        self.pose_crop_expansion: float = settings.pose_crop_expansion
         self.max_detectors: int = settings.max_players
-        for i in range(self.max_detectors):
-            self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type)
-        print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
+        self.pose_detectors: dict[int, Detection] = {}
+
+        if self.pose_active:
+            for i in range(self.max_detectors):
+                self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type)
+            print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
+        else:
+            print('Pose Detection: Disabled')
+
+        self.input_mutex: Lock = Lock()
+        self.input_frames: dict[int, np.ndarray] = {}
 
         # Pose angles calculator
         self.joint_angles: PoseAngleCalculator = PoseAngleCalculator()
@@ -39,7 +49,7 @@ class PosePipeline:
         if self.running:
             return
 
-        self.joint_angles.add_person_callback(self._person_output_callback)
+        self.joint_angles.add_person_callback(self._notify_callback)
         self.joint_angles.start()
 
         # Start detectors
@@ -60,12 +70,32 @@ class PosePipeline:
 
         self.joint_angles.stop()
 
-    # External Input
-    def set_person(self, person: Person) -> None:
-        detector: Optional[Detection] = self.pose_detectors.get(person.id)
+     # INPUTS
+    def add_person(self, person: Person) -> None:
 
+        if person.is_active and person.pose_image is None:
+            image: Optional[np.ndarray] = self._get_image(person.cam_id)
+            if image is not None:
+                person.set_image_and_crop(image, self.pose_crop_expansion, self.pose_detector_frame_size)
+
+        if not self.pose_active:
+            self._notify_callback(person)
+            return
+
+        detector: Optional[Detection] = self.pose_detectors.get(person.id)
         if detector:
             detector.person_input(person)
+
+    def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
+        if frame_type != FrameType.VIDEO:
+            return
+        with self.input_mutex:
+            self.input_frames[id] = image
+    def _get_image(self, id: int) -> Optional[np.ndarray]:
+        with self.input_mutex:
+            if not self.input_frames.get(id) is None:
+                return self.input_frames[id]
+            return None
 
     # External Output Callbacks
     def add_person_callback(self, callback: PersonCallback) -> None:
@@ -75,7 +105,7 @@ class PosePipeline:
             return
         self.person_output_callbacks.add(callback)
 
-    def _person_output_callback(self, person: Person) -> None:
+    def _notify_callback(self, person: Person) -> None:
         """Handle processed person"""
         with self.callback_lock:
             for callback in self.person_output_callbacks:

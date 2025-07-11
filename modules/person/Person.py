@@ -89,7 +89,7 @@ class Person:
         """Check if person hasn't been updated recently"""
         return time() - self.last_time > threshold
 
-    def set_image_and_roi(self, image: np.ndarray, roi_expansion: float, output_size: int = 256) -> None:
+    def set_image_and_crop(self, image: np.ndarray, crop_expansion: float, output_size: int = 256) -> None:
         """
         Sets both the pose ROI and the pose image for this person.
         """
@@ -98,7 +98,7 @@ class Person:
             return
 
         h, w = image.shape[:2]
-        roi = self.get_crop_rect(w, h, self.tracklet.roi, roi_expansion)
+        roi = self.get_crop_rect(w, h, self.tracklet.roi, crop_expansion)
         self.pose_crop_rect = roi
         self.pose_image = self.get_cropped_image(image, roi, output_size)
 

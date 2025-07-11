@@ -78,7 +78,7 @@ class PoseStreamProcessor(Thread):
             return
 
         if person.pose_angles is None:
-            print(f"WINDOW: Skipping person {person.id} with no pose angles, this should not happen")
+            # print(f"WINDOW: Skipping person {person.id} with no pose angles, this should not happen")
             return
 
         # Build angle/confidence dicts

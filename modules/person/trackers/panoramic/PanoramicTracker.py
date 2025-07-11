@@ -45,12 +45,10 @@ class PanoramicTracker(Thread):
     def __init__(self, gui, settings: Settings) -> None:
         super().__init__()
 
-        self.input_mutex: Lock = Lock()
         self.running: bool = False
         self.max_persons: int = settings.max_players
         self.cleanup_interval: float = 1.0 / settings.camera_fps
 
-        self.input_frames: dict[int, np.ndarray] = {}
         self.tracklet_queue: Queue[CamTracklet] = Queue()
 
         self.person_manager: PersonManager = PersonManager(self.max_persons)
@@ -60,7 +58,7 @@ class PanoramicTracker(Thread):
         self.tracklet_min_age: int =            settings.tracker_min_age
         self.tracklet_min_height: float =       settings.tracker_min_height
         self.person_timeout: float =            settings.tracker_timeout
-        self.person_roi_expansion: float =      settings.tracker_roi_expansion
+        self.person_roi_expansion: float =      settings.pose_crop_expansion
         self.cam_360_edge_threshold: float =    CAM_360_EDGE_THRESHOLD
         self.cam_360_overlap_expansion: float = CAM_360_OVERLAP_EXPANSION
         self.cam_360_hysteresis_factor: float = CAM_360_HYSTERESIS_FACTOR
@@ -139,13 +137,6 @@ class PanoramicTracker(Thread):
 
         for person in self.person_manager.all_persons():
             if person.is_active and person.pose_image is None:
-                image: Optional[np.ndarray] = self._get_image(person.cam_id)
-                if image is None:
-                    print(f"Warning: No image available for person {person.id} in camera {person.cam_id}.")
-                    return
-
-                person.set_image_and_roi(image, self.person_roi_expansion)
-
                 self._person_callback(person)
 
     def remove_overlapping_persons(self) -> None:
@@ -232,17 +223,6 @@ class PanoramicTracker(Thread):
         person.status = TrackingStatus.REMOVED
         self._person_callback(person)
 
-    # INPUTS
-    def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
-        if frame_type != FrameType.VIDEO:
-            return
-        with self.input_mutex:
-            self.input_frames[id] = image
-    def _get_image(self, id: int) -> Optional[np.ndarray]:
-        with self.input_mutex:
-            if not self.input_frames.get(id) is None:
-                return self.input_frames[id]
-            return None
     def add_tracklet(self, cam_id: int, tracklet: Tracklet) -> None :
         cam_tracklet = CamTracklet(cam_id, tracklet)
         self.tracklet_queue.put(cam_tracklet)
