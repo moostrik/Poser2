@@ -180,24 +180,24 @@ class DTWCorrelator():
             angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_streams, self.buffer_capacity)
 
             if angle_pairs:
-                batch = PairCorrelationBatch()
-
-                # Submit all pairs for analysis
                 future_to_pair: dict[Future, AnglePair] = {}
                 for pair in angle_pairs:
-                    future: Future[PairCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band, self.similarity_exponent)
+                    future: Future[PairCorrelation | None] = self._process_pool.submit(
+                        self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band, self.similarity_exponent
+                    )
                     future_to_pair[future] = pair
 
-                # Collect results
+                correlations: list[PairCorrelation] = []
                 for future in as_completed(future_to_pair):
                     pair: AnglePair = future_to_pair[future]
                     try:
                         correlation: Optional[PairCorrelation] = future.result()
                         if correlation:
-                            batch.add_result(correlation)
+                            correlations.append(correlation)
                     except Exception as e:
                         print(f"Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
 
+                batch = PairCorrelationBatch(pair_correlations=correlations)
                 self._notify_callbacks(batch)
 
 
@@ -446,7 +446,7 @@ class DTWCorrelator():
                 continue
 
         if joint_correlations:
-            return PairCorrelation(
+            return PairCorrelation.from_ids(
                 id_1=pair.id_1,
                 id_2=pair.id_2,
                 joint_correlations=joint_correlations

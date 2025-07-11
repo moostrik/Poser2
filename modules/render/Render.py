@@ -22,7 +22,7 @@ from modules.gl.Utils import lfo, fit, fill
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.Person import Person, PersonColor, TrackingStatus
-from modules.correlation.PairCorrelation import PairCorrelationStreamData
+from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.PoseDefinitions import Pose, PoseEdgeIndices
 from modules.pose.PoseStreamProcessor import PoseStreamData
 from modules.Settings import Settings

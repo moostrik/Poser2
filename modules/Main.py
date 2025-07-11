@@ -17,7 +17,7 @@ from modules.person.panoramic.PanoramicTracker import PanoramicTracker as Panora
 from modules.correlation.DTWCorrelator import DTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseStreamProcessor import PoseStreamProcessor
-from modules.correlation.PairCorrelation import PairCorrelationStreamProcessor
+from modules.correlation.PairCorrelationStream import PairCorrelationStreamProcessor
 from modules.render.Render import Render
 from modules.Settings import Settings
 
@@ -70,6 +70,7 @@ class Main():
 
         if self.settings.pose_active:
             self.panoramic_tracker.add_person_callback(self.pose_detection.set_person)
+
             self.pose_detection.add_person_callback(self.pose_streamer.add_person)
             self.pose_detection.add_person_callback(self.render.set_person)
             self.pose_detection.start()
@@ -79,8 +80,10 @@ class Main():
             self.pose_streamer.start()
 
             self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_batch)
-            self.correlation_streamer.add_stream_callback(self.render.set_correlation_stream)
             self.dtw_correlator.start()
+
+            self.correlation_streamer.add_stream_callback(self.render.set_correlation_stream)
+            self.correlation_streamer.start()
 
         else:
             self.panoramic_tracker.add_person_callback(self.render.set_person)
@@ -143,6 +146,8 @@ class Main():
         if self.dtw_correlator:
             self.dtw_correlator.stop()
             self.dtw_correlator.join()
+        if self.correlation_streamer:
+            self.correlation_streamer.stop()
 
         self.av.stop()
         self.av.join()
