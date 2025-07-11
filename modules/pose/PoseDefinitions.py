@@ -3,9 +3,14 @@
 # https://github.com/Kazuhito00/MoveNet-Python-Example/tree/main
 # Lightning for low latency, Thunder for high accuracy
 
+from dataclasses import dataclass, field
 from enum import Enum, IntEnum
+from threading import Lock
 import numpy as np
 from typing import TypedDict
+from typing import Optional, Callable
+from modules.cam.depthcam.Definitions import Rect # TODO: remove this dependency
+from pandas import Timestamp
 
 NUM_KEYPOINTS = 17
 NUM_KEYPOINT_VALUES = 3 # [y, x, score]
@@ -117,7 +122,7 @@ class JointAngle(TypedDict):
 
 JointAngleDict = dict[Keypoint, JointAngle]
 
-class Pose():
+class PosePoints():
     def __init__(self, keypoints: np.ndarray, scores: np.ndarray) -> None:
         self.keypoints: np.ndarray = keypoints  # shape (NUM_KEYPOINTS, 2)
         self.scores: np.ndarray = scores        # shape (NUM_KEYPOINTS,)
@@ -153,5 +158,59 @@ class Pose():
             colors[i*2+1] = [C[0], C[1], C[2], alpha]
         return colors
 
-PoseList = list[Pose]
+PoseList = list[PosePoints]
 
+@dataclass
+class PoseData:
+    id: int # Unique identifier for the pose data, typically the person ID
+    cam_id: int
+    time_stamp: Timestamp
+    _pose_crop_rect: Rect
+    _pose_image: np.ndarray = field(repr=False)
+
+    _pose_lock: Lock = field(default_factory=Lock, init=False, repr=False)
+    _pose_keypoints: Optional[PosePoints] = field(default=None, init=False, repr=False)
+    _pose_angles: Optional[JointAngleDict] = field(default=None, init=False, repr=False)
+
+    @property
+    def pose_crop_rect(self) -> Optional[Rect]:
+        with self._pose_lock:
+            return self._pose_crop_rect
+
+    @pose_crop_rect.setter
+    def pose_crop_rect(self, value: Rect) -> None:
+        with self._pose_lock:
+            self._pose_crop_rect = value
+
+    @property
+    def pose_image(self) -> np.ndarray:
+        with self._pose_lock:
+            return self._pose_image
+
+    @pose_image.setter
+    def pose_image(self, value: np.ndarray) -> None:
+        with self._pose_lock:
+            self._pose_image = value
+
+    @property
+    def pose(self) -> Optional[PosePoints]:
+        with self._pose_lock:
+            return self._pose
+
+    @pose.setter
+    def pose(self, value: Optional[PosePoints]) -> None:
+        with self._pose_lock:
+            self._pose = value
+
+    @property
+    def pose_angles(self) -> Optional[JointAngleDict]:
+        with self._pose_lock:
+            return self._pose_angles
+
+    @pose_angles.setter
+    def pose_angles(self, value: Optional[JointAngleDict]) -> None:
+        with self._pose_lock:
+            self._pose_angles = value
+
+
+PoseDataCallback = Callable[[PoseData], None]

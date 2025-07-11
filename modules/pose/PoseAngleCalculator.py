@@ -8,7 +8,6 @@ import numpy as np
 
 # Local application imports
 from modules.pose.PoseDefinitions import *
-from modules.person.Person import Person, PersonCallback
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -20,14 +19,14 @@ class PoseAngleCalculator(Thread):
         self._stop_event = Event()
 
         # Input
-        self.person_input_queue: Queue[Person] = Queue()
+        self.pose_input_queue: Queue[PoseData] = Queue()
 
         # Parameters
         self.confidence_threshold: float = 0.3
 
         # Callbacks
         self.callback_lock = Lock()
-        self.person_output_callbacks: set[PersonCallback] = set()
+        self.pose_output_callbacks: set[PoseDataCallback] = set()
 
         self.hot_reload = HotReloadMethods(self.__class__, True)
 
@@ -35,56 +34,56 @@ class PoseAngleCalculator(Thread):
         self._stop_event.set()
         self.join()
         with self.callback_lock:
-            self.person_output_callbacks.clear()
+            self.pose_output_callbacks.clear()
 
     def run(self) -> None:
         while not self._stop_event.is_set():
             try:
-                person: Optional[Person] = self.person_input_queue.get(block=True, timeout=0.01)
-                if person is not None:
+                pose: Optional[PoseData] = self.pose_input_queue.get(block=True, timeout=0.01)
+                if pose is not None:
                     try:
-                        self._process(person, self.confidence_threshold, self._person_output_callback)
+                        self._process(pose, self.confidence_threshold, self._person_output_callback)
                     except Exception as e:
-                        print(f"Error processing person {person.id}: {e}")
-                    self.person_input_queue.task_done()
+                        print(f"Error processing person {pose.id}: {e}")
+                    self.pose_input_queue.task_done()
             except Empty:
                 continue
 
-    def person_input(self, person: Person) -> None:
+    def person_input(self, pose: PoseData) -> None:
         """Add a person to the processing queue"""
-        self.person_input_queue.put(person)
+        self.pose_input_queue.put(pose)
 
         # External Output Calbacks
-    def add_person_callback(self, callback: PersonCallback) -> None:
+    def add_pose_callback(self, callback: PoseDataCallback) -> None:
         """Add callback for processed persons"""
         with self.callback_lock:
-            self.person_output_callbacks.add(callback)
+            self.pose_output_callbacks.add(callback)
 
-    def _person_output_callback(self, person: Person) -> None:
+    def _person_output_callback(self, pose: PoseData) -> None:
         """Handle processed person"""
         with self.callback_lock:
-            for callback in self.person_output_callbacks:
-                callback(person)
+            for callback in self.pose_output_callbacks:
+                callback(pose)
 
     def set_confidence_threshold(self, threshold: float) -> None:
         """Set the confidence threshold for joint angle calculation."""
         self.confidence_threshold = threshold
 
     @staticmethod
-    def _process(person: Person, confidence_threshold: float, callback:PersonCallback) -> None:
+    def _process(pose: PoseData, confidence_threshold: float, callback:PoseDataCallback) -> None:
 
-        if person.pose is None:
+        if pose.pose is None:
             # return nan angles and 0 for confidence
             angles: JointAngleDict = {}
             for k in PoseAngleKeypoints.keys():
                 angles[k] = JointAngle(angle=np.nan, confidence=0.0)
-            person.pose_angles = angles
-            callback(person)
+            pose.pose_angles = angles
+            callback(pose)
             return
 
         angles: JointAngleDict = {}
-        keypoints: np.ndarray = person.pose.getKeypoints()
-        scores: np.ndarray = person.pose.getScores()
+        keypoints: np.ndarray = pose.pose.getKeypoints()
+        scores: np.ndarray = pose.pose.getScores()
 
         # Calculate angles for each joint in PoseAngleDict
         for joint, (kp1, kp2, kp3) in PoseAngleKeypoints.items():
@@ -115,8 +114,8 @@ class PoseAngleCalculator(Thread):
                 # Low confidence, set angle to NaN
                 angles[joint] = JointAngle(angle = np.nan, confidence = 0.0)
 
-        person.pose_angles = angles
-        callback(person)
+        pose.pose_angles = angles
+        callback(pose)
 
     @staticmethod
     def calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, rotate_by: float = 0) -> float:

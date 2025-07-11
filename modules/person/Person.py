@@ -1,17 +1,13 @@
 # Standard library imports
 from dataclasses import dataclass, field
 from time import time
-from threading import Lock
-from typing import Optional, Callable
+from typing import Callable
 
 # Third-party imports
-import cv2
-import numpy as np
 from pandas import Timestamp
 
 # Local application imports
-from modules.cam.depthcam.Definitions import Tracklet, Rect
-from modules.pose.PoseDefinitions import Pose, JointAngleDict
+from modules.cam.depthcam.Definitions import Tracklet
 from modules.person.trackers.BaseTracker import BaseTrackerInfo, TrackingStatus
 
 @dataclass
@@ -25,56 +21,10 @@ class Person:
     start_time: float = field(default_factory=time)
     last_time: float = field(default_factory=time)
 
-    _pose_lock: Lock = field(default_factory=Lock, init=False, repr=False)
-    _pose_crop_rect: Optional[Rect] = field(default=None, init=False, repr=False)
-    _pose_image: Optional[np.ndarray] = field(default=None, init=False, repr=False)
-    _pose: Optional[Pose] = field(default=None, init=False, repr=False)
-    _pose_angles: Optional[JointAngleDict] = field(default=None, init=False, repr=False)
-
     def __post_init__(self):
         # If you want to set status from tracklet, do it here
         if self.status == TrackingStatus.NONE and self.tracklet is not None:
             self.status = TrackingStatus[self.tracklet.status.name]
-
-    @property
-    def pose_crop_rect(self) -> Optional[Rect]:
-        with self._pose_lock:
-            return self._pose_crop_rect
-
-    @pose_crop_rect.setter
-    def pose_crop_rect(self, value: Optional[Rect]) -> None:
-        with self._pose_lock:
-            self._pose_crop_rect = value
-
-    @property
-    def pose_image(self) -> Optional[np.ndarray]:
-        with self._pose_lock:
-            return self._pose_image
-
-    @pose_image.setter
-    def pose_image(self, value: Optional[np.ndarray]) -> None:
-        with self._pose_lock:
-            self._pose_image = value
-
-    @property
-    def pose(self) -> Optional[Pose]:
-        with self._pose_lock:
-            return self._pose
-
-    @pose.setter
-    def pose(self, value: Optional[Pose]) -> None:
-        with self._pose_lock:
-            self._pose = value
-
-    @property
-    def pose_angles(self) -> Optional[JointAngleDict]:
-        with self._pose_lock:
-            return self._pose_angles
-
-    @pose_angles.setter
-    def pose_angles(self, value: Optional[JointAngleDict]) -> None:
-        with self._pose_lock:
-            self._pose_angles = value
 
     @property
     def is_active(self) -> bool:

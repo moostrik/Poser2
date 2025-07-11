@@ -11,7 +11,6 @@ import onnxruntime as ort
 
 # Local application imports
 from modules.pose.PoseDefinitions import *
-from modules.person.Person import Person
 
 class Detection(Thread):
     _model_load_lock: Lock = Lock()
@@ -37,7 +36,7 @@ class Detection(Thread):
 
         self._running: bool = False
         self._input_mutex: Lock = Lock()
-        self._input_person: Person | None = None
+        self._input_pose: PoseData | None = None
         self._callbacks: set = set()
 
     def stop(self) -> None:
@@ -48,14 +47,14 @@ class Detection(Thread):
 
         self._running = True
         while self._running:
-            person: Person | None = self.get_person()
-            if person is not None:
-                image: np.ndarray | None = person.pose_image
+            pose: PoseData | None = self.get_person()
+            if pose is not None:
+                image: np.ndarray | None = pose.pose_image
                 if image is not None:
                     poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
                     if len(poses) > 0:
-                        person.pose = poses[0]
-                self.callback(person)
+                        pose.pose = poses[0]
+                self.callback(pose)
             time.sleep(0.01)
 
     def load_model_once(self) -> None:
@@ -65,23 +64,23 @@ class Detection(Thread):
                 Detection._model_loaded = True
 
     # GETTERS AND SETTERS
-    def get_person(self) -> Person | None:
+    def get_person(self) -> PoseData | None:
         with self._input_mutex:
-            return_detection: Person | None = self._input_person
-            self._input_person = None
+            return_detection: PoseData | None = self._input_pose
+            self._input_pose = None
             return return_detection
 
-    def person_input(self, detection: Person) -> None:
+    def add_pose(self, pose: PoseData) -> None:
         with self._input_mutex:
-            self._input_person = detection
+            self._input_pose = pose
 
     def get_frame_size(self) -> int:
         return Detection._moodel_size
 
     # CALLBACKS
-    def callback(self, value: Person) -> None:
+    def callback(self, pose: PoseData) -> None:
         for c in self._callbacks:
-            c(value)
+            c(pose)
 
     def addMessageCallback(self, callback) -> None:
         self._callbacks.add(callback)
@@ -122,7 +121,7 @@ class Detection(Thread):
             keypoints: np.ndarray = keypoints_with_scores[:, :2]
             keypoints = np.flip(keypoints, axis=1)
             scores: np.ndarray = keypoints_with_scores[:, 2]
-            pose = Pose(keypoints, scores)
+            pose = PosePoints(keypoints, scores)
             return [pose]
         else: # ModelType.MULTI
             poses: PoseList = []
@@ -148,7 +147,7 @@ class Detection(Thread):
                 ymax: float = kps[53]
                 xmax: float = kps[54]
 
-                pose = Pose(keypoints, scores)
+                pose = PosePoints(keypoints, scores)
                 poses.append(pose)
             return poses
 

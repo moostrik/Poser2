@@ -9,8 +9,8 @@ import pandas as pd
 import numpy as np
 
 # Local application imports
-from modules.person.Person import Person, TrackingStatus
-from modules.pose.PoseDefinitions import JointAngleDict, PoseAngleKeypoints, Keypoint
+# from modules.person.Person import Person, TrackingStatus
+from modules.pose.PoseDefinitions import *
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -31,7 +31,7 @@ class PoseStreamProcessor(Thread):
         self._stop_event = Event()
 
         # Input
-        self.person_input_queue: Queue[Person] = Queue()
+        self.pose_input_queue: Queue[PoseData] = Queue()
 
         # Windowing for joint angles
         self.buffer_capacity: int = int(settings.pose_buffer_duration * settings.camera_fps)
@@ -54,28 +54,28 @@ class PoseStreamProcessor(Thread):
     def run(self) -> None:
         while not self._stop_event.is_set():
             try:
-                person: Optional[Person] = self.person_input_queue.get(block=True, timeout=0.01)
-                if person is not None:
+                pose: Optional[PoseData] = self.pose_input_queue.get(block=True, timeout=0.01)
+                if pose is not None:
                     try:
-                        self._process(person)
+                        self._process(pose)
                     except Exception as e:
-                        print(f"Error processing person {person.id}: {e}")
-                    self.person_input_queue.task_done()
+                        print(f"Error processing person {pose.id}: {e}")
+                    self.pose_input_queue.task_done()
             except Empty:
                 continue
 
-    def add_person(self, person: Person) -> None:
-        self.person_input_queue.put(person)
+    def add_pose(self, person: PoseData) -> None:
+        self.pose_input_queue.put(person)
 
-    def _process(self, person: Person) -> None:
+    def _process(self, person: PoseData) -> None:
         """ Process a person and update the joint angle windows. """
 
-        if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.NEW:
-            # print(f"Skipping person {person.id} with status {person.status}")
-            # If the person is removed or lost, clear their angle and confidence windows
-            self.angle_buffers.pop(person.id, None)
-            self.confidence_buffers.pop(person.id, None)
-            return
+        # if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.NEW:
+        #     # print(f"Skipping person {person.id} with status {person.status}")
+        #     # If the person is removed or lost, clear their angle and confidence windows
+        #     self.angle_buffers.pop(person.id, None)
+        #     self.confidence_buffers.pop(person.id, None)
+        #     return
 
         if person.pose_angles is None:
             # print(f"WINDOW: Skipping person {person.id} with no pose angles, this should not happen")

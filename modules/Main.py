@@ -77,11 +77,12 @@ class Main():
         self.pose_streamer.add_stream_callback(self.render.set_pose_stream)
         self.pose_streamer.start()
 
-        self.pose_detection.add_person_callback(self.pose_streamer.add_person)
-        self.pose_detection.add_person_callback(self.render.set_person)
+        self.pose_detection.add_pose_callback(self.pose_streamer.add_pose)
+        self.pose_detection.add_pose_callback(self.render.set_pose)
         self.pose_detection.start()
 
         self.panoramic_tracker.add_person_callback(self.pose_detection.add_person)
+        self.panoramic_tracker.add_person_callback(self.render.set_person)
         self.panoramic_tracker.start()
 
         self.av.add_output_callback(self.render.set_av)

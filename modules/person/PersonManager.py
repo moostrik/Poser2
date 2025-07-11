@@ -180,11 +180,6 @@ class PersonManager:
             if keep.status == TrackingStatus.NEW:
                 merged_person.status = TrackingStatus.TRACKED
 
-            merged_person.pose_crop_rect = keep.pose_crop_rect
-            merged_person.pose_image = keep.pose_image
-            merged_person.pose = keep.pose
-            merged_person.pose_angles = keep.pose_angles
-
             # Remove both old persons from the manager
             self._persons.pop(merged_id, None)
             if other_id != -1:

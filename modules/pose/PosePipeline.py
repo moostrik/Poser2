@@ -8,7 +8,7 @@ import numpy as np
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
 from modules.person.Person import Person, PersonCallback
-from modules.pose.PoseDefinitions import ModelTypeNames
+from modules.pose.PoseDefinitions import ModelTypeNames, PoseData, PoseDataCallback
 from modules.pose.PoseDetection import Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.pose.PoseAngleCalculator import PoseAngleCalculator
@@ -46,7 +46,7 @@ class PosePipeline:
 
         # Callbacks
         self.callback_lock = Lock()
-        self.person_output_callbacks: set[PersonCallback] = set()
+        self.person_output_callbacks: set[PoseDataCallback] = set()
         self.running: bool = False
 
         hot_reloader = HotReloadMethods(self.__class__)
@@ -55,7 +55,7 @@ class PosePipeline:
         if self.running:
             return
 
-        self.joint_angles.add_person_callback(self._notify_callback)
+        self.joint_angles.add_pose_callback(self._notify_pose_callback)
         self.joint_angles.start()
 
         # Start detectors
@@ -79,20 +79,27 @@ class PosePipeline:
      # INPUTS
     def add_person(self, person: Person) -> None:
 
-        if person.is_active and person.pose_image is None:
-            image: Optional[np.ndarray] = self._get_image(person.cam_id)
-            if image is not None:
-                pose_image, crop_rect = self.image_processor.process_person_image(person, image)
-                person.pose_image = pose_image
-                person.pose_crop_rect = crop_rect
-
-        if not self.pose_active:
-            self._notify_callback(person)
+        image: Optional[np.ndarray] = self._get_image(person.cam_id)
+        if image is None:
             return
 
+        pose_image, crop_rect = self.image_processor.process_person_image(person, image)
+
+        if person.status == 'REMOVED':
+            print("REMOVED")
+
+        pose = PoseData(
+            id=person.id,
+            cam_id=person.cam_id,
+            time_stamp=person.time_stamp,
+            _pose_crop_rect=crop_rect,
+            _pose_image=pose_image
+        )
+
         detector: Optional[Detection] = self.pose_detectors.get(person.id)
+
         if detector:
-            detector.person_input(person)
+            detector.add_pose(pose)
 
     def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
         if frame_type != FrameType.VIDEO:
@@ -106,15 +113,15 @@ class PosePipeline:
             return None
 
     # External Output Callbacks
-    def add_person_callback(self, callback: PersonCallback) -> None:
+    def add_pose_callback(self, callback: PoseDataCallback) -> None:
         """Add callback for processed persons"""
         if self.running:
             print('Pipeline is running, cannot add callback')
             return
         self.person_output_callbacks.add(callback)
 
-    def _notify_callback(self, person: Person) -> None:
+    def _notify_pose_callback(self, pose: PoseData) -> None:
         """Handle processed person"""
         with self.callback_lock:
             for callback in self.person_output_callbacks:
-                callback(person)
+                callback(pose)

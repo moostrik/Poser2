@@ -136,7 +136,7 @@ class PanoramicTracker(Thread):
         self.remove_overlapping_persons()
 
         for person in self.person_manager.all_persons():
-            if person.is_active and person.pose_image is None:
+            if person.is_active:
                 self._person_callback(person)
 
     def remove_overlapping_persons(self) -> None:

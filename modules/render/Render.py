@@ -23,7 +23,7 @@ from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.Person import Person, PersonColor, TrackingStatus
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
-from modules.pose.PoseDefinitions import Pose, PoseEdgeIndices
+from modules.pose.PoseDefinitions import PoseData, PosePoints, PoseEdgeIndices
 from modules.pose.PoseStreamProcessor import PoseStreamData
 from modules.Settings import Settings
 
@@ -111,10 +111,12 @@ class Render(RenderWindow):
         self.input_mutex: Lock = Lock()
         self.input_tracklets: dict[int, dict[int, Tracklet]] = {}   # cam_id -> track_id -> Tracklet
         self.input_persons: dict[int, Optional[Person]] = {}           # person_id -> Person
+        self.input_poses: dict[int, Optional[PoseData]] = {}
         self.input_angle_windows: dict[int, Optional[np.ndarray]] = {}          # person_id -> angles
         for i in range(self.num_persons):
             self.input_tracklets[i] = {}
             self.input_persons[i] = None
+            self.input_poses[i] = None
             self.input_angle_windows[i] = None
 
         self.vis_width: int = settings.light_resolution
@@ -172,7 +174,7 @@ class Render(RenderWindow):
 
             self.update_pose_meshes()
             self.update_angle_meshes()
-            self.draw_persons()
+            self.draw_poses()
 
             self.draw_composition()
         except Exception as e:
@@ -214,9 +216,9 @@ class Render(RenderWindow):
 
     def update_pose_meshes(self) -> None:
         for i in range(self.num_persons):
-            person: Person | None = self.get_person(i, clear=False)
-            if person is not None:
-                pose: Pose | None = person.pose
+            pose_data: PoseData | None = self.get_pose(i, clear=False)
+            if pose_data is not None:
+                pose: PosePoints | None = pose_data.pose
                 if pose is not None:
                     self.pose_meshes[i].set_vertices(pose.getVertices())
                     self.pose_meshes[i].set_colors(pose.getColors(threshold=0.0))
@@ -301,7 +303,10 @@ class Render(RenderWindow):
             for person in persons:
                 if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.LOST:
                     continue
-                roi: Rect | None = person.pose_crop_rect
+                roi: Rect | None  = None
+                pose: PoseData | None = self.get_pose(person.id, clear=False)
+                if pose is not None:
+                    roi = pose.pose_crop_rect
                 mesh: Mesh = self.pose_meshes[person.id]
                 if roi is not None and mesh.isInitialized():
                     x, y, w, h = roi.x, roi.y, roi.width, roi.height
@@ -335,16 +340,16 @@ class Render(RenderWindow):
                 self.draw_light_angles(fbo, self.vis_image, self.vis_angle_shader)
             fbo.end()
 
-    def draw_persons(self) -> None:
+    def draw_poses(self) -> None:
         for i in range(self.num_persons):
             fbo: Fbo = self.psn_fbos[i]
-            person: Person | None = self.get_person(i)
-            if person is None:
+            pose_data: PoseData | None = self.get_pose(i)
+            if pose_data is None:
                 continue
 
             image: Image = self.psn_images[i]
-            if person.pose_image is not None:
-                image.set_image(person.pose_image)
+            if pose_data.pose_image is not None:
+                image.set_image(pose_data.pose_image)
                 image.update()
 
             analysis_image: Image = self.analysis_images[i]
@@ -353,6 +358,10 @@ class Render(RenderWindow):
             self.setView(fbo.width, fbo.height)
             fbo.begin()
 
+            person: Person | None = self.get_person(i)
+            if person is None:
+                continue
+
             if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.LOST:
                 glColor4f(1.0, 1.0, 1.0, 0.25)   # Set color
                 image.draw(0, 0, fbo.width, fbo.height)
@@ -360,9 +369,9 @@ class Render(RenderWindow):
             else:
                 image.draw(0, 0, fbo.width, fbo.height)
             # analysis_image.draw(0, 0, fbo.width, fbo.height)
-            mesh: Mesh = self.pose_meshes[person.id]
+            mesh: Mesh = self.pose_meshes[pose_data.id]
             self.draw_person(person, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
-            angle_mesh = self.angle_meshes[person.id]
+            angle_mesh = self.angle_meshes[pose_data.id]
             if angle_mesh.isInitialized():
                 angle_mesh.draw(0, 0, fbo.width, fbo.height)
 
@@ -416,6 +425,17 @@ class Render(RenderWindow):
     def set_person(self, person: Person) -> None:
         with self.input_mutex:
             self.input_persons[person.id] = person
+
+
+    def get_pose(self, id: int, clear: bool = False) -> Optional[PoseData]:
+        with self.input_mutex:
+            ret_pose: Optional[PoseData] = self.input_poses[id]
+            if clear:
+                self.input_poses[id] = None
+            return ret_pose
+    def set_pose(self, pose: PoseData) -> None:
+        with self.input_mutex:
+            self.input_poses[pose.id] = pose
 
     def get_pose_window(self, id: int, clear = False) -> Optional[np.ndarray]:
         with self.input_mutex:
