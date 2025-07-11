@@ -56,13 +56,13 @@ class Settings():
         # POSE DETCTION SETTINGS
         self.pose_model_type: ModelType         = None # type: ignore
         self.pose_active: bool                  = None # type: ignore
-        self.pose_buffer_size: int              = None # type: ignore
+        self.pose_buffer_duration: int          = None # type: ignore
 
         # POSE CORRELATION SETTINGS
         self.corr_rate_hz: float                = None # type: ignore
         self.corr_num_workers: int              = None # type: ignore
-        self.corr_window_size: int              = None # type: ignore
-        self.corr_window_timeout: float         = None # type: ignore
+        self.corr_buffer_duration: int          = None # type: ignore
+        self.corr_stream_timeout: float         = None # type: ignore
         self.corr_max_nan_ratio: float          = None # type: ignore
         self.corr_dtw_band: int                 = None # type: ignore
         self.corr_similarity_exp: float         = None # type: ignore

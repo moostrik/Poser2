@@ -34,7 +34,7 @@ class PoseStreamProcessor(Thread):
         self.person_input_queue: Queue[Person] = Queue()
 
         # Windowing for joint angles
-        self.buffer_size: int = int(settings.pose_buffer_size * settings.camera_fps)
+        self.buffer_capacity: int = int(settings.pose_buffer_duration * settings.camera_fps)
         self.angle_buffers: dict[int, pd.DataFrame] = {}
         self.confidence_buffers: dict[int, pd.DataFrame] = {}
 
@@ -91,7 +91,7 @@ class PoseStreamProcessor(Thread):
         angle_row_df = pd.DataFrame([angle_row], index=[timestamp])
         angle_df = pd.concat([angle_df, angle_row_df])
         angle_df.sort_index(inplace=True)
-        angle_df = angle_df.iloc[-self.buffer_size:]
+        angle_df = angle_df.iloc[-self.buffer_capacity:]
         self.angle_buffers[person.id] = angle_df
 
         # # Update confidence window
@@ -99,7 +99,7 @@ class PoseStreamProcessor(Thread):
         conf_row_df = pd.DataFrame([conf_row], index=[timestamp])
         conf_df = pd.concat([conf_df, conf_row_df])
         conf_df.sort_index(inplace=True)
-        conf_df = conf_df.iloc[-self.buffer_size:]
+        conf_df = conf_df.iloc[-self.buffer_capacity:]
         self.confidence_buffers[person.id] = conf_df
 
         # Interpolate and smooth angles

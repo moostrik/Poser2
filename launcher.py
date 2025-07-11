@@ -81,12 +81,12 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.pose_active =      not args.nopose
     settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
-    settings.pose_buffer_size =     10 # seconds
+    settings.pose_buffer_duration = 10 # seconds
 
     settings.corr_rate_hz =         args.fps
     settings.corr_num_workers =     10
-    settings.corr_window_size =     3 # seconds
-    settings.corr_window_timeout =  settings.tracker_timeout # seconds
+    settings.corr_buffer_duration = 3 # seconds
+    settings.corr_stream_timeout =  settings.tracker_timeout # seconds
     settings.corr_max_nan_ratio =   0.15 # maximum ratio of NaN values in a window
     settings.corr_dtw_band =        10 # maximum distance between two points in a window
     settings.corr_similarity_exp =  2.0 # exponent for similarity calculation

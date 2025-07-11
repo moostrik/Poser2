@@ -112,9 +112,9 @@ class PoseDTWCorrelator():
 
         self.interval: float = 1.0 / settings.corr_rate_hz
 
-        self.max_window_size: int = int(settings.pose_buffer_size * settings.camera_fps)
-        self.window_size: int = min(int(settings.corr_window_size * settings.camera_fps), self.max_window_size)
-        self.window_timeout: float = settings.corr_window_timeout
+        self.max_buffer_capacity: int = int(settings.pose_buffer_duration * settings.camera_fps)
+        self.buffer_capacity: int = min(int(settings.corr_buffer_duration * settings.camera_fps), self.max_buffer_capacity)
+        self.stream_timeout: float = settings.corr_stream_timeout
 
         self.maximum_nan_ratio: float = settings.corr_max_nan_ratio
         self.dtw_band: int = settings.corr_dtw_band
@@ -123,12 +123,12 @@ class PoseDTWCorrelator():
         self._max_workers: int = max(min(cpu_count(), settings.corr_num_workers), 1)
 
         self._process_pool = ProcessPoolExecutor(max_workers=self._max_workers, initializer=ignore_keyboard_interrupt)
-        self._analysis_thread = threading.Thread(target=self.run)
+        self._correlation_thread = threading.Thread(target=self.run)
         self._stop_event = threading.Event()
 
         # INPUTS
         self._input_lock = threading.Lock()
-        self._input_windows: PoseStreamDataDict = {}
+        self._input_pose_streams: PoseStreamDataDict = {}
 
         # CALLBACKS
         self._callback_lock = threading.Lock()
@@ -136,19 +136,19 @@ class PoseDTWCorrelator():
 
         # HOT RELOADER
         self.hot_reloader = HotReloadMethods(self.__class__, False, False)
-        self.hot_reloader.add_file_changed_callback(self.restart)
+        self.hot_reloader.add_file_changed_callback(self._reload_and_restart)
 
     def set_pose_stream(self, data: PoseStreamData) -> None:
         with self._input_lock:
-            self._input_windows[data.person_id] = data
+            self._input_pose_streams[data.person_id] = data
         return
 
     def add_correlation_callback(self, callback: PoseCorrelationBatchCallback) -> None:
-        """ Register a callback to receive the current pandas DataFrame window. """
+        """ Register a callback to receive the last correlation batch. """
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def _callback(self, batch: PoseCorrelationBatch) -> None:
+    def _notify_callbacks(self, batch: PoseCorrelationBatch) -> None:
         """ Call all registered callbacks with the current batch. """
         with self._callback_lock:
             for callback in self._callbacks:
@@ -158,7 +158,7 @@ class PoseDTWCorrelator():
                     print(f"[{self.__class__.__name__}] Callback error: {e}")
 
     def start(self) -> None:
-        self._analysis_thread.start()
+        self._correlation_thread.start()
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -166,30 +166,18 @@ class PoseDTWCorrelator():
         with self._callback_lock:
             self._callbacks.clear()
 
-    def restart(self) -> None:
-        self._stop_event.set()
-        self._analysis_thread.join()
-        self._process_pool.shutdown(wait=True)
-
-        self.hot_reloader.reload_methods()
-
-        self._process_pool = ProcessPoolExecutor(max_workers=self._max_workers,initializer = ignore_keyboard_interrupt)
-        self._stop_event.clear()
-        self._analysis_thread = threading.Thread(target=self.run)
-        self._analysis_thread.start()
-
     def join(self) -> None:
-        self._analysis_thread.join()
+        self._correlation_thread.join()
 
     def run(self) -> None:
         while not self._stop_event.is_set():
             loop_start: float = time.perf_counter()
 
             with self._input_lock:
-                pose_windows: PoseStreamDataDict= self._input_windows.copy()
+                pose_streams: PoseStreamDataDict= self._input_pose_streams.copy()
 
-            pose_windows = self._filter_windows_by_time(pose_windows, self.window_timeout)
-            angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_windows, self.window_size)
+            pose_streams = self._filter_streams_by_time(pose_streams, self.stream_timeout)
+            angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_streams, self.buffer_capacity)
 
             if angle_pairs:
                 batch = PoseCorrelationBatch()
@@ -210,7 +198,7 @@ class PoseDTWCorrelator():
                     except Exception as e:
                         print(f"Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
 
-                self._callback(batch)
+                self._notify_callbacks(batch)
 
 
             elapsed: float = time.perf_counter() - loop_start
@@ -218,30 +206,41 @@ class PoseDTWCorrelator():
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
+    def _reload_and_restart(self) -> None:
+        self._stop_event.set()
+        self._correlation_thread.join()
+        self._process_pool.shutdown(wait=True)
+
+        self.hot_reloader.reload_methods()
+
+        self._process_pool = ProcessPoolExecutor(max_workers=self._max_workers,initializer = ignore_keyboard_interrupt)
+        self._stop_event.clear()
+        self._correlation_thread = threading.Thread(target=self.run)
+        self._correlation_thread.start()
 
     @staticmethod
-    def _filter_windows_by_time(windows: PoseStreamDataDict, max_age_s: float = 2.0) -> PoseStreamDataDict:
-        """Return only windows whose last timestamp is within max_age_s seconds from now."""
+    def _filter_streams_by_time(streams: PoseStreamDataDict, max_age_s: float = 2.0) -> PoseStreamDataDict:
+        """Return only streams whose last timestamp is within max_age_s seconds from now."""
         now: pd.Timestamp = pd.Timestamp.now()
         filtered: PoseStreamDataDict = {}
-        for window_id, data in windows.items():
+        for id, data in streams.items():
             if not data.angles.empty:
                 last_time = data.angles.index[-1]
                 # print(last_time, (now - last_time).total_seconds())
                 if (now - last_time).total_seconds() <= max_age_s:
-                    filtered[window_id] = data
+                    filtered[id] = data
         return filtered
 
     @staticmethod
-    def _filter_windows_by_length(windows: PoseStreamDataDict, min_length: int = 20) -> PoseStreamDataDict:
-        """Return only windows with at least min_length frames."""
-        return {wid: data for wid, data in windows.items() if len(data.angles) >= min_length}
+    def _filter_streams_by_length(streams: PoseStreamDataDict, min_length: int = 20) -> PoseStreamDataDict:
+        """Return only streams with at least min_length frames."""
+        return {wid: data for wid, data in streams.items() if len(data.angles) >= min_length}
 
     @staticmethod
-    def _filter_windows_by_nan(windows: PoseStreamDataDict, min_valid_ratio: float = 0.7) -> PoseStreamDataDict:
-        """Return only windows where the ratio of non-NaN values is above min_valid_ratio."""
+    def _filter_streams_by_nan(streams: PoseStreamDataDict, min_valid_ratio: float = 0.7) -> PoseStreamDataDict:
+        """Return only streams where the ratio of non-NaN values is above min_valid_ratio."""
         filtered: PoseStreamDataDict = {}
-        for wid, data in windows.items():
+        for wid, data in streams.items():
             total: int = data.angles.size
             valid: int = data.angles.count().sum()
             if total > 0 and (valid / total) >= min_valid_ratio:
@@ -249,29 +248,29 @@ class PoseDTWCorrelator():
         return filtered
 
     @ staticmethod
-    def _remove_nans_from_windows(windows: PoseStreamDataDict) -> PoseStreamDataDict:
-        """Remove NaN values from angles and confidences DataFrames in each window."""
-        for data in windows.values():
+    def _remove_nans_from_streams(streams: PoseStreamDataDict) -> PoseStreamDataDict:
+        """Remove NaN values from angles and confidences DataFrames in each stream."""
+        for data in streams.values():
             data.angles = data.angles.dropna()
             data.confidences = data.confidences.dropna()
-        return windows
+        return streams
 
     @staticmethod
-    def _trim_windows_to_length(windows: PoseStreamDataDict, max_length: int ) -> PoseStreamDataDict:
-        """ Trim each window's DataFrames to the last max_length frames. """
-        for data in windows.values():
+    def _trim_streams_to_length(streams: PoseStreamDataDict, max_length: int ) -> PoseStreamDataDict:
+        """ Trim each stream's DataFrames to the last max_length frames. """
+        for data in streams.values():
             if len(data.angles) > max_length:
                 data.angles = data.angles.iloc[-max_length:]
                 data.confidences = data.confidences.iloc[-max_length:]
-        return windows
+        return streams
 
     @staticmethod
-    def _generate_overlapping_angle_pairs(windows: PoseStreamDataDict) -> list[AnglePair]:
-        """Generate all unique pairs of windows with overlapping time ranges."""
+    def _generate_overlapping_angle_pairs(streams: PoseStreamDataDict) -> list[AnglePair]:
+        """Generate all unique pairs of streams with overlapping time ranges."""
         angle_pairs: list[AnglePair] = []
-        window_items: list[tuple[int, PoseStreamData]] = list(windows.items())
+        stream_items: list[tuple[int, PoseStreamData]] = list(streams.items())
 
-        for (id1, win1), (id2, win2) in combinations(window_items, 2):
+        for (id1, win1), (id2, win2) in combinations(stream_items, 2):
             # Find overlapping time range
             t1_start, t1_end = win1.angles.index[0], win1.angles.index[-1]
             t2_start, t2_end = win2.angles.index[0], win2.angles.index[-1]
@@ -302,15 +301,16 @@ class PoseDTWCorrelator():
         return angle_pairs
 
     @staticmethod
-    def _generate_asof_angle_pairs(windows: PoseStreamDataDict, tolerance: pd.Timedelta) -> list[AnglePair]:
+    def _generate_asof_angle_pairs(streams: PoseStreamDataDict, tolerance: pd.Timedelta) -> list[AnglePair]:
         """
-        For each unique pair of PoseWindowData, align their angles and confidences DataFrames using merge_asof.
+        For each unique pair of PoseStream
+        Data, align their angles and confidences DataFrames using merge_asof.
         Returns a list of AnglePair(id1, id2, angles1_aligned, angles2_aligned, confidences1_aligned, confidences2_aligned).
         """
         pairs: list[AnglePair] = []
-        window_items: list[tuple[int, PoseStreamData]] = list(windows.items())
+        stream_items: list[tuple[int, PoseStreamData]] = list(streams.items())
 
-        for (id1, win1), (id2, win2) in combinations(window_items, 2):
+        for (id1, win1), (id2, win2) in combinations(stream_items, 2):
             # Get the DataFrames
             angles_1: pd.DataFrame = win1.angles
             angles_2: pd.DataFrame = win2.angles
@@ -352,15 +352,15 @@ class PoseDTWCorrelator():
         return pairs
 
     @staticmethod
-    def _generate_naive_angle_pairs(windows: PoseStreamDataDict, max_length: int) -> list[AnglePair]:
+    def _generate_naive_angle_pairs(streams: PoseStreamDataDict, max_length: int) -> list[AnglePair]:
         """
-        Generate angle pairs from windows,
+        Generate angle pairs from streams,
         Returns a list of AnglePair(id1, id2, angles1, angles2, confidences_1, confidences_2).
         """
         pairs: list[AnglePair] = []
-        window_items: list[tuple[int, PoseStreamData]] = list(windows.items())
+        stream_items: list[tuple[int, PoseStreamData]] = list(streams.items())
 
-        for (id1, win1), (id2, win2) in combinations(window_items, 2):
+        for (id1, win1), (id2, win2) in combinations(stream_items, 2):
             # Get the DataFrames
             angles_1: pd.DataFrame = win1.angles
             angles_2: pd.DataFrame = win2.angles
@@ -396,7 +396,7 @@ class PoseDTWCorrelator():
         Analyse a single pair of angle sequences for all joints and compute their similarity.
 
         For each numeric joint/column in the provided AnglePair, this method:
-        - Extracts the angle sequences from both windows and removes NaN values independently.
+        - Extracts the angle sequences from both streams and removes NaN values independently.
         - Calculates the ratio of NaN values for each sequence and skips the joint if either exceeds the maximum allowed ratio.
         - Computes the similarity between the two cleaned angle sequences using DTW with an angular cost, applying the specified Sakoe-Chiba band and similarity exponent.
         - Collects the similarity scores for all valid joints into a dictionary.
