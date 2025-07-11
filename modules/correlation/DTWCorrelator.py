@@ -17,7 +17,7 @@ from numba import njit
 import pandas as pd
 
 # Local application imports
-from modules.pose.PoseCorrelation import PoseCorrelation, PoseCorrelationBatch, PoseCorrelationBatchCallback
+from modules.correlation.PairCorrelation import PairCorrelation, PairCorrelationBatch, PoseCorrelationBatchCallback
 from modules.pose.PoseStreamProcessor import PoseStreamData, PoseStreamDataDict
 from modules.Settings import Settings
 
@@ -107,7 +107,7 @@ def dtw_angular_sakoe_chiba_path(x: np.ndarray, y: np.ndarray, band) -> tuple[fl
 def ignore_keyboard_interrupt() -> None:
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-class PoseDTWCorrelator():
+class DTWCorrelator():
     def __init__(self, settings: Settings) -> None:
 
         self.interval: float = 1.0 / settings.corr_rate_hz
@@ -148,7 +148,7 @@ class PoseDTWCorrelator():
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def _notify_callbacks(self, batch: PoseCorrelationBatch) -> None:
+    def _notify_callbacks(self, batch: PairCorrelationBatch) -> None:
         """ Call all registered callbacks with the current batch. """
         with self._callback_lock:
             for callback in self._callbacks:
@@ -180,19 +180,19 @@ class PoseDTWCorrelator():
             angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_streams, self.buffer_capacity)
 
             if angle_pairs:
-                batch = PoseCorrelationBatch()
+                batch = PairCorrelationBatch()
 
                 # Submit all pairs for analysis
                 future_to_pair: dict[Future, AnglePair] = {}
                 for pair in angle_pairs:
-                    future: Future[PoseCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band, self.similarity_exponent)
+                    future: Future[PairCorrelation | None] = self._process_pool.submit(self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band, self.similarity_exponent)
                     future_to_pair[future] = pair
 
                 # Collect results
                 for future in as_completed(future_to_pair):
                     pair: AnglePair = future_to_pair[future]
                     try:
-                        correlation: Optional[PoseCorrelation] = future.result()
+                        correlation: Optional[PairCorrelation] = future.result()
                         if correlation:
                             batch.add_result(correlation)
                     except Exception as e:
@@ -391,7 +391,7 @@ class PoseDTWCorrelator():
         return pairs
 
     @staticmethod
-    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int, similarity_exponent: float) -> Optional[PoseCorrelation]:
+    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int, similarity_exponent: float) -> Optional[PairCorrelation]:
         """
         Analyse a single pair of angle sequences for all joints and compute their similarity.
 
@@ -439,14 +439,14 @@ class PoseDTWCorrelator():
 
             # Calculate similarity
             try:
-                similarity: float = PoseDTWCorrelator._compute_correlation(angles_1, angles_2, dtw_band, similarity_exponent)
+                similarity: float = DTWCorrelator._compute_correlation(angles_1, angles_2, dtw_band, similarity_exponent)
                 joint_correlations[column] = similarity
             except Exception as e:
                 print(f"{column}: correlation failed - {e}")
                 continue
 
         if joint_correlations:
-            return PoseCorrelation(
+            return PairCorrelation(
                 id_1=pair.id_1,
                 id_2=pair.id_2,
                 joint_correlations=joint_correlations

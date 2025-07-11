@@ -14,10 +14,10 @@ from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.gui.PyReallySimpleGui import Gui
 from modules.person.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
-from modules.pose.PoseDTWCorrelator import PoseDTWCorrelator
+from modules.correlation.DTWCorrelator import DTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseStreamProcessor import PoseStreamProcessor
-from modules.pose.PoseCorrelation import PoseCorrelationWindow
+from modules.correlation.PairCorrelation import PairCorrelationStreamProcessor
 from modules.render.Render import Render
 from modules.Settings import Settings
 
@@ -48,8 +48,8 @@ class Main():
         if self.settings.pose_active:
             self.pose_detection = PosePipeline(settings)
             self.pose_streamer = PoseStreamProcessor(settings)
-            self.pose_dtw_correlator = PoseDTWCorrelator(settings)
-            self.pose_dtw_window = PoseCorrelationWindow(settings)
+            self.dtw_correlator = DTWCorrelator(settings)
+            self.correlation_streamer = PairCorrelationStreamProcessor(settings)
 
         self.av: AV = AV(self.gui, settings)
         self.running: bool = False
@@ -74,13 +74,13 @@ class Main():
             self.pose_detection.add_person_callback(self.render.set_person)
             self.pose_detection.start()
 
-            self.pose_streamer.add_window_callback(self.pose_dtw_correlator.set_pose_stream)
-            self.pose_streamer.add_window_callback(self.render.set_pose_stream)
+            self.pose_streamer.add_stream_callback(self.dtw_correlator.set_pose_stream)
+            self.pose_streamer.add_stream_callback(self.render.set_pose_stream)
             self.pose_streamer.start()
 
-            self.pose_dtw_correlator.add_correlation_callback(self.pose_dtw_window.add_batch)
-            self.pose_dtw_window.add_update_callback(self.render.set_correlation_window)
-            self.pose_dtw_correlator.start()
+            self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_batch)
+            self.correlation_streamer.add_stream_callback(self.render.set_correlation_stream)
+            self.dtw_correlator.start()
 
         else:
             self.panoramic_tracker.add_person_callback(self.render.set_person)
@@ -140,9 +140,9 @@ class Main():
             self.pose_detection.stop()
         if self.pose_streamer:
             self.pose_streamer.stop()
-        if self.pose_dtw_correlator:
-            self.pose_dtw_correlator.stop()
-            self.pose_dtw_correlator.join()
+        if self.dtw_correlator:
+            self.dtw_correlator.stop()
+            self.dtw_correlator.join()
 
         self.av.stop()
         self.av.join()

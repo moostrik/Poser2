@@ -22,7 +22,7 @@ from modules.gl.Utils import lfo, fit, fill
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
 from modules.person.Person import Person, PersonColor, TrackingStatus
-from modules.pose.PoseCorrelation import PoseCorrelationWindow, PoseCorrelationBatch
+from modules.correlation.PairCorrelation import PairCorrelationStreamData
 from modules.pose.PoseDefinitions import Pose, PoseEdgeIndices
 from modules.pose.PoseStreamProcessor import PoseStreamData
 from modules.Settings import Settings
@@ -440,8 +440,8 @@ class Render(RenderWindow):
                 return None
             self.input_R_window_consumed = True
             return self.input_R_windows.copy()
-    def set_correlation_window(self, window: PoseCorrelationWindow) -> None:
-        top_pairs: list[Tuple[int, int]] = window.get_top_pairs(n=3, time_window=0.5)
+    def set_correlation_stream(self, window: PairCorrelationStreamData) -> None:
+        top_pairs: list[Tuple[int, int]] = window.get_top_pairs(n=3, duration=0.5)
         with self.input_mutex:
             self.input_R_window_consumed = False
             self.input_R_windows.clear()

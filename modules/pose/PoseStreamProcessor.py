@@ -134,7 +134,7 @@ class PoseStreamProcessor(Thread):
         # Wrap back to [-π, π]
         return ((df_smooth + np.pi) % (2 * np.pi)) - np.pi
 
-    def add_window_callback(self, callback: PoseStreamDataCallback) -> None:
+    def add_stream_callback(self, callback: PoseStreamDataCallback) -> None:
         """ Register a callback to receive the current pandas DataFrame window. """
         with self.callback_lock:
             self.output_callbacks.add(callback)
