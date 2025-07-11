@@ -10,6 +10,7 @@ from modules.cam.depthcam.Definitions import FrameType
 from modules.person.Person import Person, PersonCallback
 from modules.pose.PoseDefinitions import ModelTypeNames
 from modules.pose.PoseDetection import Detection
+from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.pose.PoseAngleCalculator import PoseAngleCalculator
 from modules.Settings import Settings
 
@@ -24,6 +25,11 @@ class PosePipeline:
         self.pose_crop_expansion: float = settings.pose_crop_expansion
         self.max_detectors: int = settings.max_players
         self.pose_detectors: dict[int, Detection] = {}
+
+        self.image_processor: PoseImageProcessor = PoseImageProcessor(
+            crop_expansion=self.pose_crop_expansion,
+            output_size=self.pose_detector_frame_size
+        )
 
         if self.pose_active:
             for i in range(self.max_detectors):
@@ -76,7 +82,9 @@ class PosePipeline:
         if person.is_active and person.pose_image is None:
             image: Optional[np.ndarray] = self._get_image(person.cam_id)
             if image is not None:
-                person.set_image_and_crop(image, self.pose_crop_expansion, self.pose_detector_frame_size)
+                pose_image, crop_rect = self.image_processor.process_person_image(person, image)
+                person.pose_image = pose_image
+                person.pose_crop_rect = crop_rect
 
         if not self.pose_active:
             self._notify_callback(person)
