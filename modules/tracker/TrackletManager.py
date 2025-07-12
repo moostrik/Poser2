@@ -1,7 +1,7 @@
 from threading import Lock
 from typing import Optional
 
-from modules.person.Person import Person, TrackingStatus
+from modules.tracker.Tracklet import Person, TrackingStatus
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

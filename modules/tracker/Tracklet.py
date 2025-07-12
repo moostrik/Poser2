@@ -8,7 +8,7 @@ from pandas import Timestamp
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet
-from modules.person.trackers.BaseTracker import BaseTrackerInfo, TrackingStatus
+from modules.tracker.BaseTracker import BaseTrackerInfo, TrackingStatus
 
 @dataclass
 class Person:

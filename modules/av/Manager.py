@@ -10,7 +10,7 @@ from modules.av.Gui import Gui
 from modules.av.CompTest import CompTest
 from modules.av.UdpSender import UdpSender
 from modules.Settings import Settings
-from modules.person.Person import Person, PersonDict
+from modules.tracker.Tracklet import Person, PersonDict
 
 
 class Manager(Thread):

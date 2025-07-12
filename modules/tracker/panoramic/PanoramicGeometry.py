@@ -1,5 +1,5 @@
 
-from modules.person.Person import Person
+from modules.tracker.Tracklet import Person
 from modules.cam.depthcam.Definitions import Rect
 import numpy as np
 

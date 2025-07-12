@@ -13,7 +13,7 @@ from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.gui.PyReallySimpleGui import Gui
-from modules.person.trackers.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
+from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
 from modules.correlation.DTWCorrelator import DTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseStreamProcessor import PoseStreamProcessor

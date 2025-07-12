@@ -7,7 +7,7 @@ import numpy as np
 
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
-from modules.person.Person import Person, PersonCallback
+from modules.tracker.Tracklet import Person, PersonCallback
 from modules.pose.PoseDefinitions import ModelTypeNames, PoseData, PoseDataCallback
 from modules.pose.PoseDetection import Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor

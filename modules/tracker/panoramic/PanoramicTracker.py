@@ -14,12 +14,12 @@ from pandas import Timestamp
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet, FrameType
-from modules.person.Person import Person, PersonCallback, TrackingStatus
-from modules.person.PersonManager import PersonManager
-from modules.person.trackers.BaseTracker import BaseTrackerInfo
-from modules.person.trackers.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
-from modules.person.trackers.panoramic.PanoramicGeometry import PanoramicGeometry
-from modules.person.trackers.panoramic.PanoramicDefinitions import *
+from modules.tracker.Tracklet import Person, PersonCallback, TrackingStatus
+from modules.tracker.TrackletManager import PersonManager
+from modules.tracker.BaseTracker import BaseTrackerInfo
+from modules.tracker.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
+from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
+from modules.tracker.panoramic.PanoramicDefinitions import *
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
