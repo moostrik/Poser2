@@ -21,9 +21,9 @@ from modules.gl.Utils import lfo, fit, fill
 
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet, Rect as CamRect, FrameType
-from modules.tracker.Tracklet import Tracklet, PersonColor, TrackingStatus
+from modules.tracker.Tracklet import Tracklet, TrackletColor, TrackingStatus
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
-from modules.pose.PoseDefinitions import PoseData, PosePoints, PoseEdgeIndices
+from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices
 from modules.pose.PoseStreamProcessor import PoseStreamData
 from modules.Settings import Settings
 
@@ -111,7 +111,7 @@ class Render(RenderWindow):
         self.input_mutex: Lock = Lock()
         self.input_depth_tracklets: dict[int, dict[int, CamTracklet]] = {}
         self.input_tracklets: dict[int, Optional[Tracklet]] = {}
-        self.input_poses: dict[int, Optional[PoseData]] = {}
+        self.input_poses: dict[int, Optional[Pose]] = {}
         self.input_angle_windows: dict[int, Optional[np.ndarray]] = {}
         for i in range(self.max_players):
             self.input_depth_tracklets[i] = {}
@@ -216,7 +216,7 @@ class Render(RenderWindow):
 
     def update_pose_meshes(self) -> None:
         for i in range(self.max_players):
-            pose_data: PoseData | None = self.get_pose(i, clear=False)
+            pose_data: Pose | None = self.get_pose(i, clear=False)
             if pose_data is not None:
                 pose: PosePoints | None = pose_data.pose
                 if pose is not None:
@@ -304,7 +304,7 @@ class Render(RenderWindow):
                 if tracklet.status == TrackingStatus.REMOVED or tracklet.status == TrackingStatus.LOST:
                     continue
                 roi: CamRect | None  = None
-                pose: PoseData | None = self.get_pose(tracklet.id, clear=False)
+                pose: Pose | None = self.get_pose(tracklet.id, clear=False)
                 if pose is not None:
                     roi = pose.pose_crop_rect
                 mesh: Mesh = self.pose_meshes[tracklet.id]
@@ -343,7 +343,7 @@ class Render(RenderWindow):
     def draw_poses(self) -> None:
         for i in range(self.max_players):
             fbo: Fbo = self.psn_fbos[i]
-            pose_data: PoseData | None = self.get_pose(i)
+            pose_data: Pose | None = self.get_pose(i)
             if pose_data is None:
                 continue
 
@@ -430,13 +430,13 @@ class Render(RenderWindow):
             self.input_tracklets[tracklet.id] = tracklet
 
 
-    def get_pose(self, id: int, clear: bool = False) -> Optional[PoseData]:
+    def get_pose(self, id: int, clear: bool = False) -> Optional[Pose]:
         with self.input_mutex:
-            ret_pose: Optional[PoseData] = self.input_poses[id]
+            ret_pose: Optional[Pose] = self.input_poses[id]
             if clear:
                 self.input_poses[id] = None
             return ret_pose
-    def set_pose(self, pose: PoseData) -> None:
+    def set_pose(self, pose: Pose) -> None:
         with self.input_mutex:
             self.input_poses[pose.id] = pose
 
@@ -541,7 +541,7 @@ class Render(RenderWindow):
             x: float = world_angle / 360.0 * fbo.width
 
             y: float = tracklet.external_tracklet.roi.y * fbo.height
-            color: list[float] = PersonColor(tracklet.id, aplha=0.9)
+            color: list[float] = TrackletColor(tracklet.id, aplha=0.9)
             if overlap == True:
                 color[3] = 0.3
             if tracklet.status == TrackingStatus.NEW:

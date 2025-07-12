@@ -22,7 +22,7 @@ class PanoramicTrackerGui():
                     E(eT.SLDR, 'ovlp',              self.set_overlap,           CAM_360_OVERLAP_EXPANSION,  [0,1.0],    0.1)])
 
         gui_height = len(elm) * ELEMHEIGHT + BASEHEIGHT
-        self.frame = Frame('PERSON ', elm, gui_height)
+        self.frame = Frame('TRACKER ', elm, gui_height)
 
 
     # GUI FRAME

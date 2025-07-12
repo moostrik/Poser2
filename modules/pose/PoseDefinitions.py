@@ -161,8 +161,8 @@ class PosePoints():
 PoseList = list[PosePoints]
 
 @dataclass
-class PoseData:
-    id: int # Unique identifier for the pose data, typically the person ID
+class Pose:
+    id: int # Unique identifier for the pose data, typically the tracklet ID
     cam_id: int
     time_stamp: Timestamp
     _pose_crop_rect: Rect
@@ -213,4 +213,4 @@ class PoseData:
             self._pose_angles = value
 
 
-PoseDataCallback = Callable[[PoseData], None]
+PoseCallback = Callable[[Pose], None]

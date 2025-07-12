@@ -8,7 +8,7 @@ import numpy as np
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
 from modules.tracker.Tracklet import Tracklet, TrackletCallback
-from modules.pose.PoseDefinitions import ModelTypeNames, PoseData, PoseDataCallback
+from modules.pose.PoseDefinitions import ModelTypeNames, Pose, PoseCallback
 from modules.pose.PoseDetection import Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.pose.PoseAngleCalculator import PoseAngleCalculator
@@ -46,7 +46,7 @@ class PosePipeline:
 
         # Callbacks
         self.callback_lock = Lock()
-        self.pose_output_callbacks: set[PoseDataCallback] = set()
+        self.pose_output_callbacks: set[PoseCallback] = set()
         self.running: bool = False
 
         hot_reloader = HotReloadMethods(self.__class__)
@@ -83,12 +83,12 @@ class PosePipeline:
         if image is None:
             return
 
-        pose_image, crop_rect = self.image_processor.process_person_image(person, image)
+        pose_image, crop_rect = self.image_processor.process_pose_image(person, image)
 
         if person.status == 'REMOVED':
             print("REMOVED")
 
-        pose = PoseData(
+        pose = Pose(
             id=person.id,
             cam_id=person.cam_id,
             time_stamp=person.time_stamp,
@@ -113,14 +113,14 @@ class PosePipeline:
             return None
 
     # External Output Callbacks
-    def add_pose_callback(self, callback: PoseDataCallback) -> None:
+    def add_pose_callback(self, callback: PoseCallback) -> None:
         """Add callback for processed persons"""
         if self.running:
             print('Pipeline is running, cannot add callback')
             return
         self.pose_output_callbacks.add(callback)
 
-    def _notify_pose_callback(self, pose: PoseData) -> None:
+    def _notify_pose_callback(self, pose: Pose) -> None:
         """Handle processed person"""
         with self.callback_lock:
             for callback in self.pose_output_callbacks:

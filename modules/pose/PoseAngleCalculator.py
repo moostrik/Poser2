@@ -19,14 +19,14 @@ class PoseAngleCalculator(Thread):
         self._stop_event = Event()
 
         # Input
-        self.pose_input_queue: Queue[PoseData] = Queue()
+        self.pose_input_queue: Queue[Pose] = Queue()
 
         # Parameters
         self.confidence_threshold: float = 0.3
 
         # Callbacks
         self.callback_lock = Lock()
-        self.pose_output_callbacks: set[PoseDataCallback] = set()
+        self.pose_output_callbacks: set[PoseCallback] = set()
 
         self.hot_reload = HotReloadMethods(self.__class__, True)
 
@@ -39,28 +39,28 @@ class PoseAngleCalculator(Thread):
     def run(self) -> None:
         while not self._stop_event.is_set():
             try:
-                pose: Optional[PoseData] = self.pose_input_queue.get(block=True, timeout=0.01)
+                pose: Optional[Pose] = self.pose_input_queue.get(block=True, timeout=0.01)
                 if pose is not None:
                     try:
-                        self._process(pose, self.confidence_threshold, self._person_output_callback)
+                        self._process(pose, self.confidence_threshold, self._pose_output_callback)
                     except Exception as e:
-                        print(f"Error processing person {pose.id}: {e}")
+                        print(f"Error processing pose {pose.id}: {e}")
                     self.pose_input_queue.task_done()
             except Empty:
                 continue
 
-    def person_input(self, pose: PoseData) -> None:
-        """Add a person to the processing queue"""
+    def pose_input(self, pose: Pose) -> None:
+        """Add a pose to the processing queue"""
         self.pose_input_queue.put(pose)
 
         # External Output Calbacks
-    def add_pose_callback(self, callback: PoseDataCallback) -> None:
-        """Add callback for processed persons"""
+    def add_pose_callback(self, callback: PoseCallback) -> None:
+        """Add callback for processed poses"""
         with self.callback_lock:
             self.pose_output_callbacks.add(callback)
 
-    def _person_output_callback(self, pose: PoseData) -> None:
-        """Handle processed person"""
+    def _pose_output_callback(self, pose: Pose) -> None:
+        """Handle processed pose"""
         with self.callback_lock:
             for callback in self.pose_output_callbacks:
                 callback(pose)
@@ -70,7 +70,7 @@ class PoseAngleCalculator(Thread):
         self.confidence_threshold = threshold
 
     @staticmethod
-    def _process(pose: PoseData, confidence_threshold: float, callback:PoseDataCallback) -> None:
+    def _process(pose: Pose, confidence_threshold: float, callback:PoseCallback) -> None:
 
         if pose.pose is None:
             # return nan angles and 0 for confidence

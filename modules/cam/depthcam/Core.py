@@ -37,7 +37,7 @@ class Core(Thread):
         self.square: bool =             general_settings.camera_square
         self.do_color: bool =           general_settings.camera_color
         self.do_stereo: bool =          general_settings.camera_stereo
-        self.do_person: bool =          general_settings.camera_yolo
+        self.do_yolo: bool =          general_settings.camera_yolo
         self.show_stereo: bool =        general_settings.camera_show_stereo
         self.simulation: bool =         general_settings.camera_simulation
 
@@ -103,7 +103,7 @@ class Core(Thread):
         return True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
-            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_person, self.show_stereo, simulate=False)
+            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.show_stereo, simulate=False)
 
     def _setup_queues(self) -> None:
         if self.do_stereo:
@@ -128,7 +128,7 @@ class Core(Thread):
             self.outputs[Output.VIDEO_FRAME_OUT] =  self.device.getOutputQueue(name='video', maxSize=1, blocking=False)
             self.outputs[Output.VIDEO_FRAME_OUT].addCallback(self._video_callback)
             self.fps_counters[FrameType.VIDEO] = FPS(120)
-        if self.do_person:
+        if self.do_yolo:
             self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
 

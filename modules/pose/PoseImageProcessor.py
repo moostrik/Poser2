@@ -12,9 +12,9 @@ class PoseImageProcessor:
         self.crop_expansion = crop_expansion
         self.output_size = output_size
 
-    def process_person_image(self, tracklet: Tracklet, image: np.ndarray) -> tuple[np.ndarray, Rect]:
+    def process_pose_image(self, tracklet: Tracklet, image: np.ndarray) -> tuple[np.ndarray, Rect]:
         """
-        Process and return the pose image and crop rectangle for a person.
+        Process and return the pose image and crop rectangle for a pose.
         Returns tuple of (cropped_image, crop_rect).
         """
         h, w = image.shape[:2]

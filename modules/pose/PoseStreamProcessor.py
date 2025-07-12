@@ -9,7 +9,6 @@ import pandas as pd
 import numpy as np
 
 # Local application imports
-# from modules.person.Person import Person, TrackingStatus
 from modules.pose.PoseDefinitions import *
 from modules.Settings import Settings
 
@@ -31,7 +30,7 @@ class PoseStreamProcessor(Thread):
         self._stop_event = Event()
 
         # Input
-        self.pose_input_queue: Queue[PoseData] = Queue()
+        self.pose_input_queue: Queue[Pose] = Queue()
 
         # Windowing for joint angles
         self.buffer_capacity: int = int(settings.pose_buffer_duration * settings.camera_fps)
@@ -54,53 +53,46 @@ class PoseStreamProcessor(Thread):
     def run(self) -> None:
         while not self._stop_event.is_set():
             try:
-                pose: Optional[PoseData] = self.pose_input_queue.get(block=True, timeout=0.01)
+                pose: Optional[Pose] = self.pose_input_queue.get(block=True, timeout=0.01)
                 if pose is not None:
                     try:
                         self._process(pose)
                     except Exception as e:
-                        print(f"Error processing person {pose.id}: {e}")
+                        print(f"Error processing pose {pose.id}: {e}")
                     self.pose_input_queue.task_done()
             except Empty:
                 continue
 
-    def add_pose(self, person: PoseData) -> None:
-        self.pose_input_queue.put(person)
+    def add_pose(self, pose: Pose) -> None:
+        self.pose_input_queue.put(pose)
 
-    def _process(self, person: PoseData) -> None:
-        """ Process a person and update the joint angle windows. """
+    def _process(self, pose: Pose) -> None:
+        """ Process a pose and update the joint angle windows. """
 
-        # if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.NEW:
-        #     # print(f"Skipping person {person.id} with status {person.status}")
-        #     # If the person is removed or lost, clear their angle and confidence windows
-        #     self.angle_buffers.pop(person.id, None)
-        #     self.confidence_buffers.pop(person.id, None)
-        #     return
-
-        if person.pose_angles is None:
-            # print(f"WINDOW: Skipping person {person.id} with no pose angles, this should not happen")
+        if pose.pose_angles is None:
+            # print(f"WINDOW: Skipping pose {pose.id} with no pose angles, this should not happen")
             return
 
         # Build angle/confidence dicts
-        angle_row: dict[str, float] = {Keypoint(k).name: v["angle"] for k, v in person.pose_angles.items()}
-        conf_row: dict[str, float] = {Keypoint(k).name: v["confidence"] for k, v in person.pose_angles.items()}
-        timestamp: pd.Timestamp = person.time_stamp  # Assume pd.Timestamp
+        angle_row: dict[str, float] = {Keypoint(k).name: v["angle"] for k, v in pose.pose_angles.items()}
+        conf_row: dict[str, float] = {Keypoint(k).name: v["confidence"] for k, v in pose.pose_angles.items()}
+        timestamp: pd.Timestamp = pose.time_stamp  # Assume pd.Timestamp
 
         # Update angle window
-        angle_df: pd.DataFrame = self.angle_buffers.get(person.id, pd.DataFrame())
+        angle_df: pd.DataFrame = self.angle_buffers.get(pose.id, pd.DataFrame())
         angle_row_df = pd.DataFrame([angle_row], index=[timestamp])
         angle_df = pd.concat([angle_df, angle_row_df])
         angle_df.sort_index(inplace=True)
         angle_df = angle_df.iloc[-self.buffer_capacity:]
-        self.angle_buffers[person.id] = angle_df
+        self.angle_buffers[pose.id] = angle_df
 
         # # Update confidence window
-        conf_df: pd.DataFrame = self.confidence_buffers.get(person.id, pd.DataFrame())
+        conf_df: pd.DataFrame = self.confidence_buffers.get(pose.id, pd.DataFrame())
         conf_row_df = pd.DataFrame([conf_row], index=[timestamp])
         conf_df = pd.concat([conf_df, conf_row_df])
         conf_df.sort_index(inplace=True)
         conf_df = conf_df.iloc[-self.buffer_capacity:]
-        self.confidence_buffers[person.id] = conf_df
+        self.confidence_buffers[pose.id] = conf_df
 
         # Interpolate and smooth angles
         angle_df.interpolate(method='time', limit_direction='both', limit = 7, inplace=True)
@@ -108,7 +100,7 @@ class PoseStreamProcessor(Thread):
         angle_df = PoseStreamProcessor.ewm_circular_mean(angle_df, span=7.0)
 
         # Notify callbacks with both DataFrames
-        self._notify_callbacks(PoseStreamData(person.id, angle_df, conf_df))
+        self._notify_callbacks(PoseStreamData(pose.id, angle_df, conf_df))
 
     @staticmethod
     def rolling_circular_mean(df: pd.DataFrame, window: float = 0.3, min_periods: int = 1) -> pd.DataFrame:

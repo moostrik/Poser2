@@ -36,7 +36,7 @@ class CorePlayer(Core):
             super().run()
 
     def _setup_pipeline(self, pipeline: Pipeline) -> None: # override
-        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_person, self.show_stereo, simulate=True)
+        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.show_stereo, simulate=True)
 
     def _setup_queues(self) -> None: # override
         self.inputs[Input.VIDEO_FRAME_IN] =     self.device.getInputQueue(name='ex_video', maxSize=1, blocking=False)
@@ -47,7 +47,7 @@ class CorePlayer(Core):
             self.inputs[Input.STEREO_CONTROL] =     self.device.getInputQueue('stereo_control')
             self.inputs[Input.LEFT_FRAME_IN] =      self.device.getInputQueue(name='ex_left', maxSize=1, blocking=False)
             self.inputs[Input.RIGHT_FRAME_IN] =     self.device.getInputQueue(name='ex_right', maxSize=1, blocking=False)
-            if not self.do_person:
+            if not self.do_yolo:
                 self.outputs[Output.LEFT_FRAME_OUT] =   self.device.getOutputQueue(name='left', maxSize=1, blocking=False)
                 self.outputs[Output.LEFT_FRAME_OUT].addCallback(self._left_callback)
                 self.outputs[Output.RIGHT_FRAME_OUT] =  self.device.getOutputQueue(name='right', maxSize=1, blocking=False)
@@ -58,7 +58,7 @@ class CorePlayer(Core):
                 self.outputs[Output.STEREO_FRAME_OUT] = self.device.getOutputQueue(name='stereo', maxSize=1, blocking=False)
                 self.outputs[Output.STEREO_FRAME_OUT].addCallback(self._stereo_callback)
                 self.fps_counters[FrameType.DEPTH] = FPS(120)
-        if self.do_person:
+        if self.do_yolo:
             self.outputs[Output.TRACKLETS_OUT] = self.device.getOutputQueue(name='tracklets', maxSize=1, blocking=False)
             self.outputs[Output.TRACKLETS_OUT].addCallback(self._tracker_callback)
 

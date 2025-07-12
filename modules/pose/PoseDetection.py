@@ -50,7 +50,7 @@ class Detection(Thread):
         while self._running:
             try:
                 # Block until an item is available or timeout
-                pose: PoseData = self._input_queue.get(timeout=0.1)
+                pose: Pose = self._input_queue.get(timeout=0.1)
 
                 # Check if there are more items queued and warn if so
                 queue_size = self._input_queue.qsize()
@@ -83,14 +83,14 @@ class Detection(Thread):
                 Detection._model_loaded = True
 
     # GETTERS AND SETTERS
-    def add_pose(self, pose: PoseData) -> None:
+    def add_pose(self, pose: Pose) -> None:
         self._input_queue.put(pose)
 
     def get_frame_size(self) -> int:
         return Detection._moodel_size
 
     # CALLBACKS
-    def callback(self, pose: PoseData) -> None:
+    def callback(self, pose: Pose) -> None:
         for c in self._callbacks:
             c(pose)
 

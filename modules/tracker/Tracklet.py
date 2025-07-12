@@ -46,7 +46,7 @@ TrackletDict = dict[int, Tracklet]
 TrackletDictCallback = Callable[[TrackletDict], None]
 
 
-PersonColors: dict[int, str] = {
+TrackletColors: dict[int, str] = {
     0: '#006400',   # darkgreen
     1: '#00008b',   # darkblue
     2: '#b03060',   # maroon3
@@ -59,8 +59,8 @@ PersonColors: dict[int, str] = {
     9: '#6495ed',   # cornflower
 }
 
-def PersonColor(id: int, aplha: float = 0.5) -> list[float]:
-    hex_color: str = PersonColors.get(id, '#000000')
+def TrackletColor(id: int, aplha: float = 0.5) -> list[float]:
+    hex_color: str = TrackletColors.get(id, '#000000')
     rgb: list[float] =  [int(hex_color[i:i+2], 16) / 255.0 for i in (1, 3, 5)]
     rgb.append(aplha)
     return rgb
