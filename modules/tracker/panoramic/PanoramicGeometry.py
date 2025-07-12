@@ -12,6 +12,12 @@ class PanoramicGeometry():
         self.k1: float = 0.05  # Distortion coefficient k1
         self.k2: float = 0.0  # Distortion coefficient k2
 
+    def get_angles_and_overlap(self, roi: Rect, cam_id: int, expansion: float) -> tuple[float, float, bool]:
+        local_angle, world_angle = self.calc_angle(roi, cam_id)
+        overlap: bool = self.angle_in_overlap(world_angle, expansion)
+        return (local_angle, world_angle, overlap)
+
+
     def calc_angle(self, roi: Rect, cam_id: int) -> tuple[float, float]:
         local_angle: float = self._calc_local_angle(roi)
         world_angle: float = self._calc_world_angle(local_angle, cam_id)

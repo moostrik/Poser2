@@ -1,19 +1,13 @@
 # TODO
-# add has_changed property to Person?
-# make own rect class?
 # make sure that tracking removed from person is handled correctly
-# rename Person to Tracklet
 
 # Standard library imports
 import warnings
 from dataclasses import dataclass, field
 from enum import Enum
-from time import time
 from typing import Callable, Optional
 
 # Third-party imports
-# import depthai
-# from depthai import TrackingStatus
 from pandas import Timestamp
 
 # Local application imports

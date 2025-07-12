@@ -1,6 +1,8 @@
+# Standard library imports
 from threading import Lock
 from typing import Optional
 
+# Local application imports
 from modules.tracker.Tracklet import Tracklet, TrackingStatus
 
 from modules.utils.HotReloadMethods import HotReloadMethods
