@@ -114,9 +114,11 @@ class PanoramicTracker(Thread):
             self.tracklet_manager.add_tracklet(new_tracklet)
 
         # Remove tracklets that are not active anymore
-        for new_tracklet in self.tracklet_manager.all_tracklets():
-            if new_tracklet.is_expired(self.timeout):
-                self.remove_tracklet(new_tracklet)
+        for tracklet in self.tracklet_manager.all_tracklets():
+            if tracklet.is_expired(self.timeout):
+                self.tracklet_manager.remove_tracklet(tracklet.id)
+                tracklet.status = TrackingStatus.REMOVED
+                self._notify_callback(tracklet)
 
         overlaps: set[PanoramicOverlapInfo] = self.find_overlapping_tracklets()
         for overlap in overlaps:
@@ -197,10 +199,14 @@ class PanoramicTracker(Thread):
         overlap_sets: set[PanoramicOverlapInfo] = set(overlaps)
         return overlap_sets
 
-    def remove_tracklet(self, tracklet: Tracklet) -> None:
-        self.tracklet_manager.remove_tracklet(tracklet.id)
-        tracklet.status = TrackingStatus.REMOVED
-        self._notify_callback(tracklet)
+    # CALLBACKS
+    def _notify_callback(self, tracklet: Tracklet) -> None:
+        with self.callback_lock:
+            for c in self.tracklet_callbacks:
+                c(tracklet)
+    def add_tracklet_callback(self, callback: TrackletCallback) -> None:
+        with self.callback_lock:
+            self.tracklet_callbacks.add(callback)
 
     def add_cam_tracklet(self, cam_id: int, cam_tracklet: CamTracklet) -> None :
         tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, cam_tracklet)
@@ -208,14 +214,3 @@ class PanoramicTracker(Thread):
             print(f"PanoramicTracker: Invalid tracklet from camera {cam_id}, skipping.")
             return
         self.input_queue.put(tracklet)
-
-    # CALLBACKS
-    def _notify_callback(self, tracklet: Tracklet) -> None:
-        with self.callback_lock:
-            for c in self.tracklet_callbacks:
-                c(tracklet)
-    def add_tracklet_callback(self, callback: TrackletCallback) -> None:
-        if self.running:
-            print('Manager is running, cannot add callback')
-            return
-        self.tracklet_callbacks.add(callback)
