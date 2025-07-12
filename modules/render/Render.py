@@ -57,7 +57,7 @@ class Render(RenderWindow):
         self.num_cams: int = settings.camera_num
         self.num_sims: int = len(DataVisType)
         self.num_viss: int = len(LightVisType)
-        self.num_persons: int = settings.max_players
+        self.max_players: int = settings.max_players
 
         self.cam_images: dict[int, Image] = {}
         self.psn_images: dict[int, Image] = {}
@@ -90,7 +90,7 @@ class Render(RenderWindow):
             self.vis_fbos[i] = Fbo()
             self.all_fbos.append(self.vis_fbos[i])
 
-        for i in range(self.num_persons):
+        for i in range(self.max_players):
             self.psn_images[i] = Image()
             self.all_images.append(self.psn_images[i])
 
@@ -103,19 +103,19 @@ class Render(RenderWindow):
             self.angle_meshes[i] = Mesh()
             # self.all_meshes.append(self.angle_meshes[i])
 
-        self.composition: Composition_Subdivision = self.make_composition_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.num_persons, self.num_viss)
+        self.composition: Composition_Subdivision = self.make_composition_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
         super().__init__(self.composition[ImageType.TOT][0][2], self.composition[ImageType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_fps, settings.render_x, settings.render_y)
 
         self.allocated = False
 
         self.input_mutex: Lock = Lock()
-        self.input_tracklets: dict[int, dict[int, CamTracklet]] = {}   # cam_id -> track_id -> Tracklet
-        self.input_persons: dict[int, Optional[Tracklet]] = {}           # person_id -> Person
+        self.input_depth_tracklets: dict[int, dict[int, CamTracklet]] = {}
+        self.input_tracklets: dict[int, Optional[Tracklet]] = {}
         self.input_poses: dict[int, Optional[PoseData]] = {}
-        self.input_angle_windows: dict[int, Optional[np.ndarray]] = {}          # person_id -> angles
-        for i in range(self.num_persons):
-            self.input_tracklets[i] = {}
-            self.input_persons[i] = None
+        self.input_angle_windows: dict[int, Optional[np.ndarray]] = {}
+        for i in range(self.max_players):
+            self.input_depth_tracklets[i] = {}
+            self.input_tracklets[i] = None
             self.input_poses[i] = None
             self.input_angle_windows[i] = None
 
@@ -128,8 +128,8 @@ class Render(RenderWindow):
         self.all_shaders.append(self.vis_line_shader)
         self.all_shaders.append(self.vis_angle_shader)
 
-        self.analysis_images: dict[int, Image] = {}  # person_id -> Image
-        for i in range(self.num_persons):
+        self.analysis_images: dict[int, Image] = {}
+        for i in range(self.max_players):
             self.analysis_images[i] = Image()
             self.all_images.append(self.analysis_images[i])
         # self.analysis_shader: WS_Angles = WS_Angles()
@@ -142,7 +142,7 @@ class Render(RenderWindow):
 
     def reshape(self, width, height) -> None: # override
         super().reshape(width, height)
-        self.composition = self.make_composition_subdivision(width, height, self.num_cams, self.num_sims, self.num_persons, self.num_viss)
+        self.composition = self.make_composition_subdivision(width, height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
 
         for key in self.cam_fbos.keys():
             x, y, w, h = self.composition[ImageType.CAM][key]
@@ -178,7 +178,7 @@ class Render(RenderWindow):
 
             self.draw_composition()
         except Exception as e:
-            print(f"Error in draw_persons: {e}")
+            print(f"Error in draw: {e}")
 
     def update_R_meshes(self) -> None:
         R_windows: Optional[dict[Tuple[int, int], np.ndarray]] = self.get_correlation_windows()
@@ -215,7 +215,7 @@ class Render(RenderWindow):
             self.R_meshes[pair_id] = mesh
 
     def update_pose_meshes(self) -> None:
-        for i in range(self.num_persons):
+        for i in range(self.max_players):
             pose_data: PoseData | None = self.get_pose(i, clear=False)
             if pose_data is not None:
                 pose: PosePoints | None = pose_data.pose
@@ -225,7 +225,7 @@ class Render(RenderWindow):
                     self.pose_meshes[i].update()
 
     def update_angle_meshes(self) -> None:
-        for i in range(self.num_persons):
+        for i in range(self.max_players):
             data: Optional[np.ndarray] = self.get_pose_window(i, clear=True)
             if data is None:
                 continue
@@ -291,30 +291,30 @@ class Render(RenderWindow):
             image: Image = self.cam_images[i]
             image.update()
             fbo: Fbo = self.cam_fbos[i]
-            tracklets: dict[int, CamTracklet] = self.get_tracklets(i)
-            persons: list[Tracklet] = self.get_persons_for_cam(i)
+            depth_tracklets: dict[int, CamTracklet] = self.get_depth_tracklets(i)
+            tracklets: list[Tracklet] = self.get_tracklets_for_cam(i)
 
             self.setView(fbo.width, fbo.height)
             fbo.begin()
 
             image.draw(0, 0, fbo.width, fbo.height)
-            for tracklet in tracklets.values():
-                self.draw_tracklet(tracklet, 0, 0, fbo.width, fbo.height)
-            for person in persons:
-                if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.LOST:
+            for depth_tracklet in depth_tracklets.values():
+                self.draw_depth_tracklet(depth_tracklet, 0, 0, fbo.width, fbo.height)
+            for tracklet in tracklets:
+                if tracklet.status == TrackingStatus.REMOVED or tracklet.status == TrackingStatus.LOST:
                     continue
                 roi: CamRect | None  = None
-                pose: PoseData | None = self.get_pose(person.id, clear=False)
+                pose: PoseData | None = self.get_pose(tracklet.id, clear=False)
                 if pose is not None:
                     roi = pose.pose_crop_rect
-                mesh: Mesh = self.pose_meshes[person.id]
+                mesh: Mesh = self.pose_meshes[tracklet.id]
                 if roi is not None and mesh.isInitialized():
                     x, y, w, h = roi.x, roi.y, roi.width, roi.height
                     x *= fbo.width
                     y *= fbo.height
                     w *= fbo.width
                     h *= fbo.height
-                    self.draw_person(person, mesh, x, y, w, h, True, True, False)
+                    self.draw_tracklet(tracklet, mesh, x, y, w, h, True, True, False)
 
             fbo.end()
 
@@ -323,7 +323,7 @@ class Render(RenderWindow):
             fbo: Fbo = self.sim_fbos[i]
             self.setView(fbo.width, fbo.height)
             if i == DataVisType.TRACKING.value:
-                self.draw_map_positions(self.input_persons, self.num_cams, fbo)
+                self.draw_map_positions(self.get_tracklets(), self.num_cams, fbo)
             elif i == DataVisType.R_PAIRS.value:
                 self.draw_R_pairs(self.R_meshes, fbo)
 
@@ -341,7 +341,7 @@ class Render(RenderWindow):
             fbo.end()
 
     def draw_poses(self) -> None:
-        for i in range(self.num_persons):
+        for i in range(self.max_players):
             fbo: Fbo = self.psn_fbos[i]
             pose_data: PoseData | None = self.get_pose(i)
             if pose_data is None:
@@ -358,11 +358,11 @@ class Render(RenderWindow):
             self.setView(fbo.width, fbo.height)
             fbo.begin()
 
-            person: Tracklet | None = self.get_person(i)
-            if person is None:
+            tracklet: Tracklet | None = self.get_tracklet(i)
+            if tracklet is None:
                 continue
 
-            if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.LOST:
+            if tracklet.status == TrackingStatus.REMOVED or tracklet.status == TrackingStatus.LOST:
                 glColor4f(1.0, 1.0, 1.0, 0.25)   # Set color
                 image.draw(0, 0, fbo.width, fbo.height)
                 glColor4f(1.0, 1.0, 1.0, 1.0)   # Set color
@@ -370,7 +370,7 @@ class Render(RenderWindow):
                 image.draw(0, 0, fbo.width, fbo.height)
             # analysis_image.draw(0, 0, fbo.width, fbo.height)
             mesh: Mesh = self.pose_meshes[pose_data.id]
-            self.draw_person(person, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
+            self.draw_tracklet(tracklet, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
             angle_mesh = self.angle_meshes[pose_data.id]
             if angle_mesh.isInitialized():
                 angle_mesh.draw(0, 0, fbo.width, fbo.height)
@@ -387,7 +387,7 @@ class Render(RenderWindow):
             x, y, w, h = self.composition[ImageType.SIM][i]
             self.sim_fbos[i].draw(x, y, w, h)
 
-        for i in range(self.num_persons):
+        for i in range(self.max_players):
             x, y, w, h = self.composition[ImageType.PSN][i]
             self.psn_fbos[i].draw(x, y, w, h)
 
@@ -399,32 +399,35 @@ class Render(RenderWindow):
     def set_cam_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None :
         self.cam_images[cam_id].set_image(image)
 
-    def get_tracklets(self, cam_id: int, clear: bool = False) -> dict[int, CamTracklet]:
+    def get_depth_tracklets(self, cam_id: int, clear: bool = False) -> dict[int, CamTracklet]:
         with self.input_mutex:
-            ret_person: dict[int, CamTracklet] =  self.input_tracklets[cam_id].copy()
+            ret_tracklet: dict[int, CamTracklet] =  self.input_depth_tracklets[cam_id].copy()
             if clear:
-                self.input_tracklets[cam_id].clear()
-            return ret_person
-    def set_cam_tracklet(self, cam_id: int, tracklet: CamTracklet) -> None :
+                self.input_depth_tracklets[cam_id].clear()
+            return ret_tracklet
+    def set_depth_tracklet(self, cam_id: int, tracklet: CamTracklet) -> None :
         with self.input_mutex:
-            self.input_tracklets[cam_id][tracklet.id] = tracklet
+            self.input_depth_tracklets[cam_id][tracklet.id] = tracklet
 
-    def get_person(self, id: int, clear: bool = False) -> Tracklet | None:
+    def get_tracklets(self) -> dict[int, Optional[Tracklet]]:
         with self.input_mutex:
-            ret_person: Tracklet | None = self.input_persons[id]
+            return self.input_tracklets.copy()
+    def get_tracklet(self, id: int, clear: bool = False) -> Tracklet | None:
+        with self.input_mutex:
+            ret_tracklet: Tracklet | None = self.input_tracklets[id]
             if clear:
-                self.input_persons[id] = None
-            return ret_person
-    def get_persons_for_cam(self, cam_id: int) -> list[Tracklet]:
+                self.input_tracklets[id] = None
+            return ret_tracklet
+    def get_tracklets_for_cam(self, cam_id: int) -> list[Tracklet]:
         with self.input_mutex:
-            persons: list[Tracklet] = []
-            for person in self.input_persons.values():
-                if person is not None and person.cam_id == cam_id:
-                    persons.append(person)
-            return persons
-    def set_person(self, person: Tracklet) -> None:
+            tracklets: list[Tracklet] = []
+            for tracklet in self.input_tracklets.values():
+                if tracklet is not None and tracklet.cam_id == cam_id:
+                    tracklets.append(tracklet)
+            return tracklets
+    def set_tracklet(self, tracklet: Tracklet) -> None:
         with self.input_mutex:
-            self.input_persons[person.id] = person
+            self.input_tracklets[tracklet.id] = tracklet
 
 
     def get_pose(self, id: int, clear: bool = False) -> Optional[PoseData]:
@@ -452,7 +455,7 @@ class Render(RenderWindow):
         mesh_data: np.ndarray = np.stack([angles_np, conf_np], axis=-1)
 
         with self.input_mutex:
-            self.input_angle_windows[data.person_id] = mesh_data
+            self.input_angle_windows[data.player_id] = mesh_data
 
     def get_correlation_windows(self) -> Optional[dict[Tuple[int, int], np.ndarray]]:
         with self.input_mutex:
@@ -475,7 +478,7 @@ class Render(RenderWindow):
 
     # STATIC METHODS
     @staticmethod
-    def draw_tracklet(tracklet: CamTracklet, x: float, y: float, w: float, h: float) -> None:
+    def draw_depth_tracklet(tracklet: CamTracklet, x: float, y: float, w: float, h: float) -> None:
         if tracklet.status == CamTracklet.TrackingStatus.REMOVED:
             return
 
@@ -518,61 +521,30 @@ class Render(RenderWindow):
         glFlush()               # Render now
 
     @staticmethod
-    def draw_raw_positions(persons: dict[int, Tracklet | None], num_cams: int, fbo: Fbo) -> None:
-        fbo.begin()
-        glClearColor(0.1, 0.0, 0.0, 1.0)  # Set background color to black
-        glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
-
-        for person in persons.values():
-            if person is None or person.status == TrackingStatus.REMOVED:
-                continue
-
-            id: int = person.cam_id
-            w: float = person.external_tracklet.roi.width * fbo.width / num_cams
-            h: float = person.external_tracklet.roi.height * fbo.height
-            x: float = person.external_tracklet.roi.x * fbo.width / num_cams + (id * fbo.width / num_cams)
-            y: float = person.external_tracklet.roi.y * fbo.height
-            # y: float = (fbo.height - h) * 0.5
-            color = PersonColor(person.id, aplha=0.5)
-
-            glColor4f(*color)  # Reset color
-            glBegin(GL_QUADS)       # Start drawing a quad
-            glVertex2f(x, y)        # Bottom left
-            glVertex2f(x, y + h)    # Bottom right
-            glVertex2f(x + w, y + h)# Top right
-            glVertex2f(x + w, y)    # Top left
-            glEnd()                 # End drawing
-            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
-
-        fbo.end()
-        glFlush()
-        return
-
-    @staticmethod
-    def draw_map_positions(persons: dict[int, Tracklet | None], num_cams: int, fbo: Fbo) -> None:
+    def draw_map_positions(tracklets: dict[int, Tracklet | None], num_cams: int, fbo: Fbo) -> None:
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
 
-        for person in persons.values():
-            if person is None:
+        for tracklet in tracklets.values():
+            if tracklet is None:
                 continue
-            if person.status != TrackingStatus.TRACKED and person.status != TrackingStatus.NEW:
+            if tracklet.status != TrackingStatus.TRACKED and tracklet.status != TrackingStatus.NEW:
                 continue
 
-            world_angle: float = getattr(person.tracker_info, "world_angle", 0.0)
-            local_angle: float = getattr(person.tracker_info, "local_angle", 0.0)
-            overlap: bool = getattr(person.tracker_info, "overlap", False)
+            world_angle: float = getattr(tracklet.tracker_info, "world_angle", 0.0)
+            local_angle: float = getattr(tracklet.tracker_info, "local_angle", 0.0)
+            overlap: bool = getattr(tracklet.tracker_info, "overlap", False)
 
-            w: float = person.external_tracklet.roi.width * fbo.width / num_cams
-            h: float = person.external_tracklet.roi.height * fbo.height
+            w: float = tracklet.external_tracklet.roi.width * fbo.width / num_cams
+            h: float = tracklet.external_tracklet.roi.height * fbo.height
             x: float = world_angle / 360.0 * fbo.width
 
-            y: float = person.external_tracklet.roi.y * fbo.height
-            color: list[float] = PersonColor(person.id, aplha=0.9)
+            y: float = tracklet.external_tracklet.roi.y * fbo.height
+            color: list[float] = PersonColor(tracklet.id, aplha=0.9)
             if overlap == True:
                 color[3] = 0.3
-            if person.status == TrackingStatus.NEW:
+            if tracklet.status == TrackingStatus.NEW:
                 color = [1.0, 1.0, 1.0, 1.0]
 
             glColor4f(*color)  # Reset color
@@ -664,7 +636,7 @@ class Render(RenderWindow):
         glFlush()
 
     @staticmethod
-    def draw_person(person: Tracklet, pose_mesh: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
+    def draw_tracklet(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
         if draw_box:
             r: float = 0.0
             g: float = 0.0
@@ -684,7 +656,7 @@ class Render(RenderWindow):
             pose_mesh.draw(x, y, w, h)
 
         if draw_text:
-            string: str = f'ID: {person.id} Cam: {person.cam_id} Age: {person.last_time - person.start_time:.0f}'
+            string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.last_time - tracklet.start_time:.0f}'
             x += 9
             y += 15
             RenderWindow.draw_string(x, y, string)
@@ -693,7 +665,7 @@ class Render(RenderWindow):
 
     @staticmethod
     def make_composition_subdivision(dst_width: int, dst_height: int,
-                                     num_cams: int, num_sims: int, num_persons: int, num_viss: int,
+                                     num_cams: int, num_sims: int, max_players: int, num_viss: int,
                                      cam_aspect_ratio: float = 16.0 / 9.0,
                                      sim_aspect_ratio: float = 10.0,
                                      psn_aspect_ratio: float = 1.0,
@@ -714,7 +686,7 @@ class Render(RenderWindow):
         cam_grid_aspect_ratio: float = 100.0 if cam_rows == 0 else cam_aspect_ratio * cam_columns / cam_rows
         sim_grid_aspect_ratio: float = sim_aspect_ratio / num_sims
         vis_grid_aspect_ratio: float = vis_aspect_ratio / num_viss
-        psn_grid_aspect_ratio: float = psn_aspect_ratio * num_persons
+        psn_grid_aspect_ratio: float = psn_aspect_ratio * max_players
         tot_aspect_ratio: float = 1.0 / (1.0 / cam_grid_aspect_ratio + 1.0 / sim_grid_aspect_ratio + 1.0 / vis_grid_aspect_ratio + 1.0 / psn_grid_aspect_ratio)
 
         fit_width: float
@@ -733,7 +705,7 @@ class Render(RenderWindow):
         cam_width: float = fit_width if cam_columns == 0 else fit_width / cam_columns
         cam_height: float = cam_width / cam_aspect_ratio
         sim_height: float = fit_width / sim_aspect_ratio
-        psn_width: float =  fit_width / num_persons
+        psn_width: float =  fit_width / max_players
         psn_height: float = psn_width / psn_aspect_ratio
         vis_height: float = fit_width / vis_aspect_ratio
         y_start: float = fit_y
@@ -749,7 +721,7 @@ class Render(RenderWindow):
             ret[ImageType.SIM][i] = (int(fit_x), int(sim_y), int(fit_width), int(sim_height))
 
         y_start += sim_height * num_sims
-        for i in range(num_persons):
+        for i in range(max_players):
             psn_x: float = i * psn_width + fit_x
             psn_y: float = y_start
             ret[ImageType.PSN][i] = (int(psn_x), int(psn_y), int(psn_width), int(psn_height))

@@ -120,28 +120,28 @@ class PanoramicTracker(Thread):
         new_person: Optional[Tracklet] = Tracklet(-1, new_tracklet.cam_id, new_tracklet.tracklet, new_tracklet.time_stamp, tracker_info)
 
         # Check if the new person already exists in the tracker and update if necessary
-        existing_person: Optional[Tracklet] = self.person_manager.get_person_by_cam_and_tracklet(new_person.cam_id, new_person.external_tracklet.id)
+        existing_person: Optional[Tracklet] = self.person_manager.get_tracklet_by_cam_and_external_id(new_person.cam_id, new_person.external_tracklet.id)
         if existing_person is not None:
-            self.person_manager.replace_person(existing_person, new_person)
+            self.person_manager.replace_tracklet(existing_person, new_person)
 
         # Add the new person to the tracker (if it is not lost)
         if existing_person is None and new_person.status != TrackingStatus.LOST:
-            self.person_manager.add_person(new_person)
+            self.person_manager.add_tracklet(new_person)
 
         # Remove persons that are not active anymore
-        for person in self.person_manager.all_persons():
+        for person in self.person_manager.all_tracklets():
             if person.last_time < time() - self.person_timeout:
                 self.remove_person(person)
 
         self.remove_overlapping_persons()
 
-        for person in self.person_manager.all_persons():
+        for person in self.person_manager.all_tracklets():
             if person.is_active:
                 self._person_callback(person)
 
     def remove_overlapping_persons(self) -> None:
 
-        persons: list[Tracklet] = self.person_manager.all_persons()
+        persons: list[Tracklet] = self.person_manager.all_tracklets()
         for person in persons:
             # Reconstruct PanoramicTrackerInfo with updated overlap field
             if isinstance(person.tracker_info, PanoramicTrackerInfo):
@@ -198,13 +198,13 @@ class PanoramicTracker(Thread):
 
         for overlap in overlap_sets:
             # print(f"Removing overlapping persons: {overlap}")
-            keep_person: Optional[Tracklet] = self.person_manager.get_person(overlap[0])
-            remove_person: Optional[Tracklet] = self.person_manager.get_person(overlap[1])
+            keep_person: Optional[Tracklet] = self.person_manager.get_tracklet(overlap[0])
+            remove_person: Optional[Tracklet] = self.person_manager.get_tracklet(overlap[1])
             if keep_person is None or remove_person is None:
                 print(f"Warning: One of the persons in the overlap {overlap} is None sets{overlap_sets}. Skipping removal.")
                 continue
 
-            remove_id: int = self.person_manager.merge_persons(keep_person, remove_person)
+            remove_id: int = self.person_manager.merge_tracklets(keep_person, remove_person)
 
             # If the merge was not successful, we create a dummy person to trigger the callback
             if remove_person.status != TrackingStatus.NEW:
@@ -219,7 +219,7 @@ class PanoramicTracker(Thread):
                 self._person_callback(dummy_person)
 
     def remove_person(self, person: Tracklet) -> None:
-        self.person_manager.remove_person(person.id)
+        self.person_manager.remove_tracklet(person.id)
         person.status = TrackingStatus.REMOVED
         self._person_callback(person)
 
@@ -232,7 +232,7 @@ class PanoramicTracker(Thread):
         with self.callback_lock:
             for c in self.person_callbacks:
                 c(person)
-    def add_person_callback(self, callback: TrackletCallback) -> None:
+    def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         if self.running:
             print('Manager is running, cannot add callback')
             return

@@ -32,11 +32,11 @@ class Tracklet:
 
     @property
     def age(self) -> float:
-        """Get how long this person has been tracked"""
+        """Get how long this tracket has been tracked"""
         return time() - self.start_time
 
     def is_expired(self, threshold) -> bool:
-        """Check if person hasn't been updated recently"""
+        """Check if tracket hasn't been updated recently"""
         return time() - self.last_time > threshold
 
 

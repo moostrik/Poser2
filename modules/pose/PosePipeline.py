@@ -77,7 +77,7 @@ class PosePipeline:
         self.joint_angles.stop()
 
      # INPUTS
-    def add_person(self, person: Tracklet) -> None:
+    def add_tracklet(self, person: Tracklet) -> None:
 
         image: Optional[np.ndarray] = self._get_image(person.cam_id)
         if image is None:

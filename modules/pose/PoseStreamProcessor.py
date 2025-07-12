@@ -18,7 +18,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # Type for analysis output callback
 @dataclass (frozen=False)
 class PoseStreamData:
-    person_id: int
+    player_id: int
     angles: pd.DataFrame
     confidences: pd.DataFrame
 

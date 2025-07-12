@@ -64,7 +64,7 @@ class Main():
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.pose_detection.set_image)
             camera.add_tracker_callback(self.panoramic_tracker.add_cam_tracklet)
-            camera.add_tracker_callback(self.render.set_cam_tracklet)
+            camera.add_tracker_callback(self.render.set_depth_tracklet)
             camera.start()
 
         self.correlation_streamer.add_stream_callback(self.render.set_correlation_stream)
@@ -81,8 +81,8 @@ class Main():
         self.pose_detection.add_pose_callback(self.render.set_pose)
         self.pose_detection.start()
 
-        self.panoramic_tracker.add_person_callback(self.pose_detection.add_person)
-        self.panoramic_tracker.add_person_callback(self.render.set_person)
+        self.panoramic_tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
+        self.panoramic_tracker.add_tracklet_callback(self.render.set_tracklet)
         self.panoramic_tracker.start()
 
         self.av.add_output_callback(self.render.set_av)
