@@ -10,7 +10,7 @@ from modules.av.Gui import Gui
 from modules.av.CompTest import CompTest
 from modules.av.UdpSender import UdpSender
 from modules.Settings import Settings
-from modules.tracker.Tracklet import Person, PersonDict
+from modules.tracker.Tracklet import Tracklet, TrackletDict
 
 
 class Manager(Thread):
@@ -22,7 +22,7 @@ class Manager(Thread):
         self.interval: float = 1.0 / settings.light_rate
         self.last_update: float = 0.0
 
-        self.person_dict: PersonDict = {}
+        self.person_dict: TrackletDict = {}
         self.dict_lock: Lock = Lock()
 
         self.resolution: int = settings.light_resolution
@@ -63,11 +63,11 @@ class Manager(Thread):
 
 
     # SETTERS AND GETTERS
-    def set_person_dict(self, person_dict: PersonDict) -> None:
+    def set_person_dict(self, person_dict: TrackletDict) -> None:
         with self.dict_lock:
                 self.person_dict = person_dict
 
-    def get_person_dict(self) -> PersonDict:
+    def get_person_dict(self) -> TrackletDict:
         with self.dict_lock:
             return self.person_dict.copy()
 

@@ -11,7 +11,7 @@ from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
 from modules.tracker.BaseTracker import BaseTrackerInfo, TrackingStatus
 
 @dataclass
-class Person:
+class Tracklet:
     id: int
     cam_id: int
     external_tracklet: CamTracklet
@@ -41,9 +41,9 @@ class Person:
 
 
 # Type Aliases
-PersonCallback = Callable[[Person], None]
-PersonDict = dict[int, Person]
-PersonDictCallback = Callable[[PersonDict], None]
+TrackletCallback = Callable[[Tracklet], None]
+TrackletDict = dict[int, Tracklet]
+TrackletDictCallback = Callable[[TrackletDict], None]
 
 
 PersonColors: dict[int, str] = {

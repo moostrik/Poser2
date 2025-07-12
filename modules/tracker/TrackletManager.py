@@ -1,11 +1,11 @@
 from threading import Lock
 from typing import Optional
 
-from modules.tracker.Tracklet import Person, TrackingStatus
+from modules.tracker.Tracklet import Tracklet, TrackingStatus
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PersonIdPool:
+class TrackletIdPool:
     def __init__(self, max_size: int) -> None:
         self._available: set[int] = set(range(max_size))
         self._lock = Lock()
@@ -36,15 +36,15 @@ class PersonIdPool:
         with self._lock:
             return sorted(self._available)
 
-class PersonManager:
+class TrackletManager:
     def __init__(self, max_persons: int) -> None:
-        self._persons: dict[int, Person] = {}
-        self._id_pool = PersonIdPool(max_persons)
+        self._persons: dict[int, Tracklet] = {}
+        self._id_pool = TrackletIdPool(max_persons)
         self._lock = Lock()
 
         hot_reload = HotReloadMethods(self.__class__, True)
 
-    def add_person(self, person: Person) -> Optional[int]:
+    def add_person(self, person: Tracklet) -> Optional[int]:
         with self._lock:
             try:
                 person_id = self._id_pool.acquire()
@@ -56,11 +56,11 @@ class PersonManager:
             self._persons[person_id] = person
             return person_id
 
-    def get_person(self, person_id: int) -> Optional[Person]:
+    def get_person(self, person_id: int) -> Optional[Tracklet]:
         with self._lock:
             return self._persons.get(person_id, None)
 
-    def set_person(self, person: Person) -> None:
+    def set_person(self, person: Tracklet) -> None:
         with self._lock:
             if person.id in self._persons:
                 self._persons[person.id] = person
@@ -69,25 +69,25 @@ class PersonManager:
 
     def remove_person(self, person_id: int) -> None:
         with self._lock:
-            person: Person | None = self._persons.pop(person_id, None)
+            person: Tracklet | None = self._persons.pop(person_id, None)
             # person.status = TrackingStatus.REMOVED
             if person is not None:
                 self._id_pool.release(person_id)
             else:
                 print(f"PersonManager: Attempted to remove non-existent person with ID {person_id}.")
 
-    def all_persons(self) -> list[Person]:
+    def all_persons(self) -> list[Tracklet]:
         with self._lock:
             return list(self._persons.values())
 
-    def get_person_by_cam_and_tracklet(self, cam_id: int, tracklet_id: int) -> Optional[Person]:
+    def get_person_by_cam_and_tracklet(self, cam_id: int, tracklet_id: int) -> Optional[Tracklet]:
         with self._lock:
             for person in self._persons.values():
                 if person.cam_id == cam_id and person.external_tracklet and person.external_tracklet.id == tracklet_id:
                     return person
             return None
 
-    def replace_person(self, old_person: Person, new_person: Person) -> None:
+    def replace_person(self, old_person: Tracklet, new_person: Tracklet) -> None:
         """
         Replace an existing person in the manager with a new person object.
 
@@ -123,7 +123,7 @@ class PersonManager:
             # Replace in the dict
             self._persons[old_person.id] = new_person
 
-    def merge_persons(self, keep: Person, remove: Person) -> int:
+    def merge_persons(self, keep: Tracklet, remove: Tracklet) -> int:
         """
         Merge two Person objects into a single entry in the manager.
 
@@ -163,7 +163,7 @@ class PersonManager:
             merged_start_time: float = oldest.start_time
 
             # Use all other data from the newest (the 'keep' person)
-            merged_person = Person(
+            merged_person = Tracklet(
                 id=merged_id,
                 cam_id=keep.cam_id,
                 external_tracklet=keep.external_tracklet,

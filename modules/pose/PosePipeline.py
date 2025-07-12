@@ -7,7 +7,7 @@ import numpy as np
 
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
-from modules.tracker.Tracklet import Person, PersonCallback
+from modules.tracker.Tracklet import Tracklet, TrackletCallback
 from modules.pose.PoseDefinitions import ModelTypeNames, PoseData, PoseDataCallback
 from modules.pose.PoseDetection import Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
@@ -77,7 +77,7 @@ class PosePipeline:
         self.joint_angles.stop()
 
      # INPUTS
-    def add_person(self, person: Person) -> None:
+    def add_person(self, person: Tracklet) -> None:
 
         image: Optional[np.ndarray] = self._get_image(person.cam_id)
         if image is None:

@@ -14,8 +14,8 @@ from pandas import Timestamp
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
-from modules.tracker.Tracklet import Person, PersonCallback, TrackingStatus
-from modules.tracker.TrackletManager import PersonManager
+from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
+from modules.tracker.TrackletManager import TrackletManager
 from modules.tracker.BaseTracker import BaseTrackerInfo
 from modules.tracker.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
 from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
@@ -51,7 +51,7 @@ class PanoramicTracker(Thread):
 
         self.tracklet_queue: Queue[TempTracklet] = Queue()
 
-        self.person_manager: PersonManager = PersonManager(self.max_persons)
+        self.person_manager: TrackletManager = TrackletManager(self.max_persons)
 
         self.geometry: PanoramicGeometry = PanoramicGeometry(settings.camera_num, CAM_360_FOV, CAM_360_TARGET_FOV)
 
@@ -64,7 +64,7 @@ class PanoramicTracker(Thread):
         self.cam_360_hysteresis_factor: float = CAM_360_HYSTERESIS_FACTOR
 
         self.callback_lock = Lock()
-        self.person_callbacks: set[PersonCallback] = set()
+        self.person_callbacks: set[TrackletCallback] = set()
         self.gui = PanoramicTrackerGui(gui, self, settings)
 
         hot_reload = HotReloadMethods(self.__class__)
@@ -117,10 +117,10 @@ class PanoramicTracker(Thread):
         in_overlap: bool = self.geometry.angle_in_overlap(local_angle, self.cam_360_overlap_expansion)
         tracker_info = PanoramicTrackerInfo(local_angle, world_angle, in_overlap)
 
-        new_person: Optional[Person] = Person(-1, new_tracklet.cam_id, new_tracklet.tracklet, new_tracklet.time_stamp, tracker_info)
+        new_person: Optional[Tracklet] = Tracklet(-1, new_tracklet.cam_id, new_tracklet.tracklet, new_tracklet.time_stamp, tracker_info)
 
         # Check if the new person already exists in the tracker and update if necessary
-        existing_person: Optional[Person] = self.person_manager.get_person_by_cam_and_tracklet(new_person.cam_id, new_person.external_tracklet.id)
+        existing_person: Optional[Tracklet] = self.person_manager.get_person_by_cam_and_tracklet(new_person.cam_id, new_person.external_tracklet.id)
         if existing_person is not None:
             self.person_manager.replace_person(existing_person, new_person)
 
@@ -141,7 +141,7 @@ class PanoramicTracker(Thread):
 
     def remove_overlapping_persons(self) -> None:
 
-        persons: list[Person] = self.person_manager.all_persons()
+        persons: list[Tracklet] = self.person_manager.all_persons()
         for person in persons:
             # Reconstruct PanoramicTrackerInfo with updated overlap field
             if isinstance(person.tracker_info, PanoramicTrackerInfo):
@@ -198,8 +198,8 @@ class PanoramicTracker(Thread):
 
         for overlap in overlap_sets:
             # print(f"Removing overlapping persons: {overlap}")
-            keep_person: Optional[Person] = self.person_manager.get_person(overlap[0])
-            remove_person: Optional[Person] = self.person_manager.get_person(overlap[1])
+            keep_person: Optional[Tracklet] = self.person_manager.get_person(overlap[0])
+            remove_person: Optional[Tracklet] = self.person_manager.get_person(overlap[1])
             if keep_person is None or remove_person is None:
                 print(f"Warning: One of the persons in the overlap {overlap} is None sets{overlap_sets}. Skipping removal.")
                 continue
@@ -208,7 +208,7 @@ class PanoramicTracker(Thread):
 
             # If the merge was not successful, we create a dummy person to trigger the callback
             if remove_person.status != TrackingStatus.NEW:
-                dummy_person: Person = Person(
+                dummy_person: Tracklet = Tracklet(
                     remove_id,
                     remove_person.cam_id,
                     remove_person.external_tracklet,
@@ -218,7 +218,7 @@ class PanoramicTracker(Thread):
                 dummy_person.status = TrackingStatus.REMOVED
                 self._person_callback(dummy_person)
 
-    def remove_person(self, person: Person) -> None:
+    def remove_person(self, person: Tracklet) -> None:
         self.person_manager.remove_person(person.id)
         person.status = TrackingStatus.REMOVED
         self._person_callback(person)
@@ -228,11 +228,11 @@ class PanoramicTracker(Thread):
         self.tracklet_queue.put(cam_tracklet)
 
     # CALLBACKS
-    def _person_callback(self, person: Person) -> None:
+    def _person_callback(self, person: Tracklet) -> None:
         with self.callback_lock:
             for c in self.person_callbacks:
                 c(person)
-    def add_person_callback(self, callback: PersonCallback) -> None:
+    def add_person_callback(self, callback: TrackletCallback) -> None:
         if self.running:
             print('Manager is running, cannot add callback')
             return

@@ -21,7 +21,7 @@ from modules.gl.Utils import lfo, fit, fill
 
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet, Rect as CamRect, FrameType
-from modules.tracker.Tracklet import Person, PersonColor, TrackingStatus
+from modules.tracker.Tracklet import Tracklet, PersonColor, TrackingStatus
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.PoseDefinitions import PoseData, PosePoints, PoseEdgeIndices
 from modules.pose.PoseStreamProcessor import PoseStreamData
@@ -110,7 +110,7 @@ class Render(RenderWindow):
 
         self.input_mutex: Lock = Lock()
         self.input_tracklets: dict[int, dict[int, CamTracklet]] = {}   # cam_id -> track_id -> Tracklet
-        self.input_persons: dict[int, Optional[Person]] = {}           # person_id -> Person
+        self.input_persons: dict[int, Optional[Tracklet]] = {}           # person_id -> Person
         self.input_poses: dict[int, Optional[PoseData]] = {}
         self.input_angle_windows: dict[int, Optional[np.ndarray]] = {}          # person_id -> angles
         for i in range(self.num_persons):
@@ -292,7 +292,7 @@ class Render(RenderWindow):
             image.update()
             fbo: Fbo = self.cam_fbos[i]
             tracklets: dict[int, CamTracklet] = self.get_tracklets(i)
-            persons: list[Person] = self.get_persons_for_cam(i)
+            persons: list[Tracklet] = self.get_persons_for_cam(i)
 
             self.setView(fbo.width, fbo.height)
             fbo.begin()
@@ -358,7 +358,7 @@ class Render(RenderWindow):
             self.setView(fbo.width, fbo.height)
             fbo.begin()
 
-            person: Person | None = self.get_person(i)
+            person: Tracklet | None = self.get_person(i)
             if person is None:
                 continue
 
@@ -409,20 +409,20 @@ class Render(RenderWindow):
         with self.input_mutex:
             self.input_tracklets[cam_id][tracklet.id] = tracklet
 
-    def get_person(self, id: int, clear: bool = False) -> Person | None:
+    def get_person(self, id: int, clear: bool = False) -> Tracklet | None:
         with self.input_mutex:
-            ret_person: Person | None = self.input_persons[id]
+            ret_person: Tracklet | None = self.input_persons[id]
             if clear:
                 self.input_persons[id] = None
             return ret_person
-    def get_persons_for_cam(self, cam_id: int) -> list[Person]:
+    def get_persons_for_cam(self, cam_id: int) -> list[Tracklet]:
         with self.input_mutex:
-            persons: list[Person] = []
+            persons: list[Tracklet] = []
             for person in self.input_persons.values():
                 if person is not None and person.cam_id == cam_id:
                     persons.append(person)
             return persons
-    def set_person(self, person: Person) -> None:
+    def set_person(self, person: Tracklet) -> None:
         with self.input_mutex:
             self.input_persons[person.id] = person
 
@@ -518,7 +518,7 @@ class Render(RenderWindow):
         glFlush()               # Render now
 
     @staticmethod
-    def draw_raw_positions(persons: dict[int, Person | None], num_cams: int, fbo: Fbo) -> None:
+    def draw_raw_positions(persons: dict[int, Tracklet | None], num_cams: int, fbo: Fbo) -> None:
         fbo.begin()
         glClearColor(0.1, 0.0, 0.0, 1.0)  # Set background color to black
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
@@ -549,7 +549,7 @@ class Render(RenderWindow):
         return
 
     @staticmethod
-    def draw_map_positions(persons: dict[int, Person | None], num_cams: int, fbo: Fbo) -> None:
+    def draw_map_positions(persons: dict[int, Tracklet | None], num_cams: int, fbo: Fbo) -> None:
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
@@ -664,7 +664,7 @@ class Render(RenderWindow):
         glFlush()
 
     @staticmethod
-    def draw_person(person: Person, pose_mesh: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
+    def draw_person(person: Tracklet, pose_mesh: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
         if draw_box:
             r: float = 0.0
             g: float = 0.0
