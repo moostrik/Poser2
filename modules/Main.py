@@ -72,7 +72,7 @@ class Main():
         self.pose_streamer.add_stream_callback(self.render.set_pose_stream)
         self.pose_streamer.start()
 
-        # self.pose_detection.add_pose_callback(self.pose_streamer.add_pose)
+        self.pose_detection.add_pose_callback(self.pose_streamer.add_pose)
         self.pose_detection.add_pose_callback(self.render.set_pose)
         self.pose_detection.start()
 

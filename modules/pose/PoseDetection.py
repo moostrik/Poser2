@@ -65,11 +65,11 @@ class Detection(Thread):
                             break
 
                 # Process the pose
-                image: np.ndarray | None = pose.pose_image
+                image: np.ndarray | None = pose.image
                 if image is not None:
                     poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
                     if len(poses) > 0:
-                        pose.pose = poses[0]
+                        pose.points = poses[0]
                 self.callback(pose)
 
             except:

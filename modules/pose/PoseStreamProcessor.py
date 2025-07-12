@@ -69,13 +69,13 @@ class PoseStreamProcessor(Thread):
     def _process(self, pose: Pose) -> None:
         """ Process a pose and update the joint angle windows. """
 
-        if pose.pose_angles is None:
+        if pose.angles is None:
             # print(f"WINDOW: Skipping pose {pose.id} with no pose angles, this should not happen")
             return
 
         # Build angle/confidence dicts
-        angle_row: dict[str, float] = {Keypoint(k).name: v["angle"] for k, v in pose.pose_angles.items()}
-        conf_row: dict[str, float] = {Keypoint(k).name: v["confidence"] for k, v in pose.pose_angles.items()}
+        angle_row: dict[str, float] = {Keypoint(k).name: v["angle"] for k, v in pose.angles.items()}
+        conf_row: dict[str, float] = {Keypoint(k).name: v["confidence"] for k, v in pose.angles.items()}
         timestamp: pd.Timestamp = pose.time_stamp  # Assume pd.Timestamp
 
         # Update angle window

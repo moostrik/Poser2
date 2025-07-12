@@ -218,7 +218,7 @@ class Render(RenderWindow):
         for i in range(self.max_players):
             pose_data: Pose | None = self.get_pose(i, clear=False)
             if pose_data is not None:
-                pose: PosePoints | None = pose_data.pose
+                pose: PosePoints | None = pose_data.points
                 if pose is not None:
                     self.pose_meshes[i].set_vertices(pose.getVertices())
                     self.pose_meshes[i].set_colors(pose.getColors(threshold=0.0))
@@ -306,7 +306,7 @@ class Render(RenderWindow):
                 roi: Rect | None  = None
                 pose: Pose | None = self.get_pose(tracklet.id, clear=False)
                 if pose is not None:
-                    roi = pose.pose_crop_rect
+                    roi = pose.crop_rect
                 mesh: Mesh = self.pose_meshes[tracklet.id]
                 if roi is not None and mesh.isInitialized():
                     x, y, w, h = roi.x, roi.y, roi.width, roi.height
@@ -348,8 +348,13 @@ class Render(RenderWindow):
                 continue
 
             image: Image = self.psn_images[i]
-            if pose_data.pose_image is not None:
-                image.set_image(pose_data.pose_image)
+            image_color: Tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.25)
+            if pose_data.image is not None:
+                image.set_image(pose_data.image)
+                image.update()
+                image_color = (1.0, 1.0, 1.0, 1.0)  # Full opacity for pose image
+            else:
+                image.set_image(np.zeros((fbo.height, fbo.width, 3), dtype=np.uint8))
                 image.update()
 
             analysis_image: Image = self.analysis_images[i]
@@ -358,20 +363,22 @@ class Render(RenderWindow):
             self.setView(fbo.width, fbo.height)
             fbo.begin()
 
-            tracklet: Tracklet | None = self.get_tracklet(i)
-            if tracklet is None:
-                continue
+            # tracklet: Tracklet | None = self.get_tracklet(i)
+            # if tracklet is None:
+            #     continue
 
-            if tracklet.status == TrackingStatus.REMOVED or tracklet.status == TrackingStatus.LOST:
-                glColor4f(1.0, 1.0, 1.0, 0.25)   # Set color
-                image.draw(0, 0, fbo.width, fbo.height)
-                glColor4f(1.0, 1.0, 1.0, 1.0)   # Set color
-            else:
-                image.draw(0, 0, fbo.width, fbo.height)
+            # if tracklet.status == TrackingStatus.REMOVED or tracklet.status == TrackingStatus.LOST:
+            glColor4f(*image_color)   # Set color
+            image.draw(0, 0, fbo.width, fbo.height)
+            glColor4f(1.0, 1.0, 1.0, 1.0)   # Set color
+            # else:
+            #     image.draw(0, 0, fbo.width, fbo.height)
             # analysis_image.draw(0, 0, fbo.width, fbo.height)
-            mesh: Mesh = self.pose_meshes[pose_data.id]
-            self.draw_tracklet(tracklet, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
-            angle_mesh = self.angle_meshes[pose_data.id]
+            pose_mesh: Mesh = self.pose_meshes[pose_data.id]
+            pose_mesh.draw(0, 0, fbo.width, fbo.height)
+            # self.draw_tracklet(tracklet, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
+            angle_mesh: Mesh = self.angle_meshes[pose_data.id]
+            # angle_mesh.draw(0, 0, fbo.width, fbo.height)
             if angle_mesh.isInitialized():
                 angle_mesh.draw(0, 0, fbo.width, fbo.height)
 

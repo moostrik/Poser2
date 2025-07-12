@@ -42,7 +42,7 @@ class PoseAngleCalculator(Thread):
                 pose: Optional[Pose] = self.pose_input_queue.get(block=True, timeout=0.01)
                 if pose is not None:
                     try:
-                        self._process(pose, self.confidence_threshold, self._pose_output_callback)
+                        self._process(pose, self.confidence_threshold, self._notify_callback)
                     except Exception as e:
                         print(f"Error processing pose {pose.id}: {e}")
                     self.pose_input_queue.task_done()
@@ -59,7 +59,7 @@ class PoseAngleCalculator(Thread):
         with self.callback_lock:
             self.pose_output_callbacks.add(callback)
 
-    def _pose_output_callback(self, pose: Pose) -> None:
+    def _notify_callback(self, pose: Pose) -> None:
         """Handle processed pose"""
         with self.callback_lock:
             for callback in self.pose_output_callbacks:
@@ -72,18 +72,18 @@ class PoseAngleCalculator(Thread):
     @staticmethod
     def _process(pose: Pose, confidence_threshold: float, callback:PoseCallback) -> None:
 
-        if pose.pose is None:
+        if pose.points is None:
             # return nan angles and 0 for confidence
             angles: JointAngleDict = {}
             for k in PoseAngleKeypoints.keys():
                 angles[k] = JointAngle(angle=np.nan, confidence=0.0)
-            pose.pose_angles = angles
+            pose.angles = angles
             callback(pose)
             return
 
         angles: JointAngleDict = {}
-        keypoints: np.ndarray = pose.pose.getKeypoints()
-        scores: np.ndarray = pose.pose.getScores()
+        keypoints: np.ndarray = pose.points.getKeypoints()
+        scores: np.ndarray = pose.points.getScores()
 
         # Calculate angles for each joint in PoseAngleDict
         for joint, (kp1, kp2, kp3) in PoseAngleKeypoints.items():
@@ -114,7 +114,7 @@ class PoseAngleCalculator(Thread):
                 # Low confidence, set angle to NaN
                 angles[joint] = JointAngle(angle = np.nan, confidence = 0.0)
 
-        pose.pose_angles = angles
+        pose.angles = angles
         callback(pose)
 
     @staticmethod

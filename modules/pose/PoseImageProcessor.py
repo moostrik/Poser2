@@ -1,4 +1,3 @@
-from typing import Optional
 import cv2
 import numpy as np
 from modules.tracker.Tracklet import Tracklet, Rect

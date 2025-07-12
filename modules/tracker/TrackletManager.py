@@ -2,6 +2,8 @@
 from threading import Lock
 from typing import Optional
 
+from pandas import Timestamp
+
 # Local application imports
 from modules.tracker.Tracklet import Tracklet, TrackingStatus
 
@@ -161,13 +163,14 @@ class TrackletManager:
 
             # Save the id and start_time of the oldest
             merged_id: int = oldest.id
+            merged_created_at: Timestamp = oldest.created_at
             other_id: int = newest.id
 
             # Use all other data from the newest (the 'keep' tracklet)
             merged_tracklet = Tracklet(
                 id=merged_id,
                 cam_id=keep.cam_id,
-                created_at=oldest.created_at, # Use the created_at of the oldest tracklet
+                created_at=merged_created_at,
                 last_seen=keep.last_seen,
                 status=keep.status,
                 roi=keep.roi,

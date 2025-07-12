@@ -165,52 +165,11 @@ class Pose:
     id: int # Unique identifier for the pose data, typically the tracklet ID
     cam_id: int
     time_stamp: Timestamp
-    _pose_crop_rect: Rect
-    _pose_image: np.ndarray = field(repr=False)
+    crop_rect: Optional[Rect] = field(default = None, init=False, repr=False)
+    image: Optional[np.ndarray] = field(default = None, init=False, repr=False)
 
-    _pose_lock: Lock = field(default_factory=Lock, init=False, repr=False)
-    _pose_keypoints: Optional[PosePoints] = field(default=None, init=False, repr=False)
-    _pose_angles: Optional[JointAngleDict] = field(default=None, init=False, repr=False)
-
-    @property
-    def pose_crop_rect(self) -> Optional[Rect]:
-        with self._pose_lock:
-            return self._pose_crop_rect
-
-    @pose_crop_rect.setter
-    def pose_crop_rect(self, value: Rect) -> None:
-        with self._pose_lock:
-            self._pose_crop_rect = value
-
-    @property
-    def pose_image(self) -> np.ndarray:
-        with self._pose_lock:
-            return self._pose_image
-
-    @pose_image.setter
-    def pose_image(self, value: np.ndarray) -> None:
-        with self._pose_lock:
-            self._pose_image = value
-
-    @property
-    def pose(self) -> Optional[PosePoints]:
-        with self._pose_lock:
-            return self._pose
-
-    @pose.setter
-    def pose(self, value: Optional[PosePoints]) -> None:
-        with self._pose_lock:
-            self._pose = value
-
-    @property
-    def pose_angles(self) -> Optional[JointAngleDict]:
-        with self._pose_lock:
-            return self._pose_angles
-
-    @pose_angles.setter
-    def pose_angles(self, value: Optional[JointAngleDict]) -> None:
-        with self._pose_lock:
-            self._pose_angles = value
+    points: Optional[PosePoints] = field(default=None, init=False, repr=False)
+    angles: Optional[JointAngleDict] = field(default=None, init=False, repr=False)
 
 
 PoseCallback = Callable[[Pose], None]

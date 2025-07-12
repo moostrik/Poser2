@@ -7,7 +7,7 @@ import numpy as np
 
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
-from modules.tracker.Tracklet import Tracklet, TrackletCallback
+from modules.tracker.Tracklet import Tracklet, TrackletCallback, Rect
 from modules.pose.PoseDefinitions import ModelTypeNames, Pose, PoseCallback
 from modules.pose.PoseDetection import Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
@@ -76,31 +76,38 @@ class PosePipeline:
 
         self.joint_angles.stop()
 
-     # INPUTS
-    def add_tracklet(self, person: Tracklet) -> None:
-
-        image: Optional[np.ndarray] = self._get_image(person.cam_id)
-        if image is None:
+    def update(self, tracklet: Tracklet) -> None:
+        """
+        Update the pose pipeline with a new tracklet.
+        This method is called when a new tracklet is detected or updated.
+        """
+        if not self.running:
             return
-
-        if not person.is_active:
-            return
-
-        pose_image, crop_rect = self.image_processor.process_pose_image(person, image)
-
 
         pose = Pose(
-            id=person.id,
-            cam_id=person.cam_id,
-            time_stamp=person.last_seen,
-            _pose_crop_rect=crop_rect,
-            _pose_image=pose_image
+            id=tracklet.id,
+            cam_id=tracklet.cam_id,
+            time_stamp=tracklet.last_seen,
         )
+        if not tracklet.is_active:
+            self._notify_pose_callback(pose)
+            return
 
-        detector: Optional[Detection] = self.pose_detectors.get(person.id)
+        cam_image: Optional[np.ndarray] = self._get_image(tracklet.cam_id)
+        if cam_image is not None:
+            pose_image: Optional[np.ndarray] = None
+            pose_crop_rect: Optional[Rect] = None
+            pose_image, pose_crop_rect = self.image_processor.process_pose_image(tracklet, cam_image)
+            if pose_image is not None and pose_crop_rect is not None:
+                pose.image = pose_image
+                pose.crop_rect = pose_crop_rect
+                detector: Optional[Detection] = self.pose_detectors.get(tracklet.id)
+                if detector:
+                    detector.add_pose(pose)
 
-        if detector:
-            detector.add_pose(pose)
+     # INPUTS
+    def add_tracklet(self, tracklet: Tracklet) -> None:
+        self.update(tracklet)
 
     def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
         if frame_type != FrameType.VIDEO:
@@ -115,14 +122,14 @@ class PosePipeline:
 
     # External Output Callbacks
     def add_pose_callback(self, callback: PoseCallback) -> None:
-        """Add callback for processed persons"""
+        """Add callback for processed poses"""
         if self.running:
             print('Pipeline is running, cannot add callback')
             return
         self.pose_output_callbacks.add(callback)
 
     def _notify_pose_callback(self, pose: Pose) -> None:
-        """Handle processed person"""
+        """Handle processed pose"""
         with self.callback_lock:
             for callback in self.pose_output_callbacks:
                 callback(pose)
