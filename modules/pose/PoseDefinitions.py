@@ -9,7 +9,7 @@ from threading import Lock
 import numpy as np
 from typing import TypedDict
 from typing import Optional, Callable
-from modules.cam.depthcam.Definitions import Rect # TODO: remove this dependency
+from modules.tracker.Tracklet import Rect
 from pandas import Timestamp
 
 NUM_KEYPOINTS = 17

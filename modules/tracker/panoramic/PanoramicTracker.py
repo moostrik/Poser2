@@ -49,7 +49,7 @@ class PanoramicTracker(Thread):
         self.max_players: int = settings.max_players
         self.cleanup_interval: float = 1.0 / settings.camera_fps
 
-        self.tracklet_queue: Queue[TempTracklet] = Queue()
+        self.input_queue: Queue[Tracklet] = Queue()
 
         self.tracklet_manager: TrackletManager = TrackletManager(self.max_players)
 
@@ -86,7 +86,7 @@ class PanoramicTracker(Thread):
         while self.running:
             # Try to get all available tracklets as soon as they arrive
             try:
-                tracklet: TempTracklet = self.tracklet_queue.get(timeout=0.1)
+                tracklet: Tracklet = self.input_queue.get(timeout=0.1)
                 # try:
                 self.update_tracklet(tracklet)
                 # except Exception as e:
@@ -94,30 +94,29 @@ class PanoramicTracker(Thread):
             except Empty:
                 pass
 
-    def update_tracklet(self, temp_tracklet: TempTracklet) -> None:
+    def update_tracklet(self, new_tracklet: Tracklet) -> None:
 
-        depth_tracklet: CamTracklet = temp_tracklet.tracklet
-        if depth_tracklet.status == TrackingStatus.REMOVED:
+        if new_tracklet.status == TrackingStatus.REMOVED:
             return
-        if depth_tracklet.age <= self.tracklet_min_age:
+        if new_tracklet.external_age_in_frames <= self.tracklet_min_age:
             return
-        if depth_tracklet.roi.height < self.tracklet_min_height:
+        if new_tracklet.roi.height < self.tracklet_min_height:
             return
 
         # Calculate the local and world angles
-        local_angle, world_angle = self.geometry.calc_angle(depth_tracklet.roi, temp_tracklet.cam_id)
+        local_angle, world_angle = self.geometry.calc_angle(new_tracklet.roi, new_tracklet.cam_id)
 
         # Filter out tracklets that are too close to the edge of a camera's field of view
         if self.geometry.angle_in_edge(local_angle, self.cam_360_edge_threshold):
             return
 
         in_overlap: bool = self.geometry.angle_in_overlap(local_angle, self.cam_360_overlap_expansion)
-        tracker_info = PanoramicTrackerInfo(local_angle, world_angle, in_overlap)
+        new_tracklet.tracker_info = PanoramicTrackerInfo(local_angle, world_angle, in_overlap)
 
-        new_tracklet: Optional[Tracklet] = Tracklet(-1, temp_tracklet.cam_id, temp_tracklet.tracklet, temp_tracklet.time_stamp, tracker_info)
+        # new_tracklet: Optional[Tracklet] = Tracklet(-1, temp_tracklet.cam_id, temp_tracklet.tracklet, temp_tracklet.time_stamp, tracker_info)
 
         # Check if the new tracklet already exists in the tracker and update if necessary
-        existing_tracklet: Optional[Tracklet] = self.tracklet_manager.get_tracklet_by_cam_and_external_id(new_tracklet.cam_id, new_tracklet.external_tracklet.id)
+        existing_tracklet: Optional[Tracklet] = self.tracklet_manager.get_tracklet_by_cam_and_external_id(new_tracklet.cam_id, new_tracklet.external_id)
         if existing_tracklet is not None:
             self.tracklet_manager.replace_tracklet(existing_tracklet, new_tracklet)
 
@@ -126,15 +125,15 @@ class PanoramicTracker(Thread):
             self.tracklet_manager.add_tracklet(new_tracklet)
 
         # Remove tracklets that are not active anymore
-        for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.last_time < time() - self.timeout:
-                self.remove_tracklet(tracklet)
+        for new_tracklet in self.tracklet_manager.all_tracklets():
+            if new_tracklet.is_expired(self.timeout):
+                self.remove_tracklet(new_tracklet)
 
         self.remove_overlapping_tracklets()
 
-        for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.is_active:
-                self._notify_callback(tracklet)
+        for new_tracklet in self.tracklet_manager.all_tracklets():
+            if new_tracklet.is_active:
+                self._notify_callback(new_tracklet)
 
     def remove_overlapping_tracklets(self) -> None:
 
@@ -162,7 +161,7 @@ class PanoramicTracker(Thread):
                 continue
 
             # look at the hight of the trackets for extra filtering
-            height_diff: float = abs(P_A.external_tracklet.roi.height - P_B.external_tracklet.roi.height)
+            height_diff: float = abs(P_A.roi.height - P_B.roi.height)
             if height_diff > 0.1:
                 continue
 
@@ -177,7 +176,7 @@ class PanoramicTracker(Thread):
             if not P_A.is_active and not P_B.is_active:
                 continue
 
-            if P_A.age < P_B.age:
+            if P_A.age_in_seconds < P_B.age_in_seconds:
                 newest, oldest = P_A, P_B
             else:
                 newest, oldest = P_B, P_A
@@ -203,13 +202,10 @@ class PanoramicTracker(Thread):
             # If the merge was not successful, we create a dummy tracklet to trigger the callback
             if remove.status != TrackingStatus.NEW:
                 dummy: Tracklet = Tracklet(
-                    remove_id,
-                    remove.cam_id,
-                    remove.external_tracklet,
-                    remove.time_stamp,
-                    remove.tracker_info  # Pass the tracker_info from the removed tracklet
+                    cam_id=keep.cam_id,
+                    id=remove_id,
+                    status=TrackingStatus.REMOVED,
                 )
-                dummy.status = TrackingStatus.REMOVED
                 self._notify_callback(dummy)
 
     def remove_tracklet(self, tracklet: Tracklet) -> None:
@@ -217,9 +213,12 @@ class PanoramicTracker(Thread):
         tracklet.status = TrackingStatus.REMOVED
         self._notify_callback(tracklet)
 
-    def add_cam_tracklet(self, cam_id: int, tracklet: CamTracklet) -> None :
-        cam_tracklet = TempTracklet(cam_id, tracklet)
-        self.tracklet_queue.put(cam_tracklet)
+    def add_cam_tracklet(self, cam_id: int, cam_tracklet: CamTracklet) -> None :
+        tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, cam_tracklet)
+        if tracklet is None:
+            print(f"PanoramicTracker: Invalid tracklet from camera {cam_id}, skipping.")
+            return
+        self.input_queue.put(tracklet)
 
     # CALLBACKS
     def _notify_callback(self, tracklet: Tracklet) -> None:

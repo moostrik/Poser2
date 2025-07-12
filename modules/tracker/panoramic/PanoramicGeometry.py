@@ -1,6 +1,5 @@
 
-from modules.tracker.Tracklet import Tracklet
-from modules.cam.depthcam.Definitions import Rect
+from modules.tracker.Tracklet import Tracklet, Rect
 import numpy as np
 
 class PanoramicGeometry():

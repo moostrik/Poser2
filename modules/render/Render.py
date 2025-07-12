@@ -21,7 +21,7 @@ from modules.gl.Utils import lfo, fit, fill
 
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet, Rect as CamRect, FrameType
-from modules.tracker.Tracklet import Tracklet, TrackletColor, TrackingStatus
+from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus, Rect
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices
 from modules.pose.PoseStreamProcessor import PoseStreamData
@@ -303,7 +303,7 @@ class Render(RenderWindow):
             for tracklet in tracklets:
                 if tracklet.status == TrackingStatus.REMOVED or tracklet.status == TrackingStatus.LOST:
                     continue
-                roi: CamRect | None  = None
+                roi: Rect | None  = None
                 pose: Pose | None = self.get_pose(tracklet.id, clear=False)
                 if pose is not None:
                     roi = pose.pose_crop_rect
@@ -536,12 +536,12 @@ class Render(RenderWindow):
             local_angle: float = getattr(tracklet.tracker_info, "local_angle", 0.0)
             overlap: bool = getattr(tracklet.tracker_info, "overlap", False)
 
-            w: float = tracklet.external_tracklet.roi.width * fbo.width / num_cams
-            h: float = tracklet.external_tracklet.roi.height * fbo.height
+            w: float = tracklet.roi.width * fbo.width / num_cams
+            h: float = tracklet.roi.height * fbo.height
             x: float = world_angle / 360.0 * fbo.width
 
-            y: float = tracklet.external_tracklet.roi.y * fbo.height
-            color: list[float] = TrackletColor(tracklet.id, aplha=0.9)
+            y: float = tracklet.roi.y * fbo.height
+            color: list[float] = TrackletIdColor(tracklet.id, aplha=0.9)
             if overlap == True:
                 color[3] = 0.3
             if tracklet.status == TrackingStatus.NEW:
@@ -656,7 +656,7 @@ class Render(RenderWindow):
             pose_mesh.draw(x, y, w, h)
 
         if draw_text:
-            string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.last_time - tracklet.start_time:.0f}'
+            string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
             x += 9
             y += 15
             RenderWindow.draw_string(x, y, string)

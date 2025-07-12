@@ -1,8 +1,7 @@
 from typing import Optional
 import cv2
 import numpy as np
-from modules.cam.depthcam.Definitions import Rect
-from modules.tracker.Tracklet import Tracklet
+from modules.tracker.Tracklet import Tracklet, Rect
 
 
 class PoseImageProcessor:
@@ -18,7 +17,7 @@ class PoseImageProcessor:
         Returns tuple of (cropped_image, crop_rect).
         """
         h, w = image.shape[:2]
-        roi = self.get_crop_rect(w, h, tracklet.external_tracklet.roi, self.crop_expansion)
+        roi = self.get_crop_rect(w, h, tracklet.roi, self.crop_expansion)
         cropped_image = self.get_cropped_image(image, roi, self.output_size)
         return cropped_image, roi
 

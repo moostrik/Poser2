@@ -83,7 +83,7 @@ class TrackletManager:
     def get_tracklet_by_cam_and_external_id(self, cam_id: int, external_id: int) -> Optional[Tracklet]:
         with self._lock:
             for tracklet in self._tracklets.values():
-                if tracklet.cam_id == cam_id and tracklet.external_tracklet and tracklet.external_tracklet.id == external_id:
+                if tracklet.cam_id == cam_id and tracklet.external_id == external_id:
                     return tracklet
             return None
 
@@ -107,14 +107,14 @@ class TrackletManager:
         with self._lock:
             # Transfer id and start_time
             new_tracklet.id = old_tracklet.id
-            new_tracklet.start_time = old_tracklet.start_time
+            new_tracklet.created_at = old_tracklet.created_at
 
             # Update status if needed
             if new_tracklet.status == TrackingStatus.NEW:
                 new_tracklet.status = TrackingStatus.TRACKED
 
             if new_tracklet.status == TrackingStatus.LOST:
-                new_tracklet.last_time = old_tracklet.last_time
+                new_tracklet.last_seen = old_tracklet.last_seen
 
             if new_tracklet.status == TrackingStatus.REMOVED:
                 print(f"PersonManager: Attempted to replace tracklet with ID {new_tracklet.id} with status REMOVED. This should not happen.")
@@ -152,7 +152,7 @@ class TrackletManager:
                 return -1
 
             # Determine which tracklet is oldest
-            if keep.age >= remove.age:
+            if keep.age_in_seconds >= remove.age_in_seconds:
                 oldest, newest = keep, remove
             else:
                 oldest, newest = remove, keep
@@ -160,23 +160,19 @@ class TrackletManager:
             # Save the id and start_time of the oldest
             merged_id: int = oldest.id
             other_id: int = newest.id
-            merged_start_time: float = oldest.start_time
 
             # Use all other data from the newest (the 'keep' tracklet)
             merged_tracklet = Tracklet(
                 id=merged_id,
                 cam_id=keep.cam_id,
-                external_tracklet=keep.external_tracklet,
-                time_stamp=keep.time_stamp,
-                tracker_info=keep.tracker_info,
+                created_at=oldest.created_at, # Use the created_at of the oldest tracklet
+                last_seen=keep.last_seen,
+                status=keep.status,
+                roi=keep.roi,
+                _external_tracklet=keep._external_tracklet,
+                tracker_info=keep.tracker_info
             )
 
-            # Set the id and start_time from the oldest
-            merged_tracklet.start_time = merged_start_time
-
-            # Copy all relevant fields from 'keep'
-            merged_tracklet.last_time = keep.last_time
-            merged_tracklet.status = keep.status
             if keep.status == TrackingStatus.NEW:
                 merged_tracklet.status = TrackingStatus.TRACKED
 

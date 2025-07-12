@@ -83,15 +83,16 @@ class PosePipeline:
         if image is None:
             return
 
+        if not person.is_active:
+            return
+
         pose_image, crop_rect = self.image_processor.process_pose_image(person, image)
 
-        if person.status == 'REMOVED':
-            print("REMOVED")
 
         pose = Pose(
             id=person.id,
             cam_id=person.cam_id,
-            time_stamp=person.time_stamp,
+            time_stamp=person.last_seen,
             _pose_crop_rect=crop_rect,
             _pose_image=pose_image
         )

@@ -1,52 +1,188 @@
+# TODO
+# add has_changed property to Person?
+# make own rect class?
+# make sure that tracking removed from person is handled correctly
+# rename Person to Tracklet
+
 # Standard library imports
+import warnings
 from dataclasses import dataclass, field
+from enum import Enum
 from time import time
-from typing import Callable
+from typing import Callable, Optional
 
 # Third-party imports
+# import depthai
+# from depthai import TrackingStatus
 from pandas import Timestamp
 
 # Local application imports
-from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
-from modules.tracker.BaseTracker import BaseTrackerInfo, TrackingStatus
+from modules.cam.depthcam.Definitions import Tracklet as ExternalTracklet
+from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.tracker.BaseTracker import BaseTrackerInfo
+
+class TrackingStatus(Enum):
+    NEW =       0
+    TRACKED =   1
+    LOST =      2
+    REMOVED =   3
+    NONE =      4 #?
+
+DEPTHAI_TO_TRACKINGSTATUS: dict[ExternalTracklet.TrackingStatus, TrackingStatus] = {
+    ExternalTracklet.TrackingStatus.NEW: TrackingStatus.NEW,
+    ExternalTracklet.TrackingStatus.TRACKED: TrackingStatus.TRACKED,
+    ExternalTracklet.TrackingStatus.LOST: TrackingStatus.LOST,
+    ExternalTracklet.TrackingStatus.REMOVED: TrackingStatus.REMOVED,
+    # Add more if needed
+}
+
+@dataclass
+class Point3f:
+    """3D point with float coordinates"""
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+
+@dataclass
+class Rect:
+    """Rectangle defined by top-left corner and dimensions"""
+    x: float = 0.0
+    y: float = 0.0
+    width: float = 0.0
+    height: float = 0.0
+
+    @property
+    def top_left(self) -> tuple[float, float]:
+        return (self.x, self.y)
+
+    @property
+    def bottom_right(self) -> tuple[float, float]:
+        return (self.x + self.width, self.y + self.height)
+
+    @property
+    def center(self) -> tuple[float, float]:
+        return (self.x + self.width / 2, self.y + self.height / 2)
+
+    @property
+    def area(self) -> float:
+        return self.width * self.height
+
 
 @dataclass
 class Tracklet:
-    id: int
     cam_id: int
-    external_tracklet: CamTracklet
-    time_stamp: Timestamp
-    tracker_info: BaseTrackerInfo
-    status: TrackingStatus = field(default=TrackingStatus.NONE)
-    start_time: float = field(default_factory=time)
-    last_time: float = field(default_factory=time)
+    id: int =                   field(default=-1)
+    created_at: Timestamp =     field(default_factory=Timestamp.now)
+    last_seen: Timestamp =      field(default_factory=Timestamp.now)
 
-    def __post_init__(self):
-        # If you want to set status from tracklet, do it here
-        if self.status == TrackingStatus.NONE and self.external_tracklet is not None:
-            self.status = TrackingStatus[self.external_tracklet.status.name]
+    status: TrackingStatus =    field(default=TrackingStatus.NEW)
+    roi: Rect =                 field(default=Rect())
+
+    _external_tracklet: Optional[ExternalTracklet] = field(default=None, repr=False)
+    tracker_info: Optional[BaseTrackerInfo] = field(default = None)
 
     @property
     def is_active(self) -> bool:
         return self.status in (TrackingStatus.NEW, TrackingStatus.TRACKED)
 
     @property
-    def age(self) -> float:
-        """Get how long this tracket has been tracked"""
-        return time() - self.start_time
+    def age_in_seconds(self) -> float:
+        """Get how long this person has been tracked"""
+        return (self.last_seen - self.created_at).total_seconds()
 
-    def is_expired(self, threshold) -> bool:
-        """Check if tracket hasn't been updated recently"""
-        return time() - self.last_time > threshold
+    def is_expired(self, threshold: float) -> bool:
+        """Check if person hasn't been updated recently"""
+        return (Timestamp.now() - self.last_seen).total_seconds() > threshold
 
+    @property
+    def external_id(self) -> int:
+        if self._external_tracklet:
+            return self._external_tracklet.id
+        return -1
+
+    @property
+    def external_age_in_frames(self)  -> int:
+        if self._external_tracklet:
+            return self._external_tracklet.age
+        return 0
+
+    @classmethod
+    def from_depthcam(cls, cam_id: int, dct: 'ExternalTracklet') -> Optional['Tracklet']:
+        """
+        Initialize a Tracklet from a DepthCamTracklet instance.
+        """
+        status: TrackingStatus = TrackingStatus.NONE
+        if hasattr(dct, 'status'):
+            status = DEPTHAI_TO_TRACKINGSTATUS.get(dct.status, TrackingStatus.NONE)
+        else:
+            warnings.warn("Missing 'status' in DepthCamTracklet, defaulting to PROTO.")
+            return None
+
+        roi: Optional[Rect] = None
+        if hasattr(dct, 'roi'):
+            roi = Rect(
+                x=dct.roi.x,
+                y=dct.roi.y,
+                width=dct.roi.width,
+                height=dct.roi.height
+            )
+        else:
+            warnings.warn("Missing 'roi' in DepthCamTracklet, setting to None.")
+            return None
+
+        return cls(
+            cam_id=cam_id,
+            status=status,
+            roi=roi,
+            _external_tracklet=dct,
+        )
+
+    # def update_from_depthcam(self, dct: 'DepthCamTracklet') -> None:
+    #     """
+    #     Update this Tracklet's fields from a DepthCamTracklet instance.
+    #     Issues a warning if any expected attribute is missing.
+    #     """
+
+
+
+    #     # Update status
+    #     if hasattr(dct, 'status'):
+    #         if dct.status == 'NEW':
+    #             self.status = TrackingStatus.NEW
+    #         elif dct.status == 'TRACKED':
+    #             self.status = TrackingStatus.TRACKED
+    #         elif dct.status == 'LOST':
+    #             self.status = TrackingStatus.LOST
+    #         elif dct.status == 'REMOVED':
+    #             self.status = TrackingStatus.REMOVED
+    #     else:
+    #         warnings.warn("Missing 'status' in DepthCamTracklet during update, keeping previous status.")
+
+    #     # Update roi
+    #     if hasattr(dct, 'roi'):
+    #         self.roi = Rect(
+    #             x=dct.roi.x,
+    #             y=dct.roi.y,
+    #             width=dct.roi.width,
+    #             height=dct.roi.height
+    #         )
+    #     else:
+    #         warnings.warn("Missing 'roi' in DepthCamTracklet during update, keeping previous roi.")
+
+    #     # Update source tracklet
+    #     if
+    #     source_tracklet: Optional[DepthCamTracklet] = dct
+
+    #     # Only update last_seen if status is NEW or TRACKED
+    #     if self.status in (TrackingStatus.NEW, TrackingStatus.TRACKED):
+    #         self.last_seen = Timestamp.now()
 
 # Type Aliases
 TrackletCallback = Callable[[Tracklet], None]
 TrackletDict = dict[int, Tracklet]
 TrackletDictCallback = Callable[[TrackletDict], None]
 
-
-TrackletColors: dict[int, str] = {
+TrackletIdColorDict: dict[int, str] = {
     0: '#006400',   # darkgreen
     1: '#00008b',   # darkblue
     2: '#b03060',   # maroon3
@@ -59,8 +195,8 @@ TrackletColors: dict[int, str] = {
     9: '#6495ed',   # cornflower
 }
 
-def TrackletColor(id: int, aplha: float = 0.5) -> list[float]:
-    hex_color: str = TrackletColors.get(id, '#000000')
+def TrackletIdColor(id: int, aplha: float = 0.5) -> list[float]:
+    hex_color: str = TrackletIdColorDict.get(id, '#000000')
     rgb: list[float] =  [int(hex_color[i:i+2], 16) / 255.0 for i in (1, 3, 5)]
     rgb.append(aplha)
     return rgb
