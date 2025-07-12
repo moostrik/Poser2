@@ -20,7 +20,7 @@ from modules.gl.Texture import Texture
 from modules.gl.Utils import lfo, fit, fill
 
 from modules.av.Definitions import AvOutput
-from modules.cam.depthcam.Definitions import Tracklet, Rect, Point3f, FrameType
+from modules.cam.depthcam.Definitions import Tracklet as CamTracklet, Rect as CamRect, FrameType
 from modules.tracker.Tracklet import Person, PersonColor, TrackingStatus
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.PoseDefinitions import PoseData, PosePoints, PoseEdgeIndices
@@ -109,7 +109,7 @@ class Render(RenderWindow):
         self.allocated = False
 
         self.input_mutex: Lock = Lock()
-        self.input_tracklets: dict[int, dict[int, Tracklet]] = {}   # cam_id -> track_id -> Tracklet
+        self.input_tracklets: dict[int, dict[int, CamTracklet]] = {}   # cam_id -> track_id -> Tracklet
         self.input_persons: dict[int, Optional[Person]] = {}           # person_id -> Person
         self.input_poses: dict[int, Optional[PoseData]] = {}
         self.input_angle_windows: dict[int, Optional[np.ndarray]] = {}          # person_id -> angles
@@ -291,7 +291,7 @@ class Render(RenderWindow):
             image: Image = self.cam_images[i]
             image.update()
             fbo: Fbo = self.cam_fbos[i]
-            tracklets: dict[int, Tracklet] = self.get_tracklets(i)
+            tracklets: dict[int, CamTracklet] = self.get_tracklets(i)
             persons: list[Person] = self.get_persons_for_cam(i)
 
             self.setView(fbo.width, fbo.height)
@@ -303,7 +303,7 @@ class Render(RenderWindow):
             for person in persons:
                 if person.status == TrackingStatus.REMOVED or person.status == TrackingStatus.LOST:
                     continue
-                roi: Rect | None  = None
+                roi: CamRect | None  = None
                 pose: PoseData | None = self.get_pose(person.id, clear=False)
                 if pose is not None:
                     roi = pose.pose_crop_rect
@@ -399,13 +399,13 @@ class Render(RenderWindow):
     def set_cam_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None :
         self.cam_images[cam_id].set_image(image)
 
-    def get_tracklets(self, cam_id: int, clear: bool = False) -> dict[int, Tracklet]:
+    def get_tracklets(self, cam_id: int, clear: bool = False) -> dict[int, CamTracklet]:
         with self.input_mutex:
-            ret_person: dict[int, Tracklet] =  self.input_tracklets[cam_id].copy()
+            ret_person: dict[int, CamTracklet] =  self.input_tracklets[cam_id].copy()
             if clear:
                 self.input_tracklets[cam_id].clear()
             return ret_person
-    def set_tracklet(self, cam_id: int, tracklet: Tracklet) -> None :
+    def set_cam_tracklet(self, cam_id: int, tracklet: CamTracklet) -> None :
         with self.input_mutex:
             self.input_tracklets[cam_id][tracklet.id] = tracklet
 
@@ -475,8 +475,8 @@ class Render(RenderWindow):
 
     # STATIC METHODS
     @staticmethod
-    def draw_tracklet(tracklet: Tracklet, x: float, y: float, w: float, h: float) -> None:
-        if tracklet.status == Tracklet.TrackingStatus.REMOVED:
+    def draw_tracklet(tracklet: CamTracklet, x: float, y: float, w: float, h: float) -> None:
+        if tracklet.status == CamTracklet.TrackingStatus.REMOVED:
             return
 
         x = x + tracklet.roi.x * w
@@ -488,13 +488,13 @@ class Render(RenderWindow):
         g: float = 1.0
         b: float = 1.0
         a: float = min(tracklet.age / 100.0, 0.33)
-        if tracklet.status == Tracklet.TrackingStatus.NEW:
+        if tracklet.status == CamTracklet.TrackingStatus.NEW:
             r, g, b, a = (1.0, 1.0, 1.0, 1.0)
-        if tracklet.status == Tracklet.TrackingStatus.TRACKED:
+        if tracklet.status == CamTracklet.TrackingStatus.TRACKED:
             r, g, b, a = (0.0, 1.0, 0.0, a)
-        if tracklet.status == Tracklet.TrackingStatus.LOST:
+        if tracklet.status == CamTracklet.TrackingStatus.LOST:
             r, g, b, a = (1.0, 0.0, 0.0, a)
-        if tracklet.status == Tracklet.TrackingStatus.REMOVED:
+        if tracklet.status == CamTracklet.TrackingStatus.REMOVED:
             r, g, b, a = (1.0, 0.0, 0.0, 1.0)
 
         glColor4f(r, g, b, a)   # Set color

@@ -63,8 +63,8 @@ class Main():
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.pose_detection.set_image)
-            camera.add_tracker_callback(self.panoramic_tracker.add_tracklet)
-            camera.add_tracker_callback(self.render.set_tracklet)
+            camera.add_tracker_callback(self.panoramic_tracker.add_cam_tracklet)
+            camera.add_tracker_callback(self.render.set_cam_tracklet)
             camera.start()
 
         self.correlation_streamer.add_stream_callback(self.render.set_correlation_stream)

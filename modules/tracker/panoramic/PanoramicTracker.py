@@ -223,7 +223,7 @@ class PanoramicTracker(Thread):
         person.status = TrackingStatus.REMOVED
         self._person_callback(person)
 
-    def add_tracklet(self, cam_id: int, tracklet: Tracklet) -> None :
+    def add_cam_tracklet(self, cam_id: int, tracklet: Tracklet) -> None :
         cam_tracklet = CamTracklet(cam_id, tracklet)
         self.tracklet_queue.put(cam_tracklet)
 
