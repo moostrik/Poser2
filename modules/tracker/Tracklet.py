@@ -7,14 +7,14 @@ from typing import Callable
 from pandas import Timestamp
 
 # Local application imports
-from modules.cam.depthcam.Definitions import Tracklet
+from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
 from modules.tracker.BaseTracker import BaseTrackerInfo, TrackingStatus
 
 @dataclass
 class Person:
     id: int
     cam_id: int
-    tracklet: Tracklet
+    external_tracklet: CamTracklet
     time_stamp: Timestamp
     tracker_info: BaseTrackerInfo
     status: TrackingStatus = field(default=TrackingStatus.NONE)
@@ -23,8 +23,8 @@ class Person:
 
     def __post_init__(self):
         # If you want to set status from tracklet, do it here
-        if self.status == TrackingStatus.NONE and self.tracklet is not None:
-            self.status = TrackingStatus[self.tracklet.status.name]
+        if self.status == TrackingStatus.NONE and self.external_tracklet is not None:
+            self.status = TrackingStatus[self.external_tracklet.status.name]
 
     @property
     def is_active(self) -> bool:

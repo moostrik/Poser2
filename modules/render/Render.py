@@ -528,10 +528,10 @@ class Render(RenderWindow):
                 continue
 
             id: int = person.cam_id
-            w: float = person.tracklet.roi.width * fbo.width / num_cams
-            h: float = person.tracklet.roi.height * fbo.height
-            x: float = person.tracklet.roi.x * fbo.width / num_cams + (id * fbo.width / num_cams)
-            y: float = person.tracklet.roi.y * fbo.height
+            w: float = person.external_tracklet.roi.width * fbo.width / num_cams
+            h: float = person.external_tracklet.roi.height * fbo.height
+            x: float = person.external_tracklet.roi.x * fbo.width / num_cams + (id * fbo.width / num_cams)
+            y: float = person.external_tracklet.roi.y * fbo.height
             # y: float = (fbo.height - h) * 0.5
             color = PersonColor(person.id, aplha=0.5)
 
@@ -564,11 +564,11 @@ class Render(RenderWindow):
             local_angle: float = getattr(person.tracker_info, "local_angle", 0.0)
             overlap: bool = getattr(person.tracker_info, "overlap", False)
 
-            w: float = person.tracklet.roi.width * fbo.width / num_cams
-            h: float = person.tracklet.roi.height * fbo.height
+            w: float = person.external_tracklet.roi.width * fbo.width / num_cams
+            h: float = person.external_tracklet.roi.height * fbo.height
             x: float = world_angle / 360.0 * fbo.width
 
-            y: float = person.tracklet.roi.y * fbo.height
+            y: float = person.external_tracklet.roi.y * fbo.height
             color: list[float] = PersonColor(person.id, aplha=0.9)
             if overlap == True:
                 color[3] = 0.3

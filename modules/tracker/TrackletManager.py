@@ -83,7 +83,7 @@ class PersonManager:
     def get_person_by_cam_and_tracklet(self, cam_id: int, tracklet_id: int) -> Optional[Person]:
         with self._lock:
             for person in self._persons.values():
-                if person.cam_id == cam_id and person.tracklet and person.tracklet.id == tracklet_id:
+                if person.cam_id == cam_id and person.external_tracklet and person.external_tracklet.id == tracklet_id:
                     return person
             return None
 
@@ -166,7 +166,7 @@ class PersonManager:
             merged_person = Person(
                 id=merged_id,
                 cam_id=keep.cam_id,
-                tracklet=keep.tracklet,
+                external_tracklet=keep.external_tracklet,
                 time_stamp=keep.time_stamp,
                 tracker_info=keep.tracker_info,
             )

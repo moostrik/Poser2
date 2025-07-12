@@ -120,7 +120,7 @@ class PanoramicTracker(Thread):
         new_person: Optional[Person] = Person(-1, new_tracklet.cam_id, new_tracklet.tracklet, new_tracklet.time_stamp, tracker_info)
 
         # Check if the new person already exists in the tracker and update if necessary
-        existing_person: Optional[Person] = self.person_manager.get_person_by_cam_and_tracklet(new_person.cam_id, new_person.tracklet.id)
+        existing_person: Optional[Person] = self.person_manager.get_person_by_cam_and_tracklet(new_person.cam_id, new_person.external_tracklet.id)
         if existing_person is not None:
             self.person_manager.replace_person(existing_person, new_person)
 
@@ -165,7 +165,7 @@ class PanoramicTracker(Thread):
                 continue
 
             # look at the hight of the trackets for extra filtering
-            height_diff: float = abs(P_A.tracklet.roi.height - P_B.tracklet.roi.height)
+            height_diff: float = abs(P_A.external_tracklet.roi.height - P_B.external_tracklet.roi.height)
             if height_diff > 0.1:
                 continue
 
@@ -211,7 +211,7 @@ class PanoramicTracker(Thread):
                 dummy_person: Person = Person(
                     remove_id,
                     remove_person.cam_id,
-                    remove_person.tracklet,
+                    remove_person.external_tracklet,
                     remove_person.time_stamp,
                     remove_person.tracker_info  # Pass the tracker_info from the removed person
                 )
