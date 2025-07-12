@@ -44,7 +44,7 @@ def setup_pipeline(
     square: bool = True,
     do_color: bool = True,
     do_stereo: bool = True,
-    do_person: bool = True,
+    do_yolo: bool = True,
     show_stereo: bool = False,
     simulate: bool = False
     ) -> None:
@@ -57,7 +57,7 @@ def setup_pipeline(
         'Square,' if square else 'Wide,',
         'Color,' if do_color else 'Mono,',
         'Stereo (Show),' if do_stereo and show_stereo else 'Stereo (Hidden),' if do_stereo else '',
-        'Yolo,' if do_person else '',
+        'Yolo,' if do_yolo else '',
         'Simulate' if simulate else ''
     ]
 
@@ -68,47 +68,47 @@ def setup_pipeline(
     if not simulate:
         if do_color:
             if do_stereo:
-                if do_person:
-                    SetupColorStereoPerson(pipeline, fps, show_stereo, nn_path)
+                if do_yolo:
+                    SetupColorStereoYolo(pipeline, fps, show_stereo, nn_path)
                 else:
                     SetupColorStereo(pipeline, fps, show_stereo = True)
             else:
-                if do_person:
-                    SetupColorPerson(pipeline, fps, square, nn_path)
+                if do_yolo:
+                    SetupColorYolo(pipeline, fps, square, nn_path)
                 else:
                     SetupColor(pipeline, fps, square)
         else:
             if do_stereo:
-                if do_person:
-                    SetupMonoStereoPerson(pipeline, fps, show_stereo, nn_path)
+                if do_yolo:
+                    SetupMonoStereoYolo(pipeline, fps, show_stereo, nn_path)
                 else:
                     SetupMonoStereo(pipeline, fps, show_stereo = True)
             else:
-                if do_person:
-                    SetupMonoPerson(pipeline, fps, square, nn_path)
+                if do_yolo:
+                    SetupMonoYolo(pipeline, fps, square, nn_path)
                 else:
                     SetupMono(pipeline, fps, square)
     else:
         if do_color:
             if do_stereo:
-                if do_person:
-                    SimulationColorStereoPerson(pipeline, fps, show_stereo, nn_path)
+                if do_yolo:
+                    SimulationColorStereoYolo(pipeline, fps, show_stereo, nn_path)
                 else:
                     SimulationColorStereo(pipeline, fps, show_stereo)
             else:
-                if do_person:
-                    SimulationColorPerson(pipeline, fps, square, nn_path)
+                if do_yolo:
+                    SimulationColorYolo(pipeline, fps, square, nn_path)
                 else:
                     SimulationColor(pipeline, fps, square)
         else:
             if do_stereo:
-                if do_person:
-                    SimulationMonoStereoPerson(pipeline, fps, show_stereo, nn_path)
+                if do_yolo:
+                    SimulationMonoStereoYolo(pipeline, fps, show_stereo, nn_path)
                 else:
                     SimulationMonoStereo(pipeline, fps, show_stereo)
             else:
-                if do_person:
-                    SimulationMonoPerson(pipeline, fps, square, nn_path)
+                if do_yolo:
+                    SimulationMonoYolo(pipeline, fps, square, nn_path)
                 else:
                     SimulationMono(pipeline, fps, square)
 
@@ -140,7 +140,7 @@ class SetupColor(Setup):
         self.color_control.setStreamName('color_control')
         self.color_control.out.link(self.color.inputControl)
 
-class SetupColorPerson(SetupColor):
+class SetupColorYolo(SetupColor):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, square)
         print('fps', fps)
@@ -235,7 +235,7 @@ class SetupColorStereo(SetupColor):
         self.stereo_control.setStreamName('stereo_control')
         self.stereo_control.out.link(self.stereo.inputConfig)
 
-class SetupColorStereoPerson(SetupColorStereo):
+class SetupColorStereoYolo(SetupColorStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, show_stereo, lowres = True)
 
@@ -303,7 +303,7 @@ class SetupMono(Setup):
         self.mono_control.setStreamName('mono_control')
         self.mono_control.out.link(self.left.inputControl)
 
-class SetupMonoPerson(SetupMono):
+class SetupMonoYolo(SetupMono):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, square)
 
@@ -382,7 +382,7 @@ class SetupMonoStereo(SetupMono):
         self.stereo_control.setStreamName('stereo_control')
         self.stereo_control.out.link(self.stereo.inputConfig)
 
-class SetupMonoStereoPerson(SetupMonoStereo):
+class SetupMonoStereoYolo(SetupMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, show_stereo)
 
@@ -433,7 +433,7 @@ class SimulationColor(SetupColor):
 
         self.ex_video.out.link(self.output_video.input)
 
-class SimulationColorPerson(SetupColorPerson):
+class SimulationColorYolo(SetupColorYolo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, square, nn_path)
 
@@ -491,7 +491,7 @@ class SimulationColorStereo(SetupColorStereo):
             self.output_stereo.setStreamName("stereo")
             self.stereo.disparity.link(self.output_stereo.input)
 
-class SimulationColorStereoPerson(SimulationColorStereo):
+class SimulationColorStereoYolo(SimulationColorStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, show_stereo)
 
@@ -546,7 +546,7 @@ class SimulationMono(SetupMono):
 
         self.ex_left.out.link(self.output_video.input)
 
-class SimulationMonoPerson(SetupMonoPerson):
+class SimulationMonoYolo(SetupMonoYolo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, square, nn_path)
 
@@ -611,7 +611,7 @@ class SimulationMonoStereo(SetupMonoStereo):
             self.output_stereo.setStreamName("stereo")
             self.stereo.disparity.link(self.output_stereo.input)
 
-class SimulationMonoStereoPerson(SimulationMonoStereo):
+class SimulationMonoStereoYolo(SimulationMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float,  show_stereo: bool, nn_path: Path) -> None:
         super().__init__(pipeline, fps, show_stereo)
 

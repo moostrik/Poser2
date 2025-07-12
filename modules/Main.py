@@ -1,8 +1,3 @@
-# TODO
-# Person to window check, make sure window gets updated with nans if no pose is found
-# add Person state, NEW, TRACKED, LOST, REMOVED
-# make sure window gets cleared on person new or deleted
-
 # Standard library imports
 from math import ceil
 from typing import Optional
