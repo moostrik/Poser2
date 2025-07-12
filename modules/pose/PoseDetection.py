@@ -1,4 +1,5 @@
 # Standard library imports
+from queue import Queue
 import time
 from threading import Thread, Lock
 import os
@@ -20,7 +21,7 @@ class Detection(Thread):
     _moodel_size: int
     _model_session: ort.InferenceSession
 
-    def __init__(self, path: str, model_type:ModelType) -> None:
+    def __init__(self, path: str, model_type:ModelType, verbose: bool = False) -> None:
         super().__init__()
 
         if Detection._model_type is ModelType.NONE:
@@ -34,9 +35,9 @@ class Detection(Thread):
         if Detection._model_type is ModelType.NONE:
             print('Pose Detection WARNING: ModelType is NONE')
 
+        self.verbose: bool = verbose
         self._running: bool = False
-        self._input_mutex: Lock = Lock()
-        self._input_pose: PoseData | None = None
+        self._input_queue: Queue = Queue()
         self._callbacks: set = set()
 
     def stop(self) -> None:
@@ -47,15 +48,33 @@ class Detection(Thread):
 
         self._running = True
         while self._running:
-            pose: PoseData | None = self.get_person()
-            if pose is not None:
+            try:
+                # Block until an item is available or timeout
+                pose: PoseData = self._input_queue.get(timeout=0.1)
+
+                # Check if there are more items queued and warn if so
+                queue_size = self._input_queue.qsize()
+                if queue_size > 0:
+                    if self.verbose:
+                        print(f"Pose Detection WARNING: {queue_size + 1} items in queue, skipping to latest")
+                    # Get all remaining items and keep only the last one
+                    while not self._input_queue.empty():
+                        try:
+                            pose = self._input_queue.get_nowait()
+                        except:
+                            break
+
+                # Process the pose
                 image: np.ndarray | None = pose.pose_image
                 if image is not None:
                     poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
                     if len(poses) > 0:
                         pose.pose = poses[0]
                 self.callback(pose)
-            time.sleep(0.01)
+
+            except:
+                # Timeout occurred, continue loop to check _running flag
+                continue
 
     def load_model_once(self) -> None:
         with Detection._model_load_lock:
@@ -64,15 +83,8 @@ class Detection(Thread):
                 Detection._model_loaded = True
 
     # GETTERS AND SETTERS
-    def get_person(self) -> PoseData | None:
-        with self._input_mutex:
-            return_detection: PoseData | None = self._input_pose
-            self._input_pose = None
-            return return_detection
-
     def add_pose(self, pose: PoseData) -> None:
-        with self._input_mutex:
-            self._input_pose = pose
+        self._input_queue.put(pose)
 
     def get_frame_size(self) -> int:
         return Detection._moodel_size
