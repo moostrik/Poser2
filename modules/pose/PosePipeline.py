@@ -46,7 +46,7 @@ class PosePipeline:
 
         # Callbacks
         self.callback_lock = Lock()
-        self.person_output_callbacks: set[PoseDataCallback] = set()
+        self.pose_output_callbacks: set[PoseDataCallback] = set()
         self.running: bool = False
 
         hot_reloader = HotReloadMethods(self.__class__)
@@ -60,7 +60,7 @@ class PosePipeline:
 
         # Start detectors
         for detector in self.pose_detectors.values():
-            detector.addMessageCallback(self.joint_angles.person_input)
+            detector.addMessageCallback(self.joint_angles.pose_input)
             detector.start()
             self.pose_detector_frame_size = detector.get_frame_size()
 
@@ -69,7 +69,7 @@ class PosePipeline:
     def stop(self) -> None:
         self.running = False
         with self.callback_lock:
-            self.person_output_callbacks.clear()
+            self.pose_output_callbacks.clear()
 
         for detector in self.pose_detectors.values():
             detector.stop()
@@ -118,10 +118,10 @@ class PosePipeline:
         if self.running:
             print('Pipeline is running, cannot add callback')
             return
-        self.person_output_callbacks.add(callback)
+        self.pose_output_callbacks.add(callback)
 
     def _notify_pose_callback(self, pose: PoseData) -> None:
         """Handle processed person"""
         with self.callback_lock:
-            for callback in self.person_output_callbacks:
+            for callback in self.pose_output_callbacks:
                 callback(pose)

@@ -46,25 +46,25 @@ class PanoramicTracker(Thread):
         super().__init__()
 
         self.running: bool = False
-        self.max_persons: int = settings.max_players
+        self.max_players: int = settings.max_players
         self.cleanup_interval: float = 1.0 / settings.camera_fps
 
         self.tracklet_queue: Queue[TempTracklet] = Queue()
 
-        self.person_manager: TrackletManager = TrackletManager(self.max_persons)
+        self.tracklet_manager: TrackletManager = TrackletManager(self.max_players)
 
         self.geometry: PanoramicGeometry = PanoramicGeometry(settings.camera_num, CAM_360_FOV, CAM_360_TARGET_FOV)
 
         self.tracklet_min_age: int =            settings.tracker_min_age
         self.tracklet_min_height: float =       settings.tracker_min_height
-        self.person_timeout: float =            settings.tracker_timeout
-        self.person_roi_expansion: float =      settings.pose_crop_expansion
+        self.timeout: float =                   settings.tracker_timeout
+        self.roi_expansion: float =             settings.pose_crop_expansion
         self.cam_360_edge_threshold: float =    CAM_360_EDGE_THRESHOLD
         self.cam_360_overlap_expansion: float = CAM_360_OVERLAP_EXPANSION
         self.cam_360_hysteresis_factor: float = CAM_360_HYSTERESIS_FACTOR
 
         self.callback_lock = Lock()
-        self.person_callbacks: set[TrackletCallback] = set()
+        self.tracklet_callbacks: set[TrackletCallback] = set()
         self.gui = PanoramicTrackerGui(gui, self, settings)
 
         hot_reload = HotReloadMethods(self.__class__)
@@ -79,7 +79,7 @@ class PanoramicTracker(Thread):
         self.running = False
 
         with self.callback_lock:
-            self.person_callbacks.clear()
+            self.tracklet_callbacks.clear()
 
     def run(self) -> None:
         last_cleanup: float = time()
@@ -88,73 +88,70 @@ class PanoramicTracker(Thread):
             try:
                 tracklet: TempTracklet = self.tracklet_queue.get(timeout=0.1)
                 # try:
-                self.update_persons(tracklet)
+                self.update_tracklet(tracklet)
                 # except Exception as e:
-                #     print(f"Error updating persons with tracklet from camera {tracklet.cam_id}: {e}")
+                #     print(f"Error updating tracklet with tracklet from camera {tracklet.cam_id}: {e}")
             except Empty:
                 pass
 
-    def update_persons(self, new_tracklet: TempTracklet) -> None:
+    def update_tracklet(self, temp_tracklet: TempTracklet) -> None:
 
-        tracklet: CamTracklet = new_tracklet.tracklet
-        # Filter out invalid persons
-        if tracklet.status == TrackingStatus.REMOVED:
-        # if new_person.status == TrackingStatus.REMOVED:
+        depth_tracklet: CamTracklet = temp_tracklet.tracklet
+        if depth_tracklet.status == TrackingStatus.REMOVED:
             return
-        if tracklet.age <= self.tracklet_min_age:
+        if depth_tracklet.age <= self.tracklet_min_age:
             return
-        # print(f"Updating person from camera {new_person.cam_id} with tracklet {new_person.tracklet.id} and status {new_person.status} ")
-        if tracklet.roi.height < self.tracklet_min_height:
+        if depth_tracklet.roi.height < self.tracklet_min_height:
             return
 
-        # Calculate the local and world angles for the new person
-        local_angle, world_angle = self.geometry.calc_angle(tracklet.roi, new_tracklet.cam_id)
+        # Calculate the local and world angles
+        local_angle, world_angle = self.geometry.calc_angle(depth_tracklet.roi, temp_tracklet.cam_id)
 
-        # Filter out persons that are too close to the edge of a camera's field of view
+        # Filter out tracklets that are too close to the edge of a camera's field of view
         if self.geometry.angle_in_edge(local_angle, self.cam_360_edge_threshold):
             return
 
         in_overlap: bool = self.geometry.angle_in_overlap(local_angle, self.cam_360_overlap_expansion)
         tracker_info = PanoramicTrackerInfo(local_angle, world_angle, in_overlap)
 
-        new_person: Optional[Tracklet] = Tracklet(-1, new_tracklet.cam_id, new_tracklet.tracklet, new_tracklet.time_stamp, tracker_info)
+        new_tracklet: Optional[Tracklet] = Tracklet(-1, temp_tracklet.cam_id, temp_tracklet.tracklet, temp_tracklet.time_stamp, tracker_info)
 
-        # Check if the new person already exists in the tracker and update if necessary
-        existing_person: Optional[Tracklet] = self.person_manager.get_tracklet_by_cam_and_external_id(new_person.cam_id, new_person.external_tracklet.id)
-        if existing_person is not None:
-            self.person_manager.replace_tracklet(existing_person, new_person)
+        # Check if the new tracklet already exists in the tracker and update if necessary
+        existing_tracklet: Optional[Tracklet] = self.tracklet_manager.get_tracklet_by_cam_and_external_id(new_tracklet.cam_id, new_tracklet.external_tracklet.id)
+        if existing_tracklet is not None:
+            self.tracklet_manager.replace_tracklet(existing_tracklet, new_tracklet)
 
-        # Add the new person to the tracker (if it is not lost)
-        if existing_person is None and new_person.status != TrackingStatus.LOST:
-            self.person_manager.add_tracklet(new_person)
+        # Add the new tracklet to the manager (if it is not lost)
+        if existing_tracklet is None and new_tracklet.status != TrackingStatus.LOST:
+            self.tracklet_manager.add_tracklet(new_tracklet)
 
-        # Remove persons that are not active anymore
-        for person in self.person_manager.all_tracklets():
-            if person.last_time < time() - self.person_timeout:
-                self.remove_person(person)
+        # Remove tracklets that are not active anymore
+        for tracklet in self.tracklet_manager.all_tracklets():
+            if tracklet.last_time < time() - self.timeout:
+                self.remove_tracklet(tracklet)
 
-        self.remove_overlapping_persons()
+        self.remove_overlapping_tracklets()
 
-        for person in self.person_manager.all_tracklets():
-            if person.is_active:
-                self._person_callback(person)
+        for tracklet in self.tracklet_manager.all_tracklets():
+            if tracklet.is_active:
+                self._notify_callback(tracklet)
 
-    def remove_overlapping_persons(self) -> None:
+    def remove_overlapping_tracklets(self) -> None:
 
-        persons: list[Tracklet] = self.person_manager.all_tracklets()
-        for person in persons:
+        tracklets: list[Tracklet] = self.tracklet_manager.all_tracklets()
+        for tracklet in tracklets:
             # Reconstruct PanoramicTrackerInfo with updated overlap field
-            if isinstance(person.tracker_info, PanoramicTrackerInfo):
-                updated_overlap = self.geometry.angle_in_overlap(person.tracker_info.local_angle, self.cam_360_overlap_expansion)
-                person.tracker_info = PanoramicTrackerInfo(
-                    local_angle=person.tracker_info.local_angle,
-                    world_angle=person.tracker_info.world_angle,
+            if isinstance(tracklet.tracker_info, PanoramicTrackerInfo):
+                updated_overlap = self.geometry.angle_in_overlap(tracklet.tracker_info.local_angle, self.cam_360_overlap_expansion)
+                tracklet.tracker_info = PanoramicTrackerInfo(
+                    local_angle=tracklet.tracker_info.local_angle,
+                    world_angle=tracklet.tracker_info.world_angle,
                     overlap=updated_overlap
                 )
 
         overlaps: list[tuple[int, int]] = []
 
-        for P_A, P_B in combinations(persons, 2):
+        for P_A, P_B in combinations(tracklets, 2):
             if not getattr(P_A.tracker_info, "overlap", False) or not getattr(P_B.tracker_info, "overlap", False):
                 continue
             if P_A.cam_id == P_B.cam_id:
@@ -180,8 +177,6 @@ class PanoramicTracker(Thread):
             if not P_A.is_active and not P_B.is_active:
                 continue
 
-            # print(f"Comparing persons {P_A.id} and {P_B.id}: angle_diff={angle_diff:.2f}, height_diff={height_diff:.2f}")
-
             if P_A.age < P_B.age:
                 newest, oldest = P_A, P_B
             else:
@@ -197,43 +192,42 @@ class PanoramicTracker(Thread):
         overlap_sets: set[tuple[int, int]] = set(overlaps)
 
         for overlap in overlap_sets:
-            # print(f"Removing overlapping persons: {overlap}")
-            keep_person: Optional[Tracklet] = self.person_manager.get_tracklet(overlap[0])
-            remove_person: Optional[Tracklet] = self.person_manager.get_tracklet(overlap[1])
-            if keep_person is None or remove_person is None:
-                print(f"Warning: One of the persons in the overlap {overlap} is None sets{overlap_sets}. Skipping removal.")
+            keep: Optional[Tracklet] = self.tracklet_manager.get_tracklet(overlap[0])
+            remove: Optional[Tracklet] = self.tracklet_manager.get_tracklet(overlap[1])
+            if keep is None or remove is None:
+                print(f"Warning: One of the tracklets in the overlap {overlap} is None sets{overlap_sets}. Skipping removal.")
                 continue
 
-            remove_id: int = self.person_manager.merge_tracklets(keep_person, remove_person)
+            remove_id: int = self.tracklet_manager.merge_tracklets(keep, remove)
 
-            # If the merge was not successful, we create a dummy person to trigger the callback
-            if remove_person.status != TrackingStatus.NEW:
-                dummy_person: Tracklet = Tracklet(
+            # If the merge was not successful, we create a dummy tracklet to trigger the callback
+            if remove.status != TrackingStatus.NEW:
+                dummy: Tracklet = Tracklet(
                     remove_id,
-                    remove_person.cam_id,
-                    remove_person.external_tracklet,
-                    remove_person.time_stamp,
-                    remove_person.tracker_info  # Pass the tracker_info from the removed person
+                    remove.cam_id,
+                    remove.external_tracklet,
+                    remove.time_stamp,
+                    remove.tracker_info  # Pass the tracker_info from the removed tracklet
                 )
-                dummy_person.status = TrackingStatus.REMOVED
-                self._person_callback(dummy_person)
+                dummy.status = TrackingStatus.REMOVED
+                self._notify_callback(dummy)
 
-    def remove_person(self, person: Tracklet) -> None:
-        self.person_manager.remove_tracklet(person.id)
-        person.status = TrackingStatus.REMOVED
-        self._person_callback(person)
+    def remove_tracklet(self, tracklet: Tracklet) -> None:
+        self.tracklet_manager.remove_tracklet(tracklet.id)
+        tracklet.status = TrackingStatus.REMOVED
+        self._notify_callback(tracklet)
 
     def add_cam_tracklet(self, cam_id: int, tracklet: CamTracklet) -> None :
         cam_tracklet = TempTracklet(cam_id, tracklet)
         self.tracklet_queue.put(cam_tracklet)
 
     # CALLBACKS
-    def _person_callback(self, person: Tracklet) -> None:
+    def _notify_callback(self, tracklet: Tracklet) -> None:
         with self.callback_lock:
-            for c in self.person_callbacks:
-                c(person)
+            for c in self.tracklet_callbacks:
+                c(tracklet)
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         if self.running:
             print('Manager is running, cannot add callback')
             return
-        self.person_callbacks.add(callback)
+        self.tracklet_callbacks.add(callback)
