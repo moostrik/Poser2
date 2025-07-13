@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 # Standard library imports
+import time
 from dataclasses import dataclass, replace
 from itertools import combinations
 from queue import Empty, Queue
@@ -39,7 +40,7 @@ class PanoramicTracker(Thread):
 
         self.running: bool = False
         self.max_players: int = settings.max_players
-        self.cleanup_interval: float = 1.0 / settings.camera_fps
+        self.update_interval: float = 1.0 / settings.camera_fps
 
         self.input_queue: Queue[Tracklet] = Queue()
 
@@ -74,15 +75,30 @@ class PanoramicTracker(Thread):
             self.tracklet_callbacks.clear()
 
     def run(self) -> None:
+        last_update_time = time.time()
+
         while self.running:
-            # Try to get all available tracklets as soon as they arrive
-            try:
-                tracklet: Tracklet = self.input_queue.get(timeout=0.05)
-                self._add_tracklet(tracklet)
-            except Empty:
-                pass
-            self._update_tracklets()
-            self._notify_and_reset_changes()
+            current_time = time.time()
+
+            # Process all available tracklets as fast as possible
+            processed_any = False
+            while True:
+                try:
+                    tracklet: Tracklet = self.input_queue.get(timeout=0.001)  # Very short timeout
+                    self._add_tracklet(tracklet)
+                    processed_any = True
+                except Empty:
+                    break
+
+            # Update and notify at 25 FPS
+            if current_time - last_update_time >= self.update_interval:
+                self._update_tracklets()
+                self._notify_and_reset_changes()
+                last_update_time: float = current_time
+
+            # Small sleep to prevent excessive CPU usage when no tracklets are available
+            if not processed_any:
+                time.sleep(0.001)  # 1ms sleep
 
     def _add_tracklet(self, new_tracklet: Tracklet) -> None:
         if new_tracklet.status != TrackingStatus.TRACKED:

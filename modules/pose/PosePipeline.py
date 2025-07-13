@@ -60,8 +60,7 @@ class PosePipeline:
 
         # Start detectors
         for detector in self.pose_detectors.values():
-            # detector.addMessageCallback(self.joint_angles.pose_input)
-            detector.addMessageCallback(self._notify_pose_callback)
+            detector.addMessageCallback(self.joint_angles.pose_input)
             detector.start()
             self.pose_detector_frame_size = detector.get_frame_size()
 
