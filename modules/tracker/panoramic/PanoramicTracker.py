@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # Standard library imports
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import combinations
 from queue import Empty, Queue
 from threading import Thread, Lock
@@ -31,6 +31,7 @@ class PanoramicOverlapInfo:
     keep_id: int
     remove_id: int
     distance: float
+    reason: str
 
 class PanoramicTracker(Thread):
     def __init__(self, gui, settings: Settings) -> None:
@@ -77,22 +78,14 @@ class PanoramicTracker(Thread):
             # Try to get all available tracklets as soon as they arrive
             try:
                 tracklet: Tracklet = self.input_queue.get(timeout=0.05)
-                # try:
-                self.update_tracklet(tracklet)
-                # except Exception as e:
-                #     print(f"Error updating tracklet with tracklet from camera {tracklet.cam_id}: {e}")
+                self._add_tracklet(tracklet)
             except Empty:
                 pass
+            self._update_tracklets()
+            self._notify_and_reset_changes()
 
-    def cleanup_tracklets(self) -> None:
-        """Remove tracklets that are not active anymore"""
-        removed: list[Tracklet] = self.tracklet_manager.cleanup(self.timeout)
-        for tracklet in removed:
-            self._notify_callback(tracklet)
-
-    def update_tracklet(self, new_tracklet: Tracklet) -> None:
-
-        if new_tracklet.status in (TrackingStatus.REMOVED, TrackingStatus.LOST):
+    def _add_tracklet(self, new_tracklet: Tracklet) -> None:
+        if new_tracklet.status != TrackingStatus.TRACKED:
             return
         if new_tracklet.external_age_in_frames <= self.tracklet_min_age:
             return
@@ -100,60 +93,63 @@ class PanoramicTracker(Thread):
             return
 
         local_angle, world_angle, _overlap = self.geometry.get_angles_and_overlap(new_tracklet.roi, new_tracklet.cam_id, self.cam_360_edge_threshold)
-        new_tracklet.tracker_info = PanoramicTrackerInfo(local_angle, world_angle, _overlap)
+        new_tracklet = replace(new_tracklet, tracker_info=PanoramicTrackerInfo(local_angle, world_angle, _overlap))
 
         # Filter out tracklets that are too close to the edge of a camera's field of view
         if self.geometry.angle_in_edge(local_angle, self.cam_360_edge_threshold):
             return
 
-        # Check if the new tracklet already exists in the tracker and update if necessary
-        existing_tracklet: Optional[Tracklet] = self.tracklet_manager.get_tracklet_by_cam_and_external_id(new_tracklet.cam_id, new_tracklet.external_id)
-        if existing_tracklet is not None:
-            self.tracklet_manager.replace_tracklet(existing_tracklet, new_tracklet)
+        # Check if the new tracklet already exists in the tracker and replace
+        existing_tracklet_id: Optional[int] = self.tracklet_manager.get_id_by_cam_and_external_id(new_tracklet.cam_id, new_tracklet.external_id)
+        if existing_tracklet_id is not None:
+            self.tracklet_manager.replace_tracklet(existing_tracklet_id, new_tracklet)
+        # If it doesn't exist, add it as a new tracklet
         else:
             self.tracklet_manager.add_tracklet(new_tracklet)
 
-        # Remove tracklets that are not active anymore
+    def _update_tracklets(self) -> None:
+        for tracklet in self.tracklet_manager.all_tracklets():
+            if tracklet.status == TrackingStatus.REMOVED:
+                # print(f"PanoramicTracker: Removing tracklet {tracklet.id} from tracker")
+                self.tracklet_manager.remove_tracklet(tracklet.id)
+
+        # merge overlapping tracklets
+        overlaps: set[PanoramicOverlapInfo] = self.find_overlapping_tracklets(self.tracklet_manager.all_tracklets())
+        for overlap in overlaps:
+            # print(f"PanoramicTracker: Merging overlapping tracklets {overlap.keep_id} and {overlap.remove_id} with distance {overlap.distance} ({overlap.reason})")
+            self.tracklet_manager.merge_tracklets(overlap.keep_id, overlap.remove_id)
+
+        # retire expired tracklets
         for tracklet in self.tracklet_manager.all_tracklets():
             if tracklet.is_expired(self.timeout):
-                self.tracklet_manager.remove_tracklet(tracklet.id)
-                tracklet.status = TrackingStatus.REMOVED
+                # print(f"PanoramicTracker: Retiring expired tracklet {tracklet.id}")
+                self.tracklet_manager.retire_tracklet(tracklet.id)
+
+    def _notify_and_reset_changes(self) -> None:
+        updated =[]
+        for tracklet in self.tracklet_manager.all_tracklets():
+            if tracklet.is_updated:
+                updated.append(tracklet.id)
                 self._notify_callback(tracklet)
 
-        overlaps: set[PanoramicOverlapInfo] = self.find_overlapping_tracklets()
-        for overlap in overlaps:
-            keep: Optional[Tracklet] = self.tracklet_manager.get_tracklet(overlap.keep_id)
-            remove: Optional[Tracklet] = self.tracklet_manager.get_tracklet(overlap.remove_id)
-            if keep is None or remove is None:
-                print(f"Warning: One of the tracklets in the overlap {overlap} is None sets{overlaps}. Skipping removal.")
-                continue
+        # Mark all tracklets as not updated
+        self.tracklet_manager.mark_all_as_not_updated()
 
-            remove_id: int = self.tracklet_manager.merge_tracklets(keep, remove)
 
-            # If the merge was not successful, we create a dummy tracklet to trigger the callback
-            if remove.status != TrackingStatus.NEW:
-                dummy: Tracklet = Tracklet(
-                    cam_id=keep.cam_id,
-                    id=remove_id,
-                    status=TrackingStatus.REMOVED,
-                )
-                self._notify_callback(dummy)
+    def find_overlapping_tracklets(self, tracklets: list[Tracklet]) -> set[PanoramicOverlapInfo]:
 
-        for new_tracklet in self.tracklet_manager.all_tracklets():
-            if new_tracklet.is_active:
-                self._notify_callback(new_tracklet)
-
-    def find_overlapping_tracklets(self) -> set[PanoramicOverlapInfo]:
-
-        tracklets: list[Tracklet] = self.tracklet_manager.all_tracklets()
-        for tracklet in tracklets:
+        for i, tracklet in enumerate(tracklets):
             # Reconstruct PanoramicTrackerInfo with updated overlap field
             if isinstance(tracklet.tracker_info, PanoramicTrackerInfo):
                 updated_overlap = self.geometry.angle_in_overlap(tracklet.tracker_info.local_angle, self.cam_360_overlap_expansion)
-                tracklet.tracker_info = PanoramicTrackerInfo(
-                    local_angle=tracklet.tracker_info.local_angle,
-                    world_angle=tracklet.tracker_info.world_angle,
-                    overlap=updated_overlap
+
+                tracklets[i] = replace(
+                    tracklet,
+                    tracker_info=PanoramicTrackerInfo(
+                        local_angle=tracklet.tracker_info.local_angle,
+                        world_angle=tracklet.tracker_info.world_angle,
+                        overlap=updated_overlap
+                    )
                 )
 
         overlaps: list[PanoramicOverlapInfo] = []
@@ -174,11 +170,11 @@ class PanoramicTracker(Thread):
                 continue
 
             if not P_A.is_active and P_B.is_active:
-                overlaps.append(PanoramicOverlapInfo(P_B.id, P_A.id, angle_diff))
+                overlaps.append(PanoramicOverlapInfo(P_B.id, P_A.id, angle_diff, f'{P_A.id} inactive'))
                 continue
 
             elif not P_B.is_active and P_A.is_active:
-                overlaps.append(PanoramicOverlapInfo(P_A.id, P_B.id, angle_diff))
+                overlaps.append(PanoramicOverlapInfo(P_A.id, P_B.id, angle_diff, f'{P_B.id} inactive'))
                 continue
 
             if not P_A.is_active and not P_B.is_active:
@@ -192,9 +188,9 @@ class PanoramicTracker(Thread):
             edge_oldest: float = self.geometry.angle_from_edge(getattr(oldest.tracker_info, "local_angle", 45.0))
             # print(f"Comparing newest {newest.id} (edge {edge_newest}) to oldest {oldest.id} (edge {edge_oldest})")
             if edge_newest >= edge_oldest / self.cam_360_hysteresis_factor:
-                overlaps.append(PanoramicOverlapInfo(newest.id, oldest.id, angle_diff))
+                overlaps.append(PanoramicOverlapInfo(newest.id, oldest.id, angle_diff, f'{edge_newest} >= {edge_oldest}'))
             else:
-                overlaps.append(PanoramicOverlapInfo(oldest.id, newest.id, angle_diff))
+                overlaps.append(PanoramicOverlapInfo(oldest.id, newest.id, angle_diff,  f'{edge_newest} < {edge_oldest}'))
 
         overlap_sets: set[PanoramicOverlapInfo] = set(overlaps)
         return overlap_sets
@@ -202,6 +198,10 @@ class PanoramicTracker(Thread):
     # CALLBACKS
     def _notify_callback(self, tracklet: Tracklet) -> None:
         with self.callback_lock:
+            if tracklet.status == TrackingStatus.REMOVED and tracklet.id == 3:
+                print(f"PanoramicTracker: Notifying about removed tracklet {tracklet.id}")
+            if tracklet.status == TrackingStatus.NEW and tracklet.id == 3:
+                print(f"PanoramicTracker: Notifying about new tracklet {tracklet.id}")
             for c in self.tracklet_callbacks:
                 c(tracklet)
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:

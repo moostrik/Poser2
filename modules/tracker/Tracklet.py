@@ -62,7 +62,7 @@ class Rect:
         return self.width * self.height
 
 
-@dataclass
+@dataclass (frozen=True)
 class Tracklet:
     cam_id: int
     id: int =                   field(default=-1)
@@ -72,8 +72,14 @@ class Tracklet:
     status: TrackingStatus =    field(default=TrackingStatus.NEW)
     roi: Rect =                 field(default=Rect())
 
-    _external_tracklet: Optional[ExternalTracklet] = field(default=None, repr=False)
     tracker_info: Optional[BaseTrackerInfo] = field(default = None)
+    _external_tracklet: Optional[ExternalTracklet] = field(default=None, repr=False)
+    is_updated: bool =          field(default=True, repr=False)
+
+    def __post_init__(self):
+        # This will run after every instance creation, including replace()
+        # Since the dataclass is frozen, we need to use object.__setattr__
+        object.__setattr__(self, 'is_updated', True)
 
     @property
     def is_active(self) -> bool:
@@ -131,45 +137,6 @@ class Tracklet:
             _external_tracklet=dct,
         )
 
-    # def update_from_depthcam(self, dct: 'DepthCamTracklet') -> None:
-    #     """
-    #     Update this Tracklet's fields from a DepthCamTracklet instance.
-    #     Issues a warning if any expected attribute is missing.
-    #     """
-
-
-
-    #     # Update status
-    #     if hasattr(dct, 'status'):
-    #         if dct.status == 'NEW':
-    #             self.status = TrackingStatus.NEW
-    #         elif dct.status == 'TRACKED':
-    #             self.status = TrackingStatus.TRACKED
-    #         elif dct.status == 'LOST':
-    #             self.status = TrackingStatus.LOST
-    #         elif dct.status == 'REMOVED':
-    #             self.status = TrackingStatus.REMOVED
-    #     else:
-    #         warnings.warn("Missing 'status' in DepthCamTracklet during update, keeping previous status.")
-
-    #     # Update roi
-    #     if hasattr(dct, 'roi'):
-    #         self.roi = Rect(
-    #             x=dct.roi.x,
-    #             y=dct.roi.y,
-    #             width=dct.roi.width,
-    #             height=dct.roi.height
-    #         )
-    #     else:
-    #         warnings.warn("Missing 'roi' in DepthCamTracklet during update, keeping previous roi.")
-
-    #     # Update source tracklet
-    #     if
-    #     source_tracklet: Optional[DepthCamTracklet] = dct
-
-    #     # Only update last_seen if status is NEW or TRACKED
-    #     if self.status in (TrackingStatus.NEW, TrackingStatus.TRACKED):
-    #         self.last_seen = Timestamp.now()
 
 # Type Aliases
 TrackletCallback = Callable[[Tracklet], None]

@@ -1,4 +1,5 @@
 # Standard library imports
+from dataclasses import replace
 from threading import Lock
 from typing import Optional
 
@@ -55,26 +56,18 @@ class TrackletManager:
             except Exception as e:
                 print(f"PersonManager: No more IDs available: {e}")
                 return None
-            tracklet.id = id
-            tracklet.status = TrackingStatus.NEW
-            self._tracklets[id] = tracklet
+
+            new_tracklet: Tracklet = replace(
+                tracklet,
+                id = id,
+                status = TrackingStatus.NEW
+            )
+            self._tracklets[id] = new_tracklet
             return id
-
-    def get_tracklet(self, id: int) -> Optional[Tracklet]:
-        with self._lock:
-            return self._tracklets.get(id, None)
-
-    def set_tracklet(self, tracklet: Tracklet) -> None:
-        with self._lock:
-            if tracklet.id in self._tracklets:
-                self._tracklets[tracklet.id] = tracklet
-            else:
-                print(f"PersonManager: Attempted to set non-existent tracklet with ID {tracklet.id}. Adding as new tracklet.")
 
     def remove_tracklet(self, id: int) -> None:
         with self._lock:
             tracklet: Tracklet | None = self._tracklets.pop(id, None)
-            # tracklet.status = TrackingStatus.REMOVED
             if tracklet is not None:
                 self._id_pool.release(id)
             else:
@@ -84,112 +77,88 @@ class TrackletManager:
         with self._lock:
             return list(self._tracklets.values())
 
-    def get_tracklet_by_cam_and_external_id(self, cam_id: int, external_id: int) -> Optional[Tracklet]:
+    def get_id_by_cam_and_external_id(self, cam_id: int, external_id: int) -> Optional[int]:
         with self._lock:
             for tracklet in self._tracklets.values():
                 if tracklet.cam_id == cam_id and tracklet.external_id == external_id:
-                    return tracklet
+                    return tracklet.id
             return None
 
-    def replace_tracklet(self, old_tracklet: Tracklet, new_tracklet: Tracklet) -> None:
-        """
-        Replace an existing tracklet in the manager with a new tracklet object.
-
-        The new tracklet will:
-        - Take the id and start_time from the old tracklet.
-        - Have its status set to TRACKED if its current status is NEW.
-        - Replace the old tracklet in the manager's dictionary.
-
-        Args:
-            old_tracklet (Person): The tracklet currently in the manager to be replaced.
-            new_tracklet (Person): The new tracklet object to insert, inheriting id and start_time from old_tracklet.
-        """
-        if self.get_tracklet(old_tracklet.id) is None:
-            print(f"PersonManager: Attempted to replace non-existent tracklet with ID {old_tracklet.id}.")
-            return
-
+    def replace_tracklet(self, id: int, new_tracklet: Tracklet) -> None:
         with self._lock:
-            # Transfer id and start_time
-            new_tracklet.id = old_tracklet.id
-            new_tracklet.created_at = old_tracklet.created_at
+            old_tracklet: Tracklet | None = self._tracklets.get(id)
+            if old_tracklet is None:
+                print(f"PersonManager: Attempted to replace non-existent tracklet with ID {id}.")
+                return
 
-            # Update status if needed
-            if new_tracklet.status == TrackingStatus.NEW:
-                new_tracklet.status = TrackingStatus.TRACKED
+            # Create a new instance with updated fields
+            updated_tracklet: Tracklet = replace(
+                new_tracklet,
+                id=id,
+                created_at=old_tracklet.created_at,
+                status=TrackingStatus.TRACKED
+            )
+            self._tracklets[id] = updated_tracklet
 
-            if new_tracklet.status == TrackingStatus.LOST:
-                new_tracklet.last_seen = old_tracklet.last_seen
-
-            if new_tracklet.status == TrackingStatus.REMOVED:
-                print(f"PersonManager: Attempted to replace tracklet with ID {new_tracklet.id} with status REMOVED. This should not happen.")
-                # return
-
-            # Replace in the dict
-            self._tracklets[old_tracklet.id] = new_tracklet
-
-    def merge_tracklets(self, keep: Tracklet, remove: Tracklet) -> int:
-        """
-        Merge two Person objects into a single entry in the manager.
-
-        The resulting tracklet will:
-        - Use the id and start_time of the older tracklet (the one with the earlier start_time).
-        - Use all other attributes from the 'keep' tracklet.
-        - Remove both original tracklets from the manager and release the ID of the newer tracklet.
-        - Add the merged tracklet back to the manager with the merged id.
-
-        Args:
-            keep (Person): The tracklet whose data (except id and start_time) will be kept.
-            remove (Person): The tracklet whose id and start_time may be used if older.
-
-        Returns:
-            int: The id of the tracklet that was removed and released, or -1 if the merge was not successful.
-        """
-
+    def merge_tracklets(self, keep_id: int, remove_id: int) -> None:
         with self._lock:
-            # Check for invalid IDs
-            if keep.id in (-1, None):
-                print(f"PersonManager: Cannot merge tracklets with uninitialized id (keep.id={keep.id}, remove.id={remove.id})")
-                return -1
+            # Validate IDs
+            if keep_id in (-1, None) or keep_id == remove_id:
+                print(f"TrackletManager: Invalid merge (keep.id={keep_id}, remove.id={remove_id})")
+                return
 
-            if keep.id == remove.id:
-                print(f"PersonManager: Attempted to merge the same tracklet {keep.id}.")
-                return -1
+            keep: Optional[Tracklet] = self._tracklets.get(keep_id)
+            remove: Optional[Tracklet] = self._tracklets.get(remove_id)
+
+            if keep is None or remove is None:
+                print(f"TrackletManager: One of the tracklets in the merge {keep_id} and {remove_id} is None. Skipping merge.")
+                return
+
+            if not keep.is_active:
+                print(f"TrackletManager: Cannot merge tracklet with status {keep.status} (keep.id={keep.id}, remove.id={remove.id})")
+                return
+
 
             # Determine which tracklet is oldest
             if keep.age_in_seconds >= remove.age_in_seconds:
-                oldest, newest = keep, remove
+                merged_id, merged_created_at = keep.id, keep.created_at
+                other_id, other_created_at = remove.id, remove.created_at
             else:
-                oldest, newest = remove, keep
-
-            # Save the id and start_time of the oldest
-            merged_id: int = oldest.id
-            merged_created_at: Timestamp = oldest.created_at
-            other_id: int = newest.id
+                merged_id, merged_created_at = remove.id, remove.created_at
+                other_id, other_created_at = keep.id, keep.created_at
 
             # Use all other data from the newest (the 'keep' tracklet)
-            merged_tracklet = Tracklet(
+            merged_tracklet: Tracklet = replace(
+                keep,
                 id=merged_id,
-                cam_id=keep.cam_id,
                 created_at=merged_created_at,
-                last_seen=keep.last_seen,
-                status=keep.status,
-                roi=keep.roi,
-                _external_tracklet=keep._external_tracklet,
-                tracker_info=keep.tracker_info
+                status=TrackingStatus.TRACKED
             )
-
-            if keep.status == TrackingStatus.NEW:
-                merged_tracklet.status = TrackingStatus.TRACKED
-
-            # Remove both old tracklets from the manager
-            self._tracklets.pop(merged_id, None)
-            if other_id != -1:
-                self._tracklets.pop(other_id, None)
-                if other_id != merged_id:
-                    self._id_pool.release(other_id)
-
-            # Add the merged tracklet with merged_id
             self._tracklets[merged_id] = merged_tracklet
 
-            return other_id
+            other_tracklet: Tracklet = replace(
+                remove,
+                id=other_id,
+                created_at=other_created_at,
+                status=TrackingStatus.REMOVED
+            )
+            self._tracklets[other_id] = other_tracklet
+
+    def retire_tracklet(self, id: int) -> None:
+        with self._lock:
+            tracklet: Tracklet | None = self._tracklets.get(id)
+            if tracklet is None:
+                print(f"TrackletManager: Attempted to retire non-existent tracklet with ID {id}.")
+                return
+
+            removed_tracklet: Tracklet = replace(tracklet, status=TrackingStatus.REMOVED)
+            self._tracklets[id] = removed_tracklet
+
+    def mark_all_as_not_updated(self) -> None:
+        """Mark all tracklets as not updated"""
+        with self._lock:
+            for id, tracklet in self._tracklets.items():
+                if tracklet.is_updated:
+                    updated_tracklet: Tracklet = replace(tracklet, is_updated=False)
+                    self._tracklets[id] = updated_tracklet
 
