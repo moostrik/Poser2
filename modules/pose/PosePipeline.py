@@ -7,7 +7,7 @@ import numpy as np
 
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
-from modules.tracker.Tracklet import Tracklet, TrackletCallback, Rect
+from modules.tracker.Tracklet import Tracklet, TrackletCallback, Rect, TrackingStatus
 from modules.pose.PoseDefinitions import ModelTypeNames, Pose, PoseCallback
 from modules.pose.PoseDetection import Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
@@ -60,7 +60,8 @@ class PosePipeline:
 
         # Start detectors
         for detector in self.pose_detectors.values():
-            detector.addMessageCallback(self.joint_angles.pose_input)
+            # detector.addMessageCallback(self.joint_angles.pose_input)
+            detector.addMessageCallback(self._notify_pose_callback)
             detector.start()
             self.pose_detector_frame_size = detector.get_frame_size()
 
@@ -84,26 +85,29 @@ class PosePipeline:
         if not self.running:
             return
 
+        pose_final: bool = tracklet.status == TrackingStatus.REMOVED
+        pose_image: Optional[np.ndarray] = None
+        pose_crop_rect: Optional[Rect] = None
+        cam_image: Optional[np.ndarray] = self._get_image(tracklet.cam_id)
+
+        if cam_image is not None and not pose_final:
+            pose_image, pose_crop_rect = self.image_processor.process_pose_image(tracklet, cam_image)
+
         pose = Pose(
             id=tracklet.id,
             cam_id=tracklet.cam_id,
             time_stamp=tracklet.last_seen,
+            crop_rect = pose_crop_rect,
+            image = pose_image,
+            is_final = pose_final
         )
-        if not tracklet.is_active:
-            self._notify_pose_callback(pose)
-            return
 
-        cam_image: Optional[np.ndarray] = self._get_image(tracklet.cam_id)
-        if cam_image is not None:
-            pose_image: Optional[np.ndarray] = None
-            pose_crop_rect: Optional[Rect] = None
-            pose_image, pose_crop_rect = self.image_processor.process_pose_image(tracklet, cam_image)
-            if pose_image is not None and pose_crop_rect is not None:
-                pose.image = pose_image
-                pose.crop_rect = pose_crop_rect
-                detector: Optional[Detection] = self.pose_detectors.get(tracklet.id)
-                if detector:
-                    detector.add_pose(pose)
+        # print(f"PosePipeline: Processing pose for tracklet {tracklet.id} at time {pose.time_stamp}")
+        detector: Optional[Detection] = self.pose_detectors.get(tracklet.id)
+        if detector:
+            detector.add_pose(pose)
+        else:
+            self._notify_pose_callback(pose)
 
      # INPUTS
     def add_tracklet(self, tracklet: Tracklet) -> None:

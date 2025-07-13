@@ -1,4 +1,5 @@
 # Standard library imports
+from dataclasses import replace
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
 from typing import Optional
@@ -77,8 +78,8 @@ class PoseAngleCalculator(Thread):
             angles: JointAngleDict = {}
             for k in PoseAngleKeypoints.keys():
                 angles[k] = JointAngle(angle=np.nan, confidence=0.0)
-            pose.angles = angles
-            callback(pose)
+            angled_pose: Pose = replace(pose, angles=angles)
+            callback(angled_pose)
             return
 
         angles: JointAngleDict = {}
@@ -114,8 +115,8 @@ class PoseAngleCalculator(Thread):
                 # Low confidence, set angle to NaN
                 angles[joint] = JointAngle(angle = np.nan, confidence = 0.0)
 
-        pose.angles = angles
-        callback(pose)
+        angled_pose: Pose = replace(pose, angles=angles)
+        callback(angled_pose)
 
     @staticmethod
     def calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, rotate_by: float = 0) -> float:

@@ -349,7 +349,7 @@ class Render(RenderWindow):
 
             image: Image = self.psn_images[i]
             image_color: Tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.25)
-            if pose_data.image is not None:
+            if pose_data.image is not None and not pose_data.is_final:
                 image.set_image(pose_data.image)
                 image.update()
                 image_color = (1.0, 1.0, 1.0, 1.0)  # Full opacity for pose image

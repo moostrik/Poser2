@@ -1,4 +1,5 @@
 # Standard library imports
+from dataclasses import replace
 from queue import Queue
 import time
 from threading import Thread, Lock
@@ -69,7 +70,10 @@ class Detection(Thread):
                 if image is not None:
                     poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
                     if len(poses) > 0:
-                        pose.points = poses[0]
+                        pose: Pose = replace(
+                            pose,
+                            points=poses[0],
+                        )
                 self.callback(pose)
 
             except:

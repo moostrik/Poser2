@@ -160,16 +160,18 @@ class PosePoints():
 
 PoseList = list[PosePoints]
 
-@dataclass
+@dataclass (frozen=True)
 class Pose:
     id: int # Unique identifier for the pose data, typically the tracklet ID
     cam_id: int
     time_stamp: Timestamp
-    crop_rect: Optional[Rect] = field(default = None, init=False, repr=False)
-    image: Optional[np.ndarray] = field(default = None, init=False, repr=False)
+    crop_rect: Optional[Rect] = field(default = None)
+    image: Optional[np.ndarray] = field(default = None, repr=False)
 
-    points: Optional[PosePoints] = field(default=None, init=False, repr=False)
-    angles: Optional[JointAngleDict] = field(default=None, init=False, repr=False)
+    points: Optional[PosePoints] = field(default=None, repr=False)
+    angles: Optional[JointAngleDict] = field(default=None)
+
+    is_final: bool = field(default=False, repr=False)
 
 
 PoseCallback = Callable[[Pose], None]
