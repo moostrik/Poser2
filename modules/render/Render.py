@@ -216,7 +216,7 @@ class Render(RenderWindow):
 
     def update_pose_meshes(self) -> None:
         for i in range(self.max_players):
-            pose_data: Pose | None = self.get_pose(i, clear=False)
+            pose_data: Pose | None = self.get_pose(i)
             if pose_data is not None:
                 pose: PosePoints | None = pose_data.points
                 if pose is not None:
@@ -304,7 +304,7 @@ class Render(RenderWindow):
                 if tracklet.status == TrackingStatus.REMOVED or tracklet.status == TrackingStatus.LOST:
                     continue
                 roi: Rect | None  = None
-                pose: Pose | None = self.get_pose(tracklet.id, clear=False)
+                pose: Pose | None = self.get_pose(tracklet.id)
                 if pose is not None:
                     roi = pose.crop_rect
                 mesh: Mesh = self.pose_meshes[tracklet.id]
@@ -343,42 +343,45 @@ class Render(RenderWindow):
     def draw_poses(self) -> None:
         for i in range(self.max_players):
             fbo: Fbo = self.psn_fbos[i]
-            pose_data: Pose | None = self.get_pose(i)
-            if pose_data is None:
+            pose: Pose | None = self.get_pose(i)
+            if pose is None:
                 continue
 
             image: Image = self.psn_images[i]
-            image_color: Tuple[float, float, float, float] = (1.0, 1.0, 1.0, 0.25)
-            if pose_data.image is not None and not pose_data.is_final:
-                image.set_image(pose_data.image)
-                image.update()
-                image_color = (1.0, 1.0, 1.0, 1.0)  # Full opacity for pose image
-            else:
-                image.set_image(np.zeros((fbo.height, fbo.width, 3), dtype=np.uint8))
-                image.update()
+
+            if pose.is_final:
+                fbo.begin()
+                # clear fbo
+                glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
+                glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
+                fbo.end()
+                continue
+
+            if pose.image is None:
+                fbo.begin()
+                # clear fbo
+                glClearColor(1.0, 0.0, 0.0, 1.0)  # Set background color to black
+                glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
+                fbo.end()
+                continue
+
+            image.set_image(pose.image)
+            image.update()
 
             analysis_image: Image = self.analysis_images[i]
             analysis_image.update()
 
             self.setView(fbo.width, fbo.height)
             fbo.begin()
-
-            # tracklet: Tracklet | None = self.get_tracklet(i)
-            # if tracklet is None:
-            #     continue
-
-            # if tracklet.status == TrackingStatus.REMOVED or tracklet.status == TrackingStatus.LOST:
-            glColor4f(*image_color)   # Set color
             image.draw(0, 0, fbo.width, fbo.height)
-            glColor4f(1.0, 1.0, 1.0, 1.0)   # Set color
-            # else:
-            #     image.draw(0, 0, fbo.width, fbo.height)
-            # analysis_image.draw(0, 0, fbo.width, fbo.height)
-            pose_mesh: Mesh = self.pose_meshes[pose_data.id]
-            pose_mesh.draw(0, 0, fbo.width, fbo.height)
-            # self.draw_tracklet(tracklet, mesh, 0, 0, fbo.width, fbo.height, False, True, True)
-            angle_mesh: Mesh = self.angle_meshes[pose_data.id]
-            # angle_mesh.draw(0, 0, fbo.width, fbo.height)
+
+            tracklet: Tracklet | None = self.get_tracklet(i)
+            pose_mesh: Mesh = self.pose_meshes[pose.id]
+            if tracklet is None:
+                pose_mesh.draw(0, 0, fbo.width, fbo.height)
+            else:
+                self.draw_tracklet(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, False, True, True)
+            angle_mesh: Mesh = self.angle_meshes[pose.id]
             if angle_mesh.isInitialized():
                 angle_mesh.draw(0, 0, fbo.width, fbo.height)
 
@@ -437,11 +440,9 @@ class Render(RenderWindow):
             self.input_tracklets[tracklet.id] = tracklet
 
 
-    def get_pose(self, id: int, clear: bool = False) -> Optional[Pose]:
+    def get_pose(self, id: int) -> Optional[Pose]:
         with self.input_mutex:
             ret_pose: Optional[Pose] = self.input_poses[id]
-            if clear:
-                self.input_poses[id] = None
             return ret_pose
     def set_pose(self, pose: Pose) -> None:
         with self.input_mutex:
