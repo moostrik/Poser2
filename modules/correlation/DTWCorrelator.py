@@ -18,7 +18,7 @@ import pandas as pd
 
 # Local application imports
 from modules.correlation.PairCorrelation import PairCorrelation, PairCorrelationBatch, PoseCorrelationBatchCallback
-from modules.pose.PoseStreamProcessor import PoseStreamData, PoseStreamDataDict
+from modules.pose.PoseStream import PoseStreamData, PoseStreamDataDict
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods

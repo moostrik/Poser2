@@ -1,8 +1,10 @@
 # Standard library imports
 from dataclasses import dataclass
-from queue import Empty, Queue
-from threading import Event, Lock, Thread
-from typing import Optional, Callable
+from multiprocessing import Process, Queue, Event, Lock, Manager
+from threading import Thread
+from typing import Optional, Callable, Set
+import signal
+import sys
 
 # Third-party imports
 import pandas as pd
@@ -11,8 +13,6 @@ import numpy as np
 # Local application imports
 from modules.pose.PoseDefinitions import *
 from modules.Settings import Settings
-
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Type for analysis output callback
 @dataclass (frozen=False)
@@ -24,29 +24,77 @@ class PoseStreamData:
 PoseStreamDataCallback = Callable[[PoseStreamData], None]
 PoseStreamDataDict = dict[int, PoseStreamData]
 
-class PoseStreamProcessor(Thread):
-    def __init__(self, settings: Settings) -> None:
-        super().__init__()
-        self._stop_event = Event()
+class PoseStream:
+    def __init__(self, settings) -> None:
+        self.result_queue = Queue()
+        self.processor = PoseStreamProcessor(settings, self.result_queue)
+        self.output_callbacks: Set[PoseStreamDataCallback] = set()
+        self.result_thread = Thread(target=self._handle_results, daemon=True)
+        self.running = False
 
-        # Input
+    def start(self) -> None:
+        """Start the processor and result handler."""
+        self.running = True
+        self.processor.start()
+        self.result_thread.start()
+
+    def stop(self) -> None:
+        """Stop the processor and result handler."""
+        self.running = False
+        self.processor.stop()
+        self.processor.join(timeout=1.0)
+        if self.processor.is_alive():
+            self.processor.terminate()
+
+    def add_pose(self, pose) -> None:
+        """Add pose to processing queue."""
+        self.processor.add_pose(pose)
+
+    def add_stream_callback(self, callback: PoseStreamDataCallback) -> None:
+        """Register a callback to receive processed data."""
+        self.output_callbacks.add(callback)
+
+    def _handle_results(self) -> None:
+        """Handle results from the processor in the main process."""
+        while self.running:
+            try:
+                data: PoseStreamData = self.result_queue.get(timeout=0.1)
+                # Call all callbacks with the data
+                for callback in self.output_callbacks:
+                    try:
+                        callback(data)
+                    except Exception as e:
+                        print(f"Error in callback: {e}")
+            except:
+                continue
+
+
+
+
+
+class PoseStreamProcessor(Process):
+    def __init__(self, settings: Settings, result_queue: Queue) -> None:
+        super().__init__()
+
+        # Use multiprocessing primitives
+        self._stop_event = Event()
         self.pose_input_queue: Queue[Pose] = Queue()
 
-        # Windowing for joint angles
+        # For sending results back to main process
+        self.result_queue = result_queue if result_queue else Queue()
+
+        # Store settings values (not the settings object itself)
         self.buffer_capacity: int = int(settings.pose_buffer_duration * settings.camera_fps)
+
+        # Initialize buffers (will be recreated in child process)
         self.angle_buffers: dict[int, pd.DataFrame] = {}
         self.confidence_buffers: dict[int, pd.DataFrame] = {}
 
-        # Callbacks for analysis output
-        self.callback_lock = Lock()
-        self.output_callbacks: set[PoseStreamDataCallback] = set()
-
-        hot_reloader = HotReloadMethods(self.__class__, True)
+        # Note: HotReloadMethods won't work across processes
+        # hot_reloader = HotReloadMethods(self.__class__, True)
 
     def stop(self) -> None:
         self._stop_event.set()
-        with self.callback_lock:
-            self.output_callbacks.clear()
         self.angle_buffers.clear()
         self.confidence_buffers.clear()
 
@@ -59,11 +107,11 @@ class PoseStreamProcessor(Thread):
                         self._process(pose)
                     except Exception as e:
                         print(f"Error processing pose {pose.id}: {e}")
-                    self.pose_input_queue.task_done()
-            except Empty:
+            except:  # multiprocessing.Queue uses different exception
                 continue
 
     def add_pose(self, pose: Pose) -> None:
+        """Add pose to processing queue - can be called from main process."""
         self.pose_input_queue.put(pose)
 
     def _process(self, pose: Pose) -> None:
@@ -99,7 +147,7 @@ class PoseStreamProcessor(Thread):
         # angle_df = PoseWindowBuffer.rolling_circular_mean(angle_df, window=0.4, min_periods=1)
         angle_df = PoseStreamProcessor.ewm_circular_mean(angle_df, span=7.0)
 
-        # Notify callbacks with both DataFrames
+        # Send results back to main process via queue
         self._notify_callbacks(PoseStreamData(pose.id, angle_df, conf_df))
 
     @staticmethod
@@ -126,13 +174,11 @@ class PoseStreamProcessor(Thread):
         # Wrap back to [-π, π]
         return ((df_smooth + np.pi) % (2 * np.pi)) - np.pi
 
-    def add_stream_callback(self, callback: PoseStreamDataCallback) -> None:
-        """ Register a callback to receive the current pandas DataFrame window. """
-        with self.callback_lock:
-            self.output_callbacks.add(callback)
-
     def _notify_callbacks(self, data: PoseStreamData) -> None:
-        """ Handle the output of the analysis. """
-        with self.callback_lock:
-            for callback in self.output_callbacks:
-                callback(data)
+        """ Send results back to main process via queue. """
+        try:
+            # Non-blocking put to avoid deadlocks
+            self.result_queue.put(data, block=False)
+        except:
+            # Queue is full, skip this update
+            pass

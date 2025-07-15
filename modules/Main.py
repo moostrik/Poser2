@@ -11,7 +11,7 @@ from modules.gui.PyReallySimpleGui import Gui
 from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
 from modules.correlation.DTWCorrelator import DTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
-from modules.pose.PoseStreamProcessor import PoseStreamProcessor
+from modules.pose.PoseStream import PoseStream
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamProcessor
 from modules.render.Render import Render
 from modules.Settings import Settings
@@ -41,7 +41,7 @@ class Main():
         self.panoramic_tracker = PanoramicTracker(self.gui, settings)
 
         self.pose_detection = PosePipeline(settings)
-        self.pose_streamer = PoseStreamProcessor(settings)
+        self.pose_streamer = PoseStream(settings)
         self.dtw_correlator = DTWCorrelator(settings)
         self.correlation_streamer = PairCorrelationStreamProcessor(settings)
 
@@ -72,7 +72,7 @@ class Main():
         self.pose_streamer.add_stream_callback(self.render.set_pose_stream)
         self.pose_streamer.start()
 
-        # self.pose_detection.add_pose_callback(self.pose_streamer.add_pose)
+        self.pose_detection.add_pose_callback(self.pose_streamer.add_pose)
         self.pose_detection.add_pose_callback(self.render.set_pose)
         self.pose_detection.start()
 

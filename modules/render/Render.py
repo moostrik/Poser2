@@ -24,7 +24,7 @@ from modules.cam.depthcam.Definitions import Tracklet as CamTracklet, Rect as Ca
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus, Rect
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices
-from modules.pose.PoseStreamProcessor import PoseStreamData
+from modules.pose.PoseStream import PoseStreamData
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
