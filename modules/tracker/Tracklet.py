@@ -66,9 +66,10 @@ class Rect:
 class Tracklet:
     cam_id: int
     id: int =                   field(default=-1)
+
+    time_stamp: Timestamp =     field(default_factory=Timestamp.now)
     created_at: Timestamp =     field(default_factory=Timestamp.now)
     last_active: Timestamp =    field(default_factory=Timestamp.now)  # Last time person was actually detected (NEW/TRACKED)
-    time_stamp: Timestamp =     field(default_factory=Timestamp.now)
 
     status: TrackingStatus =    field(default=TrackingStatus.NEW)
     roi: Rect =                 field(default=Rect())
@@ -76,6 +77,22 @@ class Tracklet:
     tracker_info: Optional[BaseTrackerInfo] = field(default = None)
     _external_tracklet: Optional[ExternalTracklet] = field(default=None, repr=False)
     is_updated: bool =          field(default=True, repr=False)
+
+    @property
+    def is_new(self) -> bool:
+        return self.status == TrackingStatus.NEW
+
+    @property
+    def is_tracked(self) -> bool:
+        return self.status == TrackingStatus.TRACKED
+
+    @property
+    def is_lost(self) -> bool:
+        return self.status == TrackingStatus.LOST
+
+    @property
+    def is_removed(self) -> bool:
+        return self.status == TrackingStatus.REMOVED
 
     @property
     def is_active(self) -> bool:

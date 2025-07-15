@@ -120,7 +120,7 @@ class PanoramicTracker(Thread):
         if existing_tracklet_id is not None:
             self.tracklet_manager.replace_tracklet(existing_tracklet_id, new_tracklet)
         # If it doesn't exist, add it as a new tracklet
-        elif new_tracklet.status != TrackingStatus.LOST:
+        elif new_tracklet.is_active:
             self.tracklet_manager.add_tracklet(new_tracklet)
 
     def _update_tracklets(self) -> None:

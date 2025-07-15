@@ -84,12 +84,13 @@ class PosePipeline:
         if not self.running:
             return
 
-        pose_final: bool = tracklet.status == TrackingStatus.REMOVED
+        pose_final: bool = tracklet.is_removed
+
         pose_image: Optional[np.ndarray] = None
         pose_crop_rect: Optional[Rect] = None
         cam_image: Optional[np.ndarray] = self._get_image(tracklet.cam_id)
 
-        if cam_image is not None and (tracklet.status == TrackingStatus.NEW or tracklet.status == TrackingStatus.TRACKED):
+        if cam_image is not None and tracklet.is_active:
             pose_image, pose_crop_rect = self.image_processor.process_pose_image(tracklet, cam_image)
 
         pose = Pose(
