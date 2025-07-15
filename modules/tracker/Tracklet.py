@@ -67,7 +67,8 @@ class Tracklet:
     cam_id: int
     id: int =                   field(default=-1)
     created_at: Timestamp =     field(default_factory=Timestamp.now)
-    last_seen: Timestamp =      field(default_factory=Timestamp.now)
+    last_active: Timestamp =    field(default_factory=Timestamp.now)  # Last time person was actually detected (NEW/TRACKED)
+    time_stamp: Timestamp =     field(default_factory=Timestamp.now)
 
     status: TrackingStatus =    field(default=TrackingStatus.NEW)
     roi: Rect =                 field(default=Rect())
@@ -83,11 +84,11 @@ class Tracklet:
     @property
     def age_in_seconds(self) -> float:
         """Get how long this person has been tracked"""
-        return (self.last_seen - self.created_at).total_seconds()
+        return (self.last_active - self.created_at).total_seconds()
 
     def is_expired(self, threshold: float) -> bool:
         """Check if person hasn't been updated recently"""
-        return (Timestamp.now() - self.last_seen).total_seconds() > threshold
+        return (Timestamp.now() - self.last_active).total_seconds() > threshold
 
     @property
     def external_id(self) -> int:

@@ -101,7 +101,7 @@ class PanoramicTracker(Thread):
                 time.sleep(0.001)  # 1ms sleep
 
     def _add_tracklet(self, new_tracklet: Tracklet) -> None:
-        if new_tracklet.status != TrackingStatus.TRACKED:
+        if new_tracklet.status == TrackingStatus.REMOVED:
             return
         if new_tracklet.external_age_in_frames <= self.tracklet_min_age:
             return
@@ -120,7 +120,7 @@ class PanoramicTracker(Thread):
         if existing_tracklet_id is not None:
             self.tracklet_manager.replace_tracklet(existing_tracklet_id, new_tracklet)
         # If it doesn't exist, add it as a new tracklet
-        else:
+        elif new_tracklet.status != TrackingStatus.LOST:
             self.tracklet_manager.add_tracklet(new_tracklet)
 
     def _update_tracklets(self) -> None:

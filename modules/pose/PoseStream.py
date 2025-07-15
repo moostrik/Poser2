@@ -16,6 +16,23 @@ from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+
+
+
+@dataclass (frozen=True)
+class PoseStreamInput:
+    id: int
+    time_stamp: pd.Timestamp
+    angles: Optional[JointAngleDict]
+
+    @classmethod
+    def from_pose(cls, pose: Pose) -> 'PoseStreamInput':
+        return cls(
+            id=pose.id,
+            time_stamp=pose.time_stamp,
+            angles=pose.angles
+        )
+
 # Type for analysis output callback
 @dataclass (frozen=False)
 class PoseStreamData:
@@ -90,7 +107,8 @@ class PoseStream:
     def add_pose(self, pose) -> None:
         """Add pose to processing queue."""
         try:
-            self.processor.add_pose(pose)
+            pose_stream_input: PoseStreamInput = PoseStreamInput.from_pose(pose)
+            self.processor.add_pose(pose_stream_input)
         except Exception as e:
             print(f"[PoseStream] Error adding pose: {e}")
             # # If processor is dead, try to restart it
@@ -122,7 +140,7 @@ class PoseStreamProcessor(Process):
 
         # Use multiprocessing primitives
         self._stop_event = Event()
-        self.pose_input_queue: Queue[Pose] = Queue()
+        self.pose_input_queue: Queue[PoseStreamInput] = Queue()
 
         # For sending results back to main process
         self.result_queue = result_queue if result_queue else Queue()
@@ -143,7 +161,7 @@ class PoseStreamProcessor(Process):
         print("[PoseStreamProcessor] Starting processor...")
         while not self._stop_event.is_set():
             try:
-                pose: Optional[Pose] = self.pose_input_queue.get(block=True, timeout=0.01)
+                pose: Optional[PoseStreamInput] = self.pose_input_queue.get(block=True, timeout=0.01)
                 if pose is not None:
                     try:
                         self._process(pose)
@@ -153,7 +171,7 @@ class PoseStreamProcessor(Process):
                 continue
         print("[PoseStreamProcessor] Processor stopped")
 
-    def add_pose(self, pose: Pose) -> None:
+    def add_pose(self, pose: PoseStreamInput) -> None:
         """Add pose to processing queue - can be called from main process."""
         try:
             self.pose_input_queue.put(pose, block=False)
@@ -161,7 +179,14 @@ class PoseStreamProcessor(Process):
             # Queue is full, skip this pose
             pass
 
-    def _process(self, pose: Pose) -> None:
+    def _notify_callbacks(self, data: PoseStreamData) -> None:
+        """ Send results back to main process via queue. """
+        try:
+            self.result_queue.put(data, block=False)
+        except:
+            pass
+
+    def _process(self, pose: PoseStreamInput) -> None:
         """ Process a pose and update the joint angle windows. """
 
         if pose.angles is None:
@@ -192,6 +217,10 @@ class PoseStreamProcessor(Process):
         angle_df.interpolate(method='time', limit_direction='both', limit=7, inplace=True)
         angle_df = PoseStreamProcessor.ewm_circular_mean(angle_df, span=7.0)
 
+        # if pose.id == 0:
+        #     interval: float = PoseStreamProcessor.get_mean_interval(angle_df)
+        #     print(f"[PoseStreamProcessor] Processed pose {pose.id} with interval {interval:.3f}s")
+
         # Send results back to main process via queue
         self._notify_callbacks(PoseStreamData(pose.id, angle_df, conf_df))
 
@@ -219,9 +248,10 @@ class PoseStreamProcessor(Process):
         # Wrap back to [-π, π]
         return ((df_smooth + np.pi) % (2 * np.pi)) - np.pi
 
-    def _notify_callbacks(self, data: PoseStreamData) -> None:
-        """ Send results back to main process via queue. """
-        try:
-            self.result_queue.put(data, block=False)
-        except:
-            pass
+    @staticmethod
+    def get_mean_interval(df: pd.DataFrame) -> float:
+        """Calculate the mean interval between timestamps in a DataFrame."""
+        if df.empty:
+            return 0.0
+        intervals: pd.Series = df.index.to_series().diff().dt.total_seconds()
+        return intervals.mean() if not intervals.empty else 0.0

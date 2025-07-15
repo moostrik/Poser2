@@ -92,12 +92,21 @@ class TrackletManager:
                 print(f"PersonManager: Attempted to replace non-existent tracklet with ID {id}.")
                 return
 
+            status: TrackingStatus = new_tracklet.status
+            if status == TrackingStatus.NEW:
+                status = TrackingStatus.TRACKED  # A replaced tracklet can not be NEW
+
+            last_active: Timestamp = new_tracklet.last_active
+            if new_tracklet.status == TrackingStatus.LOST:
+                last_active = old_tracklet.last_active
+
             # Create a new instance with updated fields
             updated_tracklet: Tracklet = replace(
                 new_tracklet,
                 id=id,
                 created_at=old_tracklet.created_at,
-                status=TrackingStatus.TRACKED,
+                last_active=last_active,
+                status=status,
                 is_updated=True
             )
             self._tracklets[id] = updated_tracklet

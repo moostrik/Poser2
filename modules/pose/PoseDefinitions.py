@@ -9,7 +9,7 @@ from threading import Lock
 import numpy as np
 from typing import TypedDict
 from typing import Optional, Callable
-from modules.tracker.Tracklet import Rect
+from modules.tracker.Tracklet import Tracklet, Rect
 from pandas import Timestamp
 
 NUM_KEYPOINTS = 17
@@ -165,6 +165,8 @@ class Pose:
     id: int # Unique identifier for the pose data, typically the tracklet ID
     cam_id: int
     time_stamp: Timestamp
+    tracklet: Tracklet = field(repr=False)
+
     crop_rect: Optional[Rect] = field(default = None)
     image: Optional[np.ndarray] = field(default = None, repr=False)
 

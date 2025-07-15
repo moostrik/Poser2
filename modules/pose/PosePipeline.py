@@ -33,7 +33,7 @@ class PosePipeline:
 
         if self.pose_active:
             for i in range(self.max_detectors):
-                self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type)
+                self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type, True)
             print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')
@@ -89,13 +89,14 @@ class PosePipeline:
         pose_crop_rect: Optional[Rect] = None
         cam_image: Optional[np.ndarray] = self._get_image(tracklet.cam_id)
 
-        if cam_image is not None and not pose_final:
+        if cam_image is not None and (tracklet.status == TrackingStatus.NEW or tracklet.status == TrackingStatus.TRACKED):
             pose_image, pose_crop_rect = self.image_processor.process_pose_image(tracklet, cam_image)
 
         pose = Pose(
             id=tracklet.id,
             cam_id=tracklet.cam_id,
-            time_stamp=tracklet.last_seen,
+            time_stamp=tracklet.time_stamp,
+            tracklet=tracklet,
             crop_rect = pose_crop_rect,
             image = pose_image,
             is_final = pose_final
