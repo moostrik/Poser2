@@ -116,6 +116,8 @@ PoseAngleKeypoints: dict[Keypoint, tuple[Keypoint, Keypoint, Keypoint]] = {
     # Keypoint.right_knee:     ( Keypoint.right_hip,      Keypoint.right_knee,     Keypoint.right_ankle ),
 }
 
+PoseAngleNames: list[str] = [k.name for k in PoseAngleKeypoints.keys()]
+
 class JointAngle(TypedDict):
     angle: float         # The computed joint angle (degrees, or np.nan if invalid)
     confidence: float    # The minimum confidence score among the three keypoints

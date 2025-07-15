@@ -33,7 +33,7 @@ class PosePipeline:
 
         if self.pose_active:
             for i in range(self.max_detectors):
-                self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type, True)
+                self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type)
             print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')

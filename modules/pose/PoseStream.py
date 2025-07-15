@@ -24,13 +24,15 @@ class PoseStreamInput:
     id: int
     time_stamp: pd.Timestamp
     angles: Optional[JointAngleDict]
+    is_final: bool
 
     @classmethod
     def from_pose(cls, pose: Pose) -> 'PoseStreamInput':
         return cls(
             id=pose.id,
             time_stamp=pose.time_stamp,
-            angles=pose.angles
+            angles=pose.angles,
+            is_final=pose.is_final
         )
 
 # Type for analysis output callback
@@ -147,6 +149,8 @@ class PoseStreamProcessor(Process):
 
         # Store settings values (not the settings object itself)
         self.buffer_capacity: int = int(settings.pose_buffer_duration * settings.camera_fps)
+        self.resample_interval: str = f"{int(1.0 / settings.camera_fps * 1000)}ms"
+        print(f"[PoseStreamProcessor] Buffer capacity: {self.buffer_capacity}, Resample interval: {self.resample_interval}")
 
         # Initialize buffers (will be recreated in child process)
         self.angle_buffers: dict[int, pd.DataFrame] = {}
@@ -190,36 +194,47 @@ class PoseStreamProcessor(Process):
         """ Process a pose and update the joint angle windows. """
 
         if pose.angles is None:
+            print(f"[PoseStreamProcessor] Pose {pose.id} has no angles, skipping")
             return
 
-        # Build angle/confidence dicts
-        angle_row: dict[str, float] = {Keypoint(k).name: v["angle"] for k, v in pose.angles.items()}
-        conf_row: dict[str, float] = {Keypoint(k).name: v["confidence"] for k, v in pose.angles.items()}
-        timestamp: pd.Timestamp = pose.time_stamp
+        if pose.is_final:
+            if self.angle_buffers.get(pose.id) is not None:
+                self.angle_buffers.pop(pose.id, None)
+                self.confidence_buffers.pop(pose.id, None)
+            return
+
+        time_stamp: pd.Timestamp = pose.time_stamp
 
         # Update angle window
-        angle_df: pd.DataFrame = self.angle_buffers.get(pose.id, pd.DataFrame())
-        angle_row_df = pd.DataFrame([angle_row], index=[timestamp])
-        angle_df = pd.concat([angle_df, angle_row_df])
+        angle_df: pd.DataFrame = self.angle_buffers.get(pose.id, pd.DataFrame(columns=PoseAngleNames))
+        angle_row: pd.Series = pd.Series(
+            {Keypoint(k).name: v["angle"] for k, v in pose.angles.items()},
+            index=PoseAngleNames  # Ensures all columns are present, missing ones will be NaN
+        )
+        angle_df.loc[time_stamp] = angle_row # type: ignore
         angle_df.sort_index(inplace=True)
         angle_df = angle_df.iloc[-self.buffer_capacity:]
         self.angle_buffers[pose.id] = angle_df
 
         # Update confidence window
-        conf_df: pd.DataFrame = self.confidence_buffers.get(pose.id, pd.DataFrame())
-        conf_row_df = pd.DataFrame([conf_row], index=[timestamp])
-        conf_df = pd.concat([conf_df, conf_row_df])
+        conf_df: pd.DataFrame = self.confidence_buffers.get(pose.id, pd.DataFrame(columns=PoseAngleNames))
+        conf_row: pd.Series = pd.Series(
+            {Keypoint(k).name: v["confidence"] for k, v in pose.angles.items()},
+            index=PoseAngleNames  # Ensures all columns are present, missing ones will be NaN
+        )
+        conf_df.loc[time_stamp] = conf_row  # type: ignore
         conf_df.sort_index(inplace=True)
         conf_df = conf_df.iloc[-self.buffer_capacity:]
         self.confidence_buffers[pose.id] = conf_df
 
         # Interpolate and smooth angles
+        # angle_df.resample(self.resample_interval).interpolate(method='time', limit_direction='both', inplace=True)
         angle_df.interpolate(method='time', limit_direction='both', limit=7, inplace=True)
         angle_df = PoseStreamProcessor.ewm_circular_mean(angle_df, span=7.0)
 
-        # if pose.id == 0:
-        #     interval: float = PoseStreamProcessor.get_mean_interval(angle_df)
-        #     print(f"[PoseStreamProcessor] Processed pose {pose.id} with interval {interval:.3f}s")
+        if pose.id == 0: # or pose.id == 3:  # Debugging for specific players
+            interval: float = PoseStreamProcessor.get_mean_interval(angle_df)
+            print(f"[PoseStreamProcessor] Processed pose {pose.id} with interval {interval:.3f}s")
 
         # Send results back to main process via queue
         self._notify_callbacks(PoseStreamData(pose.id, angle_df, conf_df))

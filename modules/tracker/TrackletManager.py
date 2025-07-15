@@ -54,7 +54,7 @@ class TrackletManager:
             try:
                 id = self._id_pool.acquire()
             except Exception as e:
-                print(f"PersonManager: No more IDs available: {e}")
+                print(f"TrackletManager: No more IDs available: {e}")
                 return None
 
             new_tracklet: Tracklet = replace(
@@ -72,7 +72,7 @@ class TrackletManager:
             if tracklet is not None:
                 self._id_pool.release(id)
             else:
-                print(f"PersonManager: Attempted to remove non-existent tracklet with ID {id}.")
+                print(f"TrackletManager: Attempted to remove non-existent tracklet with ID {id}.")
 
     def all_tracklets(self) -> list[Tracklet]:
         with self._lock:
@@ -89,8 +89,11 @@ class TrackletManager:
         with self._lock:
             old_tracklet: Tracklet | None = self._tracklets.get(id)
             if old_tracklet is None:
-                print(f"PersonManager: Attempted to replace non-existent tracklet with ID {id}.")
+                print(f"TrackletManager: Attempted to replace non-existent tracklet with ID {id}.")
                 return -1
+
+            # if new_tracklet.time_stamp == old_tracklet.time_stamp:
+            #     print(f"TrackletManager: Attempted to replace tracklet with the same timestamp {new_tracklet.time_stamp}, old id and cam: {old_tracklet.external_id} - {old_tracklet.cam_id}, new_id: {new_tracklet.external_id} - {new_tracklet.cam_id}.")
 
             status: TrackingStatus = new_tracklet.status
             if status == TrackingStatus.NEW:
@@ -130,6 +133,8 @@ class TrackletManager:
                 print(f"TrackletManager: Cannot merge tracklet with status {keep.status} (keep.id={keep.id}, remove.id={remove.id})")
                 return -1, -1
 
+            # if keep.time_stamp == remove.time_stamp:
+            #     print(f"TrackletManager: Attempted to merge tracklet with the same timestamp {keep.time_stamp}, keep id and cam: {keep.external_id} - {keep.cam_id}, remove_id: {remove.external_id} - {remove.cam_id}.")
 
             # Determine which tracklet is oldest
             if keep.age_in_seconds >= remove.age_in_seconds:
