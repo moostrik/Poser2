@@ -76,11 +76,6 @@ class Tracklet:
     _external_tracklet: Optional[ExternalTracklet] = field(default=None, repr=False)
     is_updated: bool =          field(default=True, repr=False)
 
-    def __post_init__(self):
-        # This will run after every instance creation, including replace()
-        # Since the dataclass is frozen, we need to use object.__setattr__
-        object.__setattr__(self, 'is_updated', True)
-
     @property
     def is_active(self) -> bool:
         return self.status in (TrackingStatus.NEW, TrackingStatus.TRACKED)

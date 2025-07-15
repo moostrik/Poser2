@@ -40,7 +40,7 @@ class PanoramicTracker(Thread):
 
         self.running: bool = False
         self.max_players: int = settings.max_players
-        self.update_interval: float = 1.0 / settings.camera_fps
+        self.update_interval: float = 0.5 / settings.camera_fps # Run update loop faster than camera FPS to avoid missing frames due to timing jitter
 
         self.input_queue: Queue[Tracklet] = Queue()
 
@@ -214,12 +214,18 @@ class PanoramicTracker(Thread):
     # CALLBACKS
     def _notify_callback(self, tracklet: Tracklet) -> None:
         with self.callback_lock:
-            if tracklet.status == TrackingStatus.REMOVED and tracklet.id == 3:
-                print(f"PanoramicTracker: Notifying about removed tracklet {tracklet.id}")
-            if tracklet.status == TrackingStatus.NEW and tracklet.id == 3:
-                print(f"PanoramicTracker: Notifying about new tracklet {tracklet.id}")
             for c in self.tracklet_callbacks:
                 c(tracklet)
+
+            # if tracklet.id == 1:
+            #     addtracklets = []
+            #     for i in range(4, 8):
+            #         # Create a new tracklet with a different ID
+            #         another_tracklet: Tracklet = replace(tracklet, id=i)
+            #         addtracklets.append(another_tracklet)
+            #     for at in addtracklets:
+            #         c(at)
+
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         with self.callback_lock:
             self.tracklet_callbacks.add(callback)

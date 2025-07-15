@@ -59,8 +59,9 @@ class TrackletManager:
 
             new_tracklet: Tracklet = replace(
                 tracklet,
-                id = id,
-                status = TrackingStatus.NEW
+                id=id,
+                status=TrackingStatus.NEW,
+                is_updated=True
             )
             self._tracklets[id] = new_tracklet
             return id
@@ -96,7 +97,8 @@ class TrackletManager:
                 new_tracklet,
                 id=id,
                 created_at=old_tracklet.created_at,
-                status=TrackingStatus.TRACKED
+                status=TrackingStatus.TRACKED,
+                is_updated=True
             )
             self._tracklets[id] = updated_tracklet
 
@@ -132,7 +134,8 @@ class TrackletManager:
                 keep,
                 id=merged_id,
                 created_at=merged_created_at,
-                status=TrackingStatus.TRACKED
+                status=TrackingStatus.TRACKED,
+                is_updated=True
             )
             self._tracklets[merged_id] = merged_tracklet
 
@@ -140,7 +143,8 @@ class TrackletManager:
                 remove,
                 id=other_id,
                 created_at=other_created_at,
-                status=TrackingStatus.REMOVED
+                status=TrackingStatus.REMOVED,
+                is_updated=True
             )
             self._tracklets[other_id] = other_tracklet
 
@@ -151,7 +155,11 @@ class TrackletManager:
                 print(f"TrackletManager: Attempted to retire non-existent tracklet with ID {id}.")
                 return
 
-            removed_tracklet: Tracklet = replace(tracklet, status=TrackingStatus.REMOVED)
+            removed_tracklet: Tracklet = replace(
+                tracklet,
+                status=TrackingStatus.REMOVED,
+                is_updated=True
+            )
             self._tracklets[id] = removed_tracklet
 
     def mark_all_as_not_updated(self) -> None:
@@ -159,6 +167,9 @@ class TrackletManager:
         with self._lock:
             for id, tracklet in self._tracklets.items():
                 if tracklet.is_updated:
-                    updated_tracklet: Tracklet = replace(tracklet, is_updated=False)
+                    updated_tracklet: Tracklet = replace(
+                        tracklet,
+                        is_updated=False
+                    )
                     self._tracklets[id] = updated_tracklet
 
