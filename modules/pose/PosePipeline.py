@@ -1,5 +1,6 @@
 # Standard library imports
-from threading import Lock
+from queue import Empty, Queue
+from threading import Event, Lock, Thread
 from typing import Optional
 
 # Third-party imports
@@ -17,8 +18,14 @@ from modules.Settings import Settings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class PosePipeline:
+class PosePipeline(Thread):
     def __init__(self, settings: Settings) -> None:
+        super().__init__()
+        self._stop_event = Event()
+        self.tracklet_input_queue: Queue[Tracklet] = Queue()
+
+        self.input_mutex: Lock = Lock()
+        self.input_frames: dict[int, np.ndarray] = {}
 
         self.pose_active: bool = settings.pose_active
         self.pose_detector_frame_size: int = 256
@@ -38,21 +45,18 @@ class PosePipeline:
         else:
             print('Pose Detection: Disabled')
 
-        self.input_mutex: Lock = Lock()
-        self.input_frames: dict[int, np.ndarray] = {}
-
         # Pose angles calculator
         self.joint_angles: PoseAngleCalculator = PoseAngleCalculator()
 
         # Callbacks
         self.callback_lock = Lock()
         self.pose_output_callbacks: set[PoseCallback] = set()
-        self.running: bool = False
 
         hot_reloader = HotReloadMethods(self.__class__)
 
     def start(self) -> None:
-        if self.running:
+        if super().is_alive():
+            print("PosePipeline is already running.")
             return
 
         self.joint_angles.add_pose_callback(self._notify_pose_callback)
@@ -64,10 +68,11 @@ class PosePipeline:
             detector.start()
             self.pose_detector_frame_size = detector.get_frame_size()
 
-        self.running = True
+        super().start()
 
     def stop(self) -> None:
-        self.running = False
+        self._stop_event.set()
+        self.join()
         with self.callback_lock:
             self.pose_output_callbacks.clear()
 
@@ -76,14 +81,20 @@ class PosePipeline:
 
         self.joint_angles.stop()
 
-    def update(self, tracklet: Tracklet) -> None:
+    def run(self) -> None:
         """
         Update the pose pipeline with a new tracklet.
         This method is called when a new tracklet is detected or updated.
         """
-        if not self.running:
-            return
+        while not self._stop_event.is_set():
+            try:
+                tracklet: Optional[Tracklet] = self.tracklet_input_queue.get(block=True, timeout=0.01)
+                if tracklet is not None:
+                    self._process(tracklet)
+            except Empty:
+                continue
 
+    def _process(self, tracklet: Tracklet) -> None:
         pose_final: bool = tracklet.is_removed
 
         pose_image: Optional[np.ndarray] = None
@@ -112,7 +123,7 @@ class PosePipeline:
 
      # INPUTS
     def add_tracklet(self, tracklet: Tracklet) -> None:
-        self.update(tracklet)
+        self.tracklet_input_queue.put(tracklet)
 
     def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
         if frame_type != FrameType.VIDEO:
@@ -127,14 +138,10 @@ class PosePipeline:
 
     # External Output Callbacks
     def add_pose_callback(self, callback: PoseCallback) -> None:
-        """Add callback for processed poses"""
-        if self.running:
-            print('Pipeline is running, cannot add callback')
-            return
-        self.pose_output_callbacks.add(callback)
+        with self.callback_lock:
+            self.pose_output_callbacks.add(callback)
 
     def _notify_pose_callback(self, pose: Pose) -> None:
-        """Handle processed pose"""
         with self.callback_lock:
             for callback in self.pose_output_callbacks:
                 callback(pose)
