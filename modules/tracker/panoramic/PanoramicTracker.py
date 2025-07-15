@@ -92,13 +92,17 @@ class PanoramicTracker(Thread):
 
             # Update and notify at 25 FPS
             if current_time - last_update_time >= self.update_interval:
-                self._update_tracklets()
-                self._notify_and_reset_changes()
+                self._update_and_notify()
                 last_update_time: float = current_time
 
             # Small sleep to prevent excessive CPU usage when no tracklets are available
             if not processed_any:
                 time.sleep(0.001)  # 1ms sleep
+
+    def _update_and_notify(self) -> None:
+        self._update_tracklets()
+        self._notify_and_reset_changes()
+        self._remove_expired_tracklets()
 
     def _add_tracklet(self, new_tracklet: Tracklet) -> None:
         if new_tracklet.status == TrackingStatus.REMOVED:
@@ -124,33 +128,28 @@ class PanoramicTracker(Thread):
             self.tracklet_manager.add_tracklet(new_tracklet)
 
     def _update_tracklets(self) -> None:
+        # retire expired tracklets
         for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.status == TrackingStatus.REMOVED:
-                # print(f"PanoramicTracker: Removing tracklet {tracklet.id} from tracker")
-                self.tracklet_manager.remove_tracklet(tracklet.id)
+            if tracklet.is_expired(self.timeout):
+                print(f"PanoramicTracker: Retiring expired tracklet {tracklet.id}")
+                self.tracklet_manager.retire_tracklet(tracklet.id)
 
         # merge overlapping tracklets
         overlaps: set[PanoramicOverlapInfo] = self.find_overlapping_tracklets(self.tracklet_manager.all_tracklets())
         for overlap in overlaps:
-            # print(f"PanoramicTracker: Merging overlapping tracklets {overlap.keep_id} and {overlap.remove_id} with distance {overlap.distance} ({overlap.reason})")
             self.tracklet_manager.merge_tracklets(overlap.keep_id, overlap.remove_id)
 
-        # retire expired tracklets
-        for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.is_expired(self.timeout):
-                # print(f"PanoramicTracker: Retiring expired tracklet {tracklet.id}")
-                self.tracklet_manager.retire_tracklet(tracklet.id)
-
     def _notify_and_reset_changes(self) -> None:
-        updated =[]
         for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.is_updated:
-                updated.append(tracklet.id)
+            if tracklet.needs_notification:
                 self._notify_callback(tracklet)
 
-        # Mark all tracklets as not updated
-        self.tracklet_manager.mark_all_as_not_updated()
+        self.tracklet_manager.mark_all_as_notified()
 
+    def _remove_expired_tracklets(self) -> None:
+        for tracklet in self.tracklet_manager.all_tracklets():
+            if tracklet.status == TrackingStatus.REMOVED:
+                self.tracklet_manager.remove_tracklet(tracklet.id)
 
     def find_overlapping_tracklets(self, tracklets: list[Tracklet]) -> set[PanoramicOverlapInfo]:
 

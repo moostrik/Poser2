@@ -61,7 +61,7 @@ class TrackletManager:
                 tracklet,
                 id=id,
                 status=TrackingStatus.NEW,
-                is_updated=True
+                needs_notification=True
             )
             self._tracklets[id] = new_tracklet
             return id
@@ -85,12 +85,12 @@ class TrackletManager:
                     return tracklet.id
             return None
 
-    def replace_tracklet(self, id: int, new_tracklet: Tracklet) -> None:
+    def replace_tracklet(self, id: int, new_tracklet: Tracklet) -> int:
         with self._lock:
             old_tracklet: Tracklet | None = self._tracklets.get(id)
             if old_tracklet is None:
                 print(f"PersonManager: Attempted to replace non-existent tracklet with ID {id}.")
-                return
+                return -1
 
             status: TrackingStatus = new_tracklet.status
             if status == TrackingStatus.NEW:
@@ -107,55 +107,60 @@ class TrackletManager:
                 created_at=old_tracklet.created_at,
                 last_active=last_active,
                 status=status,
-                is_updated=True
+                needs_notification=True
             )
             self._tracklets[id] = updated_tracklet
+            return id
 
-    def merge_tracklets(self, keep_id: int, remove_id: int) -> None:
+    def merge_tracklets(self, keep_id: int, remove_id: int) -> tuple[int, int]:
         with self._lock:
             # Validate IDs
             if keep_id in (-1, None) or keep_id == remove_id:
                 print(f"TrackletManager: Invalid merge (keep.id={keep_id}, remove.id={remove_id})")
-                return
+                return -1, -1
 
             keep: Optional[Tracklet] = self._tracklets.get(keep_id)
             remove: Optional[Tracklet] = self._tracklets.get(remove_id)
 
             if keep is None or remove is None:
                 print(f"TrackletManager: One of the tracklets in the merge {keep_id} and {remove_id} is None. Skipping merge.")
-                return
+                return -1, -1
 
             if not keep.is_active:
                 print(f"TrackletManager: Cannot merge tracklet with status {keep.status} (keep.id={keep.id}, remove.id={remove.id})")
-                return
+                return -1, -1
 
 
             # Determine which tracklet is oldest
             if keep.age_in_seconds >= remove.age_in_seconds:
-                merged_id, merged_created_at = keep.id, keep.created_at
-                other_id, other_created_at = remove.id, remove.created_at
+                merge, other = keep, remove
             else:
-                merged_id, merged_created_at = remove.id, remove.created_at
-                other_id, other_created_at = keep.id, keep.created_at
+                merge, other = remove, keep
 
             # Use all other data from the newest (the 'keep' tracklet)
             merged_tracklet: Tracklet = replace(
                 keep,
-                id=merged_id,
-                created_at=merged_created_at,
+                id=merge.id,
+                created_at=merge.created_at,
                 status=TrackingStatus.TRACKED,
-                is_updated=True
+                needs_notification=True
             )
-            self._tracklets[merged_id] = merged_tracklet
+            self._tracklets[merge.id] = merged_tracklet
+
+            needs_notification: bool = True
+            if other.status == TrackingStatus.NEW: # if a tracklet is just added and instantly merged, we don't want to mark it as updated
+                needs_notification = False
 
             other_tracklet: Tracklet = replace(
                 remove,
-                id=other_id,
-                created_at=other_created_at,
+                id=other.id,
+                created_at=other.created_at,
                 status=TrackingStatus.REMOVED,
-                is_updated=True
+                needs_notification=needs_notification
             )
-            self._tracklets[other_id] = other_tracklet
+            self._tracklets[other.id] = other_tracklet
+
+            return merge.id, other.id
 
     def retire_tracklet(self, id: int) -> None:
         with self._lock:
@@ -167,18 +172,17 @@ class TrackletManager:
             removed_tracklet: Tracklet = replace(
                 tracklet,
                 status=TrackingStatus.REMOVED,
-                is_updated=True
+                needs_notification=True
             )
             self._tracklets[id] = removed_tracklet
 
-    def mark_all_as_not_updated(self) -> None:
-        """Mark all tracklets as not updated"""
+    def mark_all_as_notified(self) -> None:
         with self._lock:
             for id, tracklet in self._tracklets.items():
-                if tracklet.is_updated:
+                if tracklet.needs_notification:
                     updated_tracklet: Tracklet = replace(
                         tracklet,
-                        is_updated=False
+                        needs_notification=False
                     )
                     self._tracklets[id] = updated_tracklet
 

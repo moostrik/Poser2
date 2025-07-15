@@ -76,7 +76,7 @@ class Tracklet:
 
     tracker_info: Optional[BaseTrackerInfo] = field(default = None)
     _external_tracklet: Optional[ExternalTracklet] = field(default=None, repr=False)
-    is_updated: bool =          field(default=True, repr=False)
+    needs_notification: bool =  field(default=True, repr=False)
 
     @property
     def is_new(self) -> bool:
@@ -128,7 +128,7 @@ class Tracklet:
         if hasattr(dct, 'status'):
             status = DEPTHAI_TO_TRACKINGSTATUS.get(dct.status, TrackingStatus.NONE)
         else:
-            warnings.warn("Missing 'status' in DepthCamTracklet, defaulting to PROTO.")
+            warnings.warn("Missing 'status' in DepthCamTracklet, defaulting to None.")
             return None
 
         roi: Optional[Rect] = None
