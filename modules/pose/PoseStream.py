@@ -14,6 +14,8 @@ import numpy as np
 from modules.pose.PoseDefinitions import *
 from modules.Settings import Settings
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 # Type for analysis output callback
 @dataclass (frozen=False)
 class PoseStreamData:
@@ -26,11 +28,45 @@ PoseStreamDataDict = dict[int, PoseStreamData]
 
 class PoseStream:
     def __init__(self, settings) -> None:
+        self.settings = settings  # Store settings for processor recreation
         self.result_queue = Queue()
         self.processor = PoseStreamProcessor(settings, self.result_queue)
         self.output_callbacks: Set[PoseStreamDataCallback] = set()
         self.result_thread = Thread(target=self._handle_results, daemon=True)
         self.running = False
+
+        # Hot reload setup for restarting processor
+        self.hot_reloader = HotReloadMethods(PoseStreamProcessor, True, True)
+        self.hot_reloader.add_file_changed_callback(self._on_file_changed)
+
+    def _on_file_changed(self) -> None:
+        """Restart the processor when files change."""
+        print("[PoseStream] File changed, restarting processor...")
+        if self.running:
+            self._restart_processor()
+
+    def _restart_processor(self) -> None:
+        """Restart the processor process."""
+        try:
+            # Stop current processor
+            if self.processor.is_alive():
+                print("[PoseStream] Stopping current processor...")
+                self.processor.stop()
+                self.processor.join(timeout=2.0)  # Wait a bit longer for graceful shutdown
+
+                if self.processor.is_alive():
+                    print("[PoseStream] Force terminating processor...")
+                    self.processor.terminate()
+                    self.processor.join(timeout=1.0)
+
+            # Create new processor
+            print("[PoseStream] Creating new processor...")
+            self.processor = PoseStreamProcessor(self.settings, self.result_queue)
+            self.processor.start()
+            print("[PoseStream] Processor restarted successfully")
+
+        except Exception as e:
+            print(f"[PoseStream] Error restarting processor: {e}")
 
     def start(self) -> None:
         """Start the processor and result handler."""
@@ -41,6 +77,11 @@ class PoseStream:
     def stop(self) -> None:
         """Stop the processor and result handler."""
         self.running = False
+
+        # Stop hot reloader
+        self.hot_reloader.stop_file_watcher()
+
+        # Stop processor
         self.processor.stop()
         self.processor.join(timeout=1.0)
         if self.processor.is_alive():
@@ -48,7 +89,13 @@ class PoseStream:
 
     def add_pose(self, pose) -> None:
         """Add pose to processing queue."""
-        self.processor.add_pose(pose)
+        try:
+            self.processor.add_pose(pose)
+        except Exception as e:
+            print(f"[PoseStream] Error adding pose: {e}")
+            # # If processor is dead, try to restart it
+            # if not self.processor.is_alive() and self.running:
+            #     self._restart_processor()
 
     def add_stream_callback(self, callback: PoseStreamDataCallback) -> None:
         """Register a callback to receive processed data."""
@@ -69,9 +116,6 @@ class PoseStream:
                 continue
 
 
-
-
-
 class PoseStreamProcessor(Process):
     def __init__(self, settings: Settings, result_queue: Queue) -> None:
         super().__init__()
@@ -90,15 +134,13 @@ class PoseStreamProcessor(Process):
         self.angle_buffers: dict[int, pd.DataFrame] = {}
         self.confidence_buffers: dict[int, pd.DataFrame] = {}
 
-        # Note: HotReloadMethods won't work across processes
-        # hot_reloader = HotReloadMethods(self.__class__, True)
-
     def stop(self) -> None:
         self._stop_event.set()
         self.angle_buffers.clear()
         self.confidence_buffers.clear()
 
     def run(self) -> None:
+        print("[PoseStreamProcessor] Starting processor...")
         while not self._stop_event.is_set():
             try:
                 pose: Optional[Pose] = self.pose_input_queue.get(block=True, timeout=0.01)
@@ -109,22 +151,26 @@ class PoseStreamProcessor(Process):
                         print(f"Error processing pose {pose.id}: {e}")
             except:  # multiprocessing.Queue uses different exception
                 continue
+        print("[PoseStreamProcessor] Processor stopped")
 
     def add_pose(self, pose: Pose) -> None:
         """Add pose to processing queue - can be called from main process."""
-        self.pose_input_queue.put(pose)
+        try:
+            self.pose_input_queue.put(pose, block=False)
+        except:
+            # Queue is full, skip this pose
+            pass
 
     def _process(self, pose: Pose) -> None:
         """ Process a pose and update the joint angle windows. """
 
         if pose.angles is None:
-            # print(f"WINDOW: Skipping pose {pose.id} with no pose angles, this should not happen")
             return
 
         # Build angle/confidence dicts
         angle_row: dict[str, float] = {Keypoint(k).name: v["angle"] for k, v in pose.angles.items()}
         conf_row: dict[str, float] = {Keypoint(k).name: v["confidence"] for k, v in pose.angles.items()}
-        timestamp: pd.Timestamp = pose.time_stamp  # Assume pd.Timestamp
+        timestamp: pd.Timestamp = pose.time_stamp
 
         # Update angle window
         angle_df: pd.DataFrame = self.angle_buffers.get(pose.id, pd.DataFrame())
@@ -134,7 +180,7 @@ class PoseStreamProcessor(Process):
         angle_df = angle_df.iloc[-self.buffer_capacity:]
         self.angle_buffers[pose.id] = angle_df
 
-        # # Update confidence window
+        # Update confidence window
         conf_df: pd.DataFrame = self.confidence_buffers.get(pose.id, pd.DataFrame())
         conf_row_df = pd.DataFrame([conf_row], index=[timestamp])
         conf_df = pd.concat([conf_df, conf_row_df])
@@ -143,8 +189,7 @@ class PoseStreamProcessor(Process):
         self.confidence_buffers[pose.id] = conf_df
 
         # Interpolate and smooth angles
-        angle_df.interpolate(method='time', limit_direction='both', limit = 7, inplace=True)
-        # angle_df = PoseWindowBuffer.rolling_circular_mean(angle_df, window=0.4, min_periods=1)
+        angle_df.interpolate(method='time', limit_direction='both', limit=7, inplace=True)
         angle_df = PoseStreamProcessor.ewm_circular_mean(angle_df, span=7.0)
 
         # Send results back to main process via queue
@@ -177,8 +222,6 @@ class PoseStreamProcessor(Process):
     def _notify_callbacks(self, data: PoseStreamData) -> None:
         """ Send results back to main process via queue. """
         try:
-            # Non-blocking put to avoid deadlocks
             self.result_queue.put(data, block=False)
         except:
-            # Queue is full, skip this update
             pass
