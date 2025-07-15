@@ -105,13 +105,20 @@ class PanoramicTracker(Thread):
         self._remove_expired_tracklets()
 
     def _add_tracklet(self, new_tracklet: Tracklet) -> None:
-        if new_tracklet.status == TrackingStatus.REMOVED:
+        # If tracklet is removed, retire it
+        if new_tracklet.is_removed:
+            existing_tracklet_id: Optional[int] = self.tracklet_manager.get_id_by_cam_and_external_id(new_tracklet.cam_id, new_tracklet.external_id)
+            if existing_tracklet_id is not None:
+                self.tracklet_manager.retire_tracklet(existing_tracklet_id)
             return
+
+        # filter out tracklets that are too young or too small
         if new_tracklet.external_age_in_frames <= self.tracklet_min_age:
             return
         if new_tracklet.roi.height < self.tracklet_min_height:
             return
 
+        # Construct PanoramicTrackerInfo with local and world angles
         local_angle, world_angle, _overlap = self.geometry.get_angles_and_overlap(new_tracklet.roi, new_tracklet.cam_id, self.cam_360_edge_threshold)
         new_tracklet = replace(new_tracklet, tracker_info=PanoramicTrackerInfo(local_angle, world_angle, _overlap))
 
@@ -123,6 +130,7 @@ class PanoramicTracker(Thread):
         existing_tracklet_id: Optional[int] = self.tracklet_manager.get_id_by_cam_and_external_id(new_tracklet.cam_id, new_tracklet.external_id)
         if existing_tracklet_id is not None:
             self.tracklet_manager.replace_tracklet(existing_tracklet_id, new_tracklet)
+
         # If it doesn't exist, add it as a new tracklet
         elif new_tracklet.is_active:
             self.tracklet_manager.add_tracklet(new_tracklet)
@@ -131,7 +139,6 @@ class PanoramicTracker(Thread):
         # retire expired tracklets
         for tracklet in self.tracklet_manager.all_tracklets():
             if tracklet.is_expired(self.timeout):
-                print(f"PanoramicTracker: Retiring expired tracklet {tracklet.id}")
                 self.tracklet_manager.retire_tracklet(tracklet.id)
 
         # merge overlapping tracklets
