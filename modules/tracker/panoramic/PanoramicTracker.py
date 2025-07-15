@@ -75,7 +75,7 @@ class PanoramicTracker(Thread):
             self.tracklet_callbacks.clear()
 
     def run(self) -> None:
-        last_update_time = time.time()
+        next_update_time = time.time() + self.update_interval
 
         while self.running:
             current_time = time.time()
@@ -90,10 +90,13 @@ class PanoramicTracker(Thread):
                 except Empty:
                     break
 
-            # Update and notify at 25 FPS
-            if current_time - last_update_time >= self.update_interval:
+            # Update and notify at precise intervals
+            if current_time >= next_update_time:
                 self._update_and_notify()
-                last_update_time: float = current_time
+                next_update_time += self.update_interval
+                # In case of drift, catch up
+                if current_time > next_update_time:
+                    next_update_time = current_time + self.update_interval
 
             # Small sleep to prevent excessive CPU usage when no tracklets are available
             if not processed_any:

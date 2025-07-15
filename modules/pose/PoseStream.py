@@ -150,7 +150,6 @@ class PoseStreamProcessor(Process):
         # Store settings values (not the settings object itself)
         self.buffer_capacity: int = int(settings.pose_buffer_duration * settings.camera_fps)
         self.resample_interval: str = f"{int(1.0 / settings.camera_fps * 1000)}ms"
-        print(f"[PoseStreamProcessor] Buffer capacity: {self.buffer_capacity}, Resample interval: {self.resample_interval}")
 
         # Initialize buffers (will be recreated in child process)
         self.angle_buffers: dict[int, pd.DataFrame] = {}
@@ -162,7 +161,6 @@ class PoseStreamProcessor(Process):
         self.confidence_buffers.clear()
 
     def run(self) -> None:
-        print("[PoseStreamProcessor] Starting processor...")
         while not self._stop_event.is_set():
             try:
                 pose: Optional[PoseStreamInput] = self.pose_input_queue.get(block=True, timeout=0.01)
@@ -171,9 +169,8 @@ class PoseStreamProcessor(Process):
                         self._process(pose)
                     except Exception as e:
                         print(f"Error processing pose {pose.id}: {e}")
-            except:  # multiprocessing.Queue uses different exception
+            except:
                 continue
-        print("[PoseStreamProcessor] Processor stopped")
 
     def add_pose(self, pose: PoseStreamInput) -> None:
         """Add pose to processing queue - can be called from main process."""
@@ -229,12 +226,13 @@ class PoseStreamProcessor(Process):
 
         # Interpolate and smooth angles
         # angle_df.resample(self.resample_interval).interpolate(method='time', limit_direction='both', inplace=True)
+        # conf_df.resample(self.resample_interval).interpolate(method='time', limit_direction='both', inplace=True)
         angle_df.interpolate(method='time', limit_direction='both', limit=7, inplace=True)
         angle_df = PoseStreamProcessor.ewm_circular_mean(angle_df, span=7.0)
 
-        if pose.id == 0: # or pose.id == 3:  # Debugging for specific players
-            interval: float = PoseStreamProcessor.get_mean_interval(angle_df)
-            print(f"[PoseStreamProcessor] Processed pose {pose.id} with interval {interval:.3f}s")
+        # if pose.id == 0: # or pose.id == 3:  # Debugging for specific players
+        #     interval: float = PoseStreamProcessor.get_mean_interval(angle_df)
+        #     print(f"[PoseStreamProcessor] Processed pose {pose.id} with interval {interval:.3f}s")
 
         # Send results back to main process via queue
         self._notify_callbacks(PoseStreamData(pose.id, angle_df, conf_df))
