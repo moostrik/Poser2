@@ -1,10 +1,8 @@
 # Standard library imports
 from dataclasses import replace
 from queue import Queue
-import time
 from threading import Thread, Lock
 import os
-from typing import Optional
 
 # Third-party imports
 import cv2
@@ -12,7 +10,7 @@ import numpy as np
 import onnxruntime as ort
 
 # Local application imports
-from modules.pose.PoseDefinitions import *
+from modules.pose.PoseDefinitions import Pose, PosePoints, ModelType, ModelFileNames, ModelInputSize
 
 class Detection(Thread):
     _model_load_lock: Lock = Lock()
@@ -46,6 +44,7 @@ class Detection(Thread):
 
     def run(self) -> None:
         self.load_model_once()
+        self.warm_up_inference()
 
         self._running = True
         while self._running:
@@ -68,7 +67,7 @@ class Detection(Thread):
                 # Process the pose
                 image: np.ndarray | None = pose.image
                 if image is not None:
-                    poses: PoseList = self.RunSession(Detection._model_session, Detection._moodel_size, image)
+                    poses: list[PosePoints] = self.run_session(Detection._model_session, Detection._moodel_size, image)
                     if len(poses) > 0:
                         pose: Pose = replace(
                             pose,
@@ -83,12 +82,19 @@ class Detection(Thread):
     def load_model_once(self) -> None:
         with Detection._model_load_lock:
             if not Detection._model_loaded:
-                Detection._model_session, Detection._moodel_size = self.LoadSession(self._model_type, Detection._model_path)
+                Detection._model_session, Detection._moodel_size = self.load_session(self._model_type, Detection._model_path)
                 Detection._model_loaded = True
+
+    def warm_up_inference(self) -> None:
+        input_size: int = Detection._moodel_size
+        dummy_image: np.ndarray = np.zeros((input_size, input_size, 3), dtype=np.uint8)
+        # Run a dummy inference to trigger CUDA/ONNX initialization
+        _: list[PosePoints] = self.run_session(Detection._model_session, input_size, dummy_image)
 
     # GETTERS AND SETTERS
     def add_pose(self, pose: Pose) -> None:
-        self._input_queue.put(pose)
+        if self._running:
+            self._input_queue.put(pose)
 
     def get_frame_size(self) -> int:
         return Detection._moodel_size
@@ -106,7 +112,7 @@ class Detection(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def LoadSession(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSession, int]:
+    def load_session(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSession, int]:
         path: str = os.path.join(model_path, ModelFileNames[model_type.value])
         onnx_session = ort.InferenceSession(
             path,
@@ -119,7 +125,7 @@ class Detection(Thread):
         return onnx_session, input_size
 
     @staticmethod
-    def RunSession(onnx_session: ort.InferenceSession, input_size: int, image: np.ndarray) -> PoseList:
+    def run_session(onnx_session: ort.InferenceSession, input_size: int, image: np.ndarray) -> list[PosePoints]:
         height, width = image.shape[:2]
         if height != input_size or width != input_size:
             image = Detection.resize_with_pad(image, input_size, input_size)
@@ -140,7 +146,7 @@ class Detection(Thread):
             pose = PosePoints(keypoints, scores)
             return [pose]
         else: # ModelType.MULTI
-            poses: PoseList = []
+            poses: list[PosePoints] = []
             for kps in keypoints_with_scores:
 
                 mean_score = kps[55]
