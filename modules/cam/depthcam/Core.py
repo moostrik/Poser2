@@ -37,7 +37,7 @@ class Core(Thread):
         self.square: bool =             general_settings.camera_square
         self.do_color: bool =           general_settings.camera_color
         self.do_stereo: bool =          general_settings.camera_stereo
-        self.do_yolo: bool =          general_settings.camera_yolo
+        self.do_yolo: bool =            general_settings.camera_yolo
         self.show_stereo: bool =        general_settings.camera_show_stereo
         self.simulation: bool =         general_settings.camera_simulation
 

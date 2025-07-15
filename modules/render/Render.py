@@ -167,13 +167,12 @@ class Render(RenderWindow):
 
         try:
             self.update_R_meshes()
+            self.update_pose_meshes()
+            self.update_angle_meshes()
 
             self.draw_cameras()
             self.draw_sims()
             self.draw_lights()
-
-            self.update_pose_meshes()
-            self.update_angle_meshes()
             self.draw_poses()
 
             self.draw_composition()
@@ -324,8 +323,8 @@ class Render(RenderWindow):
             self.setView(fbo.width, fbo.height)
             if i == DataVisType.TRACKING.value:
                 self.draw_map_positions(self.get_tracklets(), self.num_cams, fbo)
-            elif i == DataVisType.R_PAIRS.value:
-                self.draw_R_pairs(self.R_meshes, fbo)
+            # elif i == DataVisType.R_PAIRS.value:
+            #     self.draw_R_pairs(self.R_meshes, fbo)
 
     def draw_lights(self) -> None:
         self.vis_image.update()

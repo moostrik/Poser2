@@ -31,7 +31,8 @@ class RenderWindow(Thread):
         self.frame_interval: None | int = None
         if fps and fps > 0:
             self.frame_interval = int((1.0 / fps) * 1_000_000_000)
-        self.last_time: int = time.time_ns()
+            self.v_sync = False  # Disable v-sync if we are controlling FPS manually
+        # self.last_time: int = time.time_ns()
         self.windowName: str = name
         self.fps = FpsCounter()
         self.window_x: int = posX
@@ -62,7 +63,14 @@ class RenderWindow(Thread):
             wglSwapIntervalEXT(1)
         self.initGL()
         glut.glutDisplayFunc(self.drawWindow)
-        glut.glutIdleFunc(self.drawWindow)
+
+        # Use timer for precise FPS control instead of idle function
+        if self.frame_interval:
+            timer_ms = max(1, int(self.frame_interval / 1_000_000))  # Convert to milliseconds
+            glut.glutTimerFunc(timer_ms, self.timerCallback, 0)
+        else:
+            glut.glutIdleFunc(self.drawWindow)
+
         glut.glutKeyboardFunc(self.keyboardCallback)
         glut.glutSpecialFunc(self.specialKeyCallback)
         glut.glutPassiveMotionFunc(self.mouseMotionCallback)
@@ -117,17 +125,20 @@ class RenderWindow(Thread):
             # glut.glutPositionWindow(100, 100)
             # glut.glutSetCursor(glut.GLUT_CURSOR_LEFT_ARROW)
 
-    def drawWindow(self) -> None:
-        current_time: int = time.time_ns()
-        elapsed_time: int = current_time - self.last_time
+    def timerCallback(self, value) -> None:
+        glut.glutPostRedisplay()
+        if self.frame_interval and self.running:
+            timer_ms = max(1, int(self.frame_interval / 1_000_000))
+            glut.glutTimerFunc(timer_ms, self.timerCallback, 0)
 
-        if self.frame_interval and elapsed_time < self.frame_interval:
-            time.sleep((self.frame_interval - elapsed_time) / 1_000_000_000)
-        self.last_time = time.time_ns()
+    def drawWindow(self) -> None:
+        # Remove the frame timing logic since timer handles it
+        # self.last_time = time.time_ns()
 
         self.fps.tick()
-        fps = str(self.fps.get_min_fps())
-        glut.glutSetWindowTitle(' FPS: ' + fps + '          ' + self.windowName)
+        fps = str(self.fps.get_fps())
+        min_fps = str(self.fps.get_min_fps())
+        glut.glutSetWindowTitle(f'{self.windowName} - FPS: {fps} (Min: {min_fps})')
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # type: ignore
