@@ -11,8 +11,8 @@ from modules.gui.PyReallySimpleGui import Gui
 from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
 from modules.correlation.DTWCorrelator import DTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
-from modules.pose.PoseStream import PoseStream
-from modules.correlation.PairCorrelationStream import PairCorrelationStreamProcessor
+from modules.pose.PoseStream import PoseStreamManager
+from modules.correlation.PairCorrelationStream import PairCorrelationStreamManager
 from modules.render.Render import Render
 from modules.Settings import Settings
 
@@ -41,9 +41,9 @@ class Main():
         self.panoramic_tracker = PanoramicTracker(self.gui, settings)
 
         self.pose_detection = PosePipeline(settings)
-        self.pose_streamer = PoseStream(settings)
+        self.pose_streamer = PoseStreamManager(settings)
         self.dtw_correlator = DTWCorrelator(settings)
-        self.correlation_streamer = PairCorrelationStreamProcessor(settings)
+        self.correlation_streamer = PairCorrelationStreamManager(settings)
 
         self.av: AV = AV(self.gui, settings)
         self.running: bool = False
@@ -127,7 +127,6 @@ class Main():
 
         # print('stop detector')
         self.panoramic_tracker.stop()
-        self.panoramic_tracker.join()
 
         if self.pose_detection:
             self.pose_detection.stop()
@@ -135,7 +134,6 @@ class Main():
             self.pose_streamer.stop()
         if self.dtw_correlator:
             self.dtw_correlator.stop()
-            self.dtw_correlator.join()
         if self.correlation_streamer:
             self.correlation_streamer.stop()
 

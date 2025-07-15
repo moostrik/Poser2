@@ -375,7 +375,7 @@ class Render(RenderWindow):
             fbo.begin()
             image.draw(0, 0, fbo.width, fbo.height)
 
-            tracklet: Tracklet | None = self.get_tracklet(i)
+            tracklet: Tracklet | None = pose.tracklet
             pose_mesh: Mesh = self.pose_meshes[pose.id]
             if tracklet is None:
                 pose_mesh.draw(0, 0, fbo.width, fbo.height)

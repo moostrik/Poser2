@@ -20,6 +20,13 @@ class FpsCounter:
             return 0
         return int(math.floor(len(self._times) / diff))
 
+    def get_min_fps(self) -> int:
+        if len(self._times) < 2:
+            return 0
+        max_diff: float = max(self._times[i+1] - self._times[i] for i in range(len(self._times) - 1))
+        if max_diff == 0:
+            return 0
+        return int(math.floor(1.0 / max_diff))
 
 def lfo(frequency, phase=0) -> float:
     elapsed_time: float = time()

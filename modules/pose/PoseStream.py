@@ -45,7 +45,7 @@ class PoseStreamData:
 PoseStreamDataCallback = Callable[[PoseStreamData], None]
 PoseStreamDataDict = dict[int, PoseStreamData]
 
-class PoseStream:
+class PoseStreamManager:
     def __init__(self, settings) -> None:
         self.settings = settings  # Store settings for processor recreation
         self.result_queue = Queue()

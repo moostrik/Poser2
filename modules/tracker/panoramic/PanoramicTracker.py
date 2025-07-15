@@ -74,6 +74,8 @@ class PanoramicTracker(Thread):
         with self.callback_lock:
             self.tracklet_callbacks.clear()
 
+        self.join()  # Wait for the thread to finish
+
     def run(self) -> None:
         next_update_time = time.time() + self.update_interval
 
@@ -228,12 +230,13 @@ class PanoramicTracker(Thread):
 
             # if tracklet.id == 1:
             #     addtracklets = []
-            #     for i in range(4, 8):
+            #     for i in range(5, 8):
             #         # Create a new tracklet with a different ID
             #         another_tracklet: Tracklet = replace(tracklet, id=i)
             #         addtracklets.append(another_tracklet)
             #     for at in addtracklets:
-            #         c(at)
+            #         for c in self.tracklet_callbacks:
+            #             c(at)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         with self.callback_lock:

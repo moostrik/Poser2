@@ -126,7 +126,7 @@ class RenderWindow(Thread):
         self.last_time = time.time_ns()
 
         self.fps.tick()
-        fps = str(self.fps.get_fps())
+        fps = str(self.fps.get_min_fps())
         glut.glutSetWindowTitle(' FPS: ' + fps + '          ' + self.windowName)
 
         glClearColor(0.0, 0.0, 0.0, 1.0)

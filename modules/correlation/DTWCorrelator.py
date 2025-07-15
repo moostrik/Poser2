@@ -162,12 +162,10 @@ class DTWCorrelator():
 
     def stop(self) -> None:
         self._stop_event.set()
+        self._correlation_thread.join()
         self._process_pool.shutdown(wait=False)
         with self._callback_lock:
             self._callbacks.clear()
-
-    def join(self) -> None:
-        self._correlation_thread.join()
 
     def run(self) -> None:
         while not self._stop_event.is_set():
