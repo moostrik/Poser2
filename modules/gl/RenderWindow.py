@@ -60,7 +60,10 @@ class RenderWindow(Thread):
             glut.glutFullScreen()
             glut.glutSetCursor(glut.GLUT_CURSOR_NONE)
         if self.v_sync:
-            wglSwapIntervalEXT(1)
+            wglSwapIntervalEXT(1)   # Enable V-Sync
+        else:
+            wglSwapIntervalEXT(0)   # Disable V-Sync
+        
         self.initGL()
         glut.glutDisplayFunc(self.drawWindow)
 
