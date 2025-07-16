@@ -35,6 +35,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # Shaders
 from modules.gl.shaders.WS_Angles import WS_Angles
 from modules.gl.shaders.WS_Lines import WS_Lines
+from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 
 from modules.gl.shaders.RStream import RStream
 
@@ -102,8 +103,9 @@ class Render(RenderWindow):
         # shaders
         self.vis_line_shader: WS_Lines = WS_Lines()
         self.vis_angle_shader: WS_Angles = WS_Angles()
+        self.pose_stream_shader: WS_PoseStream = WS_PoseStream()
         self.r_stream_shader = RStream()
-        self.all_shaders: list[Shader] = [self.vis_line_shader, self.vis_angle_shader, self.r_stream_shader]
+        self.all_shaders: list[Shader] = [self.vis_line_shader, self.vis_angle_shader, self.pose_stream_shader, self.r_stream_shader]
 
         # composition
         self.composition: Composition_Subdivision = make_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
@@ -111,7 +113,7 @@ class Render(RenderWindow):
 
         self.allocated = False
 
-        self.hot_reloader = HotReloadMethods(self.__class__, True, False)
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def reshape(self, width, height) -> None: # override
         super().reshape(width, height)
@@ -164,7 +166,7 @@ class Render(RenderWindow):
 
     def update_angle_meshes(self) -> None:
         for i in range(self.max_players):
-            pose_stream: PoseStreamData | None = self.data.get_pose_stream(i)
+            pose_stream: PoseStreamData | None = self.data.get_pose_stream(i, False)
             if pose_stream is None:
                 continue
 
@@ -226,7 +228,7 @@ class Render(RenderWindow):
             # Alpha from confidences
 
             conf_flat: np.ndarray = confidences.T.flatten()
-            colors[:, 3] = np.where(conf_flat > 0.0, 1.0, 0.0)
+            colors[:, 3] = conf_flat #np.where(conf_flat > 0.0, 1.0, 0.0)
             # colors[:, 3] = confidences.T.flatten()
             mesh.set_colors(colors)
 
@@ -302,14 +304,22 @@ class Render(RenderWindow):
             if pose is None:
                 continue #??
             pose_image: Image = self.pse_images[i]
-            pose_frame: np.ndarray | None = pose.image
-            if pose_frame is not None:
-                pose_image.set_image(pose_frame)
+            pose_image_np: np.ndarray | None = pose.image
+            if pose_image_np is not None:
+                pose_image.set_image(pose_image_np)
                 pose_image.update()
             pose_mesh: Mesh = self.pose_meshes[pose.id]
-            angle_mesh: Mesh = self.angle_meshes[pose.id]
+            pose_stream: PoseStreamData | None = self.data.get_pose_stream(i)
+            a_s_image: Image = self.a_s_images[i]
+            if pose_stream is not None:
+                a_s_image_np: np.ndarray = self.pose_stream_to_image(pose_stream)
+                a_s_image.set_image(a_s_image_np)
+                a_s_image.update()
 
-            Render.draw_pose(fbo, pose_image, pose, pose_mesh, angle_mesh)
+            angle_mesh: Mesh = self.angle_meshes[pose.id]
+            # i =  pose.id
+
+            Render.draw_pose(fbo, pose_image, pose, pose_mesh, a_s_image, angle_mesh, self.pose_stream_shader)
 
     def draw_lights(self) -> None:
         light_image: AvOutput | None = self.data.get_light_image()
@@ -447,13 +457,13 @@ class Render(RenderWindow):
             RenderWindow.draw_string(x, y, string)
 
     @staticmethod
-    def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_mesh: Mesh) -> None:
+    def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_image: Image, angle_mesh: Mesh, shader: WS_PoseStream) -> None:
         RenderWindow.setView(fbo.width, fbo.height)
 
         if pose.is_final:
             fbo.begin()
-            glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
-            glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
+            glClearColor(0.0, 0.0, 0.0, 1.0)
+            glClear(GL_COLOR_BUFFER_BIT)
             fbo.end()
             return
 
@@ -467,6 +477,7 @@ class Render(RenderWindow):
             angle_mesh.draw(0, 0, fbo.width, fbo.height)
         glFlush()
         fbo.end()
+        shader.use(fbo.fbo_id, angle_image.tex_id)
 
     @staticmethod
     def draw_map_positions(tracklets: dict[int, Tracklet], num_cams: int, fbo: Fbo) -> None:
@@ -515,6 +526,20 @@ class Render(RenderWindow):
 
         fbo.end()
         glFlush()
+
+    @staticmethod
+    def pose_stream_to_image(pose_stream: PoseStreamData) -> np.ndarray:
+        angles_raw: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0).astype(np.float32)
+        angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
+        sign_channel: np.ndarray = (angles_raw > 0).astype(np.float32)
+        confidences: np.ndarray = np.clip(pose_stream.confidences.to_numpy().astype(np.float32), 0, 1)
+        # width, height = angles_norm.shape
+        # img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
+        # img[..., 2] = angles_norm.T   r
+        # img[..., 1] = sign_channel.T  g
+        # img[..., 0] = confidences.T   b
+        channels: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1)  # shape: (width, height, 3)
+        return channels.transpose(1, 0, 2)
 
     @staticmethod
     def draw_R_pairs(R_meshes: dict[Tuple[int, int], Mesh], fbo: Fbo) -> None:

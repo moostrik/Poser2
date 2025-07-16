@@ -224,25 +224,16 @@ class PoseStreamProcessor(Process):
         conf_df = conf_df.iloc[-self.buffer_capacity:]
         self.confidence_buffers[pose.id] = conf_df
 
-        # Interpolate and smooth angles
-        # angle_df.resample(self.resample_interval).interpolate(method='time', limit_direction='both', inplace=True)
-        # conf_df.resample(self.resample_interval).interpolate(method='time', limit_direction='both', inplace=True)
-        angle_df.interpolate(method='time', limit_direction='both', limit=7, inplace=True)
-        angle_df = PoseStreamProcessor.ewm_circular_mean(angle_df, span=7.0)
-
-        # if pose.id == 0: # or pose.id == 3:  # Debugging for specific players
-        #     interval: float = PoseStreamProcessor.get_mean_interval(angle_df)
-        #     print(f"[PoseStreamProcessor] Processed pose {pose.id} with interval {interval:.3f}s")
-
-        # Send results back to main process via queue
-        self._notify_callbacks(PoseStreamData(pose.id, angle_df, conf_df))
+        interpolated: pd.DataFrame = angle_df.interpolate(method='time', limit_direction='both', limit=7)
+        smoothed: pd.DataFrame = PoseStreamProcessor.ewm_circular_mean(interpolated, span=7.0)
+        self._notify_callbacks(PoseStreamData(pose.id, smoothed, conf_df))
 
     @staticmethod
     def rolling_circular_mean(df: pd.DataFrame, window: float = 0.3, min_periods: int = 1) -> pd.DataFrame:
         """ Rolling mean on unwrapped angles to avoid discontinuities at ±π. """
         window_str: str = f"{int(window * 1000)}ms"
         # Unwrap angles to remove discontinuities
-        df_unwrapped: pd.DataFrame = df.apply(np.unwrap)
+        df_unwrapped: pd.DataFrame = df.apply(PoseStreamProcessor.safe_unwrap)
         # Rolling mean on unwrapped angles
         df_smooth: pd.DataFrame = df_unwrapped.rolling(window=window_str, min_periods=min_periods).mean()
 
@@ -252,8 +243,7 @@ class PoseStreamProcessor(Process):
     @staticmethod
     def ewm_circular_mean(df: pd.DataFrame, span: float = 5.0) -> pd.DataFrame:
         """Exponential moving average on unwrapped angles to avoid discontinuities at ±π."""
-        # Unwrap angles to avoid discontinuities at ±π
-        df_unwrapped: pd.DataFrame = df.apply(np.unwrap)
+        df_unwrapped: pd.DataFrame = df.apply(PoseStreamProcessor.safe_unwrap)
 
         # Apply exponential moving average on unwrapped data
         df_smooth: pd.DataFrame = df_unwrapped.ewm(span=span, adjust=False).mean()
@@ -268,3 +258,26 @@ class PoseStreamProcessor(Process):
             return 0.0
         intervals: pd.Series = df.index.to_series().diff().dt.total_seconds()
         return intervals.mean() if not intervals.empty else 0.0
+
+    @staticmethod
+    def safe_unwrap(series):
+        # Find first and last valid indices
+        valid_indices = series.dropna().index
+        if len(valid_indices) < 2:
+            return series  # Not enough valid values to unwrap
+
+        # Create result series
+        result = series.copy()
+
+        # Only unwrap the valid range
+        first_valid = valid_indices[0]
+        last_valid = valid_indices[-1]
+        valid_slice = series.loc[first_valid:last_valid]
+
+        # Unwrap only the valid slice
+        unwrapped_slice = pd.Series(np.unwrap(valid_slice.values), index=valid_slice.index)
+
+        # Put back in result
+        result.loc[first_valid:last_valid] = unwrapped_slice
+
+        return result

@@ -1,0 +1,50 @@
+from OpenGL.GL import * # type: ignore
+from OpenGL.GL.shaders import ShaderProgram # type: ignore
+from modules.gl.Shader import Shader, draw_quad
+
+from modules.pose.PoseStream import PoseStreamData
+import numpy as np
+
+class WS_PoseStream(Shader):
+    def __init__(self) -> None:
+        super().__init__()
+        self.shader_name = self.__class__.__name__
+
+    def allocate(self, monitor_file = False) -> None:
+        super().allocate(self.shader_name, monitor_file)
+
+    def use(self, fbo: int, tex0: int) -> None :
+        super().use()
+        if not self.allocated: return
+        if not fbo or not tex0: return
+        s: ShaderProgram | None = self.shader_program
+        if s is None: return
+
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, tex0)
+
+        glUseProgram(s)
+        glUniform1i(glGetUniformLocation(s, "tex0"), 0)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+        draw_quad()
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+        glUseProgram(0)
+
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+
+    @staticmethod
+    def pose_stream_to_image(pose_stream: PoseStreamData) -> np.ndarray:
+        angles_raw: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0).astype(np.float32)
+        angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
+        sign_channel: np.ndarray = (angles_raw > 0).astype(np.float32)
+        confidences: np.ndarray = np.clip(pose_stream.confidences.to_numpy().astype(np.float32), 0, 1)
+        # width, height = angles_norm.shape
+        # img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
+        # img[..., 2] = angles_norm.T   r
+        # img[..., 1] = sign_channel.T  g
+        # img[..., 0] = confidences.T   b
+        channels: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1)  # shape: (width, height, 3)
+        return channels.transpose(1, 0, 2)
