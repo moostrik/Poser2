@@ -27,18 +27,17 @@ from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices
 from modules.pose.PoseStream import PoseStreamData
 from modules.Settings import Settings
 
+from modules.render.RenderCompositionSubdivision import make_subdivision, SubdivisionType
+from modules.render.RenderDataManager import RenderDataManager
+
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
 from modules.gl.shaders.WS_Angles import WS_Angles
 from modules.gl.shaders.WS_Lines import WS_Lines
 
-class ImageType(Enum):
-    TOT = 0
-    CAM = 1
-    SIM = 2
-    PSN = 3
-    VIS = 4
+from modules.gl.shaders.RStream import RStream
+
 
 class DataVisType(Enum):
     TRACKING = 0
@@ -48,113 +47,87 @@ class LightVisType(Enum):
     LINES = 0
     LIGHTS = 1
 
-Composition_Subdivision = dict[ImageType, dict[int, tuple[int, int, int, int]]]
+Composition_Subdivision = dict[SubdivisionType, dict[int, tuple[int, int, int, int]]]
 
 
 class Render(RenderWindow):
     def __init__(self, settings: Settings) -> None:
 
+        self.data: RenderDataManager = RenderDataManager()
+
+        self.max_players: int = settings.max_players
         self.num_cams: int = settings.camera_num
         self.num_sims: int = len(DataVisType)
         self.num_viss: int = len(LightVisType)
-        self.max_players: int = settings.max_players
+        self.vis_width: int = settings.light_resolution
+        self.r_streams: int = 3
 
+        # images
+        self.avi_image = Image()
         self.cam_images: dict[int, Image] = {}
-        self.psn_images: dict[int, Image] = {}
+        self.pse_images: dict[int, Image] = {}
+        self.a_s_images: dict[int, Image] = {}
+        self.r_s_images: dict[int, Image] = {}
+        for i in range(self.num_cams):
+            self.cam_images[i] = Image()
+        for i in range(self.max_players):
+            self.pse_images[i] = Image()
+            self.a_s_images[i] = Image()
+        for i in range(self.r_streams):
+            self.r_s_images[i] = Image()
 
+        # fbos
         self.cam_fbos: dict[int, Fbo] = {}
         self.sim_fbos: dict[int, Fbo] = {}
         self.vis_fbos: dict[int, Fbo] = {}
-        self.psn_fbos: dict[int, Fbo] = {}
-
-        self.R_meshes: dict[Tuple[int, int], Mesh] = {}  # pair_id -> Mesh
-        self.pose_meshes: dict[int, Mesh] = {}
-        self.angle_meshes: dict[int, Mesh] = {}
-
-        self.all_images: list[Image] = []
-        self.all_fbos: list[Fbo | SwapFbo] = []
-        # self.all_meshes: list[Mesh] = []
-        self.all_shaders: list[Shader] = []
-
+        self.pse_fbos: dict[int, Fbo] = {}
         for i in range(self.num_cams):
-            self.cam_images[i] = Image()
-            self.all_images.append(self.cam_images[i])
             self.cam_fbos[i] = Fbo()
-            self.all_fbos.append(self.cam_fbos[i])
-
         for i in range(self.num_sims):
             self.sim_fbos[i] = Fbo()
-            self.all_fbos.append(self.sim_fbos[i])
-
         for i in range(self.num_viss):
             self.vis_fbos[i] = Fbo()
-            self.all_fbos.append(self.vis_fbos[i])
-
         for i in range(self.max_players):
-            self.psn_images[i] = Image()
-            self.all_images.append(self.psn_images[i])
+            self.pse_fbos[i] = Fbo()
 
-            self.psn_fbos[i] = Fbo()
-            self.all_fbos.append(self.psn_fbos[i])
-
+        # meshes
+        self.pose_meshes: dict[int, Mesh] = {}
+        self.angle_meshes: dict[int, Mesh] = {}
+        self.R_meshes: dict[Tuple[int, int], Mesh] = {}
+        for i in range(self.max_players):
             self.pose_meshes[i] = Mesh()
             self.pose_meshes[i].set_indices(PoseEdgeIndices)
-
             self.angle_meshes[i] = Mesh()
-            # self.all_meshes.append(self.angle_meshes[i])
 
-        self.composition: Composition_Subdivision = self.make_composition_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
-        super().__init__(self.composition[ImageType.TOT][0][2], self.composition[ImageType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_fps, settings.render_x, settings.render_y)
-
-        self.allocated = False
-
-        self.input_mutex: Lock = Lock()
-        self.input_depth_tracklets: dict[int, dict[int, CamTracklet]] = {}
-        self.input_tracklets: dict[int, Optional[Tracklet]] = {}
-        self.input_poses: dict[int, Optional[Pose]] = {}
-        self.input_angle_windows: dict[int, Optional[np.ndarray]] = {}
-        for i in range(self.max_players):
-            self.input_depth_tracklets[i] = {}
-            self.input_tracklets[i] = None
-            self.input_poses[i] = None
-            self.input_angle_windows[i] = None
-
-        self.vis_width: int = settings.light_resolution
-        self.vis_height: int = 1
-        self.vis_image = Image()
-        self.all_images.append(self.vis_image)
+        # shaders
         self.vis_line_shader: WS_Lines = WS_Lines()
         self.vis_angle_shader: WS_Angles = WS_Angles()
-        self.all_shaders.append(self.vis_line_shader)
-        self.all_shaders.append(self.vis_angle_shader)
+        self.r_stream_shader = RStream()
+        self.all_shaders: list[Shader] = [self.vis_line_shader, self.vis_angle_shader, self.r_stream_shader]
 
-        self.analysis_images: dict[int, Image] = {}
-        for i in range(self.max_players):
-            self.analysis_images[i] = Image()
-            self.all_images.append(self.analysis_images[i])
-        # self.analysis_shader: WS_Angles = WS_Angles()
-        # self.all_shaders.append(self.analysis_shader)
+        # composition
+        self.composition: Composition_Subdivision = make_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
+        super().__init__(self.composition[SubdivisionType.TOT][0][2], self.composition[SubdivisionType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_fps, settings.render_x, settings.render_y)
 
-        self.input_R_windows:dict[Tuple[int, int], np.ndarray] = {}
-        self.input_R_window_consumed: bool = True
+        self.allocated = False
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, False)
 
     def reshape(self, width, height) -> None: # override
         super().reshape(width, height)
-        self.composition = self.make_composition_subdivision(width, height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
+        self.composition = make_subdivision(width, height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
 
         for key in self.cam_fbos.keys():
-            x, y, w, h = self.composition[ImageType.CAM][key]
+            x, y, w, h = self.composition[SubdivisionType.CAM][key]
             self.cam_fbos[key].allocate(w, h, GL_RGBA)
 
         for key in self.sim_fbos.keys():
-            x, y, w, h = self.composition[ImageType.SIM][key]
+            x, y, w, h = self.composition[SubdivisionType.SIM][key]
             self.sim_fbos[key].allocate(w, h, GL_RGBA)
 
-        for key in self.psn_fbos.keys():
-            x, y, w, h = self.composition[ImageType.PSN][key]
-            self.psn_fbos[key].allocate(w, h, GL_RGBA)
+        for key in self.pse_fbos.keys():
+            x, y, w, h = self.composition[SubdivisionType.PSN][key]
+            self.pse_fbos[key].allocate(w, h, GL_RGBA)
 
     def draw(self) -> None: # override
         if not self.allocated:
@@ -162,75 +135,49 @@ class Render(RenderWindow):
             for s in self.all_shaders:
                 s.allocate(True) # type: ignore
             for fbo in self.vis_fbos.values():
-                fbo.allocate(self.vis_width, self.vis_height, GL_RGBA32F)
+                fbo.allocate(self.vis_width, 1, GL_RGBA32F)
             self.allocated = True
 
         try:
-            self.update_R_meshes()
             self.update_pose_meshes()
             self.update_angle_meshes()
+            # self.update_R_meshes()
 
             self.draw_cameras()
             self.draw_sims()
-            self.draw_lights()
             self.draw_poses()
+            self.draw_lights()
 
             self.draw_composition()
         except Exception as e:
             print(f"Error in draw: {e}")
 
-    def update_R_meshes(self) -> None:
-        R_windows: Optional[dict[Tuple[int, int], np.ndarray]] = self.get_correlation_windows()
-
-        if R_windows is None:
-            return
-
-        self.R_meshes.clear()
-
-        for pair_id, data in R_windows.items():
-            if data is None or len(data) < 2:
-                continue  # Need at least 2 points to draw a line
-
-            mesh = Mesh()
-            num_points = len(data)
-
-            # X: normalized time (0 to 1), Y: similarity value (assume in [0, 1])
-            x = np.linspace(0, 1, num_points, dtype=np.float32)
-            y = np.clip(data.astype(np.float32), 0.0, 1.0)
-            vertices = np.stack([x, y, np.zeros_like(x)], axis=1)  # shape (num_points, 3)
-
-            # Indices for line strip
-            indices = np.arange(num_points - 1, dtype=np.uint32)
-            indices = np.stack([indices, indices + 1], axis=1).flatten()
-
-            # Colors (e.g., white, or color by pair_id)
-            colors = np.ones((num_points, 4), dtype=np.float32)
-
-            mesh.set_vertices(vertices)
-            mesh.set_indices(indices)
-            mesh.set_colors(colors)
-            mesh.update()
-
-            self.R_meshes[pair_id] = mesh
-
     def update_pose_meshes(self) -> None:
         for i in range(self.max_players):
-            pose_data: Pose | None = self.get_pose(i)
-            if pose_data is not None:
-                pose: PosePoints | None = pose_data.points
-                if pose is not None:
-                    self.pose_meshes[i].set_vertices(pose.getVertices())
-                    self.pose_meshes[i].set_colors(pose.getColors(threshold=0.0))
+            pose: Pose | None = self.data.get_pose(i, True)
+            if pose is not None:
+                points: PosePoints | None = pose.points
+                if points is not None:
+                    self.pose_meshes[i].set_vertices(points.getVertices())
+                    self.pose_meshes[i].set_colors(points.getColors(threshold=0.0))
                     self.pose_meshes[i].update()
 
     def update_angle_meshes(self) -> None:
         for i in range(self.max_players):
-            data: Optional[np.ndarray] = self.get_pose_window(i, clear=True)
-            if data is None:
+            pose_stream: PoseStreamData | None = self.data.get_pose_stream(i)
+            if pose_stream is None:
                 continue
 
+            angles_np: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0)
+            conf_np: np.ndarray = pose_stream.confidences.to_numpy()
+            if angles_np.shape[0] != conf_np.shape[0] or angles_np.shape[1] != conf_np.shape[1]:
+                print(f"Angles shape {angles_np.shape} does not match confidences shape {conf_np.shape}")
+                continue
+            mesh_data: np.ndarray = np.stack([angles_np, conf_np], axis=-1)
+
+
             # Only use the first 4 joints
-            data = data[:, :4, :]
+            data: np.ndarray = mesh_data[:, :4, :]
 
             mesh: Mesh = self.angle_meshes[i]
             num_frames, num_joints, _ = data.shape
@@ -285,205 +232,151 @@ class Render(RenderWindow):
 
             mesh.update()
 
+    def update_R_meshes(self) -> None:
+        r_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams()
+
+        if r_streams is None:
+            return
+
+        return
+        self.R_meshes.clear()
+
+        for pair_r in r_streams.values():
+            pair_id: Tuple[int, int] = pair_r[0]
+            data: Optional[np.ndarray] = pair_r[1]
+
+            if data is None or len(data) < 2:
+                continue  # Need at least 2 points to draw a line
+
+            mesh = Mesh()
+            num_points = len(data)
+
+            # X: normalized time (0 to 1), Y: similarity value (assume in [0, 1])
+            x = np.linspace(0, 1, num_points, dtype=np.float32)
+            y = np.clip(data.astype(np.float32), 0.0, 1.0)
+            vertices = np.stack([x, y, np.zeros_like(x)], axis=1)  # shape (num_points, 3)
+
+            # Indices for line strip
+            indices = np.arange(num_points - 1, dtype=np.uint32)
+            indices = np.stack([indices, indices + 1], axis=1).flatten()
+
+            # Colors (e.g., white, or color by pair_id)
+            colors = np.ones((num_points, 4), dtype=np.float32)
+
+            mesh.set_vertices(vertices)
+            mesh.set_indices(indices)
+            mesh.set_colors(colors)
+            mesh.update()
+
+            self.R_meshes[pair_id] = mesh
+
+
     def draw_cameras(self) -> None:
         for i in range(self.num_cams):
+            frame: np.ndarray | None = self.data.get_cam_image(i)
             image: Image = self.cam_images[i]
-            image.update()
+            if frame is not None:
+                image.set_image(frame)
+                image.update()
             fbo: Fbo = self.cam_fbos[i]
-            depth_tracklets: dict[int, CamTracklet] = self.get_depth_tracklets(i)
-            tracklets: list[Tracklet] = self.get_tracklets_for_cam(i)
+            depth_tracklets: list[CamTracklet] | None = self.data.get_depth_tracklets(i, False)
+            poses: list[Pose] = self.data.get_poses_for_cam(i)
 
-            self.setView(fbo.width, fbo.height)
-            fbo.begin()
-
-            image.draw(0, 0, fbo.width, fbo.height)
-            for depth_tracklet in depth_tracklets.values():
-                self.draw_depth_tracklet(depth_tracklet, 0, 0, fbo.width, fbo.height)
-            for tracklet in tracklets:
-                if tracklet.status == TrackingStatus.REMOVED or tracklet.status == TrackingStatus.LOST:
-                    continue
-                roi: Rect | None  = None
-                pose: Pose | None = self.get_pose(tracklet.id)
-                if pose is not None:
-                    roi = pose.crop_rect
-                mesh: Mesh = self.pose_meshes[tracklet.id]
-                if roi is not None and mesh.isInitialized():
-                    x, y, w, h = roi.x, roi.y, roi.width, roi.height
-                    x *= fbo.width
-                    y *= fbo.height
-                    w *= fbo.width
-                    h *= fbo.height
-                    self.draw_tracklet(tracklet, mesh, x, y, w, h, True, True, False)
-
-            fbo.end()
+            Render.draw_camera(fbo, image, depth_tracklets, poses, self.pose_meshes)
 
     def draw_sims(self) -> None:
         for i in range(self.num_sims):
             fbo: Fbo = self.sim_fbos[i]
             self.setView(fbo.width, fbo.height)
             if i == DataVisType.TRACKING.value:
-                self.draw_map_positions(self.get_tracklets(), self.num_cams, fbo)
+                self.draw_map_positions(self.data.get_tracklets(), self.num_cams, fbo)
             # elif i == DataVisType.R_PAIRS.value:
-            #     self.draw_R_pairs(self.R_meshes, fbo)
+            #     R_windows = self.get_correlation_windows()
+            #     if R_windows:
+            #         self.draw_R_pairs_shader(R_windows, fbo)
+
+    def draw_poses(self) -> None:
+        for i in range(self.max_players):
+            fbo: Fbo = self.pse_fbos[i]
+            pose: Pose | None = self.data.get_pose(i, False)
+            if pose is None:
+                continue #??
+            pose_image: Image = self.pse_images[i]
+            pose_frame: np.ndarray | None = pose.image
+            if pose_frame is not None:
+                pose_image.set_image(pose_frame)
+                pose_image.update()
+            pose_mesh: Mesh = self.pose_meshes[pose.id]
+            angle_mesh: Mesh = self.angle_meshes[pose.id]
+
+            Render.draw_pose(fbo, pose_image, pose, pose_mesh, angle_mesh)
 
     def draw_lights(self) -> None:
-        self.vis_image.update()
+        light_image: AvOutput | None = self.data.get_light_image()
+        if light_image is None:
+            return
+
+        self.avi_image.set_image(light_image.img)
+        self.avi_image.update()
 
         for i in range(self.num_viss):
             fbo: Fbo = self.vis_fbos[i]
             self.setView(fbo.width, fbo.height)
             fbo.begin()
             if i == LightVisType.LINES.value:
-                self.draw_light_lines(fbo, self.vis_image, self.vis_line_shader)
+                self.vis_line_shader.use(fbo.fbo_id, self.avi_image.tex_id)
             elif i == LightVisType.LIGHTS.value:
-                self.draw_light_angles(fbo, self.vis_image, self.vis_angle_shader)
-            fbo.end()
-
-    def draw_poses(self) -> None:
-        for i in range(self.max_players):
-            fbo: Fbo = self.psn_fbos[i]
-            pose: Pose | None = self.get_pose(i)
-            if pose is None:
-                continue
-
-            image: Image = self.psn_images[i]
-
-            if pose.is_final:
-                fbo.begin()
-                # clear fbo
-                glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
-                glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
-                fbo.end()
-                continue
-
-            if pose.image is None:
-                fbo.begin()
-                # clear fbo
-                glClearColor(1.0, 0.0, 0.0, 1.0)  # Set background color to black
-                glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
-                fbo.end()
-                continue
-
-            image.set_image(pose.image)
-            image.update()
-
-            analysis_image: Image = self.analysis_images[i]
-            analysis_image.update()
-
-            self.setView(fbo.width, fbo.height)
-            fbo.begin()
-            image.draw(0, 0, fbo.width, fbo.height)
-
-            tracklet: Tracklet | None = pose.tracklet
-            pose_mesh: Mesh = self.pose_meshes[pose.id]
-            if tracklet is None:
-                pose_mesh.draw(0, 0, fbo.width, fbo.height)
-            else:
-                self.draw_tracklet(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, False, True, True)
-            angle_mesh: Mesh = self.angle_meshes[pose.id]
-            if angle_mesh.isInitialized():
-                angle_mesh.draw(0, 0, fbo.width, fbo.height)
-
+                self.vis_angle_shader.use(fbo.fbo_id, self.avi_image.tex_id, light_image.resolution)
+            glFlush()
             fbo.end()
 
     def draw_composition(self) -> None:
         self.setView(self.window_width, self.window_height)
         for i in range(self.num_cams):
-            x, y, w, h = self.composition[ImageType.CAM][i]
+            x, y, w, h = self.composition[SubdivisionType.CAM][i]
             self.cam_fbos[i].draw(x, y, w, h)
 
         for i in range(self.num_sims):
-            x, y, w, h = self.composition[ImageType.SIM][i]
+            x, y, w, h = self.composition[SubdivisionType.SIM][i]
             self.sim_fbos[i].draw(x, y, w, h)
 
         for i in range(self.max_players):
-            x, y, w, h = self.composition[ImageType.PSN][i]
-            self.psn_fbos[i].draw(x, y, w, h)
+            x, y, w, h = self.composition[SubdivisionType.PSN][i]
+            self.pse_fbos[i].draw(x, y, w, h)
 
         for i in range(self.num_viss):
-            x, y, w, h = self.composition[ImageType.VIS][i]
+            x, y, w, h = self.composition[SubdivisionType.VIS][i]
             self.vis_fbos[i].draw(x, y, w, h)
 
-    # SETTERS AND GETTERS
-    def set_cam_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None :
-        self.cam_images[cam_id].set_image(image)
-
-    def get_depth_tracklets(self, cam_id: int, clear: bool = False) -> dict[int, CamTracklet]:
-        with self.input_mutex:
-            ret_tracklet: dict[int, CamTracklet] =  self.input_depth_tracklets[cam_id].copy()
-            if clear:
-                self.input_depth_tracklets[cam_id].clear()
-            return ret_tracklet
-    def set_depth_tracklet(self, cam_id: int, tracklet: CamTracklet) -> None :
-        with self.input_mutex:
-            self.input_depth_tracklets[cam_id][tracklet.id] = tracklet
-
-    def get_tracklets(self) -> dict[int, Optional[Tracklet]]:
-        with self.input_mutex:
-            return self.input_tracklets.copy()
-    def get_tracklet(self, id: int, clear: bool = False) -> Tracklet | None:
-        with self.input_mutex:
-            ret_tracklet: Tracklet | None = self.input_tracklets[id]
-            if clear:
-                self.input_tracklets[id] = None
-            return ret_tracklet
-    def get_tracklets_for_cam(self, cam_id: int) -> list[Tracklet]:
-        with self.input_mutex:
-            tracklets: list[Tracklet] = []
-            for tracklet in self.input_tracklets.values():
-                if tracklet is not None and tracklet.cam_id == cam_id:
-                    tracklets.append(tracklet)
-            return tracklets
-    def set_tracklet(self, tracklet: Tracklet) -> None:
-        with self.input_mutex:
-            self.input_tracklets[tracklet.id] = tracklet
-
-
-    def get_pose(self, id: int) -> Optional[Pose]:
-        with self.input_mutex:
-            ret_pose: Optional[Pose] = self.input_poses[id]
-            return ret_pose
-    def set_pose(self, pose: Pose) -> None:
-        with self.input_mutex:
-            self.input_poses[pose.id] = pose
-
-    def get_pose_window(self, id: int, clear = False) -> Optional[np.ndarray]:
-        with self.input_mutex:
-            ret_window: Optional[np.ndarray] = self.input_angle_windows[id]
-            if clear:
-                self.input_angle_windows[id] = None
-            return ret_window
-    def set_pose_stream(self, data: PoseStreamData) -> None:
-        angles_np: np.ndarray = np.nan_to_num(data.angles.to_numpy(), nan=0.0)
-        conf_np: np.ndarray = data.confidences.to_numpy()
-        if angles_np.shape[0] != conf_np.shape[0] or angles_np.shape[1] != conf_np.shape[1]:
-            print(f"Angles shape {angles_np.shape} does not match confidences shape {conf_np.shape}")
-            return
-        mesh_data: np.ndarray = np.stack([angles_np, conf_np], axis=-1)
-
-        with self.input_mutex:
-            self.input_angle_windows[data.player_id] = mesh_data
-
-    def get_correlation_windows(self) -> Optional[dict[Tuple[int, int], np.ndarray]]:
-        with self.input_mutex:
-            if self.input_R_window_consumed:
-                return None
-            self.input_R_window_consumed = True
-            return self.input_R_windows.copy()
-    def set_correlation_stream(self, window: PairCorrelationStreamData) -> None:
-        top_pairs: list[Tuple[int, int]] = window.get_top_pairs(n=3, duration=0.5)
-        with self.input_mutex:
-            self.input_R_window_consumed = False
-            self.input_R_windows.clear()
-            for pair in top_pairs:
-                data: Optional[np.ndarray] = window.get_metric_window(pair, metric_name='similarity')
-                if data is not None:
-                    self.input_R_windows[pair] = data
-
-    def set_av(self, value: AvOutput) -> None:
-        self.vis_image.set_image(value.img)
-
     # STATIC METHODS
+    @staticmethod
+    def draw_camera(fbo: Fbo, image: Image, depth_tracklets: list[CamTracklet], poses: list[Pose], pose_meshes: dict[int, Mesh]) -> None:
+        RenderWindow.setView(fbo.width, fbo.height)
+        fbo.begin()
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        image.draw(0, 0, fbo.width, fbo.height)
+
+        for depth_tracklet in depth_tracklets:
+            Render.draw_depth_tracklet(depth_tracklet, 0, 0, fbo.width, fbo.height)
+
+        for pose in poses:
+            tracklet: Tracklet | None = pose.tracklet
+            if tracklet is None or tracklet.is_removed or tracklet.is_lost:
+                continue
+            roi: Rect | None = pose.crop_rect
+            mesh: Mesh = pose_meshes[pose.id]
+            if roi is None or not mesh.isInitialized():
+                continue
+            x, y, w, h = roi.x, roi.y, roi.width, roi.height
+            x *= fbo.width
+            y *= fbo.height
+            w *= fbo.width
+            h *= fbo.height
+            Render.draw_tracklet(tracklet, mesh, x, y, w, h, True, True, False)
+
+        glFlush()  # Render now
+        fbo.end()
+
     @staticmethod
     def draw_depth_tracklet(tracklet: CamTracklet, x: float, y: float, w: float, h: float) -> None:
         if tracklet.status == CamTracklet.TrackingStatus.REMOVED:
@@ -525,10 +418,58 @@ class Render(RenderWindow):
         string = f'Age: {tracklet.age}'
         RenderWindow.draw_string(x, y, string)
 
-        glFlush()               # Render now
+        # glFlush()               # Render now
 
     @staticmethod
-    def draw_map_positions(tracklets: dict[int, Tracklet | None], num_cams: int, fbo: Fbo) -> None:
+    def draw_tracklet(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
+        if draw_box:
+            r: float = 0.0
+            g: float = 0.0
+            b: float = 0.0
+            a: float = 0.2
+
+            glColor4f(r, g, b, a)
+            glBegin(GL_QUADS)
+            glVertex2f(x, y)        # Bottom left
+            glVertex2f(x, y + h)    # Bottom right
+            glVertex2f(x + w, y + h)# Top right
+            glVertex2f(x + w, y)    # Top left
+            glEnd()                 # End drawing
+            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+
+        if draw_pose and pose_mesh.isInitialized():
+            pose_mesh.draw(x, y, w, h)
+
+        if draw_text:
+            string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
+            x += 9
+            y += 15
+            RenderWindow.draw_string(x, y, string)
+
+    @staticmethod
+    def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_mesh: Mesh) -> None:
+        RenderWindow.setView(fbo.width, fbo.height)
+
+        if pose.is_final:
+            fbo.begin()
+            glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
+            glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
+            fbo.end()
+            return
+
+        fbo.begin()
+        pose_image.draw(0, 0, fbo.width, fbo.height)
+        tracklet: Tracklet | None = pose.tracklet
+        if tracklet is not None:
+            draw_box: bool = tracklet.is_lost
+            Render.draw_tracklet(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box, True, True)
+        if angle_mesh.isInitialized():
+            angle_mesh.draw(0, 0, fbo.width, fbo.height)
+        glFlush()
+        fbo.end()
+
+    @staticmethod
+    def draw_map_positions(tracklets: dict[int, Tracklet], num_cams: int, fbo: Fbo) -> None:
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
@@ -584,164 +525,102 @@ class Render(RenderWindow):
         num_pairs = len(R_meshes)
         if num_pairs == 0:
             fbo.end()
-            glFlush()
             return
 
         draw_width: int = fbo.width - 80
         slice_height = fbo.height // num_pairs
 
+        # Pre-calculate color map
+        color_map = [
+            (1.0, 0.2, 0.2, 0.5),  # red
+            (0.2, 1.0, 0.2, 1.0),  # green
+            (0.2, 0.2, 1.0, 1.0),  # blue
+            (1.0, 1.0, 0.2, 1.0),  # yellow
+            (1.0, 0.2, 1.0, 1.0),  # magenta
+            (0.2, 1.0, 1.0, 1.0),  # cyan
+        ]
+
+        # Batch background rectangles
+        glBegin(GL_QUADS)
         for idx, (pair_id, mesh) in enumerate(R_meshes.items()):
             if not mesh.isInitialized():
                 continue
 
-            # Color based on first half of pair_id
             color_seed = pair_id[0] % 6
-            color_map = [
-                (1.0, 0.2, 0.2, 0.5),  # red
-                (0.2, 1.0, 0.2, 1.0),  # green
-                (0.2, 0.2, 1.0, 1.0),  # blue
-                (1.0, 1.0, 0.2, 1.0),  # yellow
-                (1.0, 0.2, 1.0, 1.0),  # magenta
-                (0.2, 1.0, 1.0, 1.0),  # cyan
-            ]
             glColor4f(*color_map[color_seed])
-                # Draw background rect for this slice
+
             y_offset = idx * slice_height
-            glBegin(GL_QUADS)
             glVertex2f(0, y_offset)
             glVertex2f(draw_width, y_offset)
             glVertex2f(draw_width, y_offset + slice_height)
             glVertex2f(0, y_offset + slice_height)
-            glEnd()
+        glEnd()
 
-            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
-            # Compute vertical offset for this slice
+        # Draw meshes and text separately to minimize state changes
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+        text_data = []  # Store text data for batch rendering
+
+        for idx, (pair_id, mesh) in enumerate(R_meshes.items()):
+            if not mesh.isInitialized():
+                continue
+
             y_offset = idx * slice_height
             mesh.draw(0, y_offset + slice_height, draw_width, -slice_height)
 
-            # Draw pair label at the end of the line
-            vertices: Optional[np.ndarray] = mesh.vertices
+            # Store text data instead of rendering immediately
+            vertices = mesh.vertices
             if vertices is not None and len(vertices) > 0:
                 last_vertex = vertices[-1]
                 x = int(last_vertex[0] * draw_width + 10)
                 y = int(y_offset + (1.0 - last_vertex[1]) * slice_height + 7)
                 text = f"{pair_id[0]}-{pair_id[1]}: {last_vertex[1]:.2f}"
-                RenderWindow.draw_string(x, y, text)
+                text_data.append((x, y, text))
 
-        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+        # Batch render all text
+        for x, y, text in text_data:
+            RenderWindow.draw_string(x, y, text)
+
         fbo.end()
-        glFlush()
 
-    @staticmethod
-    def draw_light_lines(fbo: Fbo, img: Image, shader: WS_Lines) -> None:
-        shader.use(fbo.fbo_id, img.tex_id)
-        glFlush()
+    def draw_R_pairs_shader(self, R_windows: dict[Tuple[int, int], np.ndarray], fbo: Fbo) -> None:
+        if not R_windows:
+            return
 
-    @staticmethod
-    def draw_light_angles(fbo: Fbo, img: Image, shader: WS_Angles) -> None:
-        shader.use(fbo.fbo_id, img.tex_id, img.width)
-        glFlush()
+        # Color map for different pairs
+        color_map = [
+            (1.0, 0.2, 0.2),  # red
+            (0.2, 1.0, 0.2),  # green
+            (0.2, 0.2, 1.0),  # blue
+            (1.0, 1.0, 0.2),  # yellow
+            (1.0, 0.2, 1.0),  # magenta
+            (0.2, 1.0, 1.0),  # cyan
+        ]
 
-    @staticmethod
-    def draw_tracklet(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
-        if draw_box:
-            r: float = 0.0
-            g: float = 0.0
-            b: float = 0.0
-            a: float = 0.2
+        fbo.begin()
+        glClearColor(0.1, 0.1, 0.1, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
 
-            glColor4f(r, g, b, a)
-            glBegin(GL_QUADS)
-            glVertex2f(x, y)        # Bottom left
-            glVertex2f(x, y + h)    # Bottom right
-            glVertex2f(x + w, y + h)# Top right
-            glVertex2f(x + w, y)    # Top left
-            glEnd()                 # End drawing
-            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+        # glEnable(GL_BLEND)
+        # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        if draw_pose and pose_mesh.isInitialized():
-            pose_mesh.draw(x, y, w, h)
+        num_pairs = len(R_windows)
+        for idx, (pair_id, data) in enumerate(R_windows.items()):
+            if data is None or len(data) < 2:
+                continue
 
-        if draw_text:
-            string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
-            x += 9
-            y += 15
-            RenderWindow.draw_string(x, y, string)
+            color = color_map[pair_id[0] % len(color_map)]
 
-        glFlush()               # Render now
+            self.r_stream_shader.use(
+                fbo_id=fbo.fbo_id,
+                correlation_data=data,
+                pair_index=idx,
+                total_pairs=num_pairs,
+                line_color=color,
+                line_width=10.0,
+                viewport_width=float(fbo.width),
+                viewport_height=float(fbo.height)
+            )
 
-    @staticmethod
-    def make_composition_subdivision(dst_width: int, dst_height: int,
-                                     num_cams: int, num_sims: int, max_players: int, num_viss: int,
-                                     cam_aspect_ratio: float = 16.0 / 9.0,
-                                     sim_aspect_ratio: float = 10.0,
-                                     psn_aspect_ratio: float = 1.0,
-                                     vis_aspect_ratio: float = 20.0) -> Composition_Subdivision:
-
-        ret: Composition_Subdivision = {}
-        ret[ImageType.TOT] = {}
-        ret[ImageType.CAM] = {}
-        ret[ImageType.SIM] = {}
-        ret[ImageType.PSN] = {}
-        ret[ImageType.VIS] = {}
-
-        cams_per_row: int = 4
-        cam_rows: int = math.ceil(num_cams / cams_per_row)
-        cam_columns: int = 0 if cam_rows == 0 else math.ceil(num_cams / cam_rows)
-
-        dst_aspect_ratio: float = dst_width / dst_height
-        cam_grid_aspect_ratio: float = 100.0 if cam_rows == 0 else cam_aspect_ratio * cam_columns / cam_rows
-        sim_grid_aspect_ratio: float = sim_aspect_ratio / num_sims
-        vis_grid_aspect_ratio: float = vis_aspect_ratio / num_viss
-        psn_grid_aspect_ratio: float = psn_aspect_ratio * max_players
-        tot_aspect_ratio: float = 1.0 / (1.0 / cam_grid_aspect_ratio + 1.0 / sim_grid_aspect_ratio + 1.0 / vis_grid_aspect_ratio + 1.0 / psn_grid_aspect_ratio)
-
-        fit_width: float
-        fit_height: float
-        if tot_aspect_ratio > dst_aspect_ratio:
-            fit_width = dst_width
-            fit_height = dst_width / tot_aspect_ratio
-        else:
-            fit_width = dst_height * tot_aspect_ratio
-            fit_height = dst_height
-        fit_x: float = (dst_width - fit_width) / 2.0
-        fit_y: float = (dst_height - fit_height) / 2.0
-
-        ret[ImageType.TOT][0] = (0, 0, int(fit_width), int(fit_height))
-
-        cam_width: float = fit_width if cam_columns == 0 else fit_width / cam_columns
-        cam_height: float = cam_width / cam_aspect_ratio
-        sim_height: float = fit_width / sim_aspect_ratio
-        psn_width: float =  fit_width / max_players
-        psn_height: float = psn_width / psn_aspect_ratio
-        vis_height: float = fit_width / vis_aspect_ratio
-        y_start: float = fit_y
-
-        for i in range(num_cams):
-            cam_x: float = (i % cam_columns) * cam_width + fit_x
-            cam_y: float = (i // cam_columns) * cam_height + fit_y
-            ret[ImageType.CAM][i] = (int(cam_x), int(cam_y), int(cam_width), int(cam_height))
-
-        y_start += cam_height * cam_rows
-        for i in range(num_sims):
-            sim_y: float = y_start + i * sim_height
-            ret[ImageType.SIM][i] = (int(fit_x), int(sim_y), int(fit_width), int(sim_height))
-
-        y_start += sim_height * num_sims
-        for i in range(max_players):
-            psn_x: float = i * psn_width + fit_x
-            psn_y: float = y_start
-            ret[ImageType.PSN][i] = (int(psn_x), int(psn_y), int(psn_width), int(psn_height))
-
-        y_start += psn_height
-        for i in range(num_viss):
-            sim_y: float = y_start + i * vis_height
-            ret[ImageType.VIS][i] = (int(fit_x), int(sim_y), int(fit_width), int(vis_height))
-
-        # Fill the last Vis till the bottom of the window
-        if num_viss > 0:
-            last_Vis = ret[ImageType.VIS][num_viss - 1]
-            if last_Vis[1] + last_Vis[3] < dst_height:
-                ret[ImageType.VIS][num_viss - 1] = (last_Vis[0], last_Vis[1], last_Vis[2], dst_height - last_Vis[1])
-
-        return ret
+        # glDisable(GL_BLEND)
+        # glEnable(GL_BLEND)
+        fbo.end()

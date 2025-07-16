@@ -63,7 +63,7 @@ class RenderWindow(Thread):
             wglSwapIntervalEXT(1)   # Enable V-Sync
         else:
             wglSwapIntervalEXT(0)   # Disable V-Sync
-        
+
         self.initGL()
         glut.glutDisplayFunc(self.drawWindow)
 
@@ -105,7 +105,8 @@ class RenderWindow(Thread):
         self.window_height = height
         self.setView(self.window_width, self.window_height)
 
-    def setView(self, width, height) -> None:
+    @staticmethod
+    def setView(width, height) -> None:
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         glOrtho(0, width, height, 0, -1, 1)

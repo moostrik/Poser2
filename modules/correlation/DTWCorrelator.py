@@ -140,7 +140,7 @@ class DTWCorrelator():
 
     def set_pose_stream(self, data: PoseStreamData) -> None:
         with self._input_lock:
-            self._input_pose_streams[data.player_id] = data
+            self._input_pose_streams[data.id] = data
         return
 
     def add_correlation_callback(self, callback: PoseCorrelationBatchCallback) -> None:

@@ -246,8 +246,7 @@ class Core(Thread):
         if not self.running:
             return
         for c in self.tracker_callbacks:
-            for t in tracklets:
-                c(self.id, t)
+            c(self.id, tracklets)
 
     def add_frame_callback(self, callback: FrameCallback) -> None:
         if self.running:

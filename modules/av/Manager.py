@@ -12,6 +12,8 @@ from modules.av.UdpSender import UdpSender
 from modules.Settings import Settings
 from modules.tracker.Tracklet import Tracklet, TrackletDict
 
+from modules.gl.Utils import FpsCounter
+
 
 class Manager(Thread):
     def __init__(self, gui, settings: Settings) -> None:
@@ -35,6 +37,8 @@ class Manager(Thread):
         self.udp_sender: UdpSender = UdpSender(self.settings.light_resolution, self.settings.udp_port, self.settings.udp_ip_addresses)
         self.udp_sender.start()
 
+        self.FPS: FpsCounter = FpsCounter()
+
         self.gui: Gui = Gui(gui, self)
 
     def stop(self) -> None:
@@ -57,6 +61,8 @@ class Manager(Thread):
                 sleep(sleep_time)
             else:
                 next_time = time()
+
+            self.FPS.tick()
                 # print(f"Manager fell behind by {-sleep_time:.4f} seconds, or: {-sleep_time / self.interval:.4f} frames")
 
     # STATIC METHODS

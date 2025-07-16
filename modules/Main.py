@@ -54,33 +54,33 @@ class Main():
         self.render.start()
 
         for camera in self.cameras:
-            camera.add_preview_callback(self.render.set_cam_image)
+            camera.add_preview_callback(self.render.data.set_cam_image)
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.pose_detection.set_image)
-            camera.add_tracker_callback(self.panoramic_tracker.add_cam_tracklet)
-            camera.add_tracker_callback(self.render.set_depth_tracklet)
+            camera.add_tracker_callback(self.panoramic_tracker.add_cam_tracklets)
+            camera.add_tracker_callback(self.render.data.set_depth_tracklets)
             camera.start()
 
-        self.correlation_streamer.add_stream_callback(self.render.set_correlation_stream)
+        self.correlation_streamer.add_stream_callback(self.render.data.set_correlation_stream)
         self.correlation_streamer.start()
 
         self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_correlation)
         self.dtw_correlator.start()
 
         self.pose_streamer.add_stream_callback(self.dtw_correlator.set_pose_stream)
-        self.pose_streamer.add_stream_callback(self.render.set_pose_stream)
+        self.pose_streamer.add_stream_callback(self.render.data.set_pose_stream)
         self.pose_streamer.start()
 
         self.pose_detection.add_pose_callback(self.pose_streamer.add_pose)
-        self.pose_detection.add_pose_callback(self.render.set_pose)
+        self.pose_detection.add_pose_callback(self.render.data.set_pose)
         self.pose_detection.start()
 
         self.panoramic_tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
-        self.panoramic_tracker.add_tracklet_callback(self.render.set_tracklet)
+        self.panoramic_tracker.add_tracklet_callback(self.render.data.set_tracklet)
         self.panoramic_tracker.start()
 
-        self.av.add_output_callback(self.render.set_av)
+        self.av.add_output_callback(self.render.data.set_light_image)
         self.av.start()
 
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI

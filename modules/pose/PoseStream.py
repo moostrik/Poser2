@@ -38,7 +38,7 @@ class PoseStreamInput:
 # Type for analysis output callback
 @dataclass (frozen=False)
 class PoseStreamData:
-    player_id: int
+    id: int
     angles: pd.DataFrame
     confidences: pd.DataFrame
 

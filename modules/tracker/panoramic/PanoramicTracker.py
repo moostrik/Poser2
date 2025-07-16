@@ -242,9 +242,10 @@ class PanoramicTracker(Thread):
         with self.callback_lock:
             self.tracklet_callbacks.add(callback)
 
-    def add_cam_tracklet(self, cam_id: int, cam_tracklet: CamTracklet) -> None :
-        tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, cam_tracklet)
-        if tracklet is None:
-            print(f"PanoramicTracker: Invalid tracklet from camera {cam_id}, skipping.")
-            return
-        self.input_queue.put(tracklet)
+    def add_cam_tracklets(self, cam_id: int, cam_tracklets: list[CamTracklet]) -> None :
+        for t in cam_tracklets:
+            tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, t)
+            if tracklet is None:
+                print(f"PanoramicTracker: Invalid tracklet from camera {cam_id}, skipping.")
+                return
+            self.input_queue.put(tracklet)
