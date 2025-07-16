@@ -142,7 +142,7 @@ class Render(RenderWindow):
 
         try:
             self.update_pose_meshes()
-            self.update_angle_meshes()
+            # self.update_angle_meshes()
             # self.update_R_meshes()
 
             self.draw_cameras()
@@ -473,11 +473,11 @@ class Render(RenderWindow):
         if tracklet is not None:
             draw_box: bool = tracklet.is_lost
             Render.draw_tracklet(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box, True, True)
-        if angle_mesh.isInitialized():
-            angle_mesh.draw(0, 0, fbo.width, fbo.height)
+        # if angle_mesh.isInitialized():
+        #     angle_mesh.draw(0, 0, fbo.width, fbo.height)
         glFlush()
         fbo.end()
-        shader.use(fbo.fbo_id, angle_image.tex_id)
+        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5)
 
     @staticmethod
     def draw_map_positions(tracklets: dict[int, Tracklet], num_cams: int, fbo: Fbo) -> None:

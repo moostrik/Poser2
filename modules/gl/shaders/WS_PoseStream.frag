@@ -1,78 +1,65 @@
 #version 460 core
 
 uniform sampler2D tex0;
+uniform float inv_width = 1.0/302;      // 1.0 / textureSize(tex0, 0).x
+uniform int num_joints = 4;       // textureSize(tex0, 0).y
+uniform float joint_range = 1.0 / 4.0;    // 1.0 / float(num_joints + 2)
+uniform float sqrt_line_width = pow(1.5 / 302,2);//^2; // 1.0 / 0.005
 
 in vec2 texCoord;
 out vec4 fragColor;
 
 void main() {
-    vec2 uv = texCoord;
-    uv.y = 1.0 - uv.y; // Flip the Y coordinate
-    // vec2 prev_uv = uv - vec2(0.0, 1.0 / float(textureSize(tex0, 0).y)); // Offset to the previous pixel in the y-direction
+    vec2 uv = vec2(texCoord.x, 1.0 - texCoord.y);
+    vec2 prev_uv = vec2(max(0.0, uv.x - inv_width), uv.y);
 
-    int num_joints = textureSize(tex0, 0).y;
-
-    // Get the texture data (angles_norm, sign_channel, confidences)
+    // Get current and previous data in one go
     vec3 data = texture(tex0, uv).rgb;
     float angles_norm = data.r;
     float sign_channel = data.g;
     float confidences = data.b;
-    // Calculate the difference between current pixel and previous pixel in x-direction (same joint)
-    vec2 prev_uv = uv - vec2(1.0 / float(textureSize(tex0, 0).x), 0.0); // Offset to the previous pixel in the x-direction
-    float prev_angles_norm = texture(tex0, prev_uv).r;
 
-    // Calculate joint ID - each row is one joint
-    int joint_id = int(floor(uv.y * float(num_joints)));
-
-    // Calculate positions for current and previous points
-    float joint_range = 1.0 / float(num_joints + 2);
-    float joint_center = (float(joint_id) + 0.5) / float(num_joints) - 0.5 * joint_range;
-
-    // Current point
-    vec2 current_point = vec2(uv.x, joint_center + angles_norm * joint_range);
-    // Previous point
-    vec2 prev_point = vec2(uv.x - 1.0 / float(textureSize(tex0, 0).x), joint_center + prev_angles_norm * joint_range);
-
-    // Calculate distance from current pixel to the line segment
-    vec2 line_dir = current_point - prev_point;
-    vec2 to_pixel = vec2(uv.x, uv.y) - prev_point;
-    float line_length = length(line_dir);
-    float dist_to_line = abs(cross(vec3(line_dir, 0.0), vec3(to_pixel, 0.0)).z) / line_length;
-
-    // Dynamic line thickness based on angle change
-    float delta_y = abs(angles_norm - prev_angles_norm);
-    float base_thickness = 0.005;
-
-    // Hard cutoff for line alpha
-    float line_alpha = dist_to_line < base_thickness ? 1.0 : 0.0;
-
-    // Early exit if alpha is negligible
-    if (line_alpha < 0.001) {
-        fragColor = vec4(0.0, 0.0, 0.0, 0.0);
+    // Early exit if confidence is too low
+    if (confidences < 0.001) {
+        fragColor = vec4(0.0);
         return;
     }
 
-    // Color based on joint (even/odd) and angle sign
-    vec3 color;
-    bool is_even = (joint_id % 2 == 0);
-    bool is_positive = (sign_channel > 0.5);
+    float prev_angles_norm = texture(tex0, prev_uv).r;
 
-    if (is_even) {
-        if (is_positive) {
-            color = vec3(1.0, 1.0, 0.0); // Yellow
-        } else {
-            color = vec3(1.0, 0.0, 0.0); // Red
-        }
-    } else {
-        if (is_positive) {
-            color = vec3(0.0, 0.7, 1.0); // Blue
-        } else {
-            color = vec3(0.0, 1.0, 0.0); // Green
-        }
+    // Calculate joint ID
+    int joint_id = int(uv.y * float(num_joints));
+
+    // Calculate positions - use precomputed values
+    float joint_center = (float(joint_id) + 0.5) / float(num_joints) - 0.5 * joint_range;
+
+    // Current and previous points
+    vec2 current_point = vec2(uv.x, joint_center + angles_norm * joint_range);
+    vec2 prev_point = vec2(uv.x - inv_width, joint_center + prev_angles_norm * joint_range);
+
+    // Optimized distance calculation
+    vec2 line_dir = current_point - prev_point;
+    vec2 to_pixel = vec2(uv.x, uv.y) - prev_point;
+
+    // Use squared distance comparison to avoid sqrt
+    float line_length_sq = dot(line_dir, line_dir);
+    float cross_product = line_dir.x * to_pixel.y - line_dir.y * to_pixel.x;
+    float dist_to_line_sq = (cross_product * cross_product) / line_length_sq;
+
+    // Compare squared distances (0.005^2 = 0.000025)
+    if (dist_to_line_sq > sqrt_line_width) {
+        fragColor = vec4(0.0);
+        return;
     }
 
-    // Apply confidence and line alpha
-    float alpha = confidences * line_alpha;
+    // Optimized color selection using mix
+    bool is_even = ((joint_id & 1) == 0);
+    bool is_positive = (sign_channel > 0.5);
 
-    fragColor = vec4(color, alpha);
+    // Use conditional assignment instead of nested if statements
+    vec3 color = is_even ?
+        (is_positive ? vec3(1.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)) :
+        (is_positive ? vec3(0.0, 0.7, 1.0) : vec3(0.0, 1.0, 0.0));
+
+    fragColor = vec4(color, confidences);
 }
