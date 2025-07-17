@@ -134,7 +134,7 @@ class Render(RenderWindow):
 
         try:
             self.update_pose_meshes()
-            # self.update_angle_meshes()
+            self.update_angle_meshes()
             # self.update_R_meshes()
 
             self.draw_cameras()
@@ -169,6 +169,12 @@ class Render(RenderWindow):
                 continue
             mesh_data: np.ndarray = np.stack([angles_np, conf_np], axis=-1)
 
+            capacity: int = pose_stream.capacity
+            if mesh_data.shape[0] < capacity:
+                # Pad the mesh data to match the capacity
+                padding: np.ndarray = np.zeros((capacity - mesh_data.shape[0], mesh_data.shape[1], mesh_data.shape[2]), dtype=mesh_data.dtype)
+                mesh_data = np.concatenate([padding, mesh_data], axis=0)
+
 
             # Only use the first 4 joints
             data: np.ndarray = mesh_data[:, :4, :]
@@ -180,10 +186,12 @@ class Render(RenderWindow):
 
             # Prepare confidences and angles
             confidences: np.ndarray = np.clip(data[..., 1], 0, 1)
+
+            confidences = np.where(confidences > 0, 0.7, 0.0).astype(np.float32)
             angles_raw: np.ndarray = data[..., 0]
             angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
 
-            joint_height: float = 1.0 / (num_joints + 2)
+            joint_height: float = 1.0 / (num_joints)
 
             # INDICES
             base = np.arange(num_joints) * num_frames
@@ -196,7 +204,7 @@ class Render(RenderWindow):
             # VERTICES
             frame_grid, joint_grid = np.meshgrid(np.arange(num_frames), np.arange(num_joints), indexing='ij')
             x = frame_grid / (num_frames - 1)
-            y = (joint_grid + 1.0) * joint_height + angles_norm * joint_height
+            y = (joint_grid) * joint_height + angles_norm * joint_height - 0.05
             vertices: np.ndarray = np.zeros((num_frames * num_joints, 3), dtype=np.float32)
             vertices[:, 0] = x.T.flatten()
             vertices[:, 1] = y.T.flatten()
@@ -300,7 +308,7 @@ class Render(RenderWindow):
         fbo.end()
 
         RenderWindow.setView(fbo.width, fbo.height)
-        self.r_stream_shader.use(fbo.fbo_id, self.r_s_image.tex_id, self.r_s_image.width, self.r_s_image.height, 2.5 / fbo.height)
+        self.r_stream_shader.use(fbo.fbo_id, self.r_s_image.tex_id, self.r_s_image.width, self.r_s_image.height, 1.5 / fbo.height)
 
         # self.r_stream_shader.use(fbo.fbo_id, r_s_image.tex_id, fbo.width, fbo.height, 1.0)
         # RenderWindow.setView(fbo.width, fbo.height)
@@ -488,11 +496,11 @@ class Render(RenderWindow):
         if tracklet is not None:
             draw_box: bool = tracklet.is_lost
             Render.draw_tracklet(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box, True, True)
-        # if angle_mesh.isInitialized():
-        #     angle_mesh.draw(0, 0, fbo.width, fbo.height)
+        if angle_mesh.isInitialized():
+            angle_mesh.draw(0, 0, fbo.width, fbo.height)
         glFlush()
         fbo.end()
-        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.0 / fbo.height)
+        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5 / fbo.height)
 
     @staticmethod
     def draw_map_positions(fbo: Fbo, tracklets: dict[int, Tracklet], num_cams: int) -> None:

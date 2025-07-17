@@ -26,10 +26,10 @@ class WS_RStream(Shader):
 
         glUseProgram(s)
         glUniform1i(glGetUniformLocation(s, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(s, "inv_width"),   1.0  / num_samples)
-        glUniform1i(glGetUniformLocation(s, "num_streams"),  num_streams)
-        glUniform1f(glGetUniformLocation(s, "stream_range"), 1.0  / num_streams)
-        glUniform1f(glGetUniformLocation(s, "line_width"),  linewidth ** 2)  # line width squared
+        glUniform1f(glGetUniformLocation(s, "sample_step"), 1.0  / num_samples)
+        glUniform1i(glGetUniformLocation(s, "num_streams"), num_streams)
+        glUniform1f(glGetUniformLocation(s, "stream_step"), 1.0  / num_streams)
+        glUniform1f(glGetUniformLocation(s, "line_width"),  linewidth ** 2)
 
         glBindFramebuffer(GL_FRAMEBUFFER, fbo)
         draw_quad()
