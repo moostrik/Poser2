@@ -185,6 +185,7 @@ class PairCorrelationStreamProcessor(Process):
         # self.history_duration = pd.Timedelta(seconds=history_duration)
 
         self.buffer_capacity: int = settings.corr_stream_capacity
+        self.timeout: float = settings.corr_stream_timeout
 
         # Initialize pair history (will be recreated in child process)
         self._pair_history: Dict[Tuple[int, int], pd.DataFrame] = {}
@@ -202,6 +203,8 @@ class PairCorrelationStreamProcessor(Process):
                         self._process(correlation_input)
                     except Exception as e:
                         print(f"Error processing correlation: {e}")
+
+                self.remove_old_pairs()
             except:
                 continue
 
@@ -222,7 +225,9 @@ class PairCorrelationStreamProcessor(Process):
 
     def _process(self, correlation_input: PairCorrelationStreamInput) -> None:
         """Process a correlation batch and update the pair history."""
-        batch = correlation_input.batch
+        batch: PairCorrelationBatch = correlation_input.batch
+
+
 
         if batch.is_empty:
             return
@@ -277,6 +282,24 @@ class PairCorrelationStreamProcessor(Process):
         # Remove pairs with no remaining data
         for pair_id in pairs_to_remove:
             del self._pair_history[pair_id]
+
+
+    def remove_old_pairs(self) -> None:
+        """
+        Remove pairs that have not been updated within the timeout period.
+        """
+
+        for id, history in list(self._pair_history.items()):
+            if not history.empty:
+                last_update: pd.Timestamp = history.index[-1]
+                if (pd.Timestamp.now() - last_update).total_seconds() > self.timeout:
+                    del self._pair_history[id]
+                    print(f"Removed pair {id} due to timeout")
+            else:
+                del self._pair_history[id]
+                print(f"Removed empty pair {id}")
+
+
 
     def get_stream_data(self) -> PairCorrelationStreamData:
         """Return a snapshot of the current pair correlation stream data."""

@@ -174,6 +174,10 @@ class Render(RenderWindow):
         correlation_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams()
         if correlation_streams is None:
             return
+
+        pairs: list[Tuple[int, int]] = correlation_streams.get_top_pairs(self.num_r_streams)
+        num_pairs: int = len(pairs)
+
         image_np: np.ndarray = WS_RStream.r_stream_to_image(correlation_streams, self.num_r_streams)
         self.r_s_image.set_image(image_np)
         self.r_s_image.update()
@@ -181,12 +185,9 @@ class Render(RenderWindow):
         RenderWindow.setView(fbo.width, fbo.height)
         self.r_stream_shader.use(fbo.fbo_id, self.r_s_image.tex_id, self.r_s_image.width, self.r_s_image.height, 1.5 / fbo.height)
 
-        pairs: list[Tuple[int, int]] = correlation_streams.get_top_pairs(self.num_r_streams)
-        num_pairs: int = len(pairs)
-        step: float = fbo.height / num_pairs
+        step: float = fbo.height / self.num_r_streams
 
         fbo.begin()
-
         glColor4f(1.0, 0.5, 0.5, 1.0)  # Set color to white
         for i in range(num_pairs):
             pair: Tuple[int, int] = pairs[i]
@@ -196,8 +197,6 @@ class Render(RenderWindow):
             RenderWindow.draw_string(x, y, string, font=glut.GLUT_BITMAP_TIMES_ROMAN_24) # type: ignore
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Set color to white
         fbo.end()
-
-
 
     def draw_poses(self) -> None:
         for i in range(self.max_players):

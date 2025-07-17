@@ -90,7 +90,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.corr_max_nan_ratio =   0.15 # maximum ratio of NaN values in a window
     settings.corr_dtw_band =        10 # maximum distance between two points in a window
     settings.corr_similarity_exp =  2.0 # exponent for similarity calculation
-    settings.corr_stream_capacity = int(60 * args.fps)
+    settings.corr_stream_capacity = int(30 * args.fps)
     settings.light_resolution =     3600
     settings.light_rate =           60
 
@@ -103,7 +103,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_x =             0
     settings.render_y =             0
     settings.render_fullscreen=     False
-    settings.render_fps =           30
+    settings.render_fps =           60
     settings.render_v_sync =        False
     settings.render_cams_a_row=     2
 

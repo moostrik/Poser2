@@ -43,11 +43,12 @@ class WS_RStream(Shader):
     @staticmethod
     def r_stream_to_image(r_streams: PairCorrelationStreamData, num_streams: int) -> np.ndarray:
         pairs: list[Tuple[int, int]] = r_streams.get_top_pairs(num_streams)
+        num_pairs: int = len(pairs)
         capacity: int = r_streams.capacity
 
         image: np.ndarray = np.zeros((num_streams, capacity, 3), dtype=np.float32)
 
-        for i in range(num_streams):
+        for i in range(num_pairs):
             pair: Tuple[int, int] = pairs[i]
             stream: np.ndarray | None = r_streams.get_metric_window(pair)
             if stream is not None:
@@ -69,11 +70,12 @@ class WS_RStream(Shader):
     @staticmethod
     def r_stream_to_visible_image(r_streams: PairCorrelationStreamData, num_streams: int) -> np.ndarray:
         pairs: list[Tuple[int, int]] = r_streams.get_top_pairs(num_streams)
+        num_pairs: int = len(pairs)
         capacity: int = r_streams.capacity
 
         image: np.ndarray = np.zeros((capacity, num_streams, 4), dtype=np.float32)
 
-        for i in range(num_streams):
+        for i in range(num_pairs):
             pair: Tuple[int, int] = pairs[i]
             r: np.ndarray | None = r_streams.get_metric_window(pair)
             if r is not None:
