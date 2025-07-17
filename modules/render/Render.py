@@ -19,7 +19,7 @@ from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus, Rect
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
-from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices
+from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices, PoseAngleNames
 from modules.pose.PoseStream import PoseStreamData
 from modules.Settings import Settings
 
@@ -194,7 +194,7 @@ class Render(RenderWindow):
             string: str = f'{pair[0]} | {pair[1]}'
             x: int = fbo.width - 100
             y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
-            RenderWindow.draw_string(x, y, string, font=glut.GLUT_BITMAP_TIMES_ROMAN_24) # type: ignore
+            RenderWindow.draw_box_string(x, y, string, big=True) # type: ignore
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Set color to white
         fbo.end()
 
@@ -276,9 +276,6 @@ class Render(RenderWindow):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         image.draw(0, 0, fbo.width, fbo.height)
 
-        for depth_tracklet in depth_tracklets:
-            Render.draw_depth_tracklet(depth_tracklet, 0, 0, fbo.width, fbo.height)
-
         for pose in poses:
             tracklet: Tracklet | None = pose.tracklet
             if tracklet is None or tracklet.is_removed or tracklet.is_lost:
@@ -294,6 +291,9 @@ class Render(RenderWindow):
             h *= fbo.height
             Render.draw_tracklet(tracklet, mesh, x, y, w, h, True, True, False)
 
+        for depth_tracklet in depth_tracklets:
+            Render.draw_depth_tracklet(depth_tracklet, 0, 0, fbo.width, fbo.height)
+
         glFlush()  # Render now
         fbo.end()
 
@@ -302,10 +302,10 @@ class Render(RenderWindow):
         if tracklet.status == CamTracklet.TrackingStatus.REMOVED:
             return
 
-        x = x + tracklet.roi.x * w
-        y = y + tracklet.roi.y * h
-        w = tracklet.roi.width * w
-        h = tracklet.roi.height * h
+        t_x = x + tracklet.roi.x * w
+        t_y = y + tracklet.roi.y * h
+        t_w = tracklet.roi.width * w
+        t_h = tracklet.roi.height * h
 
         r: float = 1.0
         g: float = 1.0
@@ -322,33 +322,30 @@ class Render(RenderWindow):
 
         glColor4f(r, g, b, a)   # Set color
         glBegin(GL_QUADS)       # Start drawing a quad
-        glVertex2f(x, y)        # Bottom left
-        glVertex2f(x, y + h)    # Bottom right
-        glVertex2f(x + w, y + h)# Top right
-        glVertex2f(x + w, y)    # Top left
+        glVertex2f(t_x, t_y)        # Bottom left
+        glVertex2f(t_x, t_y + t_h)    # Bottom right
+        glVertex2f(t_x + t_w, t_y + t_h)# Top right
+        glVertex2f(t_x + t_w, t_y)    # Top left
         glEnd()                 # End drawing
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
         string: str
-        x += 9
-        y += 14
+        t_x += t_w -6
+        if t_x + 66 > w:
+            t_x: float = w - 66
+        t_y += 22
         string = f'ID: {tracklet.id}'
-        RenderWindow.draw_string(x, y, string)
-        y += 14
+        RenderWindow.draw_box_string(t_x, t_y, string)
+        t_y += 22
         string = f'Age: {tracklet.age}'
-        RenderWindow.draw_string(x, y, string)
+        RenderWindow.draw_box_string(t_x, t_y, string)
 
         # glFlush()               # Render now
 
     @staticmethod
     def draw_tracklet(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
         if draw_box:
-            r: float = 0.0
-            g: float = 0.0
-            b: float = 0.0
-            a: float = 0.2
-
-            glColor4f(r, g, b, a)
+            glColor4f(0.0, 0.0, 0.0, 0.1)
             glBegin(GL_QUADS)
             glVertex2f(x, y)        # Bottom left
             glVertex2f(x, y + h)    # Bottom right
@@ -363,8 +360,8 @@ class Render(RenderWindow):
         if draw_text:
             string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
             x += 9
-            y += 15
-            RenderWindow.draw_string(x, y, string)
+            y += 12
+            RenderWindow.draw_box_string(x, y, string)
 
     @staticmethod
     def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_image: Image, angle_mesh: Mesh, shader: WS_PoseStream) -> None:
@@ -388,6 +385,26 @@ class Render(RenderWindow):
         glFlush()
         fbo.end()
         shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5 / fbo.height)
+
+
+        angle_num: int = len(PoseAngleNames)
+        step: float = fbo.height / angle_num
+        fbo.begin()
+
+        # yellow and light blue
+        colors: list[tuple[float, float, float, float]] = [(1.0, 0.5, 0.0, 1.0), (0.0, 0.8, 1.0, 1.0)]
+
+        for i in range(angle_num):
+            string: str = PoseAngleNames[i]
+            x: int = 10
+            y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
+            clr: int = i % 2
+
+            RenderWindow.draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
+
+        fbo.end()
+        return
+
 
     @staticmethod
     def draw_map_positions(fbo: Fbo, tracklets: dict[int, Tracklet], num_cams: int) -> None:
@@ -428,12 +445,12 @@ class Render(RenderWindow):
 
             string: str
             x += 9
-            y += 14
-            string = f'A: {world_angle:.1f}'
-            RenderWindow.draw_string(x, y, string)
-            y += 14
+            y += 22
+            string = f'W: {world_angle:.1f}'
+            RenderWindow.draw_box_string(x, y, string)
+            y += 22
             string = f'L: {local_angle:.1f}'
-            RenderWindow.draw_string(x, y, string)
+            RenderWindow.draw_box_string(x, y, string)
 
         fbo.end()
         glFlush()

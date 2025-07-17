@@ -14,7 +14,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class PoseAngleCalculator(Thread):
-    def __init__(self) -> None:
+    def __init__(self, confidence_threshold: float = 0.5) -> None:
         """Initialize the JointAngles calculator."""
         super().__init__()
         self._stop_event = Event()
@@ -23,7 +23,7 @@ class PoseAngleCalculator(Thread):
         self.pose_input_queue: Queue[Pose] = Queue()
 
         # Parameters
-        self.confidence_threshold: float = 0.3
+        self.confidence_threshold: float = confidence_threshold
 
         # Callbacks
         self.callback_lock = Lock()

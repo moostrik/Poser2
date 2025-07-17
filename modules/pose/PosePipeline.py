@@ -46,7 +46,7 @@ class PosePipeline(Thread):
             print('Pose Detection: Disabled')
 
         # Pose angles calculator
-        self.joint_angles: PoseAngleCalculator = PoseAngleCalculator()
+        self.joint_angles: PoseAngleCalculator = PoseAngleCalculator(settings.pose_conf_threshold)
 
         # Callbacks
         self.callback_lock = Lock()

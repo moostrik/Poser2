@@ -294,7 +294,6 @@ class PairCorrelationStreamProcessor(Process):
                 last_update: pd.Timestamp = history.index[-1]
                 if (pd.Timestamp.now() - last_update).total_seconds() > self.timeout:
                     del self._pair_history[id]
-                    print(f"Removed pair {id} due to timeout")
             else:
                 del self._pair_history[id]
                 print(f"Removed empty pair {id}")

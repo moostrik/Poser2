@@ -77,10 +77,11 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.tracker_min_age =      5 # in frames
     settings.tracker_min_height =   0.25 # * height of the camera
     settings.tracker_timeout =      1.0 # in seconds
-    settings.pose_crop_expansion=   0.1 # * height of the camera
 
     settings.pose_active =      not args.nopose
     settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
+    settings.pose_conf_threshold =  0.5
+    settings.pose_crop_expansion=   0.1 # * height of the camera
     settings.pose_stream_capacity = int(10 * args.fps)
 
     settings.corr_rate_hz =         args.fps

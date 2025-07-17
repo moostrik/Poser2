@@ -214,8 +214,42 @@ class RenderWindow(Thread):
         self.key_callbacks = []
 
     @staticmethod
-    def draw_string(x: float, y: float, string: str, font=glut.GLUT_BITMAP_HELVETICA_12)-> None: # type: ignore
+    def draw_string(x: float, y: float, string: str, color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0), big: bool = False)-> None:
+        font=glut.GLUT_BITMAP_HELVETICA_12 # type: ignore
+        if big:
+            font = glut.GLUT_BITMAP_HELVETICA_18 # type: ignore
+
+        glColor4f(*color)
         glRasterPos2f(x, y)
         for character in string:
             glut.glutBitmapCharacter(font, ord(character))
         glRasterPos2f(0, 0)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+
+
+    @staticmethod
+    def draw_box_string(x: float, y: float, string: str, color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0), box_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6), big: bool = False)-> None: # type: ignore
+        font=glut.GLUT_BITMAP_HELVETICA_12 # type: ignore
+        height = 12
+        expand = 2
+        if big:
+            font = glut.GLUT_BITMAP_HELVETICA_18 # type: ignore
+            height = 18  # GLUT_BITMAP_HELVETICA_18 is approx 18 pixels high
+            expand = 3
+        width: int = sum([glut.glutBitmapWidth(font, ord(c)) for c in string])
+
+        # Draw black rectangle behind text
+        glColor4f(*box_color)  # semi-transparent black
+        glBegin(GL_QUADS)
+        glVertex2f(x - expand, y - height - expand)
+        glVertex2f(x + width + expand, y - height - expand)
+        glVertex2f(x + width + expand, y + expand * 2)
+        glVertex2f(x - expand, y + expand * 2)
+        glEnd()
+
+        glColor4f(*color)
+        glRasterPos2f(x, y)
+        for character in string:
+            glut.glutBitmapCharacter(font, ord(character))
+        glRasterPos2f(0, 0)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
