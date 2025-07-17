@@ -560,16 +560,20 @@ class Render(RenderWindow):
 
         for i in range(num_streams):
             pair: Tuple[int, int] = pairs[i]
-            r: np.ndarray | None = r_streams.get_metric_window(pair)
-            if r is not None:
-                r_len: int = r.shape[0]
-                if r_len <= capacity:
-                    start_idx: int = capacity - r_len
-                    image[i, start_idx:, 2] = r
-                    image[i, start_idx:, 1] = 1.0
-                else:
-                    image[i, :, 2] = r[-capacity:]
+            stream: np.ndarray | None = r_streams.get_metric_window(pair)
+            if stream is not None:
+                steam_len: int = stream.shape[0]
+                if steam_len >= capacity:
+                    image[i, :, 2] = stream[-capacity:]
                     image[i, :, 1] = 1.0
+                else:
+                    start_idx: int = capacity - steam_len
+                    image[i, start_idx:, 2] = stream
+                    image[i, start_idx:, 1] = 1.0
+
+                    image[i, start_idx, 1] = 0.0
+                    if steam_len > 1:
+                        image[i, start_idx + 1, 1] = 0.0
 
         return image
 
@@ -584,26 +588,26 @@ class Render(RenderWindow):
         else:
             confidences: np.ndarray = np.clip(confidences_raw.astype(np.float32), 0, 1)
 
-        data: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1).transpose(1, 0, 2)
+        streams: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1).transpose(1, 0, 2)
 
         capacity: int = pose_stream.capacity
-        current_width: int = data.shape[1]
+        stream_len: int = streams.shape[1]
 
         # Pre-allocate the final image with the target capacity
-        image: np.ndarray = np.zeros((data.shape[0], capacity, data.shape[2]), dtype=np.float32)
+        image: np.ndarray = np.zeros((streams.shape[0], capacity, streams.shape[2]), dtype=np.float32)
 
-        if current_width > 0:
-            if current_width >= capacity:
+        if stream_len > 0:
+            if stream_len >= capacity:
                 # Take the most recent data (right-most columns)
-                image[:, :, :] = data[:, -capacity:, :]
+                image[:, :, :] = streams[:, -capacity:, :]
             else:
                 # Place data at the end (most recent position)
-                start_idx: int = capacity - current_width
-                image[:, start_idx:, :] = data
+                start_idx: int = capacity - stream_len
+                image[:, start_idx:, :] = streams
 
                 # set the first two confidences to 0.0 for visualization
                 image[:, start_idx, 0] = 0.0
-                if start_idx + 1 < capacity:
+                if stream_len > 1:
                     image[:, start_idx + 1, 0] = 0.0
 
         return image

@@ -51,28 +51,31 @@ void main() {
     vec2    curr_point = vec2(curr_uv.x, stream_top + curr_value * stream_step);
     vec2    prev_point = vec2(prev_uv.x, stream_top + prev_value * stream_step);
 
-    // Optimized distance calculation
-    vec2    line_dir = curr_point - prev_point;
-    vec2    to_pixel = vec2(uv.x, uv.y) - prev_point;
+    // Draw line between previous and current point
+    vec2 line_vector = curr_point - prev_point;
+    float line_length = length(line_vector);
 
-    // Use squared distance comparison to avoid sqrt
-    float   line_length_sq =  dot(line_dir, line_dir);
-    float   cross_product =   line_dir.x * to_pixel.y - line_dir.y * to_pixel.x;
-    float   dist_to_line_sq = (cross_product * cross_product) / line_length_sq;
+    // Normalize the line vector
+    vec2 line_dir = line_vector / line_length;
 
-    // Background color: dark grey for odd, black for even streams
-    vec3 bg_color = (stream_id % 2 == 0) ? vec3(0.0) : vec3(0.2);
+    // Vector from prev_point to current fragment
+    vec2 to_fragment = uv - prev_point;
 
-    // Line color is always white
-    vec3 line_color = vec3(1.0);
+    // Project the vector onto the line
+    float projection = dot(to_fragment, line_dir);
+    projection = clamp(projection, 0.0, line_length);
 
-    // Use squared distance for line rendering
-    if (dist_to_line_sq > line_width) {
-        fragColor = vec4(bg_color, 1.0);
-        if (curr_valid > 0.5) {
-            fragColor.g += 0.2; // Slight green tint where data exists
-        }
+    // Find the closest point on the line segment
+    vec2 closest_point = prev_point + projection * line_dir;
+
+    // Distance from fragment to the line
+    float dist = length(uv - closest_point);
+
+    // Set color based on distance (white if close enough, bg_color otherwise)
+    vec3 bg_color = ((stream_id & 1) == 0) ? vec3(0.15) : vec3(0.25);
+    if (dist <= line_width) {
+        fragColor = vec4(1.0, 1.0, 1.0, 1.0); // White line
     } else {
-        fragColor = vec4(line_color, 1.0);
+        fragColor = vec4(bg_color, 1.0); // Background
     }
 }

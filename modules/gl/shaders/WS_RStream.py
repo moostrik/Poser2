@@ -14,7 +14,7 @@ class WS_RStream(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, tex0: int, num_samples: int, num_streams: int, linewidth: float) -> None :
+    def use(self, fbo: int, tex0: int, num_samples: int, num_streams: int, line_width: float) -> None :
         super().use()
         if not self.allocated: return
         if not fbo or not tex0: return
@@ -29,7 +29,7 @@ class WS_RStream(Shader):
         glUniform1f(glGetUniformLocation(s, "sample_step"), 1.0  / num_samples)
         glUniform1i(glGetUniformLocation(s, "num_streams"), num_streams)
         glUniform1f(glGetUniformLocation(s, "stream_step"), 1.0  / num_streams)
-        glUniform1f(glGetUniformLocation(s, "line_width"),  linewidth ** 2)
+        glUniform1f(glGetUniformLocation(s, "line_width"),  line_width)
 
         glBindFramebuffer(GL_FRAMEBUFFER, fbo)
         draw_quad()

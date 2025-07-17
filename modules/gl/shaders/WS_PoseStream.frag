@@ -17,6 +17,8 @@ void main() {
 
     // Calculate stream center
     float   stream_center = (float(stream_id) + 0.5) * stream_step;
+
+    // Get current and previous UV coordinates
     vec2    curr_uv = vec2(texCoord.x, stream_center);
     vec2    prev_uv = vec2(max(0.0, texCoord.x - sample_step), stream_center);
 
@@ -50,17 +52,28 @@ void main() {
     vec2    curr_point = vec2(curr_uv.x, stream_top + curr_value * stream_step);
     vec2    prev_point = vec2(prev_uv.x, stream_top + prev_value * stream_step);
 
-    // Optimized distance calculation
-    vec2    line_dir = curr_point - prev_point;
-    vec2    to_pixel = vec2(uv.x, uv.y) - prev_point;
+    // Draw line between previous and current point
+    vec2 line_vector = curr_point - prev_point;
+    float line_length = length(line_vector);
 
-    // Use squared distance comparison to avoid sqrt
-    float   line_length_sq =  dot(line_dir, line_dir);
-    float   cross_product =   line_dir.x * to_pixel.y - line_dir.y * to_pixel.x;
-    float   dist_to_line_sq = (cross_product * cross_product) / line_length_sq;
+    // Normalize the line vector
+    vec2 line_dir = line_vector / line_length;
+
+    // Vector from prev_point to current fragment
+    vec2 to_fragment = uv - prev_point;
+
+    // Project the vector onto the line
+    float projection = dot(to_fragment, line_dir);
+    projection = clamp(projection, 0.0, line_length);
+
+    // Find the closest point on the line segment
+    vec2 closest_point = prev_point + projection * line_dir;
+
+    // Distance from fragment to the line
+    float dist = length(uv - closest_point);
 
     // Compare squared distances (0.005^2 = 0.000025)
-    if (dist_to_line_sq > line_width) {
+    if (dist > line_width) {
         fragColor = vec4(0.0);
         return;
     }
