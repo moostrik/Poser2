@@ -85,7 +85,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.corr_rate_hz =         args.fps
     settings.corr_num_workers =     10
-    settings.corr_buffer_duration = int(3 * args.fps) # seconds
+    settings.corr_buffer_duration = int(3 * args.fps)
     settings.corr_stream_timeout =  settings.tracker_timeout # seconds
     settings.corr_max_nan_ratio =   0.15 # maximum ratio of NaN values in a window
     settings.corr_dtw_band =        10 # maximum distance between two points in a window

@@ -36,12 +36,13 @@ class PoseStreamInput:
         )
 
 # Type for analysis output callback
-@dataclass (frozen=False)
+@dataclass (frozen=True)
 class PoseStreamData:
     id: int
     angles: pd.DataFrame
     confidences: pd.DataFrame
     capacity: int
+    is_final: bool
 
 PoseStreamDataCallback = Callable[[PoseStreamData], None]
 PoseStreamDataDict = dict[int, PoseStreamData]
@@ -197,8 +198,10 @@ class PoseStreamProcessor(Process):
 
         if pose.is_final:
             if self.angle_buffers.get(pose.id) is not None:
-                self.angle_buffers.pop(pose.id, None)
-                self.confidence_buffers.pop(pose.id, None)
+                angles: pd.DataFrame | None = self.angle_buffers.pop(pose.id, None)
+                confidences: pd.DataFrame | None = self.confidence_buffers.pop(pose.id, None)
+                if angles is not None and confidences is not None:
+                    self._notify_callbacks(PoseStreamData(pose.id, angles, confidences, self.buffer_capacity, True))
             return
 
         time_stamp: pd.Timestamp = pose.time_stamp
@@ -227,7 +230,7 @@ class PoseStreamProcessor(Process):
 
         interpolated: pd.DataFrame = angle_df.interpolate(method='time', limit_direction='both', limit=7)
         smoothed: pd.DataFrame = PoseStreamProcessor.ewm_circular_mean(interpolated, span=7.0)
-        self._notify_callbacks(PoseStreamData(pose.id, smoothed, conf_df, self.buffer_capacity))
+        self._notify_callbacks(PoseStreamData(pose.id, smoothed, conf_df, self.buffer_capacity, False))
 
     @staticmethod
     def rolling_circular_mean(df: pd.DataFrame, window: float = 0.3, min_periods: int = 1) -> pd.DataFrame:

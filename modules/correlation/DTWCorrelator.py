@@ -5,7 +5,7 @@ import signal
 import time
 import threading
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from itertools import combinations
 from multiprocessing import cpu_count
@@ -248,18 +248,29 @@ class DTWCorrelator():
     @ staticmethod
     def _remove_nans_from_streams(streams: PoseStreamDataDict) -> PoseStreamDataDict:
         """Remove NaN values from angles and confidences DataFrames in each stream."""
-        for data in streams.values():
-            data.angles = data.angles.dropna()
-            data.confidences = data.confidences.dropna()
+        for key, data in streams.items():
+            angles: pd.DataFrame = data.angles.dropna()
+            confidences: pd.DataFrame = data.confidences.dropna()
+            streams[key] = replace(
+                data,
+                angles=angles,
+                confidences=confidences
+            )
+
         return streams
 
     @staticmethod
     def _trim_streams_to_length(streams: PoseStreamDataDict, max_length: int ) -> PoseStreamDataDict:
         """ Trim each stream's DataFrames to the last max_length frames. """
-        for data in streams.values():
+        for key, data in streams.items():
             if len(data.angles) > max_length:
-                data.angles = data.angles.iloc[-max_length:]
-                data.confidences = data.confidences.iloc[-max_length:]
+                angles: pd.DataFrame = data.angles.iloc[-max_length:]
+                confidences: pd.DataFrame = data.confidences.iloc[-max_length:]
+            streams[key] = replace(
+                data,
+                angles=angles,
+                confidences=confidences
+            )
         return streams
 
     @staticmethod
