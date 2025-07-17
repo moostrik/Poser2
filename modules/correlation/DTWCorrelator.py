@@ -112,8 +112,8 @@ class DTWCorrelator():
 
         self.interval: float = 1.0 / settings.corr_rate_hz
 
-        self.max_buffer_capacity: int = int(settings.pose_buffer_duration * settings.camera_fps)
-        self.buffer_capacity: int = min(int(settings.corr_buffer_duration * settings.camera_fps), self.max_buffer_capacity)
+        self.max_buffer_capacity: int = settings.pose_stream_capacity
+        self.buffer_capacity: int = min(settings.corr_buffer_duration, self.max_buffer_capacity)
         self.stream_timeout: float = settings.corr_stream_timeout
 
         self.maximum_nan_ratio: float = settings.corr_max_nan_ratio

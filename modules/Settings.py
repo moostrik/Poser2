@@ -56,7 +56,7 @@ class Settings():
         self.pose_crop_expansion: float         = None # type: ignore
         self.pose_model_type: ModelType         = None # type: ignore
         self.pose_active: bool                  = None # type: ignore
-        self.pose_buffer_duration: int          = None # type: ignore
+        self.pose_stream_capacity: int          = None # type: ignore
 
         # POSE CORRELATION SETTINGS
         self.corr_rate_hz: float                = None # type: ignore
@@ -66,6 +66,7 @@ class Settings():
         self.corr_max_nan_ratio: float          = None # type: ignore
         self.corr_dtw_band: int                 = None # type: ignore
         self.corr_similarity_exp: float         = None # type: ignore
+        self.corr_stream_capacity: int          = None # type: ignore
 
         # LIGHT SETTINGS
         self.light_resolution: int              = None # type: ignore

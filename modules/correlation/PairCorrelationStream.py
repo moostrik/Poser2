@@ -17,6 +17,7 @@ class PairCorrelationStreamInput:
 class PairCorrelationStreamData:
     pair_history: Dict[Tuple[int, int], pd.DataFrame]
     timestamp: pd.Timestamp
+    capacity: int
 
     def get_top_pairs(self, n: int = 5, duration: Optional[float] = None, min_similarity: Optional[float] = None) -> list[Tuple[int, int]]:
         """
@@ -170,7 +171,7 @@ class PairCorrelationStreamManager:
                 continue
 
 class PairCorrelationStreamProcessor(Process):
-    def __init__(self, settings: Settings, result_queue: Queue, history_duration: float = 60.0) -> None:
+    def __init__(self, settings: Settings, result_queue: Queue) -> None:
         super().__init__()
 
         # Use multiprocessing primitives
@@ -181,7 +182,9 @@ class PairCorrelationStreamProcessor(Process):
         self.result_queue = result_queue if result_queue else Queue()
 
         # Store settings values
-        self.history_duration = pd.Timedelta(seconds=history_duration)
+        # self.history_duration = pd.Timedelta(seconds=history_duration)
+
+        self.buffer_capacity: int = settings.corr_stream_capacity
 
         # Initialize pair history (will be recreated in child process)
         self._pair_history: Dict[Tuple[int, int], pd.DataFrame] = {}
@@ -225,8 +228,6 @@ class PairCorrelationStreamProcessor(Process):
             return
 
         timestamp: pd.Timestamp = batch.timestamp
-        current_time: pd.Timestamp = pd.Timestamp.now()
-        cutoff_time: pd.Timestamp = current_time - self.history_duration
 
         # Process each pair correlation in the batch
         for pair_corr in batch.pair_correlations:
@@ -249,12 +250,12 @@ class PairCorrelationStreamProcessor(Process):
             self._pair_history[pair_id] = self._pair_history[pair_id].sort_index()
 
         # Prune old data
-        self._prune_history(cutoff_time)
+        self._prune_history(self.buffer_capacity)
 
         # Send results back to main process
         self._notify_callbacks(self.get_stream_data())
 
-    def _prune_history(self, cutoff_time: pd.Timestamp) -> None:
+    def _prune_history(self, max_capacity: int) -> None:
         """
         Remove data points older than the cutoff time from all pairs.
 
@@ -264,8 +265,7 @@ class PairCorrelationStreamProcessor(Process):
         pairs_to_remove: list[Tuple[int,int]] = []
 
         for pair_id, df in self._pair_history.items():
-            # Keep only rows with timestamps >= cutoff_time
-            pruned_df: pd.DataFrame = df[df.index >= cutoff_time]
+            pruned_df: pd.DataFrame = df.iloc[-max_capacity:]
 
             if pruned_df.empty:
                 # All data is old, mark for removal
@@ -287,7 +287,8 @@ class PairCorrelationStreamProcessor(Process):
             latest_ts = pd.Timestamp.now()
         return PairCorrelationStreamData(
             pair_history={k: v.copy() for k, v in self._pair_history.items()},
-            timestamp=latest_ts
+            timestamp=latest_ts,
+            capacity=self.buffer_capacity
         )
 
     @staticmethod

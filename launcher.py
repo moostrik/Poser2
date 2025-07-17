@@ -77,20 +77,20 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.tracker_min_age =      5 # in frames
     settings.tracker_min_height =   0.25 # * height of the camera
     settings.tracker_timeout =      1.0 # in seconds
-    settings.pose_crop_expansion= 0.1 # * height of the camera
+    settings.pose_crop_expansion=   0.1 # * height of the camera
 
     settings.pose_active =      not args.nopose
     settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
-    settings.pose_buffer_duration = 10 # seconds
+    settings.pose_stream_capacity = int(10 * args.fps)
 
     settings.corr_rate_hz =         args.fps
     settings.corr_num_workers =     10
-    settings.corr_buffer_duration = 3 # seconds
+    settings.corr_buffer_duration = int(3 * args.fps) # seconds
     settings.corr_stream_timeout =  settings.tracker_timeout # seconds
     settings.corr_max_nan_ratio =   0.15 # maximum ratio of NaN values in a window
     settings.corr_dtw_band =        10 # maximum distance between two points in a window
     settings.corr_similarity_exp =  2.0 # exponent for similarity calculation
-
+    settings.corr_stream_capacity = int(60 * args.fps)
     settings.light_resolution =     3600
     settings.light_rate =           60
 

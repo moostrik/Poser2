@@ -1,26 +1,21 @@
 # Standard library imports
-import math
 import numpy as np
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Type, Any, Dict, Tuple
-from threading import Lock
+from typing import Optional, Tuple
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
-import OpenGL.GLUT as glut
 
 # Local application imports
-from modules.gl.Fbo import Fbo, SwapFbo
+from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Mesh import Mesh
 from modules.gl.RenderWindow import RenderWindow
 from modules.gl.Shader import Shader
-from modules.gl.Texture import Texture
-from modules.gl.Utils import lfo, fit, fill
 
 from modules.av.Definitions import AvOutput
-from modules.cam.depthcam.Definitions import Tracklet as CamTracklet, Rect as CamRect, FrameType
+from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus, Rect
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices
@@ -61,21 +56,19 @@ class Render(RenderWindow):
         self.num_sims: int = len(DataVisType)
         self.num_viss: int = len(LightVisType)
         self.vis_width: int = settings.light_resolution
-        self.r_streams: int = 3
+        self.num_r_streams: int = 3
 
         # images
         self.avi_image = Image()
         self.cam_images: dict[int, Image] = {}
         self.pse_images: dict[int, Image] = {}
         self.a_s_images: dict[int, Image] = {}
-        self.r_s_images: dict[int, Image] = {}
+        self.r_s_image = Image()
         for i in range(self.num_cams):
             self.cam_images[i] = Image()
         for i in range(self.max_players):
             self.pse_images[i] = Image()
             self.a_s_images[i] = Image()
-        for i in range(self.r_streams):
-            self.r_s_images[i] = Image()
 
         # fbos
         self.cam_fbos: dict[int, Fbo] = {}
@@ -289,13 +282,28 @@ class Render(RenderWindow):
     def draw_sims(self) -> None:
         for i in range(self.num_sims):
             fbo: Fbo = self.sim_fbos[i]
-            self.setView(fbo.width, fbo.height)
             if i == DataVisType.TRACKING.value:
-                self.draw_map_positions(self.data.get_tracklets(), self.num_cams, fbo)
-            # elif i == DataVisType.R_PAIRS.value:
-            #     R_windows = self.get_correlation_windows()
-            #     if R_windows:
-            #         self.draw_R_pairs_shader(R_windows, fbo)
+                self.draw_map_positions(fbo, self.data.get_tracklets(), self.num_cams)
+            elif i == DataVisType.R_PAIRS.value:
+                self.draw_correlations(fbo)
+
+    def draw_correlations(self, fbo: Fbo) -> None:
+        correlation_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams()
+        if correlation_streams is None:
+            return
+        image_np: np.ndarray = Render.r_stream_to_image(correlation_streams, self.num_r_streams)
+        self.r_s_image.set_image(image_np)
+        self.r_s_image.update()
+
+        # self.r_stream_shader.use(fbo.fbo_id, r_s_image.tex_id, fbo.width, fbo.height, 1.0)
+        RenderWindow.setView(fbo.width, fbo.height)
+        fbo.begin()
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+
+        self.r_s_image.draw(0, 0, fbo.width, fbo.height)
+        glFlush()
+        fbo.end()
 
     def draw_poses(self) -> None:
         for i in range(self.max_players):
@@ -480,7 +488,8 @@ class Render(RenderWindow):
         shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5)
 
     @staticmethod
-    def draw_map_positions(tracklets: dict[int, Tracklet], num_cams: int, fbo: Fbo) -> None:
+    def draw_map_positions(fbo: Fbo, tracklets: dict[int, Tracklet], num_cams: int) -> None:
+        RenderWindow.setView(fbo.width, fbo.height)
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
@@ -526,20 +535,6 @@ class Render(RenderWindow):
 
         fbo.end()
         glFlush()
-
-    @staticmethod
-    def pose_stream_to_image(pose_stream: PoseStreamData) -> np.ndarray:
-        angles_raw: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0).astype(np.float32)
-        angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
-        sign_channel: np.ndarray = (angles_raw > 0).astype(np.float32)
-        confidences: np.ndarray = np.clip(pose_stream.confidences.to_numpy().astype(np.float32), 0, 1)
-        # width, height = angles_norm.shape
-        # img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
-        # img[..., 2] = angles_norm.T   r
-        # img[..., 1] = sign_channel.T  g
-        # img[..., 0] = confidences.T   b
-        channels: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1)  # shape: (width, height, 3)
-        return channels.transpose(1, 0, 2)
 
     @staticmethod
     def draw_R_pairs(R_meshes: dict[Tuple[int, int], Mesh], fbo: Fbo) -> None:
@@ -649,3 +644,75 @@ class Render(RenderWindow):
         # glDisable(GL_BLEND)
         # glEnable(GL_BLEND)
         fbo.end()
+
+    @staticmethod
+    def draw_correlation(fbo: Fbo, r_streams: PairCorrelationStreamData, num_streams: int) -> None:
+        r_image: np.ndarray = Render.r_stream_to_image(r_streams, num_streams)
+        # print(f"R image shape: {r_image.shape}")
+
+
+
+
+        RenderWindow.setView(fbo.width, fbo.height)
+        fbo.begin()
+
+        return
+
+
+    @staticmethod
+    def r_stream_to_image(r_streams: PairCorrelationStreamData, num_streams: int) -> np.ndarray:
+        pairs: list[Tuple[int, int]] = r_streams.get_top_pairs(num_streams)
+        capacity: int = r_streams.capacity
+
+        image: np.ndarray = np.zeros((capacity, num_streams, 4), dtype=np.float32)
+
+        for i in range(num_streams):
+            pair: Tuple[int, int] = pairs[i]
+            r: np.ndarray | None = r_streams.get_metric_window(pair)
+            if r is not None:
+                if r.shape[0] <= capacity:
+                    image[-r.shape[0]:, i, 0] = r
+                    image[-r.shape[0]:, i, 1] = r
+                    image[-r.shape[0]:, i, 2] = r
+                    image[-r.shape[0]:, i, 3] = 1.0  # Alpha channel (full opacity)
+                else:
+                    # Take the most recent data if longer than capacity
+                    image[:, i, 0] = r[-capacity:]
+                    image[:, i, 1] = r[-capacity:]
+                    image[:, i, 2] = r[-capacity:]
+                    image[:, i, 3] = 1.0  # Alpha channel (full opacity)
+
+        return image.transpose(1, 0, 2)  # Transpose to (num_streams, capacity, 4)
+
+
+    @staticmethod
+    def pose_stream_to_image(pose_stream: PoseStreamData, confidence_ceil: bool = True) -> np.ndarray:
+        angles_raw: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0).astype(np.float32)
+        angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
+        sign_channel: np.ndarray = (angles_raw > 0).astype(np.float32)
+        if confidence_ceil:
+            confidences: np.ndarray = np.where(pose_stream.confidences.to_numpy() > 0, 1.0, 0.0).astype(np.float32)
+        else:
+            confidences: np.ndarray = np.clip(pose_stream.confidences.to_numpy().astype(np.float32), 0, 1)
+        # width, height = angles_norm.shape
+        # img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
+        # img[..., 2] = angles_norm.T   r
+        # img[..., 1] = sign_channel.T  g
+        # img[..., 0] = confidences.T   b
+        channels: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1)
+        image: np.ndarray = channels.transpose(1, 0, 2)
+
+        # padding
+        capacity: int = pose_stream.capacity
+        if image.shape[1] > capacity:
+            image = image[:capacity, :, :]
+        if image.shape[1] < capacity:
+            pad_width: int = capacity - image.shape[1]
+            # Use first value for padding
+            pad_value: np.ndarray = image[:, 0, :].copy() if image.shape[1] > 0 else np.zeros((image.shape[0], image.shape[2]), dtype=image.dtype)
+            # Set confidences to zero for all rows
+            pad_value[:, 0] = 0.0
+            pad: np.ndarray = np.repeat(pad_value[:, np.newaxis, :], pad_width, axis=1)
+            image = np.concatenate([pad, image], axis=1)
+
+        return image.astype(np.float32)

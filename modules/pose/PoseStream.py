@@ -41,6 +41,7 @@ class PoseStreamData:
     id: int
     angles: pd.DataFrame
     confidences: pd.DataFrame
+    capacity: int
 
 PoseStreamDataCallback = Callable[[PoseStreamData], None]
 PoseStreamDataDict = dict[int, PoseStreamData]
@@ -148,7 +149,7 @@ class PoseStreamProcessor(Process):
         self.result_queue = result_queue if result_queue else Queue()
 
         # Store settings values (not the settings object itself)
-        self.buffer_capacity: int = int(settings.pose_buffer_duration * settings.camera_fps)
+        self.buffer_capacity: int = settings.pose_stream_capacity
         self.resample_interval: str = f"{int(1.0 / settings.camera_fps * 1000)}ms"
 
         # Initialize buffers (will be recreated in child process)
@@ -226,7 +227,7 @@ class PoseStreamProcessor(Process):
 
         interpolated: pd.DataFrame = angle_df.interpolate(method='time', limit_direction='both', limit=7)
         smoothed: pd.DataFrame = PoseStreamProcessor.ewm_circular_mean(interpolated, span=7.0)
-        self._notify_callbacks(PoseStreamData(pose.id, smoothed, conf_df))
+        self._notify_callbacks(PoseStreamData(pose.id, smoothed, conf_df, self.buffer_capacity))
 
     @staticmethod
     def rolling_circular_mean(df: pd.DataFrame, window: float = 0.3, min_periods: int = 1) -> pd.DataFrame:
