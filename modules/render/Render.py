@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
+import OpenGL.GLUT as glut
 
 # Local application imports
 from modules.gl.Fbo import Fbo
@@ -24,6 +25,7 @@ from modules.Settings import Settings
 
 from modules.render.RenderCompositionSubdivision import make_subdivision, SubdivisionType
 from modules.render.RenderDataManager import RenderDataManager
+from modules.render.RenderUpdateAngleMesh import update_angle_mesh
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -133,9 +135,9 @@ class Render(RenderWindow):
             self.allocated = True
 
         try:
-            self.update_pose_meshes()
-            self.update_angle_meshes()
-            # self.update_R_meshes()
+            for id in range(self.max_players):
+                self.update_pose_meshes(self.data.get_pose(id, True), self.pose_meshes[id])
+                # update_angle_mesh(self.data.get_pose_stream(id, False), self.angle_meshes[id])
 
             self.draw_cameras()
             self.draw_sims()
@@ -146,133 +148,7 @@ class Render(RenderWindow):
         except Exception as e:
             print(f"Error in draw: {e}")
 
-    def update_pose_meshes(self) -> None:
-        for i in range(self.max_players):
-            pose: Pose | None = self.data.get_pose(i, True)
-            if pose is not None:
-                points: PosePoints | None = pose.points
-                if points is not None:
-                    self.pose_meshes[i].set_vertices(points.getVertices())
-                    self.pose_meshes[i].set_colors(points.getColors(threshold=0.0))
-                    self.pose_meshes[i].update()
-
-    def update_angle_meshes(self) -> None:
-        for i in range(self.max_players):
-            pose_stream: PoseStreamData | None = self.data.get_pose_stream(i, False)
-            if pose_stream is None:
-                continue
-
-            angles_np: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0)
-            conf_np: np.ndarray = pose_stream.confidences.to_numpy()
-            if angles_np.shape[0] != conf_np.shape[0] or angles_np.shape[1] != conf_np.shape[1]:
-                print(f"Angles shape {angles_np.shape} does not match confidences shape {conf_np.shape}")
-                continue
-            mesh_data: np.ndarray = np.stack([angles_np, conf_np], axis=-1)
-
-            capacity: int = pose_stream.capacity
-            if mesh_data.shape[0] < capacity:
-                # Pad the mesh data to match the capacity
-                padding: np.ndarray = np.zeros((capacity - mesh_data.shape[0], mesh_data.shape[1], mesh_data.shape[2]), dtype=mesh_data.dtype)
-                mesh_data = np.concatenate([padding, mesh_data], axis=0)
-
-
-            # Only use the first 4 joints
-            data: np.ndarray = mesh_data[:, :4, :]
-
-            mesh: Mesh = self.angle_meshes[i]
-            num_frames, num_joints, _ = data.shape
-            if num_frames < 2 or num_joints < 1:
-                continue
-
-            # Prepare confidences and angles
-            confidences: np.ndarray = np.clip(data[..., 1], 0, 1)
-
-            confidences = np.where(confidences > 0, 0.7, 0.0).astype(np.float32)
-            angles_raw: np.ndarray = data[..., 0]
-            angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
-
-            joint_height: float = 1.0 / (num_joints)
-
-            # INDICES
-            base = np.arange(num_joints) * num_frames
-            frame_idx: np.ndarray = np.arange(num_frames - 1)
-            start = base[:, None] + frame_idx
-            end = start + 1
-            indices: np.ndarray = np.stack([start, end], axis=-1).reshape(-1, 2).astype(np.uint32).flatten()
-            mesh.set_indices(indices)
-
-            # VERTICES
-            frame_grid, joint_grid = np.meshgrid(np.arange(num_frames), np.arange(num_joints), indexing='ij')
-            x = frame_grid / (num_frames - 1)
-            y = (joint_grid) * joint_height + angles_norm * joint_height - 0.05
-            vertices: np.ndarray = np.zeros((num_frames * num_joints, 3), dtype=np.float32)
-            vertices[:, 0] = x.T.flatten()
-            vertices[:, 1] = y.T.flatten()
-            mesh.set_vertices(vertices)
-
-            # COLORS
-            even_mask: np.ndarray = (np.arange(num_joints) % 2 == 0)
-            even_mask: np.ndarray = np.repeat(even_mask, num_frames)
-            odd_mask = ~even_mask
-
-            angle_mask: np.ndarray = (angles_raw > 0).T.flatten()
-
-            colors: np.ndarray = np.ones((num_joints * num_frames, 4), dtype=np.float32)
-            # Even joints
-            colors[even_mask & angle_mask, :3] = [1.0, 1.0, 0.0]  # Yellow
-            colors[even_mask & ~angle_mask, :3] = [1.0, 0.0, 0.0] # Red
-            # Odd joints
-            colors[odd_mask & angle_mask, :3] = [0.0, 0.7, 1.0]   # Blue
-            colors[odd_mask & ~angle_mask, :3] = [0.0, 1.0, 0.0]  # Green
-
-            # Alpha from confidences
-
-            conf_flat: np.ndarray = confidences.T.flatten()
-            colors[:, 3] = conf_flat #np.where(conf_flat > 0.0, 1.0, 0.0)
-            # colors[:, 3] = confidences.T.flatten()
-            mesh.set_colors(colors)
-
-            mesh.update()
-
-    def update_R_meshes(self) -> None:
-        r_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams()
-
-        if r_streams is None:
-            return
-
-        return
-        self.R_meshes.clear()
-
-        for pair_r in r_streams.values():
-            pair_id: Tuple[int, int] = pair_r[0]
-            data: Optional[np.ndarray] = pair_r[1]
-
-            if data is None or len(data) < 2:
-                continue  # Need at least 2 points to draw a line
-
-            mesh = Mesh()
-            num_points = len(data)
-
-            # X: normalized time (0 to 1), Y: similarity value (assume in [0, 1])
-            x = np.linspace(0, 1, num_points, dtype=np.float32)
-            y = np.clip(data.astype(np.float32), 0.0, 1.0)
-            vertices = np.stack([x, y, np.zeros_like(x)], axis=1)  # shape (num_points, 3)
-
-            # Indices for line strip
-            indices = np.arange(num_points - 1, dtype=np.uint32)
-            indices = np.stack([indices, indices + 1], axis=1).flatten()
-
-            # Colors (e.g., white, or color by pair_id)
-            colors = np.ones((num_points, 4), dtype=np.float32)
-
-            mesh.set_vertices(vertices)
-            mesh.set_indices(indices)
-            mesh.set_colors(colors)
-            mesh.update()
-
-            self.R_meshes[pair_id] = mesh
-
-
+    # DRAW METHODS
     def draw_cameras(self) -> None:
         for i in range(self.num_cams):
             frame: np.ndarray | None = self.data.get_cam_image(i)
@@ -298,27 +174,30 @@ class Render(RenderWindow):
         correlation_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams()
         if correlation_streams is None:
             return
-        image_np: np.ndarray = Render.r_stream_to_image(correlation_streams, self.num_r_streams)
+        image_np: np.ndarray = WS_RStream.r_stream_to_image(correlation_streams, self.num_r_streams)
         self.r_s_image.set_image(image_np)
         self.r_s_image.update()
-
-        fbo.begin()
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT)
-        fbo.end()
 
         RenderWindow.setView(fbo.width, fbo.height)
         self.r_stream_shader.use(fbo.fbo_id, self.r_s_image.tex_id, self.r_s_image.width, self.r_s_image.height, 1.5 / fbo.height)
 
-        # self.r_stream_shader.use(fbo.fbo_id, r_s_image.tex_id, fbo.width, fbo.height, 1.0)
-        # RenderWindow.setView(fbo.width, fbo.height)
-        # fbo.begin()
-        # glClearColor(0.0, 0.0, 0.0, 1.0)
-        # glClear(GL_COLOR_BUFFER_BIT)
+        pairs: list[Tuple[int, int]] = correlation_streams.get_top_pairs(self.num_r_streams)
+        num_pairs: int = len(pairs)
+        step: float = fbo.height / num_pairs
 
-        # self.r_s_image.draw(0, 0, fbo.width, fbo.height)
-        # glFlush()
-        # fbo.end()
+        fbo.begin()
+
+        glColor4f(1.0, 0.5, 0.5, 1.0)  # Set color to white
+        for i in range(num_pairs):
+            pair: Tuple[int, int] = pairs[i]
+            string: str = f'{pair[0]} | {pair[1]}'
+            x: int = fbo.width - 100
+            y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
+            RenderWindow.draw_string(x, y, string, font=glut.GLUT_BITMAP_TIMES_ROMAN_24) # type: ignore
+        glColor4f(1.0, 1.0, 1.0, 1.0)  # Set color to white
+        fbo.end()
+
+
 
     def draw_poses(self) -> None:
         for i in range(self.max_players):
@@ -335,7 +214,7 @@ class Render(RenderWindow):
             pose_stream: PoseStreamData | None = self.data.get_pose_stream(i)
             a_s_image: Image = self.a_s_images[i]
             if pose_stream is not None:
-                a_s_image_np: np.ndarray = self.pose_stream_to_image(pose_stream)
+                a_s_image_np: np.ndarray = WS_PoseStream.pose_stream_to_image(pose_stream)
                 a_s_image.set_image(a_s_image_np)
                 a_s_image.update()
 
@@ -382,6 +261,15 @@ class Render(RenderWindow):
             self.vis_fbos[i].draw(x, y, w, h)
 
     # STATIC METHODS
+    @ staticmethod
+    def update_pose_meshes(pose: Pose | None, pose_mesh: Mesh) -> None:
+        if pose is not None:
+            points: PosePoints | None = pose.points
+            if points is not None:
+                pose_mesh.set_vertices(points.getVertices())
+                pose_mesh.set_colors(points.getColors(threshold=0.0))
+                pose_mesh.update()
+
     @staticmethod
     def draw_camera(fbo: Fbo, image: Image, depth_tracklets: list[CamTracklet], poses: list[Pose], pose_meshes: dict[int, Mesh]) -> None:
         RenderWindow.setView(fbo.width, fbo.height)
@@ -496,8 +384,8 @@ class Render(RenderWindow):
         if tracklet is not None:
             draw_box: bool = tracklet.is_lost
             Render.draw_tracklet(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box, True, True)
-        if angle_mesh.isInitialized():
-            angle_mesh.draw(0, 0, fbo.width, fbo.height)
+        # if angle_mesh.isInitialized():
+        #     angle_mesh.draw(0, 0, fbo.width, fbo.height)
         glFlush()
         fbo.end()
         shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5 / fbo.height)
@@ -551,63 +439,3 @@ class Render(RenderWindow):
         fbo.end()
         glFlush()
 
-    @staticmethod
-    def r_stream_to_image(r_streams: PairCorrelationStreamData, num_streams: int) -> np.ndarray:
-        pairs: list[Tuple[int, int]] = r_streams.get_top_pairs(num_streams)
-        capacity: int = r_streams.capacity
-
-        image: np.ndarray = np.zeros((num_streams, capacity, 3), dtype=np.float32)
-
-        for i in range(num_streams):
-            pair: Tuple[int, int] = pairs[i]
-            stream: np.ndarray | None = r_streams.get_metric_window(pair)
-            if stream is not None:
-                steam_len: int = stream.shape[0]
-                if steam_len >= capacity:
-                    image[i, :, 2] = stream[-capacity:]
-                    image[i, :, 1] = 1.0
-                else:
-                    start_idx: int = capacity - steam_len
-                    image[i, start_idx:, 2] = stream
-                    image[i, start_idx:, 1] = 1.0
-
-                    image[i, start_idx, 1] = 0.0
-                    if steam_len > 1:
-                        image[i, start_idx + 1, 1] = 0.0
-
-        return image
-
-    @staticmethod
-    def pose_stream_to_image(pose_stream: PoseStreamData, confidence_ceil: bool = True) -> np.ndarray:
-        angles_raw: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0).astype(np.float32)
-        confidences_raw: np.ndarray = pose_stream.confidences.to_numpy()
-        angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
-        sign_channel: np.ndarray = (angles_raw > 0).astype(np.float32)
-        if confidence_ceil:
-            confidences: np.ndarray = (confidences_raw > 0).astype(np.float32)
-        else:
-            confidences: np.ndarray = np.clip(confidences_raw.astype(np.float32), 0, 1)
-
-        streams: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1).transpose(1, 0, 2)
-
-        capacity: int = pose_stream.capacity
-        stream_len: int = streams.shape[1]
-
-        # Pre-allocate the final image with the target capacity
-        image: np.ndarray = np.zeros((streams.shape[0], capacity, streams.shape[2]), dtype=np.float32)
-
-        if stream_len > 0:
-            if stream_len >= capacity:
-                # Take the most recent data (right-most columns)
-                image[:, :, :] = streams[:, -capacity:, :]
-            else:
-                # Place data at the end (most recent position)
-                start_idx: int = capacity - stream_len
-                image[:, start_idx:, :] = streams
-
-                # set the first two confidences to 0.0 for visualization
-                image[:, start_idx, 0] = 0.0
-                if stream_len > 1:
-                    image[:, start_idx + 1, 0] = 0.0
-
-        return image

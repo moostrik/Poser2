@@ -217,5 +217,5 @@ class RenderWindow(Thread):
     def draw_string(x: float, y: float, string: str, font=glut.GLUT_BITMAP_HELVETICA_12)-> None: # type: ignore
         glRasterPos2f(x, y)
         for character in string:
-            glut.glutBitmapCharacter(font, ord(character)) # type: ignore
+            glut.glutBitmapCharacter(font, ord(character))
         glRasterPos2f(0, 0)

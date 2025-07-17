@@ -49,40 +49,44 @@ class WS_RStream(Shader):
 
         for i in range(num_streams):
             pair: Tuple[int, int] = pairs[i]
-            r: np.ndarray | None = r_streams.get_metric_window(pair)
-            if r is not None:
-                r_len: int = r.shape[0]
-                if r_len <= capacity:
-                    start_idx: int = capacity - r_len
-                    image[i, start_idx:, 2] = r
-                    image[i, start_idx:, 1] = 1.0
-                else:
-                    image[i, :, 2] = r[-capacity:]
+            stream: np.ndarray | None = r_streams.get_metric_window(pair)
+            if stream is not None:
+                steam_len: int = stream.shape[0]
+                if steam_len >= capacity:
+                    image[i, :, 2] = stream[-capacity:]
                     image[i, :, 1] = 1.0
+                else:
+                    start_idx: int = capacity - steam_len
+                    image[i, start_idx:, 2] = stream
+                    image[i, start_idx:, 1] = 1.0
+
+                    image[i, start_idx, 1] = 0.0
+                    if steam_len > 1:
+                        image[i, start_idx + 1, 1] = 0.0
 
         return image
 
-    # @staticmethod
-    # def r_stream_to_visible_image(r_streams: PairCorrelationStreamData, num_streams: int) -> np.ndarray:
-    #     pairs: list[Tuple[int, int]] = r_streams.get_top_pairs(num_streams)
-    #     capacity: int = r_streams.capacity
+    @staticmethod
+    def r_stream_to_visible_image(r_streams: PairCorrelationStreamData, num_streams: int) -> np.ndarray:
+        pairs: list[Tuple[int, int]] = r_streams.get_top_pairs(num_streams)
+        capacity: int = r_streams.capacity
 
-    #     image: np.ndarray = np.zeros((capacity, num_streams, 4), dtype=np.float32)
+        image: np.ndarray = np.zeros((capacity, num_streams, 4), dtype=np.float32)
 
-    #     for i in range(num_streams):
-    #         pair: Tuple[int, int] = pairs[i]
-    #         r: np.ndarray | None = r_streams.get_metric_window(pair)
-    #         if r is not None:
-    #             if r.shape[0] <= capacity:
-    #                 image[-r.shape[0]:, i, 0] = r
-    #                 image[-r.shape[0]:, i, 1] = r
-    #                 image[-r.shape[0]:, i, 2] = r
-    #                 image[-r.shape[0]:, i, 3] = 1.0  # Alpha channel (full opacity)
-    #             else:
-    #                 # Take the most recent data if longer than capacity
-    #                 image[:, i, 0] = r[-capacity:]
-    #                 image[:, i, 1] = r[-capacity:]
-    #                 image[:, i, 2] = r[-capacity:]
-    #                 image[:, i, 3] = 1.0  # Alpha channel (full opacity)
+        for i in range(num_streams):
+            pair: Tuple[int, int] = pairs[i]
+            r: np.ndarray | None = r_streams.get_metric_window(pair)
+            if r is not None:
+                if r.shape[0] <= capacity:
+                    image[-r.shape[0]:, i, 0] = r
+                    image[-r.shape[0]:, i, 1] = r
+                    image[-r.shape[0]:, i, 2] = r
+                    image[-r.shape[0]:, i, 3] = 1.0  # Alpha channel (full opacity)
+                else:
+                    # Take the most recent data if longer than capacity
+                    image[:, i, 0] = r[-capacity:]
+                    image[:, i, 1] = r[-capacity:]
+                    image[:, i, 2] = r[-capacity:]
+                    image[:, i, 3] = 1.0  # Alpha channel (full opacity)
 
-    #     return image.transpose(1, 0, 2)  # Transpose to (num_streams, capacity, 4)
+        return image.transpose(1, 0, 2)  # Transpose to (num_streams, capacity, 4)
