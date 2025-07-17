@@ -31,8 +31,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.gl.shaders.WS_Angles import WS_Angles
 from modules.gl.shaders.WS_Lines import WS_Lines
 from modules.gl.shaders.WS_PoseStream import WS_PoseStream
-
-from modules.gl.shaders.RStream import RStream
+from modules.gl.shaders.WS_RStream import WS_RStream
 
 
 class DataVisType(Enum):
@@ -94,10 +93,10 @@ class Render(RenderWindow):
             self.angle_meshes[i] = Mesh()
 
         # shaders
-        self.vis_line_shader: WS_Lines = WS_Lines()
-        self.vis_angle_shader: WS_Angles = WS_Angles()
-        self.pose_stream_shader: WS_PoseStream = WS_PoseStream()
-        self.r_stream_shader = RStream()
+        self.vis_line_shader = WS_Lines()
+        self.vis_angle_shader = WS_Angles()
+        self.pose_stream_shader = WS_PoseStream()
+        self.r_stream_shader = WS_RStream()
         self.all_shaders: list[Shader] = [self.vis_line_shader, self.vis_angle_shader, self.pose_stream_shader, self.r_stream_shader]
 
         # composition
@@ -295,15 +294,23 @@ class Render(RenderWindow):
         self.r_s_image.set_image(image_np)
         self.r_s_image.update()
 
-        # self.r_stream_shader.use(fbo.fbo_id, r_s_image.tex_id, fbo.width, fbo.height, 1.0)
-        RenderWindow.setView(fbo.width, fbo.height)
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
-
-        self.r_s_image.draw(0, 0, fbo.width, fbo.height)
-        glFlush()
         fbo.end()
+
+        RenderWindow.setView(fbo.width, fbo.height)
+        self.r_stream_shader.use(fbo.fbo_id, self.r_s_image.tex_id, self.r_s_image.width, self.r_s_image.height, 2.5 / fbo.height)
+
+        # self.r_stream_shader.use(fbo.fbo_id, r_s_image.tex_id, fbo.width, fbo.height, 1.0)
+        # RenderWindow.setView(fbo.width, fbo.height)
+        # fbo.begin()
+        # glClearColor(0.0, 0.0, 0.0, 1.0)
+        # glClear(GL_COLOR_BUFFER_BIT)
+
+        # self.r_s_image.draw(0, 0, fbo.width, fbo.height)
+        # glFlush()
+        # fbo.end()
 
     def draw_poses(self) -> None:
         for i in range(self.max_players):
@@ -485,7 +492,7 @@ class Render(RenderWindow):
         #     angle_mesh.draw(0, 0, fbo.width, fbo.height)
         glFlush()
         fbo.end()
-        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5)
+        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.0 / fbo.height)
 
     @staticmethod
     def draw_map_positions(fbo: Fbo, tracklets: dict[int, Tracklet], num_cams: int) -> None:
@@ -537,182 +544,58 @@ class Render(RenderWindow):
         glFlush()
 
     @staticmethod
-    def draw_R_pairs(R_meshes: dict[Tuple[int, int], Mesh], fbo: Fbo) -> None:
-        fbo.begin()
-        glClearColor(0.1, 0.1, 0.1, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT)
-
-        num_pairs = len(R_meshes)
-        if num_pairs == 0:
-            fbo.end()
-            return
-
-        draw_width: int = fbo.width - 80
-        slice_height = fbo.height // num_pairs
-
-        # Pre-calculate color map
-        color_map = [
-            (1.0, 0.2, 0.2, 0.5),  # red
-            (0.2, 1.0, 0.2, 1.0),  # green
-            (0.2, 0.2, 1.0, 1.0),  # blue
-            (1.0, 1.0, 0.2, 1.0),  # yellow
-            (1.0, 0.2, 1.0, 1.0),  # magenta
-            (0.2, 1.0, 1.0, 1.0),  # cyan
-        ]
-
-        # Batch background rectangles
-        glBegin(GL_QUADS)
-        for idx, (pair_id, mesh) in enumerate(R_meshes.items()):
-            if not mesh.isInitialized():
-                continue
-
-            color_seed = pair_id[0] % 6
-            glColor4f(*color_map[color_seed])
-
-            y_offset = idx * slice_height
-            glVertex2f(0, y_offset)
-            glVertex2f(draw_width, y_offset)
-            glVertex2f(draw_width, y_offset + slice_height)
-            glVertex2f(0, y_offset + slice_height)
-        glEnd()
-
-        # Draw meshes and text separately to minimize state changes
-        glColor4f(1.0, 1.0, 1.0, 1.0)
-        text_data = []  # Store text data for batch rendering
-
-        for idx, (pair_id, mesh) in enumerate(R_meshes.items()):
-            if not mesh.isInitialized():
-                continue
-
-            y_offset = idx * slice_height
-            mesh.draw(0, y_offset + slice_height, draw_width, -slice_height)
-
-            # Store text data instead of rendering immediately
-            vertices = mesh.vertices
-            if vertices is not None and len(vertices) > 0:
-                last_vertex = vertices[-1]
-                x = int(last_vertex[0] * draw_width + 10)
-                y = int(y_offset + (1.0 - last_vertex[1]) * slice_height + 7)
-                text = f"{pair_id[0]}-{pair_id[1]}: {last_vertex[1]:.2f}"
-                text_data.append((x, y, text))
-
-        # Batch render all text
-        for x, y, text in text_data:
-            RenderWindow.draw_string(x, y, text)
-
-        fbo.end()
-
-    def draw_R_pairs_shader(self, R_windows: dict[Tuple[int, int], np.ndarray], fbo: Fbo) -> None:
-        if not R_windows:
-            return
-
-        # Color map for different pairs
-        color_map = [
-            (1.0, 0.2, 0.2),  # red
-            (0.2, 1.0, 0.2),  # green
-            (0.2, 0.2, 1.0),  # blue
-            (1.0, 1.0, 0.2),  # yellow
-            (1.0, 0.2, 1.0),  # magenta
-            (0.2, 1.0, 1.0),  # cyan
-        ]
-
-        fbo.begin()
-        glClearColor(0.1, 0.1, 0.1, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT)
-
-        # glEnable(GL_BLEND)
-        # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        num_pairs = len(R_windows)
-        for idx, (pair_id, data) in enumerate(R_windows.items()):
-            if data is None or len(data) < 2:
-                continue
-
-            color = color_map[pair_id[0] % len(color_map)]
-
-            self.r_stream_shader.use(
-                fbo_id=fbo.fbo_id,
-                correlation_data=data,
-                pair_index=idx,
-                total_pairs=num_pairs,
-                line_color=color,
-                line_width=10.0,
-                viewport_width=float(fbo.width),
-                viewport_height=float(fbo.height)
-            )
-
-        # glDisable(GL_BLEND)
-        # glEnable(GL_BLEND)
-        fbo.end()
-
-    @staticmethod
-    def draw_correlation(fbo: Fbo, r_streams: PairCorrelationStreamData, num_streams: int) -> None:
-        r_image: np.ndarray = Render.r_stream_to_image(r_streams, num_streams)
-        # print(f"R image shape: {r_image.shape}")
-
-
-
-
-        RenderWindow.setView(fbo.width, fbo.height)
-        fbo.begin()
-
-        return
-
-
-    @staticmethod
     def r_stream_to_image(r_streams: PairCorrelationStreamData, num_streams: int) -> np.ndarray:
         pairs: list[Tuple[int, int]] = r_streams.get_top_pairs(num_streams)
         capacity: int = r_streams.capacity
 
-        image: np.ndarray = np.zeros((capacity, num_streams, 4), dtype=np.float32)
+        image: np.ndarray = np.zeros((num_streams, capacity, 3), dtype=np.float32)
 
         for i in range(num_streams):
             pair: Tuple[int, int] = pairs[i]
             r: np.ndarray | None = r_streams.get_metric_window(pair)
             if r is not None:
-                if r.shape[0] <= capacity:
-                    image[-r.shape[0]:, i, 0] = r
-                    image[-r.shape[0]:, i, 1] = r
-                    image[-r.shape[0]:, i, 2] = r
-                    image[-r.shape[0]:, i, 3] = 1.0  # Alpha channel (full opacity)
+                r_len: int = r.shape[0]
+                if r_len <= capacity:
+                    start_idx: int = capacity - r_len
+                    image[i, start_idx:, 2] = r
+                    image[i, start_idx:, 1] = 1.0
                 else:
-                    # Take the most recent data if longer than capacity
-                    image[:, i, 0] = r[-capacity:]
-                    image[:, i, 1] = r[-capacity:]
-                    image[:, i, 2] = r[-capacity:]
-                    image[:, i, 3] = 1.0  # Alpha channel (full opacity)
+                    image[i, :, 2] = r[-capacity:]
+                    image[i, :, 1] = 1.0
 
-        return image.transpose(1, 0, 2)  # Transpose to (num_streams, capacity, 4)
-
+        return image
 
     @staticmethod
     def pose_stream_to_image(pose_stream: PoseStreamData, confidence_ceil: bool = True) -> np.ndarray:
         angles_raw: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0).astype(np.float32)
+        confidences_raw: np.ndarray = pose_stream.confidences.to_numpy()
         angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
         sign_channel: np.ndarray = (angles_raw > 0).astype(np.float32)
         if confidence_ceil:
-            confidences: np.ndarray = np.where(pose_stream.confidences.to_numpy() > 0, 1.0, 0.0).astype(np.float32)
+            confidences: np.ndarray = (confidences_raw > 0).astype(np.float32)
         else:
-            confidences: np.ndarray = np.clip(pose_stream.confidences.to_numpy().astype(np.float32), 0, 1)
-        # width, height = angles_norm.shape
-        # img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
-        # img[..., 2] = angles_norm.T   r
-        # img[..., 1] = sign_channel.T  g
-        # img[..., 0] = confidences.T   b
-        channels: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1)
-        image: np.ndarray = channels.transpose(1, 0, 2)
+            confidences: np.ndarray = np.clip(confidences_raw.astype(np.float32), 0, 1)
 
-        # padding
+        data: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1).transpose(1, 0, 2)
+
         capacity: int = pose_stream.capacity
-        if image.shape[1] > capacity:
-            image = image[:capacity, :, :]
-        if image.shape[1] < capacity:
-            pad_width: int = capacity - image.shape[1]
-            # Use first value for padding
-            pad_value: np.ndarray = image[:, 0, :].copy() if image.shape[1] > 0 else np.zeros((image.shape[0], image.shape[2]), dtype=image.dtype)
-            # Set confidences to zero for all rows
-            pad_value[:, 0] = 0.0
-            pad: np.ndarray = np.repeat(pad_value[:, np.newaxis, :], pad_width, axis=1)
-            image = np.concatenate([pad, image], axis=1)
+        current_width: int = data.shape[1]
 
-        return image.astype(np.float32)
+        # Pre-allocate the final image with the target capacity
+        image: np.ndarray = np.zeros((data.shape[0], capacity, data.shape[2]), dtype=np.float32)
+
+        if current_width > 0:
+            if current_width >= capacity:
+                # Take the most recent data (right-most columns)
+                image[:, :, :] = data[:, -capacity:, :]
+            else:
+                # Place data at the end (most recent position)
+                start_idx: int = capacity - current_width
+                image[:, start_idx:, :] = data
+
+                # set the first two confidences to 0.0 for visualization
+                image[:, start_idx, 0] = 0.0
+                if start_idx + 1 < capacity:
+                    image[:, start_idx + 1, 0] = 0.0
+
+        return image

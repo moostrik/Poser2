@@ -1,10 +1,10 @@
 #version 460 core
 
 uniform sampler2D tex0;
-uniform float inv_width = 1.0/302;      // 1.0 / textureSize(tex0, 0).x
-uniform int num_joints = 4;       // textureSize(tex0, 0).y
-uniform float joint_range = 1.0 / 4.0;    // 1.0 / float(num_joints + 2)
-uniform float sqrt_line_width = pow(1.5 / 302,2);//^2; // 1.0 / 0.005
+uniform float inv_width;
+uniform int num_joints;
+uniform float joint_range;
+uniform float line_width;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -47,7 +47,7 @@ void main() {
     float dist_to_line_sq = (cross_product * cross_product) / line_length_sq;
 
     // Compare squared distances (0.005^2 = 0.000025)
-    if (dist_to_line_sq > sqrt_line_width) {
+    if (dist_to_line_sq > line_width) {
         fragColor = vec4(0.0);
         return;
     }

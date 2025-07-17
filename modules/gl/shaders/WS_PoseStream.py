@@ -13,7 +13,7 @@ class WS_PoseStream(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, tex0: int, width: int, height: int, linewidth: float) -> None :
+    def use(self, fbo: int, tex0: int, num_samples: int, num_streams: int, linewidth: float) -> None :
         super().use()
         if not self.allocated: return
         if not fbo or not tex0: return
@@ -25,10 +25,10 @@ class WS_PoseStream(Shader):
 
         glUseProgram(s)
         glUniform1i(glGetUniformLocation(s, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(s, "inv_width"),   1.0  / width)
-        glUniform1i(glGetUniformLocation(s, "num_joints"),  height)
-        glUniform1f(glGetUniformLocation(s, "joint_range"), 1.0  / height)
-        glUniform1f(glGetUniformLocation(s, "line_width"),  (linewidth  / height) ** 2)  # line width squared
+        glUniform1f(glGetUniformLocation(s, "inv_width"),   1.0  / num_samples)
+        glUniform1i(glGetUniformLocation(s, "num_joints"),  num_streams)
+        glUniform1f(glGetUniformLocation(s, "joint_range"), 1.0  / num_streams)
+        glUniform1f(glGetUniformLocation(s, "line_width"),  linewidth ** 2)  # line width squared
 
         glBindFramebuffer(GL_FRAMEBUFFER, fbo)
         draw_quad()
@@ -42,31 +42,34 @@ class WS_PoseStream(Shader):
     @staticmethod
     def pose_stream_to_image(pose_stream: PoseStreamData, confidence_ceil: bool = True) -> np.ndarray:
         angles_raw: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0).astype(np.float32)
+        confidences_raw: np.ndarray = pose_stream.confidences.to_numpy()
         angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
         sign_channel: np.ndarray = (angles_raw > 0).astype(np.float32)
         if confidence_ceil:
-            confidences: np.ndarray = np.where(pose_stream.confidences.to_numpy() > 0, 1.0, 0.0).astype(np.float32)
+            confidences: np.ndarray = (confidences_raw > 0).astype(np.float32)
         else:
-            confidences: np.ndarray = np.clip(pose_stream.confidences.to_numpy().astype(np.float32), 0, 1)
-        # width, height = angles_norm.shape
-        # img: np.ndarray = np.ones((height, width, 4), dtype=np.float32)
-        # img[..., 2] = angles_norm.T   r
-        # img[..., 1] = sign_channel.T  g
-        # img[..., 0] = confidences.T   b
-        channels: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1)
-        image: np.ndarray = channels.transpose(1, 0, 2)
+            confidences: np.ndarray = np.clip(confidences_raw.astype(np.float32), 0, 1)
 
-        # padding
+        data: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1).transpose(1, 0, 2)
+
         capacity: int = pose_stream.capacity
-        if image.shape[1] > capacity:
-            image = image[:capacity, :, :]
-        if image.shape[1] < capacity:
-            pad_width: int = capacity - image.shape[1]
-            # Use first value for padding
-            pad_value: np.ndarray = image[:, 0, :].copy() if image.shape[1] > 0 else np.zeros((image.shape[0], image.shape[2]), dtype=image.dtype)
-            # Set confidences to zero for all rows
-            pad_value[:, 0] = 0.0
-            pad: np.ndarray = np.repeat(pad_value[:, np.newaxis, :], pad_width, axis=1)
-            image = np.concatenate([pad, image], axis=1)
+        current_width: int = data.shape[1]
 
-        return image.astype(np.float32)
+        # Pre-allocate the final image with the target capacity
+        image: np.ndarray = np.zeros((data.shape[0], capacity, data.shape[2]), dtype=np.float32)
+
+        if current_width > 0:
+            if current_width >= capacity:
+                # Take the most recent data (right-most columns)
+                image[:, :, :] = data[:, -capacity:, :]
+            else:
+                # Place data at the end (most recent position)
+                start_idx: int = capacity - current_width
+                image[:, start_idx:, :] = data
+
+                # set the first two confidences to 0.0 for visualization
+                image[:, start_idx, 0] = 0.0
+                if start_idx + 1 < capacity:
+                    image[:, start_idx + 1, 0] = 0.0
+
+        return image
