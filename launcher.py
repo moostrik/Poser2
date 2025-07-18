@@ -16,7 +16,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     mp.freeze_support()
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument('-fps',     '--fps',        type=float, default=23.0,   help='frames per second')
-    parser.add_argument('-pl',      '--players',    type=int,   default=8,      help='number of players')
+    parser.add_argument('-pl',      '--players',    type=int,   default=3,      help='number of players')
     parser.add_argument('-c',       '--color',      action='store_true',        help='use color input instead of left mono')
     parser.add_argument('-sq',      '--square',     action='store_true',        help='use centre square of the camera')
     parser.add_argument('-ss',      '--showstereo', action='store_true',        help='queue stereo frames')
@@ -30,6 +30,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     parser.add_argument('-nc',      '--numcameras', type=int,   default=4,      help='number of cameras')
     parser.add_argument('-as',      '--autoset',    action='store_true',        help='camera auto settings')
     parser.add_argument('-ad',      '--debug',      action='store_true',        help='run analysis in debug mode')
+    parser.add_argument('-hd',      '--hd',         action='store_true',        help='run in Harmonic Dissonance mode')
     args: Namespace = parser.parse_args()
 
     currentPath: str = path.dirname(__file__)
@@ -47,6 +48,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     # camera_list: list[str] = ['14442C10F124D9D600']
 
     settings: Settings =            Settings()
+
+    settings.art_type =             Settings.ArtType.WS
 
     settings.max_players =          args.players
 
@@ -109,6 +112,16 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_fps =           60
     settings.render_v_sync =        False
     settings.render_cams_a_row=     2
+
+    settings.art_type =             Settings.ArtType.WS
+    if args.hd:
+        settings.art_type = Settings.ArtType.HD
+        settings.max_players = 3
+        settings.camera_list = camera_list[:3]
+        settings.camera_num = 3
+        settings.tracker_type = TrackerType.ONEPERCAM
+
+
 
     settings.check_values()
     # settings.check_cameras()

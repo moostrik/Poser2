@@ -50,7 +50,10 @@ class Main():
         self.dtw_correlator = DTWCorrelator(settings)
         self.correlation_streamer = PairCorrelationStreamManager(settings)
 
-        self.av: AV = AV(self.gui, settings)
+        self.av = None
+        if settings.art_type == Settings.ArtType.WS:
+            self.av: AV | None = AV(self.gui, settings)
+
         self.running: bool = False
 
     def start(self) -> None:
@@ -85,8 +88,9 @@ class Main():
         self.tracker.add_tracklet_callback(self.render.data.set_tracklet)
         self.tracker.start()
 
-        self.av.add_output_callback(self.render.data.set_light_image)
-        self.av.start()
+        if self.av:
+            self.av.add_output_callback(self.render.data.set_light_image)
+            self.av.start()
 
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
         self.gui.exit_callback = self.stop
@@ -97,7 +101,9 @@ class Main():
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame(), self.cameras[c+1].gui.get_gui_frame()])
             else:
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
-        self.gui.addFrame([self.av.gui.get_gui_frame()])
+
+        if self.av:
+            self.gui.addFrame([self.av.gui.get_gui_frame()])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])
@@ -122,9 +128,7 @@ class Main():
     def stop(self) -> None:
 
         if self.player:
-            # print('stop and join player')
             self.player.stop()
-            self.player.join()
 
         # print('stop cameras')
         for camera in self.cameras:
@@ -142,13 +146,11 @@ class Main():
         if self.correlation_streamer:
             self.correlation_streamer.stop()
 
-        self.av.stop()
-        self.av.join()
+        if self.av:
+            self.av.stop()
 
         if self.recorder:
-            # print('stop recorder')
             self.recorder.stop()
-            self.recorder.join()
 
         for camera in self.cameras:
             camera.join(timeout=8)

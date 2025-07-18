@@ -97,6 +97,7 @@ class SyncPlayer(Thread):
         message: Message = Message(MessageType.STOP)
         self.state_messages.put(message)
         self.stop_event.set()
+        self.join()
 
     def run(self) -> None:
         state: State = State.IDLE

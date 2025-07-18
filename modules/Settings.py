@@ -16,9 +16,15 @@ class Settings():
         H264 = '.mp4'
         H265 = '.hevc'
 
+    class ArtType(Enum):
+        NONE = 0
+        WS = 1
+        HD = 2
+
     def __init__(self) -> None:
         # GENERAL
         self.max_players: int                   = None # type: ignore
+        self.art_type: Settings.ArtType         = None # type: ignore
 
         # PATHS
         self.path_root: str                     = None # type: ignore

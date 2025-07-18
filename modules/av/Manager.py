@@ -44,6 +44,7 @@ class Manager(Thread):
     def stop(self) -> None:
         self.udp_sender.stop()
         self.running = False
+        self.join()
 
     def run(self) -> None:
         self.running = True
