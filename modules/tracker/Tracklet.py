@@ -72,6 +72,20 @@ class Rect:
         return (self.x + self.width / 2, self.y + self.height / 2)
 
     @property
+    def top(self) -> float:
+        return self.y
+
+    @property
+    def bottom(self) -> float:
+        return self.y + self.height
+
+    def left(self) -> float:
+        return self.x
+
+    def right(self) -> float:
+        return self.x + self.width
+
+    @property
     def area(self) -> float:
         return self.width * self.height
 
