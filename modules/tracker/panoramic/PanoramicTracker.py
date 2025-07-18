@@ -12,7 +12,7 @@ from typing import Optional
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
 from modules.tracker.TrackletManager import TrackletManager
-from modules.tracker.BaseTracker import BaseTrackerInfo
+from modules.tracker.BaseTracker import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
 from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
 from modules.tracker.panoramic.PanoramicDefinitions import *
@@ -22,10 +22,14 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass (frozen=True)
-class PanoramicTrackerInfo(BaseTrackerInfo):
+class PanoramicMetadata(TrackerMetadata):
     local_angle: float
     world_angle: float
     overlap: bool
+
+    @property
+    def tracker_type(self) -> TrackerType:
+        return TrackerType.PANORAMIC
 
 @dataclass(frozen=True)
 class PanoramicOverlapInfo:
@@ -34,7 +38,7 @@ class PanoramicOverlapInfo:
     distance: float
     reason: str
 
-class PanoramicTracker(Thread):
+class PanoramicTracker(Thread, BaseTracker):
     def __init__(self, gui, settings: Settings) -> None:
         super().__init__()
 
@@ -61,6 +65,10 @@ class PanoramicTracker(Thread):
         self.gui = PanoramicTrackerGui(gui, self, settings)
 
         hot_reload = HotReloadMethods(self.__class__)
+
+    @property
+    def tracker_type(self) -> TrackerType:
+        return TrackerType.PANORAMIC
 
     def start(self) -> None:
         if self.running:
@@ -125,7 +133,7 @@ class PanoramicTracker(Thread):
 
         # Construct PanoramicTrackerInfo with local and world angles
         local_angle, world_angle, _overlap = self.geometry.get_angles_and_overlap(new_tracklet.roi, new_tracklet.cam_id, self.cam_360_edge_threshold)
-        new_tracklet = replace(new_tracklet, tracker_info=PanoramicTrackerInfo(local_angle, world_angle, _overlap))
+        new_tracklet = replace(new_tracklet, metadata=PanoramicMetadata(local_angle, world_angle, _overlap))
 
         # Filter out tracklets that are too close to the edge of a camera's field of view
         if self.geometry.angle_in_edge(local_angle, self.cam_360_edge_threshold):
@@ -167,14 +175,14 @@ class PanoramicTracker(Thread):
 
         for i, tracklet in enumerate(tracklets):
             # Reconstruct PanoramicTrackerInfo with updated overlap field
-            if isinstance(tracklet.tracker_info, PanoramicTrackerInfo):
-                updated_overlap = self.geometry.angle_in_overlap(tracklet.tracker_info.local_angle, self.cam_360_overlap_expansion)
+            if isinstance(tracklet.metadata, PanoramicMetadata):
+                updated_overlap = self.geometry.angle_in_overlap(tracklet.metadata.local_angle, self.cam_360_overlap_expansion)
 
                 tracklets[i] = replace(
                     tracklet,
-                    tracker_info=PanoramicTrackerInfo(
-                        local_angle=tracklet.tracker_info.local_angle,
-                        world_angle=tracklet.tracker_info.world_angle,
+                    metadata=PanoramicMetadata(
+                        local_angle=tracklet.metadata.local_angle,
+                        world_angle=tracklet.metadata.world_angle,
                         overlap=updated_overlap
                     )
                 )
@@ -182,12 +190,12 @@ class PanoramicTracker(Thread):
         overlaps: list[PanoramicOverlapInfo] = []
 
         for P_A, P_B in combinations(tracklets, 2):
-            if not getattr(P_A.tracker_info, "overlap", False) or not getattr(P_B.tracker_info, "overlap", False):
+            if not getattr(P_A.metadata, "overlap", False) or not getattr(P_B.metadata, "overlap", False):
                 continue
             if P_A.cam_id == P_B.cam_id:
                 continue
 
-            angle_diff: float = self.geometry.angle_diff(getattr(P_A.tracker_info, "world_angle", 45.0), getattr(P_B.tracker_info, "world_angle", 45.0))
+            angle_diff: float = self.geometry.angle_diff(getattr(P_A.metadata, "world_angle", 45.0), getattr(P_B.metadata, "world_angle", 45.0))
             if angle_diff > self.geometry.fov_overlap * (1.0 + self.cam_360_overlap_expansion):
                 continue
 
@@ -211,8 +219,8 @@ class PanoramicTracker(Thread):
                 newest, oldest = P_A, P_B
             else:
                 newest, oldest = P_B, P_A
-            edge_newest: float = self.geometry.angle_from_edge(getattr(newest.tracker_info, "local_angle", 45.0))
-            edge_oldest: float = self.geometry.angle_from_edge(getattr(oldest.tracker_info, "local_angle", 45.0))
+            edge_newest: float = self.geometry.angle_from_edge(getattr(newest.metadata, "local_angle", 45.0))
+            edge_oldest: float = self.geometry.angle_from_edge(getattr(oldest.metadata, "local_angle", 45.0))
             # print(f"Comparing newest {newest.id} (edge {edge_newest}) to oldest {oldest.id} (edge {edge_oldest})")
             if edge_newest >= edge_oldest / self.cam_360_hysteresis_factor:
                 overlaps.append(PanoramicOverlapInfo(newest.id, oldest.id, angle_diff, f'{edge_newest} >= {edge_oldest}'))

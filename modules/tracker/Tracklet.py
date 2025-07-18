@@ -13,7 +13,7 @@ from pandas import Timestamp
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as ExternalTracklet
 from modules.utils.HotReloadMethods import HotReloadMethods
-from modules.tracker.BaseTracker import BaseTrackerInfo
+from modules.tracker.BaseTracker import TrackerMetadata
 
 class TrackingStatus(Enum):
     NEW =       0
@@ -74,7 +74,7 @@ class Tracklet:
     status: TrackingStatus =    field(default=TrackingStatus.NEW)
     roi: Rect =                 field(default=Rect())
 
-    tracker_info: Optional[BaseTrackerInfo] = field(default = None)
+    metadata: Optional[TrackerMetadata] = field(default = None)
     _external_tracklet: Optional[ExternalTracklet] = field(default=None, repr=False)
     needs_notification: bool =  field(default=True, repr=False)
 

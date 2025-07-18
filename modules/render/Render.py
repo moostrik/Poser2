@@ -17,6 +17,7 @@ from modules.gl.Shader import Shader
 
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
+from modules.tracker.BaseTracker import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus, Rect
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices, PoseAngleNames
@@ -405,7 +406,6 @@ class Render(RenderWindow):
         fbo.end()
         return
 
-
     @staticmethod
     def draw_map_positions(fbo: Fbo, tracklets: dict[int, Tracklet], num_cams: int) -> None:
         RenderWindow.setView(fbo.width, fbo.height)
@@ -419,9 +419,13 @@ class Render(RenderWindow):
             if tracklet.status != TrackingStatus.TRACKED and tracklet.status != TrackingStatus.NEW:
                 continue
 
-            world_angle: float = getattr(tracklet.tracker_info, "world_angle", 0.0)
-            local_angle: float = getattr(tracklet.tracker_info, "local_angle", 0.0)
-            overlap: bool = getattr(tracklet.tracker_info, "overlap", False)
+            tracklet_metadata: TrackerMetadata | None = tracklet.metadata
+            if tracklet_metadata is None or tracklet_metadata.tracker_type != TrackerType.PANORAMIC:
+                continue
+
+            world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
+            local_angle: float = getattr(tracklet.metadata, "local_angle", 0.0)
+            overlap: bool = getattr(tracklet.metadata, "overlap", False)
 
             w: float = tracklet.roi.width * fbo.width / num_cams
             h: float = tracklet.roi.height * fbo.height
