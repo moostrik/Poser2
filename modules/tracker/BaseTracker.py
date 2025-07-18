@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class TrackerType(Enum):
     UNKNOWN = "unknown"
     PANORAMIC = "panoramic"
-    ONEPERCAM = "screenbound"
+    ONEPERCAM = "onepercam"
 
 class TrackerMetadata(Protocol):
     @property

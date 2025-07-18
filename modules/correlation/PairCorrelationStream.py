@@ -197,16 +197,16 @@ class PairCorrelationStreamProcessor(Process):
     def run(self) -> None:
         while not self._stop_event.is_set():
             try:
-                correlation_input: Optional[PairCorrelationStreamInput] = self.correlation_input_queue.get(block=True, timeout=0.01)
+                correlation_input: Optional[PairCorrelationStreamInput] = self.correlation_input_queue.get(timeout=0.01)
                 if correlation_input is not None:
                     try:
                         self._process(correlation_input)
                     except Exception as e:
                         print(f"Error processing correlation: {e}")
-
-                self.remove_old_pairs()
             except:
-                continue
+                pass
+
+            self.remove_old_pairs()
 
     def add_correlation(self, correlation_input: PairCorrelationStreamInput) -> None:
         """Add correlation to processing queue - can be called from main process."""
@@ -283,7 +283,6 @@ class PairCorrelationStreamProcessor(Process):
         for pair_id in pairs_to_remove:
             del self._pair_history[pair_id]
 
-
     def remove_old_pairs(self) -> None:
         """
         Remove pairs that have not been updated within the timeout period.
@@ -294,11 +293,7 @@ class PairCorrelationStreamProcessor(Process):
                 last_update: pd.Timestamp = history.index[-1]
                 if (pd.Timestamp.now() - last_update).total_seconds() > self.timeout:
                     del self._pair_history[id]
-            else:
-                del self._pair_history[id]
-                print(f"Removed empty pair {id}")
-
-
+                    self._notify_callbacks(self.get_stream_data())
 
     def get_stream_data(self) -> PairCorrelationStreamData:
         """Return a snapshot of the current pair correlation stream data."""
