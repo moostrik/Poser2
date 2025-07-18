@@ -41,7 +41,7 @@ class TrackletIdPool:
         with self._lock:
             return sorted(self._available)
 
-class TrackletManager:
+class PanoramicTrackletManager:
     def __init__(self, max_players: int) -> None:
         self._tracklets: dict[int, Tracklet] = {}
         self._id_pool = TrackletIdPool(max_players)
@@ -185,9 +185,9 @@ class TrackletManager:
         with self._lock:
             for id, tracklet in self._tracklets.items():
                 if tracklet.needs_notification:
-                    updated_tracklet: Tracklet = replace(
+                    notified_tracklet: Tracklet = replace(
                         tracklet,
                         needs_notification=False
                     )
-                    self._tracklets[id] = updated_tracklet
+                    self._tracklets[id] = notified_tracklet
 

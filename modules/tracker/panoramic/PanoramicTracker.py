@@ -10,9 +10,9 @@ from typing import Optional
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
-from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
-from modules.tracker.TrackletManager import TrackletManager
 from modules.tracker.BaseTracker import BaseTracker, TrackerType, TrackerMetadata
+from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
+from modules.tracker.panoramic.PanoramicTrackletManager import PanoramicTrackletManager
 from modules.tracker.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
 from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
 from modules.tracker.panoramic.PanoramicDefinitions import *
@@ -48,14 +48,13 @@ class PanoramicTracker(Thread, BaseTracker):
 
         self.input_queue: Queue[Tracklet] = Queue()
 
-        self.tracklet_manager: TrackletManager = TrackletManager(self.max_players)
+        self.tracklet_manager: PanoramicTrackletManager = PanoramicTrackletManager(self.max_players)
 
         self.geometry: PanoramicGeometry = PanoramicGeometry(settings.camera_num, CAM_360_FOV, CAM_360_TARGET_FOV)
 
         self.tracklet_min_age: int =            settings.tracker_min_age
         self.tracklet_min_height: float =       settings.tracker_min_height
         self.timeout: float =                   settings.tracker_timeout
-        self.roi_expansion: float =             settings.pose_crop_expansion
         self.cam_360_edge_threshold: float =    CAM_360_EDGE_THRESHOLD
         self.cam_360_overlap_expansion: float = CAM_360_OVERLAP_EXPANSION
         self.cam_360_hysteresis_factor: float = CAM_360_HYSTERESIS_FACTOR
@@ -85,10 +84,10 @@ class PanoramicTracker(Thread, BaseTracker):
         self.join()  # Wait for the thread to finish
 
     def run(self) -> None:
-        next_update_time = time.time() + self.update_interval
+        next_update_time: float = time.time() + self.update_interval
 
         while self.running:
-            current_time = time.time()
+            current_time: float = time.time()
 
             # Process all available tracklets as fast as possible
             processed_any = False
@@ -105,7 +104,7 @@ class PanoramicTracker(Thread, BaseTracker):
                 self._update_and_notify()
                 next_update_time += self.update_interval
                 # In case of drift, catch up
-                if current_time > next_update_time:
+                while current_time > next_update_time:
                     next_update_time = current_time + self.update_interval
 
             # Small sleep to prevent excessive CPU usage when no tracklets are available

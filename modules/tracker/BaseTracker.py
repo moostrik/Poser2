@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class TrackerType(Enum):
     UNKNOWN = "unknown"
     PANORAMIC = "panoramic"
-    SCREENBOUND = "screenbound"
+    ONEPERCAM = "screenbound"
 
 class TrackerMetadata(Protocol):
     @property
@@ -31,10 +31,6 @@ class BaseTracker(Protocol):
         """Stop the tracker"""
         ...
 
-    def run(self) -> None:
-        """Run the tracker"""
-        ...
-
     def add_cam_tracklets(self, cam_id: int, cam_tracklets: List[CamTracklet]) -> None:
         """Add tracklets from a camera"""
         ...
@@ -48,7 +44,3 @@ class BaseTracker(Protocol):
         """Get the tracker type"""
         ...
 
-    # @property
-    # def running(self) -> bool:
-    #     """Check if tracker is running"""
-    #     ...

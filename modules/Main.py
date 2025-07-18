@@ -8,7 +8,9 @@ from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.gui.PyReallySimpleGui import Gui
-from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker as PanoramicTracker
+from modules.tracker.BaseTracker import TrackerType
+from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker
+from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 from modules.correlation.DTWCorrelator import DTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseStream import PoseStreamManager
@@ -38,7 +40,10 @@ class Main():
                 camera = DepthCam(self.gui, cam_id, settings)
                 self.cameras.append(camera)
 
-        self.panoramic_tracker = PanoramicTracker(self.gui, settings)
+        if settings.tracker_type == TrackerType.PANORAMIC:
+            self.tracker = PanoramicTracker(self.gui, settings)
+        else:
+            self.tracker = OnePerCamTracker(self.gui, settings)
 
         self.pose_detection = PosePipeline(settings)
         self.pose_streamer = PoseStreamManager(settings)
@@ -58,7 +63,7 @@ class Main():
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.pose_detection.set_image)
-            camera.add_tracker_callback(self.panoramic_tracker.add_cam_tracklets)
+            camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.render.data.set_depth_tracklets)
             camera.start()
 
@@ -76,9 +81,9 @@ class Main():
         self.pose_detection.add_pose_callback(self.render.data.set_pose)
         self.pose_detection.start()
 
-        self.panoramic_tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
-        self.panoramic_tracker.add_tracklet_callback(self.render.data.set_tracklet)
-        self.panoramic_tracker.start()
+        self.tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
+        self.tracker.add_tracklet_callback(self.render.data.set_tracklet)
+        self.tracker.start()
 
         self.av.add_output_callback(self.render.data.set_light_image)
         self.av.start()
@@ -95,9 +100,9 @@ class Main():
         self.gui.addFrame([self.av.gui.get_gui_frame()])
 
         if self.player:
-            self.gui.addFrame([self.player.get_gui_frame(), self.panoramic_tracker.gui.get_gui_frame()])
+            self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])
         if self.recorder:
-            self.gui.addFrame([self.recorder.get_gui_frame(), self.panoramic_tracker.gui.get_gui_frame()])
+            self.gui.addFrame([self.recorder.get_gui_frame(), self.tracker.gui.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
@@ -126,7 +131,7 @@ class Main():
             camera.stop()
 
         # print('stop detector')
-        self.panoramic_tracker.stop()
+        self.tracker.stop()
 
         if self.pose_detection:
             self.pose_detection.stop()

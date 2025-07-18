@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from enum import Enum
 
-from modules.cam.depthcam.Definitions import get_device_list
+from modules.cam.depthcam.Definitions import FrameType, get_device_list
 from modules.pose.PoseDetection import ModelType
-from modules.cam.depthcam.Definitions import FrameType
+from modules.tracker.BaseTracker import TrackerType
 
 class Settings():
     class CoderType(Enum):
@@ -48,6 +48,7 @@ class Settings():
         self.video_frame_types: list[FrameType] = None # type: ignore
 
         # TRACKING SETTINGS
+        self.tracker_type: TrackerType          = None # type: ignore
         self.tracker_min_age: int               = None # type: ignore
         self.tracker_min_height: float          = None # type: ignore
         self.tracker_timeout: float             = None # type: ignore

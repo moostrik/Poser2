@@ -30,6 +30,11 @@ DEPTHAI_TO_TRACKINGSTATUS: dict[ExternalTracklet.TrackingStatus, TrackingStatus]
     # Add more if needed
 }
 
+@dataclass(frozen=True)
+class Point2f:
+    x: float
+    y: float
+
 @dataclass
 class Point3f:
     """3D point with float coordinates"""
@@ -46,15 +51,24 @@ class Rect:
     height: float = 0.0
 
     @property
-    def top_left(self) -> tuple[float, float]:
+    def top_left(self) -> Point2f:
+        return Point2f(x=self.x, y=self.y)
         return (self.x, self.y)
 
     @property
-    def bottom_right(self) -> tuple[float, float]:
+    def bottom_right(self) -> Point2f:
+        return Point2f(
+            x=self.x + self.width,
+            y=self.y + self.height
+        )
         return (self.x + self.width, self.y + self.height)
 
     @property
-    def center(self) -> tuple[float, float]:
+    def center(self) -> Point2f:
+        return Point2f(
+            x=self.x + self.width / 2,
+            y=self.y + self.height / 2
+        )
         return (self.x + self.width / 2, self.y + self.height / 2)
 
     @property

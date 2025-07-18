@@ -8,7 +8,7 @@ from sys import exit
 from time import sleep
 
 from modules.Main import Main
-from modules.Settings import Settings, ModelType, FrameType
+from modules.Settings import Settings, ModelType, FrameType, TrackerType
 
 import multiprocessing as mp
 
@@ -16,7 +16,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     mp.freeze_support()
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument('-fps',     '--fps',        type=float, default=23.0,   help='frames per second')
-    parser.add_argument('-pl',      '--players',    type=int,   default=8,      help='number of players')
+    parser.add_argument('-pl',      '--players',    type=int,   default=3,      help='number of players')
     parser.add_argument('-c',       '--color',      action='store_true',        help='use color input instead of left mono')
     parser.add_argument('-sq',      '--square',     action='store_true',        help='use centre square of the camera')
     parser.add_argument('-ss',      '--showstereo', action='store_true',        help='queue stereo frames')
@@ -36,8 +36,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     camera_list: list[str] = ['14442C101136D1D200',
                               '14442C10F124D9D600',
-                              '14442C10110AD3D200',
-                              '14442C1031DDD2D200']
+                              '14442C10110AD3D200']
+                            #   '14442C1031DDD2D200']
 
     if args.numcameras < len(camera_list):
         camera_list = camera_list[:args.numcameras]
@@ -74,6 +74,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.video_format =         Settings.CoderFormat.H264
     settings.video_frame_types =    [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIGHT] if settings.camera_stereo else [FrameType.VIDEO]
 
+    settings.tracker_type =         TrackerType.ONEPERCAM
     settings.tracker_min_age =      5 # in frames
     settings.tracker_min_height =   0.25 # * height of the camera
     settings.tracker_timeout =      1.0 # in seconds
