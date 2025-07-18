@@ -27,10 +27,10 @@ class OnePerCamTrackerGui():
                     E(eT.TEXT, 'centre'),
                     E(eT.SLDR, 'A_centre',      self.set_add_centre_threshold,      0.15,   [0.0,1.0],  0.05),
                     E(eT.TEXT, 'height'),
-                    E(eT.SLDR, 'A_height',      self.set_add_height_threshold,      0.5,    [0.0,1.0],  0.05)])
+                    E(eT.SLDR, 'A_height',      self.set_add_height_threshold,      0.3,    [0.0,1.0],  0.05)])
         elm.append([E(eT.TEXT, '         '),
                     E(eT.TEXT, 'bottom'),
-                    E(eT.SLDR, 'A_bottom',      self.set_add_bottom_threshold,      0.2,    [0.0,1.0],  0.05)])
+                    E(eT.SLDR, 'A_bottom',      self.set_add_bottom_threshold,      0.4,    [0.0,1.0],  0.05)])
         elm.append([E(eT.TEXT, 'UPDATE   '),
                     E(eT.TEXT, 'centre'),
                     E(eT.SLDR, 'U_centre',      self.set_update_centre_threshold,   0.3,    [0.0,1.0],  0.05),

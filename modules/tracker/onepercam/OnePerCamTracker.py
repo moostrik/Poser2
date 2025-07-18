@@ -148,8 +148,6 @@ class OnePerCamTracker(Thread, BaseTracker):
         # Notify callbacks
         for tracklet in self.tracklet_manager.all_tracklets():
             if tracklet.needs_notification:
-                if tracklet.status == TrackingStatus.REMOVED:
-                    print(f"Tracklet {tracklet.id} removed.")
                 self._notify_callback(tracklet)
 
         self.tracklet_manager.mark_all_as_notified()
