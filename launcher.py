@@ -80,7 +80,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.pose_active =      not args.nopose
     settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
-    settings.pose_conf_threshold =  0.5
+    settings.pose_conf_threshold =  0.3
     settings.pose_crop_expansion=   0.1 # * height of the camera
     settings.pose_stream_capacity = int(10 * args.fps)
 

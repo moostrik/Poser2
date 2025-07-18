@@ -134,11 +134,26 @@ class PoseAngleCalculator(Thread):
         v1 = p1 - p2
         v2 = p3 - p2
 
-        angle: float = np.arctan2(v2[1], v2[0]) - np.arctan2(v1[1], v1[0])
+        # angle: float = np.arctan2(v2[1], v2[0]) - np.arctan2(v1[1], v1[0])
+
+        dot = np.dot(v1, v2)
+        det = v1[0] * v2[1] - v1[1] * v2[0]  # 2D cross product
+        angle = np.arctan2(det, dot)
+
         # Rotate the angle by a specified amount (in radians)
         angle += rotate_by
-        angle = angle % (2 * np.pi)  # Normalize to [0, 2π)
-        angle -= np.pi  # Shift to [-π, π)
+
+        # angle = angle % (2 * np.pi)  # Normalize to [0, 2π)
+        # angle -= np.pi  # Shift to [-π, π)
+
+        # Normalize to [-π, π) range
+        angle = ((angle + np.pi) % (2 * np.pi)) - np.pi
+
+        # epsilon = 1e-4
+        # if np.isclose(angle, -np.pi):
+        #     angle = -np.pi + epsilon
+        # elif np.isclose(angle, np.pi):
+        #     angle = np.pi - epsilon
 
         return angle
 

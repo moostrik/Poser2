@@ -228,7 +228,7 @@ class PoseStreamProcessor(Process):
         conf_df = conf_df.iloc[-self.buffer_capacity:]
         self.confidence_buffers[pose.id] = conf_df
 
-        interpolated: pd.DataFrame = angle_df.interpolate(method='time', limit_direction='both', limit=7)
+        interpolated: pd.DataFrame = angle_df.interpolate(method='time', limit_direction='both')#, limit=7)
         smoothed: pd.DataFrame = PoseStreamProcessor.ewm_circular_mean(interpolated, span=7.0)
         self._notify_callbacks(PoseStreamData(pose.id, smoothed, conf_df, self.buffer_capacity, False))
 

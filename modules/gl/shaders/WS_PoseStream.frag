@@ -24,7 +24,7 @@ void main() {
 
     // Get current sample and its properties
     vec3    curr_sample = texture(tex0, curr_uv).rgb;
-    float   curr_value = curr_sample.r;
+    float   curr_value = 1.0 - curr_sample.r;
     float   curr_sign = curr_sample.g;
     float   curr_conf = curr_sample.b;
 
@@ -36,7 +36,7 @@ void main() {
 
     // Get previous sample and its properties
     vec3    prev_sample = texture(tex0, prev_uv).rgb;
-    float   prev_value = prev_sample.r;
+    float   prev_value = 1.0 - prev_sample.r;
     float   pref_conf = prev_sample.b;
 
     // Early exit if invalid
