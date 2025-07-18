@@ -30,7 +30,7 @@ DEPTHAI_TO_TRACKINGSTATUS: dict[ExternalTracklet.TrackingStatus, TrackingStatus]
     # Add more if needed
 }
 
-@dataclass(frozen=True)
+@dataclass
 class Point2f:
     x: float
     y: float
@@ -53,7 +53,6 @@ class Rect:
     @property
     def top_left(self) -> Point2f:
         return Point2f(x=self.x, y=self.y)
-        return (self.x, self.y)
 
     @property
     def bottom_right(self) -> Point2f:
@@ -61,7 +60,6 @@ class Rect:
             x=self.x + self.width,
             y=self.y + self.height
         )
-        return (self.x + self.width, self.y + self.height)
 
     @property
     def center(self) -> Point2f:
@@ -69,7 +67,6 @@ class Rect:
             x=self.x + self.width / 2,
             y=self.y + self.height / 2
         )
-        return (self.x + self.width / 2, self.y + self.height / 2)
 
     @property
     def top(self) -> float:
