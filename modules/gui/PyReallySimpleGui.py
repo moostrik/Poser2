@@ -1,5 +1,5 @@
 from enum import Enum
-from threading import Thread, Lock
+from threading import Thread, Lock, current_thread
 from modules.gui.PySimpleGui import PySimpleGui as sg
 import os
 import glob
@@ -194,6 +194,10 @@ class Gui(Thread):
         with self.exit_lock:
             self.exit_callback = None
         self.running = False
+
+        if current_thread() != self:
+            self.join()
+            return
 
     def run(self) -> None:
         self.window = sg.Window(self.windowName, self.layout, keep_on_top=False, finalize=True,return_keyboard_events=True)

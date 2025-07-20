@@ -1,7 +1,7 @@
 from OpenGL.GL import * # type: ignore
 import OpenGL.GLUT as glut
 from OpenGL.WGL.EXT.swap_control import wglSwapIntervalEXT
-from threading import Thread
+from threading import Thread, current_thread
 from modules.gl.Utils import FpsCounter
 from typing import Callable
 import time
@@ -92,6 +92,9 @@ class RenderWindow(Thread):
         if self._is_allocated:
             glut.glutLeaveMainLoop()
             # self._is_allocated = False
+        if current_thread() != self:
+            self.join()
+            return
 
     def initGL(self) -> None:
         glEnable(GL_TEXTURE_2D)

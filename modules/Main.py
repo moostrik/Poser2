@@ -126,6 +126,9 @@ class Main():
         self.running = True
 
     def stop(self) -> None:
+        if not self.running:
+            return
+        self.running = False
 
         if self.player:
             self.player.stop()
@@ -155,16 +158,11 @@ class Main():
         for camera in self.cameras:
             camera.join(timeout=8)
 
-        # print ('stop gui')
         self.gui.stop()
-        # self.gui.join() # does not work as stop can be called from gui's own thread
 
-        # print ('stop render')
         self.render.exit_callback = None
         self.render.stop()
-        # self.render.join() # does not work as stop can be called from render's own thread
 
-        self.running = False
 
     def isRunning(self) -> bool :
         return self.running
