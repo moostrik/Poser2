@@ -55,6 +55,7 @@ class Main():
             self.av: AV | None = AV(self.gui, settings)
 
         self.running: bool = False
+        self.finished: bool = False
 
     def start(self) -> None:
         self.render.exit_callback = self.stop
@@ -126,18 +127,20 @@ class Main():
         self.running = True
 
     def stop(self) -> None:
+        print("Stopping main application...")
         if not self.running:
             return
         self.running = False
 
+        print("Stopping player...")
         if self.player:
             self.player.stop()
 
-        # print('stop cameras')
+        print('stop cameras')
         for camera in self.cameras:
             camera.stop()
 
-        # print('stop detector')
+        print('stop tracker')
         self.tracker.stop()
 
         if self.pose_detection:
@@ -149,26 +152,31 @@ class Main():
         if self.correlation_streamer:
             self.correlation_streamer.stop()
 
+        print('stop av')
         if self.av:
             self.av.stop()
 
+        print('stop gui')
         if self.recorder:
             self.recorder.stop()
 
+        print('stop player')
         for camera in self.cameras:
             camera.join(timeout=8)
 
+        print('stop gui')
         self.gui.stop()
 
+        print("Stopping render...")
         self.render.exit_callback = None
         self.render.stop()
 
+        self.finished = True
+        print("Main application stopped.")
 
-    def isRunning(self) -> bool :
-        return self.running
 
     def render_keyboard_callback(self, key, x, y) -> None:
-        if not  self.isRunning(): return
+        if not  self.running: return
         if key == b'g' or key == b'G':
-            if not self.gui or not self.gui.isRunning(): return
+            if not self.gui or not self.gui.running: return
             self.gui.bringToFront()

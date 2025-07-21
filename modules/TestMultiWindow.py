@@ -9,6 +9,7 @@ class TestMultiWindow():
         self.multi_window_render = MultiWindowRender(settings, self.stop)
 
         self.running: bool = False
+        self.finished: bool = False
 
     def start(self) -> None:
         self.multi_window_render.start()
@@ -18,6 +19,7 @@ class TestMultiWindow():
         if not self.running:
             return
         self.running = False
+        self.finished = True
 
         self.multi_window_render.stop()
 

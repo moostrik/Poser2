@@ -108,11 +108,11 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_title =         'White Space'
     settings.render_width =         1920
     settings.render_height =        1080
-    settings.render_x =             0
-    settings.render_y =             0
+    settings.render_x =             100
+    settings.render_y =             100
     settings.render_fullscreen=     False
-    settings.render_fps =           60
-    settings.render_v_sync =        False
+    settings.render_fps =           0
+    settings.render_v_sync =        True
     settings.render_cams_a_row=     2
 
     settings.art_type =             Settings.ArtType.WS
@@ -136,13 +136,18 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     def signal_handler_exit(sig, frame) -> None:
         print("Received interrupt signal, shutting down...")
-        if app.isRunning():
+        if app.running:
             app.stop()
         sleep(0.5)
+        if app.finished:
+            print("Application finished successfully.")
+        else:
+            print("Application did not finish properly.")
         exit()
 
     signal(SIGINT, signal_handler_exit)
 
-    while app.isRunning():
+    while not app.finished:
         sleep(0.05)
         continue
+    print("Application end.")

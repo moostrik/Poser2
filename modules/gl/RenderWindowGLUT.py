@@ -1,4 +1,4 @@
-from OpenGL.GL import * # type: ignore
+import OpenGL.GL as gl
 import OpenGL.GLUT as glut
 from OpenGL.WGL.EXT.swap_control import wglSwapIntervalEXT
 from threading import Thread, current_thread
@@ -24,7 +24,6 @@ class RenderWindow(Thread):
         self.window_height: int = height
         self.prev_window_width: int = width
         self.prev_window_height: int = height
-        self.running = True
         self.fullscreen: bool = fullscreen
         self.v_sync: bool = v_sync
         # self.frame_interval = int(1000 / fps)  # Interval in milliseconds
@@ -44,6 +43,7 @@ class RenderWindow(Thread):
 
         self._is_allocated: bool = False
         self.exit_callback: Callable | None = None
+        self.running: bool = False
 
     @property
     def is_allocated(self)-> bool:
@@ -51,6 +51,7 @@ class RenderWindow(Thread):
 
 
     def run(self) -> None:
+        self.running = True
         glut.glutInit()
         glut.glutInitDisplayMode(glut.GLUT_RGBA | glut.GLUT_DOUBLE | glut.GLUT_DEPTH) # type: ignore
         glut.glutInitWindowSize(self.window_width, self.window_height)
@@ -60,6 +61,7 @@ class RenderWindow(Thread):
             glut.glutFullScreen()
             glut.glutSetCursor(glut.GLUT_CURSOR_NONE)
         if self.v_sync:
+
             wglSwapIntervalEXT(1)   # Enable V-Sync
         else:
             wglSwapIntervalEXT(0)   # Disable V-Sync
@@ -82,25 +84,27 @@ class RenderWindow(Thread):
         glut.glutReshapeFunc(self.reshape)
         glut.glutCloseFunc(self.closeWindow)
 
-        version = glGetString(GL_VERSION)
+        version = gl.glGetString(gl.GL_VERSION)
         opengl_version: str = version.decode("utf-8") # type: ignore
         print("OpenGL version:", opengl_version)
 
+        self.allocate()
         glut.glutMainLoop()
 
     def stop(self) -> None:
         if self._is_allocated:
+            self.deallocate()
             glut.glutLeaveMainLoop()
             # self._is_allocated = False
         if current_thread() != self:
-            self.join()
+            # self.join()
             return
 
     def initGL(self) -> None:
-        glEnable(GL_TEXTURE_2D)
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        gl.glEnable(gl.GL_TEXTURE_2D)
+        gl.glClearColor(0.0, 0.0, 0.0, 1.0)
+        gl.glEnable(gl.GL_BLEND)
+        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
         self.setView(self.window_width, self.window_height)
 
     def reshape(self, width, height) -> None:
@@ -110,12 +114,12 @@ class RenderWindow(Thread):
 
     @staticmethod
     def setView(width, height) -> None:
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        glOrtho(0, width, height, 0, -1, 1)
+        gl.glMatrixMode(gl.GL_PROJECTION)
+        gl.glLoadIdentity()
+        gl.glOrtho(0, width, height, 0, -1, 1)
 
-        glMatrixMode(GL_MODELVIEW)
-        glViewport(0, 0, width, height)
+        gl.glMatrixMode(gl.GL_MODELVIEW)
+        gl.glViewport(0, 0, width, height)
 
     def setFullscreen(self, value: bool) -> None:
         if not self.is_allocated: return
@@ -133,6 +137,8 @@ class RenderWindow(Thread):
             # glut.glutSetCursor(glut.GLUT_CURSOR_LEFT_ARROW)
 
     def timerCallback(self, value) -> None:
+        if not self.running:  # Check if we should stop
+            return
         glut.glutPostRedisplay()
         if self.frame_interval and self.running:
             timer_ms = max(1, int(self.frame_interval / 1_000_000))
@@ -142,25 +148,32 @@ class RenderWindow(Thread):
         # Remove the frame timing logic since timer handles it
         # self.last_time = time.time_ns()
 
-        self.fps.tick()
         fps = str(self.fps.get_fps())
         min_fps = str(self.fps.get_min_fps())
         glut.glutSetWindowTitle(f'{self.windowName} - FPS: {fps} (Min: {min_fps})')
 
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # type: ignore
-        glLoadIdentity()
+        gl.glClearColor(0.0, 0.0, 0.0, 1.0)
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT) # type: ignore
+        gl.glLoadIdentity()
 
         self.draw()
 
         glut.glutSwapBuffers()
+        self.fps.tick()
 
         self._is_allocated = True
 
     def closeWindow(self,) -> None:
+        self.running = False  # Stop the timer callbacks
         if self.exit_callback: self.exit_callback()
 
     def draw(self) -> None:
+        pass
+
+    def allocate(self) -> None:
+        pass
+
+    def deallocate(self) -> None:
         pass
 
     def keyboardCallback(self, key, x, y) -> None:
@@ -222,12 +235,12 @@ class RenderWindow(Thread):
         if big:
             font = glut.GLUT_BITMAP_HELVETICA_18 # type: ignore
 
-        glColor4f(*color)
-        glRasterPos2f(x, y)
+        gl.glColor4f(*color)
+        gl.glRasterPos2f(x, y)
         for character in string:
             glut.glutBitmapCharacter(font, ord(character))
-        glRasterPos2f(0, 0)
-        glColor4f(1.0, 1.0, 1.0, 1.0)
+        gl.glRasterPos2f(0, 0)
+        gl.glColor4f(1.0, 1.0, 1.0, 1.0)
 
 
     @staticmethod
@@ -242,17 +255,17 @@ class RenderWindow(Thread):
         width: int = sum([glut.glutBitmapWidth(font, ord(c)) for c in string])
 
         # Draw black rectangle behind text
-        glColor4f(*box_color)  # semi-transparent black
-        glBegin(GL_QUADS)
-        glVertex2f(x - expand, y - height - expand)
-        glVertex2f(x + width + expand, y - height - expand)
-        glVertex2f(x + width + expand, y + expand * 2)
-        glVertex2f(x - expand, y + expand * 2)
-        glEnd()
+        gl.glColor4f(*box_color)  # semi-transparent black
+        gl.glBegin(gl.GL_QUADS)
+        gl.glVertex2f(x - expand, y - height - expand)
+        gl.glVertex2f(x + width + expand, y - height - expand)
+        gl.glVertex2f(x + width + expand, y + expand * 2)
+        gl.glVertex2f(x - expand, y + expand * 2)
+        gl.glEnd()
 
-        glColor4f(*color)
-        glRasterPos2f(x, y)
+        gl.glColor4f(*color)
+        gl.glRasterPos2f(x, y)
         for character in string:
             glut.glutBitmapCharacter(font, ord(character))
-        glRasterPos2f(0, 0)
-        glColor4f(1.0, 1.0, 1.0, 1.0)
+        gl.glRasterPos2f(0, 0)
+        gl.glColor4f(1.0, 1.0, 1.0, 1.0)

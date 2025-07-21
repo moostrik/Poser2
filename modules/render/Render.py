@@ -5,13 +5,14 @@ from typing import Optional, Tuple
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
-import OpenGL.GLUT as glut
+# import OpenGL.GLUT as glut
 
 # Local application imports
 from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Mesh import Mesh
-from modules.gl.RenderWindow import RenderWindow
+# from modules.gl.RenderWindowGLFW import RenderWindow
+from modules.gl.RenderWindowGLUT import RenderWindow
 from modules.gl.Shader import Shader
 
 from modules.av.Definitions import AvOutput
@@ -105,11 +106,12 @@ class Render(RenderWindow):
         self.composition: Composition_Subdivision = make_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
         super().__init__(self.composition[SubdivisionType.TOT][0][2], self.composition[SubdivisionType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_fps, settings.render_x, settings.render_y)
 
-        self.allocated = False
+        # self.allocated = False
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def reshape(self, width, height) -> None: # override
+        print(f"Reshaping RenderWindow to {width}x{height}")
         super().reshape(width, height)
         self.composition = make_subdivision(width, height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
 
@@ -126,14 +128,8 @@ class Render(RenderWindow):
             self.pse_fbos[key].allocate(w, h, GL_RGBA)
 
     def draw(self) -> None: # override
-        if not self.allocated:
-            self.reshape(self.window_width, self.window_height)
-            for s in self.all_shaders:
-                s.allocate(True) # type: ignore
-            for fbo in self.vis_fbos.values():
-                fbo.allocate(self.vis_width, 1, GL_RGBA32F)
-            self.allocated = True
 
+        # if self.running:
         try:
             for id in range(self.max_players):
                 self.update_pose_meshes(self.data.get_pose(id, True), self.pose_meshes[id])
@@ -147,6 +143,36 @@ class Render(RenderWindow):
             self.draw_composition()
         except Exception as e:
             print(f"Error in draw: {e}")
+
+    def allocate(self) -> None: # override
+        self.reshape(self.window_width, self.window_height)
+        for s in self.all_shaders:
+            s.allocate(True) # type: ignore
+        for fbo in self.vis_fbos.values():
+            fbo.allocate(self.vis_width, 1, GL_RGBA32F)
+        self.allocated = True
+
+    def deallocate(self) -> None: # override
+        for fbo in self.cam_fbos.values():
+            fbo.deallocate()
+        for fbo in self.sim_fbos.values():
+            fbo.deallocate()
+        for fbo in self.pse_fbos.values():
+            fbo.deallocate()
+        for fbo in self.vis_fbos.values():
+            fbo.deallocate()
+
+        # for mesh in self.pose_meshes.values():
+        #     mesh.deallocate()
+        self.pose_meshes.clear()
+        # for mesh in self.angle_meshes.values():
+        #     mesh.deallocate()
+        self.angle_meshes.clear()
+
+        for shader in self.all_shaders:
+            shader.deallocate()
+
+        self.allocated = False
 
     # DRAW METHODS
     def draw_cameras(self) -> None:

@@ -65,6 +65,15 @@ class Shader():
             monitor_path(self.shader_path, self.file_changed)
         self.load()
 
+    def deallocate(self) -> None :
+        if not self.allocated:
+            return
+        self.allocated = False
+        if self.shader_program is not None:
+            glDeleteProgram(self.shader_program)
+        self.shader_program = None
+        self.vertex_shader = None
+        self.fragment_shader = None
 
     def file_changed(self, file: str) -> None:
         if (file == self.vertex_file_name or
