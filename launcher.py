@@ -130,8 +130,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.camera_list = camera_list[:settings.camera_num]
         settings.tracker_type = TrackerType.ONEPERCAM
 
-
-
     settings.check_values()
     # settings.check_cameras()
 

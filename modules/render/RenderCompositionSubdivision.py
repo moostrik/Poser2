@@ -1,5 +1,8 @@
 from enum import IntEnum
 import math
+from dataclasses import dataclass, field, replace
+
+from modules.utils.PointsAndRects import Rect, Point2f
 
 class SubdivisionType(IntEnum):
     TOT = 0
@@ -9,15 +12,68 @@ class SubdivisionType(IntEnum):
     VIS = 4
 
 
+@dataclass (frozen=True)
+class SubdivisionRow:
+    name: str
+    columns: int = field(default=1)
+    rows: int = field(default=1)
+    src_aspect_ratio: float = field(default=1.0)
+    tot_aspect_ratio: float = field(default=0.0, init=False)
+
+    def __post_init__(self):
+        if self.columns < 1:
+            object.__setattr__(self, 'columns', 1)
+        if self.rows < 1:
+            object.__setattr__(self, 'rows', 1)
+        if self.src_aspect_ratio <= 0:
+            object.__setattr__(self, 'src_aspect_ratio', 1.0)
+        object.__setattr__(self, 'tot_aspect_ratio', self.src_aspect_ratio * self.columns / self.rows)
+
+@dataclass
+class Subdivision:
+    x: int
+    y: int
+    width: int
+    height: int
+    rows:dict[str, list[Rect]]
+
+
+def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst_height: int) -> Subdivision:
+
+    dst_aspect_ratio: float = dst_width / dst_height
+    tot_aspect_ratio = 1.0 / sum(1.0 / cell.tot_aspect_ratio for cell in subdivision_rows)
+
+    fit_width: float = float(dst_width) if tot_aspect_ratio > dst_aspect_ratio else float(dst_height * tot_aspect_ratio)
+    fit_height: float = dst_width / tot_aspect_ratio if tot_aspect_ratio > dst_aspect_ratio else float(dst_height)
+    fit_x: float = (dst_width - fit_width) / 2.0
+    fit_y: float = (dst_height - fit_height) / 2.0
+
+    subdivision: Subdivision = Subdivision(x=int(fit_x), y=int(fit_y), width=int(fit_width), height=int(fit_height), rows={})
+    cell_y: float = fit_y
+    for cell in subdivision_rows:
+        cell_width: float = fit_width / cell.columns
+        cell_height: float = cell_width / cell.src_aspect_ratio / cell.rows
+        subdivision.rows[cell.name] = []
+        for row in range(cell.rows):
+            for col in range(cell.columns):
+                x: float = fit_x + col * cell_width
+                y: float = cell_y + row * cell_height
+                rect: Rect = Rect(x=x, y=y, width=cell_width, height=cell_height)
+                subdivision.rows[cell.name].append(rect)
+
+        cell_y += cell_height * cell.rows
+
+    return subdivision
+
+
 Composition_Subdivision = dict[SubdivisionType, dict[int, tuple[int, int, int, int]]]
 
-
-def make_subdivision(dst_width: int, dst_height: int,
-                     num_cams: int, num_sims: int, max_players: int, num_viss: int,
-                     cam_aspect_ratio: float = 16.0 / 9.0,
-                     sim_aspect_ratio: float = 10.0,
-                     psn_aspect_ratio: float = 1.0,
-                     vis_aspect_ratio: float = 20.0) -> Composition_Subdivision:
+def make_ws_subdivision(dst_width: int, dst_height: int,
+                        num_cams: int, num_sims: int, max_players: int, num_viss: int,
+                        cam_aspect_ratio: float = 16.0 / 9.0,
+                        sim_aspect_ratio: float = 10.0,
+                        psn_aspect_ratio: float = 1.0,
+                        vis_aspect_ratio: float = 20.0) -> Composition_Subdivision:
     ret: Composition_Subdivision = {}
     ret[SubdivisionType.TOT] = {}
     ret[SubdivisionType.CAM] = {}
@@ -43,6 +99,7 @@ def make_subdivision(dst_width: int, dst_height: int,
         fit_height = dst_height
     fit_x: float = (dst_width - fit_width) / 2.0
     fit_y: float = (dst_height - fit_height) / 2.0
+
     ret[SubdivisionType.TOT][0] = (0, 0, int(fit_width), int(fit_height))
     cam_width: float = fit_width if cam_columns == 0 else fit_width / cam_columns
     cam_height: float = cam_width / cam_aspect_ratio

@@ -25,7 +25,7 @@ from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices, Pose
 from modules.pose.PoseStream import PoseStreamData
 from modules.Settings import Settings
 
-from modules.render.RenderCompositionSubdivision import make_subdivision, SubdivisionType
+from modules.render.RenderCompositionSubdivision import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.RenderDataManager import RenderDataManager
 from modules.render.RenderUpdateAngleMesh import update_angle_mesh
 
@@ -47,6 +47,12 @@ class DataVisType(Enum):
 class LightVisType(Enum):
     LINES = 0
     LIGHTS = 1
+
+class SubdivisionType(Enum):
+    CAM = "CAM"
+    SIM = "SIM"
+    PSN = "PSN"
+    VIS = "VIS"
 
 Composition_Subdivision = dict[SubdivisionType, dict[int, tuple[int, int, int, int]]]
 
@@ -106,9 +112,15 @@ class Render(RenderWindow):
         self.all_shaders: list[Shader] = [self.vis_line_shader, self.vis_angle_shader, self.pose_stream_shader, self.r_stream_shader]
 
         # composition
-        self.composition: Composition_Subdivision = make_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
-        super().__init__(self.composition[SubdivisionType.TOT][0][2],
-                         self.composition[SubdivisionType.TOT][0][3],
+        self.subdivision_rows: list[SubdivisionRow] = [
+            SubdivisionRow(name=SubdivisionType.CAM.value, columns=self.num_cams, rows=1, src_aspect_ratio=16/9),
+            SubdivisionRow(name=SubdivisionType.SIM.value, columns=1, rows=self.num_sims, src_aspect_ratio=10.0),
+            SubdivisionRow(name=SubdivisionType.PSN.value, columns=self.max_players, rows=1, src_aspect_ratio=1.0),
+            SubdivisionRow(name=SubdivisionType.VIS.value, columns=1, rows=self.num_viss, src_aspect_ratio=20.0),
+        ]
+        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height)
+
+        super().__init__(self.subdivision.width, self.subdivision.height,
                          settings.render_title,
                          settings.render_fullscreen,
                          settings.render_v_sync, settings.render_fps,
@@ -118,28 +130,27 @@ class Render(RenderWindow):
         for i in range(self.num_cams):
             self.secondary_monitor_ids.append(i+1)
 
-        # self.num_monitors: int = len(glfw.get_monitors())
-        # print(f"Number of monitors: {self.num_monitors}")
-
-        # self.allocated = False
-
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def window_reshape(self, width: int, height: int) -> None: # override
         print(f"Reshaping RenderWindow to {width}x{height}")
         super().window_reshape(width, height)
-        self.composition = make_subdivision(width, height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
+
+        self.subdivision = make_subdivision(self.subdivision_rows, width, height)
 
         for key in self.cam_fbos.keys():
-            x, y, w, h = self.composition[SubdivisionType.CAM][key]
+            rect = self.subdivision.rows[SubdivisionType.CAM.value][key]
+            w, h = int(rect.width), int(rect.height)
             self.cam_fbos[key].allocate(w, h, GL_RGBA)
 
         for key in self.sim_fbos.keys():
-            x, y, w, h = self.composition[SubdivisionType.SIM][key]
+            rect = self.subdivision.rows[SubdivisionType.SIM.value][key]
+            w, h = int(rect.width), int(rect.height)
             self.sim_fbos[key].allocate(w, h, GL_RGBA)
 
         for key in self.pse_fbos.keys():
-            x, y, w, h = self.composition[SubdivisionType.PSN][key]
+            rect = self.subdivision.rows[SubdivisionType.PSN.value][key]
+            w, h = int(rect.width), int(rect.height)
             self.pse_fbos[key].allocate(w, h, GL_RGBA)
 
     def draw(self) -> None: # override
@@ -313,19 +324,23 @@ class Render(RenderWindow):
     def draw_composition(self) -> None:
         self.setView(self.window_width, self.window_height)
         for i in range(self.num_cams):
-            x, y, w, h = self.composition[SubdivisionType.CAM][i]
+            rect = self.subdivision.rows[SubdivisionType.CAM.value][i]
+            x, y, w, h = rect.x, rect.y, rect.width, rect.height
             self.cam_fbos[i].draw(x, y, w, h)
 
         for i in range(self.num_sims):
-            x, y, w, h = self.composition[SubdivisionType.SIM][i]
+            rect = self.subdivision.rows[SubdivisionType.SIM.value][i]
+            x, y, w, h = rect.x, rect.y, rect.width, rect.height
             self.sim_fbos[i].draw(x, y, w, h)
 
         for i in range(self.max_players):
-            x, y, w, h = self.composition[SubdivisionType.PSN][i]
+            rect = self.subdivision.rows[SubdivisionType.PSN.value][i]
+            x, y, w, h = rect.x, rect.y, rect.width, rect.height
             self.pse_fbos[i].draw(x, y, w, h)
 
         for i in range(self.num_viss):
-            x, y, w, h = self.composition[SubdivisionType.VIS][i]
+            rect = self.subdivision.rows[SubdivisionType.VIS.value][i]
+            x, y, w, h = rect.x, rect.y, rect.width, rect.height
             self.vis_fbos[i].draw(x, y, w, h)
 
     # STATIC METHODS
