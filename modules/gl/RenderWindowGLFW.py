@@ -79,8 +79,22 @@ class RenderWindow():
             print(f"Render thread stopped successfully")
 
     def run(self) -> None:
+        """Main entry point for the render thread"""
+        try:
+            self._setup_window()
+            self._setup_opengl()
+            self.allocate()
+            self._main_loop()
+        except Exception as e:
+            print(f"Error in render thread: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            self.deallocate()
+            self._cleanup()
 
-        # Initialize GLFW
+    def _setup_window(self) -> None:
+        """Setup GLFW window and callbacks"""
         # Configure GLFW
         glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 4)
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 6)
@@ -89,15 +103,12 @@ class RenderWindow():
         glfw.window_hint(glfw.RESIZABLE, glfw.TRUE)
 
         # Get primary monitor for fullscreen
-        self.monitor: Optional[glfw._GLFWmonitor] = glfw.get_primary_monitor() if self.fullscreen else None
+        self.monitor = glfw.get_primary_monitor() if self.fullscreen else None
 
         # Create window
-        self.window: Optional[glfw._GLFWwindow] = glfw.create_window(
-            self.window_width,
-            self.window_height,
-            self.windowName,
-            None,
-            None
+        self.window = glfw.create_window(
+            self.window_width, self.window_height,
+            self.windowName, None, None
         )
 
         if not self.window:
@@ -124,40 +135,50 @@ class RenderWindow():
         if self.fullscreen:
             glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
 
-        self.initGL()
+    def _setup_opengl(self) -> None:
+        """Initialize OpenGL state"""
+
+        gl.glEnable(gl.GL_TEXTURE_2D)
+        gl.glClearColor(0.0, 0.0, 0.0, 1.0)
+        gl.glEnable(gl.GL_BLEND)
+        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+        self.setView(self.window_width, self.window_height)
 
         version = gl.glGetString(gl.GL_VERSION)
-        opengl_version: str = version.decode("utf-8") # type: ignore
+        opengl_version = version.decode("utf-8")  # type: ignore
         print("OpenGL version:", opengl_version)
 
-        self.last_frame_time = time.time_ns()
 
-        self.allocate()
+    def _main_loop(self) -> None:
+        """Main rendering loop with improved frame timing"""
+        next_frame_time = time.time_ns()
+        while not glfw.window_should_close(self.window):
 
-        # Main loop
-        try:
-            while True:
-                if glfw.window_should_close(self.window):
-                    break
-                glfw.make_context_current(self.window)  # Ensure context is current for this thread
-                current_time = time.time_ns()
+            self.drawWindow()
+            glfw.poll_events()
 
-                if self.frame_interval:
-                    if current_time - self.last_frame_time >= self.frame_interval:
-                        self.drawWindow()
-                        self.last_frame_time = current_time
+            # Frame timing control
+            if not self.v_sync and self.frame_interval:
+                next_frame_time += self.frame_interval
+                now: int = time.time_ns()
+                remaining: int = next_frame_time - now
+
+                if remaining > 0:
+                    # Sleep for most of the remaining time
+                    sleep_seconds = (remaining - 500_000) / 1_000_000_000  # leave 0.5ms for busy-wait
+                    if sleep_seconds > 0.002:
+                        time.sleep(sleep_seconds)
+                    # Busy-wait for the final bit
+                    while time.time_ns() < next_frame_time:
+                        pass
                 else:
-                    self.drawWindow()
+                    if -remaining > self.frame_interval:
+                        # If we're behind, reset next_frame_time to now to avoid spiral of death
+                        print("Warning: Frame time exceeded by ", -remaining / 1_000_000, "ms")
+                        next_frame_time: int = now
 
-                # Non-blocking event polling with timeout
-                glfw.poll_events()
-
-        except Exception as e:
-            pass
-            # print(f"Error in render loop: {e}")
-
-        self.deallocate()
-
+    def _cleanup(self) -> None:
+        """Clean up resources"""
 
         try:
             if self.window:
@@ -168,13 +189,6 @@ class RenderWindow():
             print(f"Error cleaning up GLFW: {e}")
 
         self.notify_exit_callbacks()
-
-    def initGL(self) -> None:
-        gl.glEnable(gl.GL_TEXTURE_2D)
-        gl.glClearColor(0.0, 0.0, 0.0, 1.0)
-        gl.glEnable(gl.GL_BLEND)
-        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
-        self.setView(self.window_width, self.window_height)
 
     def window_size_callback(self, window: Optional[glfw._GLFWwindow], width: int, height: int) -> None:
         if not window or width <= 0 or height <= 0:
