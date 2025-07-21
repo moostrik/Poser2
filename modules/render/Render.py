@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
+# import glfw
 # import OpenGL.GLUT as glut
 
 # Local application imports
@@ -36,6 +37,8 @@ from modules.gl.shaders.WS_Lines import WS_Lines
 from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 from modules.gl.shaders.WS_RStream import WS_RStream
 
+
+from time import time
 
 class DataVisType(Enum):
     TRACKING = 0
@@ -104,15 +107,27 @@ class Render(RenderWindow):
 
         # composition
         self.composition: Composition_Subdivision = make_subdivision(settings.render_width, settings.render_height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
-        super().__init__(self.composition[SubdivisionType.TOT][0][2], self.composition[SubdivisionType.TOT][0][3], settings.render_title, settings.render_fullscreen, settings.render_v_sync, settings.render_fps, settings.render_x, settings.render_y)
+        super().__init__(self.composition[SubdivisionType.TOT][0][2],
+                         self.composition[SubdivisionType.TOT][0][3],
+                         settings.render_title,
+                         settings.render_fullscreen,
+                         settings.render_v_sync, settings.render_fps,
+                         settings.render_x, settings.render_y,
+                         settings.render_monitor)
+
+        for i in range(self.num_cams):
+            self.secondary_monitor_ids.append(i+1)
+
+        # self.num_monitors: int = len(glfw.get_monitors())
+        # print(f"Number of monitors: {self.num_monitors}")
 
         # self.allocated = False
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
-    def window_reshape(self, width: int, height: int, name: str) -> None: # override
+    def window_reshape(self, width: int, height: int) -> None: # override
         print(f"Reshaping RenderWindow to {width}x{height}")
-        super().window_reshape(width, height, name)
+        super().window_reshape(width, height)
         self.composition = make_subdivision(width, height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
 
         for key in self.cam_fbos.keys():
@@ -144,8 +159,36 @@ class Render(RenderWindow):
         except Exception as e:
             print(f"Error in draw: {e}")
 
+    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None: # override
+        RenderWindow.setView(width, height)
+        tex_id: int = self.vis_fbos[0].tex_id
+        glEnable(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, tex_id)
+
+        glColor4f(1.0, 1.0, 1.0, 1.0)  # White, so texture colors show
+
+        glBegin(GL_QUADS)
+        glTexCoord2f(0.0, 0.0)
+        glVertex2f(0, 0)
+        glTexCoord2f(1.0, 0.0)
+        glVertex2f(width, 0)
+        glTexCoord2f(1.0, 1.0)
+        glVertex2f(width, height)
+        glTexCoord2f(0.0, 1.0)
+        glVertex2f(0, height)
+        glEnd()
+
+        glBindTexture(GL_TEXTURE_2D, 0)
+        glDisable(GL_TEXTURE_2D)
+        glFlush()  # Ensure all OpenGL commands are executed
+
+
+        # c: float = (time() * 0.1) % 1
+        # glClearColor(c, c, c, 1.0)
+        # glClear(GL_COLOR_BUFFER_BIT)  # type: ignore
+
     def allocate(self) -> None: # override
-        self.window_reshape(self.window_width, self.window_height, '')
+        self.window_reshape(self.window_width, self.window_height)
         for s in self.all_shaders:
             s.allocate(True) # type: ignore
         for fbo in self.vis_fbos.values():
