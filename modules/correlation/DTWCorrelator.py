@@ -295,7 +295,7 @@ class DTWCorrelator():
             confidences2_overlap = win2.confidences.loc[(win2.confidences.index >= overlap_start) & (win2.confidences.index <= overlap_end)]
 
 
-            print(len(angles1_overlap), len(angles2_overlap))
+            # print(len(angles1_overlap), len(angles2_overlap))
 
             angle_pairs.append(
                 AnglePair(

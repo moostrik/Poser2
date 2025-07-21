@@ -15,6 +15,7 @@ from modules.gl.Mesh import Mesh
 from modules.gl.RenderWindowGLFW import RenderWindow
 # from modules.gl.RenderWindowGLUT import RenderWindow
 from modules.gl.Shader import Shader
+from modules.gl.Text import draw_string, draw_box_string, text_init
 
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
@@ -115,7 +116,7 @@ class Render(RenderWindow):
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name=SubdivisionType.CAM.value, columns=self.num_cams, rows=1, src_aspect_ratio=16/9, padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=SubdivisionType.SIM.value, columns=1, rows=self.num_sims, src_aspect_ratio=10.0),
+            SubdivisionRow(name=SubdivisionType.SIM.value, columns=1, rows=self.num_sims, src_aspect_ratio=12.0, padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name=SubdivisionType.PSN.value, columns=self.max_players, rows=1, src_aspect_ratio=1.0, padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=SubdivisionType.VIS.value, columns=1, rows=self.num_viss, src_aspect_ratio=20.0, padding=Point2f(0.0, 1.0)),
         ]
@@ -131,10 +132,10 @@ class Render(RenderWindow):
         for i in range(self.num_cams):
             self.secondary_monitor_ids.append(i+1)
 
+        text_init()
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def window_reshape(self, width: int, height: int) -> None: # override
-        print(f"Reshaping RenderWindow to {width}x{height}")
         super().window_reshape(width, height)
 
         self.subdivision = make_subdivision(self.subdivision_rows, width, height)
@@ -172,7 +173,7 @@ class Render(RenderWindow):
             print(f"Error in draw: {e}")
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None: # override
-        RenderWindow.setView(width, height)
+        self.setView(width, height)
         tex_id: int = self.vis_fbos[0].tex_id
         glEnable(GL_TEXTURE_2D)
         glBindTexture(GL_TEXTURE_2D, tex_id)
@@ -241,12 +242,15 @@ class Render(RenderWindow):
             depth_tracklets: list[CamTracklet] | None = self.data.get_depth_tracklets(i, False)
             poses: list[Pose] = self.data.get_poses_for_cam(i)
 
+            self.setView(fbo.width, fbo.height)
             Render.draw_camera(fbo, image, depth_tracklets, poses, self.pose_meshes)
 
     def draw_sims(self) -> None:
         for i in range(self.num_sims):
             fbo: Fbo = self.sim_fbos[i]
             if i == DataVisType.TRACKING.value:
+
+                self.setView(fbo.width, fbo.height)
                 self.draw_map_positions(fbo, self.data.get_tracklets(), self.num_cams)
             elif i == DataVisType.R_PAIRS.value:
                 self.draw_correlations(fbo)
@@ -263,7 +267,7 @@ class Render(RenderWindow):
         self.r_s_image.set_image(image_np)
         self.r_s_image.update()
 
-        RenderWindow.setView(fbo.width, fbo.height)
+        self.setView(fbo.width, fbo.height)
         self.r_stream_shader.use(fbo.fbo_id, self.r_s_image.tex_id, self.r_s_image.width, self.r_s_image.height, 1.5 / fbo.height)
 
         step: float = fbo.height / self.num_r_streams
@@ -275,7 +279,7 @@ class Render(RenderWindow):
             string: str = f'{pair[0]} | {pair[1]}'
             x: int = fbo.width - 100
             y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
-            RenderWindow.draw_box_string(x, y, string, big=True) # type: ignore
+            draw_box_string(x, y, string, big=True) # type: ignore
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Set color to white
         fbo.end()
 
@@ -301,6 +305,7 @@ class Render(RenderWindow):
             angle_mesh: Mesh = self.angle_meshes[pose.id]
             # i =  pose.id
 
+            self.setView(fbo.width, fbo.height)
             Render.draw_pose(fbo, pose_image, pose, pose_mesh, a_s_image, angle_mesh, self.pose_stream_shader)
 
     def draw_lights(self) -> None:
@@ -356,7 +361,6 @@ class Render(RenderWindow):
 
     @staticmethod
     def draw_camera(fbo: Fbo, image: Image, depth_tracklets: list[CamTracklet], poses: list[Pose], pose_meshes: dict[int, Mesh]) -> None:
-        RenderWindow.setView(fbo.width, fbo.height)
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         image.draw(0, 0, fbo.width, fbo.height)
@@ -420,10 +424,10 @@ class Render(RenderWindow):
             t_x: float = w - 66
         t_y += 22
         string = f'ID: {tracklet.id}'
-        RenderWindow.draw_box_string(t_x, t_y, string)
+        draw_box_string(t_x, t_y, string)
         t_y += 22
         string = f'Age: {tracklet.age}'
-        RenderWindow.draw_box_string(t_x, t_y, string)
+        draw_box_string(t_x, t_y, string)
 
         # glFlush()               # Render now
 
@@ -446,11 +450,10 @@ class Render(RenderWindow):
             string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
             x += 9
             y += 12
-            RenderWindow.draw_box_string(x, y, string)
+            draw_box_string(x, y, string)
 
     @staticmethod
     def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_image: Image, angle_mesh: Mesh, shader: WS_PoseStream) -> None:
-        RenderWindow.setView(fbo.width, fbo.height)
 
         if pose.is_final:
             fbo.begin()
@@ -485,14 +488,13 @@ class Render(RenderWindow):
             y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
             clr: int = i % 2
 
-            RenderWindow.draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
+            draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
 
         fbo.end()
         return
 
     @staticmethod
     def draw_map_positions(fbo: Fbo, tracklets: dict[int, Tracklet], num_cams: int) -> None:
-        RenderWindow.setView(fbo.width, fbo.height)
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
         glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
@@ -535,10 +537,10 @@ class Render(RenderWindow):
             x += 9
             y += 22
             string = f'W: {world_angle:.1f}'
-            RenderWindow.draw_box_string(x, y, string)
+            draw_box_string(x, y, string)
             y += 22
             string = f'L: {local_angle:.1f}'
-            RenderWindow.draw_box_string(x, y, string)
+            draw_box_string(x, y, string)
 
         fbo.end()
         glFlush()

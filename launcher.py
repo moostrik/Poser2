@@ -106,10 +106,10 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.udp_ip_addresses =     udp_list
 
     settings.render_title =         'White Space'
+    settings.render_x =             0
+    settings.render_y =             50
     settings.render_width =         1920
-    settings.render_height =        1080
-    settings.render_x =             100
-    settings.render_y =             100
+    settings.render_height =        1080 - settings.render_y
     settings.render_fullscreen =    False
     settings.render_fps =           0
     settings.render_v_sync =        True

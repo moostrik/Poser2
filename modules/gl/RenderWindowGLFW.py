@@ -166,7 +166,7 @@ class RenderWindow():
         gl.glClearColor(0.0, 0.0, 0.0, 1.0)
         gl.glEnable(gl.GL_BLEND)
         gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
-        self.setView(self.window_width, self.window_height)
+        # self.setView(self.window_width, self.window_height)
 
         version = gl.glGetString(gl.GL_VERSION)
         opengl_version = version.decode("utf-8")  # type: ignore
@@ -224,7 +224,7 @@ class RenderWindow():
     def window_reshape(self, width: int, height: int) -> None:
         self.window_width = width
         self.window_height = height
-        self.setView(width, height)
+        # self.setView(width, height)
 
     def allocate(self) -> None:
         """Allocate resources for the window"""
@@ -232,8 +232,7 @@ class RenderWindow():
     def deallocate(self) -> None:
         """Deallocate resources for the window"""
 
-    @staticmethod
-    def setView(width, height) -> None:
+    def setView(self, width, height) -> None:
         gl.glMatrixMode(gl.GL_PROJECTION)
         gl.glLoadIdentity()
         gl.glOrtho(0, width, height, 0, -1, 1)
@@ -483,34 +482,3 @@ class RenderWindow():
             self.key_callbacks.clear()
             self.exit_callbacks.clear()
 
-    @staticmethod
-    def draw_string(x: float, y: float, string: str, color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0), big: bool = False)-> None:
-        # Note: GLFW doesn't have built-in text rendering like GLUT
-        # You'll need to implement text rendering using a library like freetype-py or PIL
-        # For now, this is a placeholder that sets color but doesn't render text
-        gl.glColor4f(*color)
-        # TODO: Implement text rendering with freetype-py or similar
-        # print(f"Text rendering not implemented: {string} at ({x}, {y})")
-        gl.glColor4f(1.0, 1.0, 1.0, 1.0)
-
-    @staticmethod
-    def draw_box_string(x: float, y: float, string: str, color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0), box_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6), big: bool = False)-> None:
-        # Note: GLFW doesn't have built-in text rendering like GLUT
-        # You'll need to implement text rendering using a library like freetype-py or PIL
-        height = 18 if big else 12
-        expand = 3 if big else 2
-        width = len(string) * (12 if not big else 15)  # Rough approximation
-
-        # Draw background box
-        gl.glColor4f(*box_color)
-        gl.glBegin(gl.GL_QUADS)
-        gl.glVertex2f(x - expand, y - height - expand)
-        gl.glVertex2f(x + width + expand, y - height - expand)
-        gl.glVertex2f(x + width + expand, y + expand * 2)
-        gl.glVertex2f(x - expand, y + expand * 2)
-        gl.glEnd()
-
-        gl.glColor4f(*color)
-        # TODO: Implement text rendering with freetype-py or similar
-        # print(f"Text rendering not implemented: {string} at ({x}, {y})")
-        gl.glColor4f(1.0, 1.0, 1.0, 1.0)

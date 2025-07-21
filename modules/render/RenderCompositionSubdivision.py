@@ -68,8 +68,6 @@ def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst
                 subdivision.rows[cell.name].append(rect)
         cell_y += row_height
 
-    print(f"Subdivision with a total height of {fit_height}, check with {cell_y}")
-
     return subdivision
 
 
