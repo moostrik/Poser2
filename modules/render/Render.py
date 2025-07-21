@@ -19,11 +19,12 @@ from modules.gl.Shader import Shader
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
 from modules.tracker.BaseTracker import TrackerType, TrackerMetadata
-from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus, Rect
+from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices, PoseAngleNames
 from modules.pose.PoseStream import PoseStreamData
 from modules.Settings import Settings
+from modules.utils.PointsAndRects import Rect, Point2f
 
 from modules.render.RenderCompositionSubdivision import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.RenderDataManager import RenderDataManager
@@ -113,10 +114,10 @@ class Render(RenderWindow):
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name=SubdivisionType.CAM.value, columns=self.num_cams, rows=1, src_aspect_ratio=16/9),
+            SubdivisionRow(name=SubdivisionType.CAM.value, columns=self.num_cams, rows=1, src_aspect_ratio=16/9, padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=SubdivisionType.SIM.value, columns=1, rows=self.num_sims, src_aspect_ratio=10.0),
-            SubdivisionRow(name=SubdivisionType.PSN.value, columns=self.max_players, rows=1, src_aspect_ratio=1.0),
-            SubdivisionRow(name=SubdivisionType.VIS.value, columns=1, rows=self.num_viss, src_aspect_ratio=20.0),
+            SubdivisionRow(name=SubdivisionType.PSN.value, columns=self.max_players, rows=1, src_aspect_ratio=1.0, padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=SubdivisionType.VIS.value, columns=1, rows=self.num_viss, src_aspect_ratio=20.0, padding=Point2f(0.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height)
 

@@ -17,6 +17,7 @@ class SubdivisionRow:
     name: str
     columns: int = field(default=1)
     rows: int = field(default=1)
+    padding: Point2f = field(default_factory=lambda: Point2f(0, 0))
     src_aspect_ratio: float = field(default=1.0)
     tot_aspect_ratio: float = field(default=0.0, init=False)
 
@@ -29,7 +30,7 @@ class SubdivisionRow:
             object.__setattr__(self, 'src_aspect_ratio', 1.0)
         object.__setattr__(self, 'tot_aspect_ratio', self.src_aspect_ratio * self.columns / self.rows)
 
-@dataclass
+@dataclass (frozen=True)
 class Subdivision:
     x: int
     y: int
@@ -41,27 +42,33 @@ class Subdivision:
 def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst_height: int) -> Subdivision:
 
     dst_aspect_ratio: float = dst_width / dst_height
-    tot_aspect_ratio = 1.0 / sum(1.0 / cell.tot_aspect_ratio for cell in subdivision_rows)
+    tot_aspect_ratio: float = 1.0 / sum(1.0 / cell.tot_aspect_ratio for cell in subdivision_rows)
 
     fit_width: float = float(dst_width) if tot_aspect_ratio > dst_aspect_ratio else float(dst_height * tot_aspect_ratio)
     fit_height: float = dst_width / tot_aspect_ratio if tot_aspect_ratio > dst_aspect_ratio else float(dst_height)
     fit_x: float = (dst_width - fit_width) / 2.0
     fit_y: float = (dst_height - fit_height) / 2.0
 
+    print(f"Render composition: {fit_x}, {fit_y}, {fit_width}, {fit_height}, from {dst_width}x{dst_height}, aspect ratio {tot_aspect_ratio}")
+
     subdivision: Subdivision = Subdivision(x=int(fit_x), y=int(fit_y), width=int(fit_width), height=int(fit_height), rows={})
     cell_y: float = fit_y
     for cell in subdivision_rows:
+        row_height: float = fit_height * (tot_aspect_ratio / cell.tot_aspect_ratio)
         cell_width: float = fit_width / cell.columns
-        cell_height: float = cell_width / cell.src_aspect_ratio / cell.rows
+        pad: Point2f = cell.padding
         subdivision.rows[cell.name] = []
         for row in range(cell.rows):
             for col in range(cell.columns):
-                x: float = fit_x + col * cell_width
-                y: float = cell_y + row * cell_height
-                rect: Rect = Rect(x=x, y=y, width=cell_width, height=cell_height)
+                x: float = fit_x + col * cell_width + pad.x * 0.5
+                y: float = cell_y + row * (row_height / cell.rows) + pad.y * 0.5
+                rect_width: float = cell_width - pad.x
+                rect_height: float = (row_height / cell.rows) - pad.y
+                rect = Rect(x=x, y=y, width=rect_width, height=rect_height)
                 subdivision.rows[cell.name].append(rect)
+        cell_y += row_height
 
-        cell_y += cell_height * cell.rows
+    print(f"Subdivision with a total height of {fit_height}, check with {cell_y}")
 
     return subdivision
 
