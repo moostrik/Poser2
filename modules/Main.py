@@ -54,13 +54,10 @@ class Main():
         if settings.art_type == Settings.ArtType.WS:
             self.av: AV | None = AV(self.gui, settings)
 
-        self.running: bool = False
-        self.finished: bool = False
+        self.is_running: bool = False
+        self.is_finished: bool = False
 
     def start(self) -> None:
-        self.render.exit_callback = self.stop
-        self.render.addKeyboardCallback(self.render_keyboard_callback)
-        self.render.start()
 
         for camera in self.cameras:
             camera.add_preview_callback(self.render.data.set_cam_image)
@@ -124,23 +121,30 @@ class Main():
             self.recorder.gui_check()
             self.recorder.start() # start after gui to prevent record at startup
 
-        self.running = True
+        self.is_running = True
+
+        self.render.addExitCallback(self.stop)
+        self.render.addKeyboardCallback(self.render_keyboard_callback)
+        self.render.start()
 
     def stop(self) -> None:
-        print("Stopping main application...")
-        if not self.running:
+        # print("Stopping main application...")
+        if not self.is_running:
             return
-        self.running = False
+        self.is_running = False
 
-        print("Stopping player...")
+        # print("Stopping render...")
+        self.render.stop()
+
+        # print("Stopping player...")
         if self.player:
             self.player.stop()
 
-        print('stop cameras')
+        # print('stop cameras')
         for camera in self.cameras:
             camera.stop()
 
-        print('stop tracker')
+        # print('stop tracker')
         self.tracker.stop()
 
         if self.pose_detection:
@@ -152,31 +156,27 @@ class Main():
         if self.correlation_streamer:
             self.correlation_streamer.stop()
 
-        print('stop av')
+        # print('stop av')
         if self.av:
             self.av.stop()
 
-        print('stop gui')
+        # print('stop recorder')
         if self.recorder:
             self.recorder.stop()
 
-        print('stop player')
+        # print('stop gui')
+        self.gui.stop()
+
+        # print('join cameras')
         for camera in self.cameras:
             camera.join(timeout=8)
 
-        print('stop gui')
-        self.gui.stop()
-
-        print("Stopping render...")
-        self.render.exit_callback = None
-        self.render.stop()
-
-        self.finished = True
+        self.is_finished = True
         print("Main application stopped.")
 
 
     def render_keyboard_callback(self, key, x, y) -> None:
-        if not  self.running: return
+        if not  self.is_running: return
         if key == b'g' or key == b'G':
             if not self.gui or not self.gui.running: return
             self.gui.bringToFront()

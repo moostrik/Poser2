@@ -11,8 +11,8 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Mesh import Mesh
-# from modules.gl.RenderWindowGLFW import RenderWindow
-from modules.gl.RenderWindowGLUT import RenderWindow
+from modules.gl.RenderWindowGLFW import RenderWindow
+# from modules.gl.RenderWindowGLUT import RenderWindow
 from modules.gl.Shader import Shader
 
 from modules.av.Definitions import AvOutput
@@ -110,9 +110,9 @@ class Render(RenderWindow):
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
-    def reshape(self, width, height) -> None: # override
+    def window_reshape(self, width: int, height: int, name: str) -> None: # override
         print(f"Reshaping RenderWindow to {width}x{height}")
-        super().reshape(width, height)
+        super().window_reshape(width, height, name)
         self.composition = make_subdivision(width, height, self.num_cams, self.num_sims, self.max_players, self.num_viss)
 
         for key in self.cam_fbos.keys():
@@ -145,7 +145,7 @@ class Render(RenderWindow):
             print(f"Error in draw: {e}")
 
     def allocate(self) -> None: # override
-        self.reshape(self.window_width, self.window_height)
+        self.window_reshape(self.window_width, self.window_height, '')
         for s in self.all_shaders:
             s.allocate(True) # type: ignore
         for fbo in self.vis_fbos.values():
@@ -162,11 +162,11 @@ class Render(RenderWindow):
         for fbo in self.vis_fbos.values():
             fbo.deallocate()
 
-        # for mesh in self.pose_meshes.values():
-        #     mesh.deallocate()
+        for mesh in self.pose_meshes.values():
+            mesh.deallocate()
         self.pose_meshes.clear()
-        # for mesh in self.angle_meshes.values():
-        #     mesh.deallocate()
+        for mesh in self.angle_meshes.values():
+            mesh.deallocate()
         self.angle_meshes.clear()
 
         for shader in self.all_shaders:

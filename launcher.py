@@ -4,7 +4,6 @@
 from argparse import ArgumentParser, Namespace
 from os import path
 from signal import signal, SIGINT
-from sys import exit
 from time import sleep
 
 from modules.Main import Main
@@ -17,7 +16,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     mp.freeze_support()
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument('-fps',     '--fps',        type=float, default=23.0,   help='frames per second')
-    parser.add_argument('-pl',      '--players',    type=int,   default=3,      help='number of players')
+    parser.add_argument('-pl',      '--players',    type=int,   default=8,      help='number of players')
     parser.add_argument('-c',       '--color',      action='store_true',        help='use color input instead of left mono')
     parser.add_argument('-sq',      '--square',     action='store_true',        help='use centre square of the camera')
     parser.add_argument('-ss',      '--showstereo', action='store_true',        help='queue stereo frames')
@@ -33,6 +32,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     parser.add_argument('-ad',      '--debug',      action='store_true',        help='run analysis in debug mode')
     parser.add_argument('-hd',      '--hd',         action='store_true',        help='run in Harmonic Dissonance mode')
     parser.add_argument('-tmw',     '--testmultiwindow', action='store_true',   help='test MultiWindowRender only')
+    parser.add_argument('-tm',     '--testminimal', action='store_true',   help='test with minimum setup only')
     args: Namespace = parser.parse_args()
 
     currentPath: str = path.dirname(__file__)
@@ -123,6 +123,12 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.camera_num = 3
         settings.tracker_type = TrackerType.ONEPERCAM
 
+    if args.testminimal:
+        settings.max_players = 1
+        settings.camera_list = camera_list[:1]
+        settings.camera_num = 1
+        settings.tracker_type = TrackerType.ONEPERCAM
+
 
 
     settings.check_values()
@@ -136,18 +142,16 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     def signal_handler_exit(sig, frame) -> None:
         print("Received interrupt signal, shutting down...")
-        if app.running:
+        if app.is_running:
             app.stop()
-        sleep(0.5)
-        if app.finished:
-            print("Application finished successfully.")
-        else:
-            print("Application did not finish properly.")
-        exit()
 
     signal(SIGINT, signal_handler_exit)
 
-    while not app.finished:
-        sleep(0.05)
+    while not app.is_finished:
+        sleep(0.1)
         continue
-    print("Application end.")
+
+
+    # Hard Exit for a problem that arises from GLFW not closing properly
+    # from os import _exit
+    # _exit(1)

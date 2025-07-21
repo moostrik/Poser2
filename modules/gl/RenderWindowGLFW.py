@@ -1,8 +1,8 @@
 import OpenGL.GL as gl
 import glfw
-from threading import Thread, current_thread, Event
+from threading import Thread, Lock, current_thread
 from modules.gl.Utils import FpsCounter
-from typing import Callable
+from typing import Callable, Optional
 import time
 from enum import Enum
 
@@ -18,12 +18,13 @@ class Button(Enum):
 
 class RenderWindow():
     def __init__(self, width, height, name: str, fullscreen: bool = False, v_sync: bool = True, fps: int | None = None, posX = 0, posY = 0) -> None:
-        super().__init__()
+        if not glfw.init():
+            raise Exception("Failed to initialize GLFW")
+
         self.window_width: int = width
         self.window_height: int = height
         self.prev_window_width: int = width
         self.prev_window_height: int = height
-        # self.running = True
         self.fullscreen: bool = fullscreen
         self.v_sync: bool = v_sync
         self.frame_interval: None | int = None
@@ -36,61 +37,62 @@ class RenderWindow():
         self.window_y: int = posY
         self.mouse_x: float = 0.0
         self.mouse_y: float = 0.0
-        self.mouse_callbacks: list[Callable] = []
-        self.key_callbacks: list[Callable] = []
 
         self.window = None
         self.monitor = None
         self.last_frame_time = 0
 
-
         self.render_thread: Thread | None = None
-        self._stop_event = Event()
-        self.exit_callback: Callable[[], None] | None = None
+        self.callback_lock = Lock()
+        self.exit_callbacks: set[Callable[[], None]] = set()
+        self.mouse_callbacks: set[Callable] = set()
+        self.key_callbacks: set[Callable] = set()
 
     def start(self) -> None:
         """Start the rendering thread"""
-        self._stop_event.clear()
-        self.render_thread = Thread(target=self.run, name="RenderThread")
-        self.render_thread.daemon = True
-        self.render_thread.start()
+        if self.render_thread is None or not self.render_thread.is_alive():
+            self.render_thread = Thread(target=self.run, daemon=False)
+            self.render_thread.start()
 
     def stop(self) -> None:
-        if self.render_thread and self.render_thread.is_alive():
-            self._stop_event.set()
+        """Stop the rendering thread"""
+        # Early exit if thread doesn't exist or isn't running
+        if not self.render_thread or not self.render_thread.is_alive():
+            print(f"Render thread is not running, nothing to stop")
+            return
 
-            # Multiple ways to signal the render thread to stop
-            try:
-                if self.window:
-                    glfw.set_window_should_close(self.window, True)
-                glfw.post_empty_event()  # Wake up glfw.poll_events()
-            except:
-                pass  # GLFW might not be initialized yet
+        # Check if we're calling from the render thread itself
+        if current_thread() is self.render_thread:
+            print(f"Render thread self-terminating")
+            return
 
-            if current_thread() != self.render_thread:
-                print("Waiting for render thread to finish...")
-                self.render_thread.join(timeout=8.0)
-                if self.render_thread.is_alive():
-                    print("Warning: Render thread did not stop within timeout!")
-            print("Render thread stopped.")
+        # Normal case - external thread stopping the render thread
+        self.clearCallbacks()
+        if self.window:
+            glfw.set_window_should_close(self.window, True)
+            glfw.post_empty_event()  # Wake up the event loop
+
+        self.render_thread.join(timeout=2.0)  # Wait for thread to finish with timeout
+        if self.render_thread.is_alive():
+            print(f"Warning: Render thread didn't stop gracefully")
+        else:
+            print(f"Render thread stopped successfully")
 
     def run(self) -> None:
-        # Initialize GLFW
-        if not glfw.init():
-            raise Exception("Failed to initialize GLFW")
 
+        # Initialize GLFW
         # Configure GLFW
-        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
-        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
+        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 4)
+        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 6)
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_COMPAT_PROFILE)
         glfw.window_hint(glfw.DECORATED, glfw.TRUE)
         glfw.window_hint(glfw.RESIZABLE, glfw.TRUE)
 
         # Get primary monitor for fullscreen
-        self.monitor = glfw.get_primary_monitor() if self.fullscreen else None
+        self.monitor: Optional[glfw._GLFWmonitor] = glfw.get_primary_monitor() if self.fullscreen else None
 
         # Create window
-        self.window = glfw.create_window(
+        self.window: Optional[glfw._GLFWwindow] = glfw.create_window(
             self.window_width,
             self.window_height,
             self.windowName,
@@ -113,11 +115,10 @@ class RenderWindow():
         glfw.swap_interval(1 if self.v_sync else 0)
 
         # Set callbacks
-        glfw.set_framebuffer_size_callback(self.window, self.framebuffer_size_callback)
-        glfw.set_key_callback(self.window, self.key_callback)
-        glfw.set_cursor_pos_callback(self.window, self.cursor_pos_callback)
-        glfw.set_mouse_button_callback(self.window, self.mouse_button_callback)
-        glfw.set_window_close_callback(self.window, self.window_close_callback)
+        glfw.set_framebuffer_size_callback(self.window, self.window_size_callback)
+        glfw.set_key_callback(self.window, self.notify_key_callback)
+        glfw.set_cursor_pos_callback(self.window, self.notify_cursor_pos_callback)
+        glfw.set_mouse_button_callback(self.window, self.notify_invoke_mouse_button_callbacks)
 
         # Hide cursor in fullscreen
         if self.fullscreen:
@@ -135,12 +136,10 @@ class RenderWindow():
 
         # Main loop
         try:
-            while not self._stop_event.is_set():
-                # Check for window close or stop event
+            while True:
                 if glfw.window_should_close(self.window):
-                    self.window_close_callback(self.window)
                     break
-
+                glfw.make_context_current(self.window)  # Ensure context is current for this thread
                 current_time = time.time_ns()
 
                 if self.frame_interval:
@@ -153,12 +152,9 @@ class RenderWindow():
                 # Non-blocking event polling with timeout
                 glfw.poll_events()
 
-                # Small sleep to prevent 100% CPU usage and allow stop event checking
-                if not self._stop_event.is_set():
-                    time.sleep(0.001)  # 1ms sleep
-
         except Exception as e:
-            print(f"Error in render loop: {e}")
+            pass
+            # print(f"Error in render loop: {e}")
 
         self.deallocate()
 
@@ -166,13 +162,12 @@ class RenderWindow():
         try:
             if self.window:
                 glfw.destroy_window(self.window)
+                self.window = None
             glfw.terminate()
-            print ("GLFW terminated successfully.")
         except Exception as e:
             print(f"Error cleaning up GLFW: {e}")
 
-        # exit the main thread
-
+        self.notify_exit_callbacks()
 
     def initGL(self) -> None:
         gl.glEnable(gl.GL_TEXTURE_2D)
@@ -181,10 +176,12 @@ class RenderWindow():
         gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
         self.setView(self.window_width, self.window_height)
 
-    def framebuffer_size_callback(self, window, width, height) -> None:
-        self.reshape(width, height)
+    def window_size_callback(self, window: Optional[glfw._GLFWwindow], width: int, height: int) -> None:
+        if not window or width <= 0 or height <= 0:
+            return
+        self.window_reshape(width, height, window.title)
 
-    def reshape(self, width, height) -> None:
+    def window_reshape(self, width: int, height: int, name: str) -> None:
         self.window_width = width
         self.window_height = height
         self.setView(width, height)
@@ -241,24 +238,28 @@ class RenderWindow():
         gl.glClearColor(0.0, 0.0, 0.0, 1.0)
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)  # type: ignore
         gl.glLoadIdentity()
-
-        self.draw()
+        try:
+            # Existing code...
+            self.draw()
+        except Exception as e:
+            pass
+            print(f"Error in draw: {e}")
 
         glfw.swap_buffers(self.window)
         self.fps.tick()
 
-    def window_close_callback(self, window) -> None:
-        if self.exit_callback:
-            self.exit_callback()
-
     def draw(self) -> None:
         pass
 
-    def key_callback(self, window, key, scancode, action, mods) -> None:
+    # CALLBACKS
+    def notify_key_callback(self, window, key, scancode, action, mods) -> None:
         if action == glfw.PRESS or action == glfw.REPEAT:
             if key == glfw.KEY_ESCAPE:
-                if self.exit_callback:
-                    self.exit_callback()
+
+                glfw.set_window_should_close(self.window, True)
+                glfw.post_empty_event()  # Wake up the event loop
+
+
             elif key == glfw.KEY_F:
                 self.setFullscreen(not self.fullscreen)
                 return
@@ -274,13 +275,13 @@ class RenderWindow():
                 for c in self.key_callbacks:
                     c(key_byte, self.mouse_x * self.window_width, self.mouse_y * self.window_height)
 
-    def cursor_pos_callback(self, window, xpos, ypos) -> None:
+    def notify_cursor_pos_callback(self, window, xpos, ypos) -> None:
         self.mouse_x = xpos / self.window_width
         self.mouse_y = ypos / self.window_height
         for c in self.mouse_callbacks:
             c(self.mouse_x, self.mouse_y, Button.NONE)
 
-    def mouse_button_callback(self, window, button, action, mods) -> None:
+    def notify_invoke_mouse_button_callbacks(self, window, button, action, mods) -> None:
         button_enum: Button = Button.NONE
 
         if button == glfw.MOUSE_BUTTON_LEFT:
@@ -302,17 +303,31 @@ class RenderWindow():
         for c in self.mouse_callbacks:
             c(self.mouse_x, self.mouse_y, button_enum)
 
-    def addMouseCallback(self, callback) -> None:
-        self.mouse_callbacks.append(callback)
+    def notify_exit_callbacks(self) -> None:
+        with self.callback_lock:
+            for callback in self.exit_callbacks:
+                try:
+                    callback()
+                except Exception as e:
+                    print(f"Error in exit callback: {e}")
 
-    def clearMouseCallbacks(self) -> None:
-        self.mouse_callbacks = []
+    def addMouseCallback(self, callback) -> None:
+        with self.callback_lock:
+            self.mouse_callbacks.add(callback)
 
     def addKeyboardCallback(self, callback) -> None:
-        self.key_callbacks.append(callback)
+        with self.callback_lock:
+            self.key_callbacks.add(callback)
 
-    def clearKeyboardCallbacks(self) -> None:
-        self.key_callbacks = []
+    def addExitCallback(self, callback) -> None:
+        with self.callback_lock:
+            self.exit_callbacks.add(callback)
+
+    def clearCallbacks(self) -> None:
+        with self.callback_lock:
+            self.mouse_callbacks.clear()
+            self.key_callbacks.clear()
+            self.exit_callbacks.clear()
 
     @staticmethod
     def draw_string(x: float, y: float, string: str, color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0), big: bool = False)-> None:
