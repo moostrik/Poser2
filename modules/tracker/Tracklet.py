@@ -13,7 +13,7 @@ from pandas import Timestamp
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as ExternalTracklet
 from modules.utils.HotReloadMethods import HotReloadMethods
-from modules.tracker.BaseTracker import TrackerMetadata
+from modules.tracker.TrackerBase import TrackerMetadata
 from modules.utils.PointsAndRects import Rect, Point2f
 
 class TrackingStatus(Enum):

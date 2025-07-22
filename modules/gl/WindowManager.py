@@ -8,6 +8,7 @@ from typing import Callable, Optional
 import glfw
 
 # Local application imports
+from modules.gl.RenderBase import RenderBase
 from modules.gl.Utils import FpsCounter
 
 
@@ -21,9 +22,11 @@ class Button(Enum):
     RIGHT_DOWN =    6
 
 class WindowManager():
-    def __init__(self, width, height, name: str, fullscreen: bool = False, v_sync: bool = True, fps: int | None = None, posX = 0, posY = 0, monitor_id = 0, secondary_monitor_ids: list[int] = []) -> None:
+    def __init__(self, renderer: RenderBase, width, height, name: str, fullscreen: bool = False, v_sync: bool = True, fps: int | None = None, posX = 0, posY = 0, monitor_id = 0, secondary_monitor_ids: list[int] = []) -> None:
         if not glfw.init():
             raise Exception("Failed to initialize GLFW")
+
+        self.renderer = renderer
 
         self.window_width: int = width
         self.window_height: int = height
@@ -160,7 +163,7 @@ class WindowManager():
 
     def _render_loop(self) -> None:
         """Main rendering loop with improved frame timing"""
-        self.allocate()
+        self.renderer.allocate()
 
         next_frame_time = time_ns()
         while not glfw.window_should_close(self.main_window):
@@ -191,7 +194,7 @@ class WindowManager():
                         next_frame_time: int = now
 
 
-        self.deallocate()
+        self.renderer.deallocate()
 
     def _cleanup(self) -> None:
         """Clean up resources"""
@@ -212,7 +215,7 @@ class WindowManager():
             return
         self.window_width = width
         self.window_height = height
-        self.main_window_reshape(width, height)
+        self.renderer.on_main_window_resize(width, height)
 
     def _draw_main_window(self) -> None:
         fps = str(self.fps.get_fps())
@@ -224,7 +227,7 @@ class WindowManager():
         glfw.swap_interval(1 if self.v_sync else 0)
 
         try:
-            self.draw_main(self.window_width, self.window_height)
+            self.renderer.draw_main(self.window_width, self.window_height)
         except Exception as e:
             pass
             print(f"Error in draw: {e}")
@@ -295,7 +298,7 @@ class WindowManager():
         glfw.make_context_current(window)  # <-- Make this window's context current
         glfw.swap_interval(0)
         try:
-            self.draw_secondary(monitor_id, width, height)
+            self.renderer.draw_secondary(monitor_id, width, height)
         except Exception as e:
             print(f"Error in draw_secondary: {e}")
         glfw.swap_buffers(window)
@@ -442,23 +445,3 @@ class WindowManager():
             else:
                 self._setup_secondary_window(win, monitor_id, False)
 
-    # FOR COMPOSITION
-    def allocate(self) -> None:
-        """Allocate resources in the renderer"""
-        pass
-
-    def deallocate(self) -> None:
-        """Deallocate resources in the renderer"""
-        pass
-
-    def main_window_reshape(self, width: int, height: int) -> None:
-        """ Handle main window resize event. """
-        pass
-
-    def draw_main(self, width: int, height: int) -> None:
-        """ Draw content in the main window. """
-        pass
-
-    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        """Draw content in the secondary window."""
-        pass

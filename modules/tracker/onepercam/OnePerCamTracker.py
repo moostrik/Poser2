@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
-from modules.tracker.BaseTracker import BaseTracker, TrackerType, TrackerMetadata
+from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
 from modules.tracker.onepercam.OnePerCamTrackerGui import OnePerCamTrackerGui
 from modules.Settings import Settings

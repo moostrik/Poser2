@@ -1,3 +1,9 @@
+"""
+TODO
+from abc import ABC, abstractmethod
+similar to gl/RenderBase.py
+"""
+
 from __future__ import annotations
 
 from enum import Enum

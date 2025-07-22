@@ -10,7 +10,7 @@ from typing import Optional
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
-from modules.tracker.BaseTracker import BaseTracker, TrackerType, TrackerMetadata
+from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
 from modules.tracker.panoramic.PanoramicTrackletManager import PanoramicTrackletManager
 from modules.tracker.panoramic.PanoramicTrackerGui import PanoramicTrackerGui

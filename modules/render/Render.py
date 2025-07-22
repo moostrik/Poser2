@@ -16,10 +16,11 @@ from modules.gl.WindowManager import WindowManager
 # from modules.gl.RenderWindowGLUT import RenderWindow
 from modules.gl.Shader import Shader
 from modules.gl.Text import draw_string, draw_box_string, text_init
+from modules.gl.RenderBase import RenderBase
 
 from modules.av.Definitions import AvOutput
 from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
-from modules.tracker.BaseTracker import TrackerType, TrackerMetadata
+from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices, PoseAngleNames
@@ -59,7 +60,7 @@ class SubdivisionType(Enum):
 Composition_Subdivision = dict[SubdivisionType, dict[int, tuple[int, int, int, int]]]
 
 
-class Render():
+class Render(RenderBase):
     def __init__(self, settings: Settings) -> None:
         self.data: DataManager = DataManager()
 
@@ -124,6 +125,7 @@ class Render():
         # window manager
         secondary_monitor_ids: list[int] = [i for i in range(1, self.num_cams + 1)]
         self.window_manager: WindowManager = WindowManager(
+            self,
             self.subdivision.width, self.subdivision.height,
             settings.render_title,
             settings.render_fullscreen,
@@ -133,39 +135,53 @@ class Render():
             secondary_monitor_ids
         )
 
-        self.window_manager.draw_main = self.draw_main
-        self.window_manager.draw_secondary = self.draw_secondary
-        self.window_manager.allocate = self.allocate
-        self.window_manager.deallocate = self.deallocate
-        self.window_manager.main_window_reshape = self.main_window_reshape
-
         # text
         text_init()
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
-    def main_window_reshape(self, width: int, height: int) -> None: # override
-        self.subdivision = make_subdivision(self.subdivision_rows, width, height)
+    def allocate(self) -> None: # override
+        glEnable(GL_TEXTURE_2D)
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # self.setView(self.window_width, self.window_height)
 
-        for key in self.cam_fbos.keys():
-            rect = self.subdivision.rows[SubdivisionType.CAM.value][key]
-            w, h = int(rect.width), int(rect.height)
-            self.cam_fbos[key].allocate(w, h, GL_RGBA)
+        version = glGetString(GL_VERSION)
+        opengl_version = version.decode("utf-8")  # type: ignore
+        print("OpenGL version:", opengl_version)
 
-        for key in self.sim_fbos.keys():
-            rect = self.subdivision.rows[SubdivisionType.SIM.value][key]
-            w, h = int(rect.width), int(rect.height)
-            self.sim_fbos[key].allocate(w, h, GL_RGBA)
+        self.on_main_window_resize(self.subdivision.width, self.subdivision.height)
+        for s in self.all_shaders:
+            s.allocate(True) # type: ignore
+        for fbo in self.vis_fbos.values():
+            fbo.allocate(self.vis_width, 1, GL_RGBA32F)
+        self.allocated = True
 
-        for key in self.pse_fbos.keys():
-            rect = self.subdivision.rows[SubdivisionType.PSN.value][key]
-            w, h = int(rect.width), int(rect.height)
-            self.pse_fbos[key].allocate(w, h, GL_RGBA)
+    def deallocate(self) -> None: # override
+        for fbo in self.cam_fbos.values():
+            fbo.deallocate()
+        for fbo in self.sim_fbos.values():
+            fbo.deallocate()
+        for fbo in self.pse_fbos.values():
+            fbo.deallocate()
+        for fbo in self.vis_fbos.values():
+            fbo.deallocate()
 
-    def draw_main(self, width: int, height: int) -> None: # override
+        for mesh in self.pose_meshes.values():
+            mesh.deallocate()
+        self.pose_meshes.clear()
+        for mesh in self.angle_meshes.values():
+            mesh.deallocate()
+        self.angle_meshes.clear()
 
-        # if self.running:
+        for shader in self.all_shaders:
+            shader.deallocate()
+
+        self.allocated = False
+
+    def draw_main(self, width: int, height: int) -> None:
         try:
             for id in range(self.max_players):
                 self.update_pose_meshes(self.data.get_pose(id, True), self.pose_meshes[id])
@@ -208,46 +224,25 @@ class Render():
         # glClearColor(c, c, c, 1.0)
         # glClear(GL_COLOR_BUFFER_BIT)  # type: ignore
 
-    def allocate(self) -> None: # override
-        glEnable(GL_TEXTURE_2D)
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        # self.setView(self.window_width, self.window_height)
+    def on_main_window_resize(self, width: int, height: int) -> None: # override
+        self.subdivision = make_subdivision(self.subdivision_rows, width, height)
 
-        version = glGetString(GL_VERSION)
-        opengl_version = version.decode("utf-8")  # type: ignore
-        print("OpenGL version:", opengl_version)
+        for key in self.cam_fbos.keys():
+            rect = self.subdivision.rows[SubdivisionType.CAM.value][key]
+            w, h = int(rect.width), int(rect.height)
+            self.cam_fbos[key].allocate(w, h, GL_RGBA)
 
-        self.main_window_reshape(self.subdivision.width, self.subdivision.height)
-        for s in self.all_shaders:
-            s.allocate(True) # type: ignore
-        for fbo in self.vis_fbos.values():
-            fbo.allocate(self.vis_width, 1, GL_RGBA32F)
-        self.allocated = True
+        for key in self.sim_fbos.keys():
+            rect = self.subdivision.rows[SubdivisionType.SIM.value][key]
+            w, h = int(rect.width), int(rect.height)
+            self.sim_fbos[key].allocate(w, h, GL_RGBA)
 
-    def deallocate(self) -> None: # override
-        for fbo in self.cam_fbos.values():
-            fbo.deallocate()
-        for fbo in self.sim_fbos.values():
-            fbo.deallocate()
-        for fbo in self.pse_fbos.values():
-            fbo.deallocate()
-        for fbo in self.vis_fbos.values():
-            fbo.deallocate()
+        for key in self.pse_fbos.keys():
+            rect = self.subdivision.rows[SubdivisionType.PSN.value][key]
+            w, h = int(rect.width), int(rect.height)
+            self.pse_fbos[key].allocate(w, h, GL_RGBA)
 
-        for mesh in self.pose_meshes.values():
-            mesh.deallocate()
-        self.pose_meshes.clear()
-        for mesh in self.angle_meshes.values():
-            mesh.deallocate()
-        self.angle_meshes.clear()
-
-        for shader in self.all_shaders:
-            shader.deallocate()
-
-        self.allocated = False
-
+    # DRAW METHODS
     def setView(self, width, height) -> None:
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
@@ -255,7 +250,7 @@ class Render():
 
         glMatrixMode(GL_MODELVIEW)
         glViewport(0, 0, width, height)
-    # DRAW METHODS
+
     def draw_cameras(self) -> None:
         for i in range(self.num_cams):
             frame: np.ndarray | None = self.data.get_cam_image(i)
