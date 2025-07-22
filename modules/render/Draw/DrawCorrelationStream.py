@@ -12,8 +12,6 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
 from modules.render.Draw.DrawBase import DrawBase, Rect
-from modules.render.DrawMethods import DrawMethods
-
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
@@ -29,6 +27,8 @@ class DrawRStream(DrawBase):
         self.num_streams: int = num_streams
         text_init()
 
+        hot_reload = HotReloadMethods(self.__class__, True, True)
+
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
         if not DrawRStream.r_stream_shader.allocated:
@@ -39,6 +39,9 @@ class DrawRStream(DrawBase):
         self.image.deallocate()
         if DrawRStream.r_stream_shader.allocated:
             DrawRStream.r_stream_shader.deallocate()
+
+    def draw(self, rect: Rect) -> None:
+        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self, only_if_dirty: bool) -> None:
         correlation_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams(only_if_dirty)
@@ -52,7 +55,7 @@ class DrawRStream(DrawBase):
         self.image.set_image(image_np)
         self.image.update()
 
-        DrawMethods.setView(self.fbo.width, self.fbo.height)
+        DrawBase.setView(self.fbo.width, self.fbo.height)
         self.r_stream_shader.use(self.fbo.fbo_id, self.image.tex_id, self.image.width, self.image.height, 1.5 / self.fbo.height)
 
         step: float = self.fbo.height / self.num_streams
@@ -66,7 +69,6 @@ class DrawRStream(DrawBase):
             y: int = self.fbo.height - (int(self.fbo.height - (i + 0.5) * step) - 12)
             draw_box_string(x, y, string, big=True) # type: ignore
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Set color to white
-        self.fbo.end()
 
-    def draw(self, rect: Rect) -> None:
-        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        glFlush()  # Render now
+        self.fbo.end()

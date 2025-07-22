@@ -38,12 +38,12 @@ class Subdivision:
     height: int
     _rows:dict[str, list[Rect]]
 
-    def get_rect(self, key: str, index: int) -> Rect:
+    def get_rect(self, key: str, index: int = 0) -> Rect:
         if key not in self._rows or index >= len(self._rows[key]):
             return Rect(0, 0, 128, 128)
         return self._rows[key][index]
 
-    def get_width_and_height(self, key, index) -> tuple[int, int]:
+    def get_allocation_size(self, key: str, index: int = 0) -> tuple[int, int]:
         rect: Rect = self.get_rect(key, index)
         return int(rect.width), int(rect.height)
 

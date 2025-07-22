@@ -22,6 +22,5 @@ class DrawBase(ABC):
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         glOrtho(0, width, height, 0, -1, 1)
-
         glMatrixMode(GL_MODELVIEW)
         glViewport(0, 0, width, height)

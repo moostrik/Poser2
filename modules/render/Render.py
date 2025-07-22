@@ -99,15 +99,15 @@ class Render(RenderBase):
         self.draw_white_space.allocate(self.ws_width, 1, GL_RGBA32F)
 
     def allocate_window_draws(self) -> None:
-        w, h = self.subdivision.get_width_and_height(SubdivisionType.RST.value, 0)
+        w, h = self.subdivision.get_allocation_size(SubdivisionType.RST.value)
         self.draw_r_stream.allocate(w, h, GL_RGBA)
-        w, h = self.subdivision.get_width_and_height(SubdivisionType.TRK.value, 0)
+        w, h = self.subdivision.get_allocation_size(SubdivisionType.TRK.value)
         self.draw_tracker.allocate(w, h, GL_RGBA)
         for key in self.draw_cameras.keys():
-            w, h = self.subdivision.get_width_and_height(SubdivisionType.CAM.value, key)
+            w, h = self.subdivision.get_allocation_size(SubdivisionType.CAM.value, key)
             self.draw_cameras[key].allocate(w, h, GL_RGBA)
         for key in self.draw_poses.keys():
-            w, h = self.subdivision.get_width_and_height(SubdivisionType.PSN.value, key)
+            w, h = self.subdivision.get_allocation_size(SubdivisionType.PSN.value, key)
             self.draw_poses[key].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
@@ -127,7 +127,7 @@ class Render(RenderBase):
         # self.angle_meshes.update(False)
 
         self.draw_white_space.update(True)
-        self.draw_r_stream.update(True)
+        self.draw_r_stream.update(False)
         self.draw_tracker.update(False)
         for i in range(self.num_cams):
             self.draw_cameras[i].update(False)
@@ -139,9 +139,9 @@ class Render(RenderBase):
     def draw_composition(self) -> None:
         self.setView(self.subdivision.width, self.subdivision.height)
 
-        self.draw_white_space.draw(self.subdivision.get_rect(SubdivisionType.WS.value, 0))
-        self.draw_tracker.draw(self.subdivision.get_rect(SubdivisionType.TRK.value, 0))
-        self.draw_r_stream.draw(self.subdivision.get_rect(SubdivisionType.RST.value, 0))
+        self.draw_white_space.draw(self.subdivision.get_rect(SubdivisionType.WS.value))
+        self.draw_tracker.draw(self.subdivision.get_rect(SubdivisionType.TRK.value))
+        self.draw_r_stream.draw(self.subdivision.get_rect(SubdivisionType.RST.value))
         for i in range(self.num_cams):
             self.draw_cameras[i].draw(self.subdivision.get_rect(SubdivisionType.CAM.value, i))
         for i in range(self.max_players):

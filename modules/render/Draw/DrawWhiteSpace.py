@@ -26,6 +26,7 @@ class DrawWhiteSpace(DrawBase):
         self.fbo_lines: Fbo = Fbo()
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
+        text_init()
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo_lines.allocate(width, height, internal_format)
@@ -44,6 +45,12 @@ class DrawWhiteSpace(DrawBase):
         if DrawWhiteSpace.angles_shader.allocated:
             DrawWhiteSpace.angles_shader.deallocate()
 
+    def draw(self, rect: Rect) -> None:
+        x, y, width, height = rect.x, rect.y, rect.width, rect.height
+        half_height: float = height / 2
+        self.fbo_lines.draw(x, y, width, half_height)
+        self.fbo_angles.draw(x, y+half_height, width, half_height)
+
     def update(self, only_if_dirty: bool) -> None:
         light_image: AvOutput | None = self.data.get_light_image(only_if_dirty)
         if light_image is None:
@@ -61,9 +68,3 @@ class DrawWhiteSpace(DrawBase):
         self.fbo_angles.begin()
         self.angles_shader.use(self.fbo_angles.fbo_id, self.image.tex_id, self.fbo_angles.width)
         self.fbo_angles.end()
-
-    def draw(self, rect: Rect) -> None:
-        x, y, width, height = rect.x, rect.y, rect.width, rect.height
-        half_height: float = height / 2
-        self.fbo_lines.draw(x, y, width, half_height)
-        self.fbo_angles.draw(x, y+half_height, width, half_height)

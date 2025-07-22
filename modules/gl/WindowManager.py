@@ -89,8 +89,6 @@ class WindowManager():
         self.render_thread.join(timeout=2.0)  # Wait for thread to finish with timeout
         if self.render_thread.is_alive():
             print(f"Warning: Render thread didn't stop gracefully")
-        else:
-            print(f"Render thread stopped successfully")
 
     def _run(self) -> None:
         self._setup()

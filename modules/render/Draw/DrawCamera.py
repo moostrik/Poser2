@@ -8,29 +8,25 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Mesh import Mesh
-from modules.gl.Text import draw_string, draw_box_string, text_init
-from modules.gl.shaders.WS_PoseStream import WS_PoseStream
+from modules.gl.Text import draw_box_string, text_init
 
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
-from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices, PoseAngleNames
-from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
-from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
-from modules.utils.PointsAndRects import Rect, Point2f
+from modules.pose.PoseDefinitions import Pose
+from modules.tracker.Tracklet import Tracklet
 
 from modules.render.DataManager import DataManager
 from modules.render.Draw.DrawBase import DrawBase, Rect
 from modules.render.Mesh.PoseMeshes import PoseMeshes
-from modules.render.DrawMethods import DrawMethods
 
 
 class DrawCamera(DrawBase):
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
+        self.pose_meshes: PoseMeshes = pose_meshes
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.cam_id: int = cam_id
-
-        self.pose_meshes: PoseMeshes = pose_meshes
+        text_init()
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
@@ -38,6 +34,9 @@ class DrawCamera(DrawBase):
     def deallocate(self) -> None:
         self.fbo.deallocate()
         self.image.deallocate()
+
+    def draw(self, rect: Rect) -> None:
+        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self, only_if_dirty: bool) -> None:
         frame: np.ndarray | None = self.data.get_cam_image(self.cam_id)
@@ -57,10 +56,6 @@ class DrawCamera(DrawBase):
         glFlush()
         fbo.end()
 
-    def draw(self, rect: Rect) -> None:
-        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
-
-
     @staticmethod
     def draw_camera_overlay(depth_tracklets: list[DepthTracklet], poses: list[Pose], pose_meshes: dict[int, Mesh], x: float, y: float, width: float, height: float) -> None:
         for pose in poses:
@@ -76,8 +71,74 @@ class DrawCamera(DrawBase):
             roi_y: float = y + roi_y * height
             roi_w: float = roi_w * width
             roi_h: float = roi_h * height
-            DrawMethods.draw_tracklet(tracklet, mesh, roi_x, roi_y, roi_w, roi_h, True, True, False)
+            DrawCamera.draw_tracklet(tracklet, mesh, roi_x, roi_y, roi_w, roi_h, True, True, False)
 
         for depth_tracklet in depth_tracklets:
-            DrawMethods.draw_depth_tracklet(depth_tracklet, 0, 0, width, height)
+            DrawCamera.draw_depth_tracklet(depth_tracklet, 0, 0, width, height)
+
+    @staticmethod
+    def draw_depth_tracklet(tracklet: DepthTracklet, x: float, y: float, width: float, height: float) -> None:
+        if tracklet.status == DepthTracklet.TrackingStatus.REMOVED:
+            return
+
+        t_x: float = x + tracklet.roi.x * width
+        t_y: float = y + tracklet.roi.y * height
+        t_w: float = tracklet.roi.width * width
+        t_h: float = tracklet.roi.height* height
+
+        r: float = 1.0
+        g: float = 1.0
+        b: float = 1.0
+        a: float = min(tracklet.age / 100.0, 0.33)
+        if tracklet.status == DepthTracklet.TrackingStatus.NEW:
+            r, g, b, a = (1.0, 1.0, 1.0, 1.0)
+        if tracklet.status == DepthTracklet.TrackingStatus.TRACKED:
+            r, g, b, a = (0.0, 1.0, 0.0, a)
+        if tracklet.status == DepthTracklet.TrackingStatus.LOST:
+            r, g, b, a = (1.0, 0.0, 0.0, a)
+        if tracklet.status == DepthTracklet.TrackingStatus.REMOVED:
+            r, g, b, a = (1.0, 0.0, 0.0, 1.0)
+
+        glColor4f(r, g, b, a)   # Set color
+        glBegin(GL_QUADS)       # Start drawing a quad
+        glVertex2f(t_x, t_y)        # Bottom left
+        glVertex2f(t_x, t_y + t_h)    # Bottom right
+        glVertex2f(t_x + t_w, t_y + t_h)# Top right
+        glVertex2f(t_x + t_w, t_y)    # Top left
+        glEnd()                 # End drawing
+        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+
+        string: str
+        t_x += t_w -6
+        if t_x + 66 > width:
+            t_x: float = width - 66
+        t_y += 22
+        string = f'ID: {tracklet.id}'
+        draw_box_string(t_x, t_y, string)
+        t_y += 22
+        string = f'Age: {tracklet.age}'
+        draw_box_string(t_x, t_y, string)
+
+        # glFlush()               # Render now
+
+    @staticmethod
+    def draw_tracklet(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, width: float, height: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
+        if draw_box:
+            glColor4f(0.0, 0.0, 0.0, 0.1)
+            glBegin(GL_QUADS)
+            glVertex2f(x, y)        # Bottom left
+            glVertex2f(x, y + height)    # Bottom right
+            glVertex2f(x + width, y + height)# Top right
+            glVertex2f(x + width, y)    # Top left
+            glEnd()                 # End drawing
+            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+
+        if draw_pose and pose_mesh.isInitialized():
+            pose_mesh.draw(x, y, width, height)
+
+        if draw_text:
+            string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
+            x += 9
+            y += 12
+            draw_box_string(x, y, string)
 

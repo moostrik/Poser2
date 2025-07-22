@@ -18,7 +18,6 @@ from modules.render.DataManager import DataManager
 from modules.render.Draw.DrawBase import DrawBase, Rect
 from modules.render.Mesh.PoseMeshes import PoseMeshes
 from modules.render.Mesh.AngleMeshes import AngleMeshes
-from modules.render.DrawMethods import DrawMethods
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -49,6 +48,9 @@ class DrawPose(DrawBase):
         if DrawPose.pose_stream_shader.allocated:
             DrawPose.pose_stream_shader.deallocate()
 
+    def draw(self, rect: Rect) -> None:
+        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
+
     def update(self, only_if_dirty: bool) -> None:
         key = self.cam_id
         pose: Pose | None = self.data.get_pose(key, only_if_dirty)
@@ -71,9 +73,6 @@ class DrawPose(DrawBase):
         DrawPose.draw_pose(self.fbo, self.image, pose, pose_mesh, self.pose_stream_image, angle_mesh, DrawPose.pose_stream_shader)
         self.fbo.end()
 
-    def draw(self, rect: Rect) -> None:
-        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
-
     @staticmethod
     def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_image: Image, angle_mesh: Mesh, shader: WS_PoseStream) -> None:
         fbo.begin()
@@ -87,7 +86,7 @@ class DrawPose(DrawBase):
         tracklet: Tracklet | None = pose.tracklet
         if tracklet is not None:
             draw_box: bool = tracklet.is_lost
-            DrawMethods.draw_tracklet(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box, True, True)
+            DrawPose.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
         if angle_mesh.isInitialized():
             angle_mesh.draw(0, 0, fbo.width, fbo.height)
         # glFlush()
@@ -109,3 +108,23 @@ class DrawPose(DrawBase):
             clr: int = i % 2
 
             draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
+
+
+    @staticmethod
+    def draw_pose_box(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, width: float, height: float, draw_box = False) -> None:
+        if draw_box:
+            glColor4f(0.0, 0.0, 0.0, 0.1)
+            glBegin(GL_QUADS)
+            glVertex2f(x, y)        # Bottom left
+            glVertex2f(x, y + height)    # Bottom right
+            glVertex2f(x + width, y + height)# Top right
+            glVertex2f(x + width, y)    # Top left
+            glEnd()                 # End drawing
+            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+
+        pose_mesh.draw(x, y, width, height)
+
+        string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
+        x += 9
+        y += 12
+        draw_box_string(x, y, string)

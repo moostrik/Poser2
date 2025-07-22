@@ -13,13 +13,16 @@ from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 from modules.render.DataManager import DataManager
 from modules.render.Draw.DrawBase import DrawBase, Rect
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 class DrawPanoramicTracker(DrawBase):
-    """Methods for updating meshes based on pose data."""
     def __init__(self, data: DataManager, num_cams: int) -> None:
         self.data: DataManager = data
         self.num_cams: int = num_cams
         self.fbo: Fbo = Fbo()
         text_init()
+
+        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
@@ -27,20 +30,17 @@ class DrawPanoramicTracker(DrawBase):
     def deallocate(self) -> None:
         self.fbo.deallocate()
 
-    def update(self, only_if_dirty: bool) -> None:
-        tracklets: dict[int, Tracklet] = self.data.get_tracklets()
-        if tracklets is not None:
-            self.draw_map_positions(tracklets, self.fbo, self.num_cams)
-
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
-    @staticmethod
-    def draw_map_positions(tracklets: dict[int, Tracklet], fbo: Fbo, num_cams: int) -> None:
-        fbo.begin()
-        glClearColor(0.0, 0.0, 0.0, 1.0)
+    def update(self, only_if_dirty: bool) -> None:
+        tracklets: dict[int, Tracklet] = self.data.get_tracklets()
+        if tracklets is None:
+            return
+        DrawBase.setView(self.fbo.width, self.fbo.height)
+        self.fbo.begin()
+        glClearColor(1.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
-
 
         for tracklet in tracklets.values():
             if tracklet is None:
@@ -56,10 +56,10 @@ class DrawPanoramicTracker(DrawBase):
             local_angle: float = getattr(tracklet.metadata, "local_angle", 0.0)
             overlap: bool = getattr(tracklet.metadata, "overlap", False)
 
-            roi_width: float = tracklet.roi.width * fbo.width / num_cams
-            roi_height: float = tracklet.roi.height * fbo.height
-            roi_x: float = world_angle / 360.0 * fbo.width
-            roi_y: float = tracklet.roi.y * fbo.height
+            roi_width: float = tracklet.roi.width * self.fbo.width / self.num_cams
+            roi_height: float = tracklet.roi.height * self.fbo.height
+            roi_x: float = world_angle / 360.0 * self.fbo.width
+            roi_y: float = tracklet.roi.y * self.fbo.height
 
             color: list[float] = TrackletIdColor(tracklet.id, aplha=0.9)
             if overlap == True:
@@ -86,5 +86,5 @@ class DrawPanoramicTracker(DrawBase):
             draw_box_string(roi_x, roi_y, string)
 
         glFlush()  # Render now
-        fbo.end()
+        self.fbo.end()
 

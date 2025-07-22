@@ -172,7 +172,7 @@ class Main():
             camera.join(timeout=8)
 
         self.is_finished = True
-        print("Main application stopped.")
+        # print("Main application stopped.")
 
 
     def render_keyboard_callback(self, key, x, y) -> None:
