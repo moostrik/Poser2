@@ -18,6 +18,8 @@ from modules.render.DataManager import DataManager
 from modules.render.renders.BaseRender import BaseRender, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 class CameraRender(BaseRender):
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
@@ -27,6 +29,8 @@ class CameraRender(BaseRender):
         self.image: Image = Image()
         self.cam_id: int = cam_id
         text_init()
+
+        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
@@ -38,13 +42,14 @@ class CameraRender(BaseRender):
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
-    def update(self, only_if_dirty: bool) -> None:
-        frame: np.ndarray | None = self.data.get_cam_image(self.cam_id)
+    def update(self) -> None:
+        frame: np.ndarray | None = self.data.get_cam_image(self.cam_id, False, self.key())
         if frame is not None:
+            print(f"CameraRender: Updating camera {self.cam_id} with image of shape {frame.shape}")
             self.image.set_image(frame)
             self.image.update()
         fbo: Fbo = self.fbo
-        depth_tracklets: list[DepthTracklet] | None = self.data.get_depth_tracklets(self.cam_id, False)
+        depth_tracklets: list[DepthTracklet] | None = self.data.get_depth_tracklets(self.cam_id, False, self.key())
         poses: list[Pose] = self.data.get_poses_for_cam(self.cam_id)
         meshes: dict[int, Mesh] = self.pose_meshes.meshes
 

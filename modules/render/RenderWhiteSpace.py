@@ -24,7 +24,7 @@ from modules.render.renders.RStreamRender import RStreamRender
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class Render(RenderBase):
+class RenderWhiteSpace(RenderBase):
     def __init__(self, settings: Settings) -> None:
         self.data: DataManager =    DataManager()
 
@@ -51,22 +51,21 @@ class Render(RenderBase):
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name=CameraRender.get_key(),     columns=self.num_cams,      rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=TrackerRender.get_key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name=RStreamRender.get_key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name=PoseRender.get_key(),       columns=self.max_players,   rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=WhiteSpaceRender.get_key(), columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=CameraRender.key(),     columns=self.num_cams,      rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=TrackerRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=RStreamRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=PoseRender.key(),       columns=self.max_players,   rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=WhiteSpaceRender.key(), columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height)
 
         # window manager
-        secondary_monitor_ids: list[int] = [i for i in range(1, self.num_cams + 1)]
         self.window_manager: WindowManager = WindowManager(
             self, self.subdivision.width, self.subdivision.height,
             settings.render_title, settings.render_fullscreen,
             settings.render_v_sync, settings.render_fps,
             settings.render_x, settings.render_y,
-            settings.render_monitor, secondary_monitor_ids
+            settings.render_monitor
         )
 
         # hot reloader
@@ -91,15 +90,15 @@ class Render(RenderBase):
         self.white_space_render.allocate(self.ws_width, 1, GL_RGBA32F)
 
     def allocate_window_renders(self) -> None:
-        w, h = self.subdivision.get_allocation_size(RStreamRender.get_key())
+        w, h = self.subdivision.get_allocation_size(RStreamRender.key())
         self.r_stream_render.allocate(w, h, GL_RGBA)
-        w, h = self.subdivision.get_allocation_size(TrackerRender.get_key())
+        w, h = self.subdivision.get_allocation_size(TrackerRender.key())
         self.tracker_render.allocate(w, h, GL_RGBA)
         for key in self.camera_renders.keys():
-            w, h = self.subdivision.get_allocation_size(CameraRender.get_key(), key)
+            w, h = self.subdivision.get_allocation_size(CameraRender.key(), key)
             self.camera_renders[key].allocate(w, h, GL_RGBA)
         for key in self.pose_renders.keys():
-            w, h = self.subdivision.get_allocation_size(PoseRender.get_key(), key)
+            w, h = self.subdivision.get_allocation_size(PoseRender.key(), key)
             self.pose_renders[key].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
@@ -115,29 +114,29 @@ class Render(RenderBase):
         self.angle_meshes.deallocate()
 
     def draw_main(self, width: int, height: int) -> None:
-        self.pose_meshes.update(True)
+        self.pose_meshes.update()
         # self.angle_meshes.update(False)
 
-        self.white_space_render.update(True)
-        self.r_stream_render.update(False)
-        self.tracker_render.update(False)
+        self.white_space_render.update()
+        self.r_stream_render.update()
+        self.tracker_render.update()
         for i in range(self.num_cams):
-            self.camera_renders[i].update(False)
+            self.camera_renders[i].update()
         for i in range(self.max_players):
-            self.pose_renders[i].update(False)
+            self.pose_renders[i].update()
 
         self.draw_composition()
 
     def draw_composition(self) -> None:
         self.setView(self.subdivision.width, self.subdivision.height)
 
-        self.white_space_render.draw(self.subdivision.get_rect(WhiteSpaceRender.get_key()))
-        self.tracker_render.draw(self.subdivision.get_rect(TrackerRender.get_key()))
-        self.r_stream_render.draw(self.subdivision.get_rect(RStreamRender.get_key()))
-        for i in range(self.num_cams):
-            self.camera_renders[i].draw(self.subdivision.get_rect(CameraRender.get_key(), i))
-        for i in range(self.max_players):
-            self.pose_renders[i].draw(self.subdivision.get_rect(PoseRender.get_key(), i))
+        self.white_space_render.draw(self.subdivision.get_rect(WhiteSpaceRender.key()))
+        self.tracker_render.draw(self.subdivision.get_rect(TrackerRender.key()))
+        # self.r_stream_render.draw(self.subdivision.get_rect(RStreamRender.key()))
+        # for i in range(self.num_cams):
+        #     self.camera_renders[i].draw(self.subdivision.get_rect(CameraRender.key(), i))
+        # for i in range(self.max_players):
+        #     self.pose_renders[i].draw(self.subdivision.get_rect(PoseRender.key(), i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None: # override
         self.setView(width, height)

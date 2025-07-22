@@ -37,6 +37,8 @@ class PoseRender(BaseRender):
         self.angle_meshes: AngleMeshes = angle_meshes
         text_init()
 
+        hot_reload = HotReloadMethods(self.__class__, True, True)
+
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
         if not PoseRender.pose_stream_shader.allocated:
@@ -51,9 +53,9 @@ class PoseRender(BaseRender):
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
-    def update(self, only_if_dirty: bool) -> None:
-        key = self.cam_id
-        pose: Pose | None = self.data.get_pose(key, only_if_dirty)
+    def update(self) -> None:
+        key: int = self.cam_id
+        pose: Pose | None = self.data.get_pose(key, False, self.key())
         if pose is None:
             return #??
         pose_image_np: np.ndarray | None = pose.image
@@ -61,7 +63,7 @@ class PoseRender(BaseRender):
             self.image.set_image(pose_image_np)
             self.image.update()
         pose_mesh: Mesh = self.pose_meshes.meshes[pose.id]
-        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, only_if_dirty=True)
+        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.key())
         if pose_stream is not None:
             stream_image: np.ndarray = WS_PoseStream.pose_stream_to_image(pose_stream)
             self.pose_stream_image.set_image(stream_image)

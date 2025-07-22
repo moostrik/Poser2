@@ -1,4 +1,4 @@
-
+# Standard library imports
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -33,10 +33,11 @@ class PanoramicTrackerRender(BaseRender):
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
-    def update(self, only_if_dirty: bool) -> None:
+    def update(self) -> None:
         tracklets: dict[int, Tracklet] = self.data.get_tracklets()
         if tracklets is None:
             return
+        # print(f"PanoramicTrackerRender: Updating with {len(tracklets)} tracklets")
         BaseRender.setView(self.fbo.width, self.fbo.height)
         self.fbo.begin()
         glClearColor(1.0, 0.0, 0.0, 1.0)

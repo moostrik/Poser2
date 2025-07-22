@@ -15,7 +15,7 @@ from modules.correlation.DTWCorrelator import DTWCorrelator
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseStream import PoseStreamManager
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamManager
-from modules.render.Render import Render
+from modules.render.RenderWhiteSpace import RenderWhiteSpace
 from modules.Settings import Settings
 
 
@@ -25,7 +25,7 @@ class Main():
 
         self.settings: Settings = settings
 
-        self.render = Render(settings)
+        self.render = RenderWhiteSpace(settings)
 
         self.cameras: list[DepthCam | DepthSimulator] = []
         self.recorder: Optional[Recorder] = None
@@ -87,7 +87,7 @@ class Main():
         self.tracker.start()
 
         if self.av:
-            self.av.add_output_callback(self.render.data.set_light_image)
+            # self.av.add_output_callback(self.render.data.set_light_image)
             self.av.start()
 
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI

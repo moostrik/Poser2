@@ -1,5 +1,4 @@
 # Standard library imports
-import numpy as np
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -51,8 +50,8 @@ class WhiteSpaceRender(BaseRender):
         self.fbo_lines.draw(x, y, width, half_height)
         self.fbo_angles.draw(x, y+half_height, width, half_height)
 
-    def update(self, only_if_dirty: bool) -> None:
-        light_image: AvOutput | None = self.data.get_light_image(only_if_dirty)
+    def update(self) -> None:
+        light_image: AvOutput | None = self.data.get_light_image(True, self.key())
         if light_image is None:
             return
 

@@ -44,8 +44,8 @@ class RStreamRender(BaseRender):
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
-    def update(self, only_if_dirty: bool) -> None:
-        correlation_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams(only_if_dirty)
+    def update(self) -> None:
+        correlation_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams(True, self.key())
         if correlation_streams is None:
             return
 

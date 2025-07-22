@@ -8,20 +8,20 @@ from OpenGL.GL import * # type: ignore
 from modules.utils.PointsAndRects import Rect
 
 class BaseRender(ABC):
-    key: str | None = None
+    _key: str | None = None
 
     @classmethod
-    def get_key(cls) -> str:
+    def key(cls) -> str:
         """Auto-generate render type identifier from class name if not explicitly set"""
-        if cls.key is not None:
-            return cls.key
+        if cls._key is not None:
+            return cls._key
 
         # Default: strip 'Render' from class name and uppercase
-        cls.key = cls.__name__
-        if cls.key.endswith("Render"):
-            cls.key = cls.key[:-6]  # Remove "Render"
-            cls.key = cls.key.upper()
-        return cls.key
+        cls._key = cls.__name__
+        if cls._key.endswith("Render"):
+            cls._key = cls._key[:-6]  # Remove "Render"
+            cls._key = cls._key.upper()
+        return cls._key
 
 
     @abstractmethod
@@ -29,7 +29,7 @@ class BaseRender(ABC):
     @abstractmethod
     def deallocate(self) -> None: ...
     @abstractmethod
-    def update(self, only_if_dirty: bool) -> None: ...
+    def update(self) -> None: ...
     @abstractmethod
     def draw(self, rect:Rect) -> None: ...
 

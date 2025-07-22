@@ -1,15 +1,18 @@
+# Standard library imports
 import numpy as np
 
+# Third-party imports
+
+# Local application imports
 from modules.gl.Mesh import Mesh
 from modules.pose.PoseStream import PoseStreamData
-from modules.pose.PoseDefinitions import Pose, PosePoints
 from modules.render.DataManager import DataManager
+from modules.render.renders.BaseRender import BaseRender, Rect
 
-class AngleMeshes:
+class AngleMeshes(BaseRender):
     def __init__(self, data: DataManager, amount: int) -> None:
         self.data: DataManager = data
         self.amount: int = amount
-
         self.meshes: dict[int, Mesh] = {}
 
     def allocate(self) -> None:
@@ -24,10 +27,12 @@ class AngleMeshes:
             mesh.deallocate()
         self.meshes.clear()
 
+    def draw(self, rect: Rect) -> None:
+        pass
 
-    def update(self, only_if_dirty: bool) -> None:
+    def update(self) -> None:
         for id in range(self.amount):
-            pose: PoseStreamData | None = self.data.get_pose_stream(id, only_if_dirty)
+            pose: PoseStreamData | None = self.data.get_pose_stream(id, True, self.key())
             mesh: Mesh | None = self.meshes.get(id, None)
             if pose is not None and mesh is not None:
                 AngleMeshes.update_angle_mesh(pose, mesh)
