@@ -9,7 +9,7 @@ from threading import Thread, Lock
 from typing import Optional
 
 # Local application imports
-from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
+from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
 from modules.tracker.panoramic.PanoramicTrackletManager import PanoramicTrackletManager
@@ -249,7 +249,7 @@ class PanoramicTracker(Thread, BaseTracker):
         with self.callback_lock:
             self.tracklet_callbacks.add(callback)
 
-    def add_cam_tracklets(self, cam_id: int, cam_tracklets: list[CamTracklet]) -> None :
+    def add_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None :
         for t in cam_tracklets:
             tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, t)
             if tracklet is None:

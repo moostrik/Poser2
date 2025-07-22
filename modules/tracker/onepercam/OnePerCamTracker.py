@@ -5,7 +5,7 @@ from queue import Empty, Queue
 from threading import Thread, Lock
 from typing import List, Optional
 
-from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
+from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
@@ -168,7 +168,7 @@ class OnePerCamTracker(Thread, BaseTracker):
         with self._callback_lock:
             self._tracklet_callbacks.add(callback)
 
-    def add_cam_tracklets(self, cam_id: int, cam_tracklets: List[CamTracklet]) -> None:
+    def add_cam_tracklets(self, cam_id: int, cam_tracklets: List[DepthTracklet]) -> None:
         tracklet_list: List[Tracklet] = []
         for t in cam_tracklets:
             tracklet: Optional[Tracklet] = Tracklet.from_depthcam(cam_id, t)

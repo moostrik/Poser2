@@ -5,14 +5,13 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl.Fbo import Fbo
-from modules.gl.Image import Image
+from modules.gl.Text import draw_box_string, text_init
+
 from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
 from modules.render.DataManager import DataManager
-from modules.render.Draw.DrawBase import DrawBase
-from modules.gl.Text import draw_string, draw_box_string, text_init
-
+from modules.render.Draw.DrawBase import DrawBase, Rect
 
 class DrawPanoramicTracker(DrawBase):
     """Methods for updating meshes based on pose data."""
@@ -33,8 +32,8 @@ class DrawPanoramicTracker(DrawBase):
         if tracklets is not None:
             self.draw_map_positions(tracklets, self.fbo, self.num_cams)
 
-    def draw(self, x: float, y: float, width: float, height: float) -> None:
-        self.fbo.draw(x, y, width, height)
+    def draw(self, rect: Rect) -> None:
+        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     @staticmethod
     def draw_map_positions(tracklets: dict[int, Tracklet], fbo: Fbo, num_cams: int) -> None:

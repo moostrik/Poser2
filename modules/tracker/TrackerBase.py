@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from enum import Enum
 from typing import Protocol, List
-from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
+from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 # Forward declaration to avoid circular import
 
 from typing import TYPE_CHECKING
@@ -37,7 +37,7 @@ class BaseTracker(Protocol):
         """Stop the tracker"""
         ...
 
-    def add_cam_tracklets(self, cam_id: int, cam_tracklets: List[CamTracklet]) -> None:
+    def add_cam_tracklets(self, cam_id: int, cam_tracklets: List[DepthTracklet]) -> None:
         """Add tracklets from a camera"""
         ...
 

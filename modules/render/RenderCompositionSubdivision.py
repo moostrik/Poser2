@@ -30,14 +30,22 @@ class SubdivisionRow:
             object.__setattr__(self, 'src_aspect_ratio', 1.0)
         object.__setattr__(self, 'tot_aspect_ratio', self.src_aspect_ratio * self.columns / self.rows)
 
-@dataclass (frozen=True)
+@dataclass
 class Subdivision:
     x: int
     y: int
     width: int
     height: int
-    rows:dict[str, list[Rect]]
+    _rows:dict[str, list[Rect]]
 
+    def get_rect(self, key: str, index: int) -> Rect:
+        if key not in self._rows or index >= len(self._rows[key]):
+            return Rect(0, 0, 128, 128)
+        return self._rows[key][index]
+
+    def get_width_and_height(self, key, index) -> tuple[int, int]:
+        rect: Rect = self.get_rect(key, index)
+        return int(rect.width), int(rect.height)
 
 def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst_height: int) -> Subdivision:
 
@@ -49,13 +57,13 @@ def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst
     fit_x: float = (dst_width - fit_width) / 2.0
     fit_y: float = (dst_height - fit_height) / 2.0
 
-    subdivision: Subdivision = Subdivision(x=int(fit_x), y=int(fit_y), width=int(fit_width), height=int(fit_height), rows={})
+    subdivision: Subdivision = Subdivision(x=int(fit_x), y=int(fit_y), width=int(fit_width), height=int(fit_height), _rows={})
     cell_y: float = fit_y
     for cell in subdivision_rows:
         row_height: float = fit_height * (tot_aspect_ratio / cell.tot_aspect_ratio)
         cell_width: float = fit_width / cell.columns
         pad: Point2f = cell.padding
-        subdivision.rows[cell.name] = []
+        subdivision._rows[cell.name] = []
         for row in range(cell.rows):
             for col in range(cell.columns):
                 x: float = fit_x + col * cell_width + pad.x * 0.5
@@ -63,7 +71,7 @@ def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst
                 rect_width: float = cell_width - pad.x
                 rect_height: float = (row_height / cell.rows) - pad.y
                 rect = Rect(x=x, y=y, width=rect_width, height=rect_height)
-                subdivision.rows[cell.name].append(rect)
+                subdivision._rows[cell.name].append(rect)
         cell_y += row_height
 
     return subdivision

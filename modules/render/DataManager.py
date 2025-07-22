@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional, TypeVar, Generic
 
 
-from modules.cam.depthcam.Definitions import Tracklet as CamTracklet, FrameType
+from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameType
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices
 from modules.pose.PoseStream import PoseStreamData
@@ -30,7 +30,7 @@ class DataManager:
         # Data storage
         self.light_image: Dict[int, DataItem[AvOutput]] = {}
         self.cam_image: Dict[int, DataItem[np.ndarray]] = {}
-        self.depth_tracklets: Dict[int, DataItem[List[CamTracklet]]] = {}
+        self.depth_tracklets: Dict[int, DataItem[List[DepthTracklet]]] = {}
         self.tracklets: Dict[int, DataItem[Tracklet]] = {}
         self.poses: Dict[int, DataItem[Pose]] = {}
         self.pose_streams: Dict[int, DataItem[PoseStreamData]] = {}
@@ -66,11 +66,11 @@ class DataManager:
         return self._get_data_dict(self.cam_image, key, only_if_dirty)
 
     # Depth tracklet management
-    def set_depth_tracklets(self, key: int, value: list[CamTracklet]) -> None:
+    def set_depth_tracklets(self, key: int, value: list[DepthTracklet]) -> None:
         self._set_data_dict(self.depth_tracklets, key, value)
 
-    def get_depth_tracklets(self, key: int, only_if_dirty: bool = True) -> list[CamTracklet]:
-        result: List[CamTracklet] | None = self._get_data_dict(self.depth_tracklets, key, only_if_dirty)
+    def get_depth_tracklets(self, key: int, only_if_dirty: bool = True) -> list[DepthTracklet]:
+        result: List[DepthTracklet] | None = self._get_data_dict(self.depth_tracklets, key, only_if_dirty)
         return result if result is not None else []
 
     # Tracklet management

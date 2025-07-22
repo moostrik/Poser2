@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Optional, TypeVar, Generic, Any
 
 
-from modules.cam.depthcam.Definitions import Tracklet as CamTracklet
+from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.PoseDefinitions import Pose
 from modules.pose.PoseStream import PoseStreamData
@@ -16,7 +16,7 @@ from modules.av.Definitions import AvOutput
 DATA_SCHEMA = [
     ("av_frame", "single", Optional[AvOutput]),
     ("cam_frames", "dict", np.ndarray),
-    ("depth_tracklets", "dict", List[CamTracklet]),
+    ("depth_tracklets", "dict", List[DepthTracklet]),
     ("tracklets", "dict", Tracklet),
     ("poses", "dict", Pose),
     ("pose_streams", "dict", PoseStreamData),

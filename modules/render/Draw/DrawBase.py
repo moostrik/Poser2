@@ -1,6 +1,11 @@
+# Standard library imports
 from abc import ABC, abstractmethod
 
+# Third-party imports
 from OpenGL.GL import * # type: ignore
+
+# Local application imports
+from modules.utils.PointsAndRects import Rect
 
 class DrawBase(ABC):
     @abstractmethod
@@ -10,4 +15,13 @@ class DrawBase(ABC):
     @abstractmethod
     def update(self, only_if_dirty: bool) -> None: ...
     @abstractmethod
-    def draw(self, x: float, y: float, width: float, height: float) -> None: ...
+    def draw(self, rect:Rect) -> None: ...
+
+    @staticmethod
+    def setView(width, height) -> None:
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, width, height, 0, -1, 1)
+
+        glMatrixMode(GL_MODELVIEW)
+        glViewport(0, 0, width, height)
