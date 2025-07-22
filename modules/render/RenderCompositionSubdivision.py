@@ -49,8 +49,6 @@ def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst
     fit_x: float = (dst_width - fit_width) / 2.0
     fit_y: float = (dst_height - fit_height) / 2.0
 
-    print(f"Render composition: {fit_x}, {fit_y}, {fit_width}, {fit_height}, from {dst_width}x{dst_height}, aspect ratio {tot_aspect_ratio}")
-
     subdivision: Subdivision = Subdivision(x=int(fit_x), y=int(fit_y), width=int(fit_width), height=int(fit_height), rows={})
     cell_y: float = fit_y
     for cell in subdivision_rows:

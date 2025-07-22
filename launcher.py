@@ -114,7 +114,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_fps =           0
     settings.render_v_sync =        True
     settings.render_cams_a_row =    2
-    settings.render_monitor =       2
+    settings.render_monitor =       1
 
     settings.art_type =             Settings.ArtType.WS
     if args.hd:

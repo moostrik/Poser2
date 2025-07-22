@@ -1,10 +1,14 @@
-import OpenGL.GL as gl
-import glfw
-from threading import Thread, Lock, current_thread
-from modules.gl.Utils import FpsCounter
-from typing import Callable, Optional
-import time
+# Standard library imports
 from enum import Enum
+from threading import Thread, Lock, current_thread
+from time import sleep, time_ns
+from typing import Callable, Optional
+
+# Third-party imports
+import glfw
+
+# Local application imports
+from modules.gl.Utils import FpsCounter
 
 
 class Button(Enum):
@@ -89,7 +93,6 @@ class RenderWindow():
         """Main entry point for the render thread"""
         try:
             self._setup_windows()
-            self._setup_opengl()
             self.allocate()
             self._main_loop()
         except Exception as e:
@@ -153,28 +156,20 @@ class RenderWindow():
         glfw.set_cursor_pos_callback(self.main_window, self.notify_cursor_pos_callback)
         glfw.set_mouse_button_callback(self.main_window, self.notify_invoke_mouse_button_callbacks)
 
-        for secondary in self.secondary_monitor_ids:
-            win: glfw._GLFWwindow | None = self.create_secondary_window(secondary)
+        monitors: list[glfw._GLFWmonitor] = self.get_monitors_sorted_by_position()
+
+        for id in self.secondary_monitor_ids:
+            if id < 0 or id >= len(monitors):
+                print(f"{self.__class__.__name__} ID: {id} out of range for available monitors: {len(monitors)}")
+                continue
+            win: glfw._GLFWwindow | None = self.create_secondary_window(id, monitors[id])
             if win:
                 self.secondary_windows.append(win)
         glfw.focus_window(self.main_window)
 
-    def _setup_opengl(self) -> None:
-        """Initialize OpenGL state"""
-
-        gl.glEnable(gl.GL_TEXTURE_2D)
-        gl.glClearColor(0.0, 0.0, 0.0, 1.0)
-        gl.glEnable(gl.GL_BLEND)
-        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
-        # self.setView(self.window_width, self.window_height)
-
-        version = gl.glGetString(gl.GL_VERSION)
-        opengl_version = version.decode("utf-8")  # type: ignore
-        print("OpenGL version:", opengl_version)
-
     def _main_loop(self) -> None:
         """Main rendering loop with improved frame timing"""
-        next_frame_time = time.time_ns()
+        next_frame_time = time_ns()
         while not glfw.window_should_close(self.main_window):
 
             self.draw_main_window()
@@ -185,16 +180,16 @@ class RenderWindow():
             # Frame timing control
             if not self.v_sync and self.frame_interval:
                 next_frame_time += self.frame_interval
-                now: int = time.time_ns()
+                now: int = time_ns()
                 remaining: int = next_frame_time - now
 
                 if remaining > 0:
                     # Sleep for most of the remaining time
-                    sleep_seconds = (remaining - 500_000) / 1_000_000_000  # leave 0.5ms for busy-wait
+                    sleep_seconds: float = (remaining - 500_000) / 1_000_000_000  # leave 0.5ms for busy-wait
                     if sleep_seconds > 0.002:
-                        time.sleep(sleep_seconds)
+                        sleep(sleep_seconds)
                     # Busy-wait for the final bit
-                    while time.time_ns() < next_frame_time:
+                    while time_ns() < next_frame_time:
                         pass
                 else:
                     if -remaining > self.frame_interval:
@@ -231,14 +226,6 @@ class RenderWindow():
 
     def deallocate(self) -> None:
         """Deallocate resources for the window"""
-
-    def setView(self, width, height) -> None:
-        gl.glMatrixMode(gl.GL_PROJECTION)
-        gl.glLoadIdentity()
-        gl.glOrtho(0, width, height, 0, -1, 1)
-
-        gl.glMatrixMode(gl.GL_MODELVIEW)
-        gl.glViewport(0, 0, width, height)
 
     def setFullscreen(self, value: bool) -> None:
         if not self.main_window: return
@@ -278,9 +265,6 @@ class RenderWindow():
         glfw.make_context_current(self.main_window)
         glfw.swap_interval(1 if self.v_sync else 0)
 
-        gl.glClearColor(0.0, 0.0, 0.0, 1.0)
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)  # type: ignore
-        gl.glLoadIdentity()
         try:
             self.draw()
         except Exception as e:
@@ -294,37 +278,19 @@ class RenderWindow():
         pass
 
     # SECONDARY WINDOWS
-    def create_secondary_window(self, id: int) -> Optional[glfw._GLFWwindow]:
-        """
-        Create a secondary window that shares the OpenGL context with the main window.
-        The secondary window will be created fullscreen on the specified monitor.
-        """
-
-        if id < 0 or id >= len(glfw.get_monitors()):
-            print(f"Invalid monitor ID: {id}")
-            return None
-
-        monitor: Optional[glfw._GLFWmonitor] = glfw.get_monitors()[id]
-        if not monitor:
-            print(f"Monitor {id} not found")
-            return None
-
-        name: str = f'{id}'
-
+    def create_secondary_window(self, id: int, monitor: glfw._GLFWmonitor) -> Optional[glfw._GLFWwindow]:
         if self.main_window is None:
             print("Main window must be created before secondary windows.")
             return None
 
-        # Create the secondary window, sharing context with the main window
+        name: str = f'{id}'
         secondary: Optional[glfw._GLFWwindow] = glfw.create_window(100, 100, name, None, self.main_window)
         if not secondary:
             print("Failed to create secondary window")
             return None
 
-
         glfw.set_mouse_button_callback(secondary, self.invoke_secondary_callbacks)
-
-        self._setup_window(secondary, id, True)
+        self.setup_secondary_window(secondary, id, True)
 
         return secondary
 
@@ -352,11 +318,11 @@ class RenderWindow():
             if not monitor:
                 continue
             if value:
-                self._setup_window(win, monitor_id, True)
+                self.setup_secondary_window(win, monitor_id, True)
             else:
-                self._setup_window(win, monitor_id, False)
+                self.setup_secondary_window(win, monitor_id, False)
 
-    def _setup_window(self, window: glfw._GLFWwindow, monitor_id: int, fullscreen: bool) -> None:
+    def setup_secondary_window(self, window: glfw._GLFWwindow, monitor_id: int, fullscreen: bool) -> None:
         """Setup a secondary window with the given monitor ID and fullscreen mode"""
         monitor: Optional[glfw._GLFWmonitor] = glfw.get_monitors()[monitor_id] if monitor_id < len(glfw.get_monitors()) else None
         if not monitor:
@@ -400,9 +366,25 @@ class RenderWindow():
         Draw content in the secondary window.
         This method should be overridden in subclasses to provide specific rendering logic.
         """
-        c: float = time.time() % 1
-        gl.glClearColor(c, c, c, 1.0)
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT)  # type: ignore
+
+    @staticmethod
+    def get_monitors_sorted_by_position() -> list[glfw._GLFWmonitor]:
+        monitors: list[glfw._GLFWmonitor] = glfw.get_monitors()
+        if not monitors:
+            return []
+        primary: glfw._GLFWmonitor = monitors[0]
+        others: list[glfw._GLFWmonitor] = monitors[1:]
+
+        # Pair each monitor with its (x, y) position
+        others_with_pos: list[tuple[glfw._GLFWmonitor, int, int]] = [
+            (monitor, *glfw.get_monitor_pos(monitor)) for monitor in others
+        ]
+        # Sort by x, then by y (negative y before positive y)
+        others_sorted: list[tuple[glfw._GLFWmonitor, int, int]] = sorted(
+            others_with_pos,
+            key=lambda item: (item[1], item[2])
+        )
+        return [primary] + [monitor for monitor, _, _ in others_sorted]
 
     # CALLBACKS
     def notify_key_callback(self, window, key, scancode, action, mods) -> None:
@@ -411,7 +393,6 @@ class RenderWindow():
 
                 glfw.set_window_should_close(self.main_window, True)
                 glfw.post_empty_event()  # Wake up the event loop
-
 
             elif key == glfw.KEY_F:
                 self.setFullscreen(not self.fullscreen)

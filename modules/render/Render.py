@@ -201,6 +201,16 @@ class Render(RenderWindow):
         # glClear(GL_COLOR_BUFFER_BIT)  # type: ignore
 
     def allocate(self) -> None: # override
+        glEnable(GL_TEXTURE_2D)
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # self.setView(self.window_width, self.window_height)
+
+        version = glGetString(GL_VERSION)
+        opengl_version = version.decode("utf-8")  # type: ignore
+        print("OpenGL version:", opengl_version)
+
         self.window_reshape(self.window_width, self.window_height)
         for s in self.all_shaders:
             s.allocate(True) # type: ignore
@@ -230,6 +240,13 @@ class Render(RenderWindow):
 
         self.allocated = False
 
+    def setView(self, width, height) -> None:
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, width, height, 0, -1, 1)
+
+        glMatrixMode(GL_MODELVIEW)
+        glViewport(0, 0, width, height)
     # DRAW METHODS
     def draw_cameras(self) -> None:
         for i in range(self.num_cams):
