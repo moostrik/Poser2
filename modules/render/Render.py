@@ -12,7 +12,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Mesh import Mesh
-from modules.gl.RenderWindowGLFW import RenderWindow
+from modules.gl.WindowManager import WindowManager
 # from modules.gl.RenderWindowGLUT import RenderWindow
 from modules.gl.Shader import Shader
 from modules.gl.Text import draw_string, draw_box_string, text_init
@@ -28,8 +28,8 @@ from modules.Settings import Settings
 from modules.utils.PointsAndRects import Rect, Point2f
 
 from modules.render.RenderCompositionSubdivision import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.RenderDataManager import RenderDataManager
-from modules.render.RenderUpdateAngleMesh import update_angle_mesh
+from modules.render.DataManager import DataManager
+from modules.render.RenderAngleMesh import update_angle_mesh
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -59,10 +59,9 @@ class SubdivisionType(Enum):
 Composition_Subdivision = dict[SubdivisionType, dict[int, tuple[int, int, int, int]]]
 
 
-class Render(RenderWindow):
+class Render():
     def __init__(self, settings: Settings) -> None:
-
-        self.data: RenderDataManager = RenderDataManager()
+        self.data: DataManager = DataManager()
 
         self.max_players: int = settings.max_players
         self.num_cams: int = settings.camera_num
@@ -122,22 +121,31 @@ class Render(RenderWindow):
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height)
 
-        super().__init__(self.subdivision.width, self.subdivision.height,
-                         settings.render_title,
-                         settings.render_fullscreen,
-                         settings.render_v_sync, settings.render_fps,
-                         settings.render_x, settings.render_y,
-                         settings.render_monitor)
+        # window manager
+        secondary_monitor_ids: list[int] = [i for i in range(1, self.num_cams + 1)]
+        self.window_manager: WindowManager = WindowManager(
+            self.subdivision.width, self.subdivision.height,
+            settings.render_title,
+            settings.render_fullscreen,
+            settings.render_v_sync, settings.render_fps,
+            settings.render_x, settings.render_y,
+            settings.render_monitor,
+            secondary_monitor_ids
+        )
 
-        for i in range(self.num_cams):
-            self.secondary_monitor_ids.append(i+1)
+        self.window_manager.draw_main = self.draw_main
+        self.window_manager.draw_secondary = self.draw_secondary
+        self.window_manager.allocate = self.allocate
+        self.window_manager.deallocate = self.deallocate
+        self.window_manager.main_window_reshape = self.main_window_reshape
 
+        # text
         text_init()
+
+        # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
-    def window_reshape(self, width: int, height: int) -> None: # override
-        super().window_reshape(width, height)
-
+    def main_window_reshape(self, width: int, height: int) -> None: # override
         self.subdivision = make_subdivision(self.subdivision_rows, width, height)
 
         for key in self.cam_fbos.keys():
@@ -155,7 +163,7 @@ class Render(RenderWindow):
             w, h = int(rect.width), int(rect.height)
             self.pse_fbos[key].allocate(w, h, GL_RGBA)
 
-    def draw(self) -> None: # override
+    def draw_main(self, width: int, height: int) -> None: # override
 
         # if self.running:
         try:
@@ -211,7 +219,7 @@ class Render(RenderWindow):
         opengl_version = version.decode("utf-8")  # type: ignore
         print("OpenGL version:", opengl_version)
 
-        self.window_reshape(self.window_width, self.window_height)
+        self.main_window_reshape(self.subdivision.width, self.subdivision.height)
         for s in self.all_shaders:
             s.allocate(True) # type: ignore
         for fbo in self.vis_fbos.values():
@@ -345,7 +353,7 @@ class Render(RenderWindow):
             fbo.end()
 
     def draw_composition(self) -> None:
-        self.setView(self.window_width, self.window_height)
+        self.setView(self.subdivision.width, self.subdivision.height)
         for i in range(self.num_cams):
             rect = self.subdivision.rows[SubdivisionType.CAM.value][i]
             x, y, w, h = rect.x, rect.y, rect.width, rect.height

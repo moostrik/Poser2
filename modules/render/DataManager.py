@@ -23,7 +23,7 @@ class DataItem(Generic[T]):
 
 CorrelationStreamDict = Dict[int, Tuple[Tuple[int, int], np.ndarray]]
 
-class RenderDataManager:
+class DataManager:
     def __init__(self) -> None:
         self.mutex: Lock = Lock()
 

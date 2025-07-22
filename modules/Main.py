@@ -123,9 +123,9 @@ class Main():
 
         self.is_running = True
 
-        self.render.addExitCallback(self.stop)
-        self.render.addKeyboardCallback(self.render_keyboard_callback)
-        self.render.start()
+        self.render.window_manager.add_exit_callback(self.stop)
+        self.render.window_manager.add_keyboard_callback(self.render_keyboard_callback)
+        self.render.window_manager.start()
 
     def stop(self) -> None:
         # print("Stopping main application...")
@@ -134,7 +134,7 @@ class Main():
         self.is_running = False
 
         # print("Stopping render...")
-        self.render.stop()
+        self.render.window_manager.stop()
 
         # print("Stopping player...")
         if self.player:

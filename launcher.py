@@ -7,7 +7,6 @@ from signal import signal, SIGINT
 from time import sleep
 
 from modules.Main import Main
-from modules.TestMultiWindow import TestMultiWindow
 from modules.Settings import Settings, ModelType, FrameType, TrackerType
 
 import multiprocessing as mp
@@ -31,8 +30,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     parser.add_argument('-as',      '--autoset',    action='store_true',        help='camera auto settings')
     parser.add_argument('-ad',      '--debug',      action='store_true',        help='run analysis in debug mode')
     parser.add_argument('-hd',      '--hd',         action='store_true',        help='run in Harmonic Dissonance mode')
-    parser.add_argument('-tmw',     '--testmultiwindow', action='store_true',   help='test MultiWindowRender only')
-    parser.add_argument('-tm',     '--testminimal', action='store_true',   help='test with minimum setup only')
+    parser.add_argument('-tm',      '--testminimal',action='store_true',   help='test with minimum setup only')
     args: Namespace = parser.parse_args()
 
     currentPath: str = path.dirname(__file__)
@@ -133,10 +131,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.check_values()
     # settings.check_cameras()
 
-    if args.testmultiwindow:
-        app = TestMultiWindow(settings)
-    else:
-        app = Main(settings)
+    app = Main(settings)
     app.start()
 
     def signal_handler_exit(sig, frame) -> None:
