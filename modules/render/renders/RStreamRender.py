@@ -13,8 +13,6 @@ from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
 from modules.render.renders.BaseRender import BaseRender, Rect
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 # Shaders
 from modules.gl.shaders.WS_RStream import WS_RStream
 
@@ -27,8 +25,6 @@ class RStreamRender(BaseRender):
         self.image: Image = Image()
         self.num_streams: int = num_streams
         text_init()
-
-        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
@@ -62,12 +58,12 @@ class RStreamRender(BaseRender):
         step: float = self.fbo.height / self.num_streams
 
         self.fbo.begin()
-        glColor4f(1.0, 0.5, 0.5, 1.0)  # Set color to white
+        glColor4f(1.0, 0.5, 0.5, 1.0)
         for i in range(num_pairs):
             pair: tuple[int, int] = pairs[i]
             string: str = f'{pair[0]} | {pair[1]}'
             x: int = self.fbo.width - 100
             y: int = self.fbo.height - (int(self.fbo.height - (i + 0.5) * step) - 12)
-            draw_box_string(x, y, string, big=True) # type: ignore
-        glColor4f(1.0, 1.0, 1.0, 1.0)  # Set color to white
+            draw_box_string(x, y, string, big=True)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
         self.fbo.end()

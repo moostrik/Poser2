@@ -132,11 +132,11 @@ class RenderWhiteSpace(RenderBase):
 
         self.white_space_render.draw(self.subdivision.get_rect(WhiteSpaceRender.key()))
         self.tracker_render.draw(self.subdivision.get_rect(TrackerRender.key()))
-        # self.r_stream_render.draw(self.subdivision.get_rect(RStreamRender.key()))
-        # for i in range(self.num_cams):
-        #     self.camera_renders[i].draw(self.subdivision.get_rect(CameraRender.key(), i))
-        # for i in range(self.max_players):
-        #     self.pose_renders[i].draw(self.subdivision.get_rect(PoseRender.key(), i))
+        self.r_stream_render.draw(self.subdivision.get_rect(RStreamRender.key()))
+        for i in range(self.num_cams):
+            self.camera_renders[i].draw(self.subdivision.get_rect(CameraRender.key(), i))
+        for i in range(self.max_players):
+            self.pose_renders[i].draw(self.subdivision.get_rect(PoseRender.key(), i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None: # override
         self.setView(width, height)

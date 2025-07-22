@@ -43,9 +43,8 @@ class CameraRender(BaseRender):
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        frame: np.ndarray | None = self.data.get_cam_image(self.cam_id, False, self.key())
+        frame: np.ndarray | None = self.data.get_cam_image(self.cam_id, True, self.key())
         if frame is not None:
-            print(f"CameraRender: Updating camera {self.cam_id} with image of shape {frame.shape}")
             self.image.set_image(frame)
             self.image.update()
         fbo: Fbo = self.fbo

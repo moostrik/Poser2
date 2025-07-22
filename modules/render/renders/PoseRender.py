@@ -55,7 +55,7 @@ class PoseRender(BaseRender):
 
     def update(self) -> None:
         key: int = self.cam_id
-        pose: Pose | None = self.data.get_pose(key, False, self.key())
+        pose: Pose | None = self.data.get_pose(key, True, self.key())
         if pose is None:
             return #??
         pose_image_np: np.ndarray | None = pose.image
@@ -70,6 +70,10 @@ class PoseRender(BaseRender):
             self.pose_stream_image.update()
 
         angle_mesh: Mesh = self.angle_meshes.meshes[pose.id]
+
+        # shader gets reset on hot reload, so we need to check if it's allocated
+        if not PoseRender.pose_stream_shader.allocated:
+            PoseRender.pose_stream_shader.allocate(monitor_file=False)
 
         BaseRender.setView(self.fbo.width, self.fbo.height)
         PoseRender.draw_pose(self.fbo, self.image, pose, pose_mesh, self.pose_stream_image, angle_mesh, PoseRender.pose_stream_shader)

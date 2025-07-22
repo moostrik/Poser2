@@ -87,7 +87,7 @@ class Main():
         self.tracker.start()
 
         if self.av:
-            # self.av.add_output_callback(self.render.data.set_light_image)
+            self.av.add_output_callback(self.render.data.set_light_image)
             self.av.start()
 
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI

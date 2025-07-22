@@ -14,8 +14,6 @@ from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.av.Definitions import AvOutput
 from modules.Settings import Settings
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 T = TypeVar('T')
 
 @dataclass
@@ -38,22 +36,18 @@ class DataManager:
         self.pose_streams: Dict[int, DataItem[PoseStreamData]] = {}
         self.r_streams: Dict[int, DataItem[PairCorrelationStreamData]] = {}
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
-
     def _set_data_dict(self, data_dict: Dict[int, DataItem[T]], data_key: int, value: T) -> None:
         with self.mutex:
-            print(f"Setting data for key {data_key}: {value}")
             data_dict[data_key] = DataItem(value)
 
-    def _get_data_dict(self, data_dict: Dict[int, DataItem[T]], data_key: int, use_accessed: bool, consumer_key: str) -> Optional[T]:
+    def _get_data_dict(self, data_dict: Dict[int, DataItem[T]], data_key: int, only_new_data: bool, consumer_key: str) -> Optional[T]:
         with self.mutex:
             item: Optional[DataItem[T]] = data_dict.get(data_key)
             if not item:
                 return None
-            if use_accessed and item.accessed.get(consumer_key, False):
-                # print(f"DataManager: Accessed data for key {data_key} by {consumer_key} already exists, returning cached value.")
+            if only_new_data and item.accessed.get(consumer_key, False):
                 return None
-            if use_accessed:
+            if only_new_data:
                 item.accessed[consumer_key] = True
             return item.value
 
@@ -61,31 +55,30 @@ class DataManager:
     def set_light_image(self, value: AvOutput) -> None:
         self._set_data_dict(self.light_image, 0, value)
 
-    def get_light_image(self, only_if_dirty: bool, consumer_key: str) -> Optional[AvOutput]:
-        return self._get_data_dict(self.light_image, 0, only_if_dirty, consumer_key)
+    def get_light_image(self, only_new_data: bool, consumer_key: str) -> Optional[AvOutput]:
+        return self._get_data_dict(self.light_image, 0, only_new_data, consumer_key)
 
     # Camera image management
     def set_cam_image(self, key: int, frame_type: FrameType, value: np.ndarray) -> None:
-        print(f"DataManager: Setting camera image for key {key} with frame type {frame_type} and shape {value.shape}")
         self._set_data_dict(self.cam_image, key, value)
 
-    def get_cam_image(self, key: int, only_if_dirty: bool, consumer_key: str) -> Optional[np.ndarray]:
-        return self._get_data_dict(self.cam_image, key, only_if_dirty, consumer_key)
+    def get_cam_image(self, key: int, only_new_data: bool, consumer_key: str) -> Optional[np.ndarray]:
+        return self._get_data_dict(self.cam_image, key, only_new_data, consumer_key)
 
     # Depth tracklet management
     def set_depth_tracklets(self, key: int, value: list[DepthTracklet]) -> None:
         self._set_data_dict(self.depth_tracklets, key, value)
 
-    def get_depth_tracklets(self, key: int, only_if_dirty: bool, consumer_key: str) -> list[DepthTracklet]:
-        result: List[DepthTracklet] | None = self._get_data_dict(self.depth_tracklets, key, only_if_dirty, consumer_key)
+    def get_depth_tracklets(self, key: int, only_new_data: bool, consumer_key: str) -> list[DepthTracklet]:
+        result: List[DepthTracklet] | None = self._get_data_dict(self.depth_tracklets, key, only_new_data, consumer_key)
         return result if result is not None else []
 
     # Tracklet management
     def set_tracklet(self, value: Tracklet) -> None:
         self._set_data_dict(self.tracklets, value.id, value)
 
-    def get_tracklet(self, id: int, only_if_dirty: bool, consumer_key: str) -> Optional[Tracklet]:
-        return self._get_data_dict(self.tracklets, id, only_if_dirty, consumer_key)
+    def get_tracklet(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Tracklet]:
+        return self._get_data_dict(self.tracklets, id, only_new_data, consumer_key)
 
     def get_tracklets(self) -> dict[int, Tracklet]:
         with self.mutex:
@@ -99,8 +92,8 @@ class DataManager:
     def set_pose(self, value: Pose) -> None:
         self._set_data_dict(self.poses, value.id, value)
 
-    def get_pose(self, id: int, only_if_dirty: bool, consumer_key: str) -> Optional[Pose]:
-        return self._get_data_dict(self.poses, id, only_if_dirty, consumer_key)
+    def get_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
+        return self._get_data_dict(self.poses, id, only_new_data, consumer_key)
 
     def get_poses_for_cam(self, cam_id: int) -> List[Pose]:
         with self.mutex:
@@ -110,13 +103,13 @@ class DataManager:
     def set_pose_stream(self, value: PoseStreamData) -> None:
         self._set_data_dict(self.pose_streams, value.id, value)
 
-    def get_pose_stream(self, id: int, only_if_dirty: bool, consumer_key: str) -> Optional[PoseStreamData]:
-        return self._get_data_dict(self.pose_streams, id, only_if_dirty, consumer_key)
+    def get_pose_stream(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[PoseStreamData]:
+        return self._get_data_dict(self.pose_streams, id, only_new_data, consumer_key)
 
     # Correlation window management
     def set_correlation_stream(self, value: PairCorrelationStreamData) -> None:
         self._set_data_dict(self.r_streams, 0, value)
 
-    def get_correlation_streams(self, only_if_dirty: bool, consumer_key: str) -> Optional[PairCorrelationStreamData]:
-        return self._get_data_dict(self.r_streams, 0, only_if_dirty, consumer_key)
+    def get_correlation_streams(self, only_new_data: bool, consumer_key: str) -> Optional[PairCorrelationStreamData]:
+        return self._get_data_dict(self.r_streams, 0, only_new_data, consumer_key)
 
