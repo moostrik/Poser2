@@ -5,28 +5,32 @@ from modules.pose.PoseStream import PoseStreamData
 from modules.pose.PoseDefinitions import Pose, PosePoints
 from modules.render.DataManager import DataManager
 
-class RenderMeshMethods:
-    """Methods for updating meshes based on pose data."""
+class AngleMeshes:
+    def __init__(self, data: DataManager, amount: int) -> None:
+        self.data: DataManager = data
+        self.amount: int = amount
 
-    @staticmethod
-    def update_pose_meshes(data: DataManager, max_players: int, pose_meshes: dict[int, Mesh]) -> None:
-        for id in range(max_players):
-            pose: Pose | None = data.get_pose(id, True)
-            pose_mesh: Mesh | None = pose_meshes.get(id, None)
-            if pose is not None and pose_mesh is not None:
-                points: PosePoints | None = pose.points
-                if points is not None:
-                    pose_mesh.set_vertices(points.getVertices())
-                    pose_mesh.set_colors(points.getColors(threshold=0.0))
-                    pose_mesh.update()
+        self.meshes: dict[int, Mesh] = {}
 
-    @staticmethod
-    def update_angle_meshes(data: DataManager, meshes: dict[int, Mesh], amount: int) -> None:
-        for id in range(amount):
-            pose: PoseStreamData | None = data.get_pose_stream(id, False)
-            mesh: Mesh | None = meshes.get(id, None)
+    def allocate(self) -> None:
+        for i in range(self.amount):
+            if i not in self.meshes:
+                mesh = Mesh()
+                mesh.allocate()
+                self.meshes[i] = mesh
+
+    def deallocate(self) -> None:
+        for mesh in self.meshes.values():
+            mesh.deallocate()
+        self.meshes.clear()
+
+
+    def update(self, only_if_dirty: bool) -> None:
+        for id in range(self.amount):
+            pose: PoseStreamData | None = self.data.get_pose_stream(id, only_if_dirty)
+            mesh: Mesh | None = self.meshes.get(id, None)
             if pose is not None and mesh is not None:
-                RenderMeshMethods.update_angle_mesh(pose, mesh)
+                AngleMeshes.update_angle_mesh(pose, mesh)
 
     @staticmethod
     def update_angle_mesh(pose_stream: PoseStreamData, angle_mesh: Mesh) -> None:
@@ -56,6 +60,7 @@ class RenderMeshMethods:
         confidences = np.where(confidences > 0, 0.7, 0.0).astype(np.float32)
         angles_raw: np.ndarray = data[..., 0]
         angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
+        angles_norm = 1.0 - angles_norm
         joint_height: float = 1.0 / (num_joints)
 
         # INDICES

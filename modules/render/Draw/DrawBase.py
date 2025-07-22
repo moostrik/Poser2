@@ -1,0 +1,13 @@
+from abc import ABC, abstractmethod
+
+from OpenGL.GL import * # type: ignore
+
+class DrawBase(ABC):
+    @abstractmethod
+    def allocate(self, width: int, height: int, internal_format: int) -> None: ...
+    @abstractmethod
+    def deallocate(self) -> None: ...
+    @abstractmethod
+    def update(self, only_if_dirty: bool) -> None: ...
+    @abstractmethod
+    def draw(self, x: float, y: float, width: float, height: float) -> None: ...
