@@ -11,11 +11,11 @@ from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
 from modules.render.DataManager import DataManager
-from modules.render.Draw.DrawBase import DrawBase, Rect
+from modules.render.renders.BaseRender import BaseRender, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class DrawPanoramicTracker(DrawBase):
+class PanoramicTrackerRender(BaseRender):
     def __init__(self, data: DataManager, num_cams: int) -> None:
         self.data: DataManager = data
         self.num_cams: int = num_cams
@@ -37,7 +37,7 @@ class DrawPanoramicTracker(DrawBase):
         tracklets: dict[int, Tracklet] = self.data.get_tracklets()
         if tracklets is None:
             return
-        DrawBase.setView(self.fbo.width, self.fbo.height)
+        BaseRender.setView(self.fbo.width, self.fbo.height)
         self.fbo.begin()
         glClearColor(1.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
@@ -84,7 +84,5 @@ class DrawPanoramicTracker(DrawBase):
             roi_y += 22
             string = f'L: {local_angle:.1f}'
             draw_box_string(roi_x, roi_y, string)
-
-        glFlush()  # Render now
         self.fbo.end()
 

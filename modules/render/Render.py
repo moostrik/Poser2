@@ -12,14 +12,15 @@ from modules.gl.RenderBase import RenderBase
 from modules.Settings import Settings
 
 from modules.render.DataManager import DataManager
-from modules.render.RenderCompositionSubdivision import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.Mesh.PoseMeshes import PoseMeshes
-from modules.render.Mesh.AngleMeshes import AngleMeshes
-from modules.render.Draw.DrawPanoramicTracker import DrawPanoramicTracker
-from modules.render.Draw.DrawCamera import DrawCamera
-from modules.render.Draw.DrawPose import DrawPose
-from modules.render.Draw.DrawCorrelationStream import DrawRStream
-from modules.render.Draw.DrawWhiteSpace import DrawWhiteSpace
+from modules.render.CompositionSubdivision import make_subdivision, SubdivisionRow, Subdivision
+from modules.render.meshes.PoseMeshes import PoseMeshes
+from modules.render.meshes.AngleMeshes import AngleMeshes
+
+from modules.render.renders.WhiteSpaceRender import WhiteSpaceRender
+from modules.render.renders.PanoramicTrackerRender import PanoramicTrackerRender
+from modules.render.renders.CameraRender import CameraRender
+from modules.render.renders.PoseRender import PoseRender
+from modules.render.renders.RStreamRender import RStreamRender
 
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -46,16 +47,16 @@ class Render(RenderBase):
         self.angle_meshes =         AngleMeshes(self.data, self.max_players)
 
         # drawers
-        self.draw_white_space =     DrawWhiteSpace(self.data)
-        self.draw_r_stream =        DrawRStream(self.data, self.num_R_streams)
-        self.draw_tracker =         DrawPanoramicTracker(self.data, self.num_cams)
-        self.draw_cameras:          dict[int, DrawCamera] = {}
-        self.draw_poses:            dict[int, DrawPose] = {}
+        self.white_space_render =   WhiteSpaceRender(self.data)
+        self.r_stream_render =      RStreamRender(self.data, self.num_R_streams)
+        self.tracker_render =       PanoramicTrackerRender(self.data, self.num_cams)
+        self.camera_renders:        dict[int, CameraRender] = {}
+        self.pose_renders:          dict[int, PoseRender] = {}
 
         for i in range(self.num_cams):
-            self.draw_cameras[i] = DrawCamera(self.data, self.pose_meshes, i)
+            self.camera_renders[i] = CameraRender(self.data, self.pose_meshes, i)
         for i in range(self.max_players):
-            self.draw_poses[i] = DrawPose(self.data, self.pose_meshes, self.angle_meshes, i)
+            self.pose_renders[i] = PoseRender(self.data, self.pose_meshes, self.angle_meshes, i)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
@@ -95,28 +96,28 @@ class Render(RenderBase):
         self.pose_meshes.allocate()
         self.angle_meshes.allocate()
 
-        self.allocate_window_draws()
-        self.draw_white_space.allocate(self.ws_width, 1, GL_RGBA32F)
+        self.allocate_window_renders()
+        self.white_space_render.allocate(self.ws_width, 1, GL_RGBA32F)
 
-    def allocate_window_draws(self) -> None:
+    def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size(SubdivisionType.RST.value)
-        self.draw_r_stream.allocate(w, h, GL_RGBA)
+        self.r_stream_render.allocate(w, h, GL_RGBA)
         w, h = self.subdivision.get_allocation_size(SubdivisionType.TRK.value)
-        self.draw_tracker.allocate(w, h, GL_RGBA)
-        for key in self.draw_cameras.keys():
+        self.tracker_render.allocate(w, h, GL_RGBA)
+        for key in self.camera_renders.keys():
             w, h = self.subdivision.get_allocation_size(SubdivisionType.CAM.value, key)
-            self.draw_cameras[key].allocate(w, h, GL_RGBA)
-        for key in self.draw_poses.keys():
+            self.camera_renders[key].allocate(w, h, GL_RGBA)
+        for key in self.pose_renders.keys():
             w, h = self.subdivision.get_allocation_size(SubdivisionType.PSN.value, key)
-            self.draw_poses[key].allocate(w, h, GL_RGBA)
+            self.pose_renders[key].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
-        self.draw_white_space.deallocate()
-        self.draw_r_stream.deallocate()
-        self.draw_tracker.deallocate()
-        for draw in self.draw_cameras.values():
+        self.white_space_render.deallocate()
+        self.r_stream_render.deallocate()
+        self.tracker_render.deallocate()
+        for draw in self.camera_renders.values():
             draw.deallocate()
-        for draw in self.draw_poses.values():
+        for draw in self.pose_renders.values():
             draw.deallocate()
 
         self.pose_meshes.deallocate()
@@ -126,34 +127,34 @@ class Render(RenderBase):
         self.pose_meshes.update(True)
         # self.angle_meshes.update(False)
 
-        self.draw_white_space.update(True)
-        self.draw_r_stream.update(False)
-        self.draw_tracker.update(False)
+        self.white_space_render.update(True)
+        self.r_stream_render.update(False)
+        self.tracker_render.update(False)
         for i in range(self.num_cams):
-            self.draw_cameras[i].update(False)
+            self.camera_renders[i].update(False)
         for i in range(self.max_players):
-            self.draw_poses[i].update(False)
+            self.pose_renders[i].update(False)
 
         self.draw_composition()
 
     def draw_composition(self) -> None:
         self.setView(self.subdivision.width, self.subdivision.height)
 
-        self.draw_white_space.draw(self.subdivision.get_rect(SubdivisionType.WS.value))
-        self.draw_tracker.draw(self.subdivision.get_rect(SubdivisionType.TRK.value))
-        self.draw_r_stream.draw(self.subdivision.get_rect(SubdivisionType.RST.value))
+        self.white_space_render.draw(self.subdivision.get_rect(SubdivisionType.WS.value))
+        self.tracker_render.draw(self.subdivision.get_rect(SubdivisionType.TRK.value))
+        self.r_stream_render.draw(self.subdivision.get_rect(SubdivisionType.RST.value))
         for i in range(self.num_cams):
-            self.draw_cameras[i].draw(self.subdivision.get_rect(SubdivisionType.CAM.value, i))
+            self.camera_renders[i].draw(self.subdivision.get_rect(SubdivisionType.CAM.value, i))
         for i in range(self.max_players):
-            self.draw_poses[i].draw(self.subdivision.get_rect(SubdivisionType.PSN.value, i))
+            self.pose_renders[i].draw(self.subdivision.get_rect(SubdivisionType.PSN.value, i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None: # override
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
-        self.draw_white_space.draw(Rect(0, 0, width, height))
+        self.white_space_render.draw(Rect(0, 0, width, height))
 
     def on_main_window_resize(self, width: int, height: int) -> None: # override
         self.subdivision = make_subdivision(self.subdivision_rows, width, height)
-        self.allocate_window_draws()
+        self.allocate_window_renders()
 
 

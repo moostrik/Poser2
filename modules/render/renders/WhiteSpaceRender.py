@@ -12,12 +12,12 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.av.Definitions import AvOutput
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
-from modules.render.Draw.DrawBase import DrawBase, Rect
+from modules.render.renders.BaseRender import BaseRender, Rect
 
 from modules.gl.shaders.WS_Angles import WS_Angles
 from modules.gl.shaders.WS_Lines import WS_Lines
 
-class DrawWhiteSpace(DrawBase):
+class WhiteSpaceRender(BaseRender):
     angles_shader = WS_Angles()
     lines_shader = WS_Lines()
 
@@ -31,19 +31,19 @@ class DrawWhiteSpace(DrawBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo_lines.allocate(width, height, internal_format)
         self.fbo_angles.allocate(width, height, internal_format)
-        if not DrawWhiteSpace.lines_shader.allocated:
-            DrawWhiteSpace.lines_shader.allocate(monitor_file=False)
-        if not DrawWhiteSpace.angles_shader.allocated:
-            DrawWhiteSpace.angles_shader.allocate(monitor_file=False)
+        if not WhiteSpaceRender.lines_shader.allocated:
+            WhiteSpaceRender.lines_shader.allocate(monitor_file=False)
+        if not WhiteSpaceRender.angles_shader.allocated:
+            WhiteSpaceRender.angles_shader.allocate(monitor_file=False)
 
     def deallocate(self) -> None:
         self.fbo_lines.deallocate()
         self.fbo_angles.deallocate()
         self.image.deallocate()
-        if DrawWhiteSpace.lines_shader.allocated:
-            DrawWhiteSpace.lines_shader.deallocate()
-        if DrawWhiteSpace.angles_shader.allocated:
-            DrawWhiteSpace.angles_shader.deallocate()
+        if WhiteSpaceRender.lines_shader.allocated:
+            WhiteSpaceRender.lines_shader.deallocate()
+        if WhiteSpaceRender.angles_shader.allocated:
+            WhiteSpaceRender.angles_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         x, y, width, height = rect.x, rect.y, rect.width, rect.height

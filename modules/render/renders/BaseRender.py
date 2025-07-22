@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.utils.PointsAndRects import Rect
 
-class DrawBase(ABC):
+class BaseRender(ABC):
     @abstractmethod
     def allocate(self, width: int, height: int, internal_format: int) -> None: ...
     @abstractmethod

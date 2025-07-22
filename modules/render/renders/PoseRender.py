@@ -15,16 +15,16 @@ from modules.pose.PoseDefinitions import Pose, PoseAngleNames
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
-from modules.render.Draw.DrawBase import DrawBase, Rect
-from modules.render.Mesh.PoseMeshes import PoseMeshes
-from modules.render.Mesh.AngleMeshes import AngleMeshes
+from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.meshes.PoseMeshes import PoseMeshes
+from modules.render.meshes.AngleMeshes import AngleMeshes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
 from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 
-class DrawPose(DrawBase):
+class PoseRender(BaseRender):
     pose_stream_shader = WS_PoseStream()
 
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, angle_meshes: AngleMeshes, cam_id: int) -> None:
@@ -39,14 +39,14 @@ class DrawPose(DrawBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
-        if not DrawPose.pose_stream_shader.allocated:
-            DrawPose.pose_stream_shader.allocate(monitor_file=False)
+        if not PoseRender.pose_stream_shader.allocated:
+            PoseRender.pose_stream_shader.allocate(monitor_file=False)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
         self.image.deallocate()
-        if DrawPose.pose_stream_shader.allocated:
-            DrawPose.pose_stream_shader.deallocate()
+        if PoseRender.pose_stream_shader.allocated:
+            PoseRender.pose_stream_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -69,8 +69,8 @@ class DrawPose(DrawBase):
 
         angle_mesh: Mesh = self.angle_meshes.meshes[pose.id]
 
-        DrawBase.setView(self.fbo.width, self.fbo.height)
-        DrawPose.draw_pose(self.fbo, self.image, pose, pose_mesh, self.pose_stream_image, angle_mesh, DrawPose.pose_stream_shader)
+        BaseRender.setView(self.fbo.width, self.fbo.height)
+        PoseRender.draw_pose(self.fbo, self.image, pose, pose_mesh, self.pose_stream_image, angle_mesh, PoseRender.pose_stream_shader)
         self.fbo.end()
 
     @staticmethod
@@ -86,10 +86,9 @@ class DrawPose(DrawBase):
         tracklet: Tracklet | None = pose.tracklet
         if tracklet is not None:
             draw_box: bool = tracklet.is_lost
-            DrawPose.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
+            PoseRender.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
         if angle_mesh.isInitialized():
             angle_mesh.draw(0, 0, fbo.width, fbo.height)
-        # glFlush()
         fbo.end()
         shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5 / fbo.height)
 
@@ -122,7 +121,8 @@ class DrawPose(DrawBase):
             glEnd()                 # End drawing
             glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
-        pose_mesh.draw(x, y, width, height)
+        if pose_mesh.isInitialized():
+            pose_mesh.draw(x, y, width, height)
 
         string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
         x += 9

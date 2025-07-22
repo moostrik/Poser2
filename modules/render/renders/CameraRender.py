@@ -15,11 +15,11 @@ from modules.pose.PoseDefinitions import Pose
 from modules.tracker.Tracklet import Tracklet
 
 from modules.render.DataManager import DataManager
-from modules.render.Draw.DrawBase import DrawBase, Rect
-from modules.render.Mesh.PoseMeshes import PoseMeshes
+from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.meshes.PoseMeshes import PoseMeshes
 
 
-class DrawCamera(DrawBase):
+class CameraRender(BaseRender):
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
         self.pose_meshes: PoseMeshes = pose_meshes
@@ -48,12 +48,11 @@ class DrawCamera(DrawBase):
         poses: list[Pose] = self.data.get_poses_for_cam(self.cam_id)
         meshes: dict[int, Mesh] = self.pose_meshes.meshes
 
-        DrawBase.setView(fbo.width, fbo.height)
+        BaseRender.setView(fbo.width, fbo.height)
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         self.image.draw(0, 0, fbo.width, fbo.height)
-        DrawCamera.draw_camera_overlay(depth_tracklets, poses, meshes, 0, 0, fbo.width, fbo.height)
-        glFlush()
+        CameraRender.draw_camera_overlay(depth_tracklets, poses, meshes, 0, 0, fbo.width, fbo.height)
         fbo.end()
 
     @staticmethod
@@ -71,10 +70,10 @@ class DrawCamera(DrawBase):
             roi_y: float = y + roi_y * height
             roi_w: float = roi_w * width
             roi_h: float = roi_h * height
-            DrawCamera.draw_tracklet(tracklet, mesh, roi_x, roi_y, roi_w, roi_h, True, True, False)
+            CameraRender.draw_tracklet(tracklet, mesh, roi_x, roi_y, roi_w, roi_h)
 
         for depth_tracklet in depth_tracklets:
-            DrawCamera.draw_depth_tracklet(depth_tracklet, 0, 0, width, height)
+            CameraRender.draw_depth_tracklet(depth_tracklet, 0, 0, width, height)
 
     @staticmethod
     def draw_depth_tracklet(tracklet: DepthTracklet, x: float, y: float, width: float, height: float) -> None:
@@ -119,26 +118,18 @@ class DrawCamera(DrawBase):
         string = f'Age: {tracklet.age}'
         draw_box_string(t_x, t_y, string)
 
-        # glFlush()               # Render now
-
     @staticmethod
-    def draw_tracklet(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, width: float, height: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
-        if draw_box:
-            glColor4f(0.0, 0.0, 0.0, 0.1)
-            glBegin(GL_QUADS)
-            glVertex2f(x, y)        # Bottom left
-            glVertex2f(x, y + height)    # Bottom right
-            glVertex2f(x + width, y + height)# Top right
-            glVertex2f(x + width, y)    # Top left
-            glEnd()                 # End drawing
-            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+    def draw_tracklet(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, width: float, height: float) -> None:
+        glColor4f(0.0, 0.0, 0.0, 0.1)
+        glBegin(GL_QUADS)
+        glVertex2f(x, y)        # Bottom left
+        glVertex2f(x, y + height)    # Bottom right
+        glVertex2f(x + width, y + height)# Top right
+        glVertex2f(x + width, y)    # Top left
+        glEnd()                 # End drawing
+        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
-        if draw_pose and pose_mesh.isInitialized():
+        if pose_mesh.isInitialized():
             pose_mesh.draw(x, y, width, height)
 
-        if draw_text:
-            string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
-            x += 9
-            y += 12
-            draw_box_string(x, y, string)
 

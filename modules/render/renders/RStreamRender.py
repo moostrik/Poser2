@@ -11,13 +11,14 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
-from modules.render.Draw.DrawBase import DrawBase, Rect
+from modules.render.renders.BaseRender import BaseRender, Rect
+
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
 from modules.gl.shaders.WS_RStream import WS_RStream
 
-class DrawRStream(DrawBase):
+class RStreamRender(BaseRender):
     r_stream_shader = WS_RStream()
 
     def __init__(self, data: DataManager, num_streams: int) -> None:
@@ -31,14 +32,14 @@ class DrawRStream(DrawBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
-        if not DrawRStream.r_stream_shader.allocated:
-            DrawRStream.r_stream_shader.allocate(monitor_file=False)
+        if not RStreamRender.r_stream_shader.allocated:
+            RStreamRender.r_stream_shader.allocate(monitor_file=False)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
         self.image.deallocate()
-        if DrawRStream.r_stream_shader.allocated:
-            DrawRStream.r_stream_shader.deallocate()
+        if RStreamRender.r_stream_shader.allocated:
+            RStreamRender.r_stream_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -55,7 +56,7 @@ class DrawRStream(DrawBase):
         self.image.set_image(image_np)
         self.image.update()
 
-        DrawBase.setView(self.fbo.width, self.fbo.height)
+        BaseRender.setView(self.fbo.width, self.fbo.height)
         self.r_stream_shader.use(self.fbo.fbo_id, self.image.tex_id, self.image.width, self.image.height, 1.5 / self.fbo.height)
 
         step: float = self.fbo.height / self.num_streams
@@ -69,6 +70,4 @@ class DrawRStream(DrawBase):
             y: int = self.fbo.height - (int(self.fbo.height - (i + 0.5) * step) - 12)
             draw_box_string(x, y, string, big=True) # type: ignore
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Set color to white
-
-        glFlush()  # Render now
         self.fbo.end()
