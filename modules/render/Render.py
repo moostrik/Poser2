@@ -1,6 +1,5 @@
 # Standard library imports
 from enum import Enum
-from marshal import version
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -12,26 +11,18 @@ from modules.gl.RenderBase import RenderBase
 from modules.Settings import Settings
 
 from modules.render.DataManager import DataManager
-from modules.render.CompositionSubdivision import make_subdivision, SubdivisionRow, Subdivision
+from modules.render.Subdivision import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
 from modules.render.renders.WhiteSpaceRender import WhiteSpaceRender
-from modules.render.renders.PanoramicTrackerRender import PanoramicTrackerRender
+from modules.render.renders.PanoramicTrackerRender import PanoramicTrackerRender as TrackerRender
 from modules.render.renders.CameraRender import CameraRender
 from modules.render.renders.PoseRender import PoseRender
 from modules.render.renders.RStreamRender import RStreamRender
 
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
-class SubdivisionType(Enum):
-    CAM = "CAM"
-    TRK = "TRK"
-    RST = "RST"
-    PSN = "PSN"
-    WS = "WS"
 
 class Render(RenderBase):
     def __init__(self, settings: Settings) -> None:
@@ -49,7 +40,7 @@ class Render(RenderBase):
         # drawers
         self.white_space_render =   WhiteSpaceRender(self.data)
         self.r_stream_render =      RStreamRender(self.data, self.num_R_streams)
-        self.tracker_render =       PanoramicTrackerRender(self.data, self.num_cams)
+        self.tracker_render =       TrackerRender(self.data, self.num_cams)
         self.camera_renders:        dict[int, CameraRender] = {}
         self.pose_renders:          dict[int, PoseRender] = {}
 
@@ -60,11 +51,11 @@ class Render(RenderBase):
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name=SubdivisionType.CAM.value, columns=self.num_cams, rows=1, src_aspect_ratio=16/9, padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=SubdivisionType.TRK.value, columns=1, rows=1, src_aspect_ratio=12.0, padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name=SubdivisionType.RST.value, columns=1, rows=1, src_aspect_ratio=12.0, padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name=SubdivisionType.PSN.value, columns=self.max_players, rows=1, src_aspect_ratio=1.0, padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=SubdivisionType.WS.value, columns=1, rows=1, src_aspect_ratio=10.0, padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=CameraRender.get_key(),     columns=self.num_cams,      rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=TrackerRender.get_key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=RStreamRender.get_key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=PoseRender.get_key(),       columns=self.max_players,   rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=WhiteSpaceRender.get_key(), columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height)
 
@@ -87,7 +78,7 @@ class Render(RenderBase):
             opengl_version: str = version.decode("utf-8")
             print("OpenGL version:", opengl_version)
         else:
-            raise RuntimeError("OpenGL context is not valid or not current!")
+            raise RuntimeError("OpenGL context is not valid")
 
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
@@ -100,15 +91,15 @@ class Render(RenderBase):
         self.white_space_render.allocate(self.ws_width, 1, GL_RGBA32F)
 
     def allocate_window_renders(self) -> None:
-        w, h = self.subdivision.get_allocation_size(SubdivisionType.RST.value)
+        w, h = self.subdivision.get_allocation_size(RStreamRender.get_key())
         self.r_stream_render.allocate(w, h, GL_RGBA)
-        w, h = self.subdivision.get_allocation_size(SubdivisionType.TRK.value)
+        w, h = self.subdivision.get_allocation_size(TrackerRender.get_key())
         self.tracker_render.allocate(w, h, GL_RGBA)
         for key in self.camera_renders.keys():
-            w, h = self.subdivision.get_allocation_size(SubdivisionType.CAM.value, key)
+            w, h = self.subdivision.get_allocation_size(CameraRender.get_key(), key)
             self.camera_renders[key].allocate(w, h, GL_RGBA)
         for key in self.pose_renders.keys():
-            w, h = self.subdivision.get_allocation_size(SubdivisionType.PSN.value, key)
+            w, h = self.subdivision.get_allocation_size(PoseRender.get_key(), key)
             self.pose_renders[key].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
@@ -140,13 +131,13 @@ class Render(RenderBase):
     def draw_composition(self) -> None:
         self.setView(self.subdivision.width, self.subdivision.height)
 
-        self.white_space_render.draw(self.subdivision.get_rect(SubdivisionType.WS.value))
-        self.tracker_render.draw(self.subdivision.get_rect(SubdivisionType.TRK.value))
-        self.r_stream_render.draw(self.subdivision.get_rect(SubdivisionType.RST.value))
+        self.white_space_render.draw(self.subdivision.get_rect(WhiteSpaceRender.get_key()))
+        self.tracker_render.draw(self.subdivision.get_rect(TrackerRender.get_key()))
+        self.r_stream_render.draw(self.subdivision.get_rect(RStreamRender.get_key()))
         for i in range(self.num_cams):
-            self.camera_renders[i].draw(self.subdivision.get_rect(SubdivisionType.CAM.value, i))
+            self.camera_renders[i].draw(self.subdivision.get_rect(CameraRender.get_key(), i))
         for i in range(self.max_players):
-            self.pose_renders[i].draw(self.subdivision.get_rect(SubdivisionType.PSN.value, i))
+            self.pose_renders[i].draw(self.subdivision.get_rect(PoseRender.get_key(), i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None: # override
         self.setView(width, height)
