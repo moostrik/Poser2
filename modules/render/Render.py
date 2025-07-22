@@ -30,7 +30,7 @@ from modules.utils.PointsAndRects import Rect, Point2f
 
 from modules.render.RenderCompositionSubdivision import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.DataManager import DataManager
-from modules.render.RenderAngleMesh import update_angle_mesh
+from modules.render.RenderMeshMethods import RenderMeshMethods as Meshmethods
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -152,7 +152,7 @@ class Render(RenderBase):
         opengl_version = version.decode("utf-8")  # type: ignore
         print("OpenGL version:", opengl_version)
 
-        self.on_main_window_resize(self.subdivision.width, self.subdivision.height)
+        self.on_main_window_resize(self.subdivision.width, self.subdivision.height) # allocated fbos
         for s in self.all_shaders:
             s.allocate(True) # type: ignore
         for fbo in self.vis_fbos.values():
@@ -183,9 +183,9 @@ class Render(RenderBase):
 
     def draw_main(self, width: int, height: int) -> None:
         try:
-            for id in range(self.max_players):
-                self.update_pose_meshes(self.data.get_pose(id, True), self.pose_meshes[id])
-                # update_angle_mesh(self.data.get_pose_stream(id, False), self.angle_meshes[id])
+            # update meshes
+            Meshmethods.update_pose_meshes(self.data, self.max_players, self.pose_meshes)
+            Meshmethods.update_angle_meshes(self.data, self.angle_meshes, self.max_players)
 
             self.draw_cameras()
             self.draw_sims()
@@ -198,31 +198,8 @@ class Render(RenderBase):
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None: # override
         self.setView(width, height)
-        tex_id: int = self.vis_fbos[0].tex_id
         glEnable(GL_TEXTURE_2D)
-        glBindTexture(GL_TEXTURE_2D, tex_id)
-
-        glColor4f(1.0, 1.0, 1.0, 1.0)  # White, so texture colors show
-
-        glBegin(GL_QUADS)
-        glTexCoord2f(0.0, 0.0)
-        glVertex2f(0, 0)
-        glTexCoord2f(1.0, 0.0)
-        glVertex2f(width, 0)
-        glTexCoord2f(1.0, 1.0)
-        glVertex2f(width, height)
-        glTexCoord2f(0.0, 1.0)
-        glVertex2f(0, height)
-        glEnd()
-
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glDisable(GL_TEXTURE_2D)
-        glFlush()  # Ensure all OpenGL commands are executed
-
-
-        # c: float = (time() * 0.1) % 1
-        # glClearColor(c, c, c, 1.0)
-        # glClear(GL_COLOR_BUFFER_BIT)  # type: ignore
+        self.vis_fbos[0].draw(0, 0, width, height)
 
     def on_main_window_resize(self, width: int, height: int) -> None: # override
         self.subdivision = make_subdivision(self.subdivision_rows, width, height)
@@ -243,13 +220,6 @@ class Render(RenderBase):
             self.pse_fbos[key].allocate(w, h, GL_RGBA)
 
     # DRAW METHODS
-    def setView(self, width, height) -> None:
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        glOrtho(0, width, height, 0, -1, 1)
-
-        glMatrixMode(GL_MODELVIEW)
-        glViewport(0, 0, width, height)
 
     def draw_cameras(self) -> None:
         for i in range(self.num_cams):
@@ -263,15 +233,47 @@ class Render(RenderBase):
             poses: list[Pose] = self.data.get_poses_for_cam(i)
 
             self.setView(fbo.width, fbo.height)
-            Render.draw_camera(fbo, image, depth_tracklets, poses, self.pose_meshes)
+            fbo.begin()
+            glClearColor(0.0, 0.0, 0.0, 1.0)
+            image.draw(0, 0, fbo.width, fbo.height)
+            Render.draw_camera_overlay(depth_tracklets, poses, self.pose_meshes, 0, 0, fbo.width, fbo.height)
+            # glFlush()
+            fbo.end()
+
+    def draw_poses(self) -> None:
+        for i in range(self.max_players):
+            fbo: Fbo = self.pse_fbos[i]
+            pose: Pose | None = self.data.get_pose(i, False)
+            if pose is None:
+                continue #??
+            pose_image: Image = self.pse_images[i]
+            pose_image_np: np.ndarray | None = pose.image
+            if pose_image_np is not None:
+                pose_image.set_image(pose_image_np)
+                pose_image.update()
+            pose_mesh: Mesh = self.pose_meshes[pose.id]
+            pose_stream: PoseStreamData | None = self.data.get_pose_stream(i)
+            a_s_image: Image = self.a_s_images[i]
+            if pose_stream is not None:
+                a_s_image_np: np.ndarray = WS_PoseStream.pose_stream_to_image(pose_stream)
+                a_s_image.set_image(a_s_image_np)
+                a_s_image.update()
+
+            angle_mesh: Mesh = self.angle_meshes[pose.id]
+
+            self.setView(fbo.width, fbo.height)
+            Render.draw_pose(fbo, pose_image, pose, pose_mesh, a_s_image, angle_mesh, self.pose_stream_shader)
+            fbo.end()
 
     def draw_sims(self) -> None:
         for i in range(self.num_sims):
             fbo: Fbo = self.sim_fbos[i]
             if i == DataVisType.TRACKING.value:
-
                 self.setView(fbo.width, fbo.height)
-                self.draw_map_positions(fbo, self.data.get_tracklets(), self.num_cams)
+                fbo.begin()
+                self.draw_map_positions(self.data.get_tracklets(), self.num_cams, 0, 0, fbo.width, fbo.height)
+                # glFlush()
+                fbo.end()
             elif i == DataVisType.R_PAIRS.value:
                 self.draw_correlations(fbo)
 
@@ -302,31 +304,6 @@ class Render(RenderBase):
             draw_box_string(x, y, string, big=True) # type: ignore
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Set color to white
         fbo.end()
-
-    def draw_poses(self) -> None:
-        for i in range(self.max_players):
-            fbo: Fbo = self.pse_fbos[i]
-            pose: Pose | None = self.data.get_pose(i, False)
-            if pose is None:
-                continue #??
-            pose_image: Image = self.pse_images[i]
-            pose_image_np: np.ndarray | None = pose.image
-            if pose_image_np is not None:
-                pose_image.set_image(pose_image_np)
-                pose_image.update()
-            pose_mesh: Mesh = self.pose_meshes[pose.id]
-            pose_stream: PoseStreamData | None = self.data.get_pose_stream(i)
-            a_s_image: Image = self.a_s_images[i]
-            if pose_stream is not None:
-                a_s_image_np: np.ndarray = WS_PoseStream.pose_stream_to_image(pose_stream)
-                a_s_image.set_image(a_s_image_np)
-                a_s_image.update()
-
-            angle_mesh: Mesh = self.angle_meshes[pose.id]
-            # i =  pose.id
-
-            self.setView(fbo.width, fbo.height)
-            Render.draw_pose(fbo, pose_image, pose, pose_mesh, a_s_image, angle_mesh, self.pose_stream_shader)
 
     def draw_lights(self) -> None:
         light_image: AvOutput | None = self.data.get_light_image()
@@ -370,21 +347,8 @@ class Render(RenderBase):
             self.vis_fbos[i].draw(x, y, w, h)
 
     # STATIC METHODS
-    @ staticmethod
-    def update_pose_meshes(pose: Pose | None, pose_mesh: Mesh) -> None:
-        if pose is not None:
-            points: PosePoints | None = pose.points
-            if points is not None:
-                pose_mesh.set_vertices(points.getVertices())
-                pose_mesh.set_colors(points.getColors(threshold=0.0))
-                pose_mesh.update()
-
     @staticmethod
-    def draw_camera(fbo: Fbo, image: Image, depth_tracklets: list[CamTracklet], poses: list[Pose], pose_meshes: dict[int, Mesh]) -> None:
-        fbo.begin()
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        image.draw(0, 0, fbo.width, fbo.height)
-
+    def draw_camera_overlay(depth_tracklets: list[CamTracklet], poses: list[Pose], pose_meshes: dict[int, Mesh], x: float, y: float, width: float, height: float) -> None:
         for pose in poses:
             tracklet: Tracklet | None = pose.tracklet
             if tracklet is None or tracklet.is_removed or tracklet.is_lost:
@@ -393,28 +357,25 @@ class Render(RenderBase):
             mesh: Mesh = pose_meshes[pose.id]
             if roi is None or not mesh.isInitialized():
                 continue
-            x, y, w, h = roi.x, roi.y, roi.width, roi.height
-            x *= fbo.width
-            y *= fbo.height
-            w *= fbo.width
-            h *= fbo.height
-            Render.draw_tracklet(tracklet, mesh, x, y, w, h, True, True, False)
+            roi_x, roi_y, roi_w, roi_h = roi.x, roi.y, roi.width, roi.height
+            roi_x: float = x + roi_x * width
+            roi_y: float = y + roi_y * height
+            roi_w: float = roi_w * width
+            roi_h: float = roi_h * height
+            Render.draw_tracklet(tracklet, mesh, roi_x, roi_y, roi_w, roi_h, True, True, False)
 
         for depth_tracklet in depth_tracklets:
-            Render.draw_depth_tracklet(depth_tracklet, 0, 0, fbo.width, fbo.height)
-
-        glFlush()  # Render now
-        fbo.end()
+            Render.draw_depth_tracklet(depth_tracklet, 0, 0, width, height)
 
     @staticmethod
-    def draw_depth_tracklet(tracklet: CamTracklet, x: float, y: float, w: float, h: float) -> None:
+    def draw_depth_tracklet(tracklet: CamTracklet, x: float, y: float, width: float, height: float) -> None:
         if tracklet.status == CamTracklet.TrackingStatus.REMOVED:
             return
 
-        t_x = x + tracklet.roi.x * w
-        t_y = y + tracklet.roi.y * h
-        t_w = tracklet.roi.width * w
-        t_h = tracklet.roi.height * h
+        t_x = x + tracklet.roi.x * width
+        t_y = y + tracklet.roi.y * height
+        t_w = tracklet.roi.width * width
+        t_h = tracklet.roi.height * height
 
         r: float = 1.0
         g: float = 1.0
@@ -440,8 +401,8 @@ class Render(RenderBase):
 
         string: str
         t_x += t_w -6
-        if t_x + 66 > w:
-            t_x: float = w - 66
+        if t_x + 66 > width:
+            t_x: float = width - 66
         t_y += 22
         string = f'ID: {tracklet.id}'
         draw_box_string(t_x, t_y, string)
@@ -452,19 +413,19 @@ class Render(RenderBase):
         # glFlush()               # Render now
 
     @staticmethod
-    def draw_tracklet(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, w: float, h: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
+    def draw_tracklet(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, width: float, height: float, draw_box = False, draw_pose = False, draw_text = False) -> None:
         if draw_box:
             glColor4f(0.0, 0.0, 0.0, 0.1)
             glBegin(GL_QUADS)
             glVertex2f(x, y)        # Bottom left
-            glVertex2f(x, y + h)    # Bottom right
-            glVertex2f(x + w, y + h)# Top right
-            glVertex2f(x + w, y)    # Top left
+            glVertex2f(x, y + height)    # Bottom right
+            glVertex2f(x + width, y + height)# Top right
+            glVertex2f(x + width, y)    # Top left
             glEnd()                 # End drawing
             glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
         if draw_pose and pose_mesh.isInitialized():
-            pose_mesh.draw(x, y, w, h)
+            pose_mesh.draw(x, y, width, height)
 
         if draw_text:
             string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
@@ -474,15 +435,13 @@ class Render(RenderBase):
 
     @staticmethod
     def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_image: Image, angle_mesh: Mesh, shader: WS_PoseStream) -> None:
+        fbo.begin()
 
         if pose.is_final:
-            fbo.begin()
             glClearColor(0.0, 0.0, 0.0, 1.0)
             glClear(GL_COLOR_BUFFER_BIT)
-            fbo.end()
             return
 
-        fbo.begin()
         pose_image.draw(0, 0, fbo.width, fbo.height)
         tracklet: Tracklet | None = pose.tracklet
         if tracklet is not None:
@@ -510,14 +469,10 @@ class Render(RenderBase):
 
             draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
 
-        fbo.end()
-        return
-
     @staticmethod
-    def draw_map_positions(fbo: Fbo, tracklets: dict[int, Tracklet], num_cams: int) -> None:
-        fbo.begin()
-        glClearColor(0.0, 0.0, 0.0, 1.0)  # Set background color to black
-        glClear(GL_COLOR_BUFFER_BIT)       # Actually clear the buffer!
+    def draw_map_positions(tracklets: dict[int, Tracklet], num_cams: int, x: float, y: float, width: float, height: float) -> None:
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
 
         for tracklet in tracklets.values():
             if tracklet is None:
@@ -533,11 +488,11 @@ class Render(RenderBase):
             local_angle: float = getattr(tracklet.metadata, "local_angle", 0.0)
             overlap: bool = getattr(tracklet.metadata, "overlap", False)
 
-            w: float = tracklet.roi.width * fbo.width / num_cams
-            h: float = tracklet.roi.height * fbo.height
-            x: float = world_angle / 360.0 * fbo.width
+            roi_width: float = tracklet.roi.width * width / num_cams
+            roi_height: float = tracklet.roi.height * height
+            roi_x: float = world_angle / 360.0 * width + x
+            roi_y: float = tracklet.roi.y * height + y
 
-            y: float = tracklet.roi.y * fbo.height
             color: list[float] = TrackletIdColor(tracklet.id, aplha=0.9)
             if overlap == True:
                 color[3] = 0.3
@@ -546,22 +501,19 @@ class Render(RenderBase):
 
             glColor4f(*color)  # Reset color
             glBegin(GL_QUADS)       # Start drawing a quad
-            glVertex2f(x, y)        # Bottom left
-            glVertex2f(x, y + h)    # Bottom right
-            glVertex2f(x + w, y + h)# Top right
-            glVertex2f(x + w, y)    # Top left
+            glVertex2f(roi_x, roi_y)        # Bottom left
+            glVertex2f(roi_x, roi_y + roi_height)    # Bottom right
+            glVertex2f(roi_x + roi_width, roi_y + roi_height)# Top right
+            glVertex2f(roi_x + roi_width, roi_y)    # Top left
             glEnd()                 # End drawing
             glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
             string: str
-            x += 9
-            y += 22
+            roi_x += 9
+            roi_y += 22
             string = f'W: {world_angle:.1f}'
-            draw_box_string(x, y, string)
-            y += 22
+            draw_box_string(roi_x, roi_y, string)
+            roi_y += 22
             string = f'L: {local_angle:.1f}'
-            draw_box_string(x, y, string)
-
-        fbo.end()
-        glFlush()
+            draw_box_string(roi_x, roi_y, string)
 
