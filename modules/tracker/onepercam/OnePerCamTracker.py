@@ -1,5 +1,5 @@
 # Standard library imports
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from queue import Empty, Queue
 from threading import Lock, Thread
 from time import sleep, time
@@ -88,7 +88,6 @@ class OnePerCamTracker(Thread, BaseTracker):
 
             # Update at intervals
             if current_time >= next_update_time:
-                self._create_metadata()
                 self._update_and_notify()
                 next_update_time += self._update_interval
                 if current_time > next_update_time:
@@ -152,19 +151,19 @@ class OnePerCamTracker(Thread, BaseTracker):
         add_tracklet: Tracklet = add_tracklets[0]
         self.tracklet_manager.add_tracklet(add_tracklet)
 
-    def _create_metadata(self) -> None:
-        for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.metadata is not None:
-                metadata = OnePerCamMetadata(
-                    smooth_rect = self.smooth_rects.update(tracklet)
-                )
-            self.tracklet_manager.set_metadata(tracklet.id, metadata)
-
     def _update_and_notify(self) -> None:
         # retire expired tracklets
         for tracklet in self.tracklet_manager.all_tracklets():
             if tracklet.is_expired(self.timeout):
                 self.tracklet_manager.retire_tracklet(tracklet.id)
+
+        # Create metadata for each tracklet
+        for tracklet in self.tracklet_manager.all_tracklets():
+            if tracklet.metadata is None: # the same as tracklet.needs_notification?
+                metadata = OnePerCamMetadata(
+                    smooth_rect = self.smooth_rects.update(tracklet)
+                )
+                self.tracklet_manager.set_metadata(tracklet.id, metadata)
 
         # Notify callbacks
         for tracklet in self.tracklet_manager.all_tracklets():

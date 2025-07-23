@@ -36,6 +36,13 @@ class OnePerCamTrackerGui():
                     E(eT.SLDR, 'U_centre',      self.set_update_centre_threshold,   0.3,    [0.0,1.0],  0.05),
                     E(eT.TEXT, 'height'),
                     E(eT.SLDR, 'U_height',      self.set_update_height_treshold,    0.25,   [0.0,1.0],  0.05)])
+        elm.append([E(eT.TEXT, 'SMOOTH   '),
+                    E(eT.TEXT, 'factor'),
+                    E(eT.SLDR, 'S_factor',      self.set_smooth_factor,             0.3,    [0.0,1.0],  0.05),
+                    E(eT.TEXT, 'limit C'),
+                    E(eT.SLDR, 'L_center',      self.set_smooth_center_limit,      0.05,   [0.0,1.0],  0.01),
+                    E(eT.TEXT, 'H'),
+                    E(eT.SLDR, 'L_height',      self.set_smooth_height_limit,      0.03,   [0.0,1.0],  0.01)])
 
         gui_height: int = len(elm) * ELEMHEIGHT + BASEHEIGHT
         self.frame = Frame('SCREEN TRACKER ', elm, gui_height)
@@ -64,3 +71,12 @@ class OnePerCamTrackerGui():
 
     def set_update_height_treshold(self, value: float) -> None:
         self.tracker.update_height_treshold = value
+
+    def set_smooth_factor(self, value: float) -> None:
+        self.tracker.smooth_rects.smooth_factor = value
+
+    def set_smooth_center_limit(self, value: float) -> None:
+        self.tracker.smooth_rects.limit_center = value
+
+    def set_smooth_height_limit(self, value: float) -> None:
+        self.tracker.smooth_rects.limit_height = value
