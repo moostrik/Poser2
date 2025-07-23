@@ -6,8 +6,9 @@ import glob
 from queue import Queue, Empty
 from time import sleep
 
-BASEHEIGHT = 30
-ELEMHEIGHT = 33
+BASEHEIGHT = 35
+ELEMHEIGHT = 44
+FRAMEWIDTH = 700
 
 class eType(Enum):
     NONE = 0
@@ -85,7 +86,7 @@ def Element(type: eType, key: str, callback=None, value: bool| int | float | str
 
     return element
 
-def Frame(name, elementList, height = 100, width = 500) ->sg.Frame:
+def Frame(name, elementList, height = 100, width = FRAMEWIDTH) ->sg.Frame:
     frame = sg.Frame(title=name, layout=elementList, size=(width, height), expand_x=False, expand_y=True)
     return frame
 
@@ -171,14 +172,14 @@ class Gui(Thread):
     def start(self) -> None:
         elem = []
         elem.append([Element(eType.TEXT, '© Matthias Oostrik 2025')])
-        autograph = Frame('TITLE', elem, 60)
+        autograph = Frame('TITLE', elem, 90)
         elem = []
         elem.append([Element(eType.BTTN, 'Exit', self.call_exit_callback),
                      Element(eType.TEXT, ' '),
                      Element(eType.CMBO, 'SettingsFile', self.set_settings_name, self.defaultSettingsName, self.get_setting_names()),
                      Element(eType.BTTN, 'Save', self.saveSettings),
                      Element(eType.BTTN, 'Load', self.loadSettings)])
-        frame = Frame('APP', elem, 60)
+        frame = Frame('APP', elem, 90)
         self.addFrame([autograph, frame])
 
         self.window: sg.Window | None = None
