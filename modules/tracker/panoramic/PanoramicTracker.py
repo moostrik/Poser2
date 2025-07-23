@@ -1,11 +1,9 @@
-from __future__ import annotations
-
 # Standard library imports
-import time
 from dataclasses import dataclass, replace
 from itertools import combinations
 from queue import Empty, Queue
-from threading import Thread, Lock
+from threading import Lock, Thread
+from time import sleep, time
 from typing import Optional
 
 # Local application imports
@@ -84,10 +82,10 @@ class PanoramicTracker(Thread, BaseTracker):
         self.join()  # Wait for the thread to finish
 
     def run(self) -> None:
-        next_update_time: float = time.time() + self.update_interval
+        next_update_time: float = time() + self.update_interval
 
         while self.running:
-            current_time: float = time.time()
+            current_time: float = time()
 
             # Process all available tracklets as fast as possible
             processed_any = False
@@ -109,7 +107,7 @@ class PanoramicTracker(Thread, BaseTracker):
 
             # Small sleep to prevent excessive CPU usage when no tracklets are available
             if not processed_any:
-                time.sleep(0.001)  # 1ms sleep
+                sleep(0.001)  # 1ms sleep
 
     def _update_and_notify(self) -> None:
         self._update_tracklets()

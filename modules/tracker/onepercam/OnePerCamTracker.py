@@ -1,19 +1,28 @@
-from __future__ import annotations
-import time
+# Standard library imports
 from dataclasses import dataclass, replace
 from queue import Empty, Queue
-from threading import Thread, Lock
+from threading import Lock, Thread
+from time import sleep, time
 from typing import List, Optional
 
+# Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
+from modules.Settings import Settings
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
 from modules.tracker.onepercam.OnePerCamTrackerGui import OnePerCamTrackerGui
-from modules.Settings import Settings
 
+from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+@dataclass (frozen=True)
+class OnePerCamMetadata(TrackerMetadata):
+    smooth_rect: Rect
+
+    @property
+    def tracker_type(self) -> TrackerType:
+        return TrackerType.ONEPERCAM
 
 class OnePerCamTracker(Thread, BaseTracker):
     def __init__(self, gui, settings: Settings) -> None:
@@ -59,10 +68,10 @@ class OnePerCamTracker(Thread, BaseTracker):
         self.join(timeout=1.0)
 
     def run(self) -> None:
-        next_update_time: float = time.time() + self._update_interval
+        next_update_time: float = time() + self._update_interval
 
         while self._running:
-            current_time: float = time.time()
+            current_time: float = time()
 
             # Process tracklets
             processed_any = False
@@ -82,7 +91,7 @@ class OnePerCamTracker(Thread, BaseTracker):
                     next_update_time = current_time + self._update_interval
 
             if not processed_any:
-                time.sleep(0.001)
+                sleep(0.001)
 
     def _add_tracklet(self, tracklets: list[Tracklet]) -> None:
 

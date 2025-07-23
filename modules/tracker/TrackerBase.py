@@ -1,52 +1,39 @@
-"""
-TODO
-from abc import ABC, abstractmethod
-similar to gl/RenderBase.py
-"""
-
 from __future__ import annotations
 
+# Standard library imports
+from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Protocol, List
-from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
-# Forward declaration to avoid circular import
-
 from typing import TYPE_CHECKING
+
+# Local application imports
+from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
+
+# Forward declaration to avoid circular import
 if TYPE_CHECKING:
-    from modules.tracker.Tracklet import Tracklet, TrackletCallback
-# from modules.tracker.Tracklet import Tracklet, TrackletCallback
+    from modules.tracker.Tracklet import TrackletCallback
 
 class TrackerType(Enum):
     UNKNOWN = "unknown"
     PANORAMIC = "panoramic"
     ONEPERCAM = "onepercam"
 
-class TrackerMetadata(Protocol):
-    @property
-    def tracker_type(self) -> TrackerType:
-        """Get the tracker type for this info"""
-        ...
+class TrackerMetadata(ABC):
+    @abstractmethod
+    def tracker_type(self) -> TrackerType: ...
 
-class BaseTracker(Protocol):
-    # Core methods that all trackers must implement
-    def start(self) -> None:
-        """Start the tracker"""
-        ...
+class BaseTracker(ABC):
+    @abstractmethod
+    def start(self) -> None: ...
 
-    def stop(self) -> None:
-        """Stop the tracker"""
-        ...
+    @abstractmethod
+    def stop(self) -> None: ...
 
-    def add_cam_tracklets(self, cam_id: int, cam_tracklets: List[DepthTracklet]) -> None:
-        """Add tracklets from a camera"""
-        ...
+    @abstractmethod
+    def add_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None: ...
 
-    def add_tracklet_callback(self, callback: TrackletCallback) -> None:
-        """Add a callback for tracklet updates"""
-        ...
+    @abstractmethod
+    def add_tracklet_callback(self, callback: TrackletCallback) -> None: ...
 
-    @property
-    def tracker_type(self) -> TrackerType:
-        """Get the tracker type"""
-        ...
+    @abstractmethod
+    def tracker_type(self) -> TrackerType: ...
 
