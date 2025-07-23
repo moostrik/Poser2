@@ -127,8 +127,6 @@ class OnePerCamTracker(Thread, BaseTracker):
             if t.roi.height < self.add_height_threshold:
                 continue
 
-            if t.cam_id == 1:
-                print(t.roi.bottom, 1.0 - self.add_bottom_threshold)
             if t.roi.bottom < 1.0 - self.add_bottom_threshold:
                 continue
 
