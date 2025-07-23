@@ -10,11 +10,13 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.Settings import Settings
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
+from modules.tracker.onepercam.OnePerCamSmoothRect import OnePerCamSmoothRect
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
 from modules.tracker.onepercam.OnePerCamTrackerGui import OnePerCamTrackerGui
 
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 @dataclass (frozen=True)
 class OnePerCamMetadata(TrackerMetadata):
@@ -46,6 +48,7 @@ class OnePerCamTracker(Thread, BaseTracker):
         self.add_bottom_threshold: float =     0.2
 
         self.tracklet_manager: TrackletManager = TrackletManager(self._num_cams)
+        self.smooth_rects: OnePerCamSmoothRect = OnePerCamSmoothRect(self._num_cams)
 
         self.gui = OnePerCamTrackerGui(gui, self, settings)
 
@@ -85,6 +88,7 @@ class OnePerCamTracker(Thread, BaseTracker):
 
             # Update at intervals
             if current_time >= next_update_time:
+                self._create_metadata()
                 self._update_and_notify()
                 next_update_time += self._update_interval
                 if current_time > next_update_time:
@@ -95,7 +99,7 @@ class OnePerCamTracker(Thread, BaseTracker):
 
     def _add_tracklet(self, tracklets: list[Tracklet]) -> None:
 
-        # UPDATE TRACKLET
+        # UPDATE EXISTING TRACKLET
         update_tracklet: Optional[Tracklet] = None
         for t in tracklets:
             if t in self.tracklet_manager:
@@ -147,6 +151,14 @@ class OnePerCamTracker(Thread, BaseTracker):
         add_tracklets = sorted(add_tracklets, key=lambda x: x.external_age_in_frames, reverse=True)
         add_tracklet: Tracklet = add_tracklets[0]
         self.tracklet_manager.add_tracklet(add_tracklet)
+
+    def _create_metadata(self) -> None:
+        for tracklet in self.tracklet_manager.all_tracklets():
+            if tracklet.metadata is not None:
+                metadata = OnePerCamMetadata(
+                    smooth_rect = self.smooth_rects.update(tracklet)
+                )
+            self.tracklet_manager.set_metadata(tracklet.id, metadata)
 
     def _update_and_notify(self) -> None:
         # retire expired tracklets

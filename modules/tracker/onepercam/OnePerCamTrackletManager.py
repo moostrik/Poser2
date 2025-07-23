@@ -128,3 +128,15 @@ class OnePerCamTrackletManager:
                     )
                     self._tracklets[id] = notified_tracklet
 
+    def set_metadata(self, id: int, metadata) -> None:
+        with self._lock:
+            tracklet: Tracklet | None = self._tracklets.get(id)
+            if tracklet is None:
+                print(f"TrackletManager: Attempted to update metadata for non-existent tracklet with ID {id}.")
+                return
+
+            updated_tracklet: Tracklet = replace(
+                tracklet,
+                metadata=metadata
+            )
+            self._tracklets[id] = updated_tracklet

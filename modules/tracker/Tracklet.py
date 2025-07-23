@@ -12,7 +12,6 @@ from pandas import Timestamp
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as ExternalTracklet
-from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.tracker.TrackerBase import TrackerMetadata
 from modules.utils.PointsAndRects import Rect, Point2f
 
@@ -28,9 +27,7 @@ DEPTHAI_TO_TRACKINGSTATUS: dict[ExternalTracklet.TrackingStatus, TrackingStatus]
     ExternalTracklet.TrackingStatus.TRACKED: TrackingStatus.TRACKED,
     ExternalTracklet.TrackingStatus.LOST: TrackingStatus.LOST,
     ExternalTracklet.TrackingStatus.REMOVED: TrackingStatus.REMOVED,
-    # Add more if needed
 }
-
 
 @dataclass (frozen=True)
 class Tracklet:
