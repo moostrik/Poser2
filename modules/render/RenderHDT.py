@@ -37,20 +37,20 @@ class RenderHDT(RenderBase):
         self.angle_meshes =         AngleMeshes(self.data, self.max_players)
 
         # drawers
-        # self.tracker_render =       TrackerRender(self.data)
         self.camera_renders:        dict[int, CameraRender] = {}
-        self.pose_renders:          dict[int, PoseRender] = {}
+        self.tracker_renders:       dict[int, TrackerRender] = {}
+        # self.pose_renders:          dict[int, PoseRender] = {}
         self.r_stream_render =      RStreamRender(self.data, self.num_R_streams)
 
         for i in range(self.num_cams):
             self.camera_renders[i] = CameraRender(self.data, self.pose_meshes, i)
         for i in range(self.max_players):
-            self.pose_renders[i] = PoseRender(self.data, self.pose_meshes, self.angle_meshes, i)
+            self.tracker_renders[i] = TrackerRender(self.data, self.pose_meshes, i)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name=CameraRender.key(),     columns=self.num_cams,      rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=PoseRender.key(),       columns=self.max_players,   rows=1, src_aspect_ratio=9/16,   padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=TrackerRender.key(),    columns=self.max_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=RStreamRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
@@ -91,15 +91,15 @@ class RenderHDT(RenderBase):
         for key in self.camera_renders.keys():
             w, h = self.subdivision.get_allocation_size(CameraRender.key(), key)
             self.camera_renders[key].allocate(w, h, GL_RGBA)
-        for key in self.pose_renders.keys():
-            w, h = self.subdivision.get_allocation_size(PoseRender.key(), key)
-            self.pose_renders[key].allocate(w, h, GL_RGBA)
+        for key in self.tracker_renders.keys():
+            w, h = self.subdivision.get_allocation_size(TrackerRender.key(), key)
+            self.tracker_renders[key].allocate(w, h, GL_RGBA32F)
 
     def deallocate(self) -> None:
         self.r_stream_render.deallocate()
         for draw in self.camera_renders.values():
             draw.deallocate()
-        for draw in self.pose_renders.values():
+        for draw in self.tracker_renders.values():
             draw.deallocate()
 
         self.pose_meshes.deallocate()
@@ -113,7 +113,7 @@ class RenderHDT(RenderBase):
         for i in range(self.num_cams):
             self.camera_renders[i].update()
         for i in range(self.max_players):
-            self.pose_renders[i].update()
+            self.tracker_renders[i].update()
 
         self.draw_composition(width, height)
 
@@ -124,12 +124,12 @@ class RenderHDT(RenderBase):
         for i in range(self.num_cams):
             self.camera_renders[i].draw(self.subdivision.get_rect(CameraRender.key(), i))
         for i in range(self.max_players):
-            self.pose_renders[i].draw(self.subdivision.get_rect(PoseRender.key(), i))
+            self.tracker_renders[i].draw(self.subdivision.get_rect(TrackerRender.key(), i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
-        self.camera_renders[monitor_id].draw(Rect(0, 0, width, height))
+        self.tracker_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)

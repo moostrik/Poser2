@@ -156,14 +156,17 @@ class OnePerCamTracker(Thread, BaseTracker):
         for tracklet in self.tracklet_manager.all_tracklets():
             if tracklet.is_expired(self.timeout):
                 self.tracklet_manager.retire_tracklet(tracklet.id)
+                # print(f"Retiring expired tracklet {tracklet.id} at {time()}")
 
         # Create metadata for each tracklet
         for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.metadata is None: # the same as tracklet.needs_notification?
-                metadata = OnePerCamMetadata(
-                    smooth_rect = self.smooth_rects.update(tracklet)
-                )
-                self.tracklet_manager.set_metadata(tracklet.id, metadata)
+            if tracklet.needs_notification:
+                smooth_rect = self.smooth_rects.update(tracklet)
+                if smooth_rect is not None:
+                    metadata = OnePerCamMetadata(
+                        smooth_rect=smooth_rect
+                    )
+                    self.tracklet_manager.set_metadata(tracklet.id, metadata)
 
         # Notify callbacks
         for tracklet in self.tracklet_manager.all_tracklets():
