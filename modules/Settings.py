@@ -19,7 +19,7 @@ class Settings():
     class ArtType(Enum):
         NONE = 0
         WS = 1
-        HD = 2
+        HDT = 2
 
     def __init__(self) -> None:
         # GENERAL

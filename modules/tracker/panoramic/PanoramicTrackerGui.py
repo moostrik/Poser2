@@ -17,7 +17,7 @@ class PanoramicTrackerGui():
                     E(eT.TEXT, 'fov'),
                     E(eT.SLDR, 'fov',               self.set_fov,               CAM_360_FOV,                [90,130],   0.5),
                     E(eT.TEXT, 'edge'),
-                    E(eT.SLDR, 'edge',              self.set_edge_threshold,    CAM_360_EDGE_THRESHOLD,     [0,0.5],    0.1),
+                    E(eT.SLDR, 'edge',              self.set_edge_threshold,    CAM_360_EDGE_THRESHOLD,     [0,0.6],    0.1),
                     E(eT.TEXT, 'ovlp'),
                     E(eT.SLDR, 'ovlp',              self.set_overlap,           CAM_360_OVERLAP_EXPANSION,  [0,1.0],    0.1)])
 

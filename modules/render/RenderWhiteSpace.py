@@ -57,7 +57,7 @@ class RenderWhiteSpace(RenderBase):
             SubdivisionRow(name=PoseRender.key(),       columns=self.max_players,   rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=WhiteSpaceRender.key(), columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
         ]
-        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height)
+        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
         # window manager
         self.window_manager: WindowManager = WindowManager(
@@ -125,10 +125,10 @@ class RenderWhiteSpace(RenderBase):
         for i in range(self.max_players):
             self.pose_renders[i].update()
 
-        self.draw_composition()
+        self.draw_composition(width, height)
 
-    def draw_composition(self) -> None:
-        self.setView(self.subdivision.width, self.subdivision.height)
+    def draw_composition(self, width: int, height: int) -> None:
+        self.setView(width, height)
 
         self.white_space_render.draw(self.subdivision.get_rect(WhiteSpaceRender.key()))
         self.tracker_render.draw(self.subdivision.get_rect(TrackerRender.key()))
@@ -138,13 +138,13 @@ class RenderWhiteSpace(RenderBase):
         for i in range(self.max_players):
             self.pose_renders[i].draw(self.subdivision.get_rect(PoseRender.key(), i))
 
-    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None: # override
+    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
         self.white_space_render.draw(Rect(0, 0, width, height))
 
-    def on_main_window_resize(self, width: int, height: int) -> None: # override
-        self.subdivision = make_subdivision(self.subdivision_rows, width, height)
+    def on_main_window_resize(self, width: int, height: int) -> None:
+        self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)
         self.allocate_window_renders()
 
 

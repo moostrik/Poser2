@@ -15,7 +15,7 @@ from modules.render.renders.BaseRender import BaseRender, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class OnePerCamRender(BaseRender):
+class OnePerCamTrackerRender(BaseRender):
     def __init__(self, data: DataManager) -> None:
         self.data: DataManager = data
         self.fbo: Fbo = Fbo()

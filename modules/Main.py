@@ -7,16 +7,17 @@ from modules.av.Manager import Manager as AV
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
+from modules.correlation.DTWCorrelator import DTWCorrelator
+from modules.correlation.PairCorrelationStream import PairCorrelationStreamManager
 from modules.gui.PyReallySimpleGui import Gui
+from modules.pose.PosePipeline import PosePipeline
+from modules.pose.PoseStream import PoseStreamManager
+from modules.render.RenderWhiteSpace import RenderWhiteSpace
+from modules.render.RenderHDT import RenderHDT
+from modules.Settings import Settings
 from modules.tracker.TrackerBase import TrackerType
 from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker
 from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
-from modules.correlation.DTWCorrelator import DTWCorrelator
-from modules.pose.PosePipeline import PosePipeline
-from modules.pose.PoseStream import PoseStreamManager
-from modules.correlation.PairCorrelationStream import PairCorrelationStreamManager
-from modules.render.RenderWhiteSpace import RenderWhiteSpace
-from modules.Settings import Settings
 
 
 class Main():
@@ -25,7 +26,12 @@ class Main():
 
         self.settings: Settings = settings
 
+        self.av = None
         self.render = RenderWhiteSpace(settings)
+        if settings.art_type == Settings.ArtType.WS:
+            self.av: AV | None = AV(self.gui, settings)
+        if settings.art_type == Settings.ArtType.HDT:
+            self.render = RenderHDT(settings)
 
         self.cameras: list[DepthCam | DepthSimulator] = []
         self.recorder: Optional[Recorder] = None
@@ -49,10 +55,6 @@ class Main():
         self.pose_streamer = PoseStreamManager(settings)
         self.dtw_correlator = DTWCorrelator(settings)
         self.correlation_streamer = PairCorrelationStreamManager(settings)
-
-        self.av = None
-        if settings.art_type == Settings.ArtType.WS:
-            self.av: AV | None = AV(self.gui, settings)
 
         self.is_running: bool = False
         self.is_finished: bool = False

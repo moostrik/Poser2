@@ -1,10 +1,8 @@
 # Standard library imports
 from dataclasses import dataclass
-from multiprocessing import Process, Queue, Event, Lock, Manager
+from multiprocessing import Process, Queue, Event
 from threading import Thread
 from typing import Optional, Callable, Set
-import signal
-import sys
 
 # Third-party imports
 import pandas as pd
@@ -15,8 +13,6 @@ from modules.pose.PoseDefinitions import *
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
 
 
 @dataclass (frozen=True)
@@ -48,7 +44,7 @@ PoseStreamDataCallback = Callable[[PoseStreamData], None]
 PoseStreamDataDict = dict[int, PoseStreamData]
 
 class PoseStreamManager:
-    def __init__(self, settings) -> None:
+    def __init__(self, settings: Settings) -> None:
         self.settings = settings  # Store settings for processor recreation
         self.result_queue = Queue()
         self.processor = PoseStreamProcessor(settings, self.result_queue)

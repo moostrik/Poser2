@@ -47,15 +47,18 @@ class Subdivision:
         rect: Rect = self.get_rect(key, index)
         return int(rect.width), int(rect.height)
 
-def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst_height: int) -> Subdivision:
+def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst_height: int, align_center: bool) -> Subdivision:
 
     dst_aspect_ratio: float = dst_width / dst_height
     tot_aspect_ratio: float = 1.0 / sum(1.0 / cell.tot_aspect_ratio for cell in subdivision_rows)
 
-    fit_width: float = float(dst_width) if tot_aspect_ratio > dst_aspect_ratio else float(dst_height * tot_aspect_ratio)
-    fit_height: float = dst_width / tot_aspect_ratio if tot_aspect_ratio > dst_aspect_ratio else float(dst_height)
-    fit_x: float = (dst_width - fit_width) / 2.0
-    fit_y: float = (dst_height - fit_height) / 2.0
+    fit_width: float = float(dst_width) if tot_aspect_ratio > dst_aspect_ratio else float(dst_height) * tot_aspect_ratio
+    fit_height: float = float(dst_width) / tot_aspect_ratio if tot_aspect_ratio > dst_aspect_ratio else float(dst_height)
+    fit_x: float = 0
+    fit_y: float = 0
+    if align_center:
+        fit_x: float = (dst_width - fit_width) / 2.0
+        fit_y: float = (dst_height - fit_height) / 2.0
 
     subdivision: Subdivision = Subdivision(x=int(fit_x), y=int(fit_y), width=int(fit_width), height=int(fit_height), _rows={})
     cell_y: float = fit_y

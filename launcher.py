@@ -29,7 +29,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     parser.add_argument('-nc',      '--numcameras', type=int,   default=4,      help='number of cameras')
     parser.add_argument('-as',      '--autoset',    action='store_true',        help='camera auto settings')
     parser.add_argument('-ad',      '--debug',      action='store_true',        help='run analysis in debug mode')
-    parser.add_argument('-hd',      '--hd',         action='store_true',        help='run in Harmonic Dissonance mode')
+    parser.add_argument('-hdt',     '--hdt',        action='store_true',        help='run in Harmonic Dissonance mode')
     parser.add_argument('-tm',      '--testminimal',action='store_true',   help='test with minimum setup only')
     args: Namespace = parser.parse_args()
 
@@ -80,7 +80,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.tracker_type =         TrackerType.PANORAMIC
     settings.tracker_min_age =      5 # in frames
     settings.tracker_min_height =   0.25 # * height of the camera
-    settings.tracker_timeout =      1.0 # in seconds
+    settings.tracker_timeout =      2.0 # in seconds
 
     settings.pose_active =      not args.nopose
     settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
@@ -116,8 +116,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_R_num =         3
 
     settings.art_type =             Settings.ArtType.WS
-    if args.hd:
-        settings.art_type = Settings.ArtType.HD
+    if args.hdt:
+        settings.art_type = Settings.ArtType.HDT
         settings.max_players = 3
         settings.camera_num = settings.max_players
         settings.camera_list = camera_list[:settings.camera_num]

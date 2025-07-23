@@ -123,6 +123,11 @@ class PanoramicTracker(Thread, BaseTracker):
             if existing_tracklet_id is not None:
                 self.tracklet_manager.retire_tracklet(existing_tracklet_id)
             return
+        if new_tracklet.is_lost:
+            existing_tracklet_id: Optional[int] = self.tracklet_manager.get_id_by_cam_and_external_id(new_tracklet.cam_id, new_tracklet.external_id)
+            if existing_tracklet_id is not None:
+                self.tracklet_manager.replace_tracklet(existing_tracklet_id, new_tracklet)
+            return
 
         # filter out tracklets that are too young or too small
         if new_tracklet.external_age_in_frames <= self.tracklet_min_age:
