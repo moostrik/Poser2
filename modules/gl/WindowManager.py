@@ -46,8 +46,8 @@ class WindowManager():
         self.mouse_y: float = 0.0
 
         self.monitor: Optional[glfw._GLFWmonitor] = None
+        self._ordered_monitor_ids: list[int] = []
         self.monitor_id: int = monitor_id
-        self.last_frame_time = 0
 
         self.render_thread: Thread | None = None
         self.callback_lock = Lock()
@@ -104,6 +104,8 @@ class WindowManager():
         glfw.window_hint(glfw.DECORATED, glfw.TRUE)
         glfw.window_hint(glfw.RESIZABLE, glfw.TRUE)
 
+        self._ordered_monitor_ids = self._get_monitors_sorted_by_position()
+
         # Get primary monitor for fullscreen
         self.monitor: Optional[glfw._GLFWmonitor] = glfw.get_primary_monitor() if self.fullscreen else None
 
@@ -117,9 +119,9 @@ class WindowManager():
             glfw.terminate()
             raise Exception("Failed to create GLFW window")
 
-        self.monitor = glfw.get_primary_monitor()
-        if self.monitor_id > 0 and self.monitor_id < len(glfw.get_monitors()):
-            self.monitor = glfw.get_monitors()[self.monitor_id]
+        if self.monitor_id > len(self._ordered_monitor_ids):
+            self.monitor_id = len(self._ordered_monitor_ids) - 1
+        self.monitor = glfw.get_monitors()[self._ordered_monitor_ids[self.monitor_id]]
 
         mode: glfw._GLFWvidmode = glfw.get_video_mode(self.monitor)
         width: int = mode.size.width
@@ -148,15 +150,17 @@ class WindowManager():
         glfw.set_cursor_pos_callback(self.main_window, self._notify_cursor_pos_callback)
         glfw.set_mouse_button_callback(self.main_window, self._notify_invoke_mouse_button_callbacks)
 
-        monitors: list[glfw._GLFWmonitor] = self._get_monitors_sorted_by_position()
-
         for id in self.secondary_monitor_ids:
-            if id < 0 or id >= len(monitors):
-                print(f"{self.__class__.__name__} ID: {id} out of range for available monitors: {len(monitors)}")
+            if id < 0 or id >= len(self._ordered_monitor_ids):
+                print(f"{self.__class__.__name__} ID: {id} out of range for available monitors: {self._ordered_monitor_ids}")
                 continue
-            win: glfw._GLFWwindow | None = self._create_secondary_window(id, monitors[id])
+
+            monitor_id: int = self._ordered_monitor_ids[id]
+            name: str = f'{id}'
+            win: glfw._GLFWwindow | None = self._create_secondary_window(name, monitor_id)
             if win:
                 self.secondary_windows.append(win)
+
         glfw.focus_window(self.main_window)
 
     def _render_loop(self) -> None:
@@ -234,21 +238,27 @@ class WindowManager():
         self.fps.tick()
 
     # SECONDARY WINDOWS
-    def _create_secondary_window(self, id: int, monitor: glfw._GLFWmonitor) -> Optional[glfw._GLFWwindow]:
+    def _create_secondary_window(self, name:str, monitor_id: int) -> Optional[glfw._GLFWwindow]:
         if self.main_window is None:
             print("Main window must be created before secondary windows.")
             return None
 
-        name: str = f'{id}'
-        secondary: Optional[glfw._GLFWwindow] = glfw.create_window(100, 100, name, None, self.main_window)
-        if not secondary:
+        monitors: list[glfw._GLFWmonitor] = glfw.get_monitors()
+        if monitor_id < 0 or monitor_id >= len(monitors):
+            print(f"Monitor ID {monitor_id} is out of range for available monitors: {len(monitors)}")
+            return None
+
+        monitor: glfw._GLFWmonitor = monitors[monitor_id]
+
+        win: Optional[glfw._GLFWwindow] = glfw.create_window(100, 100, name, None, self.main_window)
+        if not win:
             print("Failed to create secondary window")
             return None
 
-        glfw.set_mouse_button_callback(secondary, self._invoke_secondary_callbacks)
-        self._setup_secondary_window(secondary, id, True)
+        glfw.set_mouse_button_callback(win, self._invoke_secondary_callbacks)
+        self._setup_secondary_window(win, monitor_id, True)
 
-        return secondary
+        return win
 
     def _destroy_secondary_windows(self) -> None:
         for win in self.secondary_windows:
@@ -302,23 +312,25 @@ class WindowManager():
         glfw.swap_buffers(window)
 
     @staticmethod
-    def _get_monitors_sorted_by_position() -> list[glfw._GLFWmonitor]:
+    def _get_monitors_sorted_by_position() -> list[int]:
         monitors: list[glfw._GLFWmonitor] = glfw.get_monitors()
         if not monitors:
             return []
-        primary: glfw._GLFWmonitor = monitors[0]
+
+        primary = 0
         others: list[glfw._GLFWmonitor] = monitors[1:]
 
-        # Pair each monitor with its (x, y) position
-        others_with_pos: list[tuple[glfw._GLFWmonitor, int, int]] = [
-            (monitor, *glfw.get_monitor_pos(monitor)) for monitor in others
+        # Pair each monitor index with its (x, y) position
+        others_with_pos: list[tuple[int, int, int]] = [
+            (i + 1, *glfw.get_monitor_pos(monitor)) for i, monitor in enumerate(others)
         ]
         # Sort by x, then by y (negative y before positive y)
-        others_sorted: list[tuple[glfw._GLFWmonitor, int, int]] = sorted(
+        others_sorted: list[tuple[int, int, int]] = sorted(
             others_with_pos,
             key=lambda item: (item[1], item[2])
         )
-        return [primary] + [monitor for monitor, _, _ in others_sorted]
+
+        return [primary] + [idx for idx, _, _ in others_sorted]
 
     # CALLBACKS
     def _notify_key_callback(self, window, key, scancode, action, mods) -> None:
@@ -434,7 +446,8 @@ class WindowManager():
             title: Optional[str] | None = glfw.get_window_title(win)
             if title is None:
                 continue
-            monitor_id: int = int(title)
+            id = int(title)
+            monitor_id: int = self._ordered_monitor_ids[id] if id < len(self._ordered_monitor_ids) else 0
             monitor: Optional[glfw._GLFWmonitor] = glfw.get_monitors()[monitor_id] if monitor_id < len(glfw.get_monitors()) else None
             if not monitor:
                 continue
