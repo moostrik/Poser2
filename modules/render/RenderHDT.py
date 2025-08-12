@@ -82,6 +82,9 @@ class RenderHDT(RenderBase):
 
         self.pose_meshes.allocate()
         self.angle_meshes.allocate()
+        for key in self.tracker_renders.keys():
+            w, h = self.subdivision.get_allocation_size(TrackerRender.key(), key)
+            self.tracker_renders[key].allocate(w, h, GL_RGBA32F)
 
         self.allocate_window_renders()
 
@@ -90,10 +93,7 @@ class RenderHDT(RenderBase):
         self.r_stream_render.allocate(w, h, GL_RGBA)
         for key in self.camera_renders.keys():
             w, h = self.subdivision.get_allocation_size(CameraRender.key(), key)
-            self.camera_renders[key].allocate(w, h, GL_RGBA)
-        for key in self.tracker_renders.keys():
-            w, h = self.subdivision.get_allocation_size(TrackerRender.key(), key)
-            self.tracker_renders[key].allocate(w, h, GL_RGBA32F)
+            self.camera_renders[key].allocate(2160 , 3840, GL_RGBA)
 
     def deallocate(self) -> None:
         self.r_stream_render.deallocate()

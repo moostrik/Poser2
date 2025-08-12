@@ -6,7 +6,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl.Image import Image
-from modules.gl.Fbo import Fbo
+from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
@@ -19,36 +19,42 @@ from modules.render.renders.BaseRender import BaseRender, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from modules.gl.shaders.NoiseSimplex import NoiseSimplex
+from modules.gl.shaders.Exposure import Exposure
 
 class OnePerCamTrackerRender(BaseRender):
+    exposure_shader = Exposure()
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
         self.pose_meshes: PoseMeshes = pose_meshes
         self.cam_id: int = cam_id
-        self.fbo: Fbo = Fbo()
+        self.cam_fbo: Fbo = Fbo()
+        self.exp_fbo: Fbo = Fbo()
         self.cam_image: Image = Image()
         text_init()
-        self.noise_shader: NoiseSimplex = NoiseSimplex()
-
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
-        self.fbo.allocate(width, height, internal_format)
+        self.cam_fbo.allocate(width, height, internal_format)
+        self.exp_fbo.allocate(width, height, internal_format)
+        if not OnePerCamTrackerRender.exposure_shader.allocated:
+            OnePerCamTrackerRender.exposure_shader.allocate()
 
     def deallocate(self) -> None:
-        self.fbo.deallocate()
+        self.cam_fbo.deallocate()
+        self.exp_fbo.deallocate()
+        if OnePerCamTrackerRender.exposure_shader.allocated:
+            OnePerCamTrackerRender.exposure_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
-        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        self.exp_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         key: int = self.cam_id
 
 
-        self.noise_shader: NoiseSimplex = NoiseSimplex()
-        if not self.noise_shader.allocated:
-            self.noise_shader.allocate()
+        self.shader: Exposure = Exposure()
+        if not self.shader.allocated:
+            self.shader.allocate()
 
         tracklets: list[Tracklet] = self.data.get_tracklets_for_cam(self.cam_id)
         if not tracklets:
@@ -77,36 +83,38 @@ class OnePerCamTrackerRender(BaseRender):
         width: float = cam_image_roi.width / cam_image_aspect_ratio
         x: float = cam_image_roi.x + (cam_image_roi.width - width) / 2.0
 
-        BaseRender.setView(self.fbo.width, self.fbo.height)
-        self.fbo.begin()
-        glColor4f(1.0, 1.0, 1.0, 0.1)
 
-        self.cam_image.draw_roi(0, 0, self.fbo.width, self.fbo.height,
+        BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
+        self.cam_fbo.begin()
+        glColor4f(1.0, 01.0, 0.5, 0.1)
+
+        self.cam_image.draw_roi(0, 0, self.cam_fbo.width, self.cam_fbo.height,
                                 x, cam_image_roi.y, width, cam_image_roi.height)
 
 
         glColor4f(1.0, 1.0, 1.0, 1.0)
-        self.fbo.end()
+        self.cam_fbo.end()
+
+        if not OnePerCamTrackerRender.exposure_shader.allocated:
+            OnePerCamTrackerRender.exposure_shader.allocate()
+        OnePerCamTrackerRender.exposure_shader.use(self.exp_fbo.fbo_id, self.cam_fbo.tex_id, 1.5, 0.1, 0.2)
+
+        # self.exp_fbo.begin()
+        # glClearColor(0.0, 0.0, 0.0, 1.0)
+        # glClear(GL_COLOR_BUFFER_BIT)
+        # self.exp_fbo.end()
 
 
     def clear_fbo(self) -> None:
-        """Clear the render"""
-        BaseRender.setView(self.fbo.width, self.fbo.height)
-
-        glColor4f(0.0, 0.0, 0.0, 0.2)
-        # self.noise_shader.use(self.fbo.fbo_id, 0.001, self.fbo.width, self.fbo.height)
-
-        self.fbo.begin()
-
+        BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
 
         glColor4f(0.0, 0.0, 0.0, 0.05)
-        # draw rectangle covering the whole FBO
+        self.exp_fbo.begin()
         glBegin(GL_QUADS)
         glVertex2f(0.0, 0.0)
-        glVertex2f(0.0, self.fbo.height)
-        glVertex2f(self.fbo.width, self.fbo.height)
-        glVertex2f(self.fbo.width, 0.0)
+        glVertex2f(0.0, self.cam_fbo.height)
+        glVertex2f(self.cam_fbo.width, self.cam_fbo.height)
+        glVertex2f(self.cam_fbo.width, 0.0)
         glEnd()
-
+        self.exp_fbo.end()
         glColor4f(1.0, 1.0, 1.0, 1.0)
-        self.fbo.end()

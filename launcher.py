@@ -14,23 +14,24 @@ import multiprocessing as mp
 if __name__ == '__main__': # For Windows compatibility with multiprocessing
     mp.freeze_support()
     parser: ArgumentParser = ArgumentParser()
-    parser.add_argument('-fps',     '--fps',        type=float, default=23.0,   help='frames per second')
-    parser.add_argument('-pl',      '--players',    type=int,   default=8,      help='number of players')
-    parser.add_argument('-c',       '--color',      action='store_true',        help='use color input instead of left mono')
-    parser.add_argument('-sq',      '--square',     action='store_true',        help='use centre square of the camera')
-    parser.add_argument('-ss',      '--showstereo', action='store_true',        help='queue stereo frames')
-    parser.add_argument('-ll',      '--lightning',  action='store_true',        help='use low latency movenet model')
-    parser.add_argument('-st',      '--stereo',     action='store_true',        help='use stereo depth')
-    parser.add_argument('-ny',      '--noyolo',     action='store_true',        help='do not do yolo person detection')
-    parser.add_argument('-np',      '--nopose',     action='store_true',        help='do not do pose detection')
-    parser.add_argument('-cl',      '--chunklength',type=float, default=6.0,    help='duration of video chunks in seconds')
-    parser.add_argument('-sim',     '--simulation', action='store_true',        help='use prerecored video with camera')
-    parser.add_argument('-pt',      '--passthrough',action='store_true',        help='use prerecored video without camera')
-    parser.add_argument('-nc',      '--numcameras', type=int,   default=4,      help='number of cameras')
-    parser.add_argument('-as',      '--autoset',    action='store_true',        help='camera auto settings')
-    parser.add_argument('-ad',      '--debug',      action='store_true',        help='run analysis in debug mode')
-    parser.add_argument('-hdt',     '--hdt',        action='store_true',        help='run in Harmonic Dissonance mode')
-    parser.add_argument('-tm',      '--testminimal',action='store_true',   help='test with minimum setup only')
+    parser.add_argument('-fps',     '--fps',            type=float, default=23.0,   help='frames per second')
+    parser.add_argument('-pl',      '--players',        type=int,   default=8,      help='number of players')
+    parser.add_argument('-c',       '--color',          action='store_true',        help='use color input instead of left mono')
+    parser.add_argument('-sq',      '--square',         action='store_true',        help='use centre square of the camera')
+    parser.add_argument('-ss',      '--showstereo',     action='store_true',        help='queue stereo frames')
+    parser.add_argument('-ll',      '--lightning',      action='store_true',        help='use low latency movenet model')
+    parser.add_argument('-st',      '--stereo',         action='store_true',        help='use stereo depth')
+    parser.add_argument('-ny',      '--noyolo',         action='store_true',        help='do not do yolo person detection')
+    parser.add_argument('-np',      '--nopose',         action='store_true',        help='do not do pose detection')
+    parser.add_argument('-cl',      '--chunklength',    type=float, default=6.0,    help='duration of video chunks in seconds')
+    parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecored video with camera')
+    parser.add_argument('-pt',      '--passthrough',    action='store_true',        help='use prerecored video without camera')
+    parser.add_argument('-nc',      '--numcameras',     type=int,   default=4,      help='number of cameras')
+    parser.add_argument('-as',      '--autoset',        action='store_true',        help='camera auto settings')
+    parser.add_argument('-ad',      '--debug',          action='store_true',        help='run analysis in debug mode')
+    parser.add_argument('-hdt',     '--harmonictrio',   action='store_true',        help='run in Harmonic Dissonance mode')
+    parser.add_argument('-ws',      '--whitespace',     action='store_true',        help='run in Whitespace mode')
+    parser.add_argument('-tm',      '--testminimal',    action='store_true',        help='test with minimum setup only')
     args: Namespace = parser.parse_args()
 
     currentPath: str = path.dirname(__file__)
@@ -115,19 +116,23 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_monitor =       0
     settings.render_R_num =         3
 
-    settings.art_type =             Settings.ArtType.WS
-    if args.hdt:
-        settings.art_type = Settings.ArtType.HDT
-        settings.max_players = 3
-        settings.camera_num = settings.max_players
-        settings.camera_list = camera_list[:settings.camera_num]
-        settings.tracker_type = TrackerType.ONEPERCAM
+    settings.art_type =             Settings.ArtType.HDT
+    if args.whitespace:
+        settings.art_type = Settings.ArtType.WS
+
+    if settings.art_type == Settings.ArtType.HDT:
+        settings.render_title =     'Harmonic Dissonance'
+        settings.max_players =      3
+        settings.camera_num =       settings.max_players
+        settings.camera_list =      camera_list[:settings.camera_num]
+        settings.tracker_type =     TrackerType.ONEPERCAM
 
     if args.testminimal:
-        settings.max_players = 2
-        settings.camera_num = settings.max_players
-        settings.camera_list = camera_list[:settings.camera_num]
-        settings.tracker_type = TrackerType.ONEPERCAM
+        settings.render_title =     'Minimal Test'
+        settings.max_players =      2
+        settings.camera_num =       settings.max_players
+        settings.camera_list =      camera_list[:settings.camera_num]
+        settings.tracker_type =     TrackerType.ONEPERCAM
 
     settings.check_values()
     # settings.check_cameras()
