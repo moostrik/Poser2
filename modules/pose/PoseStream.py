@@ -38,6 +38,7 @@ class PoseStreamData:
     angles: pd.DataFrame
     confidences: pd.DataFrame
     capacity: int
+    mean_movement: float
     is_final: bool
 
 PoseStreamDataCallback = Callable[[PoseStreamData], None]
@@ -197,7 +198,7 @@ class PoseStreamProcessor(Process):
                 angles: pd.DataFrame | None = self.angle_buffers.pop(pose.id, None)
                 confidences: pd.DataFrame | None = self.confidence_buffers.pop(pose.id, None)
                 if angles is not None and confidences is not None:
-                    self._notify_callbacks(PoseStreamData(pose.id, angles, confidences, self.buffer_capacity, True))
+                    self._notify_callbacks(PoseStreamData(pose.id, angles, confidences, self.buffer_capacity, 0.0, True))
             return
 
         time_stamp: pd.Timestamp = pose.time_stamp
@@ -226,7 +227,8 @@ class PoseStreamProcessor(Process):
 
         interpolated: pd.DataFrame = angle_df.interpolate(method='time', limit_direction='both')#, limit=7)
         smoothed: pd.DataFrame = PoseStreamProcessor.ewm_circular_mean(interpolated, span=7.0)
-        self._notify_callbacks(PoseStreamData(pose.id, smoothed, conf_df, self.buffer_capacity, False))
+        mean_movement: float = PoseStreamProcessor.get_highest_movement(smoothed, conf_df, threshold=0.0)
+        self._notify_callbacks(PoseStreamData(pose.id, smoothed, conf_df, self.buffer_capacity, mean_movement, False))
 
     @staticmethod
     def rolling_circular_mean(df: pd.DataFrame, window: float = 0.3, min_periods: int = 1) -> pd.DataFrame:
@@ -281,3 +283,49 @@ class PoseStreamProcessor(Process):
         result.loc[first_valid:last_valid] = unwrapped_slice
 
         return result
+
+    @staticmethod
+    def get_mean_movement(angles: pd.DataFrame, confidences: pd.DataFrame, num_samples: int, threshold: float = 0.0) -> float:
+        """Calculate the mean movement across all angles using only the last num_samples."""
+        if angles.empty or confidences.empty:
+            return 0.0
+
+        # Use only the last num_samples rows
+        angles_tail = angles.tail(num_samples)
+        confidences_tail = confidences.tail(num_samples)
+
+        # Calculate absolute differences between consecutive angles
+        angle_diffs: pd.DataFrame = angles_tail.diff().abs()
+        # Apply confidence mask
+        angle_diffs *= confidences_tail
+
+        # Calculate mean movement where confidence is above threshold
+        valid_movement: pd.DataFrame = angle_diffs[confidences_tail > threshold]
+        mean_val: float = valid_movement.mean().mean() if not valid_movement.empty else 0.0
+        if pd.isna(mean_val):
+            return 0.0
+        return float(mean_val)
+
+    @staticmethod
+    def get_highest_movement(angles: pd.DataFrame, confidences: pd.DataFrame, threshold: float = 0.0) -> float:
+        """Calculate the highest joint movement using only the last sample (difference between last two rows)."""
+        if angles.empty or confidences.empty or len(angles) < 2:
+            return 0.0
+
+        # Use only the last two rows to get the most recent movement
+        angles_tail = angles.tail(2)
+        confidences_tail = confidences.tail(2)
+
+        # Calculate absolute differences between the last two samples
+        angle_diffs: pd.DataFrame = angles_tail.diff().abs().iloc[-1:]
+        # Apply confidence mask
+        angle_diffs *= confidences_tail.iloc[-1:]
+
+        # Only consider movements where confidence is above threshold
+        valid_mask = confidences_tail.iloc[-1:] > threshold
+        angle_diffs = angle_diffs.where(valid_mask, 0.0)
+
+        max_val = angle_diffs.max().max()
+        if pd.isna(max_val):
+            return 0.0
+        return float(max_val)

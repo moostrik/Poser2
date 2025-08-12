@@ -7,6 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.gl.WindowManager import WindowManager
 from modules.gl.RenderBase import RenderBase
+from modules.gl.Fbo import Fbo, SwapFbo
 
 from modules.Settings import Settings
 
@@ -18,6 +19,7 @@ from modules.render.meshes.AngleMeshes import AngleMeshes
 from modules.render.renders.HDT.CentreCameraRender import CentreCameraRender
 from modules.render.renders.HDT.CamOverlayRender import CamOverlayRender
 from modules.render.renders.HDT.MovementCamRender import MovementCamRender
+from modules.render.renders.HDT.SynchronyCam import SynchronyCam
 from modules.render.renders.CameraRender import CameraRender
 from modules.render.renders.RStreamRender import RStreamRender
 
@@ -40,6 +42,9 @@ class RenderHDT(RenderBase):
         self.camera_renders:        dict[int, CameraRender] = {}
         self.centre_cam_renders:    dict[int, CentreCameraRender] = {}
         self.movement_cam_renders:  dict[int, MovementCamRender] = {}
+
+        self.cam_fbos: list[Fbo] = []
+        self.sync_renders:          dict[int, SynchronyCam] = {}
         self.overlay_renders:       dict[int, CamOverlayRender] = {}
         self.r_stream_render =      RStreamRender(self.data, self.num_R_streams)
 
@@ -48,6 +53,8 @@ class RenderHDT(RenderBase):
             self.centre_cam_renders[i] = CentreCameraRender(self.data, i)
             self.movement_cam_renders[i] = MovementCamRender(self.data, i)
             self.overlay_renders[i] = CamOverlayRender(self.data, self.pose_meshes, i)
+            self.sync_renders[i] = SynchronyCam(self.data, i)
+            self.cam_fbos.append(self.movement_cam_renders[i].get_fbo())
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
@@ -86,6 +93,7 @@ class RenderHDT(RenderBase):
         for key in self.centre_cam_renders.keys():
             self.centre_cam_renders[key].allocate(2160, 3840, GL_RGBA32F)
             self.movement_cam_renders[key].allocate(2160, 3840, GL_RGBA32F)
+            self.sync_renders[key].allocate(2160, 3840, GL_RGBA32F)
 
         self.allocate_window_renders()
 
@@ -105,6 +113,10 @@ class RenderHDT(RenderBase):
             draw.deallocate()
         for draw in self.centre_cam_renders.values():
             draw.deallocate()
+        for draw in self.movement_cam_renders.values():
+            draw.deallocate()
+        for draw in self.sync_renders.values():
+            draw.deallocate()
         for draw in self.overlay_renders.values():
             draw.deallocate()
 
@@ -119,6 +131,7 @@ class RenderHDT(RenderBase):
             self.overlay_renders[i].update()
             self.centre_cam_renders[i].update()
             self.movement_cam_renders[i].update(self.centre_cam_renders[i].get_fbo())
+            self.sync_renders[i].update(self.cam_fbos)
 
         self.draw_composition(width, height)
 
@@ -141,7 +154,9 @@ class RenderHDT(RenderBase):
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
-        self.movement_cam_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
+
+        self.sync_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
+        # self.cam_fbos[monitor_id - 1].draw(0, 0, width, height)
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)
