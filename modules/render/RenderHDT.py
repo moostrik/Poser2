@@ -15,9 +15,10 @@ from modules.render.Subdivision import make_subdivision, SubdivisionRow, Subdivi
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
-from modules.render.renders.OnePerCamTrackerRender import OnePerCamTrackerRender as TrackerRender
+from modules.render.renders.HDT.CentreCameraRender import CentreCameraRender
+from modules.render.renders.HDT.CamOverlayRender import CamOverlayRender
+from modules.render.renders.HDT.MovementCamRender import MovementCamRender
 from modules.render.renders.CameraRender import CameraRender
-from modules.render.renders.PoseRender import PoseRender
 from modules.render.renders.RStreamRender import RStreamRender
 
 from modules.utils.PointsAndRects import Rect, Point2f
@@ -34,24 +35,25 @@ class RenderHDT(RenderBase):
 
         # meshes
         self.pose_meshes =          PoseMeshes(self.data, self.max_players)
-        self.angle_meshes =         AngleMeshes(self.data, self.max_players)
 
         # drawers
         self.camera_renders:        dict[int, CameraRender] = {}
-        self.tracker_renders:       dict[int, TrackerRender] = {}
-        # self.pose_renders:          dict[int, PoseRender] = {}
+        self.centre_cam_renders:    dict[int, CentreCameraRender] = {}
+        self.movement_cam_renders:  dict[int, MovementCamRender] = {}
+        self.overlay_renders:       dict[int, CamOverlayRender] = {}
         self.r_stream_render =      RStreamRender(self.data, self.num_R_streams)
 
         for i in range(self.num_cams):
             self.camera_renders[i] = CameraRender(self.data, self.pose_meshes, i)
-        for i in range(self.max_players):
-            self.tracker_renders[i] = TrackerRender(self.data, self.pose_meshes, i)
+            self.centre_cam_renders[i] = CentreCameraRender(self.data, i)
+            self.movement_cam_renders[i] = MovementCamRender(self.data, i)
+            self.overlay_renders[i] = CamOverlayRender(self.data, self.pose_meshes, i)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name=CameraRender.key(),     columns=self.num_cams,      rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=TrackerRender.key(),    columns=self.max_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=RStreamRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
+            SubdivisionRow(name=CameraRender.key(),         columns=self.num_cams,      rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=CamOverlayRender.key(),     columns=self.max_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=RStreamRender.key(),        columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
@@ -81,55 +83,65 @@ class RenderHDT(RenderBase):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.pose_meshes.allocate()
-        self.angle_meshes.allocate()
-        for key in self.tracker_renders.keys():
-            w, h = self.subdivision.get_allocation_size(TrackerRender.key(), key)
-            self.tracker_renders[key].allocate(w, h, GL_RGBA32F)
+        for key in self.centre_cam_renders.keys():
+            self.centre_cam_renders[key].allocate(2160, 3840, GL_RGBA32F)
+            self.movement_cam_renders[key].allocate(2160, 3840, GL_RGBA32F)
 
         self.allocate_window_renders()
 
     def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size(RStreamRender.key())
         self.r_stream_render.allocate(w, h, GL_RGBA)
-        for key in self.camera_renders.keys():
-            w, h = self.subdivision.get_allocation_size(CameraRender.key(), key)
-            self.camera_renders[key].allocate(2160 , 3840, GL_RGBA)
+
+        for i in range(self.num_cams):
+            w, h = self.subdivision.get_allocation_size(CameraRender.key(), i)
+            self.camera_renders[i].allocate(w , h, GL_RGBA)
+            w, h = self.subdivision.get_allocation_size(CamOverlayRender.key(), i)
+            self.overlay_renders[i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         self.r_stream_render.deallocate()
         for draw in self.camera_renders.values():
             draw.deallocate()
-        for draw in self.tracker_renders.values():
+        for draw in self.centre_cam_renders.values():
+            draw.deallocate()
+        for draw in self.overlay_renders.values():
             draw.deallocate()
 
         self.pose_meshes.deallocate()
-        self.angle_meshes.deallocate()
 
     def draw_main(self, width: int, height: int) -> None:
         self.pose_meshes.update()
-        # self.angle_meshes.update(False)
 
         self.r_stream_render.update()
         for i in range(self.num_cams):
             self.camera_renders[i].update()
-        for i in range(self.max_players):
-            self.tracker_renders[i].update()
+            self.overlay_renders[i].update()
+            self.centre_cam_renders[i].update()
+            self.movement_cam_renders[i].update(self.centre_cam_renders[i].get_fbo())
 
         self.draw_composition(width, height)
 
     def draw_composition(self, width:int, height: int) -> None:
         self.setView(width, height)
 
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+
         self.r_stream_render.draw(self.subdivision.get_rect(RStreamRender.key()))
         for i in range(self.num_cams):
             self.camera_renders[i].draw(self.subdivision.get_rect(CameraRender.key(), i))
-        for i in range(self.max_players):
-            self.tracker_renders[i].draw(self.subdivision.get_rect(TrackerRender.key(), i))
+
+            # ADDITIVE
+            glBlendFunc(GL_ONE, GL_ONE)
+            self.centre_cam_renders[i].draw(self.subdivision.get_rect(CamOverlayRender.key(), i))
+            self.overlay_renders[i].draw(self.subdivision.get_rect(CamOverlayRender.key(), i))
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
-        self.tracker_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
+        self.movement_cam_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)
