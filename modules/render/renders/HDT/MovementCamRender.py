@@ -36,6 +36,7 @@ class MovementCamRender(BaseRender):
         self.cam_image: Image = Image()
 
         self.movement: float = 0.0
+        self.movement_for_synchrony: float = 0.0
         text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -65,6 +66,7 @@ class MovementCamRender(BaseRender):
 
         pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.key())
         if pose_stream is not None:
+            self.movement_for_synchrony = pose_stream.mean_movement
             if pose_stream.mean_movement > 0.01:
                 self.movement = 0.05
             else:
@@ -112,7 +114,7 @@ class MovementCamRender(BaseRender):
         brightness: float = 1.0
         contrast: float = 1.3
 
-        exposure: float = 1.0
+        exposure: float = 1.5
         offset: float = 0.0
         gamma: float = 0.3
 
@@ -121,13 +123,11 @@ class MovementCamRender(BaseRender):
         MovementCamRender.contrast_shader.use(self.con_fbo.fbo_id, self.exp_fbo.tex_id, brightness, contrast)
 
         # self.exp_fbo.begin()
-        # glClearColor(0.0, 0.0, 0.0, 1.0)
+        # glClearColor(0.0, 0.0, 0.0, 0.00000005)
         # glClear(GL_COLOR_BUFFER_BIT)
         # self.exp_fbo.end()
 
-
-
-
+        self.clear_fbo()
 
     def clear_fbo(self) -> None:
         BaseRender.setView(self.exp_fbo.width, self.exp_fbo.height)

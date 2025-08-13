@@ -43,10 +43,11 @@ class RenderHDT(RenderBase):
         self.centre_cam_renders:    dict[int, CentreCameraRender] = {}
         self.movement_cam_renders:  dict[int, MovementCamRender] = {}
 
-        self.cam_fbos: list[Fbo] = []
         self.sync_renders:          dict[int, SynchronyCam] = {}
         self.overlay_renders:       dict[int, CamOverlayRender] = {}
         self.r_stream_render =      RStreamRender(self.data, self.num_R_streams)
+
+        self.cam_fbos: list[Fbo] = []
 
         for i in range(self.num_cams):
             self.camera_renders[i] = CameraRender(self.data, self.pose_meshes, i)
@@ -131,7 +132,7 @@ class RenderHDT(RenderBase):
             self.overlay_renders[i].update()
             self.centre_cam_renders[i].update()
             self.movement_cam_renders[i].update(self.centre_cam_renders[i].get_fbo())
-            self.sync_renders[i].update(self.cam_fbos)
+            self.sync_renders[i].update(self.cam_fbos, self.movement_cam_renders[i].movement_for_synchrony)
 
         self.draw_composition(width, height)
 

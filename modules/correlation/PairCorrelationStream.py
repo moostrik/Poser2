@@ -81,6 +81,25 @@ class PairCorrelationStreamData:
 
         return df[metric_name].to_numpy()
 
+    def get_correlation_for_key(self, index: int) -> Dict[int, float]:
+        """
+        Get the correlation values for a specific pose index.
+
+        Args:
+            index: The index of the pose to retrieve correlations for
+
+        Returns:
+            Dictionary mapping other_id to similarity_score
+        """
+        correlations: Dict[int, float] = {}
+        for pair_id, df in self.pair_history.items():
+            if index in pair_id:
+                if not df.empty:
+                    last_row = df.iloc[-1]
+                    other_id = pair_id[1] if pair_id[0] == index else pair_id[0]
+                    correlations[other_id] = last_row['similarity']
+        return correlations
+
 PairCorrelationStreamDataCallback = Callable[[PairCorrelationStreamData], None]
 
 class PairCorrelationStreamManager:

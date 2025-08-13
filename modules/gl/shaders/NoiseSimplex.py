@@ -11,12 +11,12 @@ class NoiseSimplex(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo, blend: float, width: float, height: float) -> None :
+    def use(self, fbo, speed: float, blend: float, width: float, height: float) -> None :
         super().use()
         if not self.allocated: return
         if not fbo: return
 
-        t: float = (time() % (3600.0))
+        t: float = (time() * speed % (3600.0))
 
         s = self.shader_program
         glUseProgram(s)
