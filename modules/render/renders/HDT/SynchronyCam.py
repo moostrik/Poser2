@@ -72,8 +72,8 @@ class SynchronyCam(BaseRender):
         syncs: PairCorrelationStreamData | None = self.data.get_correlation_streams(False, self.key())
 
 
-        score_1: float = 0.0# math.pow(scores.get(other_keys[0], 0.0), 2.0)
-        score_2: float = 0.0 #math.pow(scores.get(other_keys[1], 0.0), 2.0)
+        score_1: float = 0.0
+        score_2: float = 0.0
         # if syncs is None:
         #     glColor4f(1.0, 1.0, 1.0, 1.0)
         #     self.fbo.begin()
@@ -85,8 +85,9 @@ class SynchronyCam(BaseRender):
         if syncs is not None:
             scores: dict[int, float] = syncs.get_correlation_for_key(key)
 
-            score_1 = math.pow(scores.get(other_keys[0], 0.0), 2.0)
-            score_2 = math.pow(scores.get(other_keys[1], 0.0), 2.0)
+            score_1 = math.pow(scores.get(other_keys[0], 0.0), 1.5)
+            score_2 = math.pow(scores.get(other_keys[1], 0.0), 1.5)
+
 
         main_fbo = cam_fbos[key]
         other_fbo_1 = cam_fbos[other_keys[0]]

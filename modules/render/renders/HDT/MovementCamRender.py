@@ -68,9 +68,9 @@ class MovementCamRender(BaseRender):
         if pose_stream is not None:
             self.movement_for_synchrony = pose_stream.mean_movement
             if pose_stream.mean_movement > 0.005:
-                self.movement = 0.05
+                self.movement = 0.03
             else:
-                self.movement = 0.01
+                self.movement = 0.005
             # if key == 0:
             #     print(f'pose_stream.mean_movement: {pose_stream.mean_movement: .3f}')
 
@@ -111,10 +111,10 @@ class MovementCamRender(BaseRender):
         if not MovementCamRender.contrast_shader.allocated:
             MovementCamRender.contrast_shader.allocate()
 
-        brightness: float = 1.0
+        brightness: float = 0.5
         contrast: float = 1.9
 
-        exposure: float = 1.5
+        exposure: float = 1.3
         offset: float = 0.0
         gamma: float = 0.2
 

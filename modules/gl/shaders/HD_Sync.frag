@@ -13,7 +13,7 @@ out vec4 fragColor;
 void main() {
     vec4 noiseTexel = texture(noise, texCoord);
 
-    float offset = 0.02;
+    float offset = 0.01;
 
     vec4 texel0 = texture(tex0, texCoord + noiseTexel.rg * offset);
     vec4 texel1 = texture(tex1, texCoord + noiseTexel.gb * offset);
