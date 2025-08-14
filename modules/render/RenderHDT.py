@@ -156,8 +156,12 @@ class RenderHDT(RenderBase):
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
 
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+
         self.sync_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
-        # self.cam_fbos[monitor_id - 1].draw(0, 0, width, height)
+        # self.centre_cam_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
+        # self.movement_cam_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)

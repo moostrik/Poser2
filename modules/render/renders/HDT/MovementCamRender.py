@@ -67,10 +67,10 @@ class MovementCamRender(BaseRender):
         pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.key())
         if pose_stream is not None:
             self.movement_for_synchrony = pose_stream.mean_movement
-            if pose_stream.mean_movement > 0.01:
+            if pose_stream.mean_movement > 0.005:
                 self.movement = 0.05
             else:
-                self.movement = 0.0
+                self.movement = 0.01
             # if key == 0:
             #     print(f'pose_stream.mean_movement: {pose_stream.mean_movement: .3f}')
 
@@ -87,11 +87,11 @@ class MovementCamRender(BaseRender):
 
         alpha: float = self.movement
         if self.cam_id == 0: # Red
-            glColor4f(1.0, 0.5, 0.5, alpha) # Red
+            glColor4f(1.0, 0., 0., alpha) # Red
         elif self.cam_id == 1: # Yellow
-            glColor4f(1.0, 1.0, 0., alpha)
+            glColor4f(0.84, 0.76, 0., alpha)
         elif self.cam_id == 2: # Cyan
-            glColor4f(0.0, 1.0, 1.0, alpha)
+            glColor4f(0.0, 0.9, 1.0, alpha)
 
 
         BaseRender.setView(self.color_fbo.width, self.color_fbo.height)
@@ -112,15 +112,15 @@ class MovementCamRender(BaseRender):
             MovementCamRender.contrast_shader.allocate()
 
         brightness: float = 1.0
-        contrast: float = 1.3
+        contrast: float = 1.9
 
         exposure: float = 1.5
         offset: float = 0.0
-        gamma: float = 0.3
+        gamma: float = 0.2
 
         MovementCamRender.exposure_shader.use(self.exp_fbo.fbo_id, self.color_fbo.tex_id, exposure, offset, gamma)
 
-        MovementCamRender.contrast_shader.use(self.con_fbo.fbo_id, self.exp_fbo.tex_id, brightness, contrast)
+        MovementCamRender.contrast_shader.use(self.con_fbo.fbo_id, self.color_fbo.tex_id, brightness, contrast)
 
         # self.exp_fbo.begin()
         # glClearColor(0.0, 0.0, 0.0, 0.00000005)

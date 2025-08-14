@@ -297,7 +297,11 @@ class SetupMono(Setup):
             self.left.out.link(self.left_manip.inputImage)
             self.left_manip.out.link(self.output_video.input)
         else:
-            self.left.out.link(self.output_video.input)
+            self.left_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
+            self.left_manip.initialConfig.setVerticalFlip(True)
+            self.left.out.link(self.left_manip.inputImage)
+            self.left_manip.out.link(self.output_video.input)
+            # self.left.out.link(self.output_video.input)
 
         self.mono_control: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.mono_control.setStreamName('mono_control')
@@ -314,6 +318,7 @@ class SetupMonoYolo(SetupMono):
         else:
             self.manip.initialConfig.setResize(640,352)
             self.manip.initialConfig.setKeepAspectRatio(False)
+            self.manip.initialConfig.setVerticalFlip(True)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         self.left.out.link(self.manip.inputImage)
 

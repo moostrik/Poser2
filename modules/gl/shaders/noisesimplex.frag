@@ -119,11 +119,11 @@ void main() {
 	vec2 p = (texCoord * 2.0 - vec2(1.0))* resolution * (0.5 - blend * 0.03);
 	vec3 p3 = vec3(p, time*10);
 
-    float value = simplex3d_fractal(p3*0.002);
+    float red = clamp(0.5 + simplex3d_fractal(p3*0.002), 0.0, 1.0);
+    float green = clamp(0.5 + simplex3d_fractal(p3*0.00132), 0.0, 1.0);
+    float blue = clamp(0.5 + simplex3d_fractal(p3*0.00228), 0.0, 1.0);
 
-	value = clamp(0.5 + value, 0.0, 1.0);
-
-    fragColor = vec4(vec3(value), 1.0);
+    fragColor = vec4(red, green, blue, 1.0);
 
 }
 

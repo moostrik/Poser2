@@ -70,16 +70,27 @@ class SynchronyCam(BaseRender):
         other_keys: list[int] = [i for i in range(len(cam_fbos)) if i != key]
 
         syncs: PairCorrelationStreamData | None = self.data.get_correlation_streams(False, self.key())
-        if syncs is None:
-            return
-        scores: dict[int, float] = syncs.get_correlation_for_key(key)
+
+
+        score_1: float = 0.0# math.pow(scores.get(other_keys[0], 0.0), 2.0)
+        score_2: float = 0.0 #math.pow(scores.get(other_keys[1], 0.0), 2.0)
+        # if syncs is None:
+        #     glColor4f(1.0, 1.0, 1.0, 1.0)
+        #     self.fbo.begin()
+        #     glClearColor(0.0, 0.0, 0.0, 1.0)
+        #     glClear(GL_COLOR_BUFFER_BIT)
+        #     self.fbo.end()
+        #     return
+
+        if syncs is not None:
+            scores: dict[int, float] = syncs.get_correlation_for_key(key)
+
+            score_1 = math.pow(scores.get(other_keys[0], 0.0), 2.0)
+            score_2 = math.pow(scores.get(other_keys[1], 0.0), 2.0)
 
         main_fbo = cam_fbos[key]
         other_fbo_1 = cam_fbos[other_keys[0]]
         other_fbo_2 = cam_fbos[other_keys[1]]
-        score_1 = math.pow(scores.get(other_keys[0], 0.0), 2.0)
-        score_2 = math.pow(scores.get(other_keys[1], 0.0), 2.0)
-
 
         BaseRender.setView(self.fbo.width, self.fbo.height)
 
@@ -88,13 +99,13 @@ class SynchronyCam(BaseRender):
         if not SynchronyCam.noise_shader.allocated:
             SynchronyCam.noise_shader.allocate(True)
 
-        glColor4f(1.0, 1.0, 1.0, 1.0)
-        self.fbo.begin()
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT)
-        self.fbo.end()
+        # glColor4f(1.0, 1.0, 1.0, 1.0)
+        # self.fbo.begin()
+        # glClearColor(1.0, 0.0, 0.0, 1.0)
+        # glClear(GL_COLOR_BUFFER_BIT)
+        # self.fbo.end()
 
-        SynchronyCam.noise_shader.use(self.noise_fbo.fbo_id, 20, 3500, self.fbo.width, self.fbo.height)
+        SynchronyCam.noise_shader.use(self.noise_fbo.fbo_id, 40, 600, self.fbo.width, self.fbo.height)
         SynchronyCam.shader.use(self.fbo.fbo_id, main_fbo.tex_id, other_fbo_1.tex_id, other_fbo_2.tex_id, self.noise_fbo.tex_id, score_1, score_2)
 
 
