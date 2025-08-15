@@ -64,15 +64,6 @@ class MovementCamRender(BaseRender):
     def update(self, cam_fbo: Fbo) -> None:
         key: int = self.cam_id
 
-        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.key())
-        if pose_stream is not None:
-            self.movement_for_synchrony = pose_stream.mean_movement
-            if pose_stream.mean_movement > 0.005:
-                self.movement = 0.03
-            else:
-                self.movement = 0.001
-            # if key == 0:
-            #     print(f'pose_stream.mean_movement: {pose_stream.mean_movement: .3f}')
 
 
         tracklets: list[Tracklet] = self.data.get_tracklets_for_cam(self.cam_id)
@@ -84,14 +75,26 @@ class MovementCamRender(BaseRender):
             self.clear_fbo()
             return
 
+        glColor4f(0.0, 0., 0., 0.01)
+        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.key())
+        if pose_stream is not None:
+            self.movement_for_synchrony = pose_stream.mean_movement
+            if pose_stream.mean_movement > 0.009:
+                self.movement = 0.03
 
-        alpha: float = self.movement
-        if self.cam_id == 0: # Red
-            glColor4f(1.0, 0., 0., alpha) # Red
-        elif self.cam_id == 1: # Yellow
-            glColor4f(0.84, 0.76, 0., alpha)
-        elif self.cam_id == 2: # Cyan
-            glColor4f(0.0, 0.9, 1.0, alpha)
+                alpha: float = 0.25
+                if self.cam_id == 0: # Red
+                    glColor4f(1.0, 0., 0., alpha) # Red
+                elif self.cam_id == 1: # Yellow
+                    glColor4f(0.84, 0.76, 0., alpha)
+                elif self.cam_id == 2: # Cyan
+                    glColor4f(0.0, 0.9, 1.0, alpha)
+            else:
+                self.movement = 0.001
+            # if key == 0:
+            #     print(f'pose_stream.mean_movement: {pose_stream.mean_movement: .3f}')
+
+
 
 
         BaseRender.setView(self.color_fbo.width, self.color_fbo.height)
@@ -114,7 +117,7 @@ class MovementCamRender(BaseRender):
         brightness: float = 0.5
         contrast: float = 1.9
 
-        exposure: float = 1.3
+        exposure: float = 1.1
         offset: float = 0.0
         gamma: float = 0.2
 

@@ -56,6 +56,8 @@ class SyncRecorderGui(SyncRecorder):
         print("Sending signal to HDT")
         self.marker_signal_1 = True
         self.marker_signal_1_time = time.time()
+        if self.gui is not None:
+            self.gui.updateElement('Rec', False)
         # self.osc_client.send_message("/HDT/signal", 1)
 
     def gui_marker_2(self) -> None:

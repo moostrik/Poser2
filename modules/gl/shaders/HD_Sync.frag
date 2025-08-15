@@ -31,8 +31,8 @@ void main() {
 
     vec4 color = texel0 * w0 + texel1 * w1 + texel2 * w2;
     float magnitude = length(color.rgb);
-    color *= 2.0;
-    float t = 2.0;
+    color *= 3.0;
+    float t = 1.2;
     if (magnitude > t) {
         color.rgb = (color.rgb / magnitude) * t;
     }
