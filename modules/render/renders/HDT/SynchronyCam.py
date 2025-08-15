@@ -38,8 +38,6 @@ class SynchronyCam(BaseRender):
         self.noise_fbo: Fbo = Fbo()
         self.cam_image: Image = Image()
 
-        self.clear_hack = True
-
         self.movement: float = 0.0
         text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -73,12 +71,6 @@ class SynchronyCam(BaseRender):
 
         syncs: PairCorrelationStreamData | None = self.data.get_correlation_streams(False, self.key())
 
-        tracklets: list[Tracklet] = self.data.get_tracklets_for_cam(self.cam_id)
-        if not tracklets:
-            self.fbo.begin()
-            glClearColor(0.0, 0.0, 0.0, 1.0)
-            glClear(GL_COLOR_BUFFER_BIT)
-            self.fbo.end()
 
         score_1: float = 0.0
         score_2: float = 0.0
@@ -89,13 +81,6 @@ class SynchronyCam(BaseRender):
 
             score_1 = math.pow(scores.get(other_keys[0], 0.0), 1.5)
             score_2 = math.pow(scores.get(other_keys[1], 0.0), 1.5)
-
-            if self.clear_hack:
-                self.fbo.begin()
-                glClearColor(0.0, 0.0, 0.0, 1.0)
-                glClear(GL_COLOR_BUFFER_BIT)
-                self.fbo.end()
-                self.clear_hack = False
 
         main_fbo = cam_fbos[key]
         other_fbo_1 = cam_fbos[other_keys[0]]
