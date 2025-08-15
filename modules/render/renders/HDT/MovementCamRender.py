@@ -70,7 +70,7 @@ class MovementCamRender(BaseRender):
             if pose_stream.mean_movement > 0.005:
                 self.movement = 0.03
             else:
-                self.movement = 0.005
+                self.movement = 0.001
             # if key == 0:
             #     print(f'pose_stream.mean_movement: {pose_stream.mean_movement: .3f}')
 
