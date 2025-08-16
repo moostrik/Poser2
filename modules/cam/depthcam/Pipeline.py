@@ -301,7 +301,7 @@ class SetupMono(Setup):
             self.left_manip.initialConfig.setVerticalFlip(False)
             mesh_w: int = 2
             mesh_h: int = 64
-            warp_mesh: list[dai.Point2f] = find_perspective_warp(1280, 720, 180, False, False, mesh_w, mesh_h)
+            warp_mesh: list[dai.Point2f] = find_perspective_warp(1280, 720, -180, False, True, mesh_w, mesh_h)
 
             self.left_manip.setWarpMesh(warp_mesh, mesh_w, mesh_h)
             self.left.out.link(self.left_manip.inputImage)

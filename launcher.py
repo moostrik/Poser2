@@ -36,7 +36,10 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     currentPath: str = path.dirname(__file__)
 
-    camera_list: list[str] = ['14442C1081DA90D000']
+    camera_list: list[str] = ['14442C101136D1D200',
+                              '14442C10F124D9D600',
+                              '14442C10110AD3D200',
+                              '14442C1031DDD2D200']
 
     if args.numcameras < len(camera_list):
         camera_list = camera_list[:args.numcameras]
@@ -132,7 +135,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.tracker_type =     TrackerType.ONEPERCAM
 
     settings.check_values()
-    settings.check_cameras()
+    # settings.check_cameras()
 
     app = Main(settings)
     app.start()
