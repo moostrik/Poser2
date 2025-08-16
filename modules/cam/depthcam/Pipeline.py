@@ -298,7 +298,12 @@ class SetupMono(Setup):
             self.left_manip.out.link(self.output_video.input)
         else:
             self.left_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-            self.left_manip.initialConfig.setVerticalFlip(True)
+            self.left_manip.initialConfig.setVerticalFlip(False)
+            mesh_w: int = 2
+            mesh_h: int = 64
+            warp_mesh: list[dai.Point2f] = find_perspective_warp(1280, 720, 180, False, False, mesh_w, mesh_h)
+
+            self.left_manip.setWarpMesh(warp_mesh, mesh_w, mesh_h)
             self.left.out.link(self.left_manip.inputImage)
             self.left_manip.out.link(self.output_video.input)
             # self.left.out.link(self.output_video.input)
@@ -318,9 +323,8 @@ class SetupMonoYolo(SetupMono):
         else:
             self.manip.initialConfig.setResize(640,352)
             self.manip.initialConfig.setKeepAspectRatio(False)
-            self.manip.initialConfig.setVerticalFlip(True)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-        self.left.out.link(self.manip.inputImage)
+        self.left_manip.out.link(self.manip.inputImage)
 
         self.detection_network: dai.node.YoloDetectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork)
         self.detection_network.setBlobPath(nn_path)
@@ -344,6 +348,10 @@ class SetupMonoYolo(SetupMono):
         self.output_tracklets: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.output_tracklets.setStreamName("tracklets")
         self.object_tracker.out.link(self.output_tracklets.input)
+
+
+
+
 
 class SetupMonoStereo(SetupMono):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool) -> None:
@@ -656,3 +664,42 @@ class SimulationMonoStereoYolo(SimulationMonoStereo):
 
         pipeline.remove(self.output_left)
         pipeline.remove(self.output_right)
+
+import cv2
+import numpy as np
+
+def find_perspective_warp(width, height, width_offset, flip_h, flip_v, mesh_w, mesh_h)  -> list[dai.Point2f]:
+    src_points: np.ndarray = np.array([
+        [0, 0],             # Top-left
+        [width, 0],         # Top-right
+        [width, height],    # Bottom-right
+        [0, height]         # Bottom-left
+    ], dtype=np.float32)
+
+    dst_points: np.ndarray = np.array([
+        [width_offset, 0],
+        [width - width_offset, 0],
+        [width + width_offset, height],
+        [-width_offset, height]
+    ], dtype=np.float32)
+
+    if flip_h:
+        dst_points[:, 0] = width - dst_points[:, 0]
+    if flip_v:
+        dst_points[:, 1] = height - dst_points[:, 1]
+
+    H: np.ndarray = cv2.getPerspectiveTransform(src_points, dst_points)
+    H_inv: np.ndarray = np.linalg.inv(H)
+
+    grid_x: np.ndarray = np.linspace(0, width - 1, mesh_w)
+    grid_y: np.ndarray = np.linspace(0, height - 1, mesh_h)
+
+    mesh_points: list[dai.Point2f] = []
+    for y in grid_y:
+        for x in grid_x:
+            p: np.ndarray = np.array([x, y, 1.0])
+            src = H_inv @ p
+            src /= src[2]  # normalize
+            mesh_points.append(dai.Point2f(float(src[0]), float(src[1])))
+
+    return mesh_points

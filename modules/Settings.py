@@ -105,6 +105,8 @@ class Settings():
     def check_cameras(self) -> None:
         available: list[str]  = get_device_list()
         selected: list[str] = []
+        print(f"Available cameras: {available}")
+        return
         for camera in self.camera_list:
             if camera not in available:
                 print(f"Omitting camera '{camera}' not found in camera list")

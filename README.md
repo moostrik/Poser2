@@ -27,6 +27,9 @@ https://code.visualstudio.com/Download
 * Download from [site](https://www.python.org/downloads/release/python-3106/)
 * start webui to downoad dependencies
 
+# Install Visual C++ Redistributable
+ONNX Runtime needs the Microsoft Visual C++ Redistributable. [Download](https://aka.ms/vs/17/release/vc_redist.x64.exe) and install it, then restart your computer.
+
 # run install.bat
 
 # run start.bat
@@ -36,7 +39,7 @@ https://code.visualstudio.com/Download
 * Press Windows+R to open the Run dialog, type shell:Common Startup
 * move shortcut to startup folder
 
-# onnx CUDA install
+# onnx CUDA install (REDUNDANT)
 * Using onnxruntime-gpy 1.18.1
 * [instructions](https://onnxruntime.ai/docs/install/#cuda-and-cudnn) follow 'CUDA and CuDNN', not 'Pyhton installs'
 * express install cuda 11.8 from [site](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Windows&target_arch=x86_64&target_version=11&target_type=exe_local)
@@ -47,3 +50,7 @@ https://code.visualstudio.com/Download
 # Hints
 * RUNNING SCRIPTS IS DISABLED: ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```
 * Could not find the DLL(s) 'msvcp140.dll: https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
+
+
+
+
