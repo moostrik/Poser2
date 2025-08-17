@@ -27,6 +27,7 @@ class CentreCameraRender(BaseRender):
 
         self.smooth_rect: PoseSmoothRect = PoseSmoothRect()
 
+        self.last_pose: Pose | None = None
         self.last_Rect: Rect | None = None
         # self.last_tracklet: Tracklet | None = None
         text_init()
@@ -53,7 +54,10 @@ class CentreCameraRender(BaseRender):
         pose: Pose | None = self.data.get_pose(key, False, self.key())
 
         if pose is not None:
-            self.last_Rect = self.smooth_rect._update(pose)
+            self.last_pose = pose
+
+        if self.last_pose is not None:
+            self.last_Rect = self.smooth_rect._update(self.last_pose)
 
             # if pose.smooth_rect is not None:
             #     self.last_Rect = pose.smooth_rect
@@ -127,7 +131,7 @@ class PoseSmoothRect():
         self.nose_dest_y: float = 0.4
         self.bottom_dest_y: float = 0.95
 
-        self.spring_constant: float = 500.0
+        self.spring_constant: float = 200.0
         self.damping_ratio: float = 0.9
 
         # Get the bottom and nose positions
