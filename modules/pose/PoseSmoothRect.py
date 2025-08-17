@@ -19,9 +19,12 @@ class PoseSmoothRect():
         self.rect_output_callbacks: set[PoseCallback] = set()
         self.callback_lock: Lock = Lock()
 
-        # Smoothing properties
-        self.smoothing_factor: float = smoothing_factor
         self.current_rect: Optional[Rect] = None
+
+        # Spring-damper system state
+        self.velocity: Rect = Rect(0.0, 0.0, 0.0, 0.0)
+        self.spring_constant: float = 1000.0
+        self.damping_ratio: float = 0.9
 
         # Target relative positions
         self.nose_dest_x: float = 0.5   # Nose centered horizontally
@@ -29,6 +32,7 @@ class PoseSmoothRect():
         self.bottom_dest_y: float = 0.9  # Lowest ankle at 90% from the top
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
+
 
     def _update(self, pose: Pose) -> None:
 
@@ -38,6 +42,10 @@ class PoseSmoothRect():
         self.bottom_dest_y: float = 0.95
         self.src_aspectratio: float = 16 / 9
         self.dst_aspectratio: float = 9 / 16
+
+
+        self.spring_constant: float = 1000.0
+        self.damping_ratio: float = 0.9
 
         # Get the bottom and nose positions
         pose_rect: Rect | None = pose.crop_rect
@@ -65,31 +73,35 @@ class PoseSmoothRect():
         top: float = nose_y - height * self.nose_dest_y
         new_rect = Rect(left, top, width, height)
 
-        # Apply smoothing
-        x_smooth: float = self.smoothing_factor
-        y_smooth: float = self.smoothing_factor / self.src_aspectratio
-
+        # Apply spring-damper smoothing
         if self.current_rect is not None:
-            s_x: float = (1 - x_smooth) * self.current_rect.x + x_smooth * new_rect.x
-            s_y: float = (1 - y_smooth) * self.current_rect.y + y_smooth * new_rect.y
-            s_h: float = (1 - y_smooth) * self.current_rect.height + y_smooth * new_rect.height
-            s_w: float = s_h * self.dst_aspectratio
-            smooth_rect = Rect(x=s_x, y=s_y, height=s_h, width=s_w)
-            self.current_rect = smooth_rect
+            smooth_x, self.velocity.x = self._apply_spring_damper(
+                new_rect.x, self.current_rect.x, self.velocity.x,
+                self.spring_constant, self.damping_ratio
+            )
+            smooth_y, self.velocity.y = self._apply_spring_damper(
+                new_rect.y, self.current_rect.y, self.velocity.y,
+                self.spring_constant, self.damping_ratio
+            )
+            smooth_h, self.velocity.height = self._apply_spring_damper(
+                new_rect.height, self.current_rect.height, self.velocity.height,
+                self.spring_constant, self.damping_ratio
+            )
+            smooth_w: float = smooth_h * self.dst_aspectratio
+            self.current_rect = Rect(x=smooth_x, y=smooth_y, height=smooth_h, width=smooth_w)
         else:
             self.current_rect = new_rect
-
-        # self.current_rect = new_rect
 
         # Notify callbacks with the updated rectangle
         self._notify_callback(pose, self.current_rect)
 
         if pose.is_final:
-            # Reset current_rect when the pose is final
             self.current_rect = None
+            self.velocity = Rect(0.0, 0.0, 0.0, 0.0)
 
     def pose_input(self, pose: Pose) -> None:
         """Add a pose to the processing queue"""
+
         self._update(pose)
 
     def add_pose_callback(self, callback: PoseCallback) -> None:
@@ -105,3 +117,27 @@ class PoseSmoothRect():
             for callback in self.rect_output_callbacks:
                 callback(new_pose)
 
+    # STATIC METHODS
+    @staticmethod
+    def _apply_spring_damper(new_value: float, current_value: float,
+                           velocity: float, spring_constant: float,
+                           damping_ratio: float, dt: float = 1.0/60.0) -> tuple[float, float]:
+        """Apply spring-damper physics to a single value. Returns (new_value, new_velocity)"""
+        if current_value is None:
+            return new_value, 0.0
+
+        # Calculate spring force
+        displacement = new_value - current_value
+        spring_force = spring_constant * displacement
+
+        # Calculate damping force
+        damping_force = -2.0 * damping_ratio * np.sqrt(spring_constant) * velocity
+
+        # Update velocity
+        total_force = spring_force + damping_force
+        new_velocity = velocity + total_force * dt
+
+        # Update position
+        result_value = current_value + new_velocity * dt
+
+        return result_value, new_velocity
