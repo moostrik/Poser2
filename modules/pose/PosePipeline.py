@@ -13,6 +13,7 @@ from modules.pose.PoseDefinitions import ModelTypeNames, Pose, PoseCallback
 from modules.pose.PoseDetection import Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.pose.PoseAngleCalculator import PoseAngleCalculator
+from modules.pose.PoseSmoothRect import PoseSmoothRect
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -32,6 +33,7 @@ class PosePipeline(Thread):
         self.pose_crop_expansion: float = settings.pose_crop_expansion
         self.max_detectors: int = settings.max_players
         self.pose_detectors: dict[int, Detection] = {}
+        self.smooth_rects: dict[int, PoseSmoothRect] = {}
 
         self.image_processor: PoseImageProcessor = PoseImageProcessor(
             crop_expansion=self.pose_crop_expansion,
@@ -41,6 +43,7 @@ class PosePipeline(Thread):
         if self.pose_active:
             for i in range(self.max_detectors):
                 self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type, True)
+                self.smooth_rects[i] = PoseSmoothRect()
             print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')
@@ -62,9 +65,13 @@ class PosePipeline(Thread):
         self.joint_angles.add_pose_callback(self._notify_pose_callback)
         self.joint_angles.start()
 
+        for smooth_rect in self.smooth_rects.values():
+            smooth_rect.add_pose_callback(self.joint_angles.pose_input)
+
         # Start detectors
-        for detector in self.pose_detectors.values():
-            detector.addMessageCallback(self.joint_angles.pose_input)
+        for key, detector in self.pose_detectors.items():
+            detector.addMessageCallback(self.smooth_rects[key].pose_input)
+            # detector.addMessageCallback(self.joint_angles.pose_input)
             detector.start()
             self.pose_detector_frame_size = detector.get_frame_size()
 

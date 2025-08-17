@@ -170,12 +170,31 @@ class Pose:
     tracklet: Tracklet = field(repr=False)
 
     crop_rect: Optional[Rect] = field(default = None)
+    smooth_rect: Optional[Rect] = field(default = None)
     image: Optional[np.ndarray] = field(default = None, repr=False)
 
     points: Optional[PosePoints] = field(default=None, repr=False)
     angles: Optional[JointAngleDict] = field(default=None)
 
     is_final: bool = field(default=False, repr=False)
+
+    def get_absolute_keypoints(self) -> Optional[np.ndarray]:
+        """
+        Get keypoints in the original rectangle coordinates.
+        Returns a tuple of (keypoints, scores) or None if not available.
+        """
+        if self.points is None or self.crop_rect is None:
+            return None
+
+        keypoints = self.points.keypoints  # Normalized coordinates within the model
+        rect = self.crop_rect
+
+        # Convert from normalized coordinates to actual pixel coordinates in the crop rect
+        real_keypoints = np.zeros_like(keypoints)
+        real_keypoints[:, 0] = keypoints[:, 0] * rect.width + rect.x  # x coordinates
+        real_keypoints[:, 1] = keypoints[:, 1] * rect.height + rect.y  # y coordinates
+
+        return real_keypoints
 
 
 PoseCallback = Callable[[Pose], None]

@@ -9,6 +9,7 @@ from modules.gl.Image import Image
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
+from modules.pose.PoseDefinitions import Pose, PoseAngleNames
 from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
@@ -24,7 +25,8 @@ class CentreCameraRender(BaseRender):
         self.cam_fbo: Fbo = Fbo()
         self.cam_image: Image = Image()
 
-        self.last_tracklet: Tracklet | None = None
+        self.last_Rect: Rect | None = None
+        # self.last_tracklet: Tracklet | None = None
         text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -41,18 +43,18 @@ class CentreCameraRender(BaseRender):
         key: int = self.cam_id
 
         tracklets: list[Tracklet] = self.data.get_tracklets_for_cam(self.cam_id)
-        if tracklets:
-            self.last_tracklet = tracklets[0]
-
-        if self.last_tracklet is None:
+        if not tracklets:
             self.clear_fbo()
             return
+        # cam_image_roi: Rect = getattr(self.last_tracklet.metadata, "smooth_rect", Rect(0.0, 0.0, 1.0, 1.0))
 
-        tracklet_metadata: TrackerMetadata | None = self.last_tracklet.metadata
-        if tracklet_metadata is None or tracklet_metadata.tracker_type != TrackerType.ONEPERCAM:
-            self.clear_fbo()
-            return
-        cam_image_roi: Rect = getattr(self.last_tracklet.metadata, "smooth_rect", Rect(0.0, 0.0, 1.0, 1.0))
+        pose: Pose | None = self.data.get_pose(key, True, self.key())
+        if pose is not None:
+            if pose.smooth_rect is not None:
+                self.last_Rect = pose.smooth_rect
+
+        if self.last_Rect is None:
+            self.last_Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
         cam_image_np: np.ndarray | None = self.data.get_cam_image(key, True, self.key())
 
@@ -60,16 +62,21 @@ class CentreCameraRender(BaseRender):
             self.cam_image.set_image(cam_image_np)
             self.cam_image.update()
 
+
+
+        # print (self.cam_image.width,self.cam_image.height)
         cam_image_aspect_ratio: float = self.cam_image.width / self.cam_image.height
-        width: float = cam_image_roi.width / cam_image_aspect_ratio
-        x: float = cam_image_roi.x + (cam_image_roi.width - width) / 2.0
+
+        width: float =  self.last_Rect.width / cam_image_aspect_ratio
+
+        x: float =  self.last_Rect.x + ( self.last_Rect.width - width) / 2.0
 
 
         BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
 
         self.cam_image.draw_roi(0, 0, self.cam_fbo.width, self.cam_fbo.height,
-                                x, cam_image_roi.y, width, cam_image_roi.height)
+                                x,  self.last_Rect.y, width,  self.last_Rect.height)
 
         glColor4f(1.0, 1.0, 1.0, 1.0)
         self.cam_fbo.end()
