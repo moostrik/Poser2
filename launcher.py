@@ -44,7 +44,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     if args.numcameras < len(camera_list):
         camera_list = camera_list[:args.numcameras]
 
-    udp_list: list[str] = ['127.0.0.1',]
+    udp_list: list[str] = ['127.0.0.1','10.0.0.81']
 
     # camera_list: list[str] = ['14442C10F124D9D600']
 
@@ -116,7 +116,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_monitor =       0
     settings.render_R_num =         3
 
-    settings.art_type =             Settings.ArtType.HDT
+    #settings.art_type =             Settings.ArtType.HDT
     if args.whitespace:
         settings.art_type = Settings.ArtType.WS
 

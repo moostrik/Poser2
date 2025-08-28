@@ -109,23 +109,23 @@ class UdpSender(threading.Thread):
             message_list.append(bundle.build())
 
             if IMG_TYPE == np.float32:
-                white_channel: np.ndarray = UdpSender.float_to_uint8(av_output.img[0, :, 0])
-                blue_channel: np.ndarray = UdpSender.float_to_uint8(av_output.img[0, :, 1])
+                white_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 0])
+                blue_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 1])
             elif IMG_TYPE == np.uint8:
-                white_channel: np.ndarray = UdpSender.float_to_uint8(av_output.img[0, :, 0])
-                blue_channel: np.ndarray = UdpSender.float_to_uint8(av_output.img[0, :, 1])
+                white_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 0])
+                blue_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 1])
 
             for i in range(num_chunks):
                 start_idx: int = i * chunk_size
                 end_idx: int = min((i + 1) * chunk_size, len(white_channel))
 
                 white_chunk_bytes: bytes = white_channel[start_idx:end_idx].tobytes()
-                wc_msgb = OscMessageBuilder(f"/WS/white/chunk/{i}")
+                wc_msgb = OscMessageBuilder(f"/WS/white{i}")
                 wc_msgb.add_arg(white_chunk_bytes, 'b')
                 message_list.append(wc_msgb.build())
 
                 blue_chunk_bytes: bytes = blue_channel[start_idx:end_idx].tobytes()
-                bc_msgb = OscMessageBuilder(f"/WS/blue/chunk/{i}")
+                bc_msgb = OscMessageBuilder(f"/WS/blue{i}")
                 bc_msgb.add_arg(blue_chunk_bytes, 'b')
                 message_list.append(bc_msgb.build())
 

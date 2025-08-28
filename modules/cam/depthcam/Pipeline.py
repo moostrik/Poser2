@@ -286,6 +286,7 @@ class SetupMono(Setup):
         self.left.setCamera("left")
         self.left.setResolution(self.resolution)
         self.left.setFps(self.fps)
+        # self.left.setImageOrientation(dai.CameraImageOrientation.VERTICAL_FLIP)
 
         self.output_video: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.output_video.setStreamName("video")
@@ -301,7 +302,7 @@ class SetupMono(Setup):
             self.left_manip.initialConfig.setVerticalFlip(False)
             mesh_w: int = 2
             mesh_h: int = 64
-            warp_mesh: list[dai.Point2f] = find_perspective_warp(1280, 720, -180, False, True, mesh_w, mesh_h)
+            warp_mesh: list[dai.Point2f] = find_perspective_warp(1280, 720, -40, False, False, mesh_w, mesh_h)
 
             self.left_manip.setWarpMesh(warp_mesh, mesh_w, mesh_h)
             self.left.out.link(self.left_manip.inputImage)
