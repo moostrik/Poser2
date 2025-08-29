@@ -112,10 +112,11 @@ class UdpSender(threading.Thread):
                 white_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 0])
                 blue_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 1])
             elif IMG_TYPE == np.uint8:
-                white_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 0])
-                blue_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 1])
+                white_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.img[0, :, 0])
+                blue_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.img[0, :, 1])
 
             for i in range(num_chunks):
+
                 start_idx: int = i * chunk_size
                 end_idx: int = min((i + 1) * chunk_size, len(white_channel))
 

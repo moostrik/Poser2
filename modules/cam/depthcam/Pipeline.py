@@ -3,6 +3,13 @@ from datetime import timedelta
 from pathlib import Path
 
 from modules.cam.depthcam.Definitions import *
+from dataclasses import dataclass
+
+@dataclass
+class PerspectiveConfig:
+    flip_h: bool
+    flip_v: bool
+    perspective: float
 
 def get_frame_types(do_color: bool, do_stereo: bool, show_stereo: bool, simulate: bool) -> list[FrameType]:
     frame_types: list[FrameType] = [FrameType.NONE_]
@@ -46,6 +53,7 @@ def setup_pipeline(
     do_stereo: bool = True,
     do_yolo: bool = True,
     show_stereo: bool = False,
+    perspective: PerspectiveConfig = PerspectiveConfig(False, False, 0.0),
     simulate: bool = False
     ) -> None:
 
@@ -85,9 +93,9 @@ def setup_pipeline(
                     SetupMonoStereo(pipeline, fps, show_stereo = True)
             else:
                 if do_yolo:
-                    SetupMonoYolo(pipeline, fps, square, nn_path)
+                    SetupMonoYolo(pipeline, fps, square, nn_path, perspective)
                 else:
-                    SetupMono(pipeline, fps, square)
+                    SetupMono(pipeline, fps, square, perspective)
     else:
         if do_color:
             if do_stereo:
@@ -275,47 +283,34 @@ class SetupColorStereoYolo(SetupColorStereo):
 
 
 class SetupMono(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig = PerspectiveConfig(False, False, 0.0)) -> None:
         super().__init__(pipeline, fps)
         self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
-
-        # self.makelightwork: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
-        # self.makelightwork.setCamera("left")
-
         self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
         self.left.setCamera("left")
         self.left.setResolution(self.resolution)
         self.left.setFps(self.fps)
-        # self.left.setImageOrientation(dai.CameraImageOrientation.VERTICAL_FLIP)
 
         self.output_video: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.output_video.setStreamName("video")
 
-        if square:
-            self.left_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-            self.left_manip.initialConfig.setResize(720, 720)
-            self.left_manip.initialConfig.setKeepAspectRatio(True)
-            self.left.out.link(self.left_manip.inputImage)
-            self.left_manip.out.link(self.output_video.input)
-        else:
-            self.left_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-            self.left_manip.initialConfig.setVerticalFlip(False)
-            mesh_w: int = 2
-            mesh_h: int = 64
-            warp_mesh: list[dai.Point2f] = find_perspective_warp(1280, 720, -40, False, False, mesh_w, mesh_h)
+        self.left_warp: dai.node.Warp = pipeline.create(dai.node.Warp)
+        warp_p: float = 1280 * 0.5 * perspective.perspective
+        mesh_w: int = 2
+        mesh_h: int = 64
+        warp_mesh: list[dai.Point2f] = find_perspective_warp(1280, 720, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
 
-            self.left_manip.setWarpMesh(warp_mesh, mesh_w, mesh_h)
-            self.left.out.link(self.left_manip.inputImage)
-            self.left_manip.out.link(self.output_video.input)
-            # self.left.out.link(self.output_video.input)
+        self.left_warp.setWarpMesh(warp_mesh, mesh_w, mesh_h)
+        self.left.out.link(self.left_warp.inputImage)
+        self.left_warp.out.link(self.output_video.input)
 
         self.mono_control: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.mono_control.setStreamName('mono_control')
         self.mono_control.out.link(self.left.inputControl)
 
 class SetupMonoYolo(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, square)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path, perspective: PerspectiveConfig = PerspectiveConfig(False, False, 0.0)) -> None:
+        super().__init__(pipeline, fps, square, perspective)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         if square:
@@ -325,7 +320,7 @@ class SetupMonoYolo(SetupMono):
             self.manip.initialConfig.setResize(640,352)
             self.manip.initialConfig.setKeepAspectRatio(False)
         self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-        self.left_manip.out.link(self.manip.inputImage)
+        self.left_warp.out.link(self.manip.inputImage)
 
         self.detection_network: dai.node.YoloDetectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork)
         self.detection_network.setBlobPath(nn_path)

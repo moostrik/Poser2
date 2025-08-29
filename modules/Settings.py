@@ -45,6 +45,9 @@ class Settings():
         self.camera_simulation: bool            = None # type: ignore
         self.camera_passthrough: bool           = None # type: ignore
         self.camera_manual: bool                = None # type: ignore
+        self.camera_flip_h: bool                = None # type: ignore
+        self.camera_flip_v: bool                = None # type: ignore
+        self.camera_perspective: float          = None # type: ignore
 
         # RECORDER AND PLAYER SETTINGS
         self.video_chunk_length: float          = None # type: ignore
