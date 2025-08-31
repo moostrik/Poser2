@@ -28,13 +28,15 @@ class PosePipeline(Thread):
         self.input_frames: dict[int, np.ndarray] = {}
 
         self.pose_active: bool = settings.pose_active
-        self.pose_detector_frame_size: int = 256
+        self.pose_detector_frame_width: int = 192
+        self.pose_detector_frame_height: int = 256
         self.pose_crop_expansion: float = settings.pose_crop_expansion
         self.max_detectors: int = settings.max_players
         self.pose_detectors: dict[int, Detection] = {}
         self.image_processor: PoseImageProcessor = PoseImageProcessor(
             crop_expansion=self.pose_crop_expansion,
-            output_size=self.pose_detector_frame_size
+            output_width=self.pose_detector_frame_width,
+            output_height=self.pose_detector_frame_height
         )
 
         if self.pose_active:
@@ -65,7 +67,6 @@ class PosePipeline(Thread):
         for key, detector in self.pose_detectors.items():
             detector.addMessageCallback(self.joint_angles.pose_input)
             detector.start()
-            self.pose_detector_frame_size = detector.get_frame_size()
 
         super().start()
 

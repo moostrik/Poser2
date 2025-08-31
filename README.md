@@ -3,54 +3,70 @@ depth cam pose synchony detection
 
 ## INSTALLATION
 
-# install git for windows
+# Git for Windows
 * Download from [site](https://git-scm.com/download/win)
 
-# create ssh key for github
+# SSH Github
 * create ssh key
 ```ssh-keygen -t ed25519 -C "m.oostrik@gmail.com"```
 * copy key and add to github
 
-# install visual studio code and extentions
-https://code.visualstudio.com/Download
+# VSCode
+* Download from [site](https://code.visualstudio.com/Download)
+* install extentions
+    * Pylance
+    * Python
+    * Python Debugger
+    * Python Environments
+    * Python Indent
 
-* Python
-* python Indent
-* Python Environment Manager
-* IntelliCode
+# Python
+* Install python 3.10 from Microsoft Store (or find a better method)
 
-# clone project
-```git@github.com:moostrik/camDiffusers.git```
-* init and update submodules
+# Visual C++ Redistributable
+* install and RESTART [Download](https://aka.ms/vs/17/release/vc_redist.x86.exe)
 
-# install python 3.10.6
-* Download from [site](https://www.python.org/downloads/release/python-3106/)
-* start webui to downoad dependencies
+# Set-ExecutionPolicy
+* open powershell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```
 
-# Install Visual C++ Redistributable
-ONNX Runtime needs the Microsoft Visual C++ Redistributable. [Download](https://aka.ms/vs/17/release/vc_redist.x64.exe) and install it, then restart your computer.
+# Clone Project
+* ```git clone git@github.com:moostrik/DepthPose.git```
 
-# run install.bat
+# Install Project
+* in powershell run ```.\install.bat```
 
-# run start.bat
+# Run Project
+* activate venv and run ```python .\launcher.py```
+* or in powershell run ```.\start.bat```
 
-# add start.bat to startup
+# Startup
 * make a shortcut of start.bat
 * Press Windows+R to open the Run dialog, type shell:Common Startup
 * move shortcut to startup folder
 
-# onnx CUDA install (REDUNDANT)
-* Using onnxruntime-gpy 1.18.1
-* [instructions](https://onnxruntime.ai/docs/install/#cuda-and-cudnn) follow 'CUDA and CuDNN', not 'Pyhton installs'
-* express install cuda 11.8 from [site](https://developer.nvidia.com/cuda-11-8-0-download-archive?target_os=Windows&target_arch=x86_64&target_version=11&target_type=exe_local)
-* install cudnn 8.9.2 from [site](https://developer.nvidia.com/rdp/cudnn-archive) instructions [here](https://docs.nvidia.com/deeplearning/cudnn/archives/cudnn-890/install-guide/index.html) not [here](https://docs.nvidia.com/deeplearning/cudnn/latest/installation/windows.html)
-* install Zlib [download](http://www.winimage.com/zLibDll/zlib123dllx64.zip), following instructions from cudnn
-* add cudnn and Zlib dll folders to Path (RUN, control sysdm.cpl, Advanced, Environment Variables, add multiple values to variable 'path' )
 
-# Hints
-* RUNNING SCRIPTS IS DISABLED: ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```
-* Could not find the DLL(s) 'msvcp140.dll: https://learn.microsoft.com/en-US/cpp/windows/latest-supported-vc-redist?view=msvc-170
+## OPTIONAL
 
-
-
+# build MMPose (for cuda 12.1, probably works for newer cuda)
+* install torch with cuda ```pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121```
+(or, i forgot what i did) ```pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu121``` )
+* install openmim ```pip install openmim```
+* install mmcv ```mim install mmcv==2.1.0```   (this will build mmcv, takes abaout 15 minutes)
+* install mmdet ```mim install mmdet==3.2.0```
+* install mmpose ```mim install mmpose==1.3.2```
+* mim can be used to download the models (If your use case is controlled poses / standard humans, coco is fine.
+If your use case has varied poses or unusual angles, aic-coco is better.)
+  * mim download mmpose --config rtmpose-l_8xb256-420e_aic-coco-256x192  --dest .\models
+  * mim download mmpose --config rtmpose-l_8xb256-420e_aic-coco-384x288  --dest .\models
+  * mim download mmpose --config rtmpose-m_8xb256-420e_aic-coco-256x192  --dest .\models
+  * mim download mmpose --config rtmpose-m_8xb256-420e_aic-coco-384x288  --dest .\models
+  * mim download mmpose --config rtmpose-s_8xb256-420e_aic-coco-256x192  --dest .\models
+  * mim download mmpose --config rtmpose-t_8xb256-420e_aic-coco-256x192  --dest .\models
+* the following links are helpful:
+  * https://pytorch.org/get-started/locally/
+  * https://pypi.org/project/torchvision/
+  * https://github.com/pytorch/pytorch/wiki/PyTorch-Versions
+  * https://mmpose.readthedocs.io/en/latest/installation.html
+  * https://mmcv.readthedocs.io/en/latest/get_started/installation.html
+  * https://mmpose.readthedocs.io/en/latest/model_zoo/body_2d_keypoint.html#coco-dataset
 

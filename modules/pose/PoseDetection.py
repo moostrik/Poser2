@@ -7,26 +7,32 @@ import os
 # Third-party imports
 import cv2
 import numpy as np
-import onnxruntime as ort
+
+import torch
+from mmpose.apis import inference_topdown, init_model
+
 
 # Local application imports
-from modules.pose.PoseDefinitions import Pose, PosePoints, ModelType, ModelFileNames, ModelInputSize
+from modules.pose.PoseDefinitions import Pose, PosePoints, ModelType, ModelFileNames
 
 class Detection(Thread):
     _model_load_lock: Lock = Lock()
     _model_loaded: bool =  False
     _model_type: ModelType = ModelType.NONE
-    _model_path: str
-    _moodel_size: int
-    _model_session: ort.InferenceSession
+    _model_config_file: str = ""
+    _model_checkpoint_file: str = ""
+    _model_width: int = 192
+    _model_height: int = 256
+    _model_session: torch.nn.Module
 
     def __init__(self, path: str, model_type:ModelType, verbose: bool = False) -> None:
         super().__init__()
 
         if Detection._model_type is ModelType.NONE:
             Detection._model_type = model_type
-            Detection._model_path = path
-            Detection._moodel_size = ModelInputSize[model_type.value]
+            Detection._model_config_file = path + '/' + ModelFileNames[model_type.value][0]
+            Detection._model_checkpoint_file = path + '/' + ModelFileNames[model_type.value][1]
+            print(Detection._model_checkpoint_file, Detection._model_config_file)
         else:
             if Detection._model_type is not model_type:
                 print('Pose Detection WARNING: ModelType is different from the first instance')
@@ -44,7 +50,6 @@ class Detection(Thread):
 
     def run(self) -> None:
         self.load_model_once()
-        self.warm_up_inference()
 
         self._running = True
         while self._running:
@@ -67,7 +72,7 @@ class Detection(Thread):
                 # Process the pose
                 image: np.ndarray | None = pose.image
                 if image is not None:
-                    poses: list[PosePoints] = self.run_session(Detection._model_session, Detection._moodel_size, image)
+                    poses: list[PosePoints] = self.run_session(Detection._model_session, image)
                     if len(poses) > 0:
                         pose: Pose = replace(
                             pose,
@@ -79,25 +84,19 @@ class Detection(Thread):
                 # Timeout occurred, continue loop to check _running flag
                 continue
 
-    def load_model_once(self) -> None:
+    def load_model_once(self) -> None:     
         with Detection._model_load_lock:
             if not Detection._model_loaded:
-                Detection._model_session, Detection._moodel_size = self.load_session(self._model_type, Detection._model_path)
+                print("LOAD")
+                model = init_model(Detection._model_config_file, Detection._model_checkpoint_file, device='cuda:0')
+                Detection._model_session = model
                 Detection._model_loaded = True
-
-    def warm_up_inference(self) -> None:
-        input_size: int = Detection._moodel_size
-        dummy_image: np.ndarray = np.zeros((input_size, input_size, 3), dtype=np.uint8)
-        # Run a dummy inference to trigger CUDA/ONNX initialization
-        _: list[PosePoints] = self.run_session(Detection._model_session, input_size, dummy_image)
+                print("END LOAD")
 
     # GETTERS AND SETTERS
     def add_pose(self, pose: Pose) -> None:
         if self._running:
             self._input_queue.put(pose)
-
-    def get_frame_size(self) -> int:
-        return Detection._moodel_size
 
     # CALLBACKS
     def callback(self, pose: Pose) -> None:
@@ -110,68 +109,34 @@ class Detection(Thread):
     def clearMessageCallbacks(self) -> None:
         self._callbacks = set()
 
-    # STATIC METHODS
-    @staticmethod
-    def load_session(model_type: ModelType, model_path: str) -> tuple[ort.InferenceSession, int]:
-        path: str = os.path.join(model_path, ModelFileNames[model_type.value])
-        onnx_session = ort.InferenceSession(
-            path,
-            providers=[
-                'CUDAExecutionProvider',
-                'CPUExecutionProvider'
-            ],
-        )
-        input_size: int = ModelInputSize[model_type.value]
-        return onnx_session, input_size
 
     @staticmethod
-    def run_session(onnx_session: ort.InferenceSession, input_size: int, image: np.ndarray) -> list[PosePoints]:
+    def run_session(session: torch.nn, image: np.ndarray) -> list[PosePoints]:
         height, width = image.shape[:2]
-        if height != input_size or width != input_size:
-            image = Detection.resize_with_pad(image, input_size, input_size)
-        input_image: np.ndarray = image.reshape(-1, input_size, input_size, 3)
-        input_image = input_image.astype('int32')
+        if height != 256 or width != 192:
+            image = Detection.resize_with_pad(image, 192, 256)
+            
+        results = inference_topdown(session, image )
 
-        input_name  = onnx_session.get_inputs()[0].name
-        output_name = onnx_session.get_outputs()[0].name
-        outputs     = onnx_session.run([output_name], {input_name: input_image})
+        poses = []
+        for result in results:
+            pred_instances = result.pred_instances
+            keypoints = pred_instances.keypoints
+            scores = pred_instances.keypoint_scores
 
-        keypoints_with_scores: np.ndarray = outputs[0]
-        keypoints_with_scores = np.squeeze(keypoints_with_scores)
+            for i in range(len(keypoints)):
+                person_keypoints = keypoints[i]  # [num_keypoints, 2]
+                person_scores = scores[i]        # [num_keypoints]
 
-        if Detection._model_type is ModelType.LIGHTNING or Detection._model_type is ModelType.THUNDER:
-            keypoints: np.ndarray = keypoints_with_scores[:, :2]
-            keypoints = np.flip(keypoints, axis=1)
-            scores: np.ndarray = keypoints_with_scores[:, 2]
-            pose = PosePoints(keypoints, scores)
-            return [pose]
-        else: # ModelType.MULTI
-            poses: list[PosePoints] = []
-            for kps in keypoints_with_scores:
+                # Normalize keypoints to [0, 1] range
+                norm_keypoints = person_keypoints.copy()
+                norm_keypoints[:, 0] /= width   # x / width
+                norm_keypoints[:, 1] /= height  # y / height
 
-                mean_score = kps[55]
-                if mean_score < 0.1:
-                    continue
-
-                # make a nd.array of 17 by 3 for the keypoints
-                keypoints: np.ndarray = np.zeros((17, 2), dtype=np.float32)
-                scores: np.ndarray = np.zeros((17), dtype=np.float32)
-                for index in range(17):
-                    x: float = kps[(index * 3) + 1]
-                    y: float = kps[(index * 3) + 0]
-                    s: float = kps[(index * 3) + 2]
-
-                    keypoints[index] = [x, y]
-                    scores[index] = s
-
-                ymin: float = kps[51]
-                xmin: float = kps[52]
-                ymax: float = kps[53]
-                xmax: float = kps[54]
-
-                pose = PosePoints(keypoints, scores)
+                pose = PosePoints(norm_keypoints, person_scores)
+                # print("Normalized Keypoints:", norm_keypoints)
                 poses.append(pose)
-            return poses
+        return poses
 
     @staticmethod
     def resize_with_pad(image, target_width, target_height, padding_color=(0, 0, 0)) -> np.ndarray:

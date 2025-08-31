@@ -21,25 +21,20 @@ MULTIPOSE_INSTANCE_SIZE = NUM_KEYPOINTS * NUM_KEYPOINT_VALUES + MULTIPOSE_BOX_SI
 
 
 class ModelType(Enum):
-    NONE =      0
-    THUNDER =   1
-    LIGHTNING = 2
-    MULTI =     3
+    NONE =   0
+    LARGE =  1
+    MEDIUM = 2
+    SMALL =  3
+    TINY =   4
 
 ModelTypeNames: list[str] = [e.name for e in ModelType]
 
-ModelFileNames: list[str] = [
-    'none',
-    'movenet_singlepose_thunder_4.onnx',
-    'movenet_singlepose_lightning_4.onnx',
-    'movenet_multipose_lightning_1.onnx'
-]
-
-ModelInputSize: list[int] = [
-    0,
-    256,
-    192,
-    256,
+ModelFileNames: list[tuple[str, str]] = [
+    ['none', ''],
+    ['rtmpose-l_8xb256-420e_aic-coco-256x192.py', 'rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth'],
+    ['rtmpose-m_8xb256-420e_aic-coco-256x192.py', 'rtmpose-m_simcc-aic-coco_pt-aic-coco_420e-256x192-63eb25f7_20230126.pth'],
+    ['rtmpose-s_8xb256-420e_aic-coco-256x192.py', 'rtmpose-s_simcc-aic-coco_pt-aic-coco_420e-256x192-fcb2599b_20230126.pth'],
+    ['rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth']
 ]
 
 class Keypoint(IntEnum):

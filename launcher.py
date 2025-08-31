@@ -1,5 +1,11 @@
 # TODO
 # Save videos to temporary folder until finished
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+import os
+os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
+
 
 from argparse import ArgumentParser, Namespace
 from os import path
@@ -19,7 +25,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     parser.add_argument('-c',       '--color',          action='store_true',        help='use color input instead of left mono')
     parser.add_argument('-sq',      '--square',         action='store_true',        help='use centre square of the camera')
     parser.add_argument('-ss',      '--showstereo',     action='store_true',        help='queue stereo frames')
-    parser.add_argument('-ll',      '--lightning',      action='store_true',        help='use low latency movenet model')
     parser.add_argument('-st',      '--stereo',         action='store_true',        help='use stereo depth')
     parser.add_argument('-ny',      '--noyolo',         action='store_true',        help='do not do yolo person detection')
     parser.add_argument('-np',      '--nopose',         action='store_true',        help='do not do pose detection')
@@ -84,7 +89,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.tracker_timeout =      2.0 # in seconds
 
     settings.pose_active =      not args.nopose
-    settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.LIGHTNING if args.lightning else ModelType.THUNDER
+    settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.SMALL
     settings.pose_conf_threshold =  0.3
     settings.pose_crop_expansion =  0.1 # * height of the camera
     settings.pose_stream_capacity = int(10 * args.fps)

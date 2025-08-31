@@ -6,9 +6,10 @@ from modules.tracker.Tracklet import Tracklet, Rect
 class PoseImageProcessor:
     """Handles image cropping and processing for pose detection"""
 
-    def __init__(self, crop_expansion: float = 0.0, output_size: int = 256):
+    def __init__(self, crop_expansion: float = 0.0, output_width: int = 192, output_height: int = 256):
         self.crop_expansion = crop_expansion
-        self.output_size = output_size
+        self.output_width = output_width
+        self.output_height = output_height
 
     def process_pose_image(self, tracklet: Tracklet, image: np.ndarray) -> tuple[np.ndarray, Rect]:
         """
@@ -17,7 +18,7 @@ class PoseImageProcessor:
         """
         h, w = image.shape[:2]
         roi = self.get_crop_rect(w, h, tracklet.roi, self.crop_expansion)
-        cropped_image = self.get_cropped_image(image, roi, self.output_size)
+        cropped_image = self.get_cropped_image(image, roi, self.output_width, self.output_height)
         return cropped_image, roi
 
     @staticmethod
@@ -50,7 +51,7 @@ class PoseImageProcessor:
         return Rect(norm_x, norm_y, norm_w, norm_h)
 
     @staticmethod
-    def get_cropped_image(image: np.ndarray, roi: Rect, output_size: int) -> np.ndarray:
+    def get_cropped_image(image: np.ndarray, roi: Rect, output_width: int, output_height: int) -> np.ndarray:
         """Extract and resize the cropped image from the ROI"""
         image_height, image_width = image.shape[:2]
         image_channels = image.shape[2] if len(image.shape) > 2 else 1
@@ -82,4 +83,4 @@ class PoseImageProcessor:
             crop = cv2.copyMakeBorder(crop, top_padding, bottom_padding, left_padding, right_padding, cv2.BORDER_CONSTANT, value=[0, 0, 0])
 
         # Resize the cutout to the desired size
-        return cv2.resize(crop, (output_size, output_size), interpolation=cv2.INTER_AREA)
+        return cv2.resize(crop, (output_width, output_height), interpolation=cv2.INTER_AREA)
