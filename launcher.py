@@ -77,7 +77,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.camera_passthrough =   args.passthrough
     settings.camera_manual =    not args.autoset
     settings.camera_flip_h =        False
-    settings.camera_flip_v =        True
+    settings.camera_flip_v =        False
     settings.camera_perspective =   0.1
 
     settings.video_chunk_length =   args.chunklength

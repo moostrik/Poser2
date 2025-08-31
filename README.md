@@ -17,7 +17,7 @@ depth cam pose synchony detection
     * Pylance
     * Python
     * Python Debugger
-    * Python Environments
+    * Python Environment Manager (deprecated) or Python Environments
     * Python Indent
 
 # Python
