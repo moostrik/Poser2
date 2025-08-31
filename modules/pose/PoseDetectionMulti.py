@@ -3,6 +3,7 @@ from dataclasses import replace
 from queue import Queue
 from threading import Thread, Lock
 import os
+import time
 
 # Third-party imports
 import cv2
@@ -28,7 +29,7 @@ from mmpose.structures.bbox import bbox_xywh2xyxy
 # Local application imports
 from modules.pose.PoseDefinitions import Pose, PosePoints, ModelType, ModelFileNames
 
-class Detection(Thread):
+class PoseDetectionMulti(Thread):
     _model_load_lock: Lock = Lock()
     _model_loaded: bool =  False
     _model_type: ModelType = ModelType.NONE
@@ -37,25 +38,30 @@ class Detection(Thread):
     _model_width: int = 192
     _model_height: int = 256
     _model_session: torch.nn.Module
+    _pipeline: Compose
 
-    def __init__(self, path: str, model_type:ModelType, verbose: bool = False) -> None:
+    def __init__(self, path: str, model_type:ModelType, fps: float = 30.0, verbose: bool = False) -> None:
         super().__init__()
-
-        if Detection._model_type is ModelType.NONE:
-            Detection._model_type = model_type
-            Detection._model_config_file = path + '/' + ModelFileNames[model_type.value][0]
-            Detection._model_checkpoint_file = path + '/' + ModelFileNames[model_type.value][1]
-            print(Detection._model_checkpoint_file, Detection._model_config_file)
+        
+        if PoseDetectionMulti._model_type is ModelType.NONE:
+            PoseDetectionMulti._model_type = model_type
+            PoseDetectionMulti._model_config_file = path + '/' + ModelFileNames[model_type.value][0]
+            PoseDetectionMulti._model_checkpoint_file = path + '/' + ModelFileNames[model_type.value][1]
+            print(PoseDetectionMulti._model_checkpoint_file, PoseDetectionMulti._model_config_file)
         else:
-            if Detection._model_type is not model_type:
+            if PoseDetectionMulti._model_type is not model_type:
                 print('Pose Detection WARNING: ModelType is different from the first instance')
 
-        if Detection._model_type is ModelType.NONE:
+        if PoseDetectionMulti._model_type is ModelType.NONE:
             print('Pose Detection WARNING: ModelType is NONE')
+
+        self.interval: float = 1.0 / fps
 
         self.verbose: bool = verbose
         self._running: bool = False
-        self._input_queue: Queue = Queue()
+        # Replace Queue with dictionary
+        self._poses_dict: dict = {}
+        self._poses_lock: Lock = Lock()  # Add lock for thread safety
         self._callbacks: set = set()
 
     def stop(self) -> None:
@@ -65,43 +71,79 @@ class Detection(Thread):
         self.load_model_once()
 
         self._running = True
+        
+        next_time: float = time.time()
         while self._running:
             try:
-                # Block until an item is available or timeout
-                pose: Pose = self._input_queue.get(timeout=0.1)
+                # Process multiple poses at a time from the dictionary
+                current_poses = []
+                pose_ids = []
+                images = []
+                
+                with self._poses_lock:
+                    # Collect up to 8 images to process in batch
+                    batch_size = min(8, len(self._poses_dict))
+                    if batch_size > 0:
+                        for i, pose_id in enumerate(list(self._poses_dict.keys())[:batch_size]):
+                            pose = self._poses_dict.pop(pose_id)
+                            if pose.image is not None:
+                                current_poses.append(pose)
+                                pose_ids.append(pose_id)
+                                images.append(pose.image)
+                
+                # If we got poses to process, handle them in batch
+                if images:
+                    # Process all images in a single batch call
+                    start_time = time.perf_counter()
+                    all_poses = self.run_session(
+                        PoseDetectionMulti._model_session, 
+                        PoseDetectionMulti._pipeline,
+                        images)
+                    end_time = time.perf_counter()
+                    
+                    processing_time = end_time - start_time
+                    print(f"Pose Detection Processing Time: {processing_time:.4f} seconds")
 
-                # Check if there are more items queued and warn if so
-                queue_size = self._input_queue.qsize()
-                if queue_size > 0:
-                    if self.verbose:
-                        print(f"Pose Detection WARNING: {queue_size + 1} items in queue, skipping to latest")
-                    # Get all remaining items and keep only the last one
-                    while not self._input_queue.empty():
-                        try:
-                            pose = self._input_queue.get_nowait()
-                        except:
-                            break
+                    # Match results with original poses
+                    for i, pose in enumerate(current_poses):
+                        if i < len(all_poses) and all_poses[i]:
+                            # Use the first detected person in each image
+                            # (or could implement person matching logic here)
+                            updated_pose = replace(
+                                pose,
+                                points=all_poses[i][0] if all_poses[i] else None
+                            )
+                            self.callback(updated_pose)
+                        else:
+                            # No pose detected, but still send back the original
+                            self.callback(pose)
+                while next_time < time.time():
+                    next_time += self.interval
+                sleep_time = next_time - time.time()
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                # else:
+                #     # No poses to process, wait a bit
+                #     import time
+                #     time.sleep(0.01)
 
-                # Process the pose
-                image: np.ndarray | None = pose.image
-                if image is not None:
-                    poses: list[PosePoints] = self.run_session(Detection._model_session, image)
-                    if len(poses) > 0:
-                        pose: Pose = replace(
-                            pose,
-                            points=poses[0],
-                        )
-                self.callback(pose)
-
-            except:
-                # Timeout occurred, continue loop to check _running flag
+            except Exception as e:
+                if self.verbose:
+                    print(f"Pose Detection Error: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
                 continue
 
     # GETTERS AND SETTERS
     def add_pose(self, pose: Pose) -> None:
-        if self._running:
-            self._input_queue.put(pose)
 
+        if self._running and pose.id is not None:
+            with self._poses_lock:
+                # if self._poses_dict.get(pose.id) is not None:
+                #     print(f"Pose Detection Warning: Pose ID {pose.id} already in queue, overwriting.")
+                self._poses_dict[pose.id] = pose
+
+    
     # CALLBACKS
     def callback(self, pose: Pose) -> None:
         for c in self._callbacks:
@@ -115,46 +157,52 @@ class Detection(Thread):
 
     @staticmethod
     def load_model_once() -> None:     
-        with Detection._model_load_lock:
-            if not Detection._model_loaded:
-                model = init_model(Detection._model_config_file, Detection._model_checkpoint_file, device='cuda:0')
-                Detection._model_session = model
-                Detection._model_loaded = True
+        with PoseDetectionMulti._model_load_lock:
+            if not PoseDetectionMulti._model_loaded:
+                model = init_model(PoseDetectionMulti._model_config_file, PoseDetectionMulti._model_checkpoint_file, device='cuda:0')
+                try:
+                    model.half()
+                except Exception:
+                    print("Pose Detection: Could not convert model to half precision.")
+                PoseDetectionMulti._model_session = model
+                PoseDetectionMulti._model_loaded = True
+                
+                PoseDetectionMulti._pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
 
     @staticmethod
-    def run_session(session: torch.nn, image: np.ndarray) -> list[PosePoints]:
-        height, width = image.shape[:2]
-        if height != 256 or width != 192:
-            image = Detection.resize_with_pad(image, 192, 256)
-            
-        images = [image]
-        # with torch.cuda.amp.autocast():
-        results = Detection.inference_topdown_multi(session, images)[0]
-        # results = Detection.inference_topdown(session, image)
-
-
+    def run_session(session: torch.nn, pipeline,  images: list[np.ndarray]) -> list[list[PosePoints]]:
+        
+        with torch.cuda.amp.autocast():
+            all_results = PoseDetectionMulti.inference_topdown_multi(session, pipeline, images)
+        
         poses = []
-        for result in results:
-            pred_instances = result.pred_instances
-            keypoints = pred_instances.keypoints
-            scores = pred_instances.keypoint_scores
+        
+        # Process all results for all images
+        for image_results in all_results:
+            image_poses = []
+            for result in image_results:
+                pred_instances = result.pred_instances
+                keypoints = pred_instances.keypoints
+                scores = pred_instances.keypoint_scores
 
-            for i in range(len(keypoints)):
-                person_keypoints = keypoints[i]  # [num_keypoints, 2]
-                person_scores = scores[i]        # [num_keypoints]
+                for i in range(len(keypoints)):
+                    person_keypoints = keypoints[i]  # [num_keypoints, 2]
+                    person_scores = scores[i]        # [num_keypoints]
 
-                # Normalize keypoints to [0, 1] range
-                norm_keypoints = person_keypoints.copy()
-                norm_keypoints[:, 0] /= width   # x / width
-                norm_keypoints[:, 1] /= height  # y / height
+                    # Normalize keypoints to [0, 1] range
+                    norm_keypoints = person_keypoints.copy()
+                    norm_keypoints[:, 0] /= 192   # x / width
+                    norm_keypoints[:, 1] /= 256  # y / height
 
-                pose = PosePoints(norm_keypoints, person_scores)
-                # print("Normalized Keypoints:", norm_keypoints)
-                poses.append(pose)
+                    pose = PosePoints(norm_keypoints, person_scores)
+                    image_poses.append(pose)
+
+            poses.append(image_poses)
+
         return poses
     
     @staticmethod
-    def inference_topdown_multi(model: nn.Module,
+    def inference_topdown_multi(model: nn.Module, pipeline,
                   imgs: List[np.ndarray],
                   bboxes: Optional[List[Union[List, np.ndarray]]] = None,
                   bbox_format: str = 'xyxy') -> List[List[PoseDataSample]]:
@@ -174,7 +222,7 @@ class Detection(Thread):
         scope = model.cfg.get('default_scope', 'mmpose')
         if scope is not None:
             init_default_scope(scope)
-        pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
+        # pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
         
         if bboxes is None:
             bboxes = [None] * len(imgs)
@@ -211,9 +259,14 @@ class Detection(Thread):
         if data_list:
             # Process all images in a single batch
             batch = pseudo_collate(data_list)
+            
+            
+            start_time = time.perf_counter()
             with torch.no_grad():
                 all_results = model.test_step(batch)
-            
+                end_time = time.perf_counter()
+                print(f"Pose Detection: Inference time: {end_time - start_time:.4f} seconds")
+
             # Split results back by image
             start_idx = 0
             for length in img_lengths:

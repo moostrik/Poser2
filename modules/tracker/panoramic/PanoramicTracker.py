@@ -235,18 +235,29 @@ class PanoramicTracker(Thread, BaseTracker):
     # CALLBACKS
     def _notify_callback(self, tracklet: Tracklet) -> None:
         with self.callback_lock:
-            for c in self.tracklet_callbacks:
-                c(tracklet)
+            if tracklet.id < 2:
+                for c in self.tracklet_callbacks:
+                    c(tracklet)
 
-            # if tracklet.id == 1:
-            #     addtracklets = []
-            #     for i in range(5, 8):
-            #         # Create a new tracklet with a different ID
-            #         another_tracklet: Tracklet = replace(tracklet, id=i)
-            #         addtracklets.append(another_tracklet)
-            #     for at in addtracklets:
-            #         for c in self.tracklet_callbacks:
-            #             c(at)
+            if tracklet.id == 0:
+                addtracklets = []
+                for i in range(2, 5):
+                    # Create a new tracklet with a different ID
+                    another_tracklet: Tracklet = replace(tracklet, id=i)
+                    addtracklets.append(another_tracklet)
+                for at in addtracklets:
+                    for c in self.tracklet_callbacks:
+                        c(at)
+
+            if tracklet.id == 1:
+                addtracklets = []
+                for i in range(5, 8):
+                    # Create a new tracklet with a different ID
+                    another_tracklet: Tracklet = replace(tracklet, id=i)
+                    addtracklets.append(another_tracklet)
+                for at in addtracklets:
+                    for c in self.tracklet_callbacks:
+                        c(at)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         with self.callback_lock:

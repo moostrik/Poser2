@@ -10,7 +10,7 @@ import numpy as np
 from modules.cam.depthcam.Definitions import FrameType
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, Rect, TrackingStatus
 from modules.pose.PoseDefinitions import ModelTypeNames, Pose, PoseCallback
-from modules.pose.PoseDetection import Detection
+from modules.pose.PoseDetectionMulti import PoseDetectionMulti as Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.pose.PoseAngleCalculator import PoseAngleCalculator
 from modules.Settings import Settings
@@ -32,17 +32,17 @@ class PosePipeline(Thread):
         self.pose_detector_frame_height: int = 256
         self.pose_crop_expansion: float = settings.pose_crop_expansion
         self.max_detectors: int = settings.max_players
-        self.pose_detectors: dict[int, Detection] = {}
+        self.pose_detector: Detection | None = None
         self.image_processor: PoseImageProcessor = PoseImageProcessor(
             crop_expansion=self.pose_crop_expansion,
             output_width=self.pose_detector_frame_width,
             output_height=self.pose_detector_frame_height
         )
+        
 
         if self.pose_active:
-            for i in range(self.max_detectors):
-                self.pose_detectors[i] = Detection(settings.path_model, settings.pose_model_type, True)
-            print('Pose Detection:', self.max_detectors, 'instances of model', ModelTypeNames[settings.pose_model_type.value])
+            self.pose_detector = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, True)
+            print('Pose Detection:', 'model', ModelTypeNames[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')
 
@@ -64,9 +64,9 @@ class PosePipeline(Thread):
         self.joint_angles.start()
 
         # Start detectors
-        for key, detector in self.pose_detectors.items():
-            detector.addMessageCallback(self.joint_angles.pose_input)
-            detector.start()
+        if self.pose_detector is not None:
+            self.pose_detector.addMessageCallback(self.joint_angles.pose_input)
+            self.pose_detector.start()
 
         super().start()
 
@@ -76,8 +76,8 @@ class PosePipeline(Thread):
         with self.callback_lock:
             self.pose_output_callbacks.clear()
 
-        for detector in self.pose_detectors.values():
-            detector.stop()
+        if self.pose_detector is not None:
+            self.pose_detector.stop()
 
         self.joint_angles.stop()
 
@@ -115,9 +115,9 @@ class PosePipeline(Thread):
         )
 
         # print(f"PosePipeline: Processing pose for tracklet {tracklet.id} at time {pose.time_stamp}")
-        detector: Optional[Detection] = self.pose_detectors.get(tracklet.id)
-        if detector:
-            detector.add_pose(pose)
+
+        if self.pose_detector is not None:
+            self.pose_detector.add_pose(pose)
         else:
             self._notify_pose_callback(pose)
 
