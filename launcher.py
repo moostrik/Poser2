@@ -1,10 +1,10 @@
 # TODO
 # Save videos to temporary folder until finished
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-import os
-os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
+# import warnings
+# warnings.filterwarnings("ignore", category=FutureWarning)
+# warnings.filterwarnings("ignore", category=DeprecationWarning)
+# import os
+# os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
 
 
 from argparse import ArgumentParser, Namespace
