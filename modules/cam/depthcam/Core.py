@@ -10,7 +10,7 @@ from typing import Set
 from threading import Thread, Event
 
 from modules.Settings import Settings
-from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types
+from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
 from modules.cam.depthcam.Definitions import *
 from modules.cam.depthcam.CoreSettings import CoreSettings
 from modules.cam.depthcam.Gui import Gui
@@ -40,6 +40,12 @@ class Core(Thread):
         self.do_yolo: bool =            general_settings.camera_yolo
         self.show_stereo: bool =        general_settings.camera_show_stereo
         self.simulation: bool =         general_settings.camera_simulation
+
+        self.perspective: PerspectiveConfig = PerspectiveConfig(
+            general_settings.camera_flip_h,
+            general_settings.camera_flip_v,
+            general_settings.camera_perspective
+        )
 
         # DAI
         self.device:                    dai.Device
@@ -103,7 +109,7 @@ class Core(Thread):
         return True
 
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:
-            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.show_stereo, simulate=False)
+            setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.show_stereo, self.perspective, simulate=False)
 
     def _setup_queues(self) -> None:
         if self.do_stereo:
