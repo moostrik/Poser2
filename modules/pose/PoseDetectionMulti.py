@@ -30,29 +30,25 @@ from mmpose.structures.bbox import bbox_xywh2xyxy
 from modules.pose.PoseDefinitions import Pose, PosePoints, ModelType, ModelFileNames
 
 class PoseDetectionMulti(Thread):
-    _model_load_lock: Lock = Lock()
-    _model_loaded: bool =  False
-    _model_type: ModelType = ModelType.NONE
-    _model_config_file: str = ""
-    _model_checkpoint_file: str = ""
-    _model_width: int = 192
-    _model_height: int = 256
-    _model_session: torch.nn.Module
-    _pipeline: Compose
-
+    # Class no longer has class variables
+    
     def __init__(self, path: str, model_type:ModelType, fps: float = 30.0, verbose: bool = False) -> None:
         super().__init__()
         
-        if PoseDetectionMulti._model_type is ModelType.NONE:
-            PoseDetectionMulti._model_type = model_type
-            PoseDetectionMulti._model_config_file = path + '/' + ModelFileNames[model_type.value][0]
-            PoseDetectionMulti._model_checkpoint_file = path + '/' + ModelFileNames[model_type.value][1]
-            print(PoseDetectionMulti._model_checkpoint_file, PoseDetectionMulti._model_config_file)
-        else:
-            if PoseDetectionMulti._model_type is not model_type:
-                print('Pose Detection WARNING: ModelType is different from the first instance')
+        # Convert class variables to instance variables
+        self.model_load_lock: Lock = Lock()
+        self.model_loaded: bool = False
+        self.model_type: ModelType = model_type
+        self.model_config_file: str = path + '/' + ModelFileNames[model_type.value][0]
+        self.model_checkpoint_file: str = path + '/' + ModelFileNames[model_type.value][1]
+        self.model_width: int = 192
+        self.model_height: int = 256
+        self.model_session: torch.nn.Module = None
+        self.pipeline: Compose = None
+        
+        print(self.model_checkpoint_file, self.model_config_file)
 
-        if PoseDetectionMulti._model_type is ModelType.NONE:
+        if self.model_type is ModelType.NONE:
             print('Pose Detection WARNING: ModelType is NONE')
 
         self.interval: float = 1.0 / fps
@@ -96,8 +92,8 @@ class PoseDetectionMulti(Thread):
                     # Process all images in a single batch call
                     start_time = time.perf_counter()
                     all_poses = self.run_session(
-                        PoseDetectionMulti._model_session, 
-                        PoseDetectionMulti._pipeline,
+                        self.model_session, 
+                        self.pipeline,
                         images)
                     end_time = time.perf_counter()
                     
@@ -136,13 +132,11 @@ class PoseDetectionMulti(Thread):
 
     # GETTERS AND SETTERS
     def add_pose(self, pose: Pose) -> None:
-
         if self._running and pose.id is not None:
             with self._poses_lock:
                 # if self._poses_dict.get(pose.id) is not None:
                 #     print(f"Pose Detection Warning: Pose ID {pose.id} already in queue, overwriting.")
                 self._poses_dict[pose.id] = pose
-
     
     # CALLBACKS
     def callback(self, pose: Pose) -> None:
@@ -155,25 +149,24 @@ class PoseDetectionMulti(Thread):
     def clearMessageCallbacks(self) -> None:
         self._callbacks = set()
 
-    @staticmethod
-    def load_model_once() -> None:     
-        with PoseDetectionMulti._model_load_lock:
-            if not PoseDetectionMulti._model_loaded:
-                model = init_model(PoseDetectionMulti._model_config_file, PoseDetectionMulti._model_checkpoint_file, device='cuda:0')
+    # Changed from staticmethod to instance method
+    def load_model_once(self) -> None:     
+        with self.model_load_lock:
+            if not self.model_loaded:
+                model = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
                 try:
                     model.half()
                 except Exception:
                     print("Pose Detection: Could not convert model to half precision.")
-                PoseDetectionMulti._model_session = model
-                PoseDetectionMulti._model_loaded = True
+                self.model_session = model
+                self.model_loaded = True
                 
-                PoseDetectionMulti._pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
+                self.pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
 
-    @staticmethod
-    def run_session(session: torch.nn, pipeline,  images: list[np.ndarray]) -> list[list[PosePoints]]:
-        
+    # Changed from staticmethod to instance method
+    def run_session(self, session: torch.nn, pipeline, images: list[np.ndarray]) -> list[list[PosePoints]]:
         with torch.cuda.amp.autocast():
-            all_results = PoseDetectionMulti.inference_topdown_multi(session, pipeline, images)
+            all_results = self.inference_topdown_multi(session, pipeline, images)
         
         poses = []
         
@@ -191,8 +184,8 @@ class PoseDetectionMulti(Thread):
 
                     # Normalize keypoints to [0, 1] range
                     norm_keypoints = person_keypoints.copy()
-                    norm_keypoints[:, 0] /= 192   # x / width
-                    norm_keypoints[:, 1] /= 256  # y / height
+                    norm_keypoints[:, 0] /= self.model_width   # x / width
+                    norm_keypoints[:, 1] /= self.model_height  # y / height
 
                     pose = PosePoints(norm_keypoints, person_scores)
                     image_poses.append(pose)
@@ -201,8 +194,8 @@ class PoseDetectionMulti(Thread):
 
         return poses
     
-    @staticmethod
-    def inference_topdown_multi(model: nn.Module, pipeline,
+    # Changed from staticmethod to instance method
+    def inference_topdown_multi(self, model: nn.Module, pipeline,
                   imgs: List[np.ndarray],
                   bboxes: Optional[List[Union[List, np.ndarray]]] = None,
                   bbox_format: str = 'xyxy') -> List[List[PoseDataSample]]:
@@ -265,7 +258,7 @@ class PoseDetectionMulti(Thread):
             with torch.no_grad():
                 all_results = model.test_step(batch)
                 end_time = time.perf_counter()
-                print(f"Pose Detection: Inference time: {end_time - start_time:.4f} seconds")
+                # print(f"Pose Detection: Inference time: {end_time - start_time:.4f} seconds")
 
             # Split results back by image
             start_idx = 0
@@ -275,59 +268,7 @@ class PoseDetectionMulti(Thread):
         
         return results_by_image
 
-    @staticmethod
-    def inference_topdown(model: nn.Module,
-                      img: Union[np.ndarray, str],
-                      bboxes: Optional[Union[List, np.ndarray]] = None,
-                      bbox_format: str = 'xyxy') -> List[PoseDataSample]:
-
-        scope = model.cfg.get('default_scope', 'mmpose')
-        if scope is not None:
-            init_default_scope(scope)
-        pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
-
-        if bboxes is None or len(bboxes) == 0:
-            # get bbox from the image size
-            if isinstance(img, str):
-                w, h = Image.open(img).size
-            else:
-                h, w = img.shape[:2]
-
-            bboxes = np.array([[0, 0, w, h]], dtype=np.float32)
-        else:
-            if isinstance(bboxes, list):
-                bboxes = np.array(bboxes)
-
-            assert bbox_format in {'xyxy', 'xywh'}, \
-                f'Invalid bbox_format "{bbox_format}".'
-
-            if bbox_format == 'xywh':
-                bboxes = bbox_xywh2xyxy(bboxes)
-
-        # construct batch data samples
-        data_list = []
-        for bbox in bboxes:
-            if isinstance(img, str):
-                data_info = dict(img_path=img)
-            else:
-                data_info = dict(img=img)
-            data_info['bbox'] = bbox[None]  # shape (1, 4)
-            data_info['bbox_score'] = np.ones(1, dtype=np.float32)  # shape (1,)
-            data_info.update(model.dataset_meta)
-            data_list.append(pipeline(data_info))
-
-        if data_list:
-            # collate data list into a batch, which is a dict with following keys:
-            # batch['inputs']: a list of input images
-            # batch['data_samples']: a list of :obj:`PoseDataSample`
-            batch = pseudo_collate(data_list)
-            with torch.no_grad():
-                results = model.test_step(batch)
-        else:
-            results = []
-
-        return results
-
+   
 
     @staticmethod
     def resize_with_pad(image, target_width, target_height, padding_color=(0, 0, 0)) -> np.ndarray:

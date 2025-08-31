@@ -32,7 +32,8 @@ class PosePipeline(Thread):
         self.pose_detector_frame_height: int = 256
         self.pose_crop_expansion: float = settings.pose_crop_expansion
         self.max_detectors: int = settings.max_players
-        self.pose_detector: Detection | None = None
+        self.pose_detector_A: Detection | None = None
+        self.pose_detector_B: Detection | None = None
         self.image_processor: PoseImageProcessor = PoseImageProcessor(
             crop_expansion=self.pose_crop_expansion,
             output_width=self.pose_detector_frame_width,
@@ -41,7 +42,8 @@ class PosePipeline(Thread):
         
 
         if self.pose_active:
-            self.pose_detector = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, True)
+            self.pose_detector_A = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, True)
+            self.pose_detector_B = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, True)
             print('Pose Detection:', 'model', ModelTypeNames[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')
@@ -64,9 +66,12 @@ class PosePipeline(Thread):
         self.joint_angles.start()
 
         # Start detectors
-        if self.pose_detector is not None:
-            self.pose_detector.addMessageCallback(self.joint_angles.pose_input)
-            self.pose_detector.start()
+        if self.pose_detector_A is not None:
+            self.pose_detector_A.addMessageCallback(self.joint_angles.pose_input)
+            self.pose_detector_A.start()
+        if self.pose_detector_B is not None:
+            self.pose_detector_B.addMessageCallback(self.joint_angles.pose_input)
+            self.pose_detector_B.start()
 
         super().start()
 
@@ -76,8 +81,10 @@ class PosePipeline(Thread):
         with self.callback_lock:
             self.pose_output_callbacks.clear()
 
-        if self.pose_detector is not None:
-            self.pose_detector.stop()
+        if self.pose_detector_A is not None:
+            self.pose_detector_A.stop()
+        if self.pose_detector_B is not None:
+            self.pose_detector_B.stop()
 
         self.joint_angles.stop()
 
@@ -115,11 +122,17 @@ class PosePipeline(Thread):
         )
 
         # print(f"PosePipeline: Processing pose for tracklet {tracklet.id} at time {pose.time_stamp}")
-
-        if self.pose_detector is not None:
-            self.pose_detector.add_pose(pose)
-        else:
-            self._notify_pose_callback(pose)
+        # if pose.id % 2 == 0:
+        if True:
+            if self.pose_detector_A is not None:
+                self.pose_detector_A.add_pose(pose)
+            else:
+                self._notify_pose_callback(pose)
+        # else:
+        #     if self.pose_detector_B is not None:
+        #         self.pose_detector_B.add_pose(pose)
+        #     else:
+        #         self._notify_pose_callback(pose)
 
      # INPUTS
     def add_tracklet(self, tracklet: Tracklet) -> None:
