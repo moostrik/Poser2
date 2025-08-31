@@ -1,17 +1,14 @@
-depthai==2.29.0.0
-ffmpeg-python
-glfw==2.9.0
-mmdet==3.2.0
-mmpose==1.3.2
-numpy==1.24.1
-opencv-python==4.11.0.86
-opencv-contrib-python==4.11.0.86
-pandas==2.3.0
-Pillow==11.1.0
-python-osc==1.9.3
-tensorflow==2.10.0
-watchdog==6.0.0
-
-# still using these?
-fastdtw==0.3.4
-numba==0.61.2
+depthai==2.30.0                 # latest version
+ffmpeg-python==0.2.0            # latest version
+glfw==2.9.0                     # latest version
+mmdet==3.2.0                        # compatible with mmcv==2.1.0
+mmpose==1.3.2                       # compatible with mmcv==2.1.0
+numba==0.61.2                   # latest version
+numpy<2.0.0                         # needed for torch?
+opencv-python==4.11.0.86            # highest version with numpy<2.0.0
+opencv-contrib-python==4.11.0.86    # highest version with numpy<2.0.0
+pandas==2.3.2                   # latest version
+Pillow==11.3.0                  # latest version
+psutil==7.0.0                   # latest version
+python-osc==1.9.3               # latest version
+watchdog==6.0.0                 # latest version

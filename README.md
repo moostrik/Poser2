@@ -11,6 +11,9 @@ depth cam pose synchony detection
 ```ssh-keygen -t ed25519 -C "m.oostrik@gmail.com"```
 * copy key and add to github
 
+# Python
+* Install python 3.10 from Microsoft Store (or find a better method)
+
 # VSCode
 * Download from [site](https://code.visualstudio.com/Download)
 * install extentions
@@ -20,14 +23,15 @@ depth cam pose synchony detection
     * Python Environment Manager (deprecated) or Python Environments
     * Python Indent
 
-# Python
-* Install python 3.10 from Microsoft Store (or find a better method)
-
 # Visual C++ Redistributable
 * install and RESTART [Download](https://aka.ms/vs/17/release/vc_redist.x86.exe)
 
 # Set-ExecutionPolicy
 * open powershell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```
+
+# FFmpeg
+* Download from [site](https://ffmpeg.org/download.html#build-windows)
+* And add its 'bin' to path
 
 # Clone Project
 * ```git clone git@github.com:moostrik/DepthPose.git```

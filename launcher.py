@@ -1,8 +1,8 @@
-# import psutil
-# import os
+import psutil
+import os
 
-# p = psutil.Process(os.getpid())
-# p.nice(psutil.REALTIME_PRIORITY_CLASS)
+p = psutil.Process(os.getpid())
+p.nice(psutil.REALTIME_PRIORITY_CLASS)
 
 
 from argparse import ArgumentParser, Namespace
