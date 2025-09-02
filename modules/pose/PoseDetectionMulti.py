@@ -1,110 +1,89 @@
 # Standard library imports
-from dataclasses import replace
-from queue import Queue
-from threading import Thread, Lock
-import os
 import time
+from dataclasses import replace
+from threading import Thread, Lock, Event
 
 # Third-party imports
 import cv2
 import numpy as np
-
 import torch
-import torch.nn as nn
-from mmpose.apis import inference_topdown, init_model
-from typing import List, Optional, Union
-from mmpose.structures import PoseDataSample
-from mmengine.config import Config
-from mmengine.dataset import Compose, pseudo_collate
-from mmengine.model.utils import revert_sync_batchnorm
-from mmengine.registry import init_default_scope
-from mmengine.runner import load_checkpoint
-from PIL import Image
+from pandas import Timestamp
 
-from mmpose.datasets.datasets.utils import parse_pose_metainfo
-from mmpose.models.builder import build_pose_estimator
+from mmpose.apis import init_model
+from mmpose.structures import PoseDataSample
+from mmengine.dataset import Compose, pseudo_collate
+from mmengine.registry import init_default_scope
 from mmpose.structures import PoseDataSample
 from mmpose.structures.bbox import bbox_xywh2xyxy
 
 # Local application imports
 from modules.pose.PoseDefinitions import Pose, PosePoints, ModelType, ModelFileNames
 
-class PoseDetectionMulti(Thread):
-    # Class no longer has class variables
-    
+class PoseDetectionMulti(Thread):    
     def __init__(self, path: str, model_type:ModelType, fps: float = 30.0, verbose: bool = False) -> None:
         super().__init__()
         
-        # Convert class variables to instance variables
-        self.model_load_lock: Lock = Lock()
-        self.model_loaded: bool = False
-        self.model_type: ModelType = model_type
+        if model_type is ModelType.NONE:
+            print('Pose Detection WARNING: ModelType is NONE')
         self.model_config_file: str = path + '/' + ModelFileNames[model_type.value][0]
         self.model_checkpoint_file: str = path + '/' + ModelFileNames[model_type.value][1]
         self.model_width: int = 192
         self.model_height: int = 256
-        self.model_session: torch.nn.Module = None
-        self.pipeline: Compose = None
         
-        print(self.model_checkpoint_file, self.model_config_file)
-
-        if self.model_type is ModelType.NONE:
-            print('Pose Detection WARNING: ModelType is NONE')
-
         self.interval: float = 1.0 / fps
 
         self.verbose: bool = verbose
         self._running: bool = False
-        # Replace Queue with dictionary
+        
         self._poses_dict: dict = {}
+        self._poses_timestamp: dict = {}
         self._poses_lock: Lock = Lock()  # Add lock for thread safety
         self._callbacks: set = set()
+        
+        self._notify_update_event: Event = Event()
 
     def stop(self) -> None:
         self._running = False
 
     def run(self) -> None:
-        self.load_model_once()
+        model:torch.nn.Module = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
+        model.half()        
+        pipeline: Compose = Compose(model.cfg.test_dataloader.dataset.pipeline)
 
         self._running = True
         
         next_time: float = time.time()
         while self._running:
+            self._notify_update_event.wait(timeout=0.1)
+            self._notify_update_event.clear()
+            start_time = time.perf_counter()
             try:
                 # Process multiple poses at a time from the dictionary
-                current_poses = []
-                pose_ids = []
-                images = []
-                
+                current_poses: list[Pose] = []
+                empty_poses: list[Pose] = []
+                images: list[np.ndarray] = []
+
                 with self._poses_lock:
-                    # Collect up to 8 images to process in batch
-                    batch_size = min(8, len(self._poses_dict))
-                    if batch_size > 0:
-                        for i, pose_id in enumerate(list(self._poses_dict.keys())[:batch_size]):
-                            pose = self._poses_dict.pop(pose_id)
-                            if pose.image is not None:
-                                current_poses.append(pose)
-                                pose_ids.append(pose_id)
-                                images.append(pose.image)
+                    for pose in self._poses_dict.values():
+                        if pose.image is not None:
+                            current_poses.append(pose)
+                        else:
+                            empty_poses.append(pose)
+                    self._poses_dict = {}
                 
-                # If we got poses to process, handle them in batch
+                for pose in empty_poses:
+                    self.callback(pose)
+                     
+                images = [pose.image for pose in current_poses]
+
                 if images:
-                    # Process all images in a single batch call
-                    start_time = time.perf_counter()
-                    all_poses = self.run_session(
-                        self.model_session, 
-                        self.pipeline,
-                        images)
-                    end_time = time.perf_counter()
-                    
-                    processing_time = end_time - start_time
-                    print(f"Pose Detection Processing Time: {processing_time:.4f} seconds")
+                    data_samples = PoseDetectionMulti.run_interference(model,pipeline,images, False)
+                    all_poses = PoseDetectionMulti.process_pose_data_samples(data_samples, self.model_width, self.model_height)
 
                     # Match results with original poses
                     for i, pose in enumerate(current_poses):
                         if i < len(all_poses) and all_poses[i]:
                             # Use the first detected person in each image
-                            # (or could implement person matching logic here)
                             updated_pose = replace(
                                 pose,
                                 points=all_poses[i][0] if all_poses[i] else None
@@ -113,15 +92,6 @@ class PoseDetectionMulti(Thread):
                         else:
                             # No pose detected, but still send back the original
                             self.callback(pose)
-                while next_time < time.time():
-                    next_time += self.interval
-                sleep_time = next_time - time.time()
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
-                # else:
-                #     # No poses to process, wait a bit
-                #     import time
-                #     time.sleep(0.01)
 
             except Exception as e:
                 if self.verbose:
@@ -129,15 +99,35 @@ class PoseDetectionMulti(Thread):
                     import traceback
                     traceback.print_exc()
                 continue
+            
+            if self.verbose:
+                detection_time = time.perf_counter() - start_time
+                if detection_time > self.interval:
+                    print(f"Pose Detection Time: {detection_time:.3f} seconds")
 
     # GETTERS AND SETTERS
     def add_pose(self, pose: Pose) -> None:
         if self._running and pose.id is not None:
             with self._poses_lock:
-                # if self._poses_dict.get(pose.id) is not None:
-                #     print(f"Pose Detection Warning: Pose ID {pose.id} already in queue, overwriting.")
+                if self._poses_dict.get(pose.id) is not None:
+                    existing_pose: Pose = self._poses_dict[pose.id]
+                    e_time = existing_pose.time_stamp
+                    n_time = pose.time_stamp
+                    difference = (n_time - e_time).total_seconds()
+                    
+                    t2 = self._poses_timestamp.get(pose.id, Timestamp.now())
+                    diff2 = (Timestamp.now() - t2).total_seconds()
+
+                    print(f"Pose Detection Warning: Pose ID {pose.id} already in queue, overwriting. {existing_pose.cam_id} {pose.cam_id} {difference:.3f}, {diff2:.3f}")
+                    
+                    # print(f"Existing Pose: {self._poses_dict[pose.id].time_stamp}, New Pose: {pose.time_stamp}")
+
                 self._poses_dict[pose.id] = pose
-    
+                self._poses_timestamp[pose.id] = Timestamp.now()
+                
+        
+            self._notify_update_event.set()
+
     # CALLBACKS
     def callback(self, pose: Pose) -> None:
         for c in self._callbacks:
@@ -149,30 +139,76 @@ class PoseDetectionMulti(Thread):
     def clearMessageCallbacks(self) -> None:
         self._callbacks = set()
 
-    # Changed from staticmethod to instance method
-    def load_model_once(self) -> None:     
-        with self.model_load_lock:
-            if not self.model_loaded:
-                model = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
-                try:
-                    model.half()
-                except Exception:
-                    print("Pose Detection: Could not convert model to half precision.")
-                self.model_session = model
-                self.model_loaded = True
-                
-                self.pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
-
-    # Changed from staticmethod to instance method
-    def run_session(self, session: torch.nn, pipeline, images: list[np.ndarray]) -> list[list[PosePoints]]:
+    # STATIC METHODS
+    @staticmethod
+    def run_interference(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray], verbose: bool= False) -> list[list[PoseDataSample]]:
         with torch.cuda.amp.autocast():
-            all_results = self.inference_topdown_multi(session, pipeline, images)
-        
-        poses = []
-        
-        # Process all results for all images
-        for image_results in all_results:
-            image_poses = []
+            
+            start_time = time.perf_counter()
+            
+            scope = model.cfg.get('default_scope', 'mmpose')
+            if scope is not None:
+                init_default_scope(scope)
+            # pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
+
+            bboxes = [None] * len(imgs)
+
+            # Process each image and its bboxes to create data samples
+            data_list = []
+            img_lengths = []  # Track number of data samples per image
+
+            for img_idx, (img, img_bboxes) in enumerate(zip(imgs, bboxes)):
+                h, w = img.shape[:2]
+
+                # Handle bboxes for this image
+                if img_bboxes is None or len(img_bboxes) == 0:
+                    img_bboxes = np.array([[0, 0, w, h]], dtype=np.float32)
+                else:
+                    if isinstance(img_bboxes, list):
+                        img_bboxes = np.array(img_bboxes)
+
+                    img_bboxes = bbox_xywh2xyxy(img_bboxes)
+
+                # Create data samples for each bbox in this image
+                for bbox in img_bboxes:
+                    data_info = dict(img=img)
+                    data_info['bbox'] = bbox[None]  # shape (1, 4)
+                    data_info['bbox_score'] = np.ones(1, dtype=np.float32)
+                    data_info.update(model.dataset_meta)
+                    data_list.append(pipeline(data_info))
+
+                img_lengths.append(len(img_bboxes))
+
+            results_by_image = []
+
+            if data_list:
+                # Process all images in a single batch
+                batch = pseudo_collate(data_list)
+
+
+                start_time = time.perf_counter()
+                with torch.no_grad():
+                    all_results = model.test_step(batch)
+                    end_time = time.perf_counter()
+                    # print(f"Pose Detection: Inference time: {end_time - start_time:.4f} seconds")
+
+                # Split results back by image
+                start_idx = 0
+                for length in img_lengths:
+                    results_by_image.append(all_results[start_idx:start_idx + length])
+                    start_idx += length
+                    
+            
+            if verbose:
+                print(f"Pose Detection Processing Time: {time.perf_counter() - start_time  :.3f} seconds")
+
+            return results_by_image
+    
+    @staticmethod
+    def process_pose_data_samples(data_samples: list, model_width: int, model_height: int) -> list[list[PosePoints]]:
+        poses: list[list[PosePoints]] = []
+        for image_results in data_samples:
+            image_poses: list[PosePoints] = []
             for result in image_results:
                 pred_instances = result.pred_instances
                 keypoints = pred_instances.keypoints
@@ -184,8 +220,8 @@ class PoseDetectionMulti(Thread):
 
                     # Normalize keypoints to [0, 1] range
                     norm_keypoints = person_keypoints.copy()
-                    norm_keypoints[:, 0] /= self.model_width   # x / width
-                    norm_keypoints[:, 1] /= self.model_height  # y / height
+                    norm_keypoints[:, 0] /= model_width   # x / width
+                    norm_keypoints[:, 1] /= model_height  # y / height
 
                     pose = PosePoints(norm_keypoints, person_scores)
                     image_poses.append(pose)
@@ -194,82 +230,6 @@ class PoseDetectionMulti(Thread):
 
         return poses
     
-    # Changed from staticmethod to instance method
-    def inference_topdown_multi(self, model: nn.Module, pipeline,
-                  imgs: List[np.ndarray],
-                  bboxes: Optional[List[Union[List, np.ndarray]]] = None,
-                  bbox_format: str = 'xyxy') -> List[List[PoseDataSample]]:
-        """Inference multiple images with a top-down pose estimator.
-
-        Args:
-            model (nn.Module): The top-down pose estimator
-            imgs (List[np.ndarray]): List of images to process in batch
-            bboxes (List[np.ndarray], optional): List of bboxes for each image.
-                If None, entire image will be used. Defaults to None.
-            bbox_format (str): The bbox format indicator. Options are ``'xywh'``
-                and ``'xyxy'``. Defaults to ``'xyxy'``
-
-        Returns:
-            List[List[PoseDataSample]]: The inference results for each image.
-        """
-        scope = model.cfg.get('default_scope', 'mmpose')
-        if scope is not None:
-            init_default_scope(scope)
-        # pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
-        
-        if bboxes is None:
-            bboxes = [None] * len(imgs)
-        
-        # Process each image and its bboxes to create data samples
-        data_list = []
-        img_lengths = []  # Track number of data samples per image
-        
-        for img_idx, (img, img_bboxes) in enumerate(zip(imgs, bboxes)):
-            h, w = img.shape[:2]
-            
-            # Handle bboxes for this image
-            if img_bboxes is None or len(img_bboxes) == 0:
-                img_bboxes = np.array([[0, 0, w, h]], dtype=np.float32)
-            else:
-                if isinstance(img_bboxes, list):
-                    img_bboxes = np.array(img_bboxes)
-                
-                if bbox_format == 'xywh':
-                    img_bboxes = bbox_xywh2xyxy(img_bboxes)
-            
-            # Create data samples for each bbox in this image
-            for bbox in img_bboxes:
-                data_info = dict(img=img)
-                data_info['bbox'] = bbox[None]  # shape (1, 4)
-                data_info['bbox_score'] = np.ones(1, dtype=np.float32)
-                data_info.update(model.dataset_meta)
-                data_list.append(pipeline(data_info))
-            
-            img_lengths.append(len(img_bboxes))
-        
-        results_by_image = []
-        
-        if data_list:
-            # Process all images in a single batch
-            batch = pseudo_collate(data_list)
-            
-            
-            start_time = time.perf_counter()
-            with torch.no_grad():
-                all_results = model.test_step(batch)
-                end_time = time.perf_counter()
-                # print(f"Pose Detection: Inference time: {end_time - start_time:.4f} seconds")
-
-            # Split results back by image
-            start_idx = 0
-            for length in img_lengths:
-                results_by_image.append(all_results[start_idx:start_idx + length])
-                start_idx += length
-        
-        return results_by_image
-
-   
-
     @staticmethod
     def resize_with_pad(image, target_width, target_height, padding_color=(0, 0, 0)) -> np.ndarray:
         # Get the original dimensions
