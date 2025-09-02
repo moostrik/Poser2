@@ -19,7 +19,7 @@ from mmpose.structures.bbox import bbox_xywh2xyxy
 # Local application imports
 from modules.pose.PoseDefinitions import Pose, PosePoints, ModelType, ModelFileNames
 
-class PoseDetectionMulti(Thread):    
+class PoseDetection(Thread):    
     def __init__(self, path: str, model_type:ModelType, fps: float = 30.0, verbose: bool = False) -> None:
         super().__init__()
         
@@ -77,8 +77,8 @@ class PoseDetectionMulti(Thread):
                 images = [pose.image for pose in current_poses]
 
                 if images:
-                    data_samples = PoseDetectionMulti.run_interference(model,pipeline,images, False)
-                    all_poses = PoseDetectionMulti.process_pose_data_samples(data_samples, self.model_width, self.model_height)
+                    data_samples = PoseDetection.run_interference(model,pipeline,images, False)
+                    all_poses = PoseDetection.process_pose_data_samples(data_samples, self.model_width, self.model_height)
 
                     # Match results with original poses
                     for i, pose in enumerate(current_poses):

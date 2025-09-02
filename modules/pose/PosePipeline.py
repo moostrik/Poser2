@@ -10,7 +10,7 @@ import numpy as np
 from modules.cam.depthcam.Definitions import FrameType
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, Rect, TrackingStatus
 from modules.pose.PoseDefinitions import ModelTypeNames, Pose, PoseCallback
-from modules.pose.PoseDetectionMulti import PoseDetectionMulti as Detection
+from modules.pose.PoseDetection import PoseDetection as Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.pose.PoseAngleCalculator import PoseAngleCalculator
 from modules.Settings import Settings
