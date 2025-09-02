@@ -1,7 +1,7 @@
 # Standard library imports
 from dataclasses import dataclass
 from queue import Empty, Queue
-from threading import Lock, Thread
+from threading import Lock, Thread, Event
 from time import sleep, time
 from typing import List, Optional
 
@@ -31,7 +31,7 @@ class OnePerCamTracker(Thread, BaseTracker):
         super().__init__()
 
         self._running: bool = False
-        self._update_interval: float = 0.5 / settings.camera_fps
+        self._update_event: Event = Event()
         self._input_queue: Queue[List[Tracklet]] = Queue()
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletCallback] = set()
@@ -69,32 +69,29 @@ class OnePerCamTracker(Thread, BaseTracker):
         with self._callback_lock:
             self._tracklet_callbacks.clear()
         self.join(timeout=1.0)
+        
+    def notify_update(self) -> None:
+        if self._running:
+            self._update_event.set()
 
+    def notify_update_from_image(self, cam_id: int, frame_type, image) -> None:
+        if cam_id == 0:
+            self.notify_update()
+            
     def run(self) -> None:
-        next_update_time: float = time() + self._update_interval
 
         while self._running:
-            current_time: float = time()
+            self._update_event.wait(timeout=0.1)
+            self._update_event.clear()
 
-            # Process tracklets
-            processed_any = False
             while True:
                 try:
                     tracklets: list[Tracklet] = self._input_queue.get(timeout=0.001)
                     self._add_tracklet(tracklets)
-                    processed_any = True
                 except Empty:
                     break
 
-            # Update at intervals
-            if current_time >= next_update_time:
-                self._update_and_notify()
-                next_update_time += self._update_interval
-                if current_time > next_update_time:
-                    next_update_time = current_time + self._update_interval
-
-            if not processed_any:
-                sleep(0.001)
+            self._update_and_notify()
 
     def _add_tracklet(self, tracklets: list[Tracklet]) -> None:
 

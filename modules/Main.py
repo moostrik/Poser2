@@ -66,6 +66,7 @@ class Main():
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.pose_detection.set_image)
+            camera.add_frame_callback(self.tracker.notify_update_from_image)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.render.data.set_depth_tracklets)
             camera.start()

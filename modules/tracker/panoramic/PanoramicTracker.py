@@ -2,7 +2,7 @@
 from dataclasses import dataclass, replace
 from itertools import combinations
 from queue import Empty, Queue
-from threading import Lock, Thread
+from threading import Lock, Thread, Event
 from time import sleep, time
 from typing import Optional
 
@@ -41,9 +41,10 @@ class PanoramicTracker(Thread, BaseTracker):
         super().__init__()
 
         self.running: bool = False
+        self.update_event: Event = Event()
+        
         self.max_players: int = settings.max_players
-        self.update_interval: float = 0.5 / settings.camera_fps # Run update loop faster than camera FPS to avoid missing frames due to timing jitter
-
+        
         self.input_queue: Queue[Tracklet] = Queue()
 
         self.tracklet_manager: PanoramicTrackletManager = PanoramicTrackletManager(self.max_players)
@@ -81,38 +82,29 @@ class PanoramicTracker(Thread, BaseTracker):
 
         self.join()  # Wait for the thread to finish
 
+    def notify_update(self) -> None:
+        if self.running:    
+            self.update_event.set()
+
+    def notify_update_from_image(self, cam_id: int, frame_type, image) -> None:
+        if cam_id == 0:
+            self.notify_update()
+            
     def run(self) -> None:
-        next_update_time: float = time() + self.update_interval
-
         while self.running:
-            current_time: float = time()
+            self.update_event.wait(timeout=0.1)
+            self.update_event.clear()
 
-            # Process all available tracklets as fast as possible
-            processed_any = False
             while True:
                 try:
-                    tracklet: Tracklet = self.input_queue.get(timeout=0.001)  # Very short timeout
+                    tracklet: Tracklet = self.input_queue.get(block=False)
                     self._add_tracklet(tracklet)
-                    processed_any = True
                 except Empty:
                     break
-
-            # Update and notify at precise intervals
-            if current_time >= next_update_time:
-                self._update_and_notify()
-                next_update_time += self.update_interval
-                # In case of drift, catch up
-                while current_time > next_update_time:
-                    next_update_time = current_time + self.update_interval
-
-            # Small sleep to prevent excessive CPU usage when no tracklets are available
-            if not processed_any:
-                sleep(0.001)  # 1ms sleep
-
-    def _update_and_notify(self) -> None:
-        self._update_tracklets()
-        self._notify_and_reset_changes()
-        self._remove_expired_tracklets()
+            
+            self._update_tracklets()
+            self._notify_and_reset_changes()
+            self._remove_expired_tracklets()
 
     def _add_tracklet(self, new_tracklet: Tracklet) -> None:
         # If tracklet is removed, retire it
@@ -157,7 +149,7 @@ class PanoramicTracker(Thread, BaseTracker):
                 self.tracklet_manager.retire_tracklet(tracklet.id)
 
         # merge overlapping tracklets
-        overlaps: set[PanoramicOverlapInfo] = self.find_overlapping_tracklets(self.tracklet_manager.all_tracklets())
+        overlaps: set[PanoramicOverlapInfo] = self._find_overlapping_tracklets(self.tracklet_manager.all_tracklets())
         for overlap in overlaps:
             self.tracklet_manager.merge_tracklets(overlap.keep_id, overlap.remove_id)
 
@@ -173,7 +165,7 @@ class PanoramicTracker(Thread, BaseTracker):
             if tracklet.status == TrackingStatus.REMOVED:
                 self.tracklet_manager.remove_tracklet(tracklet.id)
 
-    def find_overlapping_tracklets(self, tracklets: list[Tracklet]) -> set[PanoramicOverlapInfo]:
+    def _find_overlapping_tracklets(self, tracklets: list[Tracklet]) -> set[PanoramicOverlapInfo]:
 
         for i, tracklet in enumerate(tracklets):
             # Reconstruct PanoramicTrackerInfo with updated overlap field
