@@ -118,7 +118,7 @@ class PoseDetection(Thread):
                     t2 = self._poses_timestamp.get(pose.id, Timestamp.now())
                     diff2 = (Timestamp.now() - t2).total_seconds()
 
-                    print(f"Pose Detection Warning: Pose ID {pose.id} already in queue, overwriting. {existing_pose.cam_id} {pose.cam_id} {difference:.3f}, {diff2:.3f}")
+                    print(f"Pose Detection Warning: Pose ID {pose.id} already in queue, overwriting. {difference:.3f}, {diff2:.3f}")
                     
                     # print(f"Existing Pose: {self._poses_dict[pose.id].time_stamp}, New Pose: {pose.time_stamp}")
 

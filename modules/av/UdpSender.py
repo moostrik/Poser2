@@ -208,7 +208,7 @@ class UdpSender(threading.Thread):
 
         # If the array fits in one chunk, return the array length
         if byte_length <= max_chunk_size:
-            return 1, byte_length
+            return byte_length, 1 
 
         # Calculate minimum number of chunks needed
         min_chunks = (byte_length + max_chunk_size - 1) // max_chunk_size
