@@ -94,6 +94,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.pose_conf_threshold =  0.3
     settings.pose_crop_expansion =  0.1 # * height of the camera
     settings.pose_stream_capacity = int(10 * args.fps)
+    settings.pose_verbose =         False
 
     settings.corr_rate_hz =         args.fps
     settings.corr_num_workers =     10

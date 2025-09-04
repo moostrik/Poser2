@@ -5,11 +5,12 @@ import math
 import time
 
 class TestPattern(IntEnum):
-    FILL = 0
-    PULSE = auto()
-    CHASE = auto()
-    LINES = auto()
-    RNDOM = auto()
+    NONE = 0
+    FILL = 1
+    PULSE = 2
+    CHASE = 3
+    LINES = 4
+    RNDOM = 5
 
 TEST_PATTERN_NAMES: list[str] = [p.name for p in TestPattern]
 
@@ -39,7 +40,7 @@ class CompTest():
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
-    def make_pattern(self) -> np.ndarray:
+    def update(self) -> np.ndarray:
         try:
             if self.pattern == TestPattern.FILL:
                 self.make_fill(self.white_array, self.WP)

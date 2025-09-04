@@ -34,9 +34,9 @@ class PoseDetection(Thread):
 
         self.verbose: bool = verbose
         self._running: bool = False
-        
-        self._poses_dict: dict = {}
-        self._poses_timestamp: dict = {}
+
+        self._poses_dict: dict[int, Pose] = {}
+        self._poses_timestamp: dict[int, Timestamp] = {}
         self._poses_lock: Lock = Lock()  # Add lock for thread safety
         self._callbacks: set = set()
         
@@ -44,6 +44,7 @@ class PoseDetection(Thread):
 
     def stop(self) -> None:
         self._running = False
+        self._notify_update_event.set()  # Wake up the thread if waiting
 
     def run(self) -> None:
         model:torch.nn.Module = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
@@ -54,7 +55,7 @@ class PoseDetection(Thread):
         
         next_time: float = time.time()
         while self._running:
-            self._notify_update_event.wait(timeout=0.1)
+            self._notify_update_event.wait(timeout=1.0)
             self._notify_update_event.clear()
             start_time = time.perf_counter()
             try:
@@ -111,22 +112,19 @@ class PoseDetection(Thread):
             with self._poses_lock:
                 if self._poses_dict.get(pose.id) is not None:
                     existing_pose: Pose = self._poses_dict[pose.id]
-                    e_time = existing_pose.time_stamp
-                    n_time = pose.time_stamp
-                    difference = (n_time - e_time).total_seconds()
-                    
-                    t2 = self._poses_timestamp.get(pose.id, Timestamp.now())
-                    diff2 = (Timestamp.now() - t2).total_seconds()
+                    self.callback(existing_pose)
 
-                    print(f"Pose Detection Warning: Pose ID {pose.id} already in queue, overwriting. {difference:.3f}, {diff2:.3f}")
-                    
-                    # print(f"Existing Pose: {self._poses_dict[pose.id].time_stamp}, New Pose: {pose.time_stamp}")
+                    if self.verbose:
+                        diff1 = (pose.time_stamp - existing_pose.time_stamp).total_seconds()
+                        diff2 = (Timestamp.now() - self._poses_timestamp.get(pose.id, Timestamp.now())).total_seconds()
+                        print(f"Pose Detection Warning: Pose ID {pose.id} already in queue, overwriting. {diff1:.3f}, {diff2:.3f}")
 
                 self._poses_dict[pose.id] = pose
                 self._poses_timestamp[pose.id] = Timestamp.now()
                 
-        
-            self._notify_update_event.set()
+    def notify_update(self) -> None:
+        if self._running:
+            self._notify_update_event.set()       
 
     # CALLBACKS
     def callback(self, pose: Pose) -> None:

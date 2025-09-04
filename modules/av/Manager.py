@@ -1,5 +1,6 @@
 # Standard library imports
-from threading import Thread, Lock
+from queue import Empty, Queue
+from threading import Event, Thread, Lock
 from time import time, sleep
 
 # Third-party imports
@@ -7,12 +8,16 @@ from time import time, sleep
 # Local application imports
 from modules.av.Definitions import *
 from modules.av.Gui import Gui
-from modules.av.CompTest import CompTest
+from modules.av.Comp import Comp
+from modules.av.CompTest import CompTest, TestPattern
 from modules.av.UdpSender import UdpSender
 from modules.Settings import Settings
-from modules.tracker.Tracklet import Tracklet, TrackletDict
+from modules.pose.PoseDefinitions import Pose
 
 from modules.gl.Utils import FpsCounter
+
+
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class Manager(Thread):
@@ -20,43 +25,47 @@ class Manager(Thread):
         super().__init__()
         self.settings: Settings = settings
 
-        self.running: bool = False
+        self._stop_event = Event()
         self.interval: float = 1.0 / settings.light_rate
         self.last_update: float = 0.0
 
-        self.person_dict: TrackletDict = {}
-        self.dict_lock: Lock = Lock()
-
         self.resolution: int = settings.light_resolution
         self.output: AvOutput = AvOutput(self.resolution)
+        
+        self.pose_input_queue: Queue[Pose] = Queue()
 
+        self.comp: Comp = Comp(settings)
         self.comp_test: CompTest = CompTest(self.resolution)
-
-        self.output_callbacks: list[AvOutputCallback] = []
 
         self.udp_sender: UdpSender = UdpSender(self.settings.light_resolution, self.settings.udp_port, self.settings.udp_ip_addresses)
         self.udp_sender.start()
 
         self.FPS: FpsCounter = FpsCounter()
-
         self.gui: Gui = Gui(gui, self)
+        
+        self.output_callbacks: list[AvOutputCallback] = []
+        self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     def stop(self) -> None:
         self.udp_sender.stop()
-        self.running = False
+        self._stop_event.set()
         self.join()
 
     def run(self) -> None:
-        self.running = True
         next_time: float = time()
-        while self.running:
+        while not self._stop_event.is_set():
+            
+            poses: list[Pose] = []
+            try:
+                while True:
+                    pose: Pose = self.pose_input_queue.get_nowait()
+                    poses.append(pose)
+            except Empty:
+                pass
 
-            self.output.img = self.comp_test.make_pattern()
+            self._update(poses)
 
-            self._output_callback(self.output)
-            self.udp_sender.send_message(self.output)
-
-            next_time += self.interval
+            next_time += self.interval            
             sleep_time: float = next_time - time()
             if sleep_time > 0:
                 sleep(sleep_time)
@@ -64,20 +73,29 @@ class Manager(Thread):
                 next_time = time()
 
             self.FPS.tick()
-                # print(f"Manager fell behind by {-sleep_time:.4f} seconds, or: {-sleep_time / self.interval:.4f} frames")
+            self.gui.update()
 
-    # STATIC METHODS
+    def _update(self, poses: list[Pose]) -> None:
+        # comp_img: np.ndarray = self.comp.update(poses)
+        try:
+            comp_img: np.ndarray = self.comp.update(poses)
+        except Exception as e:
+            print(f"Error in Comp update: {e}")
+            return        
+        
+        if self.comp_test.pattern == TestPattern.NONE:
+            self.output.img = comp_img
+        else:
+            self.output.img = self.comp_test.update()
 
+        self._output_callback(self.output)
+        self.udp_sender.send_message(self.output)
 
-    # SETTERS AND GETTERS
-    def set_person_dict(self, person_dict: TrackletDict) -> None:
-        with self.dict_lock:
-                self.person_dict = person_dict
+    # SETTERS
+    def add_pose(self, pose: Pose) -> None:
+        self.pose_input_queue.put(pose)
 
-    def get_person_dict(self) -> TrackletDict:
-        with self.dict_lock:
-            return self.person_dict.copy()
-
+    # CALLBACKS
     def _output_callback(self, output: AvOutput) -> None:
         for callback in self.output_callbacks:
             callback(output)

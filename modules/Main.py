@@ -67,6 +67,7 @@ class Main():
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.pose_detection.set_image)
             camera.add_frame_callback(self.tracker.notify_update_from_image)
+            camera.add_frame_callback(self.pose_detection.notify_update_from_image)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.render.data.set_depth_tracklets)
             camera.start()
@@ -77,12 +78,13 @@ class Main():
         self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_correlation)
         self.dtw_correlator.start()
 
-        # self.pose_streamer.add_stream_callback(self.dtw_correlator.set_pose_stream)
+        self.pose_streamer.add_stream_callback(self.dtw_correlator.set_pose_stream)
         self.pose_streamer.add_stream_callback(self.render.data.set_pose_stream)
         self.pose_streamer.start()
 
         self.pose_detection.add_pose_callback(self.pose_streamer.add_pose)
         self.pose_detection.add_pose_callback(self.render.data.set_pose)
+        self.pose_detection.add_pose_callback(self.av.add_pose)
         self.pose_detection.start()
 
         self.tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
@@ -104,7 +106,7 @@ class Main():
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
         if self.av:
-            self.gui.addFrame([self.av.gui.get_gui_frame()])
+            self.gui.addFrame([self.av.gui.get_gui_frame(), self.av.gui.get_gui_test_frame()])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])

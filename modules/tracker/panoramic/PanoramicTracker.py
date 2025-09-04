@@ -226,8 +226,8 @@ class PanoramicTracker(Thread, BaseTracker):
 
     # CALLBACKS
     def _notify_callback(self, tracklet: Tracklet) -> None:
-        self._notify_callback_multi_sim(tracklet)
-        return
+        # self._notify_callback_multi_sim(tracklet)
+        # return
         
         with self.callback_lock:
             for c in self.tracklet_callbacks:

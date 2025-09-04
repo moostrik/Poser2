@@ -1,19 +1,45 @@
 from __future__ import annotations
 
-from modules.Settings import Settings
 
 from modules.av.Definitions import *
 # from modules.av.Manager import Manager
-from modules.av.CompTest import CompTest, TestPattern, TEST_PATTERN_NAMES
+from modules.av.CompTest import TEST_PATTERN_NAMES
 
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
 
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from modules.av.Manager import Manager
+
 class Gui():
-    def __init__(self, gui: G, manager) -> None:
+    def __init__(self, gui: G, manager: 'Manager') -> None:
         self.gui: G = gui
-        from modules.av.Manager import Manager
         self.manager: Manager = manager
+        
+        
+        elm: list = []
+        elm.append([E(eT.TEXT, '    '),
+                    E(eT.CHCK, 'Show Overlay',  manager.comp.show_overlay),
+                    E(eT.BTTN, 'Reset',         manager.comp.reset, expand=False),
+                    E(eT.TEXT, 'FPS'),
+                    E(eT.SLDR, 'avFPS',         None,                                   0,  [0,60],   0.1)])
+        elm.append([E(eT.TEXT, 'Smth'),
+                    E(eT.SLDR, 'Smooth',        manager.comp.set_smooth_alpha,          0.5, [0., 1.],  0.01)])
+        elm.append([E(eT.TEXT, 'Void'),
+                    E(eT.SLDR, 'Void',          manager.comp.set_void_width,            0.05, [0., 1.],  0.01),
+                    E(eT.TEXT, 'Patt'),
+                    E(eT.SLDR, 'Patt',          manager.comp.set_pattern_width,         0.2,  [0., 1.],  0.01)])
+        elm.append([E(eT.TEXT, '  A0'),
+                    E(eT.SLDR, 'A0',            manager.comp.set_input_A0,              0.05, [0., 1.],  0.01),
+                    E(eT.TEXT, '  A1'),
+                    E(eT.SLDR, 'A1',            manager.comp.set_input_A1,              0.2,  [0., 1.],  0.01)])
+        elm.append([E(eT.TEXT, '  B0'),
+                    E(eT.SLDR, 'B0',            manager.comp.set_input_B0,              0.05, [0., 1.],  0.01),
+                    E(eT.TEXT, '  B1'),
+                    E(eT.SLDR, 'B1',            manager.comp.set_input_B1,              0.2,  [0., 1.],  0.01)])
+        gui_height = len(elm) * ELEMHEIGHT + BASEHEIGHT
+        self.frame = Frame('COMP TEST', elm, gui_height)
 
         elm: list = []
         elm.append([E(eT.TEXT, 'Pattern  '),
@@ -47,11 +73,13 @@ class Gui():
                     E(eT.SLDR, 'B_amount',      manager.comp_test.set_blue_amount,      36,  [1, 360],  1)])
 
         gui_height = len(elm) * ELEMHEIGHT + BASEHEIGHT
-        self.frame = Frame('COMP TEST', elm, gui_height)
+        self.test_frame = Frame('COMP TEST', elm, gui_height)
 
     # GUI FRAME
     def get_gui_frame(self):
           return self.frame
+    def get_gui_test_frame(self):
+          return self.test_frame
 
     def reset(self) -> None:
         self.manager.comp_test.reset()
@@ -64,13 +92,4 @@ class Gui():
     def update(self) -> None:
         if not self.gui:
             return
-        self.gui.updateElement('W_test', self.manager.comp_test.WP.strength)
-        self.gui.updateElement('B_test', self.manager.comp_test.BP.strength)
-        self.gui.updateElement('W_speed', self.manager.comp_test.WP.speed)
-        self.gui.updateElement('B_speed', self.manager.comp_test.BP.speed)
-        self.gui.updateElement('W_phase', self.manager.comp_test.WP.phase)
-        self.gui.updateElement('B_phase', self.manager.comp_test.BP.phase)
-        self.gui.updateElement('W_amount', self.manager.comp_test.WP.amount)
-        self.gui.updateElement('B_amount', self.manager.comp_test.BP.amount)
-        self.gui.updateElement('W_width', self.manager.comp_test.WP.width)
-        self.gui.updateElement('B_width', self.manager.comp_test.BP.width)
+        self.gui.updateElement('avFPS', self.manager.FPS.get_fps())

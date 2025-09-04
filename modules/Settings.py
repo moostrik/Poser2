@@ -68,6 +68,7 @@ class Settings():
         self.pose_active: bool                  = None # type: ignore
         self.pose_stream_capacity: int          = None # type: ignore
         self.pose_conf_threshold: float         = None # type: ignore
+        self.pose_verbose: bool                 = None # type: ignore
 
         # POSE CORRELATION SETTINGS
         self.corr_rate_hz: float                = None # type: ignore

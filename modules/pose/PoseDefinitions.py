@@ -154,6 +154,8 @@ class PosePoints():
             colors[i*2] = [C[0], C[1], C[2], alpha]
             colors[i*2+1] = [C[0], C[1], C[2], alpha]
         return colors
+    
+        
 
 PoseList = list[PosePoints]
 
@@ -191,5 +193,39 @@ class Pose:
 
         return real_keypoints
 
+    def get_approximate_person_length(self, threshold: float = 0.3) -> float | None:
+        """
+        Estimate the person's length by summing the lengths of both arms and both legs,
+        only if all keypoints for a limb are above the confidence threshold.
+        """
+        
+        if self.points is None:
+            return None
+        
+        keypoints = self.points.getKeypoints()  # shape (NUM_KEYPOINTS, 2)
+        scores = self.points.getScores()        # shape (NUM_KEYPOINTS,)
+        height = self.crop_rect.height if self.crop_rect is not None else 1.0
+    
+        # Define the keypoint triplets for each limb
+        limbs = [
+            # Arms: shoulder -> elbow -> wrist
+            (Keypoint.left_shoulder, Keypoint.left_elbow, Keypoint.left_wrist),
+            (Keypoint.right_shoulder, Keypoint.right_elbow, Keypoint.right_wrist),
+            # Legs: hip -> knee -> ankle
+            (Keypoint.left_hip, Keypoint.left_knee, Keypoint.left_ankle),
+            (Keypoint.right_hip, Keypoint.right_knee, Keypoint.right_ankle),
+        ]
+    
+        limb_lengths: list[float] = []
+        for kp1, kp2, kp3 in limbs:
+            # Check if all keypoints for this limb are above threshold
+            if (scores[kp1] > threshold and scores[kp2] > threshold and scores[kp3] > threshold):
+                # Calculate limb length as sum of two segments
+                seg1 = np.linalg.norm(keypoints[kp1] - keypoints[kp2])
+                seg2 = np.linalg.norm(keypoints[kp2] - keypoints[kp3])
+                limb_lengths.append(seg1 + seg2)
+    
+        return max(limb_lengths) * 2.5 * height if limb_lengths else None
 
+PoseDict = dict[int, Pose]
 PoseCallback = Callable[[Pose], None]

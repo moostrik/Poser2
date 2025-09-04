@@ -41,7 +41,7 @@ class PosePipeline(Thread):
         
 
         if self.pose_active:
-            self.pose_detector = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, True)
+            self.pose_detector = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, settings.pose_verbose)
             print('Pose Detection:', 'model', ModelTypeNames[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')
@@ -134,6 +134,10 @@ class PosePipeline(Thread):
             if not self.input_frames.get(id) is None:
                 return self.input_frames[id]
             return None
+        
+    def notify_update_from_image(self, cam_id: int, frame_type, image) -> None:
+        if cam_id == 0:
+            self.pose_detector.notify_update()
 
     # External Output Callbacks
     def add_pose_callback(self, callback: PoseCallback) -> None:
