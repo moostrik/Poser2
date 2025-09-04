@@ -76,12 +76,12 @@ class Manager(Thread):
             self.gui.update()
 
     def _update(self, poses: list[Pose]) -> None:
-        # comp_img: np.ndarray = self.comp.update(poses)
-        try:
-            comp_img: np.ndarray = self.comp.update(poses)
-        except Exception as e:
-            print(f"Error in Comp update: {e}")
-            return        
+        comp_img: np.ndarray = self.comp.update(poses)
+        # try:
+        #     comp_img: np.ndarray = self.comp.update(poses)
+        # except Exception as e:
+        #     print(f"Error in Comp update: {e}")
+        #     return        
         
         if self.comp_test.pattern == TestPattern.NONE:
             self.output.img = comp_img

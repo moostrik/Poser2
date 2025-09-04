@@ -58,16 +58,19 @@ class Comp():
         world_positions: dict[int, float] = {}
         approximate_lengths: dict[int, float] = {}        
         void_widths: dict[int, float] = {}
+        ages: dict[int, float] = {}
         for i in range(self.num_players):
             world_positions[i] = self.smooth_metrics[i].world_angle
             approximate_lengths[i] = self.smooth_metrics[i].approximate_person_length
 
             void_width: float = self.parameters.void_width * 0.036
             void_widths[i] = void_width + approximate_lengths[i] * void_width if approximate_lengths[i] is not None else None
+            
+            ages[i] = self.smooth_metrics[i].age
 
         # print(approximate_lengths)
 
-        self.make_voids(self.overlay_array, world_positions, void_widths, self.parameters)
+        self.make_voids(self.overlay_array, world_positions, void_widths, ages, self.parameters)
 
 
         self.output_img[0, :, 0] = self.white_array[:]
@@ -101,12 +104,13 @@ class Comp():
     def show_overlay(self, value: bool) -> None:
         self.parameters.show_overlay = value
 
-    def make_voids(self,array: np.ndarray, world_positions: dict[int, float], void_widths: dict[int, float], P: TestParameters) -> None:
+    def make_voids(self,array: np.ndarray, world_positions: dict[int, float], void_widths: dict[int, float], ages: dict[int, float], P: TestParameters) -> None:
         array -= self.interval * 4.0
         
         for i in range(len(world_positions)):
             if world_positions[i] is not None and void_widths[i] is not None:
-                Comp.draw_field_with_edge(array, world_positions[i], void_widths[i], 1.0, 20, BlendType.MAX)
+                age = min(ages[i] * 0.8, 1.0)
+                Comp.draw_field_with_edge(array, world_positions[i], void_widths[i], age, 20, BlendType.MAX)
 
             
     @staticmethod        

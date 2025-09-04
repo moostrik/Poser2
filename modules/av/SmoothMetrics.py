@@ -32,8 +32,8 @@ class SmoothMetrics:
                 output_fps=output_fps, 
                 is_circular= True if field_.name == "world_angle" else False,
             )
-            
-        
+        self.age: float = 0.0
+
         self.hot_reloader = HotReloadMethods(self.__class__, True)
             
     def __getattr__(self, name):
@@ -54,7 +54,8 @@ class SmoothMetrics:
         
     def add_pose(self, pose: Pose) -> None:
         tracklet: Tracklet | None = pose.tracklet
-        if tracklet is not None and tracklet.is_active:
+        if tracklet is not None and tracklet.is_active and tracklet.age_in_seconds > 2.0:
+            self.age = tracklet.age_in_seconds - 2.0  # Start age after 2 seconds of active tracking
         
             # angles: JointAngleDict | None  = pose.angles
             # if angles is not None:
