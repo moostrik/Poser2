@@ -13,8 +13,11 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class BlendType(Enum):
     NONE = "replace"
     ADD = "add"
+    SUBTRACT = "subtract"
+    MULTIPLY = "multiply"
     MAX = "max"
     MIN = "min"
+    NON_ZERO = "non_zero"
 
 
 class TestParameters():
@@ -26,7 +29,7 @@ class TestParameters():
         self.input_A1: float = 0.0
         self.input_B0: float = 0.0
         self.input_B1: float = 0.0
-        self.show_overlay: bool = False
+        self.show_void: bool = False
 
 class Comp():
     def __init__(self, settings: Settings) -> None:
@@ -36,9 +39,9 @@ class Comp():
         self.interval: float = 1.0 / settings.light_rate
 
         # Pre-allocate arrays
-        self.white_array: np.ndarray = np.zeros((self.resolution), dtype=IMG_TYPE)
+        self.white_array: np.ndarray = np.ones((self.resolution), dtype=IMG_TYPE)
         self.blue_array: np.ndarray = np.zeros((self.resolution), dtype=IMG_TYPE)
-        self.overlay_array: np.ndarray = np.zeros((self.resolution), dtype=IMG_TYPE)
+        self.void_array: np.ndarray = np.zeros((self.resolution), dtype=IMG_TYPE)
         self.output_img: np.ndarray = np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
         self.indices: np.ndarray = np.arange(self.resolution)
         
@@ -54,6 +57,9 @@ class Comp():
 
         for pose in poses:
             self.smooth_metrics[pose.id].add_pose(pose)
+        
+        for sm in self.smooth_metrics.values():
+            sm.update()
             
         world_positions: dict[int, float] = {}
         approximate_lengths: dict[int, float] = {}        
@@ -62,32 +68,43 @@ class Comp():
         for i in range(self.num_players):
             world_positions[i] = self.smooth_metrics[i].world_angle
             approximate_lengths[i] = self.smooth_metrics[i].approximate_person_length
+            
+            ages[i] = self.smooth_metrics[i].age
 
             void_width: float = self.parameters.void_width * 0.036
-            void_widths[i] = void_width + approximate_lengths[i] * void_width if approximate_lengths[i] is not None else None
+            void_widths[i] = (void_width + approximate_lengths[i] * void_width) * pow(min(1.0, ages[i] * 2.0), 1.5) if approximate_lengths[i] is not None else None
             
             ages[i] = self.smooth_metrics[i].age
 
         # print(approximate_lengths)
 
-        self.make_voids(self.overlay_array, world_positions, void_widths, ages, self.parameters)
+        self.make_voids(self.void_array, world_positions, void_widths, ages, self.parameters)
 
-
+        self.blue_array.fill(0.0)
+        self.white_array.fill(1.0)
+        # add overlay to second channel 
+        if self.parameters.show_void:
+            inverted_void_array = 1.0 - self.void_array
+            Comp.blend_values(self.white_array, inverted_void_array, 0, BlendType.MULTIPLY)  
+            Comp.blend_values(self.blue_array, inverted_void_array, 0, BlendType.MULTIPLY)
+            Comp.blend_values(self.blue_array, self.void_array * 0.5, 0, BlendType.ADD)
+            
         self.output_img[0, :, 0] = self.white_array[:]
         self.output_img[0, :, 1] = self.blue_array[:]
-        # add overlay to second channel 
-        if self.parameters.show_overlay:
-            self.output_img[0, :, 1] = self.overlay_array[:]
 
         return self.output_img
 
 
     def reset(self) -> None:
-        self.parameters = TestParameters()
-
-    def set_smooth_alpha(self, value: float) -> None:
         for sm in self.smooth_metrics.values():
-            sm.set_alpha(value)
+            sm.reset()
+
+    def set_smoothness(self, value: float) -> None:
+        for sm in self.smooth_metrics.values():
+            sm.set_smoothness(value)
+    def set_responsiveness(self, value: float) -> None:
+        for sm in self.smooth_metrics.values():
+            sm.set_responsiveness(value)
     def set_void_width(self, value: float) -> None:
         self.parameters.void_width = max(0.0, min(1.0, value))
     def set_pattern_width(self, value: float) -> None:
@@ -102,15 +119,16 @@ class Comp():
     def set_input_B1(self, value: float) -> None:
         self.parameters.input_B1 = max(0.0, min(1.0, value))
     def show_overlay(self, value: bool) -> None:
-        self.parameters.show_overlay = value
+        self.parameters.show_void = value
 
     def make_voids(self,array: np.ndarray, world_positions: dict[int, float], void_widths: dict[int, float], ages: dict[int, float], P: TestParameters) -> None:
         array -= self.interval * 4.0
+        array.fill(0.0) 
         
         for i in range(len(world_positions)):
             if world_positions[i] is not None and void_widths[i] is not None:
                 age = min(ages[i] * 0.8, 1.0)
-                Comp.draw_field_with_edge(array, world_positions[i], void_widths[i], age, 20, BlendType.MAX)
+                Comp.draw_field_with_edge(array, world_positions[i], void_widths[i], 1.0, 20, BlendType.MAX)
 
             
     @staticmethod        
@@ -162,10 +180,17 @@ class Comp():
                 array[start_idx:end_idx] =  values
             elif blend == BlendType.ADD:
                 array[start_idx:end_idx] += values
+            elif blend == BlendType.SUBTRACT:
+                array[start_idx:end_idx] -= values
+            elif blend == BlendType.MULTIPLY:
+                array[start_idx:end_idx] *= values
             elif blend == BlendType.MAX:
                 array[start_idx:end_idx] = np.maximum(array[start_idx:end_idx], values)
             elif blend == BlendType.MIN:
                 array[start_idx:end_idx] = np.minimum(array[start_idx:end_idx], values)
+            elif blend == BlendType.NON_ZERO:
+                mask = values != 0
+                array[start_idx:end_idx][mask] = values[mask]
                 
         np.clip(array, 0, 1, out=array)
 

@@ -25,7 +25,9 @@ class Gui():
                     E(eT.TEXT, 'FPS'),
                     E(eT.SLDR, 'avFPS',         None,                                   0,  [0,60],   0.1)])
         elm.append([E(eT.TEXT, 'Smth'),
-                    E(eT.SLDR, 'Smooth',        manager.comp.set_smooth_alpha,          0.5, [0., 1.],  0.01)])
+                    E(eT.SLDR, 'Smooth',        manager.comp.set_smoothness,          0.5, [0., 1.],  0.01),
+                    E(eT.TEXT, 'Resp'),
+                    E(eT.SLDR, 'Resp',          manager.comp.set_responsiveness,       0.5, [0., 1.],  0.01)])
         elm.append([E(eT.TEXT, 'Void'),
                     E(eT.SLDR, 'Void',          manager.comp.set_void_width,            0.05, [0., 1.],  0.01),
                     E(eT.TEXT, 'Patt'),

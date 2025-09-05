@@ -37,8 +37,7 @@ class ValueSmoother:
         Args:
             method: Smoothing method to use
             window_size: Window size for moving average
-            alpha: Smoothing factor for exponential smoothing (0-1)
-                  Lower values = more smoothing
+            alpha: Smoothing factor for exponential smoothing (0-1) Lower values = more smoothing
             output_fps: Target output framerate
             is_circular: Whether the value is circular (0 and 1 are the same)
             min_cutoff: Minimum cutoff frequency for One Euro filter
