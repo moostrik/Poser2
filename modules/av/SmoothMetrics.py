@@ -32,6 +32,7 @@ class SmoothMetrics:
                 output_fps=output_fps, 
                 is_circular= True if field_.name == "world_angle" else False,
             )
+        # age should be interpolated (not smoothed)
         self.age: float = 0.0
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
