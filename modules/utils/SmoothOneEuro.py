@@ -4,7 +4,6 @@ import math
 START_TIME: float = time.time()
 
 class SmoothOneEuro:
-    
     def __init__(self, freq=60.0, responsiveness=0.5, smoothness=0.5):
         self.filter = OneEuroFilter(freq=freq)
         self.set_responsiveness(responsiveness)
@@ -65,7 +64,8 @@ class SmoothOneEuroCircular:
         value_norm: angle normalized in [0,1], where 0=-pi, 1=pi
         """
         # Convert normalized [0,1] → angle in [-pi, pi]
-        angle = (value * 2 * math.pi) - math.pi
+        # angle = (value * 2 * math.pi) - math.pi
+        angle = value
         
         self.x = math.cos(angle)
         self.y = math.sin(angle) 
