@@ -31,9 +31,9 @@ class WhiteSpaceRender(BaseRender):
         self.fbo_lines.allocate(width, height, internal_format)
         self.fbo_angles.allocate(width, height, internal_format)
         if not WhiteSpaceRender.lines_shader.allocated:
-            WhiteSpaceRender.lines_shader.allocate(monitor_file=False)
+            WhiteSpaceRender.lines_shader.allocate(monitor_file=True)
         if not WhiteSpaceRender.angles_shader.allocated:
-            WhiteSpaceRender.angles_shader.allocate(monitor_file=False)
+            WhiteSpaceRender.angles_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self.fbo_lines.deallocate()

@@ -25,6 +25,12 @@ class Settings():
         # GENERAL
         self.max_players: int                   = None # type: ignore
         self.art_type: Settings.ArtType         = None # type: ignore
+        
+        #GUI
+        self.gui_location_x: int                = None # type: ignore
+        self.gui_location_y: int                = None # type: ignore
+        self.gui_on_top: bool                   = None # type: ignore
+        self.gui_default_file: str              = None # type: ignore
 
         # PATHS
         self.path_root: str                     = None # type: ignore

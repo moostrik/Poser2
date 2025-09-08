@@ -35,7 +35,7 @@ void main() {
 
         if (delta < halfAngle) {
             float falloff = smoothstep(halfAngle, 0.0, delta);
-            float whiteValue = texture(tex0, vec2(float(i) / (texWidth - 1.0), 0.5)).b;
+            float whiteValue = texture(tex0, vec2(float(i) / (texWidth - 1.0), 0.5)).b * 0.8;
             white += whiteValue * falloff;
             float blueValue = texture(tex0, vec2(float(i) / (texWidth - 1.0), 0.5)).g;
             blue += blueValue * falloff;

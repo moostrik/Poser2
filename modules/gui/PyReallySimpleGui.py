@@ -6,6 +6,9 @@ import glob
 from queue import Queue, Empty
 from time import sleep
 
+
+from modules.Settings import Settings
+
 BASEHEIGHT = 35
 ELEMHEIGHT = 44
 FRAMEWIDTH = 700
@@ -154,13 +157,16 @@ def PopUp(window: sg.Window, text: str, duration: float = 1) -> None:
         sg.popup(text, location=location)
 
 class Gui(Thread):
-    def __init__(self, name: str = 'name', path: str | None = '', defaultSettingsName: str = 'default', exitCallback = None) -> None:
+    def __init__(self, settings: Settings, exitCallback = None) -> None:
         super().__init__()
         sg.theme('DarkBlack')
         sg.set_options(font=("consolas", 10))
-        self.windowName: str = name
-        self.defaultSettingsName = defaultSettingsName
-        self.settings: sg.UserSettings = sg.UserSettings(path = path, filename = defaultSettingsName + '.json')
+        self.windowName: str = settings.render_title + ' GUI'
+        self.defaultSettingsName = settings.gui_default_file
+        self.settings: sg.UserSettings = sg.UserSettings(path = settings.path_file, filename = self.defaultSettingsName + '.json')
+        self.on_top: bool = settings.gui_on_top
+        self.location_x: int = settings.gui_location_x
+        self.location_y: int = settings.gui_location_y
         self.exit_lock = Lock()
         self.exit_callback = exitCallback
         self.messageQueue: Queue = Queue()
@@ -201,7 +207,7 @@ class Gui(Thread):
             return
 
     def run(self) -> None:
-        self.window = sg.Window(self.windowName, self.layout, keep_on_top=False, finalize=True,return_keyboard_events=True)
+        self.window = sg.Window(self.windowName, self.layout, keep_on_top=self.on_top, finalize=True,return_keyboard_events=True, location=(self.location_x, self.location_y))
         self.loadSettings()
 
         while self.running:

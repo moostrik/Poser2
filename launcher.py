@@ -57,6 +57,11 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.max_players =          args.players
 
+    settings.gui_location_x =       1920
+    settings.gui_location_y =       -1500
+    settings.gui_on_top =           True
+    settings.gui_default_file =     'default'
+
     settings.path_root =            currentPath
     settings.path_file =            path.join(currentPath, 'files')
     settings.path_model =           path.join(currentPath, 'models')
@@ -113,14 +118,14 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.render_title =         'White Space'
     settings.render_x =             0
-    settings.render_y =             50
-    settings.render_width =         1920
-    settings.render_height =        1080 - settings.render_y
+    settings.render_y =             0
+    settings.render_width =         1920 * 2
+    settings.render_height =        1080 * 2 - settings.render_y
     settings.render_fullscreen =    False
     settings.render_fps =           0
     settings.render_v_sync =        True
     settings.render_cams_a_row =    2
-    settings.render_monitor =       0
+    settings.render_monitor =       1
     settings.render_R_num =         3
 
     #settings.art_type =             Settings.ArtType.HDT

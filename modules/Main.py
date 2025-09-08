@@ -22,7 +22,7 @@ from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
 class Main():
     def __init__(self, settings: Settings) -> None:
-        self.gui = Gui(settings.render_title + ' GUI', settings.path_file, 'default')
+        self.gui = Gui(settings)
 
         self.settings: Settings = settings
 

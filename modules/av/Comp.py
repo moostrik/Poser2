@@ -72,6 +72,7 @@ class Comp():
     @staticmethod
     def make_voids(array: np.ndarray, pose_metrics: MultiPoseMetrics, draw: DrawMethods, P: TestParameters) -> None:
         array -= P.interval * 4.0
+        np.clip(array, 0, 1, out=array)
 
         world_positions: dict[int, float] = pose_metrics.world_positions
         ages: dict[int, float] = pose_metrics.ages
@@ -82,72 +83,25 @@ class Comp():
                 age = pow(min(ages[i] * 1.8, 1.0), 1.5)
                 void_width: float = P.void_width * 0.036
                 width = (void_width + pose_lengths[i] * void_width)
+                # print (age, width)
                 draw.draw_field_with_edge(array, world_positions[i], width, age, 20, BlendType.MAX)
 
 
-            
+    @staticmethod
+    def make_patterns(array: np.ndarray, pose_metrics: MultiPoseMetrics, draw: DrawMethods, P: TestParameters) -> None:
+        array.fill(0.0)
 
-    # @staticmethod        
-    # def draw_in_array_with_edge(array: np.ndarray, start_idx: int, end_idx: int, value: float, edge:float, blend: BlendType) -> None:
-
-
-        # print(array)
-        # with np.printoptions(threshold=np.inf, precision=3, suppress=True):
-        #     print(array)
+        world_positions: dict[int, float] = pose_metrics.world_positions
+        ages: dict[int, float] = pose_metrics.ages
+        pose_lengths: dict[int, float] = pose_metrics.pose_lengths
         
-    # @staticmethod
-    # def make_fill(array: np.ndarray, P: TestParameters) -> None:
-    #     array.fill(P.strength * IMG_MP)
-
-    # @staticmethod
-    # def make_pulse(array: np.ndarray, P: TestParameters) -> None:
-    #     T: float = time.time()
-    #     phase_angle = T * math.pi * P.speed + P.phase
-    #     value: float = (0.5 * math.sin(phase_angle) + 0.5) * P.strength * IMG_MP
-    #     array.fill(value)
-
-    # @staticmethod
-    # def make_chase(array: np.ndarray, P: TestParameters, indices: np.ndarray) -> None:
-    #     resolution: int = array.shape[1]
-    #     adjusted_speed: float = P.speed * P.amount / 10.0
-    #     wave_phase_per_pixel: float = P.amount * 2 * math.pi / resolution
-    #     time_offset: float = time.time() * adjusted_speed * 2 * math.pi
-
-    #     # Vectorized
-    #     phases = indices * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi
-    #     array[0, :] = (0.5 * np.sin(phases) + 0.5) * P.strength * IMG_MP
-
-    #     # # Old version for reference
-    #     # for i in range(resolution):
-    #     #     phase: float = i * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi
-    #     #     value: float = 0.5 * math.sin(phase) + 0.5
-    #     #     array[0, i] = value * P.strength * IMG_MP
-
-    # @staticmethod
-    # def make_lines(array: np.ndarray, P: TestParameters, indices: np.ndarray) -> None:
-    #     resolution: int = array.shape[1]
-    #     adjusted_speed: float = P.speed * P.amount / 10.0
-    #     wave_phase_per_pixel: float = P.amount * 2 * math.pi / resolution
-    #     time_offset: float = time.time() * adjusted_speed * 2 * math.pi
-
-    #     # Vectorized
-    #     phases = indices * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi + math.pi
-    #     values = 0.5 * np.sin(phases) + 0.5
-    #     array[0, :] = np.where(values < P.width, P.strength * IMG_MP, 0.0)
-
-    #     # # Old version for reference
-    #     # for i in range(resolution):
-    #     #     phase: float = i * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi + math.pi
-    #     #     value: float = 0.5 * math.sin(phase) + 0.5
-    #     #     value = 1.0 if value < P.width else 0.0
-    #     #     array[0, i] = value * P.strength * IMG_MP
-
-    # @staticmethod
-    # def make_random(array: np.ndarray, P: TestParameters, indices: np.ndarray) -> None:
-    #     T: float = time.time() * P.speed
-    #     sine_values: np.ndarray = np.sin(T + indices)
-    #     array[0, :] = np.where(sine_values > 0.5, P.strength * IMG_MP, 0)
-
+        for i in range(len(world_positions)):
+            if world_positions[i] is not None and pose_lengths[i] is not None and ages[i] is not None:
+                age = pow(min(ages[i] * 1.8, 1.0), 1.5)
+                width: float = P.pattern_width 
+                # width = (pattern_width + pose_lengths[i] * pattern_width)
+                draw.draw_field_with_edge(array, world_positions[i], width, age, int(width * P.pattern_edge), BlendType.ADD)
+      
     # SETTERS
     def set_smoothness(self, value: float) -> None:
         self.pose_metrics.set_smoothness(value)

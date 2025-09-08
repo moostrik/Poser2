@@ -1,5 +1,7 @@
     
 import numpy as np
+import time
+import math
 from enum import Enum
 from modules.utils.HotReloadMethods import HotReloadMethods    
 
@@ -61,8 +63,12 @@ class DrawMethods:
         resolution: int = len(array)
         
         end_idx = start_idx + len(values)
-        if start_idx < 0 or end_idx > resolution:
-            raise ValueError("start_idx and end_idx must be within the bounds of the array.")
+        if start_idx < 0:
+            start_idx = 0
+        if end_idx > resolution:
+            end_idx = resolution
+            
+            # raise ValueError("start_idx and end_idx must be within the bounds of the array.")
         
         if start_idx < end_idx:
             if blend == BlendType.NONE:
@@ -82,3 +88,57 @@ class DrawMethods:
                 array[start_idx:end_idx][mask] = values[mask]
                 
         np.clip(array, 0, 1, out=array)
+        
+        
+    # @staticmethod
+    # def make_fill(array: np.ndarray, P: TestParameters) -> None:
+    #     array.fill(P.strength * IMG_MP)
+
+    # @staticmethod
+    # def make_pulse(array: np.ndarray, P: TestParameters) -> None:
+    #     T: float = time.time()
+    #     phase_angle = T * math.pi * P.speed + P.phase
+    #     value: float = (0.5 * math.sin(phase_angle) + 0.5) * P.strength * IMG_MP
+    #     array.fill(value)
+
+    # @staticmethod
+    # def make_chase(array: np.ndarray, P: TestParameters, indices: np.ndarray) -> None:
+    #     resolution: int = array.shape[1]
+    #     adjusted_speed: float = P.speed * P.amount / 10.0
+    #     wave_phase_per_pixel: float = P.amount * 2 * math.pi / resolution
+    #     time_offset: float = time.time() * adjusted_speed * 2 * math.pi
+
+    #     # Vectorized
+    #     phases = indices * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi
+    #     array[0, :] = (0.5 * np.sin(phases) + 0.5) * P.strength * IMG_MP
+
+    #     # # Old version for reference
+    #     # for i in range(resolution):
+    #     #     phase: float = i * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi
+    #     #     value: float = 0.5 * math.sin(phase) + 0.5
+    #     #     array[0, i] = value * P.strength * IMG_MP
+
+    # @staticmethod
+    # def make_lines(array: np.ndarray, P: TestParameters, indices: np.ndarray) -> None:
+    #     resolution: int = array.shape[1]
+    #     adjusted_speed: float = P.speed * P.amount / 10.0
+    #     wave_phase_per_pixel: float = P.amount * 2 * math.pi / resolution
+    #     time_offset: float = time.time() * adjusted_speed * 2 * math.pi
+
+    #     # Vectorized
+    #     phases = indices * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi + math.pi
+    #     values = 0.5 * np.sin(phases) + 0.5
+    #     array[0, :] = np.where(values < P.width, P.strength * IMG_MP, 0.0)
+
+    #     # # Old version for reference
+    #     # for i in range(resolution):
+    #     #     phase: float = i * wave_phase_per_pixel - time_offset + P.phase * 2 * math.pi + math.pi
+    #     #     value: float = 0.5 * math.sin(phase) + 0.5
+    #     #     value = 1.0 if value < P.width else 0.0
+    #     #     array[0, i] = value * P.strength * IMG_MP
+
+    # @staticmethod
+    # def make_random(array: np.ndarray, P: TestParameters, indices: np.ndarray) -> None:
+    #     T: float = time.time() * P.speed
+    #     sine_values: np.ndarray = np.sin(T + indices)
+    #     array[0, :] = np.where(sine_values > 0.5, P.strength * IMG_MP, 0)
