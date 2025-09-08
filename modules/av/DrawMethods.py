@@ -61,6 +61,7 @@ class DrawMethods:
     @staticmethod
     def blend_values(array: np.ndarray, values: np.ndarray, start_idx: int, blend: BlendType) -> None:
         resolution: int = len(array)
+        print(resolution)
         
         end_idx = start_idx + len(values)
         if start_idx < 0:
