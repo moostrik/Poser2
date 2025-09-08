@@ -2,6 +2,7 @@ from dataclasses import dataclass, field, fields, make_dataclass
 # from modules.utils.SmoothValue import SmoothValue
 
 import numpy as np
+from time import time
 
 from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
@@ -13,7 +14,8 @@ import OneEuroFilter
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class SmoothMetrics:
+
+class PoseMetrics:
     def __init__(self, settings: Settings):
         # object.__setattr__(self, "filters", {})
         # object.__setattr__(self, "age", 0.0)
@@ -29,7 +31,8 @@ class SmoothMetrics:
             angle_name = key.name
             self.filters[angle_name] = SmoothOneEuro(freq = output_fps)
 
-        self.age: float = 0.0
+        self.start_age: float | None = 0.0
+        self.age: float | None = 0.0
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
             
@@ -52,11 +55,14 @@ class SmoothMetrics:
     def update(self) -> None:
         for filter in self.filters.values():
             filter.update()
+            
+        self.age = time() - self.start_age if self.start_age is not None else None
 
     def add_pose(self, pose: Pose) -> None:
         tracklet: Tracklet | None = pose.tracklet
         if tracklet is not None and tracklet.is_active and tracklet.age_in_seconds > 2.0:
-            self.age = tracklet.age_in_seconds - 2.0  # Start age after 2 seconds of active tracking
+            if self.start_age is None:
+                self.start_age = time()
         
             angles: JointAngleDict | None  = pose.angles
             if angles is not None:
@@ -86,6 +92,8 @@ class SmoothMetrics:
         """Reset all smoothers"""
         for smoother in self.filters.values():
             smoother.reset()  
+        self.age = None
+        self.start_age = None
 
     def set_smoothness(self, value: float) -> None:
         for smoother in self.filters.values():
@@ -94,3 +102,52 @@ class SmoothMetrics:
     def set_responsiveness(self, value: float) -> None:
         for smoother in self.filters.values():
             smoother.set_responsiveness(value)
+            
+            
+            
+class MultiPoseMetrics:    
+    def __init__(self, settings: Settings):        
+        self.num_players: int = settings.max_players
+        
+        self.smooth_metrics_dict: dict[int, PoseMetrics] = {}
+        for i in range(self.num_players):
+            self.smooth_metrics_dict[i] = PoseMetrics(settings)
+            
+        self.world_positions: dict[int, float] = {}
+        self.pose_lengths: dict[int, float] = {}        
+        self.ages: dict[int, float] = {}
+        self.left_shoulders: dict[int, float] = {}        
+        self.right_shoulders: dict[int, float] = {}
+        self.left_elbows: dict[int, float] = {}
+        self.right_elbows: dict[int, float] = {}
+
+        self.hot_reloader = HotReloadMethods(self.__class__, True)
+        
+
+
+    def update(self, poses: list[Pose]) -> None:
+        for pose in poses:
+            self.smooth_metrics_dict[pose.id].add_pose(pose)
+            
+        for key, sm in self.smooth_metrics_dict.items():
+            sm.update()
+            self.world_positions[key] = sm.world_angle
+            self.pose_lengths[key] = sm.approximate_person_length            
+            self.ages[key] = sm.age
+            self.left_shoulders[key] = sm.left_shoulder
+            self.right_shoulders[key] = sm.right_shoulder
+            self.left_elbows[key] = sm.left_elbow
+            self.right_elbows[key] = sm.right_elbow
+            
+    def set_smoothness(self, value: float) -> None:
+        for sm in self.smooth_metrics_dict.values():
+            sm.set_smoothness(value)
+            
+    def set_responsiveness(self, value: float) -> None:
+        for sm in self.smooth_metrics_dict.values():
+            sm.set_responsiveness(value)
+            
+    def reset(self) -> None:
+        for sm in self.smooth_metrics_dict.values():
+            sm.reset()
+
