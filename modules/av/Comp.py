@@ -146,9 +146,9 @@ class Comp():
                 age_pattern_power: float = 0.75
                 age_pattern_width: float = pattern_width * pow(min(age * age_pattern_speed, 1.0), age_pattern_power)
 
-                white_line_count_A: float = 4  #+ (P.input_A0 * 88) + (P.input_A1 * 88)
+                white_line_count_A: float = 20  #+ (P.input_A0 * 88) + (P.input_A1 * 88)
                 white_line_count_B: float = 22  #+ (P.input_B0 * 88) + (P.input_B1 * 88)
-                white_line_width_A: float = 0.25 #+ (P.input_A0 * 0.7)
+                white_line_width_A: float = 0.6 #+ (P.input_A0 * 0.7)
                 white_line_width_B: float = 0.5 #+ (P.input_B0 * 0.7)
                 white_line_speed_A: float = 2 #+ (P.input_A1 * 13.2)
                 white_line_speed_B: float = 2.2 #+ (P.input_B1 * 13.2)
@@ -183,28 +183,55 @@ class Comp():
         if pixel_span == 0 or thickness == 0.0:
             return
 
-        pixel_start: int = pixel_anchor if span >= 0 else (pixel_anchor - pixel_span)
-        if thickness == 1.0:
-            intensities = np.ones(pixel_span)
+        pixel_start: int = pixel_anchor#  if span >= 0 else (pixel_anchor - pixel_span)
+
+        wave_positions = ((np.linspace(0, pixel_span - 1, pixel_span) + pixel_start) % resolution) / resolution
+        wave_time: float = time.time() * abs(speed)
+        wave_cycles: float = 2 * math.pi * fequency
+        wave_flip: float = math.pi if speed < 0 else 0.0
+
+        thickness = 0.25
+        invert = False
+        T: float = 1.0 - thickness * 2.0
+        if thickness > 0.5:
+            invert = True
+            T=(thickness - 0.5) * 2.0
+
+
+        wave_phases = (wave_positions - anchor) * wave_cycles - wave_time
+        if invert:
+            wave_phases += np.pi
+        wave_phases = wave_phases % (2 * math.pi)
+
+        wave_phases = wave_phases / (2 * math.pi)
+        wave_phases -= T
+        np.maximum(wave_phases, 0.0, out=wave_phases)
+        wave_phases /= 1.0 - T
+        wave_phases = wave_phases * (2 * math.pi)
+
+        if invert:
+            wave_phases += np.pi * 0.5
         else:
-            wave_positions = ((np.linspace(0, pixel_span - 1, pixel_span) + pixel_start) % resolution) / resolution
-            wave_time: float = time.time() * speed
-            wave_cycles: float = 2 * math.pi * fequency
-            wave_flip: float = math.pi if speed < 0 else 0.0
+            wave_phases += np.pi * -0.5
 
-            wave_phases = (wave_positions - anchor) * wave_cycles - wave_time + wave_flip
-            # phases = world_positions * wave_phase_per_unit - time_offset # relative to world
-            intensities = (1.0 + np.sin(wave_phases)) * 0.5
+        sharpness: float = 3
 
-            steepness: float = 5.0
-            intensities = (1.0 + np.sin(wave_phases)* steepness) * 0.5
-            intensities = np.clip(intensities, 0.0, 1.0, out=intensities)
+        intensities = (1.0 + np.sin(wave_phases ) * sharpness) * 0.5
+        np.clip(intensities, 0, 1, out=intensities)
+        if speed < 0:
+            # Mirror the wave positions or the final intensities
+            intensities = intensities[::-1]
+            pixel_start = (pixel_start - pixel_span) % resolution
 
-            power_factor: float = 1.0 / thickness - 1.0
-            intensities: np.ndarray = np.power(intensities, power_factor)
+
+
 
         Comp.draw_edge(intensities, int(pixel_span * 0.1), 1.5)
+
+
         Comp.apply_circular(array, intensities, pixel_start, blend)
+
+
 
 
     @staticmethod
