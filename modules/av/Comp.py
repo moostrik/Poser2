@@ -190,20 +190,14 @@ class Comp():
         if pixel_span == 0 or thickness <= 0.0:
             return
 
-
-
         if thickness >= 1.0:
             intensities: np.ndarray = np.ones((pixel_span), dtype=array.dtype)
         else:
             wave_positions = ((np.linspace(0, pixel_span - 1, pixel_span) + pixel_anchor) % resolution) / resolution
 
-            invert = False
-            offset: float = -thickness
-            wave_trim: float = 1.0 - thickness * 2.0
-            if thickness > 0.5:
-                invert = True
-                wave_trim = (thickness - 0.5) * 2.0
-                offset = (thickness - 0.5)
+            invert: bool = thickness > 0.5
+            wave_trim: float = (thickness - 0.5) * 2.0 if invert else 1.0 - thickness * 2.0
+            offset: float = (thickness - 0.5) if invert else -thickness
 
             wave_time: float = time.time() * speed + offset * -TWOPI
             wave_cycles: float = TWOPI * num_waves
@@ -215,11 +209,7 @@ class Comp():
             np.clip(wave_phases, 0, 1, out=wave_phases)
             wave_phases /= 1.0 - wave_trim
             wave_phases = wave_phases * TWOPI
-
-            if invert:
-                wave_phases += HALFPI
-            else:
-                wave_phases += -HALFPI
+            wave_phases += HALFPI if invert else -HALFPI
 
             intensities = (1.0 + np.sin(wave_phases ) * sharpness) * 0.5
             np.clip(intensities, 0, 1, out=intensities)
