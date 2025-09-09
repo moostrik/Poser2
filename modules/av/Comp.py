@@ -18,6 +18,11 @@ from modules.av.DrawMethods import BlendType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+PI: float = np.pi
+TWOPI: float = 2 * np.pi
+HALFPI: float = np.pi / 2
+
+
 @dataclass
 class TestParameters():
     void_width: float =  0.05
@@ -146,17 +151,19 @@ class Comp():
                 age_pattern_power: float = 0.75
                 age_pattern_width: float = pattern_width * pow(min(age * age_pattern_speed, 1.0), age_pattern_power)
 
-                white_line_count_A: float = 20  #+ (P.input_A0 * 88) + (P.input_A1 * 88)
+                white_line_count_A: float = 33  #+ (P.input_A0 * 88) + (P.input_A1 * 88)
                 white_line_count_B: float = 22  #+ (P.input_B0 * 88) + (P.input_B1 * 88)
-                white_line_width_A: float = 0.6 #+ (P.input_A0 * 0.7)
+                white_line_width_A: float = 0.3 #+ (P.input_A0 * 0.7)
                 white_line_width_B: float = 0.5 #+ (P.input_B0 * 0.7)
                 white_line_speed_A: float = 2 #+ (P.input_A1 * 13.2)
                 white_line_speed_B: float = 2.2 #+ (P.input_B1 * 13.2)
+                white_line_sharpness_A: float = 2.0
+                white_line_sharpness_B: float = 1.0
 
                 blend: BlendType = BlendType.MAX
 
-                Comp.draw_waves(whites, centre, age_pattern_width, white_line_count_A, white_line_width_A, white_line_speed_A, blend)
-                Comp.draw_waves(whites, centre, -age_pattern_width, white_line_count_A, white_line_width_A, -white_line_speed_A, blend)
+                Comp.draw_waves(whites, centre, age_pattern_width, white_line_count_A, white_line_width_A, white_line_sharpness_A, white_line_speed_A, blend)
+                Comp.draw_waves(whites, centre, -age_pattern_width, white_line_count_A, white_line_width_A, white_line_sharpness_A, white_line_speed_A, blend)
                 # Comp.draw_lines(whites, centre, age_pattern_width, white_line_count_B, white_line_width_B, white_line_speed_B, blend)
                 # Comp.draw_lines(whites, centre, -age_pattern_width, white_line_count_B, white_line_width_B, -white_line_speed_B, blend)
 
@@ -176,59 +183,53 @@ class Comp():
 
 
     @staticmethod
-    def draw_waves(array: np.ndarray, anchor: float, span: float, fequency: float, thickness: float, speed: float, blend: BlendType) -> None:
+    def draw_waves(array: np.ndarray, anchor: float, span: float, num_waves: float, thickness: float, sharpness: float, speed: float, blend: BlendType) -> None:
         resolution: int = len(array)
         pixel_anchor: int = int(anchor * resolution)
         pixel_span: int = abs(int(span * resolution))
-        if pixel_span == 0 or thickness == 0.0:
+        if pixel_span == 0 or thickness <= 0.0:
             return
 
-        pixel_start: int = pixel_anchor#  if span >= 0 else (pixel_anchor - pixel_span)
-
-        wave_positions = ((np.linspace(0, pixel_span - 1, pixel_span) + pixel_start) % resolution) / resolution
-        wave_time: float = time.time() * abs(speed)
-        wave_cycles: float = 2 * math.pi * fequency
-        wave_flip: float = math.pi if speed < 0 else 0.0
-
-        thickness = 0.25
-        invert = False
-        T: float = 1.0 - thickness * 2.0
-        if thickness > 0.5:
-            invert = True
-            T=(thickness - 0.5) * 2.0
 
 
-        wave_phases = (wave_positions - anchor) * wave_cycles - wave_time
-        if invert:
-            wave_phases += np.pi
-        wave_phases = wave_phases % (2 * math.pi)
-
-        wave_phases = wave_phases / (2 * math.pi)
-        wave_phases -= T
-        np.maximum(wave_phases, 0.0, out=wave_phases)
-        wave_phases /= 1.0 - T
-        wave_phases = wave_phases * (2 * math.pi)
-
-        if invert:
-            wave_phases += np.pi * 0.5
+        if thickness >= 1.0:
+            intensities: np.ndarray = np.ones((pixel_span), dtype=array.dtype)
         else:
-            wave_phases += np.pi * -0.5
+            wave_positions = ((np.linspace(0, pixel_span - 1, pixel_span) + pixel_anchor) % resolution) / resolution
 
-        sharpness: float = 3
+            invert = False
+            offset: float = -thickness
+            wave_trim: float = 1.0 - thickness * 2.0
+            if thickness > 0.5:
+                invert = True
+                wave_trim = (thickness - 0.5) * 2.0
+                offset = (thickness - 0.5)
 
-        intensities = (1.0 + np.sin(wave_phases ) * sharpness) * 0.5
-        np.clip(intensities, 0, 1, out=intensities)
-        if speed < 0:
-            # Mirror the wave positions or the final intensities
-            intensities = intensities[::-1]
+            wave_time: float = time.time() * speed + offset * -TWOPI
+            wave_cycles: float = TWOPI * num_waves
+
+            wave_phases = (wave_positions - anchor) * wave_cycles - wave_time
+            wave_phases = wave_phases % TWOPI
+            wave_phases = wave_phases / TWOPI
+            wave_phases -= wave_trim
+            np.clip(wave_phases, 0, 1, out=wave_phases)
+            wave_phases /= 1.0 - wave_trim
+            wave_phases = wave_phases * TWOPI
+
+            if invert:
+                wave_phases += HALFPI
+            else:
+                wave_phases += -HALFPI
+
+            intensities = (1.0 + np.sin(wave_phases ) * sharpness) * 0.5
+            np.clip(intensities, 0, 1, out=intensities)
+
+        pixel_start: int = pixel_anchor
+        if span < 0:
+            intensities[:] = intensities[::-1]
             pixel_start = (pixel_start - pixel_span) % resolution
 
-
-
-
         Comp.draw_edge(intensities, int(pixel_span * 0.1), 1.5)
-
-
         Comp.apply_circular(array, intensities, pixel_start, blend)
 
 
