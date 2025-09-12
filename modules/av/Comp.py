@@ -65,10 +65,12 @@ class Comp():
         self.output_comp[0, :, 0] = self.Wh_L_array[:]
         self.output_comp[0, :, 1] = self.Wh_R_array[:]
         self.output_comp[0, :, 2] = self.blue_array[:]
-        self.output_comp[0, :, 3] = self.void_array[:]
+
+        self.output_comp[0, :, 3] = 0.0
 
         # add overlay to second channel
         if self.settings.use_void:
+            self.output_comp[0, :, 3] = self.void_array[:]
             inverted_void_array = 1.0 - self.void_array
             Comp.blend_values(self.Wh_L_array, inverted_void_array, 0, BlendType.MULTIPLY)
             Comp.blend_values(self.Wh_R_array, inverted_void_array, 0, BlendType.MULTIPLY)
@@ -107,6 +109,7 @@ class Comp():
 
     @staticmethod
     def make_patterns(W_L: np.ndarray, W_R: np.ndarray, blues: np.ndarray, pose_metrics: MultiPoseMetrics, P: CompSettings) -> None:
+        resolution: int = len(W_L)
         W_L.fill(0.0)
         W_R.fill(0.0)
         blues.fill(0.0)
@@ -122,35 +125,43 @@ class Comp():
             if pose_metrics.is_player_present(i) and world_positions[i] is not None:
                 centre: float | None = world_positions[i]
                 age: float | None = ages[i]
-                if centre is None or age is None:
+                length: float | None = pose_lengths[i]
+                if centre is None or age is None or length is None:
                     continue
                 age_pattern_speed: float = 0.25
                 age_pattern_power: float = 0.75
-                age_pattern_width: float = pattern_width * pow(min(age * age_pattern_speed, 1.0), age_pattern_power)
+                patt_width: float = pattern_width * pow(min(age * age_pattern_speed, 1.0), age_pattern_power)
 
-                white_line_count_A: float = 33  #+ (P.input_A0 * 88) + (P.input_A1 * 88)
-                white_line_count_B: float = 33  #+ (P.input_B0 * 88) + (P.input_B1 * 88)
-                white_line_width_A: float = 0.1 #+ (P.input_A0 * 0.7)
-                white_line_width_B: float = 0.1 #+ (P.input_B0 * 0.7)
-                white_line_speed_A: float = 1.23 #+ (P.input_A1 * 13.2)
-                white_line_speed_B: float = 1.23 #+ (P.input_B1 * 13.2)
-                white_line_sharpness: float = 1
+                left_count: float = P.line_amount
+                right_count: float = P.line_amount
+                left_width: float = P.line_width #+ (P.input_W0 * 0.7)
+                right_width: float = P.line_width #+ (P.input_B0 * 0.7)
+                speed: float = P.line_speed
+                sharpness: float = P.line_sharpness
+
+
+                outer_edge: int = int(P.pattern_edge * resolution)
+                # print(f"outer_edge: {outer_edge}")
+                void_width: float = (P.void_width * 0.5 + length * P.void_width * 0.5)
+                inner_edge: int = int(void_width * resolution * 0.7)
 
                 blend: BlendType = BlendType.MAX
 
-                Comp.draw_waves(W_L, centre, age_pattern_width,  white_line_count_A, white_line_width_A, white_line_sharpness, white_line_speed_A, 0, blend)
-                Comp.draw_waves(W_L, centre, -age_pattern_width, white_line_count_A, white_line_width_A, white_line_sharpness, white_line_speed_A, 0, blend)
-                Comp.draw_waves(W_R, centre, age_pattern_width,  white_line_count_B, white_line_width_B, white_line_sharpness, white_line_speed_B, 0.5, blend)
-                Comp.draw_waves(W_R, centre, -age_pattern_width, white_line_count_B, white_line_width_B, white_line_sharpness, white_line_speed_B, 0.5, blend)
+                Comp.draw_waves(W_L,   centre, patt_width,  left_count,  left_width,  sharpness, speed,  0,   inner_edge, outer_edge, blend)
+                Comp.draw_waves(W_L,   centre, -patt_width, left_count,  left_width,  sharpness, speed,  0,   outer_edge, inner_edge, blend)
+                Comp.draw_waves(W_R,   centre, patt_width,  right_count, right_width, sharpness, speed,  0.5, inner_edge, outer_edge, blend)
+                Comp.draw_waves(W_R,   centre, -patt_width, right_count, right_width, sharpness, speed,  0.5, outer_edge, inner_edge, blend)
 
-                Comp.draw_waves(blues, centre, age_pattern_width,  white_line_count_A, white_line_width_A, white_line_sharpness, -white_line_speed_A, 0, blend)
-                Comp.draw_waves(blues, centre, -age_pattern_width, white_line_count_A, white_line_width_A, white_line_sharpness, -white_line_speed_A, 0, blend)
-                Comp.draw_waves(blues, centre, age_pattern_width,  white_line_count_B, white_line_width_B, white_line_sharpness, -white_line_speed_B, 0.5, blend)
-                Comp.draw_waves(blues, centre, -age_pattern_width, white_line_count_B, white_line_width_B, white_line_sharpness, -white_line_speed_B, 0.5, blend)
+                Comp.draw_waves(blues, centre, patt_width,  left_count,  left_width,  sharpness, -speed, 0,   inner_edge, outer_edge, blend)
+                Comp.draw_waves(blues, centre, -patt_width, left_count,  left_width,  sharpness, -speed, 0,   outer_edge, inner_edge, blend)
+                Comp.draw_waves(blues, centre, patt_width,  right_count, right_width, sharpness, -speed, 0.5, inner_edge, outer_edge, blend)
+                Comp.draw_waves(blues, centre, -patt_width, right_count, right_width, sharpness, -speed, 0.5, outer_edge, inner_edge, blend)
 
 
     @staticmethod
-    def draw_waves(array: np.ndarray, anchor: float, span: float, num_waves: float, thickness: float, sharpness: float, speed: float, phase: float,blend: BlendType) -> None:
+    def draw_waves(array: np.ndarray, anchor: float, span: float, num_waves: float,
+                   thickness: float, sharpness: float, speed: float, phase: float,
+                   edge_left: int, edge_right: int,blend: BlendType) -> None:
         # optional: work with smoothsteps
 
         resolution: int = len(array)
@@ -188,9 +199,8 @@ class Comp():
             intensities = intensities[::-1]
             pixel_start = (pixel_start - pixel_span) % resolution
 
-
-        edge_size: int = int(pixel_span * 0.1)
-        Comp.draw_edge(intensities, edge_size, 1.5, EdgeSide.BOTH)
+        Comp.draw_edge(intensities, edge_left, 1.5, EdgeSide.LEFT)
+        Comp.draw_edge(intensities, edge_right, 1.5, EdgeSide.RIGHT)
         Comp.apply_circular(array, intensities, pixel_start, blend)
 
     @staticmethod

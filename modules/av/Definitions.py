@@ -44,5 +44,7 @@ class CompSettings():
     pattern_width: float = 0.2          # in normalized world width (0..1)
     pattern_edge: float = 0.2           # in normalized world width (0..1)
 
-    pattern_sharpness: float = 1.5      # higher is sharper
-    pattern_speed: float = 1.5          # higher is faster
+    line_sharpness: float = 1.5         # higher is sharper
+    line_speed: float = 1.5             # higher is faster
+    line_width: float = 0.1             # in normalized world width (0..1)
+    line_amount: float = 20.0            # number of lines

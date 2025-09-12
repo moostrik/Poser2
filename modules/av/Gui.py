@@ -25,26 +25,31 @@ class Gui():
                     E(eT.BTTN, 'Reset',         manager.comp.reset,             expand=False),
                     E(eT.TEXT, 'FPS'),
                     E(eT.SLDR, 'avFPS',         None,                       0,  [0,60],   0.1)])
-        elm.append([E(eT.TEXT, 'Pose'),
+        elm.append([E(eT.TEXT, 'POSE'),
                     E(eT.TEXT, 'Smoot'),
                     E(eT.SLDR, 'Smooth',        self.set_smoothness,        comp_settings.smoothness,       [0., 1.],  0.01),
                     E(eT.TEXT, 'Resp'),
                     E(eT.SLDR, 'Resp',          self.set_responsiveness,    comp_settings.responsiveness,   [0., 1.],  0.01)])
-        elm.append([E(eT.TEXT, 'Void'),
+        elm.append([E(eT.TEXT, 'VOID'),
                     E(eT.TEXT, 'Width'),
                     E(eT.SLDR, 'VoidWidth',     self.set_void_width,        comp_settings.void_width,       [1,  20],  0.5),
                     E(eT.TEXT, 'Edge'),
                     E(eT.SLDR, 'VoidEdge',      self.set_void_edge,         comp_settings.void_edge,        [0., 10],  0.5)])
-        elm.append([E(eT.TEXT, 'Patt'),
+        elm.append([E(eT.TEXT, 'PATT'),
                     E(eT.TEXT, 'Width'),
                     E(eT.SLDR, 'PattWidth',     self.set_pattern_width,     comp_settings.pattern_width,    [0.,360],  1.0),
                     E(eT.TEXT, 'Edge'),
                     E(eT.SLDR, 'PattEdge',      self.set_pattern_edge,      comp_settings.pattern_edge,     [0., 30],  0.5)])
-        elm.append([E(eT.TEXT, '    '),
+        elm.append([E(eT.TEXT, 'LINE'),
                     E(eT.TEXT, 'Speed'),
-                    E(eT.SLDR, 'PattSpeed',     self.set_pattern_speed,     comp_settings.pattern_speed,    [0.,360],  1.0),
+                    E(eT.SLDR, 'LineSpeed',     self.set_line_speed,        comp_settings.line_speed,       [0., 10],  0.1),
                     E(eT.TEXT, 'Shrp'),
-                    E(eT.SLDR, 'PattSharp',     self.set_pattern_sharpness, comp_settings.pattern_sharpness,     [0., 30],  0.5)])
+                    E(eT.SLDR, 'LineSharp',     self.set_line_sharpness,    comp_settings.line_sharpness,   [0.,  5],  0.1)])
+        elm.append([E(eT.TEXT, 'LINE'),
+                    E(eT.TEXT, 'Width'),
+                    E(eT.SLDR, 'LineWidth',     self.set_line_width,        comp_settings.line_width,       [0.,  1],  0.05),
+                    E(eT.TEXT, 'Amnt'),
+                    E(eT.SLDR, 'LineAmount',    self.set_line_amount,       comp_settings.line_amount,      [0.,180],  1)])
         gui_height = len(elm) * ELEMHEIGHT + BASEHEIGHT
         self.frame = Frame('COMP TEST', elm, gui_height)
 
@@ -130,10 +135,18 @@ class Gui():
         self.comp_settings.pattern_edge = value / 360
         self.manager.comp.update_settings()
 
-    def set_pattern_speed(self, value) -> None:
-        self.comp_settings.pattern_speed = value / 10
+    def set_line_speed(self, value) -> None:
+        self.comp_settings.line_speed = value
         self.manager.comp.update_settings()
 
-    def set_pattern_sharpness(self, value) -> None:
-        self.comp_settings.pattern_sharpness = value
+    def set_line_sharpness(self, value) -> None:
+        self.comp_settings.line_sharpness = value
+        self.manager.comp.update_settings()
+
+    def set_line_width(self, value) -> None:
+        self.comp_settings.line_width = value
+        self.manager.comp.update_settings()
+
+    def set_line_amount(self, value) -> None:
+        self.comp_settings.line_amount = value
         self.manager.comp.update_settings()

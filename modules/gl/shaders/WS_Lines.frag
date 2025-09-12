@@ -24,13 +24,14 @@ void main() {
     // draw leftbar in orange, rightbar in cyan, bluebar in blue
     vec3 leftColor = vec3(1.0, 0.5, 0.0); // Orange
     vec3 rightColor = vec3(0.0, 1.0, 1.0); // Cyan
+    // vec3 leftColor = vec3(1.0, 0.0, 0.0); // Red
+    // vec3 rightColor = vec3(0.0, 1.0, 0.0); // Green
     vec3 blueColor = vec3(0.0, 0.0, 1.0); // Blue
-    vec3 voidColor = vec3(0.5, 0.5, 0.5); // Gray
+    vec3 voidColor = vec3(0.25, 0.25, 0.5); // Gray
     vec3 color = (leftBar * leftColor + rightBar * rightColor + blueBar * blueColor);
 
-    color = mix(color, voidColor, voidBar);
+    color = mix(color, voidColor, voidBar); // keep your void blending
 
-    // vec3 color = vec3(leftBar, rightBar, blueBar);
     fragColor = vec4(color, 1.0);
 
 
