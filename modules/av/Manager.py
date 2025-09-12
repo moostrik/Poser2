@@ -31,7 +31,7 @@ class Manager(Thread):
 
         self.resolution: int = settings.light_resolution
         self.output: AvOutput = AvOutput(self.resolution)
-        
+
         self.pose_input_queue: Queue[Pose] = Queue()
 
         self.comp: Comp = Comp(settings)
@@ -41,8 +41,8 @@ class Manager(Thread):
         self.udp_sender.start()
 
         self.FPS: FpsCounter = FpsCounter()
-        self.gui: Gui = Gui(gui, self)
-        
+        self.gui: Gui = Gui(gui, self, self.comp.settings)
+
         self.output_callbacks: list[AvOutputCallback] = []
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
@@ -54,7 +54,7 @@ class Manager(Thread):
     def run(self) -> None:
         next_time: float = time()
         while not self._stop_event.is_set():
-            
+
             poses: list[Pose] = []
             try:
                 while True:
@@ -65,7 +65,7 @@ class Manager(Thread):
 
             self._update(poses)
 
-            next_time += self.interval            
+            next_time += self.interval
             sleep_time: float = next_time - time()
             if sleep_time > 0:
                 sleep(sleep_time)
@@ -79,13 +79,13 @@ class Manager(Thread):
         # comp_img: np.ndarray = self.comp.update(poses)
         try:
             comp_img: np.ndarray = self.comp.update(poses)
+            self.output.img = comp_img
+            self.output.test = self.comp.output_comp
         except Exception as e:
             print(f"Error in Comp update: {e}")
-            return        
-        
-        if self.comp_test.pattern == TestPattern.NONE:
-            self.output.img = comp_img
-        else:
+            return
+
+        if self.comp_test.pattern != TestPattern.NONE:
             self.output.img = self.comp_test.update()
 
         self._output_callback(self.output)

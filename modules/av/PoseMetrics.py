@@ -6,7 +6,7 @@ from time import time
 
 from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import Pose, PoseAngleNames, JointAngleDict, PoseAngleKeypoints
+from modules.pose.PoseDefinitions import Pose, PoseAngleNames, JointAngleDict, PoseAngleKeypoints, Keypoint, PosePoints, Rect
 from modules.Settings import Settings
 
 import OneEuroFilter
@@ -64,6 +64,7 @@ class PoseMetrics:
             if self.start_age is None:
                 self.start_age = time()
 
+
             angles: JointAngleDict | None  = pose.angles
             if angles is not None:
                 # print(angles)
@@ -81,6 +82,24 @@ class PoseMetrics:
                 self.approximate_person_length = approximate_person_length #* min(self.age, 1.0)
 
             world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
+            nose_angle_offset: float | None = None
+            pose_points: PosePoints | None = pose.points
+            crop_rect: Rect | None = pose.crop_rect
+            if pose_points is not None and crop_rect is not None:
+                nose_x = pose_points.getKeypoints()[Keypoint.nose.value][0]
+                nose_conf = pose_points.getScores()[Keypoint.nose.value]
+                if nose_conf > 0.3:
+                    # calculate nose offset from center of crop rect
+                    crop_center_x: float = crop_rect.center.x
+                    nose_offset_x: float = nose_x - 0.5
+                    # convert to angle in degrees, assuming 110 degree horizontal FOV
+                    fov_degrees: float = 110.0
+                    nose_angle_offset = nose_offset_x * crop_rect.width * fov_degrees
+                    # print(f"nose_offset_x: {nose_offset_x}, nose_angle_offset: {crop_rect.width}")
+
+
+            world_angle += nose_angle_offset if nose_angle_offset is not None else 0.0
+
             # convert from [0...360] to [-pi, pi]
             self.world_angle = np.deg2rad(world_angle - 180)
             # print (self.world_angle)

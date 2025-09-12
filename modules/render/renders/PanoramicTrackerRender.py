@@ -59,7 +59,7 @@ class PanoramicTrackerRender(BaseRender):
 
             roi_width: float = tracklet.roi.width * self.fbo.width / self.num_cams
             roi_height: float = tracklet.roi.height * self.fbo.height
-            roi_x: float = world_angle / 360.0 * self.fbo.width
+            roi_x: float = world_angle / 360.0 * self.fbo.width - roi_width / 2.0
             roi_y: float = tracklet.roi.y * self.fbo.height
 
             color: list[float] = TrackletIdColor(tracklet.id, aplha=0.9)

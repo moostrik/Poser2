@@ -16,6 +16,8 @@ from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
 from modules.render.renders.WhiteSpaceRender import WhiteSpaceRender
+from modules.render.renders.WSLightRender import WSLightRender
+from modules.render.renders.WSLinesRender import WSLinesRender
 from modules.render.renders.PanoramicTrackerRender import PanoramicTrackerRender as TrackerRender
 from modules.render.renders.CameraRender import CameraRender
 from modules.render.renders.PoseRender import PoseRender
@@ -38,7 +40,8 @@ class RenderWhiteSpace(RenderBase):
         self.angle_meshes =         AngleMeshes(self.data, self.max_players)
 
         # drawers
-        self.white_space_render =   WhiteSpaceRender(self.data)
+        self.ws_light_render =      WSLightRender(self.data)
+        self.ws_lines_render =      WSLinesRender(self.data)
         self.r_stream_render =      RStreamRender(self.data, self.num_R_streams)
         self.tracker_render =       TrackerRender(self.data, self.num_cams)
         self.camera_renders:        dict[int, CameraRender] = {}
@@ -53,9 +56,10 @@ class RenderWhiteSpace(RenderBase):
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name=CameraRender.key(),     columns=self.num_cams,      rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=TrackerRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name=RStreamRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=WSLinesRender.key(),    columns=1,                  rows=1, src_aspect_ratio=40.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=WSLightRender.key(),    columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name=PoseRender.key(),       columns=self.max_players,   rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=WhiteSpaceRender.key(), columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=RStreamRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
@@ -87,7 +91,8 @@ class RenderWhiteSpace(RenderBase):
         self.angle_meshes.allocate()
 
         self.allocate_window_renders()
-        self.white_space_render.allocate(self.ws_width, 1, GL_RGBA32F)
+        self.ws_light_render.allocate(self.ws_width, 1, GL_RGBA32F)
+        self.ws_lines_render.allocate(self.ws_width, 100, GL_RGBA32F)
 
     def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size(RStreamRender.key())
@@ -102,7 +107,8 @@ class RenderWhiteSpace(RenderBase):
             self.pose_renders[key].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
-        self.white_space_render.deallocate()
+        self.ws_light_render.deallocate()
+        self.ws_lines_render.deallocate()
         self.r_stream_render.deallocate()
         self.tracker_render.deallocate()
         for draw in self.camera_renders.values():
@@ -117,7 +123,8 @@ class RenderWhiteSpace(RenderBase):
         self.pose_meshes.update()
         # self.angle_meshes.update(False)
 
-        self.white_space_render.update()
+        self.ws_light_render.update()
+        self.ws_lines_render.update()
         self.r_stream_render.update()
         self.tracker_render.update()
         for i in range(self.num_cams):
@@ -130,7 +137,8 @@ class RenderWhiteSpace(RenderBase):
     def draw_composition(self, width: int, height: int) -> None:
         self.setView(width, height)
 
-        self.white_space_render.draw(self.subdivision.get_rect(WhiteSpaceRender.key()))
+        self.ws_light_render.draw(self.subdivision.get_rect(WSLightRender.key()))
+        self.ws_lines_render.draw(self.subdivision.get_rect(WSLinesRender.key()))
         self.tracker_render.draw(self.subdivision.get_rect(TrackerRender.key()))
         self.r_stream_render.draw(self.subdivision.get_rect(RStreamRender.key()))
         for i in range(self.num_cams):
@@ -141,7 +149,7 @@ class RenderWhiteSpace(RenderBase):
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
-        self.white_space_render.draw(Rect(0, 0, width, height))
+        self.ws_light_render.draw(Rect(0, 0, width, height))
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)

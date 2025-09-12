@@ -5,6 +5,7 @@ from modules.av.Definitions import *
 # from modules.av.Manager import Manager
 from modules.av.CompTest import TEST_PATTERN_NAMES
 
+from modules.av.Definitions import CompSettings
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
 
@@ -13,33 +14,37 @@ if TYPE_CHECKING:
     from modules.av.Manager import Manager
 
 class Gui():
-    def __init__(self, gui: G, manager: 'Manager') -> None:
+    def __init__(self, gui: G, manager: 'Manager', comp_settings: CompSettings) -> None:
         self.gui: G = gui
         self.manager: Manager = manager
-        
-        
+        self.comp_settings: CompSettings = comp_settings
+
         elm: list = []
         elm.append([E(eT.TEXT, '    '),
-                    E(eT.CHCK, 'Show Overlay',  manager.comp.show_overlay),
-                    E(eT.BTTN, 'Reset',         manager.comp.reset, expand=False),
+                    E(eT.CHCK, 'Show Overlay',  self.set_use_void,          comp_settings.use_void),
+                    E(eT.BTTN, 'Reset',         manager.comp.reset,             expand=False),
                     E(eT.TEXT, 'FPS'),
-                    E(eT.SLDR, 'avFPS',         None,                                   0,  [0,60],   0.1)])
-        elm.append([E(eT.TEXT, 'Smth'),
-                    E(eT.SLDR, 'Smooth',        manager.comp.set_smoothness,          0.5, [0., 1.],  0.01),
+                    E(eT.SLDR, 'avFPS',         None,                       0,  [0,60],   0.1)])
+        elm.append([E(eT.TEXT, 'Pose'),
+                    E(eT.TEXT, 'Smoot'),
+                    E(eT.SLDR, 'Smooth',        self.set_smoothness,        comp_settings.smoothness,       [0., 1.],  0.01),
                     E(eT.TEXT, 'Resp'),
-                    E(eT.SLDR, 'Resp',          manager.comp.set_responsiveness,       0.5, [0., 1.],  0.01)])
+                    E(eT.SLDR, 'Resp',          self.set_responsiveness,    comp_settings.responsiveness,   [0., 1.],  0.01)])
         elm.append([E(eT.TEXT, 'Void'),
-                    E(eT.SLDR, 'Void',          manager.comp.set_void_width,            0.05, [0., 1.],  0.01),
-                    E(eT.TEXT, 'Patt'),
-                    E(eT.SLDR, 'Patt',          manager.comp.set_pattern_width,         0.2,  [0., 1.],  0.01)])
-        elm.append([E(eT.TEXT, '  A0'),
-                    E(eT.SLDR, 'A0',            manager.comp.set_input_A0,              0.05, [0., 1.],  0.01),
-                    E(eT.TEXT, '  A1'),
-                    E(eT.SLDR, 'A1',            manager.comp.set_input_A1,              0.2,  [0., 1.],  0.01)])
-        elm.append([E(eT.TEXT, '  B0'),
-                    E(eT.SLDR, 'B0',            manager.comp.set_input_B0,              0.05, [0., 1.],  0.01),
-                    E(eT.TEXT, '  B1'),
-                    E(eT.SLDR, 'B1',            manager.comp.set_input_B1,              0.2,  [0., 1.],  0.01)])
+                    E(eT.TEXT, 'Width'),
+                    E(eT.SLDR, 'VoidWidth',     self.set_void_width,        comp_settings.void_width,       [1,  20],  0.5),
+                    E(eT.TEXT, 'Edge'),
+                    E(eT.SLDR, 'VoidEdge',      self.set_void_edge,         comp_settings.void_edge,        [0., 10],  0.5)])
+        elm.append([E(eT.TEXT, 'Patt'),
+                    E(eT.TEXT, 'Width'),
+                    E(eT.SLDR, 'PattWidth',     self.set_pattern_width,     comp_settings.pattern_width,    [0.,360],  1.0),
+                    E(eT.TEXT, 'Edge'),
+                    E(eT.SLDR, 'PattEdge',      self.set_pattern_edge,      comp_settings.pattern_edge,     [0., 30],  0.5)])
+        elm.append([E(eT.TEXT, '    '),
+                    E(eT.TEXT, 'Speed'),
+                    E(eT.SLDR, 'PattSpeed',     self.set_pattern_speed,     comp_settings.pattern_speed,    [0.,360],  1.0),
+                    E(eT.TEXT, 'Shrp'),
+                    E(eT.SLDR, 'PattSharp',     self.set_pattern_sharpness, comp_settings.pattern_sharpness,     [0., 30],  0.5)])
         gui_height = len(elm) * ELEMHEIGHT + BASEHEIGHT
         self.frame = Frame('COMP TEST', elm, gui_height)
 
@@ -95,3 +100,40 @@ class Gui():
         if not self.gui:
             return
         self.gui.updateElement('avFPS', self.manager.FPS.get_fps())
+
+
+    def set_use_void(self, value) -> None:
+        self.comp_settings.use_void = value
+        self.manager.comp.update_settings()
+
+    def set_smoothness(self, value) -> None:
+        self.comp_settings.smoothness = value
+        self.manager.comp.update_settings()
+
+    def set_responsiveness(self, value) -> None:
+        self.comp_settings.responsiveness = value
+        self.manager.comp.update_settings()
+
+    def set_void_width(self, value) -> None:
+        self.comp_settings.void_width = value / 360
+        self.manager.comp.update_settings()
+
+    def set_void_edge(self, value) -> None:
+        self.comp_settings.void_edge = value / 360
+        self.manager.comp.update_settings()
+
+    def set_pattern_width(self, value) -> None:
+        self.comp_settings.pattern_width = value / 360
+        self.manager.comp.update_settings()
+
+    def set_pattern_edge(self, value) -> None:
+        self.comp_settings.pattern_edge = value / 360
+        self.manager.comp.update_settings()
+
+    def set_pattern_speed(self, value) -> None:
+        self.comp_settings.pattern_speed = value / 10
+        self.manager.comp.update_settings()
+
+    def set_pattern_sharpness(self, value) -> None:
+        self.comp_settings.pattern_sharpness = value
+        self.manager.comp.update_settings()
