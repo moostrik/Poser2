@@ -1,22 +1,22 @@
 from __future__ import annotations
 
 
-from modules.av.Definitions import *
+# from modules.WS.WSDefinitions import
 # from modules.av.Manager import Manager
-from modules.av.CompTest import TEST_PATTERN_NAMES
+from modules.WS.WSDrawTest import TEST_PATTERN_NAMES
 
-from modules.av.Definitions import CompSettings
+from modules.WS.WSDefinitions import CompSettings
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from modules.av.Manager import Manager
+    from modules.WS.WSPipeline import WSPipeline
 
-class Gui():
-    def __init__(self, gui: G, manager: 'Manager', comp_settings: CompSettings) -> None:
+class WSGui():
+    def __init__(self, gui: G, manager: 'WSPipeline', comp_settings: CompSettings) -> None:
         self.gui: G = gui
-        self.manager: Manager = manager
+        self.manager: WSPipeline = manager
         self.comp_settings: CompSettings = comp_settings
 
         elm: list = []
@@ -24,7 +24,7 @@ class Gui():
                     E(eT.CHCK, 'Show Overlay',  self.set_use_void,          comp_settings.use_void),
                     E(eT.BTTN, 'Reset',         manager.comp.reset,             expand=False),
                     E(eT.TEXT, 'FPS'),
-                    E(eT.SLDR, 'avFPS',         None,                       0,  [0,60],   0.1)])
+                    E(eT.SLDR, 'WSFPS',         None,                       0,  [0,60],   0.1)])
         elm.append([E(eT.TEXT, 'POSE'),
                     E(eT.TEXT, 'Smoot'),
                     E(eT.SLDR, 'Smooth',        self.set_smoothness,        comp_settings.smoothness,       [0., 1.],  0.01),
@@ -104,7 +104,7 @@ class Gui():
     def update(self) -> None:
         if not self.gui:
             return
-        self.gui.updateElement('avFPS', self.manager.FPS.get_fps())
+        self.gui.updateElement('WSFPS', self.manager.FPS.get_fps())
 
 
     def set_use_void(self, value) -> None:

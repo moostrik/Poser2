@@ -11,7 +11,7 @@ from modules.tracker.Tracklet import Tracklet
 from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices
 from modules.pose.PoseStream import PoseStreamData
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
-from modules.av.Definitions import AvOutput
+from modules.WS.WSDefinitions import WSOutput
 from modules.Settings import Settings
 
 T = TypeVar('T')
@@ -28,7 +28,7 @@ class DataManager:
         self.mutex: Lock = Lock()
 
         # Data storage
-        self.light_image: Dict[int, DataItem[AvOutput]] = {}
+        self.light_image: Dict[int, DataItem[WSOutput]] = {}
         self.cam_image: Dict[int, DataItem[np.ndarray]] = {}
         self.depth_tracklets: Dict[int, DataItem[List[DepthTracklet]]] = {}
         self.tracklets: Dict[int, DataItem[Tracklet]] = {}
@@ -52,10 +52,10 @@ class DataManager:
             return item.value
 
     # Audio-visual data management
-    def set_light_image(self, value: AvOutput) -> None:
+    def set_light_image(self, value: WSOutput) -> None:
         self._set_data_dict(self.light_image, 0, value)
 
-    def get_light_image(self, only_new_data: bool, consumer_key: str) -> Optional[AvOutput]:
+    def get_light_image(self, only_new_data: bool, consumer_key: str) -> Optional[WSOutput]:
         return self._get_data_dict(self.light_image, 0, only_new_data, consumer_key)
 
     # Camera image management

@@ -3,7 +3,7 @@ from math import ceil
 from typing import Optional
 
 # Local application imports
-from modules.av.Manager import Manager as AV
+from modules.WS.WSPipeline import WSPipeline as AV
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
@@ -84,7 +84,6 @@ class Main():
 
         self.pose_detection.add_pose_callback(self.pose_streamer.add_pose)
         self.pose_detection.add_pose_callback(self.render.data.set_pose)
-        self.pose_detection.add_pose_callback(self.av.add_pose)
         self.pose_detection.start()
 
         self.tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
@@ -92,6 +91,8 @@ class Main():
         self.tracker.start()
 
         if self.av:
+            self.pose_detection.add_pose_callback(self.av.add_pose)
+            self.pose_streamer.add_stream_callback(self.av.add_pose_stream)
             self.av.add_output_callback(self.render.data.set_light_image)
             self.av.start()
 

@@ -2,7 +2,7 @@ from turtle import width
 import wave
 from cv2 import threshold
 from numpy._typing._array_like import NDArray
-from modules.av.Definitions import *
+from modules.WS.WSDefinitions import *
 from typing import Optional
 import math
 import time
@@ -10,10 +10,7 @@ import numpy as np
 from enum import Enum
 
 from modules.Settings import Settings
-from modules.av.PoseMetrics import MultiPoseMetrics
-from modules.pose.PoseDefinitions import Pose
-
-from modules.av.DrawMethods import BlendType
+from modules.WS.WSDataManager import WSDataManager
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -27,110 +24,127 @@ class EdgeSide(Enum):
     RIGHT = 2
     BOTH = 3
 
-class Comp():
-    def __init__(self, general_settings: Settings) -> None:
+class BlendType(Enum):
+    NONE = "replace"
+    ADD = "add"
+    SUBTRACT = "subtract"
+    MULTIPLY = "multiply"
+    MAX = "max"
+    MIN = "min"
+    NON_ZERO = "non_zero"
+
+class WSDraw():
+    def __init__(self, general_settings: Settings, data_manager: WSDataManager) -> None:
         self.resolution: int = general_settings.light_resolution
         self.settings: CompSettings = CompSettings(
             interval=1.0 / general_settings.light_rate,
             num_players=general_settings.max_players)
 
         # self.draw_methods: DrawMethods = DrawMethods()
-        self.pose_metrics: MultiPoseMetrics = MultiPoseMetrics(general_settings)
+        self.data_manager: WSDataManager = data_manager
 
         self.Wh_L_array: np.ndarray = np.ones((self.resolution), dtype=IMG_TYPE)
         self.Wh_R_array: np.ndarray = np.ones((self.resolution), dtype=IMG_TYPE)
         self.blue_array: np.ndarray = np.ones((self.resolution), dtype=IMG_TYPE)
         self.void_array: np.ndarray = np.zeros((self.resolution), dtype=IMG_TYPE)
-        self.output_light: np.ndarray = np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
-        # self.output_sound: np.ndarray = np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
-        self.output_comp: np.ndarray = np.zeros((1, self.resolution, 4), dtype=IMG_TYPE)
+
+        self.output: WSOutput = WSOutput(self.resolution)
+
+        # self.output_light: np.ndarray = np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
+        # # self.output_sound: np.ndarray = np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
+        # self.output_comp: np.ndarray = np.zeros((1, self.resolution, 4), dtype=IMG_TYPE)
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
 
     # SETTERS
     def update_settings(self) -> None:
-        self.pose_metrics.set_smoothness(self.settings.smoothness)
-        self.pose_metrics.set_responsiveness(self.settings.responsiveness)
+        self.data_manager.set_smoothness(self.settings.smoothness)
+        self.data_manager.set_responsiveness(self.settings.responsiveness)
 
 
-    def update(self, poses: list[Pose]) -> np.ndarray:
+    def update(self) -> None:
 
-        self.pose_metrics.add_poses(poses)
-        self.pose_metrics.update()
+        self.make_voids(self.void_array, self.data_manager, self.settings)
+        self.make_patterns(self.Wh_L_array, self.Wh_R_array, self.blue_array, self.data_manager, self.settings)
 
-        self.make_voids(self.void_array, self.pose_metrics, self.settings)
-        self.make_patterns(self.Wh_L_array, self.Wh_R_array, self.blue_array, self.pose_metrics, self.settings)
-
-        self.output_comp[0, :, 0] = self.Wh_L_array[:]
-        self.output_comp[0, :, 1] = self.Wh_R_array[:]
-        self.output_comp[0, :, 2] = self.blue_array[:]
-
-        self.output_comp[0, :, 3] = 0.0
+        self.output.infos_0 = self.Wh_L_array[:]
+        self.output.infos_1 = self.Wh_R_array[:]
+        self.output.infos_2 = self.blue_array[:]
+        self.output.infos_3 = 0.0
 
         # add overlay to second channel
         if self.settings.use_void:
-            self.output_comp[0, :, 3] = self.void_array[:]
+            self.output.infos_3 = self.void_array[:]
             inverted_void_array = 1.0 - self.void_array
-            Comp.blend_values(self.Wh_L_array, inverted_void_array, 0, BlendType.MULTIPLY)
-            Comp.blend_values(self.Wh_R_array, inverted_void_array, 0, BlendType.MULTIPLY)
-            Comp.blend_values(self.blue_array, inverted_void_array, 0, BlendType.MULTIPLY)
-            Comp.blend_values(self.blue_array, self.void_array * 0.5, 0, BlendType.ADD)
+            WSDraw.blend_values(self.Wh_L_array, inverted_void_array, 0, BlendType.MULTIPLY)
+            WSDraw.blend_values(self.Wh_R_array, inverted_void_array, 0, BlendType.MULTIPLY)
+            WSDraw.blend_values(self.blue_array, inverted_void_array, 0, BlendType.MULTIPLY)
+            WSDraw.blend_values(self.blue_array, self.void_array * 0.5, 0, BlendType.ADD)
 
-        self.output_light[0, :, 0] = self.Wh_L_array[:] + self.Wh_R_array[:]
-        self.output_light[0, :, 1] = self.blue_array[:]
-
-        return self.output_light
+        self.output.light_0 = self.Wh_L_array[:] + self.Wh_R_array[:]
+        self.output.light_1 = self.blue_array[:]
 
     def reset(self) -> None:
-        self.pose_metrics.reset()
+        self.data_manager.reset()
+
+    def get_output(self) -> WSOutput:
+        return self.output
+
 
     @staticmethod
-    def make_voids(array: np.ndarray, pose_metrics: MultiPoseMetrics, P: CompSettings) -> None:
+    def make_voids(array: np.ndarray, pose_metrics: WSDataManager, P: CompSettings) -> None:
         array -= P.interval * 4.0
         np.clip(array, 0, 1, out=array)
 
-        world_positions: dict[int, float | None] = pose_metrics.world_positions
-        ages: dict[int, float | None] = pose_metrics.ages
-        pose_lengths: dict[int, float | None] = pose_metrics.pose_lengths
+        world_positions: dict[int, float] = pose_metrics.world_positions
+        ages: dict[int, float] = pose_metrics.ages
+        pose_lengths: dict[int, float] = pose_metrics.pose_lengths
 
         for i in range(len(world_positions)):
-            centre: float | None = world_positions[i]
-            length: float | None = pose_lengths[i]
-            age: float | None = ages[i]
+            if pose_metrics.presents.get(i, False) == False:
+                continue
+            centre: float = world_positions[i]
+            length: float = pose_lengths[i]
+            age: float = ages[i]
 
-            if centre is not None and length is not None and age is not None:
-                strength: float = pow(min(age * 1.8, 1.0), 1.5)
-                void_width: float = P.void_width * 0.5
-                width: float = (void_width + length * void_width)
-                edge: int = int(P.void_edge * len(array))
-                Comp.draw_field(array, centre, width, strength, edge, BlendType.MAX)
-
+            strength: float = pow(min(age * 1.8, 1.0), 1.5)
+            void_width: float = P.void_width * 0.5
+            width: float = (void_width + length * void_width)
+            edge: int = int(P.void_edge * len(array))
+            WSDraw.draw_field(array, centre, width, strength, edge, BlendType.MAX)
 
     @staticmethod
-    def make_patterns(W_L: np.ndarray, W_R: np.ndarray, blues: np.ndarray, pose_metrics: MultiPoseMetrics, P: CompSettings) -> None:
+    def make_patterns(W_L: np.ndarray, W_R: np.ndarray, blues: np.ndarray, pose_metrics: WSDataManager, P: CompSettings) -> None:
         resolution: int = len(W_L)
         W_L.fill(0.0)
         W_R.fill(0.0)
         blues.fill(0.0)
 
-        world_positions: dict[int, float | None] = pose_metrics.world_positions
-        ages: dict[int, float | None] = pose_metrics.ages
-        pose_lengths: dict[int, float | None] = pose_metrics.pose_lengths
+        world_positions: dict[int, float] = pose_metrics.world_positions
+        ages: dict[int, float] = pose_metrics.ages
+        pose_lengths: dict[int, float] = pose_metrics.pose_lengths
         num_player_width: float = 1.0 / max(pose_metrics.smooth_num_active_players, 1)
         pattern_width: float = P.pattern_width * 0.25 + num_player_width * P.pattern_width * 0.25
 
         for i in range(pose_metrics.num_players):
 
-            if pose_metrics.is_player_present(i) and world_positions[i] is not None:
-                centre: float | None = world_positions[i]
-                age: float | None = ages[i]
-                length: float | None = pose_lengths[i]
-                if centre is None or age is None or length is None:
-                    continue
+            if pose_metrics.is_player_present(i):
+                centre: float = world_positions[i]
+                age: float = ages[i]
+                length: float = pose_lengths[i]
+                left_elbow: float = pose_metrics.left_elbows[i]
+                left_shoulder: float = pose_metrics.left_shoulders[i]
+                right_elbow: float = pose_metrics.right_elbows[i]
+                right_shoulder: float = pose_metrics.right_shoulders[i]
+
                 age_pattern_speed: float = 0.25
                 age_pattern_power: float = 0.75
                 patt_width: float = pattern_width * pow(min(age * age_pattern_speed, 1.0), age_pattern_power)
+
+                # print(left_elbow)
+
+                pose_threshold: float = 0.01
 
                 left_count: float = P.line_amount
                 right_count: float = P.line_amount
@@ -147,16 +161,15 @@ class Comp():
 
                 blend: BlendType = BlendType.MAX
 
-                Comp.draw_waves(W_L,   centre, patt_width,  left_count,  left_width,  sharpness, speed,  0,   inner_edge, outer_edge, blend)
-                Comp.draw_waves(W_L,   centre, -patt_width, left_count,  left_width,  sharpness, speed,  0,   outer_edge, inner_edge, blend)
-                Comp.draw_waves(W_R,   centre, patt_width,  right_count, right_width, sharpness, speed,  0.5, inner_edge, outer_edge, blend)
-                Comp.draw_waves(W_R,   centre, -patt_width, right_count, right_width, sharpness, speed,  0.5, outer_edge, inner_edge, blend)
+                WSDraw.draw_waves(W_L,   centre, patt_width,  left_count,  left_width,  sharpness, speed,  0,   inner_edge, outer_edge, blend)
+                WSDraw.draw_waves(W_L,   centre, -patt_width, left_count,  left_width,  sharpness, speed,  0,   outer_edge, inner_edge, blend)
+                WSDraw.draw_waves(W_R,   centre, patt_width,  right_count, right_width, sharpness, speed,  0.5, inner_edge, outer_edge, blend)
+                WSDraw.draw_waves(W_R,   centre, -patt_width, right_count, right_width, sharpness, speed,  0.5, outer_edge, inner_edge, blend)
 
-                Comp.draw_waves(blues, centre, patt_width,  left_count,  left_width,  sharpness, -speed, 0,   inner_edge, outer_edge, blend)
-                Comp.draw_waves(blues, centre, -patt_width, left_count,  left_width,  sharpness, -speed, 0,   outer_edge, inner_edge, blend)
-                Comp.draw_waves(blues, centre, patt_width,  right_count, right_width, sharpness, -speed, 0.5, inner_edge, outer_edge, blend)
-                Comp.draw_waves(blues, centre, -patt_width, right_count, right_width, sharpness, -speed, 0.5, outer_edge, inner_edge, blend)
-
+                WSDraw.draw_waves(blues, centre, patt_width,  left_count,  left_width,  sharpness, -speed, 0,   inner_edge, outer_edge, blend)
+                WSDraw.draw_waves(blues, centre, -patt_width, left_count,  left_width,  sharpness, -speed, 0,   outer_edge, inner_edge, blend)
+                WSDraw.draw_waves(blues, centre, patt_width,  right_count, right_width, sharpness, -speed, 0.5, inner_edge, outer_edge, blend)
+                WSDraw.draw_waves(blues, centre, -patt_width, right_count, right_width, sharpness, -speed, 0.5, outer_edge, inner_edge, blend)
 
     @staticmethod
     def draw_waves(array: np.ndarray, anchor: float, span: float, num_waves: float,
@@ -199,9 +212,9 @@ class Comp():
             intensities = intensities[::-1]
             pixel_start = (pixel_start - pixel_span) % resolution
 
-        Comp.draw_edge(intensities, edge_left, 1.5, EdgeSide.LEFT)
-        Comp.draw_edge(intensities, edge_right, 1.5, EdgeSide.RIGHT)
-        Comp.apply_circular(array, intensities, pixel_start, blend)
+        WSDraw.draw_edge(intensities, edge_left, 1.5, EdgeSide.LEFT)
+        WSDraw.draw_edge(intensities, edge_right, 1.5, EdgeSide.RIGHT)
+        WSDraw.apply_circular(array, intensities, pixel_start, blend)
 
     @staticmethod
     def draw_field(array: np.ndarray, centre: float, width: float, strength: float, edge: int, blend: BlendType) -> None:
@@ -214,11 +227,9 @@ class Comp():
 
         edge_width: int = int(min(edge, field_width // 2))
         if edge_width > 0:
-            Comp.draw_edge(values, edge_width, 1.5, EdgeSide.BOTH)
+            WSDraw.draw_edge(values, edge_width, 1.5, EdgeSide.BOTH)
 
-        Comp.apply_circular(array, values, idx_start, blend)
-
-
+        WSDraw.apply_circular(array, values, idx_start, blend)
 
     @staticmethod
     def draw_edge(array: np.ndarray, edge: int, curve: float, edge_side: EdgeSide) -> None:
@@ -244,10 +255,10 @@ class Comp():
         start_idx = start_idx % resolution
         end_idx: int = (start_idx + len(values)) % resolution
         if start_idx < end_idx:
-            Comp.blend_values(array, values, start_idx, blend)
+            WSDraw.blend_values(array, values, start_idx, blend)
         else:
-            Comp.blend_values(array, values[:resolution - start_idx], start_idx, blend)
-            Comp.blend_values(array, values[resolution - start_idx:], 0, blend)
+            WSDraw.blend_values(array, values[:resolution - start_idx], start_idx, blend)
+            WSDraw.blend_values(array, values[resolution - start_idx:], 0, blend)
 
     @staticmethod
     def blend_values(array: np.ndarray, values: np.ndarray, start_idx: int, blend: BlendType) -> None:

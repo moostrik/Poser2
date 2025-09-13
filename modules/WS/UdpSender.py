@@ -14,7 +14,7 @@ from pythonosc.osc_bundle import OscBundle
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 # Local application imports
-from modules.av.Definitions import AvOutput, IMG_TYPE
+from modules.WS.WSDefinitions import WSOutput, IMG_TYPE
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Constants
@@ -38,7 +38,7 @@ class UdpSender(threading.Thread):
         self.chunk_size, self.num_chunks = self._calculate_optimal_chunks(resolution, self.byte_size, mtu)
 
         self.running = False
-        self.message_queue: queue.Queue[AvOutput] = queue.Queue()
+        self.message_queue: queue.Queue[WSOutput] = queue.Queue()
 
         # Create an OSC client for each IP address
         self.osc_clients: dict[str, UDPClient] = {}
@@ -68,7 +68,7 @@ class UdpSender(threading.Thread):
         while self.running:
             try:
                 # Block until a message is available or timeout occurs
-                av_output: AvOutput = self.message_queue.get(block=True, timeout=0.1)
+                av_output: WSOutput = self.message_queue.get(block=True, timeout=0.1)
                 message_list: Optional[OscMessageList] = self._build_message(av_output, self.resolution, self.chunk_size, self.num_chunks)
                 if message_list:
                     for ip in self.osc_clients:
@@ -80,13 +80,13 @@ class UdpSender(threading.Thread):
             except queue.Empty:
                 continue
 
-    def send_message(self, av_output: AvOutput):
+    def send_message(self, av_output: WSOutput):
         """Queue a message to be sent."""
         self.message_queue.put(av_output)
 
     @staticmethod
-    def _build_message(av_output: AvOutput, resolution: int, chunk_size: int, num_chunks: int) -> Optional[OscMessageList]:
-        """Send the AvOutput as OSC messages to all IP addresses using blob data."""
+    def _build_message(av_output: WSOutput, resolution: int, chunk_size: int, num_chunks: int) -> Optional[OscMessageList]:
+        """Send the WSOutput as OSC messages to all IP addresses using blob data."""
         try:
             if av_output.resolution != resolution:
                 raise Exception(f"Resolution mismatch: expected {resolution}, got {av_output.resolution}")
@@ -109,11 +109,11 @@ class UdpSender(threading.Thread):
             message_list.append(bundle.build())
 
             if IMG_TYPE == np.float32:
-                white_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 0])
-                blue_channel: np.ndarray = UdpSender.float_to_int8(av_output.img[0, :, 1])
+                white_channel: np.ndarray = UdpSender.float_to_int8(av_output.light_0)
+                blue_channel: np.ndarray = UdpSender.float_to_int8(av_output.light_1)
             elif IMG_TYPE == np.uint8:
-                white_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.img[0, :, 0])
-                blue_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.img[0, :, 1])
+                white_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.light_0)
+                blue_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.light_1)
 
             for i in range(num_chunks):
 
@@ -208,7 +208,7 @@ class UdpSender(threading.Thread):
 
         # If the array fits in one chunk, return the array length
         if byte_length <= max_chunk_size:
-            return byte_length, 1 
+            return byte_length, 1
 
         # Calculate minimum number of chunks needed
         min_chunks = (byte_length + max_chunk_size - 1) // max_chunk_size

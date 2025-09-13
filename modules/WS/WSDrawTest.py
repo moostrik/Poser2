@@ -1,8 +1,12 @@
-from modules.av.Definitions import *
-from modules.utils.HotReloadMethods import HotReloadMethods
-from typing import Optional
 import math
 import time
+import numpy as np
+from enum import Enum, IntEnum, auto
+
+from modules.WS.WSDefinitions import IMG_TYPE, IMG_MP
+from modules.utils.HotReloadMethods import HotReloadMethods
+from typing import Optional
+
 
 class TestPattern(IntEnum):
     NONE = 0
@@ -14,7 +18,7 @@ class TestPattern(IntEnum):
 
 TEST_PATTERN_NAMES: list[str] = [p.name for p in TestPattern]
 
-methods_path: str = 'modules/av/CompTestMethods.py'
+methods_path: str = 'modules/WS/CompTestMethods.py'
 
 class TestParameters():
     def __init__(self) -> None:
@@ -24,7 +28,7 @@ class TestParameters():
         self.width: float =     0.5
         self.amount: int =      36
 
-class CompTest():
+class WSDrawTest():
     def __init__(self, resolution: int) -> None:
         self.resolution: int = resolution
         self.pattern: TestPattern = TestPattern.FILL

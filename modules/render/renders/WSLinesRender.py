@@ -8,7 +8,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.av.Definitions import AvOutput
+from modules.WS.WSDefinitions import WSOutput
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
 from modules.render.renders.BaseRender import BaseRender, Rect
@@ -40,11 +40,11 @@ class WSLinesRender(BaseRender):
         self.fbo_lines.draw(x, y, width, height)
 
     def update(self) -> None:
-        light_image: AvOutput | None = self.data.get_light_image(True, self.key())
+        light_image: WSOutput | None = self.data.get_light_image(True, self.key())
         if light_image is None:
             return
 
-        self.image.set_image(light_image.test)
+        self.image.set_image(light_image.infos_img)
         self.image.update()
 
         self.setView(self.fbo_lines.width, self.fbo_lines.height)
