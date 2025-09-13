@@ -137,18 +137,19 @@ class WSDraw():
                 right_elbow: float = pose_metrics.right_elbows[i]
                 right_shoulder: float = pose_metrics.right_shoulders[i]
 
+
                 age_pattern_speed: float = 0.25
                 age_pattern_power: float = 0.75
                 patt_width: float = pattern_width * pow(min(age * age_pattern_speed, 1.0), age_pattern_power)
 
-                # print(left_elbow)
+                # print(left_shoulder)
 
                 pose_threshold: float = 0.01
 
-                left_count: float = P.line_amount
-                right_count: float = P.line_amount
-                left_width: float = P.line_width #+ (P.input_W0 * 0.7)
-                right_width: float = P.line_width #+ (P.input_B0 * 0.7)
+                left_count: float =     5 + P.line_amount * abs(left_shoulder) / PI
+                right_count: float =    5 + P.line_amount * abs(right_shoulder) / PI
+                left_width: float =     P.line_width  * (1.0 - abs(left_elbow) / PI)
+                right_width: float =    P.line_width  * (1.0 - abs(right_elbow) / PI)
                 speed: float = P.line_speed
                 sharpness: float = P.line_sharpness
 
@@ -165,10 +166,10 @@ class WSDraw():
                 WSDraw.draw_waves(W_R,   centre, patt_width,  right_count, right_width, sharpness, speed,  0.5, inner_edge, outer_edge, blend)
                 WSDraw.draw_waves(W_R,   centre, -patt_width, right_count, right_width, sharpness, speed,  0.5, outer_edge, inner_edge, blend)
 
-                WSDraw.draw_waves(blues, centre, patt_width,  left_count,  left_width,  sharpness, -speed, 0,   inner_edge, outer_edge, blend)
-                WSDraw.draw_waves(blues, centre, -patt_width, left_count,  left_width,  sharpness, -speed, 0,   outer_edge, inner_edge, blend)
-                WSDraw.draw_waves(blues, centre, patt_width,  right_count, right_width, sharpness, -speed, 0.5, inner_edge, outer_edge, blend)
-                WSDraw.draw_waves(blues, centre, -patt_width, right_count, right_width, sharpness, -speed, 0.5, outer_edge, inner_edge, blend)
+                # WSDraw.draw_waves(blues, centre, patt_width,  left_count,  left_width,  sharpness, -speed, 0,   inner_edge, outer_edge, blend)
+                # WSDraw.draw_waves(blues, centre, -patt_width, left_count,  left_width,  sharpness, -speed, 0,   outer_edge, inner_edge, blend)
+                # WSDraw.draw_waves(blues, centre, patt_width,  right_count, right_width, sharpness, -speed, 0.5, inner_edge, outer_edge, blend)
+                # WSDraw.draw_waves(blues, centre, -patt_width, right_count, right_width, sharpness, -speed, 0.5, outer_edge, inner_edge, blend)
 
     @staticmethod
     def draw_waves(array: np.ndarray, anchor: float, span: float, num_waves: float,

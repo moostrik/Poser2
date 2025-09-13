@@ -41,6 +41,11 @@ class PoseStreamData:
     mean_movement: float
     is_final: bool
 
+    def get_last_angles(self) -> list[float]:
+        if self.angles.empty:
+            return [0.0] * len(PoseAngleNames)
+        return self.angles.iloc[-1].tolist()
+
 PoseStreamDataCallback = Callable[[PoseStreamData], None]
 PoseStreamDataDict = dict[int, PoseStreamData]
 

@@ -7,6 +7,7 @@ from time import time
 from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.PoseDefinitions import JointAngle, Pose, PoseAngleNames, JointAngleDict, PoseAngleKeypoints, Keypoint, PosePoints, Rect
+from modules.pose.PoseStream import PoseStreamData
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -81,14 +82,14 @@ class WSData:
             self.present = True
 
 
-            angles: JointAngleDict | None  = pose.angles
-            if angles is not None:
-                # print(angles)
-                for key in PoseAngleKeypoints.keys():
-                    angle_value: JointAngle = angles[key]
-                    angle_name: str = key.name
-                    if angle_value['confidence'] > 0.3 and angle_value['angle'] is not np.nan:
-                        setattr(self, angle_name, angle_value['angle'])
+            # angles: JointAngleDict | None  = pose.angles
+            # if angles is not None:
+            #     # print(angles)
+            #     for key in PoseAngleKeypoints.keys():
+            #         angle_value: JointAngle = angles[key]
+            #         angle_name: str = key.name
+            #         if angle_value['confidence'] > 0.3 and angle_value['angle'] is not np.nan:
+            #             setattr(self, angle_name, angle_value['angle'])
 
                     # print(f"Setting {angle_name} to {angle_value.angle}")
                     # setattr(self, angle_name, angle_value)
@@ -122,6 +123,16 @@ class WSData:
 
         if pose.is_final:
             self.reset()
+
+    def add_stream(self, stream: PoseStreamData) -> None:
+        if not self.present:
+            return
+
+        angles: list[float] = stream.get_last_angles()
+        for i, angle in enumerate(angles):
+            name: str = PoseAngleNames[i]
+            if angle is not np.nan:
+                setattr(self, name, angle)
 
     def reset(self) -> None:
         """Reset all smoothers"""
@@ -182,14 +193,16 @@ class WSDataManager:
             self.smooth_metrics_dict[pose.id].add_pose(pose)
 
     def add_streams(self, streams: list) -> None:
-        pass
+        for stream in streams:
+            self.smooth_metrics_dict[stream.id].add_stream(stream)
+
+            # print(stream.id, stream.get_last_angles())
 
     def update(self) -> None:
         if self.settings.is_updated:
             for sm in self.smooth_metrics_dict.values():
                 sm.set_smoothness(self.settings.smoothness)
                 sm.set_responsiveness(self.settings.responsiveness)
-
 
         for key, sm in self.smooth_metrics_dict.items():
             sm.update()
