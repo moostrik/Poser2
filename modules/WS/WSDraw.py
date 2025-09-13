@@ -1,15 +1,8 @@
-from turtle import width
-import wave
-from cv2 import threshold
-from numpy._typing._array_like import NDArray
-from modules.WS.WSDefinitions import *
-from typing import Optional
-import math
+from modules.WS.WSOutput import *
 import time
 import numpy as np
 from enum import Enum
 
-from modules.Settings import Settings
 from modules.WS.WSDataManager import WSDataManager
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -33,20 +26,34 @@ class BlendType(Enum):
     MIN = "min"
     NON_ZERO = "non_zero"
 
+@dataclass
+class WSDrawSettings():
+    void_width: float =  0.05           # in normalized world width (0..1)
+    void_edge: float = 0.01             # in normalized world width (0..1)
+    use_void: bool = True
+
+    pattern_width: float = 0.2          # in normalized world width (0..1)
+    pattern_edge: float = 0.2           # in normalized world width (0..1)
+
+    line_sharpness: float = 1.5         # higher is sharper
+    line_speed: float = 1.5             # higher is faster
+    line_width: float = 0.1             # in normalized world width (0..1)
+    line_amount: float = 20.0            # number of lines
+
+
 class WSDraw():
-    def __init__(self, general_settings: Settings, data_manager: WSDataManager) -> None:
-        self.resolution: int = general_settings.light_resolution
-        self.settings: CompSettings = CompSettings(
-            interval=1.0 / general_settings.light_rate,
-            num_players=general_settings.max_players)
+    def __init__(self, resolution: int, interval: float, data_manager: WSDataManager, settings: WSDrawSettings) -> None:
+        self.resolution: int = resolution
+        self.interval: float = interval
+        self.settings: WSDrawSettings = settings
 
         # self.draw_methods: DrawMethods = DrawMethods()
         self.data_manager: WSDataManager = data_manager
 
-        self.Wh_L_array: np.ndarray = np.ones((self.resolution), dtype=IMG_TYPE)
-        self.Wh_R_array: np.ndarray = np.ones((self.resolution), dtype=IMG_TYPE)
-        self.blue_array: np.ndarray = np.ones((self.resolution), dtype=IMG_TYPE)
-        self.void_array: np.ndarray = np.zeros((self.resolution), dtype=IMG_TYPE)
+        self.Wh_L_array: np.ndarray = np.ones((self.resolution), dtype=WS_IMG_TYPE)
+        self.Wh_R_array: np.ndarray = np.ones((self.resolution), dtype=WS_IMG_TYPE)
+        self.blue_array: np.ndarray = np.ones((self.resolution), dtype=WS_IMG_TYPE)
+        self.void_array: np.ndarray = np.zeros((self.resolution), dtype=WS_IMG_TYPE)
 
         self.output: WSOutput = WSOutput(self.resolution)
 
@@ -56,16 +63,8 @@ class WSDraw():
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
-
-    # SETTERS
-    def update_settings(self) -> None:
-        self.data_manager.set_smoothness(self.settings.smoothness)
-        self.data_manager.set_responsiveness(self.settings.responsiveness)
-
-
     def update(self) -> None:
-
-        self.make_voids(self.void_array, self.data_manager, self.settings)
+        self.make_voids(self.void_array, self.data_manager, self.settings, self.interval)
         self.make_patterns(self.Wh_L_array, self.Wh_R_array, self.blue_array, self.data_manager, self.settings)
 
         self.output.infos_0 = self.Wh_L_array[:]
@@ -93,8 +92,8 @@ class WSDraw():
 
 
     @staticmethod
-    def make_voids(array: np.ndarray, pose_metrics: WSDataManager, P: CompSettings) -> None:
-        array -= P.interval * 4.0
+    def make_voids(array: np.ndarray, pose_metrics: WSDataManager, P: WSDrawSettings, interval: float) -> None:
+        array -= interval * 4.0
         np.clip(array, 0, 1, out=array)
 
         world_positions: dict[int, float] = pose_metrics.world_positions
@@ -115,7 +114,7 @@ class WSDraw():
             WSDraw.draw_field(array, centre, width, strength, edge, BlendType.MAX)
 
     @staticmethod
-    def make_patterns(W_L: np.ndarray, W_R: np.ndarray, blues: np.ndarray, pose_metrics: WSDataManager, P: CompSettings) -> None:
+    def make_patterns(W_L: np.ndarray, W_R: np.ndarray, blues: np.ndarray, pose_metrics: WSDataManager, P: WSDrawSettings) -> None:
         resolution: int = len(W_L)
         W_L.fill(0.0)
         W_R.fill(0.0)

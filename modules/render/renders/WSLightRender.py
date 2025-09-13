@@ -8,7 +8,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.WS.WSDefinitions import WSOutput
+from modules.WS.WSOutput import WSOutput
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
 from modules.render.renders.BaseRender import BaseRender, Rect

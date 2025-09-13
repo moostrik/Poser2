@@ -6,11 +6,12 @@ from time import time, sleep
 # Third-party imports
 
 # Local application imports
-from modules.WS.WSDefinitions import WSOutput, WSOutputCallback
-from modules.WS.WSGui import WSGui
-from modules.WS.WSDataManager import WSDataManager
-from modules.WS.WSDraw import WSDraw
+from modules.WS.WSDataManager import WSDataManager, WSDataSettings
+from modules.WS.WSDraw import WSDraw, WSDrawSettings
 from modules.WS.WSDrawTest import WSDrawTest, TestPattern
+from modules.WS.WSGui import WSGui
+from modules.WS.WSSettings import WSSettings
+from modules.WS.WSOutput import WSOutput, WSOutputCallback
 from modules.WS.UdpSender import UdpSender
 
 from modules.Settings import Settings
@@ -24,37 +25,43 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class WSPipeline(Thread):
-    def __init__(self, gui, settings: Settings) -> None:
+    def __init__(self, gui, general_settings: Settings) -> None:
         super().__init__()
-        self.settings: Settings = settings
 
         self._stop_event = Event()
-        self.interval: float = 1.0 / settings.light_rate
-        self.last_update: float = 0.0
-
-        self.resolution: int = settings.light_resolution
-        self.output: WSOutput = WSOutput(self.resolution)
-
         self.pose_input_queue: Queue[Pose] = Queue()
         self.pose_stream_input_queue: Queue[PoseStreamData] = Queue()
+        self.last_update: float = 0.0
 
-        self.data_manager: WSDataManager = WSDataManager(settings)
+        rate: int = general_settings.light_rate
+        self.interval: float = 1.0 / rate
+        resolution: int = general_settings.light_resolution
+        num_players: int = general_settings.max_players
 
-        self.comp: WSDraw = WSDraw(settings, self.data_manager)
+        self.settings = WSSettings(
+            data_settings = WSDataSettings(),
+            draw_settings = WSDrawSettings(),
+        )
 
-        self.comp_test: WSDrawTest = WSDrawTest(self.resolution)
+        self.output: WSOutput = WSOutput(resolution)
 
-        self.udp_sender: UdpSender = UdpSender(self.settings.light_resolution, self.settings.udp_port, self.settings.udp_ip_addresses)
-        self.udp_sender.start()
+        self.data_manager: WSDataManager = WSDataManager(rate, num_players, self.settings.data_settings)
+
+        self.comp: WSDraw = WSDraw(resolution, self.interval, self.data_manager, self.settings.draw_settings)
+
+        self.comp_test: WSDrawTest = WSDrawTest(resolution)
+
+        self.udp_sender: UdpSender = UdpSender(resolution, general_settings.udp_port, general_settings.udp_ip_addresses)
 
         self.FPS: FpsCounter = FpsCounter()
-        self.gui: WSGui = WSGui(gui, self, self.comp.settings)
+        self.gui: WSGui = WSGui(gui, self, self.settings)
 
         self.output_callbacks: list[WSOutputCallback] = []
         # self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     def start(self) -> None:
         super().start()
+        self.udp_sender.start()
 
     def stop(self) -> None:
         self.udp_sender.stop()
@@ -97,7 +104,7 @@ class WSPipeline(Thread):
         self._output_callback(self.output)
 
         self.FPS.tick()
-        self.gui.update()
+        self.gui.update_fps(self.FPS.get_fps())
 
     # SETTERS
     def add_pose(self, pose: Pose) -> None:

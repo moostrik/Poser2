@@ -3,7 +3,7 @@ from math import ceil
 from typing import Optional
 
 # Local application imports
-from modules.WS.WSPipeline import WSPipeline as AV
+from modules.WS.WSPipeline import WSPipeline
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
@@ -26,10 +26,10 @@ class Main():
 
         self.settings: Settings = settings
 
-        self.av = None
+        self.WS = None
         self.render = RenderWhiteSpace(settings)
         if settings.art_type == Settings.ArtType.WS:
-            self.av: AV | None = AV(self.gui, settings)
+            self.WS: WSPipeline | None = WSPipeline(self.gui, settings)
         if settings.art_type == Settings.ArtType.HDT:
             self.render = RenderHDT(settings)
 
@@ -90,11 +90,11 @@ class Main():
         self.tracker.add_tracklet_callback(self.render.data.set_tracklet)
         self.tracker.start()
 
-        if self.av:
-            self.pose_detection.add_pose_callback(self.av.add_pose)
-            self.pose_streamer.add_stream_callback(self.av.add_pose_stream)
-            self.av.add_output_callback(self.render.data.set_light_image)
-            self.av.start()
+        if self.WS:
+            self.pose_detection.add_pose_callback(self.WS.add_pose)
+            self.pose_streamer.add_stream_callback(self.WS.add_pose_stream)
+            self.WS.add_output_callback(self.render.data.set_light_image)
+            self.WS.start()
 
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
         self.gui.exit_callback = self.stop
@@ -106,8 +106,8 @@ class Main():
             else:
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
-        if self.av:
-            self.gui.addFrame([self.av.gui.get_gui_frame(), self.av.gui.get_gui_test_frame()])
+        if self.WS:
+            self.gui.addFrame([self.WS.gui.get_gui_frame(), self.WS.gui.get_gui_test_frame()])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])
@@ -163,8 +163,8 @@ class Main():
             self.correlation_streamer.stop()
 
         # print('stop av')
-        if self.av:
-            self.av.stop()
+        if self.WS:
+            self.WS.stop()
 
         # print('stop recorder')
         if self.recorder:

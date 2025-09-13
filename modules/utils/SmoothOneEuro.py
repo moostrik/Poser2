@@ -4,8 +4,8 @@ import math
 START_TIME: float = time.time()
 
 class SmoothOneEuro:
-    def __init__(self, freq=60.0, responsiveness=0.5, smoothness=0.5) -> None:
-        self.filter = OneEuroFilter(freq=freq)
+    def __init__(self, frequency=60.0, responsiveness=0.5, smoothness=0.5) -> None:
+        self.filter = OneEuroFilter(freq=frequency)
         self.set_responsiveness(responsiveness)
         self.set_smoothness(smoothness)
         self.input_value: float | None = None
@@ -48,9 +48,9 @@ class SmoothOneEuro:
 
 
 class SmoothOneEuroCircular:
-    def __init__(self, freq=60.0, responsiveness=0.5, smoothness=0.5) -> None:
-        self.fx = OneEuroFilter(freq=freq)
-        self.fy = OneEuroFilter(freq=freq)
+    def __init__(self, frequency=60.0, responsiveness=0.5, smoothness=0.5) -> None:
+        self.fx = OneEuroFilter(freq=frequency)
+        self.fy = OneEuroFilter(freq=frequency)
         self.set_responsiveness(responsiveness)
         self.set_smoothness(smoothness)
         self.x: float | None = None

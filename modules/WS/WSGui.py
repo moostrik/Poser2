@@ -5,7 +5,7 @@ from __future__ import annotations
 # from modules.av.Manager import Manager
 from modules.WS.WSDrawTest import TEST_PATTERN_NAMES
 
-from modules.WS.WSDefinitions import CompSettings
+from modules.WS.WSSettings import WSSettings
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
 
@@ -14,42 +14,42 @@ if TYPE_CHECKING:
     from modules.WS.WSPipeline import WSPipeline
 
 class WSGui():
-    def __init__(self, gui: G, manager: 'WSPipeline', comp_settings: CompSettings) -> None:
+    def __init__(self, gui: G, manager: 'WSPipeline', settings: WSSettings) -> None:
         self.gui: G = gui
         self.manager: WSPipeline = manager
-        self.comp_settings: CompSettings = comp_settings
+        self.settings: WSSettings = settings
 
         elm: list = []
         elm.append([E(eT.TEXT, '    '),
-                    E(eT.CHCK, 'Show Overlay',  self.set_use_void,          comp_settings.use_void),
+                    E(eT.CHCK, 'Show Overlay',  self.set_use_void,          settings.draw_settings.use_void),
                     E(eT.BTTN, 'Reset',         manager.comp.reset,             expand=False),
                     E(eT.TEXT, 'FPS'),
                     E(eT.SLDR, 'WSFPS',         None,                       0,  [0,60],   0.1)])
         elm.append([E(eT.TEXT, 'POSE'),
                     E(eT.TEXT, 'Smoot'),
-                    E(eT.SLDR, 'Smooth',        self.set_smoothness,        comp_settings.smoothness,       [0., 1.],  0.01),
+                    E(eT.SLDR, 'Smooth',        self.set_smoothness,        settings.data_settings.smoothness,       [0., 1.],  0.01),
                     E(eT.TEXT, 'Resp'),
-                    E(eT.SLDR, 'Resp',          self.set_responsiveness,    comp_settings.responsiveness,   [0., 1.],  0.01)])
+                    E(eT.SLDR, 'Resp',          self.set_responsiveness,    settings.data_settings.responsiveness,   [0., 1.],  0.01)])
         elm.append([E(eT.TEXT, 'VOID'),
                     E(eT.TEXT, 'Width'),
-                    E(eT.SLDR, 'VoidWidth',     self.set_void_width,        comp_settings.void_width,       [1,  20],  0.5),
+                    E(eT.SLDR, 'VoidWidth',     self.set_void_width,        settings.draw_settings.void_width,       [1,  20],  0.5),
                     E(eT.TEXT, 'Edge'),
-                    E(eT.SLDR, 'VoidEdge',      self.set_void_edge,         comp_settings.void_edge,        [0., 10],  0.5)])
+                    E(eT.SLDR, 'VoidEdge',      self.set_void_edge,         settings.draw_settings.void_edge,        [0., 10],  0.5)])
         elm.append([E(eT.TEXT, 'PATT'),
                     E(eT.TEXT, 'Width'),
-                    E(eT.SLDR, 'PattWidth',     self.set_pattern_width,     comp_settings.pattern_width,    [0.,360],  1.0),
+                    E(eT.SLDR, 'PattWidth',     self.set_pattern_width,     settings.draw_settings.pattern_width,    [0.,360],  1.0),
                     E(eT.TEXT, 'Edge'),
-                    E(eT.SLDR, 'PattEdge',      self.set_pattern_edge,      comp_settings.pattern_edge,     [0., 30],  0.5)])
+                    E(eT.SLDR, 'PattEdge',      self.set_pattern_edge,      settings.draw_settings.pattern_edge,     [0., 30],  0.5)])
         elm.append([E(eT.TEXT, 'LINE'),
                     E(eT.TEXT, 'Speed'),
-                    E(eT.SLDR, 'LineSpeed',     self.set_line_speed,        comp_settings.line_speed,       [0., 10],  0.1),
+                    E(eT.SLDR, 'LineSpeed',     self.set_line_speed,        settings.draw_settings.line_speed,       [0., 10],  0.1),
                     E(eT.TEXT, 'Shrp'),
-                    E(eT.SLDR, 'LineSharp',     self.set_line_sharpness,    comp_settings.line_sharpness,   [0.,  5],  0.1)])
+                    E(eT.SLDR, 'LineSharp',     self.set_line_sharpness,    settings.draw_settings.line_sharpness,   [0.,  5],  0.1)])
         elm.append([E(eT.TEXT, 'LINE'),
                     E(eT.TEXT, 'Width'),
-                    E(eT.SLDR, 'LineWidth',     self.set_line_width,        comp_settings.line_width,       [0.,  1],  0.05),
+                    E(eT.SLDR, 'LineWidth',     self.set_line_width,        settings.draw_settings.line_width,       [0.,  1],  0.05),
                     E(eT.TEXT, 'Amnt'),
-                    E(eT.SLDR, 'LineAmount',    self.set_line_amount,       comp_settings.line_amount,      [0.,180],  1)])
+                    E(eT.SLDR, 'LineAmount',    self.set_line_amount,       settings.draw_settings.line_amount,      [0.,180],  1)])
         gui_height = len(elm) * ELEMHEIGHT + BASEHEIGHT
         self.frame = Frame('COMP TEST', elm, gui_height)
 
@@ -95,58 +95,45 @@ class WSGui():
 
     def reset(self) -> None:
         self.manager.comp_test.reset()
-        self.update()
 
     def white_to_blue(self) -> None:
         self.manager.comp_test.white_to_blue()
-        self.update()
 
-    def update(self) -> None:
+    def update_fps(self, value: float) -> None:
         if not self.gui:
             return
-        self.gui.updateElement('WSFPS', self.manager.FPS.get_fps())
+        self.gui.updateElement('WSFPS', value)
 
 
     def set_use_void(self, value) -> None:
-        self.comp_settings.use_void = value
-        self.manager.comp.update_settings()
+        self.settings.draw_settings.use_void = value
 
     def set_smoothness(self, value) -> None:
-        self.comp_settings.smoothness = value
-        self.manager.comp.update_settings()
+        self.settings.data_settings.smoothness = value
 
     def set_responsiveness(self, value) -> None:
-        self.comp_settings.responsiveness = value
-        self.manager.comp.update_settings()
+        self.settings.data_settings.responsiveness = value
 
     def set_void_width(self, value) -> None:
-        self.comp_settings.void_width = value / 360
-        self.manager.comp.update_settings()
+        self.settings.draw_settings.void_width = value / 360
 
     def set_void_edge(self, value) -> None:
-        self.comp_settings.void_edge = value / 360
-        self.manager.comp.update_settings()
+        self.settings.draw_settings.void_edge = value / 360
 
     def set_pattern_width(self, value) -> None:
-        self.comp_settings.pattern_width = value / 360
-        self.manager.comp.update_settings()
+        self.settings.draw_settings.pattern_width = value / 360
 
     def set_pattern_edge(self, value) -> None:
-        self.comp_settings.pattern_edge = value / 360
-        self.manager.comp.update_settings()
+        self.settings.draw_settings.pattern_edge = value / 360
 
     def set_line_speed(self, value) -> None:
-        self.comp_settings.line_speed = value
-        self.manager.comp.update_settings()
+        self.settings.draw_settings.line_speed = value
 
     def set_line_sharpness(self, value) -> None:
-        self.comp_settings.line_sharpness = value
-        self.manager.comp.update_settings()
+        self.settings.draw_settings.line_sharpness = value
 
     def set_line_width(self, value) -> None:
-        self.comp_settings.line_width = value
-        self.manager.comp.update_settings()
+        self.settings.draw_settings.line_width = value
 
     def set_line_amount(self, value) -> None:
-        self.comp_settings.line_amount = value
-        self.manager.comp.update_settings()
+        self.settings.draw_settings.line_amount = value

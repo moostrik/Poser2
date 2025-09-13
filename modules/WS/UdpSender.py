@@ -14,7 +14,7 @@ from pythonosc.osc_bundle import OscBundle
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 # Local application imports
-from modules.WS.WSDefinitions import WSOutput, IMG_TYPE
+from modules.WS.WSOutput import WSOutput, WS_IMG_TYPE
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Constants
@@ -108,10 +108,10 @@ class UdpSender(threading.Thread):
 
             message_list.append(bundle.build())
 
-            if IMG_TYPE == np.float32:
+            if WS_IMG_TYPE == np.float32:
                 white_channel: np.ndarray = UdpSender.float_to_int8(av_output.light_0)
                 blue_channel: np.ndarray = UdpSender.float_to_int8(av_output.light_1)
-            elif IMG_TYPE == np.uint8:
+            elif WS_IMG_TYPE == np.uint8:
                 white_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.light_0)
                 blue_channel: np.ndarray = UdpSender.uint8_to_int8(av_output.light_1)
 

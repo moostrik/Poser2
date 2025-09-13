@@ -3,7 +3,7 @@ import time
 import numpy as np
 from enum import Enum, IntEnum, auto
 
-from modules.WS.WSDefinitions import IMG_TYPE, IMG_MP
+from modules.WS.WSOutput import WS_IMG_TYPE
 from modules.utils.HotReloadMethods import HotReloadMethods
 from typing import Optional
 
@@ -17,6 +17,8 @@ class TestPattern(IntEnum):
     RNDOM = 5
 
 TEST_PATTERN_NAMES: list[str] = [p.name for p in TestPattern]
+
+IMG_MP = 1.0
 
 methods_path: str = 'modules/WS/CompTestMethods.py'
 
@@ -37,9 +39,9 @@ class WSDrawTest():
         self.BP: TestParameters = TestParameters()
 
         # Pre-allocate arrays
-        self.white_array: np.ndarray = np.zeros((1, resolution), dtype=IMG_TYPE)
-        self.blue_array: np.ndarray = np.zeros((1, resolution), dtype=IMG_TYPE)
-        self.output_img: np.ndarray = np.zeros((1, resolution, 3), dtype=IMG_TYPE)
+        self.white_array: np.ndarray = np.zeros((1, resolution), dtype=WS_IMG_TYPE)
+        self.blue_array: np.ndarray = np.zeros((1, resolution), dtype=WS_IMG_TYPE)
+        self.output_img: np.ndarray = np.zeros((1, resolution, 3), dtype=WS_IMG_TYPE)
         self.indices: np.ndarray = np.arange(resolution)
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)

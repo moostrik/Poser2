@@ -11,7 +11,7 @@ from modules.tracker.Tracklet import Tracklet
 from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices
 from modules.pose.PoseStream import PoseStreamData
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
-from modules.WS.WSDefinitions import WSOutput
+from modules.WS.WSOutput import WSOutput
 from modules.Settings import Settings
 
 T = TypeVar('T')

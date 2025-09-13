@@ -6,27 +6,41 @@ from time import time
 
 from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import Pose, PoseAngleNames, JointAngleDict, PoseAngleKeypoints, Keypoint, PosePoints, Rect
-from modules.Settings import Settings
+from modules.pose.PoseDefinitions import JointAngle, Pose, PoseAngleNames, JointAngleDict, PoseAngleKeypoints, Keypoint, PosePoints, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+@dataclass
+class WSDataSettings:
+    smoothness: float = 0.5
+    responsiveness: float = 0.5
+    _is_updated: bool = field(default=False, repr=False)
+
+    def __setattr__(self, name, value) -> None:
+        if name != "_is_updated" and hasattr(self, name) and getattr(self, name) != value:
+            super().__setattr__("_is_updated", True)
+        super().__setattr__(name, value)
+
+    @property
+    def is_updated(self) -> bool:
+        val: bool = self._is_updated
+        self._is_updated = False
+        return val
+
+    @is_updated.setter
+    def is_updated(self, value: bool) -> None:
+        self._is_updated = value
 
 class WSData:
-    def __init__(self, settings: Settings):
-        # object.__setattr__(self, "filters", {})
-        # object.__setattr__(self, "age", 0.0)
-
-        # input_fps = settings.camera_fps
-        output_fps = settings.light_rate
+    def __init__(self, frequency: float) -> None:
 
         self.filters: dict[str, SmoothOneEuro | SmoothOneEuroCircular] = {}
 
-        self.filters["world_angle"] = SmoothOneEuroCircular(freq = output_fps)
-        self.filters["approximate_person_length"] = SmoothOneEuro(freq = output_fps)
+        self.filters["world_angle"] = SmoothOneEuroCircular(frequency)
+        self.filters["approximate_person_length"] = SmoothOneEuro(frequency)
         for key in PoseAngleKeypoints.keys():
-            angle_name = key.name
-            self.filters[angle_name] = SmoothOneEuro(freq = output_fps)
+            angle_name: str = key.name
+            self.filters[angle_name] = SmoothOneEuro(frequency)
 
         self.present: bool = False
         self.start_age: float = 0.0
@@ -34,20 +48,20 @@ class WSData:
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
-    def __getattr__(self, name):
+    def __getattr__(self, name) -> float:
         """Allow access to smoothed values as attributes."""
         if "filters" in self.__dict__ and name in self.filters:
-            smoother = self.filters[name]
-            value = smoother.get_smoothed_value()
+            smoother: SmoothOneEuro | SmoothOneEuroCircular = self.filters[name]
+            value: float | None = smoother.get_smoothed_value()
             if value is None:
                 return 0.0
             return value
         raise AttributeError(f"'SmoothMetrics' object has no attribute '{name}'")
 
-    def __setattr__(self, name, value):
+    def __setattr__(self, name, value) -> None:
         # Avoid recursion for internal attributes
         if "filters" in self.__dict__ and name in self.filters:
-            filter = self.filters[name]
+            filter: SmoothOneEuro | SmoothOneEuroCircular = self.filters[name]
             filter.add_value(value)
         else:
             super().__setattr__(name, value)
@@ -62,7 +76,7 @@ class WSData:
         tracklet: Tracklet | None = pose.tracklet
 
         if tracklet is not None and tracklet.is_active and tracklet.age_in_seconds > 2.0:
-            if self.start_age is 0.0:
+            if self.start_age == 0.0:
                 self.start_age = time()
             self.present = True
 
@@ -71,8 +85,8 @@ class WSData:
             if angles is not None:
                 # print(angles)
                 for key in PoseAngleKeypoints.keys():
-                    angle_value = angles[key]
-                    angle_name = key.name
+                    angle_value: JointAngle = angles[key]
+                    angle_name: str = key.name
                     if angle_value['confidence'] > 0.3 and angle_value['angle'] is not np.nan:
                         setattr(self, angle_name, angle_value['angle'])
 
@@ -103,7 +117,7 @@ class WSData:
             world_angle += nose_angle_offset if nose_angle_offset is not None else 0.0
 
             # convert from [0...360] to [-pi, pi]
-            self.world_angle = np.deg2rad(world_angle - 180)
+            self.world_angle: float = np.deg2rad(world_angle - 180)
             # print (self.world_angle)
 
         if pose.is_final:
@@ -128,14 +142,15 @@ class WSData:
 
 
 class WSDataManager:
-    def __init__(self, settings: Settings) -> None:
-        self.num_players: int = settings.max_players
+    def __init__(self, frequency: float, num_players: int, settings: WSDataSettings) -> None:
+        self.settings: WSDataSettings = settings
+        self.num_players: int = num_players
 
         self.smooth_metrics_dict: dict[int, WSData] = {}
         for i in range(self.num_players):
-            self.smooth_metrics_dict[i] = WSData(settings)
+            self.smooth_metrics_dict[i] = WSData(frequency)
 
-        self.num_active_players_smoother: SmoothOneEuro = SmoothOneEuro(freq = settings.light_rate)
+        self.num_active_players_smoother: SmoothOneEuro = SmoothOneEuro(frequency)
         self.presents: dict[int, bool] = {}
 
         self.world_positions: dict[int, float] = {}
@@ -170,6 +185,12 @@ class WSDataManager:
         pass
 
     def update(self) -> None:
+        if self.settings.is_updated:
+            for sm in self.smooth_metrics_dict.values():
+                sm.set_smoothness(self.settings.smoothness)
+                sm.set_responsiveness(self.settings.responsiveness)
+
+
         for key, sm in self.smooth_metrics_dict.items():
             sm.update()
             self.presents[key] = sm.present
@@ -183,14 +204,6 @@ class WSDataManager:
 
         self.num_active_players_smoother.add_value(self.num_active_players)
         self.num_active_players_smoother.update()
-
-    def set_smoothness(self, value: float) -> None:
-        for sm in self.smooth_metrics_dict.values():
-            sm.set_smoothness(value)
-
-    def set_responsiveness(self, value: float) -> None:
-        for sm in self.smooth_metrics_dict.values():
-            sm.set_responsiveness(value)
 
     def reset(self) -> None:
         for sm in self.smooth_metrics_dict.values():
