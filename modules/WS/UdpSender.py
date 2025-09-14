@@ -86,6 +86,8 @@ class UdpSender(threading.Thread):
 
     @staticmethod
     def _build_message(av_output: WSOutput, resolution: int, chunk_size: int, num_chunks: int) -> Optional[OscMessageList]:
+        message_list: OscMessageList = []
+        return message_list
         """Send the WSOutput as OSC messages to all IP addresses using blob data."""
         try:
             if av_output.resolution != resolution:
@@ -153,6 +155,7 @@ class UdpSender(threading.Thread):
         # Convert to float16 for memory efficiency, then back to float32 for calculations
         arr_clipped = np.clip(arr, 0.0, 1.0)
         arr_scaled = arr_clipped * 255.0 - 128.0    # Scale to -128 to 127 range
+        # print( arr_scaled.min(), arr_scaled.max())
         return np.round(arr_scaled).astype(np.int8)
     @staticmethod
 

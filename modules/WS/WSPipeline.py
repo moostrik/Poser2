@@ -47,7 +47,7 @@ class WSPipeline(Thread):
 
         self.data_manager: WSDataManager = WSDataManager(rate, num_players, self.settings.data_settings)
 
-        self.comp: WSDraw = WSDraw(resolution, self.interval, self.data_manager, self.settings.draw_settings)
+        self.comp: WSDraw = WSDraw(resolution, num_players, self.interval, self.data_manager, self.settings.draw_settings)
 
         self.comp_test: WSDrawTest = WSDrawTest(resolution)
 
@@ -57,7 +57,7 @@ class WSPipeline(Thread):
         self.gui: WSGui = WSGui(gui, self, self.settings)
 
         self.output_callbacks: list[WSOutputCallback] = []
-        # self.hot_reloader = HotReloadMethods(self.__class__, True)
+        self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     def start(self) -> None:
         super().start()

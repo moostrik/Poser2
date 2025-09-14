@@ -42,10 +42,11 @@ class WSDrawSettings():
 
 
 class WSDraw():
-    def __init__(self, resolution: int, interval: float, data_manager: WSDataManager, settings: WSDrawSettings) -> None:
+    def __init__(self, resolution: int, num_players: int, interval: float, data_manager: WSDataManager, settings: WSDrawSettings) -> None:
         self.resolution: int = resolution
         self.interval: float = interval
         self.settings: WSDrawSettings = settings
+        self.num_players: int = num_players
 
         # self.draw_methods: DrawMethods = DrawMethods()
         self.data_manager: WSDataManager = data_manager
@@ -57,9 +58,11 @@ class WSDraw():
 
         self.output: WSOutput = WSOutput(self.resolution)
 
-        # self.output_light: np.ndarray = np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
-        # # self.output_sound: np.ndarray = np.zeros((1, self.resolution, 3), dtype=IMG_TYPE)
-        # self.output_comp: np.ndarray = np.zeros((1, self.resolution, 4), dtype=IMG_TYPE)
+        self.left_pattern_times: dict[int, float] = {}
+        self.right_pattern_times: dict[int, float] = {}
+        for i in range(self.num_players):
+            self.left_pattern_times[i] = 0.0
+            self.right_pattern_times[i] = 0.0
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
@@ -113,8 +116,8 @@ class WSDraw():
             edge: int = int(P.void_edge * len(array))
             WSDraw.draw_field(array, centre, width, strength, edge, BlendType.MAX)
 
-    @staticmethod
-    def make_patterns(W_L: np.ndarray, W_R: np.ndarray, blues: np.ndarray, pose_metrics: WSDataManager, P: WSDrawSettings) -> None:
+    def make_patterns(self, W_L: np.ndarray, W_R: np.ndarray, blues: np.ndarray, pose_metrics: WSDataManager, P: WSDrawSettings) -> None:
+
         resolution: int = len(W_L)
         W_L.fill(0.0)
         W_R.fill(0.0)
@@ -126,6 +129,7 @@ class WSDraw():
         num_player_width: float = 1.0 / max(pose_metrics.smooth_num_active_players, 1)
         pattern_width: float = P.pattern_width * 0.25 + num_player_width * P.pattern_width * 0.25
 
+
         for i in range(pose_metrics.num_players):
 
             if pose_metrics.is_player_present(i):
@@ -134,25 +138,40 @@ class WSDraw():
                 length: float = pose_lengths[i]
                 left_elbow: float = pose_metrics.left_elbows[i]
                 left_shoulder: float = pose_metrics.left_shoulders[i]
-                right_elbow: float = pose_metrics.right_elbows[i]
-                right_shoulder: float = pose_metrics.right_shoulders[i]
-
+                rigt_elbow: float = pose_metrics.right_elbows[i]
+                rigt_shoulder: float = pose_metrics.right_shoulders[i]
 
                 age_pattern_speed: float = 0.25
                 age_pattern_power: float = 0.75
                 patt_width: float = pattern_width * pow(min(age * age_pattern_speed, 1.0), age_pattern_power)
 
-                # print(left_shoulder)
+                left_count: float = 5 + P.line_amount   * (1.0 - (np.cos(left_shoulder) + 1.0) / 2.0)
+                rigt_count: float = 5 + P.line_amount   * (1.0 - (np.cos(rigt_shoulder) + 1.0) / 2.0)
+                left_width: float = P.line_width        * ((np.cos(left_elbow) + 1.0) / 2.0) * ((np.cos(left_shoulder) + 1.0) / 2.0) * 0.8 + 0.2
+                rigt_width: float = P.line_width        * ((np.cos(rigt_elbow) + 1.0) / 2.0) * ((np.cos(rigt_shoulder) + 1.0) / 2.0) * 0.8 + 0.2
+                # left_width: float = P.line_width        * (1.0 - abs(left_elbow) / PI) * (1.0 - abs(left_shoulder) / PI) * 0.8 + 0.2
+                rigt_width: float = P.line_width        #* (1.0 - abs(rigt_elbow) / PI) * (1.0 - abs(rigt_shoulder) / PI)  * 0.8 + 0.2
+                left_speed: float = P.line_speed        * (-np.sin(left_elbow))
+                rigt_speed: float = P.line_speed        * ( np.sin(rigt_elbow))
+                sharpness: float =  P.line_sharpness
 
-                pose_threshold: float = 0.01
 
-                left_count: float =     5 + P.line_amount * abs(left_shoulder) / PI
-                right_count: float =    5 + P.line_amount * abs(right_shoulder) / PI
-                left_width: float =     P.line_width  * (1.0 - abs(left_elbow) / PI)
-                right_width: float =    P.line_width  * (1.0 - abs(right_elbow) / PI)
-                speed: float = P.line_speed
-                sharpness: float = P.line_sharpness
+                epsilon = 1e-4
+                elbow_val = min(abs(left_elbow), PI - epsilon)
+                shoulder_val = min(abs(left_shoulder), PI - epsilon)
+                left_width: float = P.line_width * (1.0 - elbow_val / PI)  * 0.8 + 0.2
 
+                if left_shoulder > PI or left_shoulder < -PI:
+                    print(left_shoulder, "is out of range!")
+
+
+                if i == 2:
+                    print(left_elbow)
+
+                self.left_pattern_times[i] += self.interval * left_speed
+                self.right_pattern_times[i] += self.interval * rigt_speed
+                left_time: float = self.left_pattern_times[i]
+                rigt_time: float = self.right_pattern_times[i]
 
                 outer_edge: int = int(P.pattern_edge * resolution)
                 # print(f"outer_edge: {outer_edge}")
@@ -161,19 +180,19 @@ class WSDraw():
 
                 blend: BlendType = BlendType.MAX
 
-                WSDraw.draw_waves(W_L,   centre, patt_width,  left_count,  left_width,  sharpness, speed,  0,   inner_edge, outer_edge, blend)
-                WSDraw.draw_waves(W_L,   centre, -patt_width, left_count,  left_width,  sharpness, speed,  0,   outer_edge, inner_edge, blend)
-                WSDraw.draw_waves(W_R,   centre, patt_width,  right_count, right_width, sharpness, speed,  0.5, inner_edge, outer_edge, blend)
-                WSDraw.draw_waves(W_R,   centre, -patt_width, right_count, right_width, sharpness, speed,  0.5, outer_edge, inner_edge, blend)
+                WSDraw.draw_waves(W_L,   centre, patt_width,  left_count,  left_width,  sharpness, left_time,  0,   inner_edge, outer_edge, blend)
+                WSDraw.draw_waves(W_L,   centre, -patt_width, left_count,  left_width,  sharpness, left_time,  0,   outer_edge, inner_edge, blend)
+                WSDraw.draw_waves(W_R,   centre, patt_width,  rigt_count, rigt_width, sharpness, rigt_time, 0.5, inner_edge, outer_edge, blend)
+                WSDraw.draw_waves(W_R,   centre, -patt_width, rigt_count, rigt_width, sharpness, rigt_time, 0.5, outer_edge, inner_edge, blend)
 
-                # WSDraw.draw_waves(blues, centre, patt_width,  left_count,  left_width,  sharpness, -speed, 0,   inner_edge, outer_edge, blend)
-                # WSDraw.draw_waves(blues, centre, -patt_width, left_count,  left_width,  sharpness, -speed, 0,   outer_edge, inner_edge, blend)
-                # WSDraw.draw_waves(blues, centre, patt_width,  right_count, right_width, sharpness, -speed, 0.5, inner_edge, outer_edge, blend)
-                # WSDraw.draw_waves(blues, centre, -patt_width, right_count, right_width, sharpness, -speed, 0.5, outer_edge, inner_edge, blend)
+                # WSDraw.draw_waves(blues, centre, patt_width,  left_count,  left_width,  sharpness, -left_time, 0,   inner_edge, outer_edge, blend)
+                # WSDraw.draw_waves(blues, centre, -patt_width, left_count,  left_width,  sharpness, -left_time, 0,   outer_edge, inner_edge, blend)
+                # WSDraw.draw_waves(blues, centre, patt_width,  rigt_count, rigt_width, sharpness, -rigt_time, 0.5, inner_edge, outer_edge, blend)
+                # WSDraw.draw_waves(blues, centre, -patt_width, rigt_count, rigt_width, sharpness, -rigt_time, 0.5, outer_edge, inner_edge, blend)
 
     @staticmethod
     def draw_waves(array: np.ndarray, anchor: float, span: float, num_waves: float,
-                   thickness: float, sharpness: float, speed: float, phase: float,
+                   thickness: float, sharpness: float, time_value: float, phase: float,
                    edge_left: int, edge_right: int,blend: BlendType) -> None:
         # optional: work with smoothsteps
 
@@ -192,7 +211,7 @@ class WSDraw():
             thick_phase_offset: float = HALFPI if thick_mode else -HALFPI
             wave_cycles: float = TWOPI * num_waves
 
-            wave_time: float = time.time() * speed + thick_time_offset + phase * TWOPI
+            wave_time: float = time_value + thick_time_offset + phase * TWOPI
             positions = ((np.linspace(0, pixel_span - 1, pixel_span) + pixel_anchor) % resolution) / resolution
 
             indices = (positions - anchor) * wave_cycles - wave_time
