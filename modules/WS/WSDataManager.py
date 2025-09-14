@@ -41,7 +41,7 @@ class WSData:
         self.filters["approximate_person_length"] = SmoothOneEuro(frequency)
         for key in PoseAngleKeypoints.keys():
             angle_name: str = key.name
-            self.filters[angle_name] = SmoothOneEuro(frequency)
+            self.filters[angle_name] = SmoothOneEuroCircular(frequency)
 
         self.present: bool = False
         self.start_age: float = 0.0

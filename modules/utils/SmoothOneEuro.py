@@ -74,10 +74,7 @@ class SmoothOneEuroCircular:
             x_smooth: float = self.fx(self.x, time_elapsed)
             y_smooth: float = self.fy(self.y, time_elapsed)
 
-            value: float = math.atan2(y_smooth, x_smooth)
-            normalized_value: float = (value + math.pi) / (2 * math.pi)
-
-            self.output_value = normalized_value
+            self.output_value = math.atan2(y_smooth, x_smooth)
 
     def get_smoothed_value(self) -> float | None:
         return self.output_value
