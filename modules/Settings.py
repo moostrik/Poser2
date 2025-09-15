@@ -25,7 +25,7 @@ class Settings():
         # GENERAL
         self.max_players: int                   = None # type: ignore
         self.art_type: Settings.ArtType         = None # type: ignore
-        
+
         #GUI
         self.gui_location_x: int                = None # type: ignore
         self.gui_location_y: int                = None # type: ignore
@@ -92,7 +92,8 @@ class Settings():
 
         # UDP SETTINGS
         self.udp_port: int                      = None # type: ignore
-        self.udp_ip_addresses: list[str]        = None # type: ignore
+        self.udp_ips_light: list[str]           = None # type: ignore
+        self.udp_ips_sound: list[str]           = None # type: ignore
 
         # RENDER SETTINGS
         self.render_title: str                  = None # type: ignore

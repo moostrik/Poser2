@@ -47,7 +47,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     if args.numcameras < len(camera_list):
         camera_list = camera_list[:args.numcameras]
 
-    udp_list: list[str] = ['127.0.0.1','10.0.0.81']
+    udp_list_sound: list[str] = ['127.0.0.1','10.0.0.81']
+    udp_list_light: list[str] = []
 
     # camera_list: list[str] = ['14442C10F124D9D600']
 
@@ -114,7 +115,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.light_rate =           60
 
     settings.udp_port =             8888
-    settings.udp_ip_addresses =     udp_list
+    settings.udp_ips_sound =        udp_list_sound
+    settings.udp_ips_light =        udp_list_light
 
     settings.render_title =         'White Space'
     settings.render_x =             0

@@ -1,8 +1,12 @@
-from modules.WS.WSOutput import *
+
 import numpy as np
+
+from dataclasses import dataclass
 from enum import Enum
 
 from modules.WS.WSDataManager import WSDataManager
+
+from modules.WS.WSOutput import WSOutput, WS_IMG_TYPE
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -27,6 +31,10 @@ class BlendType(Enum):
 
 @dataclass
 class WSDrawSettings():
+    _resolution: int
+    _num_players: int
+    _interval: float
+
     void_width: float =  0.05           # in normalized world width (0..1)
     void_edge: float = 0.01             # in normalized world width (0..1)
     use_void: bool = True
@@ -38,6 +46,16 @@ class WSDrawSettings():
     line_speed: float = 1.5             # higher is faster
     line_width: float = 0.1             # in normalized world width (0..1)
     line_amount: float = 20.0            # number of lines
+
+    @property
+    def resolution(self) -> int:
+        return self._resolution
+    @property
+    def num_players(self) -> int:
+        return self._num_players
+    @property
+    def interval(self) -> float:
+        return self._interval
 
 
 class WSDraw():

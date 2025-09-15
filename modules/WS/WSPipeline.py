@@ -12,7 +12,7 @@ from modules.WS.WSDrawTest import WSDrawTest, TestPattern
 from modules.WS.WSGui import WSGui
 from modules.WS.WSSettings import WSSettings
 from modules.WS.WSOutput import WSOutput, WSOutputCallback
-from modules.WS.UdpSender import UdpSender
+from modules.WS.WSUdpSender import WSUdpSender, WSUdpSenderSettings
 
 from modules.Settings import Settings
 from modules.pose.PoseDefinitions import Pose
@@ -40,7 +40,7 @@ class WSPipeline(Thread):
 
         self.settings = WSSettings(
             data_settings = WSDataSettings(),
-            draw_settings = WSDrawSettings(),
+            draw_settings = WSDrawSettings(resolution, num_players, self.interval),
         )
 
         self.output: WSOutput = WSOutput(resolution)
@@ -51,7 +51,23 @@ class WSPipeline(Thread):
 
         self.comp_test: WSDrawTest = WSDrawTest(resolution)
 
-        self.udp_sender: UdpSender = UdpSender(resolution, general_settings.udp_port, general_settings.udp_ip_addresses)
+        light_sender_settings: WSUdpSenderSettings = WSUdpSenderSettings(
+            resolution=resolution,
+            port=general_settings.udp_port,
+            ip_addresses=general_settings.udp_ips_light,
+            send_info=False,
+            use_signed=False,
+        )
+        self.light_sender: WSUdpSender = WSUdpSender(light_sender_settings)
+
+        sound_sender_settings: WSUdpSenderSettings = WSUdpSenderSettings(
+            resolution=resolution,
+            port=general_settings.udp_port,
+            ip_addresses=general_settings.udp_ips_sound,
+            send_info=True,
+            use_signed=False,
+        )
+        self.sound_sender: WSUdpSender = WSUdpSender(sound_sender_settings)
 
         self.FPS: FpsCounter = FpsCounter()
         self.gui: WSGui = WSGui(gui, self, self.settings)
@@ -60,11 +76,13 @@ class WSPipeline(Thread):
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     def start(self) -> None:
+        self.light_sender.start()
+        self.sound_sender.start()
         super().start()
-        self.udp_sender.start()
 
     def stop(self) -> None:
-        self.udp_sender.stop()
+        self.light_sender.stop()
+        self.sound_sender.stop()
         self._stop_event.set()
         self.join()
 
@@ -99,7 +117,8 @@ class WSPipeline(Thread):
             self.comp_test.update()
             self.output.light_img = self.comp_test.output_img
 
-        self.udp_sender.send_message(self.output)
+        self.light_sender.send_message(self.output)
+        self.sound_sender.send_message(self.output)
 
         self._output_callback(self.output)
 
