@@ -33,6 +33,9 @@ depth cam pose synchony detection
 * Download from [site](https://ffmpeg.org/download.html#build-windows)
 * And add its 'bin' to path
 
+# Cuda
+* for now use CUDA 11.8 [site](https://developer.nvidia.com/cuda-11-8-0-download-archive)
+
 # Clone Project
 * ```git clone git@github.com:moostrik/DepthPose.git```
 
