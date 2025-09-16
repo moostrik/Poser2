@@ -41,7 +41,7 @@ depth cam pose synchony detection
 * And add its 'bin' to path
 
 # Cuda
-* for now use CUDA 11.8 [site](https://developer.nvidia.com/cuda-11-8-0-download-archive)
+* for now use CUDA 12.9 [site](https://developer.nvidia.com/cuda-12-9-0-download-archive)
 
 # Clone Project
 * ```git clone git@github.com:moostrik/DepthPose.git```

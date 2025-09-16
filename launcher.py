@@ -1,3 +1,12 @@
+# TODO
+# Save videos to temporary folder until finished
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+import os
+os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
+
+
 import psutil
 import os
 
@@ -58,8 +67,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.max_players =          args.players
 
-    settings.gui_location_x =       1920
-    settings.gui_location_y =       -1500
+    settings.gui_location_x =       0
+    settings.gui_location_y =       0
     settings.gui_on_top =           True
     settings.gui_default_file =     'default'
 
@@ -121,8 +130,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_title =         'White Space'
     settings.render_x =             0
     settings.render_y =             0
-    settings.render_width =         1920 * 2
-    settings.render_height =        1080 * 2 - settings.render_y
+    settings.render_width =         1920 #* 2
+    settings.render_height =        1080 #* 2 - settings.render_y
     settings.render_fullscreen =    False
     settings.render_fps =           0
     settings.render_v_sync =        True
