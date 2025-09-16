@@ -121,7 +121,14 @@ class WindowManager():
 
         if self.monitor_id > len(self._ordered_monitor_ids):
             self.monitor_id = len(self._ordered_monitor_ids) - 1
-        self.monitor = glfw.get_monitors()[self._ordered_monitor_ids[self.monitor_id]]
+
+        monitors = glfw.get_monitors()
+
+        if self.monitor_id < 0 or self.monitor_id >= len(monitors):
+            print(f"{self.__class__.__name__} ID: {self.monitor_id} out of range for available monitors: {len(monitors)}, defaulting to primary monitor")
+            self.monitor_id = 0
+
+        self.monitor = monitors[self._ordered_monitor_ids[self.monitor_id]]
 
         mode: glfw._GLFWvidmode = glfw.get_video_mode(self.monitor)
         width: int = mode.size.width
