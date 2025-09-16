@@ -3,8 +3,15 @@ depth cam pose synchony detection
 
 ## INSTALLATION
 
+# Visual Studio
+* Maybe it is necessary to instal visual studio with python and c++ modules
+* investigate on next install
+
 # Git for Windows
 * Download from [site](https://git-scm.com/download/win)
+* Configure Global User Name and Email
+```git config --global user.name "M.Oostrik"```
+```git config --global user.email "m.oostrik@gmail.com"```
 
 # SSH Github
 * create ssh key
