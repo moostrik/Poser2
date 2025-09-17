@@ -1,4 +1,4 @@
-# DepthPose
+# Poser2
 depth cam pose synchony detection
 
 ## INSTALLATION
