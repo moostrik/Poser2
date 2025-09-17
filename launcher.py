@@ -62,11 +62,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.max_players =          args.players
 
-    settings.gui_location_x =       0
-    settings.gui_location_y =       0
-    settings.gui_on_top =           True
-    settings.gui_default_file =     'default'
-
     settings.path_root =            currentPath
     settings.path_file =            path.join(currentPath, 'files')
     settings.path_model =           path.join(currentPath, 'models')
@@ -133,6 +128,11 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_cams_a_row =    2
     settings.render_monitor =       2
     settings.render_R_num =         3
+
+    settings.gui_location_x =       0
+    settings.gui_location_y =       0
+    settings.gui_on_top =           True
+    settings.gui_default_file =     'default'
 
     # settings.art_type =             Settings.ArtType.HDT
     if args.whitespace:
