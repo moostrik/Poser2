@@ -82,14 +82,14 @@ class WSData:
             self.present = True
 
 
-            # angles: JointAngleDict | None  = pose.angles
-            # if angles is not None:
-            #     # print(angles)
-            #     for key in PoseAngleKeypoints.keys():
-            #         angle_value: JointAngle = angles[key]
-            #         angle_name: str = key.name
-            #         if angle_value['confidence'] > 0.3 and angle_value['angle'] is not np.nan:
-            #             setattr(self, angle_name, angle_value['angle'])
+            angles: JointAngleDict | None  = pose.angles
+            if angles is not None:
+                # print(angles)
+                for key in PoseAngleKeypoints.keys():
+                    angle_value: JointAngle = angles[key]
+                    angle_name: str = key.name
+                    if angle_value['confidence'] > 0.3 and angle_value['angle'] is not np.nan:
+                        setattr(self, angle_name, angle_value['angle'])
 
                     # print(f"Setting {angle_name} to {angle_value.angle}")
                     # setattr(self, angle_name, angle_value)
@@ -128,11 +128,11 @@ class WSData:
         if not self.present:
             return
 
-        angles: list[float] = stream.get_last_angles()
-        for i, angle in enumerate(angles):
-            name: str = PoseAngleNames[i]
-            if angle is not np.nan:
-                setattr(self, name, angle)
+        # angles: list[float] = stream.get_last_angles()
+        # for i, angle in enumerate(angles):
+        #     name: str = PoseAngleNames[i]
+        #     if angle is not np.nan:
+        #         setattr(self, name, angle)
 
     def reset(self) -> None:
         """Reset all smoothers"""
