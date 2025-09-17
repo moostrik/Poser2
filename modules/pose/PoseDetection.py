@@ -19,6 +19,9 @@ from mmpose.structures.bbox import bbox_xywh2xyxy
 # Local application imports
 from modules.pose.PoseDefinitions import Pose, PosePoints, ModelType, ModelFileNames
 
+# Ensure numpy functions can be safely used in torch serialization
+torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
+
 class PoseDetection(Thread):
     def __init__(self, path: str, model_type:ModelType, fps: float = 30.0, verbose: bool = False) -> None:
         super().__init__()
@@ -49,7 +52,7 @@ class PoseDetection(Thread):
     def run(self) -> None:
         model:torch.nn.Module = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
         model.half()
-        pipeline: Compose = Compose(model.cfg.test_dataloader.dataset.pipeline)
+        pipeline: Compose = Compose(model.cfg.test_dataloader.dataset.pipeline) # pyright: ignore
 
         self._running = True
 
@@ -144,7 +147,7 @@ class PoseDetection(Thread):
 
             start_time = time.perf_counter()
 
-            scope = model.cfg.get('default_scope', 'mmpose')
+            scope = model.cfg.get('default_scope', 'mmpose') # pyright: ignore
             if scope is not None:
                 init_default_scope(scope)
             # pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
@@ -172,7 +175,7 @@ class PoseDetection(Thread):
                     data_info = dict(img=img)
                     data_info['bbox'] = bbox[None]  # shape (1, 4)
                     data_info['bbox_score'] = np.ones(1, dtype=np.float32)
-                    data_info.update(model.dataset_meta)
+                    data_info.update(model.dataset_meta) # pyright: ignore
                     data_list.append(pipeline(data_info))
 
                 img_lengths.append(len(img_bboxes))
@@ -186,7 +189,7 @@ class PoseDetection(Thread):
 
                 start_time = time.perf_counter()
                 with torch.no_grad():
-                    all_results = model.test_step(batch)
+                    all_results = model.test_step(batch) # pyright: ignore
                     end_time = time.perf_counter()
                     # print(f"Pose Detection: Inference time: {end_time - start_time:.4f} seconds")
 
