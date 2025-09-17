@@ -28,19 +28,14 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     mp.freeze_support()
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument('-fps',     '--fps',            type=float, default=23.0,   help='frames per second')
-    parser.add_argument('-pl',      '--players',        type=int,   default=8,      help='number of players')
-    parser.add_argument('-c',       '--color',          action='store_true',        help='use color input instead of left mono')
-    parser.add_argument('-sq',      '--square',         action='store_true',        help='use centre square of the camera')
-    parser.add_argument('-ss',      '--showstereo',     action='store_true',        help='queue stereo frames')
-    parser.add_argument('-st',      '--stereo',         action='store_true',        help='use stereo depth')
+    parser.add_argument('-pls',     '--players',        type=int,   default=8,      help='number of players')
+    parser.add_argument('-cms',     '--cameras',        type=int,   default=4,      help='number of cameras')
     parser.add_argument('-ny',      '--noyolo',         action='store_true',        help='do not do yolo person detection')
     parser.add_argument('-np',      '--nopose',         action='store_true',        help='do not do pose detection')
-    parser.add_argument('-cl',      '--chunklength',    type=float, default=6.0,    help='duration of video chunks in seconds')
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecored video with camera')
-    parser.add_argument('-pt',      '--passthrough',    action='store_true',        help='use prerecored video without camera')
-    parser.add_argument('-nc',      '--numcameras',     type=int,   default=4,      help='number of cameras')
-    parser.add_argument('-as',      '--autoset',        action='store_true',        help='camera auto settings')
-    parser.add_argument('-ad',      '--debug',          action='store_true',        help='run analysis in debug mode')
+    parser.add_argument('-simpt',   '--passthrough',    action='store_true',        help='use prerecored video without camera')
+    parser.add_argument('-cm',      '--cammanual',      action='store_true',        help='camera manual settings')
+
     parser.add_argument('-hdt',     '--harmonictrio',   action='store_true',        help='run in Harmonic Dissonance mode')
     parser.add_argument('-ws',      '--whitespace',     action='store_true',        help='run in Whitespace mode')
     parser.add_argument('-tm',      '--testminimal',    action='store_true',        help='test with minimum setup only')
@@ -53,8 +48,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
                               '14442C10110AD3D200',
                               '14442C1031DDD2D200']
 
-    if args.numcameras < len(camera_list):
-        camera_list = camera_list[:args.numcameras]
+    if args.cameras < len(camera_list):
+        camera_list = camera_list[:args.cameras]
 
     udp_list_sound: list[str] = ['127.0.0.1','10.0.0.81']
     udp_list_light: list[str] = []
@@ -81,19 +76,19 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.camera_list =          camera_list
     settings.camera_num =           len(camera_list)
     settings.camera_fps =           args.fps
-    settings.camera_square =        args.square
-    settings.camera_color =         args.color
-    settings.camera_stereo =        args.stereo
+    settings.camera_square =        False
+    settings.camera_color =         False
+    settings.camera_stereo =        False
     settings.camera_yolo =      not args.noyolo
-    settings.camera_show_stereo =   args.showstereo
+    settings.camera_show_stereo =   False
     settings.camera_simulation =    args.simulation or args.passthrough
     settings.camera_passthrough =   args.passthrough
-    settings.camera_manual =    not args.autoset
+    settings.camera_manual =        args.cammanual
     settings.camera_flip_h =        False
     settings.camera_flip_v =        False
     settings.camera_perspective =   0.1
 
-    settings.video_chunk_length =   args.chunklength
+    settings.video_chunk_length =   10 # in seconds
     settings.video_encoder =        Settings.CoderType.iGPU
     settings.video_decoder =        Settings.CoderType.iGPU
     settings.video_format =         Settings.CoderFormat.H264
