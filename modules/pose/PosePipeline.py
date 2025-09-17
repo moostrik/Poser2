@@ -38,7 +38,7 @@ class PosePipeline(Thread):
             output_width=self.pose_detector_frame_width,
             output_height=self.pose_detector_frame_height
         )
-        
+
 
         if self.pose_active:
             self.pose_detector = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, settings.pose_verbose)
@@ -118,7 +118,7 @@ class PosePipeline(Thread):
                 self.pose_detector.add_pose(pose)
             else:
                 self._notify_pose_callback(pose)
-                
+
      # INPUTS
     def add_tracklet(self, tracklet: Tracklet) -> None:
         self.tracklet_input_queue.put(tracklet)
@@ -127,16 +127,16 @@ class PosePipeline(Thread):
         if frame_type != FrameType.VIDEO:
             return
         with self.input_mutex:
-            self.input_frames[id] = image    
-            
+            self.input_frames[id] = image
+
     def _get_image(self, id: int) -> Optional[np.ndarray]:
         with self.input_mutex:
             if not self.input_frames.get(id) is None:
                 return self.input_frames[id]
             return None
-        
+
     def notify_update_from_image(self, cam_id: int, frame_type, image) -> None:
-        if cam_id == 0:
+        if cam_id == 0 and self.pose_detector is not None:
             self.pose_detector.notify_update()
 
     # External Output Callbacks

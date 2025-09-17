@@ -139,7 +139,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_monitor =       2
     settings.render_R_num =         3
 
-    #settings.art_type =             Settings.ArtType.HDT
+    # settings.art_type =             Settings.ArtType.HDT
     if args.whitespace:
         settings.art_type = Settings.ArtType.WS
 
@@ -149,6 +149,14 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.camera_num =       settings.max_players
         settings.camera_list =      camera_list[:settings.camera_num]
         settings.tracker_type =     TrackerType.ONEPERCAM
+        settings.render_monitor =   1
+        settings.render_x =         100
+        settings.render_y =         100
+        settings.render_fps =       60
+        settings.pose_model_type =  ModelType.NONE if args.nopose else ModelType.LARGE
+        settings.pose_verbose =     True
+
+        settings.camera_color =     True
 
     if args.testminimal:
         settings.render_title =     'Minimal Test'
