@@ -19,17 +19,17 @@ from mmpose.structures.bbox import bbox_xywh2xyxy
 # Local application imports
 from modules.pose.PoseDefinitions import Pose, PosePoints, ModelType, ModelFileNames
 
-class PoseDetection(Thread):    
+class PoseDetection(Thread):
     def __init__(self, path: str, model_type:ModelType, fps: float = 30.0, verbose: bool = False) -> None:
         super().__init__()
-        
+
         if model_type is ModelType.NONE:
             print('Pose Detection WARNING: ModelType is NONE')
         self.model_config_file: str = path + '/' + ModelFileNames[model_type.value][0]
         self.model_checkpoint_file: str = path + '/' + ModelFileNames[model_type.value][1]
         self.model_width: int = 192
         self.model_height: int = 256
-        
+
         self.interval: float = 1.0 / fps
 
         self.verbose: bool = verbose
@@ -39,7 +39,7 @@ class PoseDetection(Thread):
         self._poses_timestamp: dict[int, Timestamp] = {}
         self._poses_lock: Lock = Lock()  # Add lock for thread safety
         self._callbacks: set = set()
-        
+
         self._notify_update_event: Event = Event()
 
     def stop(self) -> None:
@@ -48,11 +48,11 @@ class PoseDetection(Thread):
 
     def run(self) -> None:
         model:torch.nn.Module = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
-        model.half()        
+        model.half()
         pipeline: Compose = Compose(model.cfg.test_dataloader.dataset.pipeline)
 
         self._running = True
-        
+
         next_time: float = time.time()
         while self._running:
             self._notify_update_event.wait(timeout=1.0)
@@ -71,11 +71,11 @@ class PoseDetection(Thread):
                         else:
                             empty_poses.append(pose)
                     self._poses_dict = {}
-                
+
                 for pose in empty_poses:
                     self.callback(pose)
-                     
-                images = [pose.image for pose in current_poses]
+
+                images = [pose.image for pose in current_poses if pose.image is not None]
 
                 if images:
                     data_samples = PoseDetection.run_interference(model,pipeline,images, False)
@@ -100,7 +100,7 @@ class PoseDetection(Thread):
                     import traceback
                     traceback.print_exc()
                 continue
-            
+
             if self.verbose:
                 detection_time = time.perf_counter() - start_time
                 if detection_time > self.interval:
@@ -121,10 +121,10 @@ class PoseDetection(Thread):
 
                 self._poses_dict[pose.id] = pose
                 self._poses_timestamp[pose.id] = Timestamp.now()
-                
+
     def notify_update(self) -> None:
         if self._running:
-            self._notify_update_event.set()       
+            self._notify_update_event.set()
 
     # CALLBACKS
     def callback(self, pose: Pose) -> None:
@@ -140,10 +140,10 @@ class PoseDetection(Thread):
     # STATIC METHODS
     @staticmethod
     def run_interference(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray], verbose: bool= False) -> list[list[PoseDataSample]]:
-        with torch.cuda.amp.autocast():
-            
+        with torch.cuda.amp.autocast(): # pyright: ignore
+
             start_time = time.perf_counter()
-            
+
             scope = model.cfg.get('default_scope', 'mmpose')
             if scope is not None:
                 init_default_scope(scope)
@@ -195,13 +195,13 @@ class PoseDetection(Thread):
                 for length in img_lengths:
                     results_by_image.append(all_results[start_idx:start_idx + length])
                     start_idx += length
-                    
-            
+
+
             if verbose:
                 print(f"Pose Detection Processing Time: {time.perf_counter() - start_time  :.3f} seconds")
 
             return results_by_image
-    
+
     @staticmethod
     def process_pose_data_samples(data_samples: list, model_width: int, model_height: int) -> list[list[PosePoints]]:
         poses: list[list[PosePoints]] = []
@@ -227,7 +227,7 @@ class PoseDetection(Thread):
             poses.append(image_poses)
 
         return poses
-    
+
     @staticmethod
     def resize_with_pad(image, target_width, target_height, padding_color=(0, 0, 0)) -> np.ndarray:
         # Get the original dimensions
