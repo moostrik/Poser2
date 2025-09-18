@@ -5,6 +5,7 @@ import signal
 import time
 import threading
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, replace
 from enum import Enum
 from itertools import combinations
@@ -163,7 +164,7 @@ class DTWCorrelator():
     def stop(self) -> None:
         self._stop_event.set()
         self._correlation_thread.join()
-        self._process_pool.shutdown(wait=False)
+        self._process_pool.shutdown(wait=True, cancel_futures=True)
         with self._callback_lock:
             self._callbacks.clear()
 
@@ -172,32 +173,46 @@ class DTWCorrelator():
             loop_start: float = time.perf_counter()
 
             with self._input_lock:
-                pose_streams: PoseStreamDataDict= self._input_pose_streams.copy()
+                pose_streams: PoseStreamDataDict = self._input_pose_streams.copy()
 
             pose_streams = self._filter_streams_by_time(pose_streams, self.stream_timeout)
             angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_streams, self.buffer_capacity)
 
             if angle_pairs:
                 future_to_pair: dict[Future, AnglePair] = {}
-                for pair in angle_pairs:
-                    future: Future[PairCorrelation | None] = self._process_pool.submit(
-                        self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band, self.similarity_exponent
-                    )
-                    future_to_pair[future] = pair
+                try:
+                    for pair in angle_pairs:
+                        try:
+                            future: Future[PairCorrelation | None] = self._process_pool.submit(
+                                self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band, self.similarity_exponent
+                            )
+                            future_to_pair[future] = pair
+                        except BrokenProcessPool as bpe:
+                            print(f"Failed to submit analysis for pair {pair.id_1}-{pair.id_2}: {bpe}")
+                            self._stop_event.set()
+                            break
+                except BrokenProcessPool as bpe:
+                    print(f"Process pool broken during submission: {bpe}")
+                    self._stop_event.set()
+                    break
 
                 correlations: list[PairCorrelation] = []
-                for future in as_completed(future_to_pair):
-                    pair: AnglePair = future_to_pair[future]
-                    try:
-                        correlation: Optional[PairCorrelation] = future.result()
-                        if correlation:
-                            correlations.append(correlation)
-                    except Exception as e:
-                        print(f"Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
+                try:
+                    for future in as_completed(future_to_pair):
+                        pair: AnglePair = future_to_pair[future]
+                        try:
+                            correlation: Optional[PairCorrelation] = future.result()
+                            if correlation:
+                                correlations.append(correlation)
+                        except Exception as e:
+                            print(f"Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
+                except BrokenProcessPool as bpe:
+                    print(f"Process pool broken during result collection: {bpe}")
+                    self._stop_event.set()
+                    break
 
                 batch = PairCorrelationBatch(pair_correlations=correlations)
                 self._notify_callbacks(batch)
-
 
             elapsed: float = time.perf_counter() - loop_start
             sleep_time: float = self.interval - elapsed

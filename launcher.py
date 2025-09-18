@@ -1,5 +1,6 @@
 # TODO
 # Save videos to temporary folder until finished
+
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -118,8 +119,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.udp_ips_light =        udp_list_light
 
     settings.render_title =         'White Space'
-    settings.render_x =             0
-    settings.render_y =             0
+    settings.render_x =             100
+    settings.render_y =             100
     settings.render_width =         1920 #* 2
     settings.render_height =        1080 #* 2 - settings.render_y
     settings.render_fullscreen =    False
@@ -144,7 +145,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.camera_num =       settings.max_players
         settings.camera_list =      camera_list[:settings.camera_num]
         settings.tracker_type =     TrackerType.ONEPERCAM
-        settings.render_monitor =   1
+        settings.render_monitor =   2
         settings.render_x =         100
         settings.render_y =         100
         settings.render_fps =       60
@@ -159,6 +160,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.camera_num =       settings.max_players
         settings.camera_list =      camera_list[:settings.camera_num]
         settings.tracker_type =     TrackerType.ONEPERCAM
+        settings.pose_verbose =     True
 
     settings.check_values()
     # settings.check_cameras()
@@ -166,18 +168,24 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     app = Main(settings)
     app.start()
 
+    import threading
+    # ...existing code...
+
+    shutdown_event = threading.Event()
+
+
     def signal_handler_exit(sig, frame) -> None:
         print("Received interrupt signal, shutting down...")
+        shutdown_event.set()
         if app.is_running:
             app.stop()
 
     signal(SIGINT, signal_handler_exit)
 
-    while not app.is_finished:
-        sleep(0.1)
-        continue
+    while not app.is_finished and not shutdown_event.is_set():
+        shutdown_event.wait(0.01)
 
 
     # Hard Exit for a problem that arises from GLFW not closing properly
-    # from os import _exit
-    # _exit(1)
+    from os import _exit
+    _exit(1)

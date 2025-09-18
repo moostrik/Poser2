@@ -33,6 +33,7 @@ class WindowManager():
         self.prev_window_width: int = width
         self.prev_window_height: int = height
         self.fullscreen: bool = fullscreen
+        self.windowed_fullscreen: bool = False
         self.v_sync: bool = v_sync
         self.frame_interval: None | int = None
         if fps and fps > 0:
@@ -350,6 +351,9 @@ class WindowManager():
             elif key == glfw.KEY_F:
                 self.set_main_fullscreen(not self.fullscreen)
                 return
+            elif key == glfw.KEY_W:
+                self.set_main_windowed_fullscreen(not self.windowed_fullscreen)
+                return
 
             # Convert GLFW key to byte for compatibility with existing callbacks
             key_byte = None
@@ -424,12 +428,14 @@ class WindowManager():
         self.fullscreen = value
 
         if self.fullscreen:
+            self.set_main_windowed_fullscreen(False)
             # Store current window size and position
             self.prev_window_width, self.prev_window_height = glfw.get_window_size(self.main_window)
             self.window_x, self.window_y = glfw.get_window_pos(self.main_window)
 
-            # Get monitor and video mode
-            monitor = glfw.get_primary_monitor()
+            monitors = glfw.get_monitors()
+            monitor_index = self._ordered_monitor_ids[self.monitor_id] if self.monitor_id < len(self._ordered_monitor_ids) else 0
+            monitor = monitors[monitor_index]
             mode = glfw.get_video_mode(monitor)
 
             # Set fullscreen
@@ -445,6 +451,40 @@ class WindowManager():
                 self.prev_window_width, self.prev_window_height, 0
             )
             glfw.set_input_mode(self.main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+
+    def set_main_windowed_fullscreen(self, value: bool) -> None:
+        if not self.main_window: return
+        if self.windowed_fullscreen is value: return
+
+        self.windowed_fullscreen = value
+
+        if self.windowed_fullscreen:
+            self.set_main_fullscreen(False)
+
+            # Store current window size and position
+            self.prev_window_width, self.prev_window_height = glfw.get_window_size(self.main_window)
+            self.window_x, self.window_y = glfw.get_window_pos(self.main_window)
+
+            # Get monitor and video mode
+            monitor = glfw.get_primary_monitor()
+            mode = glfw.get_video_mode(monitor)
+
+            # Set fullscreen
+            glfw.set_window_attrib(self.main_window, glfw.DECORATED, glfw.FALSE)
+            glfw.set_window_monitor(
+                self.main_window, None, self.window_x, self.window_y,
+                mode.size.width, mode.size.height, 0
+            )
+            # glfw.set_input_mode(self.main_window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+        else:
+            # Restore windowed mode
+            print("Restoring windowed mode")
+            glfw.set_window_attrib(self.main_window, glfw.DECORATED, glfw.TRUE)
+            glfw.set_window_monitor(
+                self.main_window, None, self.window_x, self.window_y,
+                self.prev_window_width, self.prev_window_height, 0
+            )
+            # glfw.set_input_mode(self.main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
 
     def set_secondary_fullscreen(self, value: bool) -> None:
         """Set all secondary windows to fullscreen or windowed mode"""
