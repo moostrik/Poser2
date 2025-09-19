@@ -58,7 +58,7 @@ class RenderWhiteSpace(RenderBase):
             SubdivisionRow(name=TrackerRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name=WSLinesRender.key(),    columns=1,                  rows=1, src_aspect_ratio=40.0,  padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name=WSLightRender.key(),    columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name=PoseRender.key(),       columns=self.max_players,   rows=1, src_aspect_ratio=0.766,   padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=PoseRender.key(),       columns=self.max_players,   rows=1, src_aspect_ratio=0.75,   padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=RStreamRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
@@ -152,11 +152,11 @@ class RenderWhiteSpace(RenderBase):
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
         line_height: int = 256
-        helper_width: int = int(196 * 2.5)
+        helper_width: int = int(192 * 2.5)
         helper_height: int = int(256 * 2.5)
         self.ws_lines_render.draw(Rect(0, 0, width * 4, line_height))
         self.ws_light_render.draw(Rect(0, line_height, width * 4, height - line_height))
-        self.camera_renders[0].draw(Rect(0, height-helper_height, helper_width, helper_height))
+        self.pose_renders[0].draw(Rect(0, height-helper_height, helper_width, helper_height))
 
 
     def on_main_window_resize(self, width: int, height: int) -> None:

@@ -2,14 +2,19 @@ import cv2
 import numpy as np
 from modules.tracker.Tracklet import Tracklet, Rect
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 class PoseImageProcessor:
     """Handles image cropping and processing for pose detection"""
 
     def __init__(self, crop_expansion: float = 0.0, output_width: int = 192, output_height: int = 256):
-        self.crop_expansion = crop_expansion
-        self.output_width = output_width
-        self.output_height = output_height
+        self.crop_expansion: float = crop_expansion
+        self.output_width: int = output_width
+        self.output_height: int = output_height
+        self.aspect_ratio: float = output_width / output_height
+
+        hot_reloader = HotReloadMethods(self.__class__)
 
     def process_pose_image(self, tracklet: Tracklet, image: np.ndarray) -> tuple[np.ndarray, Rect]:
         """
@@ -17,30 +22,35 @@ class PoseImageProcessor:
         Returns tuple of (cropped_image, crop_rect).
         """
         h, w = image.shape[:2]
-        roi = self.get_crop_rect(w, h, tracklet.roi, self.crop_expansion)
-        cropped_image = self.get_cropped_image(image, roi, self.output_width, self.output_height)
+        roi: Rect = self.get_crop_rect(w, h, tracklet.roi, self.aspect_ratio, self.crop_expansion)
+        cropped_image: np.ndarray = self.get_cropped_image(image, roi, self.output_width, self.output_height)
         return cropped_image, roi
 
     @staticmethod
-    def get_crop_rect(image_width: int, image_height: int, roi: Rect, expansion: float = 0.0) -> Rect:
+    def get_crop_rect(image_width: int, image_height: int, roi: Rect, aspect_ratio: float, expansion: float = 0.0) -> Rect:
         """Calculate the crop rectangle for pose detection"""
+
         # Calculate the original ROI coordinates
         img_x = int(roi.x * image_width)
         img_y = int(roi.y * image_height)
         img_w = int(roi.width * image_width)
         img_h = int(roi.height * image_height)
 
-        # Determine the size of the square cutout based on the longest side of the ROI
-        img_wh: int = max(img_w, img_h)
-        img_wh += int(img_wh * expansion)
+        # Calculate dimensions that maintain aspect_ratio while covering the entire ROI
+        roi_aspect: float = img_w / img_h
+
+        if roi_aspect > aspect_ratio:
+            crop_w: int = int(img_w * (1 + expansion))
+            crop_h: int = int(crop_w // aspect_ratio)
+        else:
+            crop_h: int = int(img_h * (1 + expansion))
+            crop_w: int = int(crop_h * aspect_ratio)
 
         # Calculate the new coordinates to center the square cutout around the original ROI
         crop_center_x: int = img_x + img_w // 2
         crop_center_y: int = img_y + img_h // 2
-        crop_x: int = crop_center_x - img_wh // 2
-        crop_y: int = crop_center_y - img_wh // 2
-        crop_w: int = img_wh
-        crop_h: int = img_wh
+        crop_x: int = crop_center_x - crop_w // 2
+        crop_y: int = crop_center_y - crop_h // 2
 
         # convert back to normalized coordinates
         norm_x: float = crop_x / image_width
@@ -54,7 +64,7 @@ class PoseImageProcessor:
     def get_cropped_image(image: np.ndarray, roi: Rect, output_width: int, output_height: int) -> np.ndarray:
         """Extract and resize the cropped image from the ROI"""
         image_height, image_width = image.shape[:2]
-        image_channels = image.shape[2] if len(image.shape) > 2 else 1
+        image_channels: int = image.shape[2] if len(image.shape) > 2 else 1
 
         # Calculate the original ROI coordinates
         x: int = int(roi.x * image_width)
