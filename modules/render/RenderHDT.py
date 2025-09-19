@@ -66,13 +66,14 @@ class RenderHDT(RenderBase):
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
         # window manager
-        secondary_monitor_ids: list[int] = [i for i in range(1, self.num_cams + 1)]
+        self.secondary_order_list: list[int] = settings.render_secondary_list
         self.window_manager: WindowManager = WindowManager(
             self, self.subdivision.width, self.subdivision.height,
             settings.render_title, settings.render_fullscreen,
             settings.render_v_sync, settings.render_fps,
             settings.render_x, settings.render_y,
-            settings.render_monitor, secondary_monitor_ids
+            # settings.render_monitor, sorted(settings.render_secondary_list)
+            settings.render_monitor, settings.render_secondary_list
         )
 
         # hot reloader
@@ -159,7 +160,11 @@ class RenderHDT(RenderBase):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
-        self.sync_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
+        self.secondary_order_list = [2,1,3]
+        id: int = self.secondary_order_list[monitor_id-1]
+        # print(f"Drawing secondary monitor {monitor_id} with camera {id}")
+
+        self.sync_renders[id -1].draw(Rect(0, 0, width, height))
         # self.centre_cam_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
         # self.movement_cam_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
 

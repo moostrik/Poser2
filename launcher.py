@@ -139,7 +139,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_cams_a_row =    2
     settings.render_monitor =       1
     settings.render_R_num =         3
-    settings.render_extra =         2
+    settings.render_secondary_list =         [2]
 
     settings.gui_location_x =       2400
     settings.gui_location_y =       -900
@@ -152,17 +152,16 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.camera_num =       settings.num_players
         settings.camera_list =      camera_list[:settings.camera_num]
         settings.tracker_type =     TrackerType.ONEPERCAM
-        settings.render_monitor =   0
-        settings.render_extra =     2
-        settings.render_x =         100
-        settings.render_y =         100
+        settings.render_monitor =   1
+        settings.render_secondary_list =     [2,1,3]
+        settings.render_x =         0
+        settings.render_y =         0
         settings.render_fps =       60
-        settings.render_fullscreen =True
-        settings.gui_location_x =   100
-        settings.gui_location_y =   -1500
-        settings.gui_on_top =           True
+        settings.gui_location_x =   2400
+        settings.gui_location_y =   -900
+        settings.gui_on_top =       True
 
-        settings.pose_model_type =  ModelType.NONE if args.nopose else ModelType.LARGE
+        settings.pose_model_type =  ModelType.NONE if args.nopose else ModelType.SMALL
         settings.pose_verbose =     True
 
         settings.camera_color =     True

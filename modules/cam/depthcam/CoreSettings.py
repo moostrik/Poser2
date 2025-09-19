@@ -253,18 +253,21 @@ class CoreSettings():
     # IR SETTINGS
     def apply_ir_settings(self) -> None:
         if not self.core.running: return
-        self.set_ir_flood_light(self.ir_flood_light)
-        self.set_ir_grid_light(self.ir_grid_light)
+        if not self.core.do_color:
+            self.set_ir_flood_light(self.ir_flood_light)
+            self.set_ir_grid_light(self.ir_grid_light)
 
     def set_ir_flood_light(self, value: float) -> None:
         self.ir_flood_light: float = self.clamp(value, (0.0, 1.0))
         if not self.core.running: return
-        self.core.device.setIrFloodLightIntensity(self.ir_flood_light)
+        if not self.core.do_color:
+            self.core.device.setIrFloodLightIntensity(self.ir_flood_light)
 
     def set_ir_grid_light(self, value: float) -> None:
         self.ir_grid_light: float = self.clamp(value, (0.0, 1.0))
         if not self.core.running: return
-        self.core.device.setIrLaserDotProjectorIntensity(self.ir_grid_light)
+        if not self.core.do_color:
+            self.core.device.setIrLaserDotProjectorIntensity(self.ir_grid_light)
 
     # FPS
     def get_fps(self, frame_type: FrameType) -> float:

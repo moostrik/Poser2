@@ -26,10 +26,10 @@ class Main():
 
         self.settings: Settings = settings
 
-        self.WS = None
+        self.WS: Optional[WSPipeline] = None
         self.render = RenderWhiteSpace(settings)
         if settings.art_type == Settings.ArtType.WS:
-            self.WS: WSPipeline | None = WSPipeline(self.gui, settings)
+            self.WS = WSPipeline(self.gui, settings)
         if settings.art_type == Settings.ArtType.HDT:
             self.render = RenderHDT(settings)
 
@@ -53,8 +53,12 @@ class Main():
 
         self.pose_detection = PosePipeline(settings)
         self.pose_streamer = PoseStreamManager(settings)
-        self.dtw_correlator = DTWCorrelator(settings)
-        self.correlation_streamer = PairCorrelationStreamManager(settings)
+
+        self.dtw_correlator: Optional[DTWCorrelator] = None
+        self.correlation_streamer: Optional[PairCorrelationStreamManager] = None
+        if settings.art_type == Settings.ArtType.HDT:
+            self.dtw_correlator = DTWCorrelator(settings)
+            self.correlation_streamer = PairCorrelationStreamManager(settings)
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -71,14 +75,6 @@ class Main():
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.render.data.set_depth_tracklets)
             camera.start()
-
-        self.correlation_streamer.add_stream_callback(self.render.data.set_correlation_stream)
-        self.correlation_streamer.start()
-
-        self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_correlation)
-        self.dtw_correlator.start()
-
-        self.pose_streamer.add_stream_callback(self.dtw_correlator.set_pose_stream)
         self.pose_streamer.add_stream_callback(self.render.data.set_pose_stream)
         self.pose_streamer.start()
 
@@ -89,6 +85,15 @@ class Main():
         self.tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
         self.tracker.add_tracklet_callback(self.render.data.set_tracklet)
         self.tracker.start()
+
+        if self.correlation_streamer and self.dtw_correlator:
+            self.correlation_streamer.add_stream_callback(self.render.data.set_correlation_stream)
+            self.correlation_streamer.start()
+
+            self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_correlation)
+            self.dtw_correlator.start()
+
+            self.pose_streamer.add_stream_callback(self.dtw_correlator.set_pose_stream)
 
         if self.WS:
             self.pose_detection.add_pose_callback(self.WS.add_pose)

@@ -64,14 +64,12 @@ class RenderWhiteSpace(RenderBase):
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
         # window manager
-        secondary_monitor_ids: list[int] = [settings.render_extra] if settings.render_extra > 0 else []
-
         self.window_manager: WindowManager = WindowManager(
             self, self.subdivision.width, self.subdivision.height,
             settings.render_title, settings.render_fullscreen,
             settings.render_v_sync, settings.render_fps,
             settings.render_x, settings.render_y,
-            settings.render_monitor, secondary_monitor_ids
+            settings.render_monitor, settings.render_secondary_list
         )
 
         # hot reloader
