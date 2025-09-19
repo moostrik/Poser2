@@ -147,11 +147,14 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.gui_default_file =     'default'
 
     if settings.art_type == Settings.ArtType.HDT:
-        settings.camera_fps =       25
+        settings.camera_fps =       24
         settings.render_title =     'Harmonic Dissonance'
         settings.num_players =      3
         settings.camera_num =       settings.num_players
         settings.camera_list =      camera_list[:settings.camera_num]
+        settings.camera_flip_h =        True
+        settings.camera_flip_v =        False
+        settings.camera_perspective =   0.28
         settings.tracker_type =     TrackerType.ONEPERCAM
         settings.render_monitor =   1
         settings.render_secondary_list =     [2,1,3]

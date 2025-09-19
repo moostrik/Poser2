@@ -82,9 +82,9 @@ def setup_pipeline(
                     SetupColorStereo(pipeline, fps, show_stereo = True)
             else:
                 if do_yolo:
-                    SetupColorYolo(pipeline, fps, square, nn_path)
+                    SetupColorYolo(pipeline, fps, square, perspective, nn_path)
                 else:
-                    SetupColor(pipeline, fps, square)
+                    SetupColor(pipeline, fps, square, perspective)
         else:
             if do_stereo:
                 if do_yolo:
@@ -93,7 +93,7 @@ def setup_pipeline(
                     SetupMonoStereo(pipeline, fps, show_stereo = True)
             else:
                 if do_yolo:
-                    SetupMonoYolo(pipeline, fps, square, nn_path, perspective)
+                    SetupMonoYolo(pipeline, fps, square, perspective, nn_path)
                 else:
                     SetupMono(pipeline, fps, square, perspective)
     else:
@@ -127,31 +127,33 @@ class Setup():
         self.fps: float = fps
 
 class SetupColor(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig = PerspectiveConfig(True, False, 0.280)) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig) -> None:
         super().__init__(pipeline, fps)
 
-        width, height = 1920, 1072 # for warping must be devisible by 16
+        self.width, self.height = 1920, 1072 # for warping must be devisible by 16
+        self.data_size = self.width * self.height * 3
 
         self.resolution: dai.ColorCameraProperties.SensorResolution = dai.ColorCameraProperties.SensorResolution.THE_1080_P
         self.color: dai.node.ColorCamera = pipeline.create(dai.node.ColorCamera)
         self.color.setResolution(self.resolution)
         self.color.setFps(self.fps)
         self.color.setInterleaved(False)
-        self.color.setPreviewSize(width, height)
+        self.color.setPreviewSize(self.width, self.height)
 
         self.color_warp: dai.node.Warp = pipeline.create(dai.node.Warp)
-        warp_p: float = width * 0.5 * perspective.perspective
+        warp_p: float = self.width * 0.5 * perspective.perspective
         mesh_w, mesh_h = 2, 64
 
         if square:
-            warp_p: float = height * 0.5 * perspective.perspective
-            warp_mesh: list[dai.Point2f] = find_perspective_warp_square(width, height, height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
-            width = height # make square
+            warp_p: float = self.height * 0.5 * perspective.perspective
+            warp_mesh: list[dai.Point2f] = find_perspective_warp_square(self.width, self.height, self.height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
+            self.width = self.height # make square
+            self.data_size = self.width * self.height * 3
         else:
-            warp_mesh: list[dai.Point2f] = find_perspective_warp(width, height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
+            warp_mesh: list[dai.Point2f] = find_perspective_warp(self.width, self.height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
 
-        self.color_warp.setMaxOutputFrameSize(height * height * 3)
-        self.color_warp.setOutputSize(height, height)
+        self.color_warp.setMaxOutputFrameSize(self.data_size)
+        self.color_warp.setOutputSize(self.width, self.height)
 
         self.color_warp.setWarpMesh(warp_mesh, mesh_w, mesh_h)
         self.color.preview.link(self.color_warp.inputImage)
@@ -165,18 +167,18 @@ class SetupColor(Setup):
         self.color_control.out.link(self.color.inputControl)
 
 class SetupColorYolo(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, square)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, square, perspective)
 
-        self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
+        self.detection_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
+        self.detection_manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
         if square:
-            self.manip.initialConfig.setResize(416, 416)
-            self.manip.initialConfig.setKeepAspectRatio(True)
+            self.detection_manip.initialConfig.setResize(416, 416)
+            self.detection_manip.initialConfig.setKeepAspectRatio(True)
         else:
-            self.manip.initialConfig.setResize(640,352)
-            self.manip.initialConfig.setKeepAspectRatio(False)
-        self.color_warp.out.link(self.manip.inputImage)
+            self.detection_manip.initialConfig.setResize(640,352)
+            self.detection_manip.initialConfig.setKeepAspectRatio(False)
+        self.color_warp.out.link(self.detection_manip.inputImage)
 
         self.detection_network: dai.node.YoloDetectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork)
         self.detection_network.setBlobPath(nn_path)
@@ -186,7 +188,7 @@ class SetupColorYolo(SetupColor):
         self.detection_network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
         self.detection_network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
         self.detection_network.input.setBlocking(False)
-        self.manip.out.link(self.detection_network.input)
+        self.detection_manip.out.link(self.detection_network.input)
 
         self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
         self.object_tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
@@ -200,80 +202,6 @@ class SetupColorYolo(SetupColor):
         self.outputTracklets: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
         self.outputTracklets.setStreamName("tracklets")
         self.object_tracker.out.link(self.outputTracklets.input)
-
-class SetupMono(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig = PerspectiveConfig(False, False, 0.0)) -> None:
-        super().__init__(pipeline, fps)
-
-        width, height = 1280, 720 # for warping must be devisible by 16
-
-        self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
-        self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
-        self.left.setCamera("left")
-        self.left.setResolution(self.resolution)
-        self.left.setFps(self.fps)
-
-        self.left_warp: dai.node.Warp = pipeline.create(dai.node.Warp)
-        warp_p: float = 1280 * 0.5 * perspective.perspective
-        mesh_w, mesh_h = 2, 64
-
-        if square:
-            warp_p: float = height * 0.5 * perspective.perspective
-            warp_mesh: list[dai.Point2f] = find_perspective_warp_square(1280, 720, height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
-            width = height # make square
-        else:
-            warp_mesh: list[dai.Point2f] = find_perspective_warp(1280, 720, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
-
-        self.left_warp.setMaxOutputFrameSize(height * height * 3)
-        self.left_warp.setOutputSize(height, height)
-
-        self.left_warp.setWarpMesh(warp_mesh, mesh_w, mesh_h)
-        self.left.out.link(self.left_warp.inputImage)
-
-        self.output_video: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
-        self.output_video.setStreamName("video")
-        self.left_warp.out.link(self.output_video.input)
-
-        self.mono_control: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
-        self.mono_control.setStreamName('mono_control')
-        self.mono_control.out.link(self.left.inputControl)
-
-class SetupMonoYolo(SetupMono):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path, perspective: PerspectiveConfig = PerspectiveConfig(False, False, 0.0)) -> None:
-        super().__init__(pipeline, fps, square, perspective)
-
-        self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-        self.manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
-        if square:
-            self.manip.initialConfig.setResize(416, 416)
-            self.manip.initialConfig.setKeepAspectRatio(True)
-        else:
-            self.manip.initialConfig.setResize(640,352)
-            self.manip.initialConfig.setKeepAspectRatio(False)
-        self.left_warp.out.link(self.manip.inputImage)
-
-        self.detection_network: dai.node.YoloDetectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork)
-        self.detection_network.setBlobPath(nn_path)
-        self.detection_network.setNumInferenceThreads(2)
-        self.detection_network.setNumClasses(80)
-        self.detection_network.setCoordinateSize(4)
-        self.detection_network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
-        self.detection_network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
-        self.detection_network.input.setBlocking(False)
-        self.manip.out.link(self.detection_network.input)
-
-        self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
-        self.object_tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
-        self.object_tracker.setTrackerType(TRACKER_TYPE)
-        self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
-
-        self.manip.out.link(self.object_tracker.inputTrackerFrame)
-        self.detection_network.passthrough.link(self.object_tracker.inputDetectionFrame)
-        self.detection_network.out.link(self.object_tracker.inputDetections)
-
-        self.output_tracklets: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
-        self.output_tracklets.setStreamName("tracklets")
-        self.object_tracker.out.link(self.output_tracklets.input)
 
 
 class SetupColorStereo(SetupColor):
@@ -376,9 +304,86 @@ class SetupColorStereoYolo(SetupColorStereo):
         self.object_tracker.out.link(self.output_tracklets.input)
 
 
+class SetupMono(Setup):
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig) -> None:
+        super().__init__(pipeline, fps)
+
+        self.width, self.height = 1280, 720 # for warping must be devisible by 16
+        self.data_size = self.width * self.height
+
+        self.resolution: dai.MonoCameraProperties.SensorResolution = dai.MonoCameraProperties.SensorResolution.THE_720_P
+        self.left: dai.node.MonoCamera = pipeline.create(dai.node.MonoCamera)
+        self.left.setCamera("left")
+        self.left.setResolution(self.resolution)
+        self.left.setFps(self.fps)
+
+        self.left_warp: dai.node.Warp = pipeline.create(dai.node.Warp)
+        warp_p: float = 1280 * 0.5 * perspective.perspective
+        mesh_w, mesh_h = 2, 64
+
+        if square:
+            warp_p: float = self.height * 0.5 * perspective.perspective
+            warp_mesh: list[dai.Point2f] = find_perspective_warp_square(self.width, self.height, self.height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
+            self.width = self.height # make square
+        else:
+            warp_mesh: list[dai.Point2f] = find_perspective_warp(self.width, self.height, warp_p, perspective.flip_h, perspective.flip_v, mesh_w, mesh_h)
+
+        self.left_warp.setMaxOutputFrameSize(self.data_size)
+        self.left_warp.setOutputSize(self.width, self.height)
+
+        self.left_warp.setWarpMesh(warp_mesh, mesh_w, mesh_h)
+        self.left.out.link(self.left_warp.inputImage)
+
+        self.output_video: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.output_video.setStreamName("video")
+        self.left_warp.out.link(self.output_video.input)
+
+        self.mono_control: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
+        self.mono_control.setStreamName('mono_control')
+        self.mono_control.out.link(self.left.inputControl)
+
+class SetupMonoYolo(SetupMono):
+    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, square, perspective)
+
+        self.detection_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
+        self.detection_manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
+        if square:
+            self.detection_manip.initialConfig.setResize(416, 416)
+            self.detection_manip.initialConfig.setKeepAspectRatio(True)
+        else:
+            self.detection_manip.initialConfig.setResize(640,352)
+            self.detection_manip.initialConfig.setKeepAspectRatio(False)
+        self.left_warp.out.link(self.detection_manip.inputImage)
+
+        self.detection_network: dai.node.YoloDetectionNetwork = pipeline.create(dai.node.YoloDetectionNetwork)
+        self.detection_network.setBlobPath(nn_path)
+        self.detection_network.setNumInferenceThreads(2)
+        self.detection_network.setNumClasses(80)
+        self.detection_network.setCoordinateSize(4)
+        self.detection_network.setConfidenceThreshold(YOLO_CONFIDENCE_THRESHOLD)
+        self.detection_network.setIouThreshold(YOLO_OVERLAP_THRESHOLD)
+        self.detection_network.input.setBlocking(False)
+        self.detection_manip.out.link(self.detection_network.input)
+
+        self.object_tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
+        self.object_tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
+        self.object_tracker.setTrackerType(TRACKER_TYPE)
+        self.object_tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
+
+        self.detection_manip.out.link(self.object_tracker.inputTrackerFrame)
+        self.detection_network.passthrough.link(self.object_tracker.inputDetectionFrame)
+        self.detection_network.out.link(self.object_tracker.inputDetections)
+
+        self.output_tracklets: dai.node.XLinkOut = pipeline.create(dai.node.XLinkOut)
+        self.output_tracklets.setStreamName("tracklets")
+        self.object_tracker.out.link(self.output_tracklets.input)
+
 
 class SetupMonoStereo(SetupMono):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool) -> None:
+        print("Pipeline: WARNING Mono Stereo not implemented")
+        return
         super().__init__(pipeline, fps, square = False)
         self.show_stereo: bool = show_stereo
         pipeline.remove(self.output_video)
@@ -421,6 +426,8 @@ class SetupMonoStereo(SetupMono):
 
 class SetupMonoStereoYolo(SetupMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool, nn_path: Path) -> None:
+        print("Pipeline: WARNING Mono Stereo not implemented")
+        return
         super().__init__(pipeline, fps, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
@@ -460,26 +467,28 @@ class SetupMonoStereoYolo(SetupMonoStereo):
 
 class SimulationColor(SetupColor):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
-        super().__init__(pipeline, fps, square)
+        super().__init__(pipeline, fps, square, PerspectiveConfig(False, False, 0.0))
 
         pipeline.remove(self.color)
+        pipeline.remove(self.color_warp)
 
         self.ex_video: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_video.setStreamName("ex_video")
-        self.ex_video.setMaxDataSize(1280*720*3)
+        self.ex_video.setMaxDataSize(self.data_size)
 
         self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorYolo(SetupColorYolo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, square, nn_path)
+        super().__init__(pipeline, fps, square, PerspectiveConfig(False, False, 0.0), nn_path)
 
         pipeline.remove(self.color)
+        pipeline.remove(self.color_warp)
 
         self.ex_video: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_video.setStreamName("ex_video")
-        self.ex_video.setMaxDataSize(1280*720*3)
-        self.ex_video.out.link(self.manip.inputImage)
+        self.ex_video.setMaxDataSize(self.data_size)
+        self.ex_video.out.link(self.detection_manip.inputImage)
         self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorStereo(SetupColorStereo):
@@ -576,33 +585,37 @@ class SimulationColorStereoYolo(SimulationColorStereo):
 
 class SimulationMono(SetupMono):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
-        super().__init__(pipeline, fps, square)
+        super().__init__(pipeline, fps, square, PerspectiveConfig(False, False, 0.0))
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_video")
-        self.ex_left.setMaxDataSize(1280*720*3)
+        # self.ex_left.setMaxDataSize(1280*720*3) # * 3?
+        self.ex_left.setMaxDataSize(self.data_size)
 
         self.ex_left.out.link(self.output_video.input)
 
 class SimulationMonoYolo(SetupMonoYolo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, square, nn_path)
+        super().__init__(pipeline, fps, square, PerspectiveConfig(False, False, 0.0), nn_path)
 
         pipeline.remove(self.left)
         pipeline.remove(self.mono_control)
 
         self.ex_left: dai.node.XLinkIn = pipeline.create(dai.node.XLinkIn)
         self.ex_left.setStreamName("ex_video")
-        self.ex_left.setMaxDataSize(1280*720*3)
+        # self.ex_left.setMaxDataSize(1280*720*3) # * 3?
+        self.ex_left.setMaxDataSize(self.data_size)
 
-        self.ex_left.out.link(self.manip.inputImage)
+        self.ex_left.out.link(self.detection_manip.inputImage)
         self.ex_left.out.link(self.output_video.input)
 
 class SimulationMonoStereo(SetupMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool) -> None:
+        print("Pipeline: WARNING Mono Stereo not implemented")
+        return
         super().__init__(pipeline, fps, show_stereo)
 
         self.color: dai.node.Camera = pipeline.create(dai.node.Camera)
@@ -654,6 +667,8 @@ class SimulationMonoStereo(SetupMonoStereo):
 
 class SimulationMonoStereoYolo(SimulationMonoStereo):
     def __init__(self, pipeline : dai.Pipeline, fps: float,  show_stereo: bool, nn_path: Path) -> None:
+        print("Pipeline: WARNING Mono Stereo not implemented")
+        return
         super().__init__(pipeline, fps, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
