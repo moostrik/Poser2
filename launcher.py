@@ -147,6 +147,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.gui_default_file =     'default'
 
     if settings.art_type == Settings.ArtType.HDT:
+        settings.camera_fps =       25
         settings.render_title =     'Harmonic Dissonance'
         settings.num_players =      3
         settings.camera_num =       settings.num_players
@@ -157,14 +158,15 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.render_x =         0
         settings.render_y =         0
         settings.render_fps =       60
-        settings.gui_location_x =   2400
-        settings.gui_location_y =   -900
+        settings.gui_location_x =   2200
+        settings.gui_location_y =   -700
         settings.gui_on_top =       True
 
         settings.pose_model_type =  ModelType.NONE if args.nopose else ModelType.SMALL
         settings.pose_verbose =     True
 
         settings.camera_color =     True
+        settings.camera_square =    True
 
     if args.testminimal:
         settings.render_title =     'Minimal Test'

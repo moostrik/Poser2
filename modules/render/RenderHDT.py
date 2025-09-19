@@ -59,7 +59,7 @@ class RenderHDT(RenderBase):
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name=CameraRender.key(),         columns=self.num_cams,      rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=CameraRender.key(),         columns=self.num_cams,      rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=CamOverlayRender.key(),     columns=self.max_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=RStreamRender.key(),        columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
         ]
@@ -159,14 +159,15 @@ class RenderHDT(RenderBase):
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_ONE, GL_ONE)
 
-        self.secondary_order_list = [2,1,3]
-        id: int = self.secondary_order_list[monitor_id-1]
-        # print(f"Drawing secondary monitor {monitor_id} with camera {id}")
+        camera_id: int = self.secondary_order_list.index(monitor_id)
 
-        self.sync_renders[id -1].draw(Rect(0, 0, width, height))
-        # self.centre_cam_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
-        # self.movement_cam_renders[monitor_id - 1].draw(Rect(0, 0, width, height))
+        # self.sync_renders[camera_id].draw(Rect(0, 0, width, height))
+        self.centre_cam_renders[camera_id].draw(Rect(0, 0, width, height))
+        self.overlay_renders[camera_id].draw(Rect(0, 0, width, height))
+        # self.movement_cam_renders[camera_id].draw(Rect(0, 0, width, height))
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)
