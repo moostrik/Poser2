@@ -37,17 +37,32 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     parser.add_argument('-simpt',   '--passthrough',    action='store_true',        help='use prerecored video without camera')
     parser.add_argument('-cm',      '--cammanual',      action='store_true',        help='camera manual settings')
 
-    parser.add_argument('-hdt',     '--harmonictrio',   action='store_true',        help='run in Harmonic Dissonance mode')
+    parser.add_argument('-hdt',     '--hdtrio',         action='store_true',        help='run in Harmonic Dissonance mode')
     parser.add_argument('-ws',      '--whitespace',     action='store_true',        help='run in Whitespace mode')
     parser.add_argument('-tm',      '--testminimal',    action='store_true',        help='test with minimum setup only')
     args: Namespace = parser.parse_args()
 
+
     currentPath: str = path.dirname(__file__)
+
+    settings: Settings =  Settings()
+
+    art_type_default = Settings.ArtType.HDT
+
+    settings.art_type = art_type_default
+    if art_type_default == Settings.ArtType.WS and args.hdtrio:
+        settings.art_type = Settings.ArtType.HDT
+    if art_type_default == Settings.ArtType.HDT and args.whitespace:
+        settings.art_type = Settings.ArtType.WS
 
     camera_list: list[str] = ['14442C101136D1D200',
                               '14442C10F124D9D600',
                               '14442C10110AD3D200',
                               '14442C1031DDD2D200']
+    if art_type_default == Settings.ArtType.HDT:
+        camera_list = ['19443010D153874800',
+                       '19443010D1E4974800',
+                       '19443010D14C874800']
 
     if args.cameras < len(camera_list):
         camera_list = camera_list[:args.cameras]
@@ -55,13 +70,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     udp_list_sound: list[str] = ['127.0.0.1','10.0.0.81']
     udp_list_light: list[str] = []
 
-    # camera_list: list[str] = ['14442C10F124D9D600']
+    settings.num_players =          args.players
 
-    settings: Settings =            Settings()
-
-    settings.art_type =             Settings.ArtType.WS
-
-    settings.max_players =          args.players
 
     settings.path_root =            currentPath
     settings.path_file =            path.join(currentPath, 'files')
@@ -73,7 +83,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.camera_num =           len(camera_list)
     settings.camera_fps =           args.fps
     settings.camera_square =        False
-    settings.camera_color =         False
+    settings.camera_color =         True
     settings.camera_stereo =        False
     settings.camera_yolo =      not args.noyolo
     settings.camera_show_stereo =   False
@@ -119,36 +129,39 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.udp_ips_light =        udp_list_light
 
     settings.render_title =         'White Space'
-    settings.render_x =             100
-    settings.render_y =             100
-    settings.render_width =         1920 #* 2
-    settings.render_height =        1080 #* 2 - settings.render_y
+    settings.render_x =             0
+    settings.render_y =             0
+    settings.render_width =         1920 * 2
+    settings.render_height =        1080 * 2 - settings.render_y
     settings.render_fullscreen =    False
     settings.render_fps =           0
     settings.render_v_sync =        True
     settings.render_cams_a_row =    2
-    settings.render_monitor =       2
+    settings.render_monitor =       1
     settings.render_R_num =         3
+    settings.render_extra =         2
 
-    settings.gui_location_x =       0
-    settings.gui_location_y =       0
+    settings.gui_location_x =       2400
+    settings.gui_location_y =       -900
     settings.gui_on_top =           True
     settings.gui_default_file =     'default'
 
-    # settings.art_type =             Settings.ArtType.HDT
-    if args.whitespace:
-        settings.art_type = Settings.ArtType.WS
-
     if settings.art_type == Settings.ArtType.HDT:
         settings.render_title =     'Harmonic Dissonance'
-        settings.max_players =      3
-        settings.camera_num =       settings.max_players
+        settings.num_players =      3
+        settings.camera_num =       settings.num_players
         settings.camera_list =      camera_list[:settings.camera_num]
         settings.tracker_type =     TrackerType.ONEPERCAM
-        settings.render_monitor =   2
+        settings.render_monitor =   0
+        settings.render_extra =     2
         settings.render_x =         100
         settings.render_y =         100
         settings.render_fps =       60
+        settings.render_fullscreen =True
+        settings.gui_location_x =   100
+        settings.gui_location_y =   -1500
+        settings.gui_on_top =           True
+
         settings.pose_model_type =  ModelType.NONE if args.nopose else ModelType.LARGE
         settings.pose_verbose =     True
 
@@ -156,14 +169,14 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     if args.testminimal:
         settings.render_title =     'Minimal Test'
-        settings.max_players =      2
-        settings.camera_num =       settings.max_players
+        settings.num_players =      2
+        settings.camera_num =       settings.num_players
         settings.camera_list =      camera_list[:settings.camera_num]
         settings.tracker_type =     TrackerType.ONEPERCAM
         settings.pose_verbose =     True
 
     settings.check_values()
-    # settings.check_cameras()
+    settings.check_cameras()
 
     app = Main(settings)
     app.start()

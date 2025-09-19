@@ -10,7 +10,7 @@ from modules.WS.WSDataManager import WSDataManager, WSDataSettings
 from modules.WS.WSDraw import WSDraw, WSDrawSettings
 from modules.WS.WSDrawTest import WSDrawTest, TestPattern
 from modules.WS.WSGui import WSGui
-from modules.WS.WSSettings import WSSettings
+from modules.WS.WSSettings import WSSettings, CompMode
 from modules.WS.WSOutput import WSOutput, WSOutputCallback
 from modules.WS.WSUdpSender import WSUdpSender, WSUdpSenderSettings
 
@@ -24,6 +24,7 @@ from modules.gl.Utils import FpsCounter
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
+
 class WSPipeline(Thread):
     def __init__(self, gui, general_settings: Settings) -> None:
         super().__init__()
@@ -31,16 +32,15 @@ class WSPipeline(Thread):
         self._stop_event = Event()
         self.pose_input_queue: Queue[Pose] = Queue()
         self.pose_stream_input_queue: Queue[PoseStreamData] = Queue()
-        self.last_update: float = 0.0
 
         rate: int = general_settings.light_rate
         self.interval: float = 1.0 / rate
         resolution: int = general_settings.light_resolution
-        num_players: int = general_settings.max_players
+        num_players: int = general_settings.num_players
 
         self.settings = WSSettings(
             data_settings = WSDataSettings(),
-            draw_settings = WSDrawSettings(resolution, num_players, self.interval),
+            draw_settings = WSDrawSettings(),
         )
 
         self.output: WSOutput = WSOutput(resolution)

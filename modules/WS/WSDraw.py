@@ -31,10 +31,6 @@ class BlendType(Enum):
 
 @dataclass
 class WSDrawSettings():
-    _resolution: int
-    _num_players: int
-    _interval: float
-
     void_width: float =  0.05           # in normalized world width (0..1)
     void_edge: float = 0.01             # in normalized world width (0..1)
     use_void: bool = True
@@ -45,27 +41,17 @@ class WSDrawSettings():
     line_sharpness: float = 1.5         # higher is sharper
     line_speed: float = 1.5             # higher is faster
     line_width: float = 0.1             # in normalized world width (0..1)
-    line_amount: float = 20.0            # number of lines
-
-    @property
-    def resolution(self) -> int:
-        return self._resolution
-    @property
-    def num_players(self) -> int:
-        return self._num_players
-    @property
-    def interval(self) -> float:
-        return self._interval
+    line_amount: float = 20.0           # number of lines
 
 
 class WSDraw():
     def __init__(self, resolution: int, num_players: int, interval: float, data_manager: WSDataManager, settings: WSDrawSettings) -> None:
         self.resolution: int = resolution
         self.interval: float = interval
-        self.settings: WSDrawSettings = settings
         self.num_players: int = num_players
 
-        # self.draw_methods: DrawMethods = DrawMethods()
+        self.settings: WSDrawSettings = settings
+
         self.data_manager: WSDataManager = data_manager
 
         self.Wh_L_array: np.ndarray = np.ones((self.resolution), dtype=WS_IMG_TYPE)
@@ -187,10 +173,10 @@ class WSDraw():
                 WSDraw.draw_waves(W_R,   centre, patt_width,  rigt_count, rigt_width, sharpness, rigt_time,  0.5, inner_edge, outer_edge, blend)
                 WSDraw.draw_waves(W_R,   centre, -patt_width, rigt_count, rigt_width, sharpness, rigt_time,  0.5, outer_edge, inner_edge, blend)
 
-                WSDraw.draw_waves(blues, centre, patt_width,  left_count, left_width, sharpness, -left_time, 0,   inner_edge, outer_edge, blend)
-                WSDraw.draw_waves(blues, centre, -patt_width, left_count, left_width, sharpness, -left_time, 0,   outer_edge, inner_edge, blend)
-                WSDraw.draw_waves(blues, centre, patt_width,  rigt_count, rigt_width, sharpness, -rigt_time, 0.5, inner_edge, outer_edge, blend)
-                WSDraw.draw_waves(blues, centre, -patt_width, rigt_count, rigt_width, sharpness, -rigt_time, 0.5, outer_edge, inner_edge, blend)
+                # WSDraw.draw_waves(blues, centre, patt_width,  left_count, left_width, sharpness, -left_time, 0,   inner_edge, outer_edge, blend)
+                # WSDraw.draw_waves(blues, centre, -patt_width, left_count, left_width, sharpness, -left_time, 0,   outer_edge, inner_edge, blend)
+                # WSDraw.draw_waves(blues, centre, patt_width,  rigt_count, rigt_width, sharpness, -rigt_time, 0.5, inner_edge, outer_edge, blend)
+                # WSDraw.draw_waves(blues, centre, -patt_width, rigt_count, rigt_width, sharpness, -rigt_time, 0.5, outer_edge, inner_edge, blend)
 
     @staticmethod
     def draw_waves(array: np.ndarray, anchor: float, span: float, num_waves: float,

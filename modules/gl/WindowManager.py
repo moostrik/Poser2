@@ -138,12 +138,7 @@ class WindowManager():
         self.window_x += posX
         self.window_y += posY
 
-        # Set window position if not fullscreen
-        if not self.fullscreen:
-            glfw.set_window_pos(self.main_window, self.window_x, self.window_y)
-        else:
-            glfw.set_window_pos(width, height, self.window_y)
-            glfw.set_input_mode(self.main_window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+        glfw.set_window_pos(self.main_window, self.window_x, self.window_y)
 
 
         # Make context current
@@ -158,6 +153,8 @@ class WindowManager():
         glfw.set_cursor_pos_callback(self.main_window, self._notify_cursor_pos_callback)
         glfw.set_mouse_button_callback(self.main_window, self._notify_invoke_mouse_button_callbacks)
 
+        print(f"Setting up secondary monitors: {self.secondary_monitor_ids}")
+
         for id in self.secondary_monitor_ids:
             if id < 0 or id >= len(self._ordered_monitor_ids):
                 print(f"{self.__class__.__name__} ID: {id} out of range for available monitors: {self._ordered_monitor_ids}")
@@ -170,6 +167,9 @@ class WindowManager():
                 self.secondary_windows.append(win)
 
         glfw.focus_window(self.main_window)
+
+        if self.fullscreen:
+            self.set_main_windowed_fullscreen(True)
 
     def _render_loop(self) -> None:
         """Main rendering loop with improved frame timing"""

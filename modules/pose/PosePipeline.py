@@ -31,7 +31,7 @@ class PosePipeline(Thread):
         self.pose_detector_frame_width: int = 192
         self.pose_detector_frame_height: int = 256
         self.pose_crop_expansion: float = settings.pose_crop_expansion
-        self.max_detectors: int = settings.max_players
+        self.max_detectors: int = settings.num_players
         self.pose_detector: Detection | None = None
         self.image_processor: PoseImageProcessor = PoseImageProcessor(
             crop_expansion=self.pose_crop_expansion,

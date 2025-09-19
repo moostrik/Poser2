@@ -23,7 +23,7 @@ class Settings():
 
     def __init__(self) -> None:
         # GENERAL
-        self.max_players: int                   = None # type: ignore
+        self.num_players: int                   = None # type: ignore
         self.art_type: Settings.ArtType         = None # type: ignore
 
         #GUI
@@ -107,6 +107,7 @@ class Settings():
         self.render_cams_a_row: int             = None # type: ignore
         self.render_monitor: int                = None # type: ignore
         self.render_R_num: int                  = None # type: ignore
+        self.render_extra: int                  = None # type: ignore
 
     def check_values(self) -> None:
          for key, value in vars(self).items():

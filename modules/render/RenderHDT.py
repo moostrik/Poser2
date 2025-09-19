@@ -30,7 +30,7 @@ class RenderHDT(RenderBase):
     def __init__(self, settings: Settings) -> None:
         self.data: DataManager =    DataManager()
 
-        self.max_players: int =     settings.max_players
+        self.max_players: int =     settings.num_players
         self.num_cams: int =        settings.camera_num
         self.num_R_streams: int =   settings.render_R_num
         self.ws_width: int =        settings.light_resolution

@@ -42,9 +42,9 @@ class PanoramicTracker(Thread, BaseTracker):
 
         self.running: bool = False
         self.update_event: Event = Event()
-        
-        self.max_players: int = settings.max_players
-        
+
+        self.max_players: int = settings.num_players
+
         self.input_queue: Queue[Tracklet] = Queue()
 
         self.tracklet_manager: PanoramicTrackletManager = PanoramicTrackletManager(self.max_players)
@@ -83,13 +83,13 @@ class PanoramicTracker(Thread, BaseTracker):
         self.join()  # Wait for the thread to finish
 
     def notify_update(self) -> None:
-        if self.running:    
+        if self.running:
             self.update_event.set()
 
     def notify_update_from_image(self, cam_id: int, frame_type, image) -> None:
         if cam_id == 0:
             self.notify_update()
-            
+
     def run(self) -> None:
         while self.running:
             self.update_event.wait(timeout=0.1)
@@ -101,7 +101,7 @@ class PanoramicTracker(Thread, BaseTracker):
                     self._add_tracklet(tracklet)
                 except Empty:
                     break
-            
+
             self._update_tracklets()
             self._notify_and_reset_changes()
             self._remove_expired_tracklets()
@@ -228,11 +228,11 @@ class PanoramicTracker(Thread, BaseTracker):
     def _notify_callback(self, tracklet: Tracklet) -> None:
         # self._notify_callback_multi_sim(tracklet)
         # return
-        
+
         with self.callback_lock:
             for c in self.tracklet_callbacks:
                 c(tracklet)
-                
+
     def _notify_callback_multi_sim(self, tracklet: Tracklet) -> None:
         with self.callback_lock:
             if tracklet.id < 2:

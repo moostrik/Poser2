@@ -30,7 +30,7 @@ class RenderWhiteSpace(RenderBase):
     def __init__(self, settings: Settings) -> None:
         self.data: DataManager =    DataManager()
 
-        self.max_players: int =     settings.max_players
+        self.max_players: int =     settings.num_players
         self.num_cams: int =        settings.camera_num
         self.num_R_streams: int =   settings.render_R_num
         self.ws_width: int =        settings.light_resolution
@@ -58,18 +58,20 @@ class RenderWhiteSpace(RenderBase):
             SubdivisionRow(name=TrackerRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name=WSLinesRender.key(),    columns=1,                  rows=1, src_aspect_ratio=40.0,  padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name=WSLightRender.key(),    columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name=PoseRender.key(),       columns=self.max_players,   rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=PoseRender.key(),       columns=self.max_players,   rows=1, src_aspect_ratio=0.766,   padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=RStreamRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
         # window manager
+        secondary_monitor_ids: list[int] = [settings.render_extra] if settings.render_extra > 0 else []
+
         self.window_manager: WindowManager = WindowManager(
             self, self.subdivision.width, self.subdivision.height,
             settings.render_title, settings.render_fullscreen,
             settings.render_v_sync, settings.render_fps,
             settings.render_x, settings.render_y,
-            settings.render_monitor
+            settings.render_monitor, secondary_monitor_ids
         )
 
         # hot reloader
@@ -149,7 +151,13 @@ class RenderWhiteSpace(RenderBase):
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
-        self.ws_light_render.draw(Rect(0, 0, width, height))
+        line_height: int = 256
+        helper_width: int = int(196 * 2.5)
+        helper_height: int = int(256 * 2.5)
+        self.ws_lines_render.draw(Rect(0, 0, width * 4, line_height))
+        self.ws_light_render.draw(Rect(0, line_height, width * 4, height - line_height))
+        self.camera_renders[0].draw(Rect(0, height-helper_height, helper_width, helper_height))
+
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)
