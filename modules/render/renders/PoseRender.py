@@ -27,12 +27,13 @@ from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 class PoseRender(BaseRender):
     pose_stream_shader = WS_PoseStream()
 
-    def __init__(self, data: DataManager, pose_meshes: PoseMeshes, angle_meshes: AngleMeshes, cam_id: int) -> None:
+    def __init__(self, data: DataManager, pose_meshes: PoseMeshes, angle_meshes: AngleMeshes, confidence_threshold: float, cam_id: int) -> None:
         self.data: DataManager = data
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.cam_id: int = cam_id
         self.pose_stream_image: Image = Image()
+        self.confidence_threshold: float = confidence_threshold
         self.pose_meshes: PoseMeshes = pose_meshes
         self.angle_meshes: AngleMeshes = angle_meshes
         text_init()
@@ -76,11 +77,11 @@ class PoseRender(BaseRender):
             PoseRender.pose_stream_shader.allocate(monitor_file=False)
 
         BaseRender.setView(self.fbo.width, self.fbo.height)
-        PoseRender.draw_pose(self.fbo, self.image, pose, pose_mesh, self.pose_stream_image, angle_mesh, PoseRender.pose_stream_shader)
+        PoseRender.draw_pose(self.fbo, self.image, pose, pose_mesh, self.pose_stream_image, angle_mesh, PoseRender.pose_stream_shader, self.confidence_threshold)
         self.fbo.end()
 
     @staticmethod
-    def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_image: Image, angle_mesh: Mesh, shader: WS_PoseStream) -> None:
+    def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_image: Image, angle_mesh: Mesh, shader: WS_PoseStream, confidence_threshold: float) -> None:
         fbo.begin()
 
         if pose.is_removed:
@@ -96,7 +97,7 @@ class PoseRender(BaseRender):
         if angle_mesh.isInitialized():
             angle_mesh.draw(0, 0, fbo.width, fbo.height)
         fbo.end()
-        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5 / fbo.height)
+        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5 / fbo.height, confidence_threshold)
 
 
         angle_num: int = len(PoseAngleJointNames)

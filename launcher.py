@@ -60,8 +60,9 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
                               '14442C10110AD3D200',
                               '14442C1031DDD2D200']
     if art_type_default == Settings.ArtType.HDT:
-        camera_list = ['19443010D153874800',
-                       '19443010D1E4974800',
+        camera_list = ['19443010D1E4974800',
+                       '19443010D153874800',
+
                        '19443010D14C874800']
 
     if args.cameras < len(camera_list):
@@ -107,7 +108,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.pose_active =      not args.nopose
     settings.pose_model_type =      PoseModelType.NONE if args.nopose else PoseModelType.SMALL
-    settings.pose_conf_threshold =  0.0 #3
+    settings.pose_conf_threshold =  0.5
     settings.pose_crop_expansion =  0.1 # * height of the camera
     settings.pose_stream_capacity = int(10 * args.fps)
     settings.pose_verbose =         False

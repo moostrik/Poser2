@@ -41,7 +41,7 @@ class PosePipeline(Thread):
 
 
         if self.pose_active:
-            self.pose_detector = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, settings.pose_verbose)
+            self.pose_detector = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, settings.pose_conf_threshold, settings.pose_verbose)
             print('Pose Detection:', 'model', PoseModelTypeNames[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')

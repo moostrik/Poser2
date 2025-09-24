@@ -28,12 +28,13 @@ from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 class CamOverlayRender(BaseRender):
     pose_stream_shader = WS_PoseStream()
 
-    def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
+    def __init__(self, data: DataManager, pose_meshes: PoseMeshes, confidence_threshold: float,cam_id: int) -> None:
         self.data: DataManager = data
         self.fbo: Fbo = Fbo()
         self.cam_id: int = cam_id
         self.pose_stream_image: Image = Image()
         self.pose_meshes: PoseMeshes = pose_meshes
+        self.confidence_threshold: float = confidence_threshold
         text_init()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -68,11 +69,11 @@ class CamOverlayRender(BaseRender):
             CamOverlayRender.pose_stream_shader.allocate(monitor_file=False)
 
         BaseRender.setView(self.fbo.width, self.fbo.height)
-        CamOverlayRender.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, CamOverlayRender.pose_stream_shader)
+        CamOverlayRender.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, CamOverlayRender.pose_stream_shader, self.confidence_threshold)
         self.fbo.end()
 
     @staticmethod
-    def draw_pose(fbo: Fbo, pose: Pose, pose_mesh: Mesh, angle_image: Image, shader: WS_PoseStream) -> None:
+    def draw_pose(fbo: Fbo, pose: Pose, pose_mesh: Mesh, angle_image: Image, shader: WS_PoseStream, confidence_threshold: float) -> None:
         fbo.begin()
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
@@ -85,7 +86,7 @@ class CamOverlayRender(BaseRender):
             draw_box: bool = tracklet.is_lost
             CamOverlayRender.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
         fbo.end()
-        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, line_width=1.5 / fbo.height)
+        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, line_width=1.5 / fbo.height, confidence_threshold=confidence_threshold)
 
 
         angle_num: int = len(PoseAngleJointNames)

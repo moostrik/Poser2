@@ -1,5 +1,6 @@
 # Standard library imports
 import traceback
+import signal
 from dataclasses import dataclass
 from multiprocessing import Process, Queue, Event
 from queue import Empty
@@ -54,7 +55,7 @@ PoseStreamDataDict = dict[int, PoseStreamData]
 
 class PoseStreamManager:
     def __init__(self, settings: Settings) -> None:
-        self.settings = settings  # Store settings for processor recreation
+        self.settings: Settings = settings
         num_players: int = settings.num_players
 
         self.processors: list[PoseStreamProcessor] = []
@@ -176,19 +177,18 @@ class PoseStreamProcessor(Process):
     def __init__(self, settings: Settings, result_queue: Queue) -> None:
         super().__init__()
 
-        # Use multiprocessing primitives
         self._stop_event = Event()
         self.pose_input_queue: Queue[PoseStreamInput] = Queue()
 
         # For sending results back to main process
-        self.result_queue = result_queue if result_queue else Queue()
+        self.result_queue: Queue[PoseStreamData] = result_queue if result_queue else Queue()
 
         # Store settings values (not the settings object itself)
         self.buffer_capacity: int = settings.pose_stream_capacity
         self.resample_interval: str = f"{int(1.0 / settings.camera_fps * 1000)}ms"
 
         # Initialize buffers (will be recreated in child process)
-        self.empty_df: pd.DataFrame = pd.DataFrame(columns=PoseAngleJointNames)
+        self.empty_df: pd.DataFrame = pd.DataFrame(columns=PoseAngleJointNames, dtype=float)
         self.angle_df: pd.DataFrame = self.empty_df.copy()
         self.score_df: pd.DataFrame = self.empty_df.copy()
 
@@ -196,10 +196,8 @@ class PoseStreamProcessor(Process):
         self._stop_event.set()
 
     def run(self) -> None:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
         while not self._stop_event.is_set():
-
-            start_time: float = perf_counter()
-            # Collect all available poses from the queue
             poses: list[PoseStreamInput] = []
             queue_empty = False
             while not queue_empty:
@@ -210,28 +208,20 @@ class PoseStreamProcessor(Process):
                 except Empty:
                     queue_empty = True
 
-            # Sleep if no poses to process
             if not poses:
                 sleep(0.01)
                 continue
-
-            # print(f"PoseStreamProcessor {self.pid} processing {len(poses)} poses")
-            # Process collected poses
 
             try:
                 self._process(poses)
             except Exception as e:
                 print(f"Error processing poses: {e}")
-                traceback.print_exc()  # This prints the stack trace
-
-            elapsed: float = perf_counter() - start_time
-            # print(f"[Perf] _process took {elapsed:.4f} seconds")
+                traceback.print_exc()
 
     def add_pose(self, pose: PoseStreamInput) -> None:
         """Add pose to processing queue - can be called from main process."""
         try:
             self.pose_input_queue.put(pose, block=False)
-            # print(f"PoseStreamProcessor {self.pid} added pose {pose.id, pose.time_stamp}")
         except:
             # Queue is full, skip this pose
             pass
@@ -251,8 +241,8 @@ class PoseStreamProcessor(Process):
         for pose in poses:
             if pose.is_removed:
                 # reset buffers if pose is removed
-                self.angle_df: pd.DataFrame = pd.DataFrame(columns=PoseAngleJointNames)
-                self.score_df: pd.DataFrame = pd.DataFrame(columns=PoseAngleJointNames)
+                self.angle_df: pd.DataFrame = self.empty_df.copy()
+                self.score_df: pd.DataFrame = self.empty_df.copy()
                 self._notify_callbacks(PoseStreamData(pose.id, self.angle_df, self.score_df, self.buffer_capacity, 0.0, True))
                 return
             if pose.angles is None:
@@ -268,58 +258,40 @@ class PoseStreamProcessor(Process):
         self.score_df.sort_index(inplace=True)
         self.score_df = self.score_df.iloc[-self.buffer_capacity:]
 
-        interpolated: pd.DataFrame = self.angle_df.interpolate(method='time', limit_direction='both')#, limit=7)
+        # print(self.angle_df)
+        try:
+            interpolated: pd.DataFrame = self.angle_df.interpolate(method='time', limit_direction='both')#, limit=1)
+        except Exception as e:
+            print(f"Error interpolating angles: {e}")
+            print(self.angle_df)
+
         smoothed: pd.DataFrame = PoseStreamProcessor.ewm_circular_mean(interpolated, span=7.0)
         mean_movement: float = PoseStreamProcessor.get_highest_movement(smoothed, self.score_df, threshold=0.0)
-        self._notify_callbacks(PoseStreamData(pose.id, smoothed, self.score_df, self.buffer_capacity, mean_movement, False))
 
-    def _reset(self) -> None:
-        self.angle_df: pd.DataFrame = self.empty_df.copy()
-        self.score_df: pd.DataFrame = self.empty_df.copy()
+        # interpolated_score: pd.DataFrame = self.score_df.interpolate(method='time', limit_direction='both')#, limit=15)
+
+        self._notify_callbacks(PoseStreamData(pose.id, smoothed, self.score_df, self.buffer_capacity, mean_movement, False))
 
     @ staticmethod
     def get_data_frames_from_poses(poses: list[PoseStreamInput]) ->tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Efficiently convert a list of poses into angle and confidence DataFrames.
-        This batches multiple poses for better performance than row-by-row insertion.
-
+        Convert a list of PoseStreamInput objects to two DataFrames: one for angles and one for confidences.
         Args:
             poses: List of PoseStreamInput objects to process
-
         Returns:
             tuple[pd.DataFrame, pd.DataFrame]: (angles_df, confidence_df)
         """
-        # Create dictionaries to hold data for each DataFrame
-        angle_data: dict[pd.Timestamp, dict[str, float]] = {}
-        conf_data: dict[pd.Timestamp, dict[str, float]] = {}
 
-        # Extract data from all poses at once
-        for pose in poses:
-            if pose.angles is None:
-                continue
+        if not poses or all(pose.angles is None for pose in poses):
+            empty = pd.DataFrame(columns=PoseAngleJointNames, dtype=float)
+            return empty, empty.copy()
 
-            # Use timestamp as key to ensure proper time indexing
-            timestamp: pd.Timestamp = pose.time_stamp
+        timestamps: list[pd.Timestamp] = [pose.time_stamp for pose in poses if pose.angles is not None]
+        angle_data: list[np.ndarray] = [pose.angles.angles for pose in poses if pose.angles is not None]
+        conf_data: list[np.ndarray] = [pose.angles.scores for pose in poses if pose.angles is not None]
 
-            # Add angle data
-            angle_data[timestamp] = {
-                PoseAngleJointNames[i]: pose.angles.angles[i]
-                for i in range(NUM_POSE_ANGLES)
-            }
-
-            # Add confidence data
-            conf_data[timestamp] = {
-                PoseAngleJointNames[i]: pose.angles.scores[i]
-                for i in range(NUM_POSE_ANGLES)
-            }
-
-        # Convert dictionaries to DataFrames with timestamps as index
-        angles_df: pd.DataFrame = pd.DataFrame.from_dict(angle_data, orient='index')
-        conf_df: pd.DataFrame = pd.DataFrame.from_dict(conf_data, orient='index')
-
-        # Ensure DataFrames have all expected columns, even if some data is missing
-        angles_df = angles_df.reindex(columns=PoseAngleJointNames)
-        conf_df = conf_df.reindex(columns=PoseAngleJointNames)
+        angles_df = pd.DataFrame(angle_data, index=timestamps, columns=PoseAngleJointNames, dtype=float)
+        conf_df = pd.DataFrame(conf_data, index=timestamps, columns=PoseAngleJointNames, dtype=float)
 
         return angles_df, conf_df
 

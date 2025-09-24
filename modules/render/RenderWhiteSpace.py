@@ -50,7 +50,7 @@ class RenderWhiteSpace(RenderBase):
         for i in range(self.num_cams):
             self.camera_renders[i] = CameraRender(self.data, self.pose_meshes, i)
         for i in range(self.max_players):
-            self.pose_renders[i] = PoseRender(self.data, self.pose_meshes, self.angle_meshes, i)
+            self.pose_renders[i] = PoseRender(self.data, self.pose_meshes, self.angle_meshes, settings.pose_conf_threshold, i)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [

@@ -22,8 +22,10 @@ from modules.pose.PoseDefinitions import Pose, PosePointData, PoseModelType, Pos
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 class PoseDetection(Thread):
-    def __init__(self, path: str, model_type:PoseModelType, fps: float = 30.0, verbose: bool = False) -> None:
+    def __init__(self, path: str, model_type:PoseModelType, fps: float = 30.0, confidence_threshold: float = 0.3, verbose: bool = False) -> None:
         super().__init__()
 
         if model_type is PoseModelType.NONE:
@@ -32,6 +34,7 @@ class PoseDetection(Thread):
         self.model_checkpoint_file: str = path + '/' + PoseModelFileNames[model_type.value][1]
         self.model_width: int = 192
         self.model_height: int = 256
+        self.confidence_threshold: float = confidence_threshold
 
         self.interval: float = 1.0 / fps
 
@@ -44,6 +47,9 @@ class PoseDetection(Thread):
         self._callbacks: set = set()
 
         self._notify_update_event: Event = Event()
+
+
+        hot_reloader = HotReloadMethods(self.__class__)
 
     def stop(self) -> None:
         self._running = False
@@ -82,7 +88,7 @@ class PoseDetection(Thread):
 
                 if images:
                     data_samples = PoseDetection.run_interference(model,pipeline,images, False)
-                    all_poses = PoseDetection.process_pose_data_samples(data_samples, self.model_width, self.model_height)
+                    all_poses = PoseDetection.process_pose_data_samples(data_samples, self.model_width, self.model_height, self.confidence_threshold)
 
                     # Match results with original poses
                     for i, pose in enumerate(current_poses):
@@ -206,7 +212,7 @@ class PoseDetection(Thread):
             return results_by_image
 
     @staticmethod
-    def process_pose_data_samples(data_samples: list, model_width: int, model_height: int) -> list[list[PosePointData]]:
+    def process_pose_data_samples(data_samples: list, model_width: int, model_height: int, confidence_threshold: float) -> list[list[PosePointData]]:
         poses: list[list[PosePointData]] = []
         for image_results in data_samples:
             image_poses: list[PosePointData] = []
@@ -216,11 +222,13 @@ class PoseDetection(Thread):
                 scores = pred_instances.keypoint_scores
 
                 for i in range(len(keypoints)):
-                    person_keypoints = keypoints[i]  # [num_keypoints, 2]
-                    person_scores = scores[i]        # [num_keypoints]
+                    person_keypoints: np.ndarray = keypoints[i]  # [num_keypoints, 2]
+                    person_scores: np.ndarray = scores[i]
+                    # Set scores below threshold to zero
+                    person_scores = np.where(person_scores >= confidence_threshold, person_scores, 0.0)
 
                     # Normalize keypoints to [0, 1] range
-                    norm_keypoints = person_keypoints.copy()
+                    norm_keypoints: np.ndarray = person_keypoints.copy()
                     norm_keypoints[:, 0] /= model_width   # x / width
                     norm_keypoints[:, 1] /= model_height  # y / height
 
