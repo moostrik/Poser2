@@ -2,7 +2,9 @@
 import traceback
 from dataclasses import dataclass
 from multiprocessing import Process, Queue, Event
+from queue import Empty
 from threading import Thread
+from time import sleep, perf_counter, time
 from typing import Optional, Callable, Set
 
 # Third-party imports
@@ -53,10 +55,17 @@ PoseStreamDataDict = dict[int, PoseStreamData]
 class PoseStreamManager:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings  # Store settings for processor recreation
-        self.result_queue = Queue()
-        self.processor = PoseStreamProcessor(settings, self.result_queue)
+        num_players: int = settings.num_players
+
+        self.processors: list[PoseStreamProcessor] = []
+        self.result_queues: list[Queue] = []
+        self.result_threads: list[Thread] = []
+        for i in range(num_players):
+            self.result_queues.append(Queue())
+            self.processors.append(PoseStreamProcessor(settings, self.result_queues[i]))
+            self.result_threads.append(Thread(target=self._handle_results, args=(self.result_queues[i],), daemon=True))
+
         self.output_callbacks: Set[PoseStreamDataCallback] = set()
-        self.result_thread = Thread(target=self._handle_results, daemon=True)
         self.running = False
 
         # Hot reload setup for restarting processor
@@ -70,52 +79,77 @@ class PoseStreamManager:
             self._restart_processor()
 
     def _restart_processor(self) -> None:
-        """Restart the processor process."""
+        """Restart all processors and result threads when files change."""
         try:
-            # Stop current processor
-            if self.processor.is_alive():
-                print("[PoseStream] Stopping current processor...")
-                self.processor.stop()
-                self.processor.join(timeout=2.0)  # Wait a bit longer for graceful shutdown
+            # Stop all processors
+            for processor in self.processors:
+                if processor.is_alive():
+                    print(f"[PoseStream] Stopping processor {processor.pid}...")
+                    processor.stop()
+                    processor.join(timeout=2.0)
+                    if processor.is_alive():
+                        print(f"[PoseStream] Force terminating processor {processor.pid}...")
+                        processor.terminate()
+                        processor.join(timeout=1.0)
 
-                if self.processor.is_alive():
-                    print("[PoseStream] Force terminating processor...")
-                    self.processor.terminate()
-                    self.processor.join(timeout=1.0)
+            # Clear old lists
+            self.processors.clear()
+            self.result_queues.clear()
+            self.result_threads.clear()
 
-            # Create new processor
-            print("[PoseStream] Creating new processor...")
-            self.processor = PoseStreamProcessor(self.settings, self.result_queue)
-            self.processor.start()
-            print("[PoseStream] Processor restarted successfully")
+            # Recreate processors, queues, and threads
+            num_players = self.settings.num_players
+            for i in range(num_players):
+                queue = Queue()
+                self.result_queues.append(queue)
+                processor = PoseStreamProcessor(self.settings, queue)
+                self.processors.append(processor)
+                thread = Thread(target=self._handle_results, args=(queue,), daemon=True)
+                self.result_threads.append(thread)
+
+            # Start new processors and threads
+            for processor in self.processors:
+                processor.start()
+            for thread in self.result_threads:
+                thread.start()
+
+            print("[PoseStream] All processors restarted successfully")
 
         except Exception as e:
-            print(f"[PoseStream] Error restarting processor: {e}")
+            print(f"[PoseStream] Error restarting processors: {e}")
 
     def start(self) -> None:
-        """Start the processor and result handler."""
+        """Start all processors and result handler threads."""
         self.running = True
-        self.processor.start()
-        self.result_thread.start()
+        for processor in self.processors:
+            processor.start()
+        for thread in self.result_threads:
+            thread.start()
+
+        self.hot_reloader.start_file_watcher()
 
     def stop(self) -> None:
-        """Stop the processor and result handler."""
+        """Stop all processors and result handler threads."""
         self.running = False
 
         # Stop hot reloader
         self.hot_reloader.stop_file_watcher()
 
-        # Stop processor
-        self.processor.stop()
-        self.processor.join(timeout=1.0)
-        if self.processor.is_alive():
-            self.processor.terminate()
+        # Stop all processors
+        for processor in self.processors:
+            processor.stop()
+            processor.join(timeout=1.0)
+            if processor.is_alive():
+                processor.terminate()
+                processor.join(timeout=1.0)
 
     def add_pose(self, pose) -> None:
-        """Add pose to processing queue."""
+        """Add pose to the appropriate processor's queue based on pose id."""
         try:
             pose_stream_input: PoseStreamInput = PoseStreamInput.from_pose(pose)
-            self.processor.add_pose(pose_stream_input)
+            # Distribute by id modulo number of processors
+            processor_idx = pose_stream_input.id % len(self.processors)
+            self.processors[processor_idx].add_pose(pose_stream_input)
         except Exception as e:
             print(f"[PoseStream] Error adding pose: {e}")
 
@@ -123,14 +157,14 @@ class PoseStreamManager:
         """Register a callback to receive processed data."""
         self.output_callbacks.add(callback)
 
-    def _handle_results(self) -> None:
-        """Handle results from the processor in the main process."""
+    def _handle_results(self, result_queue: Queue) -> None:
+        """Handle results from a single processor's result queue in the main process."""
         while self.running:
             try:
-                data: PoseStreamData = self.result_queue.get(timeout=0.1)
-                # Call all callbacks with the data
+                data: PoseStreamData = result_queue.get(timeout=0.1)
                 for callback in self.output_callbacks:
                     try:
+                        # this might need a lock if callbacks modify shared state
                         callback(data)
                     except Exception as e:
                         print(f"Error in callback: {e}")
@@ -154,31 +188,50 @@ class PoseStreamProcessor(Process):
         self.resample_interval: str = f"{int(1.0 / settings.camera_fps * 1000)}ms"
 
         # Initialize buffers (will be recreated in child process)
-        self.angle_buffers: dict[int, pd.DataFrame] = {}
-        self.confidence_buffers: dict[int, pd.DataFrame] = {}
+        self.empty_df: pd.DataFrame = pd.DataFrame(columns=PoseAngleJointNames)
+        self.angle_df: pd.DataFrame = self.empty_df.copy()
+        self.score_df: pd.DataFrame = self.empty_df.copy()
 
     def stop(self) -> None:
         self._stop_event.set()
-        self.angle_buffers.clear()
-        self.confidence_buffers.clear()
 
     def run(self) -> None:
         while not self._stop_event.is_set():
-            try:
-                pose: Optional[PoseStreamInput] = self.pose_input_queue.get(block=True, timeout=0.01)
-                if pose is not None:
-                    try:
-                        self._process(pose)
-                    except Exception as e:
-                        print(f"Error processing pose {pose.id}: {e}")
-                        traceback.print_exc()  # This prints the stack trace
-            except:
+
+            start_time: float = perf_counter()
+            # Collect all available poses from the queue
+            poses: list[PoseStreamInput] = []
+            queue_empty = False
+            while not queue_empty:
+                try:
+                    pose: PoseStreamInput = self.pose_input_queue.get(block=False)
+                    if pose is not None:
+                        poses.append(pose)
+                except Empty:
+                    queue_empty = True
+
+            # Sleep if no poses to process
+            if not poses:
+                sleep(0.01)
                 continue
+
+            # print(f"PoseStreamProcessor {self.pid} processing {len(poses)} poses")
+            # Process collected poses
+
+            try:
+                self._process(poses)
+            except Exception as e:
+                print(f"Error processing poses: {e}")
+                traceback.print_exc()  # This prints the stack trace
+
+            elapsed: float = perf_counter() - start_time
+            # print(f"[Perf] _process took {elapsed:.4f} seconds")
 
     def add_pose(self, pose: PoseStreamInput) -> None:
         """Add pose to processing queue - can be called from main process."""
         try:
             self.pose_input_queue.put(pose, block=False)
+            # print(f"PoseStreamProcessor {self.pid} added pose {pose.id, pose.time_stamp}")
         except:
             # Queue is full, skip this pose
             pass
@@ -190,49 +243,85 @@ class PoseStreamProcessor(Process):
         except:
             pass
 
-    def _process(self, pose: PoseStreamInput) -> None:
+    def _process(self, poses: list[PoseStreamInput]) -> None:
         """ Process a pose and update the joint angle windows. """
-
-        if pose.angles is None:
-            print(f"[PoseStreamProcessor] Pose {pose.id} has no angles, skipping")
+        if not poses:
             return
 
-        if pose.is_removed:
-            if self.angle_buffers.get(pose.id) is not None:
-                angles: pd.DataFrame | None = self.angle_buffers.pop(pose.id, None)
-                confidences: pd.DataFrame | None = self.confidence_buffers.pop(pose.id, None)
-                if angles is not None and confidences is not None:
-                    self._notify_callbacks(PoseStreamData(pose.id, angles, confidences, self.buffer_capacity, 0.0, True))
-            return
+        for pose in poses:
+            if pose.is_removed:
+                # reset buffers if pose is removed
+                self.angle_df: pd.DataFrame = pd.DataFrame(columns=PoseAngleJointNames)
+                self.score_df: pd.DataFrame = pd.DataFrame(columns=PoseAngleJointNames)
+                self._notify_callbacks(PoseStreamData(pose.id, self.angle_df, self.score_df, self.buffer_capacity, 0.0, True))
+                return
+            if pose.angles is None:
+                print(f"[PoseStreamProcessor] Pose {pose.id} has no angles, this should not happen")
+                return
 
-        time_stamp: pd.Timestamp = pose.time_stamp
+        angle_slice_df, conf_slice_df = self.get_data_frames_from_poses(poses)
+        self.angle_df = pd.concat([self.angle_df, angle_slice_df])
+        self.angle_df.sort_index(inplace=True)
+        self.angle_df = self.angle_df.iloc[-self.buffer_capacity:]
 
-        # Update angle window
-        angle_df: pd.DataFrame = self.angle_buffers.get(pose.id, pd.DataFrame(columns=PoseAngleJointNames))
-        angle_row: pd.Series = pd.Series(
-            {PoseAngleJointNames[i]: pose.angles.angles[i] for i in range(NUM_POSE_ANGLES)},
-            index=PoseAngleJointNames  # Ensures all columns are present, missing ones will be NaN
-        )
-        angle_df.loc[time_stamp] = angle_row # type: ignore
-        angle_df.sort_index(inplace=True)
-        angle_df = angle_df.iloc[-self.buffer_capacity:]
-        self.angle_buffers[pose.id] = angle_df
+        self.score_df = pd.concat([self.score_df, conf_slice_df])
+        self.score_df.sort_index(inplace=True)
+        self.score_df = self.score_df.iloc[-self.buffer_capacity:]
 
-        # Update confidence window
-        conf_df: pd.DataFrame = self.confidence_buffers.get(pose.id, pd.DataFrame(columns=PoseAngleJointNames))
-        conf_row: pd.Series = pd.Series(
-            {PoseAngleJointNames[i]: pose.angles.scores[i] for i in range(NUM_POSE_ANGLES)},
-            index=PoseAngleJointNames  # Ensures all columns are present, missing ones will be NaN
-        )
-        conf_df.loc[time_stamp] = conf_row  # type: ignore
-        conf_df.sort_index(inplace=True)
-        conf_df = conf_df.iloc[-self.buffer_capacity:]
-        self.confidence_buffers[pose.id] = conf_df
-
-        interpolated: pd.DataFrame = angle_df.interpolate(method='time', limit_direction='both')#, limit=7)
+        interpolated: pd.DataFrame = self.angle_df.interpolate(method='time', limit_direction='both')#, limit=7)
         smoothed: pd.DataFrame = PoseStreamProcessor.ewm_circular_mean(interpolated, span=7.0)
-        mean_movement: float = PoseStreamProcessor.get_highest_movement(smoothed, conf_df, threshold=0.0)
-        self._notify_callbacks(PoseStreamData(pose.id, smoothed, conf_df, self.buffer_capacity, mean_movement, False))
+        mean_movement: float = PoseStreamProcessor.get_highest_movement(smoothed, self.score_df, threshold=0.0)
+        self._notify_callbacks(PoseStreamData(pose.id, smoothed, self.score_df, self.buffer_capacity, mean_movement, False))
+
+    def _reset(self) -> None:
+        self.angle_df: pd.DataFrame = self.empty_df.copy()
+        self.score_df: pd.DataFrame = self.empty_df.copy()
+
+    @ staticmethod
+    def get_data_frames_from_poses(poses: list[PoseStreamInput]) ->tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Efficiently convert a list of poses into angle and confidence DataFrames.
+        This batches multiple poses for better performance than row-by-row insertion.
+
+        Args:
+            poses: List of PoseStreamInput objects to process
+
+        Returns:
+            tuple[pd.DataFrame, pd.DataFrame]: (angles_df, confidence_df)
+        """
+        # Create dictionaries to hold data for each DataFrame
+        angle_data: dict[pd.Timestamp, dict[str, float]] = {}
+        conf_data: dict[pd.Timestamp, dict[str, float]] = {}
+
+        # Extract data from all poses at once
+        for pose in poses:
+            if pose.angles is None:
+                continue
+
+            # Use timestamp as key to ensure proper time indexing
+            timestamp: pd.Timestamp = pose.time_stamp
+
+            # Add angle data
+            angle_data[timestamp] = {
+                PoseAngleJointNames[i]: pose.angles.angles[i]
+                for i in range(NUM_POSE_ANGLES)
+            }
+
+            # Add confidence data
+            conf_data[timestamp] = {
+                PoseAngleJointNames[i]: pose.angles.scores[i]
+                for i in range(NUM_POSE_ANGLES)
+            }
+
+        # Convert dictionaries to DataFrames with timestamps as index
+        angles_df: pd.DataFrame = pd.DataFrame.from_dict(angle_data, orient='index')
+        conf_df: pd.DataFrame = pd.DataFrame.from_dict(conf_data, orient='index')
+
+        # Ensure DataFrames have all expected columns, even if some data is missing
+        angles_df = angles_df.reindex(columns=PoseAngleJointNames)
+        conf_df = conf_df.reindex(columns=PoseAngleJointNames)
+
+        return angles_df, conf_df
 
     @staticmethod
     def rolling_circular_mean(df: pd.DataFrame, window: float = 0.3, min_periods: int = 1) -> pd.DataFrame:
