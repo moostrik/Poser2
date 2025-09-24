@@ -75,6 +75,16 @@ class Main():
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.render.data.set_depth_tracklets)
             camera.start()
+
+        if self.correlation_streamer and self.dtw_correlator:
+            self.correlation_streamer.add_stream_callback(self.render.data.set_correlation_stream)
+            self.correlation_streamer.start()
+
+            self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_correlation)
+            self.dtw_correlator.start()
+
+            self.pose_streamer.add_stream_callback(self.dtw_correlator.set_pose_stream)
+
         self.pose_streamer.add_stream_callback(self.render.data.set_pose_stream)
         self.pose_streamer.start()
 
@@ -85,15 +95,6 @@ class Main():
         self.tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
         self.tracker.add_tracklet_callback(self.render.data.set_tracklet)
         self.tracker.start()
-
-        if self.correlation_streamer and self.dtw_correlator:
-            self.correlation_streamer.add_stream_callback(self.render.data.set_correlation_stream)
-            self.correlation_streamer.start()
-
-            self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_correlation)
-            self.dtw_correlator.start()
-
-            self.pose_streamer.add_stream_callback(self.dtw_correlator.set_pose_stream)
 
         if self.WS:
             self.pose_detection.add_pose_callback(self.WS.add_pose)
