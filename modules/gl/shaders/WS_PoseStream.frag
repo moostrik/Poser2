@@ -9,9 +9,25 @@ uniform float       line_width;
 in vec2     texCoord;
 out vec4    fragColor;
 
+bool isBetweenStreamLine(vec2 uv, float stream_step, float line_width, int num_streams) {
+    int stream_id = int(floor(uv.y / stream_step));
+    if (stream_id >= num_streams - 1) return false;
+
+    // The boundary between streams
+    float boundary_y = (float(stream_id + 1)) * stream_step;
+
+    // Only 1 pixel high: use line_width as the threshold
+    return abs(uv.y - boundary_y) < (0.75 * line_width);
+}
+
+
 void main() {
     vec2    uv = vec2(texCoord.x, 1.0 - texCoord.y);
 
+    if (isBetweenStreamLine(uv, stream_step, line_width, num_streams)) {
+        fragColor = vec4(1.0, 1.0, 1.0, 1.0); // White line
+        return;
+    }
     // Calculate stream ID
     int     stream_id = int(floor(uv.y / stream_step));
 
@@ -84,8 +100,8 @@ void main() {
 
     // Use conditional assignment instead of nested if statements
     vec3    color = is_even ?
-        (is_positive ? vec3(1.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)) :
-        (is_positive ? vec3(0.0, 0.7, 1.0) : vec3(0.0, 1.0, 0.0));
+        (is_positive ? vec3(0.0, 0.7, 1.0) : vec3(0.0, 1.0, 0.0)) :
+        (is_positive ? vec3(1.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0));
 
     fragColor = vec4(color, curr_conf);
 }

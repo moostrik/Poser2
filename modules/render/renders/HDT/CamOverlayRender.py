@@ -41,7 +41,7 @@ class CamOverlayRender(BaseRender):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
         if not CamOverlayRender.pose_stream_shader.allocated:
-            CamOverlayRender.pose_stream_shader.allocate(monitor_file=False)
+            CamOverlayRender.pose_stream_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
@@ -93,7 +93,7 @@ class CamOverlayRender(BaseRender):
         fbo.begin()
 
         # yellow and light blue
-        colors: list[tuple[float, float, float, float]] = [(1.0, 0.5, 0.0, 1.0), (0.0, 0.8, 1.0, 1.0)]
+        colors: list[tuple[float, float, float, float]] = [(0.0, 0.8, 1.0, 1.0), (1.0, 0.5, 0.0, 1.0)]
 
         for i in range(angle_num):
             string: str = PoseAngleJointNames[i]

@@ -130,21 +130,34 @@ class PosePointData():
 
 # ANGLE DATA
 PoseAngleJointTriplets: dict[PoseJoint, tuple[PoseJoint, PoseJoint, PoseJoint]] = {
-    # PoseJoint.nose:           ( PoseJoint.left_eye,       PoseJoint.nose,           PoseJoint.right_eye   ),0
-    # PoseJoint.left_eye:       ( PoseJoint.left_ear,       PoseJoint.left_eye,       PoseJoint.right_eye   ),
-    # PoseJoint.right_eye:      ( PoseJoint.left_eye,       PoseJoint.right_eye,      PoseJoint.right_ear   ),
+    PoseJoint.nose:           ( PoseJoint.left_eye,       PoseJoint.nose,           PoseJoint.right_eye   ),
+    PoseJoint.left_eye:       ( PoseJoint.left_ear,       PoseJoint.left_eye,       PoseJoint.right_eye   ),
+    PoseJoint.right_eye:      ( PoseJoint.left_eye,       PoseJoint.right_eye,      PoseJoint.right_ear   ),
     PoseJoint.left_shoulder:  ( PoseJoint.left_hip,       PoseJoint.left_shoulder,  PoseJoint.left_elbow  ),
     PoseJoint.right_shoulder: ( PoseJoint.right_hip,      PoseJoint.right_shoulder, PoseJoint.right_elbow ),
     PoseJoint.left_elbow:     ( PoseJoint.left_shoulder,  PoseJoint.left_elbow,     PoseJoint.left_wrist  ),
     PoseJoint.right_elbow:    ( PoseJoint.right_shoulder, PoseJoint.right_elbow,    PoseJoint.right_wrist ),
-    # PoseJoint.left_hip:       ( PoseJoint.left_shoulder,  PoseJoint.left_hip,       PoseJoint.left_knee   ),
-    # PoseJoint.right_hip:      ( PoseJoint.right_shoulder, PoseJoint.right_hip,      PoseJoint.right_knee  ),
-    # PoseJoint.left_knee:      ( PoseJoint.left_hip,       PoseJoint.left_knee,      PoseJoint.left_ankle  ),
-    # PoseJoint.right_knee:     ( PoseJoint.right_hip,      PoseJoint.right_knee,     PoseJoint.right_ankle ),
+    PoseJoint.left_hip:       ( PoseJoint.left_shoulder,  PoseJoint.left_hip,       PoseJoint.left_knee   ),
+    PoseJoint.right_hip:      ( PoseJoint.right_shoulder, PoseJoint.right_hip,      PoseJoint.right_knee  ),
+    PoseJoint.left_knee:      ( PoseJoint.left_hip,       PoseJoint.left_knee,      PoseJoint.left_ankle  ),
+    PoseJoint.right_knee:     ( PoseJoint.right_hip,      PoseJoint.right_knee,     PoseJoint.right_ankle )
 }
 PoseAngleJointLookup: dict[PoseJoint, int] = {joint: i for i, joint in enumerate(PoseAngleJointTriplets.keys())}
 PoseAngleJointNames: list[str] = [e.name for e in PoseAngleJointTriplets.keys()]
 NUM_POSE_ANGLES: int = len(PoseAngleJointTriplets)
+PoseAngleRotations: dict[PoseJoint, float] = {
+    PoseJoint.nose:           0.0,
+    PoseJoint.left_eye:       np.pi,
+    PoseJoint.right_eye:      np.pi,
+    PoseJoint.left_shoulder:  0.0,
+    PoseJoint.right_shoulder: 0.0,
+    PoseJoint.left_elbow:     np.pi,
+    PoseJoint.right_elbow:    np.pi,
+    PoseJoint.left_hip:       np.pi,
+    PoseJoint.right_hip:      np.pi,
+    PoseJoint.left_knee:      np.pi,
+    PoseJoint.right_knee:     np.pi
+}
 
 @dataclass (frozen=True)
 class PoseAngleData():

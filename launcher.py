@@ -130,7 +130,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.render_title =         'White Space'
     settings.render_x =             0
-    settings.render_y =             0
+    settings.render_y =             100
     settings.render_width =         1920 * 2
     settings.render_height =        1080 * 2 - settings.render_y
     settings.render_fullscreen =    False
@@ -159,7 +159,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.render_monitor =   1
         settings.render_secondary_list =     [2,1,3]
         settings.render_x =         0
-        settings.render_y =         0
+        settings.render_y =         100
         settings.render_fps =       60
         settings.gui_location_x =   2200
         settings.gui_location_y =   -700
