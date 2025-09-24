@@ -1,5 +1,6 @@
 # Standard library imports
 from dataclasses import replace
+from threading import Lock
 from typing import Optional
 
 # Third-party imports
@@ -55,16 +56,16 @@ class PoseSmoothRect():
         bottom: float = min(pose_rect.bottom, 1.0)
 
         keypoints: np.ndarray | None = pose.get_absolute_keypoints()
-        if pose.points is None or keypoints is None:
+        if pose.point_data is None or keypoints is None:
             self._notify_callback(pose, self.current_rect)
             return
-        scores: np.ndarray | None = pose.points.scores
-        nose_score: float = scores[Keypoint.nose.value]
+        scores: np.ndarray | None = pose.point_data.scores
+        nose_score: float = scores[PoseJoint.nose.value]
         if nose_score < 0.3:
             self._notify_callback(pose, self.current_rect)
             return
-        nose_x: float = keypoints[Keypoint.nose.value][0]
-        nose_y: float = keypoints[Keypoint.nose.value][1]
+        nose_x: float = keypoints[PoseJoint.nose.value][0]
+        nose_y: float = keypoints[PoseJoint.nose.value][1]
 
         # Calculate rectangle dimensions
         height: float = (bottom - nose_y) / (self.bottom_dest_y- self.nose_dest_y)
@@ -95,7 +96,7 @@ class PoseSmoothRect():
         # Notify callbacks with the updated rectangle
         self._notify_callback(pose, self.current_rect)
 
-        if pose.is_final:
+        if pose.is_removed:
             self.current_rect = None
             self.velocity = Rect(0.0, 0.0, 0.0, 0.0)
 

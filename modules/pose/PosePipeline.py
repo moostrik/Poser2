@@ -9,7 +9,7 @@ import numpy as np
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, Rect, TrackingStatus
-from modules.pose.PoseDefinitions import ModelTypeNames, Pose, PoseCallback
+from modules.pose.PoseDefinitions import PoseModelTypeNames, Pose, PoseCallback
 from modules.pose.PoseDetection import PoseDetection as Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.pose.PoseAngleCalculator import PoseAngleCalculator
@@ -42,7 +42,7 @@ class PosePipeline(Thread):
 
         if self.pose_active:
             self.pose_detector = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, settings.pose_verbose)
-            print('Pose Detection:', 'model', ModelTypeNames[settings.pose_model_type.value])
+            print('Pose Detection:', 'model', PoseModelTypeNames[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')
 
@@ -95,7 +95,6 @@ class PosePipeline(Thread):
                 continue
 
     def _process(self, tracklet: Tracklet) -> None:
-        pose_final: bool = tracklet.is_removed
 
         pose_image: Optional[np.ndarray] = None
         pose_crop_rect: Optional[Rect] = None
@@ -105,13 +104,9 @@ class PosePipeline(Thread):
             pose_image, pose_crop_rect = self.image_processor.process_pose_image(tracklet, cam_image)
 
         pose = Pose(
-            id=tracklet.id,
-            cam_id=tracklet.cam_id,
-            time_stamp=tracklet.time_stamp,
             tracklet=tracklet,
             crop_rect = pose_crop_rect,
-            image = pose_image,
-            is_final = pose_final
+            crop_image = pose_image,
         )
         if True:
             if self.pose_detector is not None:

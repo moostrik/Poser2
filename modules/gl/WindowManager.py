@@ -2,6 +2,7 @@
 from enum import Enum
 from threading import Thread, Lock, current_thread
 from time import sleep, time_ns
+import traceback
 from typing import Callable, Optional
 
 # Third-party imports
@@ -239,8 +240,8 @@ class WindowManager():
         try:
             self.renderer.draw_main(self.window_width, self.window_height)
         except Exception as e:
-            pass
             print(f"Error in draw: {e}")
+            traceback.print_exc()
 
         glfw.swap_buffers(self.main_window)
         self.fps.tick()
@@ -317,6 +318,7 @@ class WindowManager():
             self.renderer.draw_secondary(monitor_id, width, height)
         except Exception as e:
             print(f"Error in draw_secondary: {e}")
+            traceback.print_exc()  # This prints the stack trace
         glfw.swap_buffers(window)
 
     @staticmethod

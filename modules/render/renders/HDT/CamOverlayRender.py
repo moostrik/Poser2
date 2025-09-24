@@ -12,7 +12,7 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.gl.Texture import Texture
 
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import Pose, PoseAngleNames
+from modules.pose.PoseDefinitions import Pose, PoseAngleJointNames
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
@@ -77,7 +77,7 @@ class CamOverlayRender(BaseRender):
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        if pose.is_final:
+        if pose.is_removed:
             return
 
         tracklet: Tracklet | None = pose.tracklet
@@ -85,10 +85,10 @@ class CamOverlayRender(BaseRender):
             draw_box: bool = tracklet.is_lost
             CamOverlayRender.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
         fbo.end()
-        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5 / fbo.height)
+        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, line_width=1.5 / fbo.height)
 
 
-        angle_num: int = len(PoseAngleNames)
+        angle_num: int = len(PoseAngleJointNames)
         step: float = fbo.height / angle_num
         fbo.begin()
 
@@ -96,7 +96,7 @@ class CamOverlayRender(BaseRender):
         colors: list[tuple[float, float, float, float]] = [(1.0, 0.5, 0.0, 1.0), (0.0, 0.8, 1.0, 1.0)]
 
         for i in range(angle_num):
-            string: str = PoseAngleNames[i]
+            string: str = PoseAngleJointNames[i]
             x: int = 10
             y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
             clr: int = i % 2

@@ -11,7 +11,7 @@ from modules.gl.Mesh import Mesh
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import Pose, PoseAngleNames
+from modules.pose.PoseDefinitions import Pose, PoseAngleJointNames
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
@@ -58,7 +58,7 @@ class PoseRender(BaseRender):
         pose: Pose | None = self.data.get_pose(key, True, self.key())
         if pose is None:
             return #??
-        pose_image_np: np.ndarray | None = pose.image
+        pose_image_np: np.ndarray | None = pose.crop_image
         if pose_image_np is not None:
             self.image.set_image(pose_image_np)
             self.image.update()
@@ -83,7 +83,7 @@ class PoseRender(BaseRender):
     def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_image: Image, angle_mesh: Mesh, shader: WS_PoseStream) -> None:
         fbo.begin()
 
-        if pose.is_final:
+        if pose.is_removed:
             glClearColor(0.0, 0.0, 0.0, 1.0)
             glClear(GL_COLOR_BUFFER_BIT)
             return
@@ -99,7 +99,7 @@ class PoseRender(BaseRender):
         shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5 / fbo.height)
 
 
-        angle_num: int = len(PoseAngleNames)
+        angle_num: int = len(PoseAngleJointNames)
         step: float = fbo.height / angle_num
         fbo.begin()
 
@@ -107,7 +107,7 @@ class PoseRender(BaseRender):
         colors: list[tuple[float, float, float, float]] = [(1.0, 0.5, 0.0, 1.0), (0.0, 0.8, 1.0, 1.0)]
 
         for i in range(angle_num):
-            string: str = PoseAngleNames[i]
+            string: str = PoseAngleJointNames[i]
             x: int = 10
             y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
             clr: int = i % 2

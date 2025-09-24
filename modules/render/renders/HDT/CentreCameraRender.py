@@ -9,7 +9,7 @@ from modules.gl.Image import Image
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.PoseDefinitions import Pose, PoseAngleNames, Keypoint
+from modules.pose.PoseDefinitions import Pose, PoseAngleJointNames, PoseJoint
 from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
@@ -25,11 +25,10 @@ class CentreCameraRender(BaseRender):
         self.cam_fbo: Fbo = Fbo()
         self.cam_image: Image = Image()
 
-        self.smooth_rect: PoseSmoothRect = PoseSmoothRect()
+        self.rect_smoother: PoseSmoothRect = PoseSmoothRect()
 
-        self.last_pose: Pose | None = None
-        self.last_Rect: Rect | None = None
-        # self.last_tracklet: Tracklet | None = None
+        # self.last_pose: Pose | None = None
+        # self.last_Rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
         text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -45,53 +44,52 @@ class CentreCameraRender(BaseRender):
     def update(self) -> None:
         key: int = self.cam_id
 
-        tracklets: list[Tracklet] = self.data.get_tracklets_for_cam(self.cam_id)
-        if not tracklets:
-            self.clear_fbo()
+        if key != 2:
             return
-        # cam_image_roi: Rect = getattr(self.last_tracklet.metadata, "smooth_rect", Rect(0.0, 0.0, 1.0, 1.0))
 
-        pose: Pose | None = self.data.get_pose(key, False, self.key())
+        pose: Pose | None = self.data.get_pose(key, only_new_data=False, consumer_key=self.key())
+        if pose is None: # only on start of program
+            return
 
-        if pose is not None:
-            self.last_pose = pose
 
-        if self.last_pose is not None:
-            self.last_Rect = self.smooth_rect._update(self.last_pose)
-
-            # if pose.smooth_rect is not None:
-            #     self.last_Rect = pose.smooth_rect
-
-        if self.last_Rect is None:
-            self.last_Rect = Rect(0.0, 0.0, 1.0, 1.0)
+        if pose.is_removed:
+            self.rect_smoother.reset()
+            self.clear_render()
+            return
 
         cam_image_np: np.ndarray | None = self.data.get_cam_image(key, True, self.key())
-
         if cam_image_np is not None:
             self.cam_image.set_image(cam_image_np)
             self.cam_image.update()
+
+        # self.last_Rect = self.rect_smoother._update(pose)
+        # print(f"Cam {key} Rect: {self.last_Rect}")
+
+
+
+        smooth_rect: Rect = self.rect_smoother.update(pose)
 
 
 
         # print (self.cam_image.width,self.cam_image.height)
         cam_image_aspect_ratio: float = self.cam_image.width / self.cam_image.height
 
-        width: float =  self.last_Rect.width / cam_image_aspect_ratio
+        width: float =  smooth_rect.width / cam_image_aspect_ratio
 
-        x: float =  self.last_Rect.x + ( self.last_Rect.width - width) / 2.0
+        x: float =  smooth_rect.x + ( smooth_rect.width - width) / 2.0
 
 
         BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
 
         self.cam_image.draw_roi(0, 0, self.cam_fbo.width, self.cam_fbo.height,
-                                x,  self.last_Rect.y, width,  self.last_Rect.height)
+                                x,  smooth_rect.y, width,  smooth_rect.height)
 
         glColor4f(1.0, 1.0, 1.0, 1.0)
         self.cam_fbo.end()
 
 
-    def clear_fbo(self) -> None:
+    def clear_render(self) -> None:
         BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
@@ -110,6 +108,7 @@ class PoseSmoothRect():
         self.src_aspectratio: float = 16 / 9
         self.dst_aspectratio: float = aspectratio
 
+        self.default_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
         self.current_rect: Rect | None = None
 
         # Spring-damper system state
@@ -125,7 +124,8 @@ class PoseSmoothRect():
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
 
-    def _update(self, pose: Pose) -> Rect | None:
+    def update(self, pose: Pose) -> Rect:
+        self.default_rect: Rect = Rect(0.0, 0.0, 0.0, 0.0)
 
         self.nose_dest_x: float = 0.5
         self.nose_dest_y: float = 0.4
@@ -137,18 +137,24 @@ class PoseSmoothRect():
         # Get the bottom and nose positions
         pose_rect: Rect | None = pose.crop_rect
         if pose_rect is None:
+            # print(f"PoseSmoothRect: No crop rect for pose {pose.id}, this should not happen")
+            return self.default_rect
+
+        if self.current_rect is None:
+            self.current_rect = pose_rect
             return self.current_rect
+
         bottom: float = min(pose_rect.bottom, 1.0)
 
-        keypoints: np.ndarray | None = pose.get_absolute_keypoints()
-        if pose.points is None or keypoints is None:
+        keypoints: np.ndarray | None = pose.absolute_points
+        if pose.point_data is None or keypoints is None:
             return self.current_rect
-        scores: np.ndarray | None = pose.points.scores
-        nose_score: float = scores[Keypoint.nose.value]
+        scores: np.ndarray | None = pose.point_data.scores
+        nose_score: float = scores[PoseJoint.nose.value]
         if nose_score < 0.3:
             return self.current_rect
-        nose_x: float = keypoints[Keypoint.nose.value][0]
-        nose_y: float = keypoints[Keypoint.nose.value][1]
+        nose_x: float = keypoints[PoseJoint.nose.value][0]
+        nose_y: float = keypoints[PoseJoint.nose.value][1]
 
         # Calculate rectangle dimensions
         height: float = (bottom - nose_y) / (self.bottom_dest_y- self.nose_dest_y)
@@ -158,32 +164,32 @@ class PoseSmoothRect():
         new_rect = Rect(left, top, width, height)
 
         # Apply spring-damper smoothing
-        if self.current_rect is not None:
-            smooth_x, self.velocity.x = self._apply_spring_damper(
-                new_rect.x, self.current_rect.x, self.velocity.x,
-                self.spring_constant, self.damping_ratio
-            )
-            smooth_y, self.velocity.y = self._apply_spring_damper(
-                new_rect.y, self.current_rect.y, self.velocity.y,
-                self.spring_constant, self.damping_ratio
-            )
-            smooth_h, self.velocity.height = self._apply_spring_damper(
-                new_rect.height, self.current_rect.height, self.velocity.height,
-                self.spring_constant, self.damping_ratio
-            )
-            smooth_w: float = smooth_h * self.dst_aspectratio
-            self.current_rect = Rect(x=smooth_x, y=smooth_y, height=smooth_h, width=smooth_w)
-        else:
-            self.current_rect = new_rect
 
-        return_rect: Rect | None = self.current_rect
+        smooth_x, self.velocity.x = self._apply_spring_damper(
+            new_rect.x, self.current_rect.x, self.velocity.x,
+            self.spring_constant, self.damping_ratio
+        )
+        smooth_y, self.velocity.y = self._apply_spring_damper(
+            new_rect.y, self.current_rect.y, self.velocity.y,
+            self.spring_constant, self.damping_ratio
+        )
+        smooth_h, self.velocity.height = self._apply_spring_damper(
+            new_rect.height, self.current_rect.height, self.velocity.height,
+            self.spring_constant, self.damping_ratio
+        )
+        smooth_w: float = smooth_h * self.dst_aspectratio
+        self.current_rect = Rect(x=smooth_x, y=smooth_y, height=smooth_h, width=smooth_w)
 
-        if pose.is_final:
-            self.current_rect = None
-            self.velocity = Rect(0.0, 0.0, 0.0, 0.0)
+        return_rect: Rect = self.current_rect
+
+        if pose.is_removed:
+            self.reset() # redundant
 
         return return_rect
 
+    def reset(self) -> None:
+        self.current_rect = None
+        self.velocity = Rect(0.0, 0.0, 0.0, 0.0)
 
     # STATIC METHODS
     @staticmethod

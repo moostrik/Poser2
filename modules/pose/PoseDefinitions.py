@@ -1,35 +1,25 @@
-# based on
-# https://www.tensorflow.org/hub/tutorials/movenet
-# https://github.com/Kazuhito00/MoveNet-Python-Example/tree/main
-# Lightning for low latency, Thunder for high accuracy
-
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
-from threading import Lock
 import numpy as np
 from typing import TypedDict
 from typing import Optional, Callable
-from modules.tracker.Tracklet import Tracklet, Rect
-from pandas import Timestamp
-
-NUM_KEYPOINTS = 17
-NUM_KEYPOINT_VALUES = 3 # [y, x, score]
-MULTIPOSE_BOX_SIZE = 5  # [ymin, xmin, ymax, xmax, score]
-MULTIPOSE_BOX_IDX = NUM_KEYPOINTS * NUM_KEYPOINT_VALUES
-MULTIPOSE_BOX_SCORE_IDX = MULTIPOSE_BOX_IDX + 4
-MULTIPOSE_INSTANCE_SIZE = NUM_KEYPOINTS * NUM_KEYPOINT_VALUES + MULTIPOSE_BOX_SIZE
+from modules.tracker.Tracklet import Tracklet
+from modules.utils.PointsAndRects import Rect
 
 
-class ModelType(Enum):
+# MODEL
+POSEMODELWIDTH = 192
+POSEMODELHEIGHT = 256
+
+class PoseModelType(Enum):
     NONE =   0
     LARGE =  1
     MEDIUM = 2
     SMALL =  3
     TINY =   4
+PoseModelTypeNames: list[str] = [e.name for e in PoseModelType]
 
-ModelTypeNames: list[str] = [e.name for e in ModelType]
-
-ModelFileNames: list[tuple[str, str]] = [
+PoseModelFileNames: list[tuple[str, str]] = [
     ('none', ''),
     ('rtmpose-l_8xb256-420e_aic-coco-256x192.py', 'rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth'),
     ('rtmpose-m_8xb256-420e_aic-coco-256x192.py', 'rtmpose-m_simcc-aic-coco_pt-aic-coco_420e-256x192-63eb25f7_20230126.pth'),
@@ -37,7 +27,8 @@ ModelFileNames: list[tuple[str, str]] = [
     ('rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth')
 ]
 
-class Keypoint(IntEnum):
+# JOINTS
+class PoseJoint(IntEnum):
     nose =          0
     left_eye =      1
     right_eye =     2
@@ -55,34 +46,29 @@ class Keypoint(IntEnum):
     right_knee =    14
     left_ankle =    15
     right_ankle =   16
+PoseJointNames: list[str] = [e.name for e in PoseJoint]
 
-KeypointNames: list[str] = [e.name for e in Keypoint]
-
-PoseEdgeList: list[list[Keypoint]] = [
-    [Keypoint.nose, Keypoint.left_eye],
-    [Keypoint.nose, Keypoint.right_eye],
-    [Keypoint.left_eye, Keypoint.left_ear],
-    [Keypoint.right_eye, Keypoint.right_ear],
-    [Keypoint.left_shoulder, Keypoint.right_shoulder],
-    [Keypoint.left_shoulder, Keypoint.left_elbow],
-    [Keypoint.right_shoulder, Keypoint.right_elbow],
-    [Keypoint.left_elbow, Keypoint.left_wrist],
-    [Keypoint.right_elbow, Keypoint.right_wrist],
-    [Keypoint.left_shoulder, Keypoint.left_hip],
-    [Keypoint.right_shoulder, Keypoint.right_hip],
-    [Keypoint.left_hip, Keypoint.left_knee],
-    [Keypoint.right_hip, Keypoint.right_knee],
-    [Keypoint.left_knee, Keypoint.left_ankle],
-    [Keypoint.right_knee, Keypoint.right_ankle]
+# VERTICES
+PoseVertexList: list[list[PoseJoint]] = [
+    [PoseJoint.nose, PoseJoint.left_eye],
+    [PoseJoint.nose, PoseJoint.right_eye],
+    [PoseJoint.left_eye, PoseJoint.left_ear],
+    [PoseJoint.right_eye, PoseJoint.right_ear],
+    [PoseJoint.left_shoulder, PoseJoint.right_shoulder],
+    [PoseJoint.left_shoulder, PoseJoint.left_elbow],
+    [PoseJoint.right_shoulder, PoseJoint.right_elbow],
+    [PoseJoint.left_elbow, PoseJoint.left_wrist],
+    [PoseJoint.right_elbow, PoseJoint.right_wrist],
+    [PoseJoint.left_shoulder, PoseJoint.left_hip],
+    [PoseJoint.right_shoulder, PoseJoint.right_hip],
+    [PoseJoint.left_hip, PoseJoint.left_knee],
+    [PoseJoint.right_hip, PoseJoint.right_knee],
+    [PoseJoint.left_knee, PoseJoint.left_ankle],
+    [PoseJoint.right_knee, PoseJoint.right_ankle]
 ]
-
-# convert PoseIndices to a 1 dimentional np.ndarray
-PoseEdgeFlatList: np.ndarray = np.array([kp.value for pose in PoseEdgeList for kp in pose], dtype=np.int32)
-
-# make an array of increasing indices with the length of KeypointFlatList
-PoseEdgeIndices: np.ndarray = np.arange(len(PoseEdgeFlatList), dtype=np.int32)
-
-PoseEdgeColors: list[tuple[float, float, float]] = [
+PoseVertexArray: np.ndarray = np.array([kp.value for pose in PoseVertexList for kp in pose], dtype=np.int32)
+PoseVertexIndices: np.ndarray = np.arange(len(PoseVertexArray), dtype=np.int32)
+PoseVertexColors: list[tuple[float, float, float]] = [
     (1.0, 0.7, 0.4),   # nose-left_eye
     (0.4, 0.7, 1.0),   # nose-right_eye
     (1.0, 0.8, 0.6),   # left_eye-left_ear
@@ -100,130 +86,154 @@ PoseEdgeColors: list[tuple[float, float, float]] = [
     (0.6, 0.8, 1.0),   # right_knee-right_ankle
 ]
 
-PoseAngleKeypoints: dict[Keypoint, tuple[Keypoint, Keypoint, Keypoint]] = {
-    Keypoint.left_shoulder:  ( Keypoint.left_hip,       Keypoint.left_shoulder,  Keypoint.left_elbow  ),
-    Keypoint.right_shoulder: ( Keypoint.right_hip,      Keypoint.right_shoulder, Keypoint.right_elbow ),
-    Keypoint.left_elbow:     ( Keypoint.left_shoulder,  Keypoint.left_elbow,     Keypoint.left_wrist  ),
-    Keypoint.right_elbow:    ( Keypoint.right_shoulder, Keypoint.right_elbow,    Keypoint.right_wrist ),
-    # Keypoint.left_hip:       ( Keypoint.left_shoulder,  Keypoint.left_hip,       Keypoint.left_knee   ),
-    # Keypoint.right_hip:      ( Keypoint.right_shoulder, Keypoint.right_hip,      Keypoint.right_knee  ),
-    # Keypoint.left_knee:      ( Keypoint.left_hip,       Keypoint.left_knee,      Keypoint.left_ankle  ),
-    # Keypoint.right_knee:     ( Keypoint.right_hip,      Keypoint.right_knee,     Keypoint.right_ankle ),
-}
+# POINT DATA
+@dataclass (frozen=True)
+class PosePointData():
+    points: np.ndarray      # shape (17, 2)
+    scores: np.ndarray      # shape (17, 1)
 
-PoseAngleNames: list[str] = [k.name for k in PoseAngleKeypoints.keys()]
+    _vertices: Optional[np.ndarray] = field(default=None, init=False, repr=False)
+    _vertex_colors: Optional[np.ndarray] = field(default=None, init=False, repr=False)
 
-class JointAngle(TypedDict):
-    angle: float         # The computed joint angle (degrees, or np.nan if invalid)
-    confidence: float    # The minimum confidence score among the three keypoints
+    @property
+    def vertices(self) -> np.ndarray:
+        if self._vertices is not None:
+            return self._vertices
 
-JointAngleDict = dict[Keypoint, JointAngle]
+        vertices: np.ndarray = np.zeros((len(PoseVertexArray), 2), dtype=np.float32)
+        for i in range(len(PoseVertexArray)):
+            vertices[i] = self.points[PoseVertexArray[i]]
 
-class PosePoints():
-    def __init__(self, keypoints: np.ndarray, scores: np.ndarray) -> None:
-        self.keypoints: np.ndarray = keypoints  # shape (NUM_KEYPOINTS, 2)
-        self.scores: np.ndarray = scores        # shape (NUM_KEYPOINTS,)
-        # self.mean_score = float(np.mean(scores))
-
-    def getKeypoints(self) -> np.ndarray:
-        return self.keypoints
-
-    def getScores(self) -> np.ndarray:
-        return self.scores
-
-    def getVertices(self) -> np.ndarray:
-        vertices: np.ndarray = np.zeros((len(PoseEdgeFlatList), 2), dtype=np.float32)
-        keypoints: np.ndarray = self.getKeypoints()
-        for i in range(len(PoseEdgeFlatList)):
-            vertices[i] = keypoints[PoseEdgeFlatList[i]]
+        object.__setattr__(self, '_vertices', vertices)
         return vertices
 
-    def getColors(self, threshold: float = 0.0, r: float = 1.0, g:float = 1.0, b:float = 1.0, a:float = 1.0) -> np.ndarray:
-        colors: np.ndarray = np.zeros((len(PoseEdgeFlatList), 4), dtype=np.float32)
-        scores: np.ndarray = self.getScores()
-        for i in range(len(PoseEdgeList)):
-            kp1: int = PoseEdgeList[i][0].value
-            kp2: int = PoseEdgeList[i][1].value
+    @property
+    def vertex_colors(self) -> np.ndarray:
+        if self._vertex_colors is not None:
+            return self._vertex_colors
+
+        vertex_colors: np.ndarray = np.zeros((len(PoseVertexArray), 4), dtype=np.float32)
+        scores: np.ndarray = self.scores
+        for i in range(len(PoseVertexList)):
+            kp1: int = PoseVertexList[i][0].value
+            kp2: int = PoseVertexList[i][1].value
             s1: float = scores[kp1]
             s2: float = scores[kp2]
             score: float = min(s1, s2)
-            alpha: float = 0.0
-            C: tuple[float, float, float] = PoseEdgeColors[i]
-            if score > threshold:
-                alpha = (score - threshold) / (1 - threshold) * a
-            colors[i*2] = [C[0], C[1], C[2], alpha]
-            colors[i*2+1] = [C[0], C[1], C[2], alpha]
-        return colors
+            alpha: float = score
+            C: tuple[float, float, float] = PoseVertexColors[i]
+            vertex_colors[i*2] = [C[0], C[1], C[2], alpha]
+            vertex_colors[i*2+1] = [C[0], C[1], C[2], alpha]
 
-PoseList = list[PosePoints]
+        object.__setattr__(self, '_vertex_colors', vertex_colors)
+        return vertex_colors
+
+# ANGLE DATA
+PoseAngleJointTriplets: dict[PoseJoint, tuple[PoseJoint, PoseJoint, PoseJoint]] = {
+    # PoseJoint.nose:           ( PoseJoint.left_eye,       PoseJoint.nose,           PoseJoint.right_eye   ),0
+    # PoseJoint.left_eye:       ( PoseJoint.left_ear,       PoseJoint.left_eye,       PoseJoint.right_eye   ),
+    # PoseJoint.right_eye:      ( PoseJoint.left_eye,       PoseJoint.right_eye,      PoseJoint.right_ear   ),
+    PoseJoint.left_shoulder:  ( PoseJoint.left_hip,       PoseJoint.left_shoulder,  PoseJoint.left_elbow  ),
+    PoseJoint.right_shoulder: ( PoseJoint.right_hip,      PoseJoint.right_shoulder, PoseJoint.right_elbow ),
+    PoseJoint.left_elbow:     ( PoseJoint.left_shoulder,  PoseJoint.left_elbow,     PoseJoint.left_wrist  ),
+    PoseJoint.right_elbow:    ( PoseJoint.right_shoulder, PoseJoint.right_elbow,    PoseJoint.right_wrist ),
+    # PoseJoint.left_hip:       ( PoseJoint.left_shoulder,  PoseJoint.left_hip,       PoseJoint.left_knee   ),
+    # PoseJoint.right_hip:      ( PoseJoint.right_shoulder, PoseJoint.right_hip,      PoseJoint.right_knee  ),
+    # PoseJoint.left_knee:      ( PoseJoint.left_hip,       PoseJoint.left_knee,      PoseJoint.left_ankle  ),
+    # PoseJoint.right_knee:     ( PoseJoint.right_hip,      PoseJoint.right_knee,     PoseJoint.right_ankle ),
+}
+PoseAngleJointLookup: dict[PoseJoint, int] = {joint: i for i, joint in enumerate(PoseAngleJointTriplets.keys())}
+PoseAngleJointNames: list[str] = [e.name for e in PoseAngleJointTriplets.keys()]
+NUM_POSE_ANGLES: int = len(PoseAngleJointTriplets)
 
 @dataclass (frozen=True)
+class PoseAngleData():
+    angles: np.ndarray = np.full(NUM_POSE_ANGLES, np.nan, dtype=np.float32) # The computed joint angles (in radians [-Pi...Pi], or np.nan if invalid)
+    scores: np.ndarray = np.zeros(NUM_POSE_ANGLES, dtype=np.float32)        # The minimum confidence score among the three PoseJoints
+
+# THE POSE
+@dataclass (frozen=True)
 class Pose:
-    id: int # Unique identifier for the pose data, typically the tracklet ID
-    cam_id: int
-    time_stamp: Timestamp
     tracklet: Tracklet = field(repr=False)
 
     crop_rect: Optional[Rect] = field(default = None)
-    smooth_rect: Optional[Rect] = field(default = None)
-    image: Optional[np.ndarray] = field(default = None, repr=False)
+    crop_image: Optional[np.ndarray] = field(default = None, repr=False)
 
-    points: Optional[PosePoints] = field(default=None, repr=False)
-    angles: Optional[JointAngleDict] = field(default=None)
+    point_data: Optional[PosePointData] = field(default=None, repr=False)
+    angle_data: Optional[PoseAngleData] = field(default=None)
 
-    is_final: bool = field(default=False, repr=False)
+    def __getattribute__(self, name):
+        # Try to get attribute from Pose first
+        try:
+            return super().__getattribute__(name)
+        except AttributeError:
+            # If not found, delegate to tracklet
+            tracklet = super().__getattribute__('tracklet')
+            if hasattr(tracklet, name):
+                return getattr(tracklet, name)
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
-    def get_absolute_keypoints(self) -> Optional[np.ndarray]:
+    def __getattr__(self, name):
         """
-        Get keypoints in the original rectangle coordinates.
-        Returns a tuple of (keypoints, scores) or None if not available.
+        Delegate attribute access to tracklet if attribute isn't found in Pose
+        For backward compatibility, use pose.tracklet.id, etc. instead
         """
-        if self.points is None or self.crop_rect is None:
+        if hasattr(self.tracklet, name):
+            return getattr(self.tracklet, name)
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
+    @property
+    def absolute_points(self) -> Optional[np.ndarray]:
+        """
+        Get PoseJoints in the original rectangle coordinates.
+        Returns a tuple of (PoseJoints, scores) or None if not available.
+        """
+        if self.point_data is None or self.crop_rect is None:
             return None
 
-        keypoints = self.points.keypoints  # Normalized coordinates within the model
-        rect = self.crop_rect
+        PoseJoints: np.ndarray = self.point_data.points  # Normalized coordinates within the model
+        rect: Rect = self.crop_rect
 
         # Convert from normalized coordinates to actual pixel coordinates in the crop rect
-        real_keypoints = np.zeros_like(keypoints)
-        real_keypoints[:, 0] = keypoints[:, 0] * rect.width + rect.x  # x coordinates
-        real_keypoints[:, 1] = keypoints[:, 1] * rect.height + rect.y  # y coordinates
+        real_PoseJoints: np.ndarray = np.zeros_like(PoseJoints)
+        real_PoseJoints[:, 0] = PoseJoints[:, 0] * rect.width + rect.x  # x coordinates
+        real_PoseJoints[:, 1] = PoseJoints[:, 1] * rect.height + rect.y  # y coordinates
 
-        return real_keypoints
+        return real_PoseJoints
 
     def get_approximate_person_length(self, threshold: float = 0.3) -> float | None:
         """
         Estimate the person's length by summing the lengths of both arms and both legs,
-        only if all keypoints for a limb are above the confidence threshold.
+        only if all PoseJoints for a limb are above the confidence threshold.
         """
 
-        if self.points is None:
+        if self.point_data is None:
             return None
 
-        keypoints = self.points.getKeypoints()  # shape (NUM_KEYPOINTS, 2)
-        scores = self.points.getScores()        # shape (NUM_KEYPOINTS,)
-        height = self.crop_rect.height if self.crop_rect is not None else 1.0
+        PoseJoints: np.ndarray = self.point_data.points
+        scores: np.ndarray = self.point_data.scores
+        height: float = self.crop_rect.height if self.crop_rect is not None else 1.0
 
-        # Define the keypoint triplets for each limb
+        # Define the PoseJoint triplets for each limb
         limbs = [
             # Arms: shoulder -> elbow -> wrist
-            (Keypoint.left_shoulder, Keypoint.left_elbow, Keypoint.left_wrist),
-            (Keypoint.right_shoulder, Keypoint.right_elbow, Keypoint.right_wrist),
+            (PoseJoint.left_shoulder, PoseJoint.left_elbow, PoseJoint.left_wrist),
+            (PoseJoint.right_shoulder, PoseJoint.right_elbow, PoseJoint.right_wrist),
             # Legs: hip -> knee -> ankle
-            (Keypoint.left_hip, Keypoint.left_knee, Keypoint.left_ankle),
-            (Keypoint.right_hip, Keypoint.right_knee, Keypoint.right_ankle),
+            (PoseJoint.left_hip, PoseJoint.left_knee, PoseJoint.left_ankle),
+            (PoseJoint.right_hip, PoseJoint.right_knee, PoseJoint.right_ankle),
         ]
 
         limb_lengths: list[float] = []
         for kp1, kp2, kp3 in limbs:
-            # Check if all keypoints for this limb are above threshold
+            # Check if all PoseJoints for this limb are above threshold
             if (scores[kp1] > threshold and scores[kp2] > threshold and scores[kp3] > threshold):
                 # Calculate limb length as sum of two segments
-                seg1: float = float(np.linalg.norm(keypoints[kp1] - keypoints[kp2]))
-                seg2: float = float(np.linalg.norm(keypoints[kp2] - keypoints[kp3]))
+                seg1: float = float(np.linalg.norm(PoseJoints[kp1] - PoseJoints[kp2]))
+                seg2: float = float(np.linalg.norm(PoseJoints[kp2] - PoseJoints[kp3]))
                 limb_lengths.append(seg1 + seg2)
 
         return max(limb_lengths) * 2.5 * height if limb_lengths else None
 
-PoseDict = dict[int, Pose]
+PoseDict = dict[PoseJoint, Pose]
 PoseCallback = Callable[[Pose], None]

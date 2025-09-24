@@ -8,7 +8,7 @@ from typing import Optional, TypeVar, Generic
 
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameType
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import Pose, PosePoints, PoseEdgeIndices
+from modules.pose.PoseDefinitions import Pose, PosePointData, PoseVertexIndices
 from modules.pose.PoseStream import PoseStreamData
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.WS.WSOutput import WSOutput
@@ -87,6 +87,11 @@ class DataManager:
     def get_tracklets_for_cam(self, cam_id: int) -> list[Tracklet]:
         with self.mutex:
             return [v.value for v in self.tracklets.values() if v.value is not None and v.value.cam_id == cam_id]
+
+
+    def get_active_tracklets_for_cam(self, cam_id: int) -> list[Tracklet]:
+        with self.mutex:
+            return [v.value for v in self.tracklets.values() if v.value is not None and v.value.cam_id == cam_id and v.value.is_active]
 
     # Pose management
     def set_pose(self, value: Pose) -> None:

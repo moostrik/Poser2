@@ -14,7 +14,7 @@ from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
 from modules.render.DataManager import DataManager
-from modules.pose.PoseDefinitions import JointAngle, Keypoint, Pose, PoseAngleNames
+from modules.pose.PoseDefinitions import PoseAngleData, PoseJoint, Pose, PoseAngleJointNames
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.renders.BaseRender import BaseRender, Rect
 

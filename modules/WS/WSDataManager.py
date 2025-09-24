@@ -6,7 +6,7 @@ from time import time
 
 from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import JointAngle, Pose, PoseAngleNames, JointAngleDict, PoseAngleKeypoints, Keypoint, PosePoints, Rect
+from modules.pose.PoseDefinitions import PoseAngleData, Pose, PoseAngleJointNames, PoseAngleJointTriplets, PoseJoint, PosePointData, Rect
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -39,7 +39,7 @@ class WSData:
 
         self.filters["world_angle"] = SmoothOneEuroCircular(frequency)
         self.filters["approximate_person_length"] = SmoothOneEuro(frequency)
-        for key in PoseAngleKeypoints.keys():
+        for key in PoseAngleJointTriplets.keys():
             angle_name: str = key.name
             self.filters[angle_name] = SmoothOneEuroCircular(frequency)
 
@@ -82,17 +82,17 @@ class WSData:
             self.present = True
 
 
-            angles: JointAngleDict | None  = pose.angles
-            if angles is not None:
-                # print(angles)
-                for key in PoseAngleKeypoints.keys():
-                    angle_value: JointAngle = angles[key]
-                    angle_name: str = key.name
-                    if angle_value['confidence'] > 0.3 and angle_value['angle'] is not np.nan:
-                        setattr(self, angle_name, angle_value['angle'])
+            # angles: PoseAngleData | None  = pose.angle_data
+            # if angles is not None:
+            #     # print(angles)
+            #     for key in PoseAngleJointTriplets.keys():
+            #         angle_value: PoseAngleData = angles[key]
+            #         angle_name: str = key.name
+            #         if angle_value['confidence'] > 0.3 and angle_value['angle'] is not np.nan:
+            #             setattr(self, angle_name, angle_value['angle'])
 
-                    # print(f"Setting {angle_name} to {angle_value.angle}")
-                    # setattr(self, angle_name, angle_value)
+            #         # print(f"Setting {angle_name} to {angle_value.angle}")
+            #         # setattr(self, angle_name, angle_value)
 
             approximate_person_length: float | None = pose.get_approximate_person_length()
             if approximate_person_length is not None:
@@ -100,11 +100,11 @@ class WSData:
 
             world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
             nose_angle_offset: float | None = None
-            pose_points: PosePoints | None = pose.points
+            pose_points: PosePointData | None = pose.point_data
             crop_rect: Rect | None = pose.crop_rect
             if pose_points is not None and crop_rect is not None:
-                nose_x = pose_points.getKeypoints()[Keypoint.nose.value][0]
-                nose_conf = pose_points.getScores()[Keypoint.nose.value]
+                nose_x = pose_points.points[PoseJoint.nose.value][0]
+                nose_conf = pose_points.scores[PoseJoint.nose.value]
                 if nose_conf > 0.3:
                     # calculate nose offset from center of crop rect
                     crop_center_x: float = crop_rect.center.x
@@ -121,7 +121,7 @@ class WSData:
             self.world_angle: float = np.deg2rad(world_angle - 180)
             # print (self.world_angle)
 
-        if pose.is_final:
+        if pose.is_removed:
             self.reset()
 
     def add_stream(self, stream: PoseStreamData) -> None:

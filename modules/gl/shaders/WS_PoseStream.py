@@ -2,6 +2,7 @@ from OpenGL.GL import * # type: ignore
 from OpenGL.GL.shaders import ShaderProgram # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
+from modules.pose.PoseDefinitions import PoseJoint, PoseAngleJointLookup
 from modules.pose.PoseStream import PoseStreamData
 import numpy as np
 
@@ -40,9 +41,18 @@ class WS_PoseStream(Shader):
 
 
     @staticmethod
-    def pose_stream_to_image(pose_stream: PoseStreamData, confidence_ceil: bool = True) -> np.ndarray:
+    def pose_stream_to_image(pose_stream: PoseStreamData, confidence_ceil: bool = False) -> np.ndarray:
+
+        # selection: list[PoseJoint] = [PoseJoint.left_shoulder, PoseJoint.right_shoulder, PoseJoint.left_elbow, PoseJoint.right_elbow]
+        # selection_indices: list[int] = [PoseAngleJointLookup[joint] for joint in selection if joint in PoseAngleJointLookup]
+        # # print(selection_indices)
+
         angles_raw: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0).astype(np.float32)
         confidences_raw: np.ndarray = pose_stream.confidences.to_numpy()
+
+        # angles_raw = angles_raw[:, selection_indices]
+        # confidences_raw = confidences_raw[:, selection_indices]
+
         angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
         sign_channel: np.ndarray = (angles_raw > 0).astype(np.float32)
         if confidence_ceil:
@@ -50,7 +60,12 @@ class WS_PoseStream(Shader):
         else:
             confidences: np.ndarray = np.clip(confidences_raw.astype(np.float32), 0, 1)
 
-        streams: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1).transpose(1, 0, 2)
+        try:
+            streams: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1).transpose(1, 0, 2)
+        except Exception as e:
+            print(len(confidences), len(sign_channel), len(angles_norm))
+            print(e)
+            return np.zeros((3, pose_stream.capacity, 3), dtype=np.float32)
 
         capacity: int = pose_stream.capacity
         stream_len: int = streams.shape[1]

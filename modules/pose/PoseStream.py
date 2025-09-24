@@ -1,4 +1,5 @@
 # Standard library imports
+import traceback
 from dataclasses import dataclass
 from multiprocessing import Process, Queue, Event
 from threading import Thread
@@ -19,16 +20,16 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class PoseStreamInput:
     id: int
     time_stamp: pd.Timestamp
-    angles: Optional[JointAngleDict]
-    is_final: bool
+    angles: PoseAngleData | None
+    is_removed: bool
 
     @classmethod
     def from_pose(cls, pose: Pose) -> 'PoseStreamInput':
         return cls(
             id=pose.id,
-            time_stamp=pose.time_stamp,
-            angles=pose.angles,
-            is_final=pose.is_final
+            time_stamp=pose.tracklet.time_stamp,
+            angles=pose.angle_data,
+            is_removed=pose.tracklet.is_removed
         )
 
 # Type for analysis output callback
@@ -43,7 +44,7 @@ class PoseStreamData:
 
     def get_last_angles(self) -> list[float]:
         if self.angles.empty:
-            return [0.0] * len(PoseAngleNames)
+            return [0.0] * len(PoseAngleJointNames)
         return self.angles.iloc[-1].tolist()
 
 PoseStreamDataCallback = Callable[[PoseStreamData], None]
@@ -117,9 +118,6 @@ class PoseStreamManager:
             self.processor.add_pose(pose_stream_input)
         except Exception as e:
             print(f"[PoseStream] Error adding pose: {e}")
-            # # If processor is dead, try to restart it
-            # if not self.processor.is_alive() and self.running:
-            #     self._restart_processor()
 
     def add_stream_callback(self, callback: PoseStreamDataCallback) -> None:
         """Register a callback to receive processed data."""
@@ -173,6 +171,7 @@ class PoseStreamProcessor(Process):
                         self._process(pose)
                     except Exception as e:
                         print(f"Error processing pose {pose.id}: {e}")
+                        traceback.print_exc()  # This prints the stack trace
             except:
                 continue
 
@@ -198,7 +197,7 @@ class PoseStreamProcessor(Process):
             print(f"[PoseStreamProcessor] Pose {pose.id} has no angles, skipping")
             return
 
-        if pose.is_final:
+        if pose.is_removed:
             if self.angle_buffers.get(pose.id) is not None:
                 angles: pd.DataFrame | None = self.angle_buffers.pop(pose.id, None)
                 confidences: pd.DataFrame | None = self.confidence_buffers.pop(pose.id, None)
@@ -209,10 +208,10 @@ class PoseStreamProcessor(Process):
         time_stamp: pd.Timestamp = pose.time_stamp
 
         # Update angle window
-        angle_df: pd.DataFrame = self.angle_buffers.get(pose.id, pd.DataFrame(columns=PoseAngleNames))
+        angle_df: pd.DataFrame = self.angle_buffers.get(pose.id, pd.DataFrame(columns=PoseAngleJointNames))
         angle_row: pd.Series = pd.Series(
-            {Keypoint(k).name: v["angle"] for k, v in pose.angles.items()},
-            index=PoseAngleNames  # Ensures all columns are present, missing ones will be NaN
+            {PoseAngleJointNames[i]: pose.angles.angles[i] for i in range(NUM_POSE_ANGLES)},
+            index=PoseAngleJointNames  # Ensures all columns are present, missing ones will be NaN
         )
         angle_df.loc[time_stamp] = angle_row # type: ignore
         angle_df.sort_index(inplace=True)
@@ -220,10 +219,10 @@ class PoseStreamProcessor(Process):
         self.angle_buffers[pose.id] = angle_df
 
         # Update confidence window
-        conf_df: pd.DataFrame = self.confidence_buffers.get(pose.id, pd.DataFrame(columns=PoseAngleNames))
+        conf_df: pd.DataFrame = self.confidence_buffers.get(pose.id, pd.DataFrame(columns=PoseAngleJointNames))
         conf_row: pd.Series = pd.Series(
-            {Keypoint(k).name: v["confidence"] for k, v in pose.angles.items()},
-            index=PoseAngleNames  # Ensures all columns are present, missing ones will be NaN
+            {PoseAngleJointNames[i]: pose.angles.scores[i] for i in range(NUM_POSE_ANGLES)},
+            index=PoseAngleJointNames  # Ensures all columns are present, missing ones will be NaN
         )
         conf_df.loc[time_stamp] = conf_row  # type: ignore
         conf_df.sort_index(inplace=True)

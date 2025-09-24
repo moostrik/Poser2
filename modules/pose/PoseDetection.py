@@ -17,19 +17,19 @@ from mmpose.structures import PoseDataSample
 from mmpose.structures.bbox import bbox_xywh2xyxy
 
 # Local application imports
-from modules.pose.PoseDefinitions import Pose, PosePoints, ModelType, ModelFileNames
+from modules.pose.PoseDefinitions import Pose, PosePointData, PoseModelType, PoseModelFileNames
 
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
 class PoseDetection(Thread):
-    def __init__(self, path: str, model_type:ModelType, fps: float = 30.0, verbose: bool = False) -> None:
+    def __init__(self, path: str, model_type:PoseModelType, fps: float = 30.0, verbose: bool = False) -> None:
         super().__init__()
 
-        if model_type is ModelType.NONE:
+        if model_type is PoseModelType.NONE:
             print('Pose Detection WARNING: ModelType is NONE')
-        self.model_config_file: str = path + '/' + ModelFileNames[model_type.value][0]
-        self.model_checkpoint_file: str = path + '/' + ModelFileNames[model_type.value][1]
+        self.model_config_file: str = path + '/' + PoseModelFileNames[model_type.value][0]
+        self.model_checkpoint_file: str = path + '/' + PoseModelFileNames[model_type.value][1]
         self.model_width: int = 192
         self.model_height: int = 256
 
@@ -69,7 +69,7 @@ class PoseDetection(Thread):
 
                 with self._poses_lock:
                     for pose in self._poses_dict.values():
-                        if pose.image is not None:
+                        if pose.crop_image is not None:
                             current_poses.append(pose)
                         else:
                             empty_poses.append(pose)
@@ -78,7 +78,7 @@ class PoseDetection(Thread):
                 for pose in empty_poses:
                     self.callback(pose)
 
-                images = [pose.image for pose in current_poses if pose.image is not None]
+                images = [pose.crop_image for pose in current_poses if pose.crop_image is not None]
 
                 if images:
                     data_samples = PoseDetection.run_interference(model,pipeline,images, False)
@@ -88,9 +88,9 @@ class PoseDetection(Thread):
                     for i, pose in enumerate(current_poses):
                         if i < len(all_poses) and all_poses[i]:
                             # Use the first detected person in each image
-                            updated_pose = replace(
+                            updated_pose: Pose = replace(
                                 pose,
-                                points=all_poses[i][0] if all_poses[i] else None
+                                point_data=all_poses[i][0] if all_poses[i] else None
                             )
                             self.callback(updated_pose)
                         else:
@@ -206,10 +206,10 @@ class PoseDetection(Thread):
             return results_by_image
 
     @staticmethod
-    def process_pose_data_samples(data_samples: list, model_width: int, model_height: int) -> list[list[PosePoints]]:
-        poses: list[list[PosePoints]] = []
+    def process_pose_data_samples(data_samples: list, model_width: int, model_height: int) -> list[list[PosePointData]]:
+        poses: list[list[PosePointData]] = []
         for image_results in data_samples:
-            image_poses: list[PosePoints] = []
+            image_poses: list[PosePointData] = []
             for result in image_results:
                 pred_instances = result.pred_instances
                 keypoints = pred_instances.keypoints
@@ -224,7 +224,7 @@ class PoseDetection(Thread):
                     norm_keypoints[:, 0] /= model_width   # x / width
                     norm_keypoints[:, 1] /= model_height  # y / height
 
-                    pose = PosePoints(norm_keypoints, person_scores)
+                    pose = PosePointData(norm_keypoints, person_scores)
                     image_poses.append(pose)
 
             poses.append(image_poses)

@@ -1,3 +1,4 @@
+import traceback
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
@@ -222,6 +223,7 @@ class PairCorrelationStreamProcessor(Process):
                         self._process(correlation_input)
                     except Exception as e:
                         print(f"Error processing correlation: {e}")
+                        traceback.print_exc()  # This prints the stack trace
             except:
                 pass
 

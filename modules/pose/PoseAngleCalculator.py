@@ -2,6 +2,7 @@
 from dataclasses import replace
 from queue import Empty, Queue
 from threading import Event, Lock, Thread
+import traceback
 from typing import Optional
 
 # Third-party imports
@@ -46,6 +47,7 @@ class PoseAngleCalculator(Thread):
                         self._process(pose, self.confidence_threshold, self._notify_callback)
                     except Exception as e:
                         print(f"Error processing pose {pose.id}: {e}")
+                        traceback.print_exc()  # This prints the stack trace
                     self.pose_input_queue.task_done()
             except Empty:
                 continue
@@ -73,50 +75,59 @@ class PoseAngleCalculator(Thread):
     @staticmethod
     def _process(pose: Pose, confidence_threshold: float, callback:PoseCallback) -> None:
 
-        if pose.points is None:
+        if pose.point_data is None:
             # return nan angles and 0 for confidence
-            angles: JointAngleDict = {}
-            for k in PoseAngleKeypoints.keys():
-                angles[k] = JointAngle(angle=np.nan, confidence=0.0)
-            angled_pose: Pose = replace(pose, angles=angles)
+            angled_pose: Pose = replace(pose, angle_data=PoseAngleData())
             callback(angled_pose)
             return
 
-        angles: JointAngleDict = {}
-        keypoints: np.ndarray = pose.points.getKeypoints()
-        scores: np.ndarray = pose.points.getScores()
+        # angles: JointAngleDict = {}
+        point_values: np.ndarray = pose.point_data.points
+        point_scores: np.ndarray = pose.point_data.scores
+
+        angle_values: np.ndarray = np.full(NUM_POSE_ANGLES, np.nan, dtype=np.float32)
+        angle_scores: np.ndarray = np.zeros(NUM_POSE_ANGLES, dtype=np.float32)
 
         # Calculate angles for each joint in PoseAngleDict
-        for joint, (kp1, kp2, kp3) in PoseAngleKeypoints.items():
-            # Get indices
-            # idx1, idx2, idx3 = kp1.value, kp2.value, kp3.value
-            idx1: int = kp1.value
-            idx2: int = kp2.value
-            idx3: int = kp3.value
-            # Check confidence scores
-            if (scores[kp1.value] > confidence_threshold and
-                scores[kp2.value] > confidence_threshold and
-                scores[kp2.value] > confidence_threshold):
+        # for joint, (kp1, kp2, kp3) in PoseAngleJointTriplets.items():
+        #     print(joint, kp1, kp2, kp3)
+        #     # Get indices
+        #     # idx1, idx2, idx3 = kp1.value, kp2.value, kp3.value
+        #     idx1: int = kp1.value
+        #     idx2: int = kp2.value
+        #     idx3: int = kp3.value
+        #     # Check confidence scores
+        #     if (point_scores[kp1.value] > confidence_threshold and
+        #         point_scores[kp2.value] > confidence_threshold and
+        #         point_scores[kp2.value] > confidence_threshold):
 
-                # Calculate angle
-                p1 = keypoints[idx1]
-                p2 = keypoints[idx2]
-                p3 = keypoints[idx3]
-                if joint == Keypoint.left_shoulder or joint == Keypoint.right_shoulder:
-                    angle: float = PoseAngleCalculator.calculate_angle(p1, p2, p3)
-                else:
-                    angle: float = PoseAngleCalculator.calculate_angle(p1, p2, p3, np.pi)
+        #         # Calculate angle
+        #         p1 = point_values[idx1]
+        #         p2 = point_values[idx2]
+        #         p3 = point_values[idx3]
+        #         if joint == PoseJoint.left_shoulder or joint == PoseJoint.right_shoulder:
+        #             angle: float = PoseAngleCalculator.calculate_angle(p1, p2, p3)
+        #         else:
+        #             angle: float = PoseAngleCalculator.calculate_angle(p1, p2, p3, np.pi)
 
-                confidence: float = min(scores[idx1], scores[idx2], scores[idx3])
-                # Store results
-                angles[joint] = JointAngle(angle = angle, confidence = confidence)
+        #         confidence: float = min(point_scores[idx1], point_scores[idx2], point_scores[idx3])
+        #         # Store results
+        #         angle_values[joint] = angle
+        #         angle_scores[joint] = confidence
 
-            else:
-                # Low confidence, set angle to NaN
-                angles[joint] = JointAngle(angle = np.nan, confidence = 0.0)
+        for i, (joint, (kp1, kp2, kp3)) in enumerate(PoseAngleJointTriplets.items()):
+            idx1, idx2, idx3 = kp1.value, kp2.value, kp3.value
+            scores = point_scores[[idx1, idx2, idx3]]
+            if np.all(scores > confidence_threshold):
+                p1, p2, p3 = point_values[idx1], point_values[idx2], point_values[idx3]
+                rotate_by = 0 if joint in (PoseJoint.left_shoulder, PoseJoint.right_shoulder) else np.pi
+                angle = PoseAngleCalculator.calculate_angle(p1, p2, p3, rotate_by)
+                confidence = np.min(scores)
+                angle_values[i] = angle
+                angle_scores[i] = confidence
 
-        angled_pose: Pose = replace(pose, angles=angles)
-        callback(angled_pose)
+                angled_pose: Pose = replace(pose, angle_data=PoseAngleData(angle_values, angle_scores))
+                callback(angled_pose)
 
     @staticmethod
     def calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, rotate_by: float = 0) -> float:
