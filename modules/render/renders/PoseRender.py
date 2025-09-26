@@ -12,7 +12,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
-from modules.pose.PoseTypes import POSE_NUM_ANGLES, PoseAngleJointNames
+from modules.pose.PoseTypes import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_NAMES
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
@@ -108,7 +108,7 @@ class PoseRender(BaseRender):
         colors: list[tuple[float, float, float, float]] = [(1.0, 0.5, 0.0, 1.0), (0.0, 0.8, 1.0, 1.0)]
 
         for i in range(angle_num):
-            string: str = PoseAngleJointNames[i]
+            string: str = POSE_ANGLE_JOINT_NAMES[i]
             x: int = 10
             y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
             clr: int = i % 2

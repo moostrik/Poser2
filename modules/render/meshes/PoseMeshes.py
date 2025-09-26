@@ -6,7 +6,7 @@ import numpy as np
 # Local application imports
 from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose, PoseVertexData
-from modules.pose.PoseTypes import PoseVertexIndices
+from modules.pose.PoseTypes import POSE_VERTEX_INDICES
 from modules.render.DataManager import DataManager
 from modules.render.renders.BaseRender import BaseRender, Rect
 
@@ -22,7 +22,7 @@ class PoseMeshes(BaseRender):
             if i not in self.meshes:
                 mesh = Mesh()
                 mesh.allocate()
-                mesh.set_indices(PoseVertexIndices)
+                mesh.set_indices(POSE_VERTEX_INDICES)
                 self.meshes[i] = mesh
 
     def deallocate(self) -> None:

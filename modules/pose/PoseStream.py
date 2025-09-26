@@ -15,7 +15,7 @@ import numpy as np
 # Local application imports
 from modules.pose.Pose import Pose
 from modules.pose.PoseAngles import PoseAngleData
-from modules.pose.PoseTypes import POSE_NUM_JOINTS, PoseAngleJointNames
+from modules.pose.PoseTypes import POSE_NUM_JOINTS, POSE_ANGLE_JOINT_NAMES
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -190,7 +190,7 @@ class PoseStreamProcessor(Process):
         self.resample_interval: str = f"{int(1.0 / settings.camera_fps * 1000)}ms"
 
         # Initialize buffers (will be recreated in child process)
-        self.empty_df: pd.DataFrame = pd.DataFrame(columns=PoseAngleJointNames, dtype=float)
+        self.empty_df: pd.DataFrame = pd.DataFrame(columns=POSE_ANGLE_JOINT_NAMES, dtype=float)
         self.angle_df: pd.DataFrame = self.empty_df.copy()
         self.score_df: pd.DataFrame = self.empty_df.copy()
 
@@ -285,15 +285,15 @@ class PoseStreamProcessor(Process):
         """
 
         if not poses or all(pose.angles is None for pose in poses):
-            empty = pd.DataFrame(columns=PoseAngleJointNames, dtype=float)
+            empty = pd.DataFrame(columns=POSE_ANGLE_JOINT_NAMES, dtype=float)
             return empty, empty.copy()
 
         timestamps: list[pd.Timestamp] = [pose.time_stamp for pose in poses if pose.angles is not None]
         angle_data: list[np.ndarray] = [pose.angles.angles for pose in poses if pose.angles is not None]
         conf_data: list[np.ndarray] = [pose.angles.scores for pose in poses if pose.angles is not None]
 
-        angles_df = pd.DataFrame(angle_data, index=timestamps, columns=PoseAngleJointNames, dtype=float)
-        conf_df = pd.DataFrame(conf_data, index=timestamps, columns=PoseAngleJointNames, dtype=float)
+        angles_df = pd.DataFrame(angle_data, index=timestamps, columns=POSE_ANGLE_JOINT_NAMES, dtype=float)
+        conf_df = pd.DataFrame(conf_data, index=timestamps, columns=POSE_ANGLE_JOINT_NAMES, dtype=float)
 
         return angles_df, conf_df
 

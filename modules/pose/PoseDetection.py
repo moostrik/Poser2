@@ -18,7 +18,7 @@ from mmpose.structures.bbox import bbox_xywh2xyxy
 
 # Local application imports
 
-from modules.pose.PoseTypes import PoseModelType, PoseModelFileNames
+from modules.pose.PoseTypes import PoseModelType, POSE_MODEL_FILE_NAMES
 from modules.pose.Pose import Pose, PosePointData
 
 # Ensure numpy functions can be safely used in torch serialization
@@ -32,8 +32,8 @@ class PoseDetection(Thread):
 
         if model_type is PoseModelType.NONE:
             print('Pose Detection WARNING: ModelType is NONE')
-        self.model_config_file: str = path + '/' + PoseModelFileNames[model_type.value][0]
-        self.model_checkpoint_file: str = path + '/' + PoseModelFileNames[model_type.value][1]
+        self.model_config_file: str = path + '/' + POSE_MODEL_FILE_NAMES[model_type.value][0]
+        self.model_checkpoint_file: str = path + '/' + POSE_MODEL_FILE_NAMES[model_type.value][1]
         self.model_width: int = 192
         self.model_height: int = 256
         self.confidence_threshold: float = confidence_threshold

@@ -10,7 +10,7 @@ import numpy as np
 from modules.cam.depthcam.Definitions import FrameType
 from modules.tracker.Tracklet import Tracklet, Rect
 from modules.pose.Pose import Pose, PoseCallback
-from modules.pose.PoseTypes import PoseModelTypeNames
+from modules.pose.PoseTypes import POSE_MODEL_TYPE_NAMES
 from modules.pose.PoseDetection import PoseDetection as Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.Settings import Settings
@@ -42,7 +42,7 @@ class PosePipeline(Thread):
 
         if self.pose_active:
             self.pose_detector = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, settings.pose_conf_threshold, settings.pose_verbose)
-            print('Pose Detection:', 'model', PoseModelTypeNames[settings.pose_model_type.value])
+            print('Pose Detection:', 'model', POSE_MODEL_TYPE_NAMES[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')
 

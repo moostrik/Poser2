@@ -14,7 +14,7 @@ from modules.gl.Texture import Texture
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 
-from modules.pose.PoseTypes import POSE_NUM_ANGLES, PoseAngleJointNames, LEFT_COLOR, RIGHT_COLOR
+from modules.pose.PoseTypes import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_NAMES, POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
@@ -95,10 +95,10 @@ class CamOverlayRender(BaseRender):
         fbo.begin()
 
         # yellow and light blue
-        colors: list[tuple[float, float, float, float]] = [(*LEFT_COLOR, 1.0), (*RIGHT_COLOR, 1.0)]
+        colors: list[tuple[float, float, float, float]] = [(*POSE_COLOR_LEFT, 1.0), (*POSE_COLOR_RIGHT, 1.0)]
 
         for i in range(angle_num):
-            string: str = PoseAngleJointNames[i]
+            string: str = POSE_ANGLE_JOINT_NAMES[i]
             x: int = 10
             y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
             clr: int = i % 2

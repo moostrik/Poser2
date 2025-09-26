@@ -4,11 +4,10 @@ from typing import Optional
 
 from modules.pose.PosePoints import PosePointData
 from modules.pose.PoseAngles import PoseAngleData
-from modules.pose.PoseTypes import (
-    PoseVertexArray, PoseVertexList, PoseJointColors,
-    BASE_ALPHA, LEFT_POSITIVE, LEFT_NEGATIVE, RIGHT_POSITIVE, RIGHT_NEGATIVE,
-    PoseAngleJointIdx
-)
+from modules.pose.PoseTypes import POSE_VERTEX_ARRAY, POSE_VERTEX_LIST, POSE_JOINT_COLORS
+from modules.pose.PoseTypes import POSE_COLOR_ALPHA_BASE, POSE_COLOR_LEFT_POSITIVE, POSE_COLOR_LEFT_NEGATIVE, POSE_COLOR_RIGHT_POSITIVE, POSE_COLOR_RIGHT_NEGATIVE
+from modules.pose.PoseTypes import POSE_ANGLE_JOINT_IDXS
+
 
 # VERTICES
 @dataclass(frozen=True)
@@ -22,14 +21,14 @@ class PoseVertices:
         if point_data is None:
             return None
 
-        vertices: np.ndarray = np.zeros((len(PoseVertexArray), 2), dtype=np.float32)
-        colors: np.ndarray = np.zeros((len(PoseVertexArray), 4), dtype=np.float32)
+        vertices: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 2), dtype=np.float32)
+        colors: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 4), dtype=np.float32)
 
-        for i, (p1, p2) in enumerate(PoseVertexList):
+        for i, (p1, p2) in enumerate(POSE_VERTEX_LIST):
             for j, joint in enumerate((p1, p2)):
                 idx: int = i * 2 + j
                 vertices[idx] = point_data.points[joint]
-                colors[idx] = [*PoseJointColors[joint], (point_data.scores[joint] + BASE_ALPHA) / (1.0 + BASE_ALPHA)]
+                colors[idx] = [*POSE_JOINT_COLORS[joint], (point_data.scores[joint] + POSE_COLOR_ALPHA_BASE) / (1.0 + POSE_COLOR_ALPHA_BASE)]
 
         vertex_data: PoseVertexData = PoseVertexData(vertices, colors)
         return vertex_data
@@ -49,15 +48,15 @@ class PoseVertices:
 
         colors: np.ndarray = vertex_data.colors.copy()
 
-        for i, (p1, p2) in enumerate(PoseVertexList):
+        for i, (p1, p2) in enumerate(POSE_VERTEX_LIST):
             for joint_pos, joint in enumerate((p1, p2)):
-                idx: int | None = PoseAngleJointIdx.get(joint)
+                idx: int | None = POSE_ANGLE_JOINT_IDXS.get(joint)
                 if idx is not None:
                     angle: float = angle_data.angles[idx]
                     if not np.isnan(angle):
                         if joint.value % 2 == 1:  # Left side
-                            colors[i*2 + joint_pos][0:3] = LEFT_POSITIVE if angle >= 0 else LEFT_NEGATIVE
+                            colors[i*2 + joint_pos][0:3] = POSE_COLOR_LEFT_POSITIVE if angle >= 0 else POSE_COLOR_LEFT_NEGATIVE
                         else:  # Right side
-                            colors[i*2 + joint_pos][0:3] = RIGHT_POSITIVE if angle >= 0 else RIGHT_NEGATIVE
+                            colors[i*2 + joint_pos][0:3] = POSE_COLOR_RIGHT_POSITIVE if angle >= 0 else POSE_COLOR_RIGHT_NEGATIVE
 
         return PoseVertexData(vertex_data.vertices, colors)

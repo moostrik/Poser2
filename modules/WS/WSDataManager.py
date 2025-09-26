@@ -7,7 +7,7 @@ from time import time
 from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose, PosePointData, PoseAngleData, PoseMeasurementData
-from modules.pose.PoseTypes import PoseJoint, PoseAngleJoints, PoseAngleJointNames
+from modules.pose.PoseTypes import PoseJoint, POSE_ANGLE_JOINTS, POSE_ANGLE_JOINT_NAMES
 from modules.pose.PoseStream import PoseStreamData
 from modules.utils.PointsAndRects import Rect
 
@@ -41,7 +41,7 @@ class WSData:
 
         self.filters["world_angle"] = SmoothOneEuroCircular(frequency)
         self.filters["approximate_person_length"] = SmoothOneEuro(frequency)
-        for key in PoseAngleJoints:
+        for key in POSE_ANGLE_JOINTS:
             angle_name: str = key.name
             self.filters[angle_name] = SmoothOneEuroCircular(frequency)
 
@@ -88,7 +88,7 @@ class WSData:
             angle_data: PoseAngleData | None  = pose.angle_data
             if angle_data is not None:
                 # print(angles)
-                for i, name in enumerate(PoseAngleJointNames):
+                for i, name in enumerate(POSE_ANGLE_JOINT_NAMES):
                     angle: float = angle_data.angles[i]
                     score: float = angle_data.scores[i]
                     if score > 0.0 and angle is not np.nan:
