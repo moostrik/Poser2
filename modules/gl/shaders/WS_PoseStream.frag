@@ -5,7 +5,6 @@ uniform float       sample_step;
 uniform int         num_streams; // redundant, can be
 uniform float       stream_step;
 uniform float       line_width;
-uniform float       confidence_threshold;
 
 in vec2     texCoord;
 out vec4    fragColor;
@@ -44,8 +43,6 @@ void main() {
     float   curr_value = 1.0 - curr_sample.r;
     float   curr_sign = curr_sample.g;
     float   curr_conf = curr_sample.b;
-    curr_conf -= confidence_threshold;
-    curr_conf /= (1.0 - confidence_threshold);
 
 
     // Early exit if confidence is too low
@@ -104,8 +101,8 @@ void main() {
 
     // Use conditional assignment instead of nested if statements
     vec3    color = is_even ?
-        (is_positive ? vec3(0.0, 0.7, 1.0) : vec3(0.0, 1.0, 0.0)) :
-        (is_positive ? vec3(1.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0));
+        (is_positive ? vec3(1.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)):
+        (is_positive ? vec3(0.0, 0.7, 1.0) : vec3(0.0, 1.0, 0.0));
 
     fragColor = vec4(color, curr_conf + 0.2);
 }

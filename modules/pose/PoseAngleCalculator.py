@@ -43,7 +43,7 @@ class PoseAngleCalculator(Thread):
                     try:
                         self._process(pose, self._notify_callback)
                     except Exception as e:
-                        print(f"Error processing pose {pose.id}: {e}")
+                        print(f"Error processing pose {pose.tracklet.id}: {e}")
                         traceback.print_exc()  # This prints the stack trace
                     self.pose_input_queue.task_done()
             except Empty:
@@ -87,14 +87,16 @@ class PoseAngleCalculator(Thread):
         for i, (joint, (kp1, kp2, kp3)) in enumerate(PoseAngleJointTriplets.items()):
             idx1, idx2, idx3 = kp1.value, kp2.value, kp3.value
             p1, p2, p3 = point_values[idx1], point_values[idx2], point_values[idx3]
-            scores = point_scores[[idx1, idx2, idx3]]
+
             if not (np.isnan(p1).any() or np.isnan(p2).any() or np.isnan(p3).any()):
                 # All points are valid (not NaN), calculate the angle
                 rotate_by: float = PoseAngleRotations[joint]
                 angle: float = PoseAngleCalculator.calculate_angle(p1, p2, p3, rotate_by)
-                confidence: float = np.min(scores)
                 angle_values[i] = angle
-                angle_scores[i] = confidence
+
+                s1, s2, s3 = point_scores[idx1], point_scores[idx2], point_scores[idx3]
+                score: float = min(s1, s2, s3)
+                angle_scores[i] = score
 
         angled_pose: Pose = replace(pose, angle_data=PoseAngleData(angle_values, angle_scores))
         callback(angled_pose)

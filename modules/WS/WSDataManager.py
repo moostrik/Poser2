@@ -118,7 +118,7 @@ class WSData:
             self.world_angle: float = np.deg2rad(world_angle - 180)
             # print (self.world_angle)
 
-        if pose.is_removed:
+        if pose.tracklet.is_removed:
             self.reset()
 
     def add_stream(self, stream: PoseStreamData) -> None:
@@ -187,7 +187,7 @@ class WSDataManager:
 
     def add_poses(self, poses: list[Pose]) -> None:
         for pose in poses:
-            self.smooth_metrics_dict[pose.id].add_pose(pose)
+            self.smooth_metrics_dict[pose.tracklet.id].add_pose(pose)
 
     def add_streams(self, streams: list) -> None:
         for stream in streams:

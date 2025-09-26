@@ -2,7 +2,7 @@ from OpenGL.GL import * # type: ignore
 from OpenGL.GL.shaders import ShaderProgram # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
-from modules.pose.PoseDefinitions import PoseJoint, PoseAngleJointLookup
+from modules.pose.PoseDefinitions import PoseJoint
 from modules.pose.PoseStream import PoseStreamData
 import numpy as np
 
@@ -14,7 +14,7 @@ class WS_PoseStream(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, tex0: int, num_samples: int, num_streams: int, line_width: float, confidence_threshold: float) -> None :
+    def use(self, fbo: int, tex0: int, num_samples: int, num_streams: int, line_width: float) -> None :
         super().use()
         if not self.allocated: return
         if not fbo or not tex0: return
@@ -30,7 +30,6 @@ class WS_PoseStream(Shader):
         glUniform1i(glGetUniformLocation(s, "num_streams"), num_streams)
         glUniform1f(glGetUniformLocation(s, "stream_step"), 1.0  / num_streams)
         glUniform1f(glGetUniformLocation(s, "line_width"),  line_width)
-        glUniform1f(glGetUniformLocation(s, "confidence_threshold"), confidence_threshold)
 
         glBindFramebuffer(GL_FRAMEBUFFER, fbo)
         draw_quad()
@@ -44,15 +43,8 @@ class WS_PoseStream(Shader):
     @staticmethod
     def pose_stream_to_image(pose_stream: PoseStreamData, confidence_ceil: bool = False) -> np.ndarray:
 
-        # selection: list[PoseJoint] = [PoseJoint.left_shoulder, PoseJoint.right_shoulder, PoseJoint.left_elbow, PoseJoint.right_elbow]
-        # selection_indices: list[int] = [PoseAngleJointLookup[joint] for joint in selection if joint in PoseAngleJointLookup]
-        # # print(selection_indices)
-
         angles_raw: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0).astype(np.float32)
         confidences_raw: np.ndarray = pose_stream.confidences.to_numpy()
-
-        # angles_raw = angles_raw[:, selection_indices]
-        # confidences_raw = confidences_raw[:, selection_indices]
 
         angles_norm: np.ndarray = np.clip(np.abs(angles_raw) / np.pi, 0, 1)
         sign_channel: np.ndarray = (angles_raw > 0).astype(np.float32)

@@ -5,7 +5,7 @@ import numpy as np
 
 # Local application imports
 from modules.gl.Mesh import Mesh
-from modules.pose.PoseDefinitions import Pose, PosePointData, PoseVertexIndices
+from modules.pose.PoseDefinitions import Pose, PoseVertexData, PoseVertexIndices
 from modules.render.DataManager import DataManager
 from modules.render.renders.BaseRender import BaseRender, Rect
 
@@ -37,8 +37,8 @@ class PoseMeshes(BaseRender):
             pose: Pose | None = self.data.get_pose(id, True, self.key())
             pose_mesh: Mesh | None = self.meshes.get(id, None)
             if pose is not None and pose_mesh is not None:
-                points: PosePointData | None = pose.point_data
-                if points is not None:
-                    pose_mesh.set_vertices(points.vertices)
-                    pose_mesh.set_colors(points.vertex_colors)
+                vertex_data: PoseVertexData | None = pose.vertex_data
+                if vertex_data is not None:
+                    pose_mesh.set_vertices(vertex_data.vertices)
+                    pose_mesh.set_colors(vertex_data.colors)
                     pose_mesh.update()

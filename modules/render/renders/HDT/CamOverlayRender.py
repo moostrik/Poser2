@@ -12,7 +12,7 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.gl.Texture import Texture
 
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import Pose, PoseAngleJointNames
+from modules.pose.PoseDefinitions import Pose, PoseAngleJointNames, LEFT_COLOR, RIGHT_COLOR
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
@@ -93,7 +93,7 @@ class CamOverlayRender(BaseRender):
         fbo.begin()
 
         # yellow and light blue
-        colors: list[tuple[float, float, float, float]] = [(0.0, 0.8, 1.0, 1.0), (1.0, 0.5, 0.0, 1.0)]
+        colors: list[tuple[float, float, float, float]] = [(*LEFT_COLOR, 1.0), (*RIGHT_COLOR, 1.0)]
 
         for i in range(angle_num):
             string: str = PoseAngleJointNames[i]
