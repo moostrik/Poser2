@@ -15,16 +15,13 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class PoseAngleCalculator(Thread):
-    def __init__(self, confidence_threshold: float = 0.5) -> None:
+    def __init__(self) -> None:
         """Initialize the JointAngles calculator."""
         super().__init__()
         self._stop_event = Event()
 
         # Input
         self.pose_input_queue: Queue[Pose] = Queue()
-
-        # Parameters
-        self.confidence_threshold: float = confidence_threshold
 
         # Callbacks
         self.callback_lock = Lock()
@@ -44,7 +41,7 @@ class PoseAngleCalculator(Thread):
                 pose: Optional[Pose] = self.pose_input_queue.get(block=True, timeout=0.01)
                 if pose is not None:
                     try:
-                        self._process(pose, self.confidence_threshold, self._notify_callback)
+                        self._process(pose, self._notify_callback)
                     except Exception as e:
                         print(f"Error processing pose {pose.id}: {e}")
                         traceback.print_exc()  # This prints the stack trace
@@ -73,7 +70,7 @@ class PoseAngleCalculator(Thread):
         self.confidence_threshold = threshold
 
     @staticmethod
-    def _process(pose: Pose, confidence_threshold: float, callback:PoseCallback) -> None:
+    def _process(pose: Pose, callback:PoseCallback) -> None:
 
         if pose.point_data is None:
             # return nan angles and 0 for confidence
@@ -81,7 +78,6 @@ class PoseAngleCalculator(Thread):
             callback(angled_pose)
             return
 
-        # angles: JointAngleDict = {}
         point_values: np.ndarray = pose.point_data.points
         point_scores: np.ndarray = pose.point_data.scores
 
@@ -90,9 +86,10 @@ class PoseAngleCalculator(Thread):
 
         for i, (joint, (kp1, kp2, kp3)) in enumerate(PoseAngleJointTriplets.items()):
             idx1, idx2, idx3 = kp1.value, kp2.value, kp3.value
-            scores: np.ndarray = point_scores[[idx1, idx2, idx3]]
-            if np.all(scores > confidence_threshold):
-                p1, p2, p3 = point_values[idx1], point_values[idx2], point_values[idx3]
+            p1, p2, p3 = point_values[idx1], point_values[idx2], point_values[idx3]
+            scores = point_scores[[idx1, idx2, idx3]]
+            if not (np.isnan(p1).any() or np.isnan(p2).any() or np.isnan(p3).any()):
+                # All points are valid (not NaN), calculate the angle
                 rotate_by: float = PoseAngleRotations[joint]
                 angle: float = PoseAngleCalculator.calculate_angle(p1, p2, p3, rotate_by)
                 confidence: float = np.min(scores)

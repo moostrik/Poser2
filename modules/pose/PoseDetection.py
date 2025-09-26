@@ -224,15 +224,13 @@ class PoseDetection(Thread):
                 for i in range(len(keypoints)):
                     person_keypoints: np.ndarray = keypoints[i]  # [num_keypoints, 2]
                     person_scores: np.ndarray = scores[i]
-                    # Set scores below threshold to zero
-                    person_scores = np.where(person_scores >= confidence_threshold, person_scores, 0.0)
 
                     # Normalize keypoints to [0, 1] range
                     norm_keypoints: np.ndarray = person_keypoints.copy()
                     norm_keypoints[:, 0] /= model_width   # x / width
                     norm_keypoints[:, 1] /= model_height  # y / height
 
-                    pose = PosePointData(norm_keypoints, person_scores)
+                    pose = PosePointData(norm_keypoints, person_scores, confidence_threshold)
                     image_poses.append(pose)
 
             poses.append(image_poses)

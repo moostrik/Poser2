@@ -89,11 +89,20 @@ PoseVertexColors: list[tuple[float, float, float]] = [
 # POINT DATA
 @dataclass (frozen=True)
 class PosePointData():
-    points: np.ndarray      # shape (17, 2)
+    raw_points: np.ndarray = field(repr=False)     # shape (17, 2)
+    points: np.ndarray = field(init=False)
     scores: np.ndarray      # shape (17, 1)
+    score_threshold: float
 
     _vertices: Optional[np.ndarray] = field(default=None, init=False, repr=False)
     _vertex_colors: Optional[np.ndarray] = field(default=None, init=False, repr=False)
+
+    def __post_init__(self):
+        s_t: float = max(0.0, min(0.99, self.score_threshold))
+        object.__setattr__(self, 'score_threshold', s_t)
+
+        filtered = self.scores >= self.score_threshold
+        object.__setattr__(self, 'points', np.where(filtered[:, np.newaxis], self.raw_points, np.nan))
 
     @property
     def vertices(self) -> np.ndarray:
@@ -119,11 +128,11 @@ class PosePointData():
             kp2: int = PoseVertexList[i][1].value
             s1: float = scores[kp1]
             s2: float = scores[kp2]
-            score: float = min(s1, s2)
-            alpha: float = score
+            alpha1: float = (s1 - self.score_threshold) / (1.0 - self.score_threshold) if s1 >= self.score_threshold else 0.0
+            alpha2: float = (s2 - self.score_threshold) / (1.0 - self.score_threshold) if s2 >= self.score_threshold else 0.0
             C: tuple[float, float, float] = PoseVertexColors[i]
-            vertex_colors[i*2] = [C[0], C[1], C[2], alpha]
-            vertex_colors[i*2+1] = [C[0], C[1], C[2], alpha]
+            vertex_colors[i*2] = [C[0], C[1], C[2], alpha1]
+            vertex_colors[i*2+1] = [C[0], C[1], C[2], alpha2]
 
         object.__setattr__(self, '_vertex_colors', vertex_colors)
         return vertex_colors
