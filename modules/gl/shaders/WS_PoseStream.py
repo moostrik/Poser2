@@ -2,7 +2,6 @@ from OpenGL.GL import * # type: ignore
 from OpenGL.GL.shaders import ShaderProgram # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
-from modules.pose.PoseDefinitions import PoseJoint
 from modules.pose.PoseStream import PoseStreamData
 import numpy as np
 

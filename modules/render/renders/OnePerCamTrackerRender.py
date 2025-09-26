@@ -13,7 +13,7 @@ from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
 from modules.render.DataManager import DataManager
-from modules.pose.PoseDefinitions import Pose, PoseAngleJointNames
+from modules.pose.Pose import Pose
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.renders.BaseRender import BaseRender, Rect
 

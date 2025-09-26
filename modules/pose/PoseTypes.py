@@ -42,7 +42,7 @@ class PoseJoint(IntEnum):
     left_ankle =    15
     right_ankle =   16
 PoseJointNames: list[str] = [e.name for e in PoseJoint]
-NUM_POSE_JOINTS: int = len(PoseJoint)
+POSE_NUM_JOINTS: int = len(PoseJoint)
 
 # COLORS
 BASE_ALPHA: float = 0.2
@@ -117,7 +117,7 @@ PoseAngleJoints: list[PoseJoint] = list(PoseAngleJointTriplets.keys())
 PoseAngleJointNames: list[str] = [e.name for e in PoseAngleJoints]
 PoseAngleJointIdx: dict[PoseJoint, int] = {joint: idx for idx, joint in enumerate(PoseAngleJoints)}
 
-NUM_POSE_ANGLES: int = len(PoseAngleJointTriplets)
+POSE_NUM_ANGLES: int = len(PoseAngleJointTriplets)
 PoseAngleRotations: dict[PoseJoint, float] = {
     PoseJoint.left_shoulder:  0.0,
     PoseJoint.right_shoulder: 0.0,

@@ -15,7 +15,7 @@ from modules.WS.WSOutput import WSOutput, WSOutputCallback
 from modules.WS.WSUdpSender import WSUdpSender, WSUdpSenderSettings
 
 from modules.Settings import Settings
-from modules.pose.PoseDefinitions import Pose
+from modules.pose.Pose import Pose
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.gl.Utils import FpsCounter

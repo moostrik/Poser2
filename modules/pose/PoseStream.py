@@ -13,7 +13,9 @@ import pandas as pd
 import numpy as np
 
 # Local application imports
-from modules.pose.PoseDefinitions import *
+from modules.pose.Pose import Pose
+from modules.pose.PoseAngles import PoseAngleData
+from modules.pose.PoseTypes import POSE_NUM_JOINTS, PoseAngleJointNames
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -47,7 +49,7 @@ class PoseStreamData:
 
     def get_last_angles(self) -> list[float]:
         if self.angles.empty:
-            return [0.0] * len(PoseAngleJointNames)
+            return [0.0] * POSE_NUM_JOINTS
         return self.angles.iloc[-1].tolist()
 
 PoseStreamDataCallback = Callable[[PoseStreamData], None]

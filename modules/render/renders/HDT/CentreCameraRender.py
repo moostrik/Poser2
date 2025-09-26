@@ -9,9 +9,8 @@ from modules.gl.Image import Image
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.PoseDefinitions import Pose, PoseAngleJointNames, PoseJoint
-from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
-from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
+from modules.pose.Pose import Pose
+from modules.pose.PoseTypes import PoseJoint
 
 from modules.render.DataManager import DataManager
 from modules.render.renders.BaseRender import BaseRender, Rect

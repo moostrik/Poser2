@@ -8,7 +8,7 @@ from typing import Optional, TypeVar, Generic
 
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameType
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import Pose, PosePointData, PoseVertexIndices
+from modules.pose.Pose import Pose
 from modules.pose.PoseStream import PoseStreamData
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.WS.WSOutput import WSOutput

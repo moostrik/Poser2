@@ -6,8 +6,10 @@ from time import time
 
 from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import PoseAngleData, Pose, PoseJoint, PosePointData, Rect, PoseAngleJoints, PoseAngleJointNames, PoseMeasurementData
+from modules.pose.Pose import Pose, PosePointData, PoseAngleData, PoseMeasurementData
+from modules.pose.PoseTypes import PoseJoint, PoseAngleJoints, PoseAngleJointNames
 from modules.pose.PoseStream import PoseStreamData
+from modules.utils.PointsAndRects import Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

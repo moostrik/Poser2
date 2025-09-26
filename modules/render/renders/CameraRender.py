@@ -11,7 +11,7 @@ from modules.gl.Mesh import Mesh
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
-from modules.pose.PoseDefinitions import Pose
+from modules.pose.Pose import Pose
 from modules.tracker.Tracklet import Tracklet
 
 from modules.render.DataManager import DataManager

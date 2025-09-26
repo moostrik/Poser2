@@ -11,7 +11,8 @@ from modules.gl.Mesh import Mesh
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import Pose, PoseAngleJointNames
+from modules.pose.Pose import Pose
+from modules.pose.PoseTypes import POSE_NUM_ANGLES, PoseAngleJointNames
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
@@ -99,7 +100,7 @@ class PoseRender(BaseRender):
         shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5 / fbo.height)
 
 
-        angle_num: int = len(PoseAngleJointNames)
+        angle_num: int = POSE_NUM_ANGLES
         step: float = fbo.height / angle_num
         fbo.begin()
 

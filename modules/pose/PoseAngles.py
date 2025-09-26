@@ -2,13 +2,13 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, TYPE_CHECKING
 
-from modules.pose.PoseTypes import PoseAngleJointTriplets, PoseAngleRotations, NUM_POSE_ANGLES
+from modules.pose.PoseTypes import PoseAngleJointTriplets, PoseAngleRotations, POSE_NUM_ANGLES
 from modules.pose.PosePoints import PosePointData
 
 @dataclass(frozen=True)
 class PoseAngleData:
-    angles: np.ndarray = field(default_factory=lambda: np.full(NUM_POSE_ANGLES, np.nan, dtype=np.float32))
-    scores: np.ndarray = field(default_factory=lambda: np.zeros(NUM_POSE_ANGLES, dtype=np.float32))
+    angles: np.ndarray = field(default_factory=lambda: np.full(POSE_NUM_ANGLES, np.nan, dtype=np.float32))
+    scores: np.ndarray = field(default_factory=lambda: np.zeros(POSE_NUM_ANGLES, dtype=np.float32))
 
 
 class PoseAngles:
@@ -24,8 +24,8 @@ class PoseAngles:
         point_values: np.ndarray = point_data.points
         point_scores: np.ndarray = point_data.scores
 
-        angle_values: np.ndarray = np.full(NUM_POSE_ANGLES, np.nan, dtype=np.float32)
-        angle_scores: np.ndarray = np.zeros(NUM_POSE_ANGLES, dtype=np.float32)
+        angle_values: np.ndarray = np.full(POSE_NUM_ANGLES, np.nan, dtype=np.float32)
+        angle_scores: np.ndarray = np.zeros(POSE_NUM_ANGLES, dtype=np.float32)
 
         for i, (joint, (kp1, kp2, kp3)) in enumerate(PoseAngleJointTriplets.items()):
             idx1, idx2, idx3 = kp1.value, kp2.value, kp3.value

@@ -8,8 +8,9 @@ import numpy as np
 
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
-from modules.tracker.Tracklet import Tracklet, TrackletCallback, Rect, TrackingStatus
-from modules.pose.PoseDefinitions import PoseModelTypeNames, Pose, PoseCallback
+from modules.tracker.Tracklet import Tracklet, Rect
+from modules.pose.Pose import Pose, PoseCallback
+from modules.pose.PoseTypes import PoseModelTypeNames
 from modules.pose.PoseDetection import PoseDetection as Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.Settings import Settings

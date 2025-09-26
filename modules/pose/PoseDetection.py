@@ -19,7 +19,7 @@ from mmpose.structures.bbox import bbox_xywh2xyxy
 # Local application imports
 
 from modules.pose.PoseTypes import PoseModelType, PoseModelFileNames
-from modules.pose.PoseDefinitions import Pose, PosePointData
+from modules.pose.Pose import Pose, PosePointData
 
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore

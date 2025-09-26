@@ -5,7 +5,6 @@ from typing import Optional, Callable
 from modules.tracker.Tracklet import Tracklet
 from modules.utils.PointsAndRects import Rect
 
-from modules.pose.PoseTypes import *
 from modules.pose.PosePoints import PosePointData
 from modules.pose.PoseVertices import PoseVertices, PoseVertexData
 from modules.pose.PoseAngles import PoseAngles, PoseAngleData
@@ -77,5 +76,5 @@ class Pose:
 
         return real_PoseJoints
 
-PoseDict = dict[PoseJoint, Pose]
+PoseDict = dict[int, Pose]
 PoseCallback = Callable[[Pose], None]
