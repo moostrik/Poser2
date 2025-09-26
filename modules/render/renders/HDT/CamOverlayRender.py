@@ -28,13 +28,12 @@ from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 class CamOverlayRender(BaseRender):
     pose_stream_shader = WS_PoseStream()
 
-    def __init__(self, data: DataManager, pose_meshes: PoseMeshes, confidence_threshold: float,cam_id: int) -> None:
+    def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
         self.fbo: Fbo = Fbo()
         self.cam_id: int = cam_id
         self.pose_stream_image: Image = Image()
         self.pose_meshes: PoseMeshes = pose_meshes
-        self.confidence_threshold: float = confidence_threshold
         text_init()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -57,7 +56,7 @@ class CamOverlayRender(BaseRender):
         pose: Pose | None = self.data.get_pose(key, True, self.key())
         if pose is None:
             return #??
-        pose_mesh: Mesh = self.pose_meshes.meshes[pose.id]
+        pose_mesh: Mesh = self.pose_meshes.meshes[pose.tracklet.id]
         pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.key())
         if pose_stream is not None:
             stream_image: np.ndarray = WS_PoseStream.pose_stream_to_image(pose_stream)
@@ -69,16 +68,16 @@ class CamOverlayRender(BaseRender):
             CamOverlayRender.pose_stream_shader.allocate(monitor_file=False)
 
         BaseRender.setView(self.fbo.width, self.fbo.height)
-        CamOverlayRender.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, CamOverlayRender.pose_stream_shader, self.confidence_threshold)
+        CamOverlayRender.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, CamOverlayRender.pose_stream_shader)
         self.fbo.end()
 
     @staticmethod
-    def draw_pose(fbo: Fbo, pose: Pose, pose_mesh: Mesh, angle_image: Image, shader: WS_PoseStream, confidence_threshold: float) -> None:
+    def draw_pose(fbo: Fbo, pose: Pose, pose_mesh: Mesh, angle_image: Image, shader: WS_PoseStream) -> None:
         fbo.begin()
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        if pose.is_removed:
+        if pose.tracklet.is_removed:
             return
 
         tracklet: Tracklet | None = pose.tracklet
@@ -86,7 +85,7 @@ class CamOverlayRender(BaseRender):
             draw_box: bool = tracklet.is_lost
             CamOverlayRender.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
         fbo.end()
-        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, line_width=1.5 / fbo.height, confidence_threshold=confidence_threshold)
+        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, line_width=1.5 / fbo.height)
 
 
         angle_num: int = len(PoseAngleJointNames)

@@ -66,7 +66,7 @@ class CameraRender(BaseRender):
             if tracklet is None or tracklet.is_removed or tracklet.is_lost:
                 continue
             roi: Rect | None = pose.crop_rect
-            mesh: Mesh = pose_meshes[pose.id]
+            mesh: Mesh = pose_meshes[pose.tracklet.id]
             if roi is None or not mesh.isInitialized():
                 continue
             roi_x, roi_y, roi_w, roi_h = roi.x, roi.y, roi.width, roi.height

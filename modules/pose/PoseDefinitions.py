@@ -90,9 +90,11 @@ PoseVertexColors: list[tuple[float, float, float]] = [
 @dataclass (frozen=True)
 class PosePointData():
     raw_points: np.ndarray = field(repr=False)     # shape (17, 2)
-    points: np.ndarray = field(init=False)
-    scores: np.ndarray      # shape (17, 1)
+    raw_scores: np.ndarray = field(repr=False)     # shape (17, 1) - original unmodified scores
     score_threshold: float
+
+    points: np.ndarray = field(init=False)         # filtered points (NaN where score < threshold)
+    scores: np.ndarray = field(init=False)         # normalized scores (0 where < threshold, else normalized)
 
     _vertices: Optional[np.ndarray] = field(default=None, init=False, repr=False)
     _vertex_colors: Optional[np.ndarray] = field(default=None, init=False, repr=False)
@@ -101,8 +103,15 @@ class PosePointData():
         s_t: float = max(0.0, min(0.99, self.score_threshold))
         object.__setattr__(self, 'score_threshold', s_t)
 
-        filtered = self.scores >= self.score_threshold
+        # Filter points based on threshold
+        filtered = self.raw_scores >= self.score_threshold
         object.__setattr__(self, 'points', np.where(filtered[:, np.newaxis], self.raw_points, np.nan))
+
+        # Normalize scores based on threshold
+        normalized: np.ndarray = np.zeros_like(self.raw_scores)
+        above_threshold = self.raw_scores >= self.score_threshold
+        normalized[above_threshold] = (self.raw_scores[above_threshold] - self.score_threshold) / (1.0 - self.score_threshold)
+        object.__setattr__(self, 'scores', normalized)
 
     @property
     def vertices(self) -> np.ndarray:
@@ -183,26 +192,6 @@ class Pose:
 
     point_data: Optional[PosePointData] = field(default=None, repr=False)
     angle_data: Optional[PoseAngleData] = field(default=None)
-
-    def __getattribute__(self, name):
-        # Try to get attribute from Pose first
-        try:
-            return super().__getattribute__(name)
-        except AttributeError:
-            # If not found, delegate to tracklet
-            tracklet = super().__getattribute__('tracklet')
-            if hasattr(tracklet, name):
-                return getattr(tracklet, name)
-            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
-
-    def __getattr__(self, name):
-        """
-        Delegate attribute access to tracklet if attribute isn't found in Pose
-        For backward compatibility, use pose.tracklet.id, etc. instead
-        """
-        if hasattr(self.tracklet, name):
-            return getattr(self.tracklet, name)
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
     @property
     def absolute_points(self) -> Optional[np.ndarray]:

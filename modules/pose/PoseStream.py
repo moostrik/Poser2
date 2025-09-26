@@ -29,7 +29,7 @@ class PoseStreamInput:
     @classmethod
     def from_pose(cls, pose: Pose) -> 'PoseStreamInput':
         return cls(
-            id=pose.id,
+            id=pose.tracklet.id,
             time_stamp=pose.tracklet.time_stamp,
             angles=pose.angle_data,
             is_removed=pose.tracklet.is_removed

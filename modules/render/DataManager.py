@@ -95,14 +95,14 @@ class DataManager:
 
     # Pose management
     def set_pose(self, value: Pose) -> None:
-        self._set_data_dict(self.poses, value.id, value)
+        self._set_data_dict(self.poses, value.tracklet.id, value)
 
     def get_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
         return self._get_data_dict(self.poses, id, only_new_data, consumer_key)
 
     def get_poses_for_cam(self, cam_id: int) -> List[Pose]:
         with self.mutex:
-            return [v.value for v in self.poses.values() if v.value is not None and v.value.cam_id == cam_id]
+            return [v.value for v in self.poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
 
     # Pose window/stream management
     def set_pose_stream(self, value: PoseStreamData) -> None:

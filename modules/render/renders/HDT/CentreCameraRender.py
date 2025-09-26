@@ -52,7 +52,7 @@ class CentreCameraRender(BaseRender):
             return
 
 
-        if pose.is_removed:
+        if pose.tracklet.is_removed:
             self.rect_smoother.reset()
             self.clear_render()
             return
@@ -182,7 +182,7 @@ class PoseSmoothRect():
 
         return_rect: Rect = self.current_rect
 
-        if pose.is_removed:
+        if pose.tracklet.is_removed:
             self.reset() # redundant
 
         return return_rect

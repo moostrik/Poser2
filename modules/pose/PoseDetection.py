@@ -117,19 +117,19 @@ class PoseDetection(Thread):
 
     # GETTERS AND SETTERS
     def add_pose(self, pose: Pose) -> None:
-        if self._running and pose.id is not None:
+        if self._running and pose.tracklet.id is not None:
             with self._poses_lock:
-                if self._poses_dict.get(pose.id) is not None:
-                    existing_pose: Pose = self._poses_dict[pose.id]
+                if self._poses_dict.get(pose.tracklet.id) is not None:
+                    existing_pose: Pose = self._poses_dict[pose.tracklet.id]
                     self.callback(existing_pose)
 
                     if self.verbose:
-                        diff1 = (pose.time_stamp - existing_pose.time_stamp).total_seconds()
-                        diff2 = (Timestamp.now() - self._poses_timestamp.get(pose.id, Timestamp.now())).total_seconds()
-                        print(f"Pose Detection Warning: Pose ID {pose.id} already in queue, overwriting. {diff1:.3f}, {diff2:.3f}")
+                        diff1 = (pose.tracklet.time_stamp - existing_pose.tracklet.time_stamp).total_seconds()
+                        diff2 = (Timestamp.now() - self._poses_timestamp.get(pose.tracklet.id, Timestamp.now())).total_seconds()
+                        print(f"Pose Detection Warning: Pose ID {pose.tracklet.id} already in queue, overwriting. {diff1:.3f}, {diff2:.3f}")
 
-                self._poses_dict[pose.id] = pose
-                self._poses_timestamp[pose.id] = Timestamp.now()
+                self._poses_dict[pose.tracklet.id] = pose
+                self._poses_timestamp[pose.tracklet.id] = Timestamp.now()
 
     def notify_update(self) -> None:
         if self._running:
