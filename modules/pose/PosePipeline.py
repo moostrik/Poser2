@@ -12,7 +12,6 @@ from modules.tracker.Tracklet import Tracklet, TrackletCallback, Rect, TrackingS
 from modules.pose.PoseDefinitions import PoseModelTypeNames, Pose, PoseCallback
 from modules.pose.PoseDetection import PoseDetection as Detection
 from modules.pose.PoseImageProcessor import PoseImageProcessor
-from modules.pose.PoseAngleCalculator import PoseAngleCalculator
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -46,9 +45,6 @@ class PosePipeline(Thread):
         else:
             print('Pose Detection: Disabled')
 
-        # Pose angles calculator
-        self.joint_angles: PoseAngleCalculator = PoseAngleCalculator()
-
         # Callbacks
         self.callback_lock = Lock()
         self.pose_output_callbacks: set[PoseCallback] = set()
@@ -60,12 +56,9 @@ class PosePipeline(Thread):
             print("PosePipeline is already running.")
             return
 
-        self.joint_angles.add_pose_callback(self._notify_pose_callback)
-        self.joint_angles.start()
-
         # Start detectors
         if self.pose_detector is not None:
-            self.pose_detector.addMessageCallback(self.joint_angles.pose_input)
+            self.pose_detector.addMessageCallback(self._notify_pose_callback)
             self.pose_detector.start()
 
         super().start()
@@ -78,8 +71,6 @@ class PosePipeline(Thread):
 
         if self.pose_detector is not None:
             self.pose_detector.stop()
-
-        self.joint_angles.stop()
 
     def run(self) -> None:
         """

@@ -6,7 +6,7 @@ from time import time
 
 from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.PoseDefinitions import PoseAngleData, Pose, PoseAngleJointNames, PoseAngleJointTriplets, PoseJoint, PosePointData, Rect
+from modules.pose.PoseDefinitions import PoseAngleData, Pose, PoseJoint, PosePointData, Rect, PoseAngleJoints, PoseAngleJointNames, PoseMeasurementData
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -39,13 +39,14 @@ class WSData:
 
         self.filters["world_angle"] = SmoothOneEuroCircular(frequency)
         self.filters["approximate_person_length"] = SmoothOneEuro(frequency)
-        for key in PoseAngleJointTriplets.keys():
+        for key in PoseAngleJoints:
             angle_name: str = key.name
             self.filters[angle_name] = SmoothOneEuroCircular(frequency)
 
         self.present: bool = False
         self.start_age: float = 0.0
         self.age: float = 0.0
+        self.approximate_person_length: float = 1.0
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
@@ -91,9 +92,9 @@ class WSData:
                     if score > 0.0 and angle is not np.nan:
                         setattr(self, name, angle)
 
-            approximate_person_length: float | None = pose.get_approximate_person_length()
-            if approximate_person_length is not None:
-                self.approximate_person_length = approximate_person_length #* min(self.age, 1.0)
+            pose_measurement_data: PoseMeasurementData | None = pose.measurement_data
+            if pose_measurement_data is not None:
+                self.approximate_person_length = pose_measurement_data.approximate_length #* min(self.age, 1.0)
 
             world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
             nose_angle_offset: float | None = None
