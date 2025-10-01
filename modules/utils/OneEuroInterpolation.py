@@ -1,17 +1,46 @@
 
+"""
+SmoothInterpolation Module
+
+Provides a collection of interpolation classes based on the 1€ Filter algorithm
+for smoothing various types of motion data. It provides interpolatedvalues between
+samples using Hermite interpolation. It also handles NaN values by substituting the
+last valid value.
+
+Classes:
+    OneEuroInterpolator: Basic interpolator for numeric values
+    NormalizedEuroInterpolator: Interpolator for values in [0,1] range
+    AngleEuroInterpolator: Specialized interpolator for angular data in [-π,π] range
+    ArrayEuroInterpolator: Interpolator for multi-dimensional numpy arrays
+"""
+
 import numpy as np
+from dataclasses import dataclass
 from OneEuroFilter import OneEuroFilter
 from collections import deque
 from time import time
 
+@dataclass
+class OneEuroSettings:
+    """Configuration parameters for the 1€ Filter."""
+    min_cutoff: float = 1.0     # Minimum cutoff frequency
+    beta: float = 0.0           # Speed coefficient
+    d_cutoff: float = 1.0       # Cutoff frequency for derivative
+
 class OneEuroInterpolator:
-    def __init__(self,  freq:float, mincutoff:float=1.0, beta:float=0.0, dcutoff:float=1.0) -> None:
-        self.filter = OneEuroFilter(freq, mincutoff, beta, dcutoff)
-        # Buffer size 4: Needed for cubic interpolation (4 points) and calculating acceleration (3 points)
-        self.buffer: deque[float] = deque(maxlen=4)
-        self.interval: float = 1.0 / freq
-        self.last_time: float = time()
-        self.last_real: float | None = None  # store the last real (non-NaN) value # Max intervals to allow for extrapolation
+    """Basic numeric value interpolator using 1€ Filter."""
+
+    def __init__(self, freq: float, settings: OneEuroSettings) -> None:
+        self.filter: OneEuroFilter = OneEuroFilter(freq, settings.min_cutoff, settings.beta, settings.d_cutoff)
+        self.interval: float = 1.0 / freq               # Expected time between samples
+        self.buffer: deque[float] = deque(maxlen=4)     # Store recent filtered values
+        self.last_time: float = time()                  # Timestamp of last sample
+        self.last_real: float | None = None             # Last non-NaN value
+
+    def update_settings(self, settings: OneEuroSettings) -> None:
+        self.filter.setMinCutoff(settings.min_cutoff)
+        self.filter.setBeta(settings.beta)
+        self.filter.setDerivateCutoff(settings.d_cutoff)
 
     def add_sample(self, value: float) -> None:
         if np.isnan(value):
@@ -72,7 +101,7 @@ class OneEuroInterpolator:
         else:
             # Only have two points - enhanced extrapolation
             v0, v1 = self.buffer[-2], self.buffer[-1]
-            velocity = v1 - v0
+            velocity: float = v1 - v0
 
             if alpha < 1.0:
                 # Simple linear interpolation between the two points
@@ -86,8 +115,13 @@ class OneEuroInterpolator:
                 # return v1 + velocity * t * decay_factor
 
 class NormalizedEuroInterpolator:
-    def __init__(self, freq:float, mincutoff:float=1.0, beta:float=0.0, dcutoff:float=1.0) -> None:
-        self.interp = OneEuroInterpolator(freq, mincutoff, beta, dcutoff)
+    """Interpolator for values in [0,1] range."""
+
+    def __init__(self, freq: float, settings: OneEuroSettings) -> None:
+        self.interp = OneEuroInterpolator(freq, settings)
+
+    def update_settings(self, settings: OneEuroSettings) -> None:
+        self.interp.update_settings(settings)
 
     def add_sample(self, value: float) -> None:
         """Add an sample in [0,1] range"""
@@ -102,9 +136,15 @@ class NormalizedEuroInterpolator:
         return max(0.0, min(1.0, val))
 
 class AngleEuroInterpolator:
-    def __init__(self, freq:float, mincutoff:float=1.0, beta:float=0.0, dcutoff:float=1.0) -> None:
-        self.sin_interp = OneEuroInterpolator(freq, mincutoff, beta, dcutoff)
-        self.cos_interp = OneEuroInterpolator(freq, mincutoff, beta, dcutoff)
+    """Interpolator for angular data in [-π,π] range."""
+
+    def __init__(self, freq: float, settings: OneEuroSettings) -> None:
+        self.sin_interp = OneEuroInterpolator(freq, settings)
+        self.cos_interp = OneEuroInterpolator(freq, settings)
+
+    def update_settings(self, settings: OneEuroSettings) -> None:
+        self.sin_interp.update_settings(settings)
+        self.cos_interp.update_settings(settings)
 
     def add_sample(self, angle: float) -> None:
         """Add an angular sample in [-π,π] range"""
@@ -125,7 +165,18 @@ class AngleEuroInterpolator:
         return np.arctan2(sin_val, cos_val)
 
 class ArrayEuroInterpolator:
-    def __init__(self, shape: tuple[int, ...], freq:float, mincutoff:float=1.0, beta:float=0.0, dcutoff:float=1.0, angular: bool=False, normalize: bool=False) -> None:
+    """Interpolator for multi-dimensional arrays."""
+
+    def __init__(self, freq:float, settings: OneEuroSettings, shape: tuple[int, ...], angular: bool=False, normalize: bool=False) -> None:
+        """
+        Args:
+            freq: Sampling frequency (Hz)
+            settings: Filter parameters
+            shape: Shape of arrays to filter
+            angular: Whether to use angle interpolation
+            normalize: Whether to normalize values to [0,1]
+        """
+
         self.shape: tuple[int, ...] = shape
         self.size: int = int(np.prod(shape))
         self.normalize: bool = normalize
@@ -133,11 +184,15 @@ class ArrayEuroInterpolator:
         self.interpolators: list[OneEuroInterpolator | AngleEuroInterpolator]
 
         if angular:
-            self.interpolators = [AngleEuroInterpolator(freq, mincutoff, beta, dcutoff)
+            self.interpolators = [AngleEuroInterpolator(freq, settings)
                                  for _ in range(self.size)]
         else:
-            self.interpolators = [OneEuroInterpolator(freq, mincutoff, beta, dcutoff)
+            self.interpolators = [OneEuroInterpolator(freq, settings)
                                  for _ in range(self.size)]
+
+    def update_settings(self, settings: OneEuroSettings) -> None:
+        for interp in self.interpolators:
+            interp.update_settings(settings)
 
     def add_sample(self, array: np.ndarray) -> None:
         flat_array: np.ndarray = array.flatten()
