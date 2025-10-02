@@ -2,9 +2,38 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, TYPE_CHECKING
 
-from modules.pose.PoseTypes import POSE_ANGLE_JOINT_TRIPLETS, POSE_ANGLE_ROTATIONS, POSE_NUM_ANGLES
+from modules.pose.PoseTypes import PoseJoint
 from modules.pose.PosePoints import PosePointData
 
+
+# DEFINITIONS
+POSE_ANGLE_JOINT_TRIPLETS: dict[PoseJoint, tuple[PoseJoint, PoseJoint, PoseJoint]] = {
+    PoseJoint.left_shoulder:  ( PoseJoint.left_hip,       PoseJoint.left_shoulder,  PoseJoint.left_elbow  ),
+    PoseJoint.right_shoulder: ( PoseJoint.right_hip,      PoseJoint.right_shoulder, PoseJoint.right_elbow ),
+    PoseJoint.left_elbow:     ( PoseJoint.left_shoulder,  PoseJoint.left_elbow,     PoseJoint.left_wrist  ),
+    PoseJoint.right_elbow:    ( PoseJoint.right_shoulder, PoseJoint.right_elbow,    PoseJoint.right_wrist ),
+    PoseJoint.left_hip:       ( PoseJoint.left_shoulder,  PoseJoint.left_hip,       PoseJoint.left_knee   ),
+    PoseJoint.right_hip:      ( PoseJoint.right_shoulder, PoseJoint.right_hip,      PoseJoint.right_knee  ),
+    PoseJoint.left_knee:      ( PoseJoint.left_hip,       PoseJoint.left_knee,      PoseJoint.left_ankle  ),
+    PoseJoint.right_knee:     ( PoseJoint.right_hip,      PoseJoint.right_knee,     PoseJoint.right_ankle )
+}
+POSE_ANGLE_JOINTS: list[PoseJoint] = list(POSE_ANGLE_JOINT_TRIPLETS.keys())
+POSE_ANGLE_JOINT_NAMES: list[str] = [e.name for e in POSE_ANGLE_JOINTS]
+POSE_ANGLE_JOINT_IDXS: dict[PoseJoint, int] = {joint: idx for idx, joint in enumerate(POSE_ANGLE_JOINTS)}
+
+POSE_NUM_ANGLES: int = len(POSE_ANGLE_JOINT_TRIPLETS)
+POSE_ANGLE_ROTATIONS: dict[PoseJoint, float] = {
+    PoseJoint.left_shoulder:    0.0,
+    PoseJoint.right_shoulder:   0.0,
+    PoseJoint.left_elbow:       np.pi,
+    PoseJoint.right_elbow:      np.pi,
+    PoseJoint.left_hip:         np.pi,
+    PoseJoint.right_hip:        np.pi,
+    PoseJoint.left_knee:        np.pi,
+    PoseJoint.right_knee:       np.pi
+}
+
+# CLASSES
 @dataclass(frozen=True)
 class PoseAngleData:
     angles: np.ndarray = field(default_factory=lambda: np.full(POSE_NUM_ANGLES, np.nan, dtype=np.float32))

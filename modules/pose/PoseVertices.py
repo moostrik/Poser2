@@ -3,13 +3,32 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from modules.pose.PosePoints import PosePointData
-from modules.pose.PoseAngles import PoseAngleData
-from modules.pose.PoseTypes import POSE_VERTEX_ARRAY, POSE_VERTEX_LIST, POSE_JOINT_COLORS
+from modules.pose.PoseAngles import PoseAngleData, POSE_ANGLE_JOINT_IDXS
+from modules.pose.PoseTypes import PoseJoint, POSE_JOINT_COLORS
 from modules.pose.PoseTypes import POSE_COLOR_ALPHA_BASE, POSE_COLOR_LEFT_POSITIVE, POSE_COLOR_LEFT_NEGATIVE, POSE_COLOR_RIGHT_POSITIVE, POSE_COLOR_RIGHT_NEGATIVE
-from modules.pose.PoseTypes import POSE_ANGLE_JOINT_IDXS
 
+# DEFINITIONS
+POSE_VERTEX_LIST: list[list[PoseJoint]] = [
+    [PoseJoint.nose,            PoseJoint.left_eye],
+    [PoseJoint.nose,            PoseJoint.right_eye],
+    [PoseJoint.left_eye,        PoseJoint.left_ear],
+    [PoseJoint.right_eye,       PoseJoint.right_ear],
+    [PoseJoint.left_shoulder,   PoseJoint.right_shoulder],
+    [PoseJoint.left_shoulder,   PoseJoint.left_elbow],
+    [PoseJoint.right_shoulder,  PoseJoint.right_elbow],
+    [PoseJoint.left_elbow,      PoseJoint.left_wrist],
+    [PoseJoint.right_elbow,     PoseJoint.right_wrist],
+    [PoseJoint.left_shoulder,   PoseJoint.left_hip],
+    [PoseJoint.right_shoulder,  PoseJoint.right_hip],
+    [PoseJoint.left_hip,        PoseJoint.left_knee],
+    [PoseJoint.right_hip,       PoseJoint.right_knee],
+    [PoseJoint.left_knee,       PoseJoint.left_ankle],
+    [PoseJoint.right_knee,      PoseJoint.right_ankle]
+]
+POSE_VERTEX_ARRAY: np.ndarray = np.array([kp.value for pose in POSE_VERTEX_LIST for kp in pose], dtype=np.int32)
+POSE_VERTEX_INDICES: np.ndarray = np.arange(len(POSE_VERTEX_ARRAY), dtype=np.int32)
 
-# VERTICES
+# CLASSES
 @dataclass(frozen=True)
 class PoseVertexData:
     vertices: np.ndarray

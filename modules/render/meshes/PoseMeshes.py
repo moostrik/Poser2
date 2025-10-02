@@ -6,7 +6,7 @@ import numpy as np
 # Local application imports
 from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose, PoseVertexData
-from modules.pose.PoseTypes import POSE_VERTEX_INDICES
+from modules.pose.PoseVertices import POSE_VERTEX_INDICES
 from modules.render.DataManager import DataManager
 from modules.render.renders.BaseRender import BaseRender, Rect
 

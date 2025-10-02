@@ -7,7 +7,8 @@ from time import time
 from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose, PosePointData, PoseAngleData, PoseMeasurementData
-from modules.pose.PoseTypes import PoseJoint, POSE_ANGLE_JOINTS, POSE_ANGLE_JOINT_NAMES
+from modules.pose.PoseAngles import POSE_ANGLE_JOINTS, POSE_ANGLE_JOINT_NAMES
+from modules.pose.PoseTypes import PoseJoint
 from modules.pose.PoseStream import PoseStreamData
 from modules.utils.PointsAndRects import Rect
 
@@ -96,7 +97,7 @@ class WSData:
 
             pose_measurement_data: PoseMeasurementData | None = pose.measurement_data
             if pose_measurement_data is not None:
-                self.approximate_person_length = pose_measurement_data.approximate_length #* min(self.age, 1.0)
+                self.approximate_person_length = pose_measurement_data.length_estimate #* min(self.age, 1.0)
 
             world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
             nose_angle_offset: float | None = None

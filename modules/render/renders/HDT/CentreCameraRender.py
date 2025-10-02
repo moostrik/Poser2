@@ -137,7 +137,7 @@ class PoseSmoothRect():
 
         pose_rect: Rect | None = pose.crop_rect
         pose_points: np.ndarray | None = pose.point_data.points if pose.point_data is not None else None
-        pose_height: float | None = pose.measurement_data.approximate_length if pose.measurement_data is not None else None
+        pose_height: float | None = pose.measurement_data.length_estimate if pose.measurement_data is not None else None
 
         if pose_rect is None:
             print(f"PoseSmoothRect: No crop rect for pose {pose.tracklet.id}, this should not happen")

@@ -1,102 +1,143 @@
 import numpy as np
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from typing import Optional, TYPE_CHECKING
-from modules.pose.PoseTypes import PoseJoint, ANATOMICAL_PROPORTIONS
+from modules.pose.PoseTypes import PoseJoint
 from modules.utils.PointsAndRects import Rect
 
 from modules.pose.PosePoints import PosePointData
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+# DEFINITIONS
+class LimbType(Enum):
+    left_arm =  auto()
+    right_arm = auto()
+    left_leg =  auto()
+    right_leg = auto()
+    spine =     auto()
+    head =      auto()
+
+class LimbCalculationType(Enum):
+    SEGMENT_CHAIN = auto()  # Sum of segments (shoulder-elbow-wrist)
+    MIDPOINT_TO_POINT = auto()  # Distance from one point to midpoint of others (spine)
+
+ANATOMICAL_PROPORTIONS: dict[str, float] = {
+    "arm": 1 / 0.41,    # arm length to full height ratio
+    "leg": 1 / 0.48,    # leg length to full height ratio
+    "spine": 1 / 0.52,  # spine length to full height ratio
+    "head": 1 / 0.13    # head width to full height ratio
+}
+
+LIMB_CONFIG: dict[LimbType, dict] = {
+    LimbType.left_arm: {
+        "joints": (PoseJoint.left_shoulder, PoseJoint.left_elbow, PoseJoint.left_wrist),
+        "proportion": ANATOMICAL_PROPORTIONS["arm"],
+        "calc_type": LimbCalculationType.SEGMENT_CHAIN,
+        "fallback": False
+    },
+    LimbType.right_arm: {
+        "joints": (PoseJoint.right_shoulder, PoseJoint.right_elbow, PoseJoint.right_wrist),
+        "proportion": ANATOMICAL_PROPORTIONS["arm"],
+        "calc_type": LimbCalculationType.SEGMENT_CHAIN,
+        "fallback": False
+    },
+    LimbType.left_leg: {
+        "joints": (PoseJoint.left_hip, PoseJoint.left_knee, PoseJoint.left_ankle),
+        "proportion": ANATOMICAL_PROPORTIONS["leg"],
+        "calc_type": LimbCalculationType.SEGMENT_CHAIN,
+        "fallback": False
+    },
+    LimbType.right_leg: {
+        "joints": (PoseJoint.right_hip, PoseJoint.right_knee, PoseJoint.right_ankle),
+        "proportion": ANATOMICAL_PROPORTIONS["leg"],
+        "calc_type": LimbCalculationType.SEGMENT_CHAIN,
+        "fallback": False
+    },
+    LimbType.spine: {
+        "joints": (PoseJoint.nose, PoseJoint.left_hip, PoseJoint.right_hip),
+        "proportion": ANATOMICAL_PROPORTIONS["spine"],
+        "calc_type": LimbCalculationType.MIDPOINT_TO_POINT,
+        "fallback": False
+    },
+    LimbType.head: {
+        "joints": (PoseJoint.left_ear, PoseJoint.nose, PoseJoint.right_ear),
+        "proportion": ANATOMICAL_PROPORTIONS["head"],
+        "calc_type": LimbCalculationType.SEGMENT_CHAIN,
+        "fallback": True  # Head is a fallback estimate
+    }
+}
+
+# CLASSES
 @dataclass(frozen=True)
 class PoseMeasurementData:
-    approximate_length: float = 1.0
+    length_estimate: float = 1.0
 
 class PoseMeasurements:
     hotreload: HotReloadMethods | None = None
+
     @staticmethod
-    def compute(point_data: Optional['PosePointData'], crop_rect: Optional[Rect]) -> PoseMeasurementData:
+    def calculate_limb_length(points: np.ndarray, limb_type: LimbType) -> Optional[float]:
+        """Calculate the length of a limb based on its type"""
+        joints: tuple = LIMB_CONFIG[limb_type]["joints"]
+        calc_type: LimbCalculationType = LIMB_CONFIG[limb_type]["calc_type"]
+
+        # Check if all required points are valid
+        if any(np.isnan(points[joint]).any() for joint in joints):
+            return None
+
+        if calc_type == LimbCalculationType.SEGMENT_CHAIN:
+            # Sum of segments (e.g., shoulder-elbow + elbow-wrist)
+            total_length = 0
+            for i in range(len(joints)-1):
+                total_length += float(np.linalg.norm(points[joints[i]] - points[joints[i+1]]))
+            return total_length  * LIMB_CONFIG[limb_type]["proportion"]
+
+        elif calc_type == LimbCalculationType.MIDPOINT_TO_POINT:
+            # Distance from first point to midpoint of other points (spine)
+            midpoint = np.mean([points[joints[1]], points[joints[2]]], axis=0)
+            return float(np.linalg.norm(points[joints[0]] - midpoint)) * LIMB_CONFIG[limb_type]["proportion"]
+
+        return None
+
+    @staticmethod
+    def compute(point_data: Optional['PosePointData'], crop_rect: Optional[Rect]) -> PoseMeasurementData | None:
         if PoseMeasurements.hotreload is None:
             PoseMeasurements.hotreload = HotReloadMethods(PoseMeasurements)
 
         if point_data is None or crop_rect is None:
-            return PoseMeasurementData()
-
-
-        # TODO REMOVE SCORES AS POINTS ARE NAN WHEN BELOW SCORE THRESHOLD
+            return None
 
         points: np.ndarray = point_data.points
-        height: float = crop_rect.height if crop_rect is not None else 1.0
+        crop_height: float = crop_rect.height
 
-        # Anatomical proportions (height multipliers)
-        PROPORTION_ARM = 1 / 0.41  # arm length to full height ratio
-        PROPORTION_LEG = 1 / 0.48  # leg length to full height ratio
-        PROPORTION_SPINE = 1 / 0.52  # spine length to full height ratiocompute
-        PROPORTION_HEAD = 1 / 0.13  # head width (ear-to-ear) to full height ratio
+        estimates: dict[LimbType, float] = {}
 
-        limb_data = {
-            "left_arm": {
-                "joints": [PoseJoint.left_shoulder, PoseJoint.left_elbow, PoseJoint.left_wrist],
-                "proportion": PROPORTION_ARM
-            },
-            "right_arm": {
-                "joints": [PoseJoint.right_shoulder, PoseJoint.right_elbow, PoseJoint.right_wrist],
-                "proportion": PROPORTION_ARM
-            },
-            "left_leg": {
-                "joints": [PoseJoint.left_hip, PoseJoint.left_knee, PoseJoint.left_ankle],
-                "proportion": PROPORTION_LEG
-            },
-            "right_leg": {
-                "joints": [PoseJoint.right_hip, PoseJoint.right_knee, PoseJoint.right_ankle],
-                "proportion": PROPORTION_LEG
-            },
-            "head": {
-                "joints": [PoseJoint.left_ear, PoseJoint.nose, PoseJoint.right_ear],
-                "proportion": PROPORTION_HEAD
-            },
-            "spine": {
-                "joints": [PoseJoint.nose, PoseJoint.left_hip, PoseJoint.right_hip],
-                "proportion": PROPORTION_SPINE,
-                "special": "spine"
-            }
-        }
+        # Calculate primary estimates
+        for limb_type, config in LIMB_CONFIG.items():
+            if config["fallback"]:
+                continue
+            limb_length: float | None = PoseMeasurements.calculate_limb_length(points, limb_type)
+            if limb_length is not None:
+                height_estimate: float = limb_length * crop_height
+                estimates[limb_type] = height_estimate
 
-        estimates = []
-
-        # Calculate length estimate for each limb
-        for limb_name, data in limb_data.items():
-            joints = data["joints"]
-            proportion = data["proportion"]
-
-            # Check if all joints are present (not NaN)
-            if all(not np.isnan(points[joint]).any() for joint in joints):
-                length = 0
-
-                if data.get("special") == "spine":
-                    mid_hip_x: float = (points[joints[1]][0] + points[joints[2]][0]) / 2
-                    mid_hip_y: float = (points[joints[1]][1] + points[joints[2]][1]) / 2
-                    mid_hip: np.ndarray = np.array([mid_hip_x, mid_hip_y])
-                    length = float(np.linalg.norm(points[joints[0]] - mid_hip))
-                else:
-                    seg1 = float(np.linalg.norm(points[joints[0]] - points[joints[1]]))
-                    seg2 = float(np.linalg.norm(points[joints[1]] - points[joints[2]]))
-                    length: float = seg1 + seg2
-
-                height_estimate = length * proportion * height
-
-                estimates.append({
-                    "limb": limb_name,
-                    "estimate": height_estimate
-                })
+        # If no primary estimates, calculate fallback estimates
+        for limb_type, config in LIMB_CONFIG.items():
+            if not config["fallback"]:
+                continue
+            limb_length: float | None = PoseMeasurements.calculate_limb_length(points, limb_type)
+            if limb_length is not None:
+                height_estimate: float = limb_length * crop_height
+                estimates[limb_type] = height_estimate
 
         if not estimates:
-            print ("No valid limb estimates for height")
-            return PoseMeasurementData()
+            print("No valid limb estimates for height")
+            return None
 
-        # Take the highest estimate (assume occlusion underestimates)
-        best_estimate = max(estimates, key=lambda e: e["estimate"])
+        best_limb: LimbType = max(estimates, key=lambda k: estimates[k])
+        best_estimate: float = estimates[best_limb]
 
-        return PoseMeasurementData(approximate_length=best_estimate["estimate"])
+        return PoseMeasurementData(length_estimate=best_estimate)
 
 # PoseMeasurements.hotreload = HotReloadMethods(PoseMeasurements)
