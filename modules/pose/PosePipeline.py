@@ -10,8 +10,7 @@ import numpy as np
 from modules.cam.depthcam.Definitions import FrameType
 from modules.tracker.Tracklet import Tracklet, Rect
 from modules.pose.Pose import Pose, PoseCallback
-from modules.pose.PoseTypes import POSE_MODEL_TYPE_NAMES
-from modules.pose.PoseDetection import PoseDetection as Detection
+from modules.pose.PoseDetection import PoseDetection, POSE_MODEL_TYPE_NAMES
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.Settings import Settings
 
@@ -32,7 +31,7 @@ class PosePipeline(Thread):
         self.pose_detector_frame_height: int = 256
         self.pose_crop_expansion: float = settings.pose_crop_expansion
         self.max_detectors: int = settings.num_players
-        self.pose_detector: Detection | None = None
+        self.pose_detector: PoseDetection | None = None
         self.image_processor: PoseImageProcessor = PoseImageProcessor(
             crop_expansion=self.pose_crop_expansion,
             output_width=self.pose_detector_frame_width,
@@ -41,7 +40,7 @@ class PosePipeline(Thread):
 
 
         if self.pose_active:
-            self.pose_detector = Detection(settings.path_model, settings.pose_model_type, settings.camera_fps, settings.pose_conf_threshold, settings.pose_verbose)
+            self.pose_detector = PoseDetection(settings.path_model, settings.pose_model_type, settings.camera_fps, settings.pose_conf_threshold, settings.pose_verbose)
             print('Pose Detection:', 'model', POSE_MODEL_TYPE_NAMES[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')

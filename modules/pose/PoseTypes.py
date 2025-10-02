@@ -1,26 +1,4 @@
-from enum import Enum, IntEnum
-import numpy as np
-
-
-# MODEL
-POSE_MODEL_WIDTH = 192
-POSE_MODEL_HEIGHT = 256
-
-class PoseModelType(Enum):
-    NONE =   0
-    LARGE =  1
-    MEDIUM = 2
-    SMALL =  3
-    TINY =   4
-POSE_MODEL_TYPE_NAMES: list[str] = [e.name for e in PoseModelType]
-
-POSE_MODEL_FILE_NAMES: list[tuple[str, str]] = [
-    ('none', ''),
-    ('rtmpose-l_8xb256-420e_aic-coco-256x192.py', 'rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth'),
-    ('rtmpose-m_8xb256-420e_aic-coco-256x192.py', 'rtmpose-m_simcc-aic-coco_pt-aic-coco_420e-256x192-63eb25f7_20230126.pth'),
-    ('rtmpose-s_8xb256-420e_aic-coco-256x192.py', 'rtmpose-s_simcc-aic-coco_pt-aic-coco_420e-256x192-fcb2599b_20230126.pth'),
-    ('rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth')
-]
+from enum import IntEnum
 
 # JOINTS
 class PoseJoint(IntEnum):

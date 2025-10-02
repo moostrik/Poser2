@@ -7,6 +7,7 @@ from threading import Thread, Lock, Event
 import cv2
 import numpy as np
 import torch
+from enum import IntEnum
 from pandas import Timestamp
 
 from mmpose.apis import init_model
@@ -17,14 +18,35 @@ from mmpose.structures import PoseDataSample
 from mmpose.structures.bbox import bbox_xywh2xyxy
 
 # Local application imports
-
-from modules.pose.PoseTypes import PoseModelType, POSE_MODEL_FILE_NAMES
 from modules.pose.Pose import Pose, PosePointData
 
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
 from modules.utils.HotReloadMethods import HotReloadMethods
+
+
+
+# DEFINITIONS
+POSE_MODEL_WIDTH = 192
+POSE_MODEL_HEIGHT = 256
+
+class PoseModelType(IntEnum):
+    NONE =   0
+    LARGE =  1
+    MEDIUM = 2
+    SMALL =  3
+    TINY =   4
+POSE_MODEL_TYPE_NAMES: list[str] = [e.name for e in PoseModelType]
+
+POSE_MODEL_FILE_NAMES: list[tuple[str, str]] = [
+    ('none', ''),
+    ('rtmpose-l_8xb256-420e_aic-coco-256x192.py', 'rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth'),
+    ('rtmpose-m_8xb256-420e_aic-coco-256x192.py', 'rtmpose-m_simcc-aic-coco_pt-aic-coco_420e-256x192-63eb25f7_20230126.pth'),
+    ('rtmpose-s_8xb256-420e_aic-coco-256x192.py', 'rtmpose-s_simcc-aic-coco_pt-aic-coco_420e-256x192-fcb2599b_20230126.pth'),
+    ('rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth')
+]
+
 
 class PoseDetection(Thread):
     def __init__(self, path: str, model_type:PoseModelType, fps: float = 30.0, confidence_threshold: float = 0.3, verbose: bool = False) -> None:
