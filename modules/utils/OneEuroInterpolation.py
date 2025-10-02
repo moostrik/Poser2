@@ -216,9 +216,3 @@ class ArrayEuroInterpolator:
             result = np.clip(result, 0.0, 1.0)
 
         return result.reshape(self.shape)
-
-
-
-
-
-
