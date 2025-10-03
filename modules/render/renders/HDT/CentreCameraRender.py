@@ -49,7 +49,6 @@ class CentreCameraRender(BaseRender):
         if key != 0:
             return
 
-
         pose: Pose | None = self.data.get_pose(key, only_new_data=True, consumer_key=self.key())
         if pose is not None:
 
@@ -71,28 +70,13 @@ class CentreCameraRender(BaseRender):
             self.cam_image.set_image(cam_image_np)
             self.cam_image.update()
 
-
-        smooth_rect: Rect = self.rect_smoother.get()
-
-
-
-        # print(smooth_rect.x, smooth_rect.y, smooth_rect.width, smooth_rect.height)
-        # return
-
-        # print (self.cam_image.width,self.cam_image.height)
-        cam_image_aspect_ratio: float = self.cam_image.width / self.cam_image.height
-
-        width: float =  smooth_rect.width / cam_image_aspect_ratio
-
-        x: float =  smooth_rect.x + ( smooth_rect.width - width) / 2.0
-
+        smooth_pose_rect: Rect = self.rect_smoother.get()
+        smooth_cam_roi: Rect = CentreCameraRender.pose_rect_to_image_roi(smooth_pose_rect, self.cam_image.width, self.cam_image.height)
 
         BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
-
         self.cam_image.draw_roi(0, 0, self.cam_fbo.width, self.cam_fbo.height,
-                                x,  smooth_rect.y, width,  smooth_rect.height)
-
+                                smooth_cam_roi.x, smooth_cam_roi.y, smooth_cam_roi.width, smooth_cam_roi.height)
         glColor4f(1.0, 1.0, 1.0, 1.0)
         self.cam_fbo.end()
 
@@ -107,8 +91,17 @@ class CentreCameraRender(BaseRender):
     def get_fbo(self) -> Fbo:
         return self.cam_fbo
 
+    @staticmethod
+    def pose_rect_to_image_roi(pose_rect: Rect, image_width: int, image_height: int) -> Rect:
+        """Convert a pose rectangle to an image ROI, maintaining aspect ratio."""
+        image_aspect_ratio: float = image_width / image_height
 
+        width: float = pose_rect.width / image_aspect_ratio
+        x: float =  pose_rect.x + (pose_rect.width - width) / 2.0
+        height: float = pose_rect.height
+        y: float = pose_rect.y
 
+        return Rect(x, y, width, height)
 
 
 class PoseSmoothRect():
@@ -134,7 +127,6 @@ class PoseSmoothRect():
 
 
     def add_pose(self, pose: Pose) -> None:
-
         pose_rect: Rect | None = pose.crop_rect
         pose_points: np.ndarray | None = pose.point_data.points if pose.point_data is not None else None
         pose_height: float | None = pose.measurement_data.length_estimate if pose.measurement_data is not None else None
@@ -154,11 +146,9 @@ class PoseSmoothRect():
         self.smooth_height.add_sample(height)
 
     def get(self) -> Rect:
-
         self.nose_dest_x: float = 0.5
         self.nose_dest_y: float = 0.33
         self.height_dest: float = 0.95
-
 
         nose_x: float | None = self.smooth_centre_x.get()
         nose_y: float | None = self.smooth_centre_y.get()
@@ -178,10 +168,9 @@ class PoseSmoothRect():
         self.current_rect = Rect(left, top, width, height)
         return self.current_rect
 
-
     def reset(self) -> None:
         self.current_rect = None
 
-        self.smooth_centre_x: NormalizedEuroInterpolator = NormalizedEuroInterpolator(25, self.settings)
-        self.smooth_centre_y: NormalizedEuroInterpolator = NormalizedEuroInterpolator(25, self.settings)
-        self.smooth_height: OneEuroInterpolator = OneEuroInterpolator(25, self.settings)
+        self.smooth_centre_x.reset()
+        self.smooth_centre_y.reset()
+        self.smooth_height.reset()

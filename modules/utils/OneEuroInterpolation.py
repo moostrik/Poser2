@@ -114,6 +114,12 @@ class OneEuroInterpolator:
                 # decay_factor = 1.0 / (1.0 + 0.5 * t)
                 # return v1 + velocity * t * decay_factor
 
+    def reset(self) -> None:
+        self.buffer.clear()
+        self.last_real = None
+        self.last_time = time()
+        self.filter.reset()
+
 class NormalizedEuroInterpolator:
     """Interpolator for values in [0,1] range."""
 
@@ -134,6 +140,9 @@ class NormalizedEuroInterpolator:
         if val is None:
             return None
         return max(0.0, min(1.0, val))
+
+    def reset(self) -> None:
+        self.interp.reset()
 
 class AngleEuroInterpolator:
     """Interpolator for angular data in [-π,π] range."""
@@ -163,6 +172,10 @@ class AngleEuroInterpolator:
             return None
 
         return np.arctan2(sin_val, cos_val)
+
+    def reset(self) -> None:
+        self.sin_interp.reset()
+        self.cos_interp.reset()
 
 class ArrayEuroInterpolator:
     """Interpolator for multi-dimensional arrays."""
@@ -216,3 +229,7 @@ class ArrayEuroInterpolator:
             result = np.clip(result, 0.0, 1.0)
 
         return result.reshape(self.shape)
+
+    def reset(self) -> None:
+        for interp in self.interpolators:
+            interp.reset()
