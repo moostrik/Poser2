@@ -70,7 +70,8 @@ class Settings():
 
         # POSE DETCTION SETTINGS
         self.pose_crop_expansion: float         = None # type: ignore
-        self.pose_model_type: PoseModelType         = None # type: ignore
+        self.pose_model_type: PoseModelType     = None # type: ignore
+        self.pose_model_warmups: int             = None # type: ignore
         self.pose_active: bool                  = None # type: ignore
         self.pose_stream_capacity: int          = None # type: ignore
         self.pose_conf_threshold: float         = None # type: ignore

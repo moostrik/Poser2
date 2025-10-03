@@ -108,6 +108,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.pose_active =      not args.nopose
     settings.pose_model_type =      PoseModelType.NONE if args.nopose else PoseModelType.SMALL
+    settings.pose_model_warmups =    settings.num_players
     settings.pose_conf_threshold =  0.5
     settings.pose_crop_expansion =  0.1 # * height of the camera
     settings.pose_stream_capacity = int(10 * args.fps)
@@ -166,7 +167,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.gui_location_y =   -700
         settings.gui_on_top =       True
 
-        settings.pose_model_type =  PoseModelType.NONE if args.nopose else PoseModelType.SMALL
+        settings.pose_model_type =  PoseModelType.NONE if args.nopose else PoseModelType.LARGE
         settings.pose_verbose =     True
 
         settings.camera_color =     True

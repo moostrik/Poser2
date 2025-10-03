@@ -1,4 +1,5 @@
 # Standard library imports
+from queue import Queue, Empty
 import time
 import traceback
 from dataclasses import replace
@@ -51,7 +52,7 @@ POSE_MODEL_FILE_NAMES: list[tuple[str, str]] = [
 
 
 class PoseDetection(Thread):
-    def __init__(self, path: str, model_type:PoseModelType, fps: float = 30.0, confidence_threshold: float = 0.3, verbose: bool = False) -> None:
+    def __init__(self, path: str, model_type:PoseModelType, model_warmup: int, fps: float = 30.0, confidence_threshold: float = 0.3, verbose: bool = False) -> None:
         super().__init__()
 
         if model_type is PoseModelType.NONE:
@@ -60,9 +61,11 @@ class PoseDetection(Thread):
         self.model_checkpoint_file: str = path + '/' + POSE_MODEL_FILE_NAMES[model_type.value][1]
         self.model_width: int = 192
         self.model_height: int = 256
+        self.model_warmup: int = model_warmup
         self.confidence_threshold: float = confidence_threshold
 
         self.interval: float = 1.0 / fps
+
 
         self.verbose: bool = verbose
         self._running: bool = False
@@ -74,17 +77,31 @@ class PoseDetection(Thread):
 
         self._notify_update_event: Event = Event()
 
+        self._callback_queue: Queue[list[Pose]] = Queue(maxsize=2)  # Limit queue size
+        self._callback_thread = Thread(target=self._callback_worker, daemon=True)
+        self._callback_running = False
 
         hot_reloader = HotReloadMethods(self.__class__)
+
+    def start(self) -> None:
+        self._callback_running = True
+        self._callback_thread.start()
+        super().start()
 
     def stop(self) -> None:
         self._running = False
         self._notify_update_event.set()  # Wake up the thread if waiting
+        self.join(timeout=2.0)
+        if self._callback_thread.is_alive():
+            self._callback_queue.put([])
+            self._callback_thread.join(timeout=2.0)
 
     def run(self) -> None:
         model:torch.nn.Module = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
         model.half()
         pipeline: Compose = Compose(model.cfg.test_dataloader.dataset.pipeline) # pyright: ignore
+
+        self._model_warmup(model, pipeline, self.model_warmup, self.verbose)
 
         self._running = True
 
@@ -94,16 +111,14 @@ class PoseDetection(Thread):
             start_time: float = time.perf_counter()
 
             try:
-                # Step 1: Pre-process - get poses and prepare images
-                poses, images = self._preprocess_poses()
+                poses: list[Pose] = self.get_poses(consume=True)
+                images: list[np.ndarray] = [pose.crop_image for pose in poses if pose.crop_image is not None]
 
-                # Step 2: Run inference if we have images
-                if images:
-                    # Run inference
-                    data_samples: list[list[PoseDataSample]] = PoseDetection._run_inference(model, pipeline, images)
+                data_samples: list[list[PoseDataSample]] = PoseDetection._run_inference(model, pipeline, images, False)
+                point_data_list: list[PosePointData | None] = PoseDetection._extract_point_data_from_samples(data_samples, self.model_width, self.model_height, self.confidence_threshold)
 
-                    # Step 3: Post-process results and send callbacks
-                    self._postprocess_results(poses, data_samples)
+                updated_poses: list[Pose] = [replace(pose, point_data=point_data_list[i]) for i, pose in enumerate(poses)]
+                self._callback_queue.put(updated_poses)
 
             except Exception as e:
                 if self.verbose:
@@ -111,47 +126,10 @@ class PoseDetection(Thread):
                     traceback.print_exc()
 
             if self.verbose:
-                detection_time = time.perf_counter() - start_time
+                detection_time: float = time.perf_counter() - start_time
                 if detection_time > self.interval:
                     print(f"Pose Detection Time: {detection_time:.3f} seconds")
 
-    def _preprocess_poses(self) -> tuple[list[Pose], list[np.ndarray]]:
-        """Extract poses from queue and prepare images for inference."""
-        poses_with_images: list[Pose] = []
-        poses_without_images: list[Pose] = []
-
-        for pose in self.get_poses(consume=True).values():
-            if pose.crop_image is not None:
-                poses_with_images.append(pose)
-            else:
-                poses_without_images.append(pose)
-
-        # Handle poses without images immediately (keep in pipeline)
-        for pose in poses_without_images:
-            self.callback(pose)
-
-        # Prepare images for inference
-        images: list[np.ndarray] = [pose.crop_image for pose in poses_with_images if pose.crop_image is not None]
-
-        return poses_with_images, images
-
-    def _postprocess_results(self, poses: list[Pose], data_samples: list[list[PoseDataSample]]) -> None:
-        """Process inference results and call callbacks with updated poses."""
-        point_data_list: list[PosePointData | None] = PoseDetection._extract_point_data_from_samples(
-            data_samples, self.model_width, self.model_height, self.confidence_threshold
-        )
-
-        # Match results with original poses
-        for i, pose in enumerate(poses):
-            if i < len(point_data_list) and point_data_list[i] is not None:
-                updated_pose: Pose = replace(
-                    pose,
-                    point_data=point_data_list[i]
-                )
-                self.callback(updated_pose)
-            else:
-                # No pose detected, callback with original pose
-                self.callback(pose)
 
     # GETTERS AND SETTERS
     def add_pose(self, pose: Pose) -> None:
@@ -159,31 +137,47 @@ class PoseDetection(Thread):
             with self._poses_lock:
                 if self._poses_dict.get(pose.tracklet.id) is not None:
                     existing_pose: Pose = self._poses_dict[pose.tracklet.id]
-                    self.callback(existing_pose)
+                    self._callback_queue.put([existing_pose])
 
                     if self.verbose:
                         diff1: float = (pose.tracklet.time_stamp - existing_pose.tracklet.time_stamp).total_seconds()
                         diff2: float = (Timestamp.now() - self._poses_timestamp.get(pose.tracklet.id, Timestamp.now())).total_seconds()
-                        print(f"Pose Detection Warning: Pose ID {pose.tracklet.id} already in queue, overwriting. {diff1:.3f}, {diff2:.3f}")
+                        print(f"Pose Detection Warning: Pose ID {pose.tracklet.id} already in queue, skipping last. {diff1:.3f}, {diff2:.3f}")
 
                 self._poses_dict[pose.tracklet.id] = pose
                 self._poses_timestamp[pose.tracklet.id] = Timestamp.now()
 
-    def get_poses(self, consume: bool) -> dict[int, Pose]:
+    def get_poses(self, consume: bool) -> list[Pose]:
         with self._poses_lock:
             poses: dict[int, Pose] = self._poses_dict.copy()
             if consume:
                 self._poses_dict = {}
-            return poses
+            return list(poses.values())
 
     def notify_update(self) -> None:
         if self._running:
             self._notify_update_event.set()
 
     # CALLBACKS
-    def callback(self, pose: Pose) -> None:
-        for c in self._callbacks:
-            c(pose)
+    def _callback_worker(self) -> None:
+        """Worker thread that processes callbacks without blocking the main thread"""
+        while self._callback_running:
+            try:
+                if self._callback_queue.qsize() > 1 and self.verbose:
+                    print("Pose Detection Warning: Callback queue size > 1, consumers may be falling behind")
+
+                pose_list: list[Pose] = self._callback_queue.get(timeout=0.5)
+
+                for pose in pose_list:
+                    for c in self._callbacks:
+                        try:
+                            c(pose)
+                        except Exception as e:
+                            if self.verbose:
+                                print(f"Pose Detection Callback Error: {str(e)}")
+                self._callback_queue.task_done()
+            except Empty:
+                continue
 
     def addMessageCallback(self, callback) -> None:
         self._callbacks.add(callback)
@@ -193,7 +187,30 @@ class PoseDetection(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _run_inference(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray], verbose: bool= False) -> list[list[PoseDataSample]]:
+    def _model_warmup(model: torch.nn.Module, pipeline: Compose, num_imgs: int, verbose: bool) -> None:
+        """Pre-warm the model with dummy inputs to initialize CUDA kernels and memory"""
+        if num_imgs <= 0:
+            return
+        if num_imgs > 8:
+            num_imgs = 8  # Limit to 8 for warmup
+
+        dummy_sizes: list[int] = [i for i in range(1, num_imgs + 1)]
+        for batch_size in dummy_sizes:
+            # Create batch of dummy images
+            dummy_imgs: list[np.ndarray] = [np.zeros((POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH, 3), dtype=np.uint8) for _ in range(batch_size)]
+            _: list[list[PoseDataSample]] = PoseDetection._run_inference(model, pipeline, dummy_imgs, False)
+
+            # Ensure GPU operations are complete
+            torch.cuda.synchronize()
+
+        if verbose:
+            print("PoseDetection: Model warmup complete")
+
+
+    @staticmethod
+    def _run_inference(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray], verbose: bool) -> list[list[PoseDataSample]]:
+        if not imgs:
+            return []
         with torch.cuda.amp.autocast(): # pyright: ignore
 
             start_time = time.perf_counter()
@@ -250,9 +267,8 @@ class PoseDetection(Thread):
                     results_by_image.append(all_results[start_idx:start_idx + length])
                     start_idx += length
 
-
-            # if verbose:
-            #     print(f"Pose Detection Processing Time: {time.perf_counter() - start_time  :.3f} seconds")
+            if verbose:
+                print(f"Pose Detection Processing Time: {time.perf_counter() - start_time  :.3f} seconds")
 
             return results_by_image
 

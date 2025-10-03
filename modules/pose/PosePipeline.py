@@ -40,7 +40,7 @@ class PosePipeline(Thread):
 
 
         if self.pose_active:
-            self.pose_detector = PoseDetection(settings.path_model, settings.pose_model_type, settings.camera_fps, settings.pose_conf_threshold, settings.pose_verbose)
+            self.pose_detector = PoseDetection(settings.path_model, settings.pose_model_type, settings.pose_model_warmups, settings.camera_fps, settings.pose_conf_threshold, settings.pose_verbose)
             print('Pose Detection:', 'model', POSE_MODEL_TYPE_NAMES[settings.pose_model_type.value])
         else:
             print('Pose Detection: Disabled')
@@ -99,11 +99,11 @@ class PosePipeline(Thread):
             crop_rect = pose_crop_rect,
             crop_image = pose_image
         )
-        if True:
-            if self.pose_detector is not None:
+        if self.pose_detector is not None:
+            if pose.crop_image is not None and pose.crop_rect is not None:
                 self.pose_detector.add_pose(pose)
-            else:
-                self._notify_pose_callback(pose)
+            return
+        self._notify_pose_callback(pose)
 
      # INPUTS
     def add_tracklet(self, tracklet: Tracklet) -> None:
