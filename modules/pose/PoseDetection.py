@@ -1,10 +1,12 @@
 # Standard library imports
 import time
+import traceback
 from dataclasses import replace
 from threading import Thread, Lock, Event
 
 # Third-party imports
 import cv2
+from mmengine.structures.instance_data import InstanceData
 import numpy as np
 import torch
 from enum import IntEnum
@@ -86,58 +88,70 @@ class PoseDetection(Thread):
 
         self._running = True
 
-        next_time: float = time.time()
         while self._running:
             self._notify_update_event.wait(timeout=1.0)
             self._notify_update_event.clear()
-            start_time = time.perf_counter()
+            start_time: float = time.perf_counter()
+
             try:
-                # Process multiple poses at a time from the dictionary
-                current_poses: list[Pose] = []
-                empty_poses: list[Pose] = []
-                images: list[np.ndarray] = []
+                # Step 1: Pre-process - get poses and prepare images
+                poses, images = self._preprocess_poses()
 
-                with self._poses_lock:
-                    for pose in self._poses_dict.values():
-                        if pose.crop_image is not None:
-                            current_poses.append(pose)
-                        else:
-                            empty_poses.append(pose)
-                    self._poses_dict = {}
-
-                for pose in empty_poses:
-                    self.callback(pose)
-
-                images = [pose.crop_image for pose in current_poses if pose.crop_image is not None]
-
+                # Step 2: Run inference if we have images
                 if images:
-                    data_samples = PoseDetection.run_interference(model,pipeline,images, False)
-                    all_poses = PoseDetection.process_pose_data_samples(data_samples, self.model_width, self.model_height, self.confidence_threshold)
+                    # Run inference
+                    data_samples: list[list[PoseDataSample]] = PoseDetection._run_inference(model, pipeline, images)
 
-                    # Match results with original poses
-                    for i, pose in enumerate(current_poses):
-                        if i < len(all_poses) and all_poses[i]:
-                            # Use the first detected person in each image
-                            updated_pose: Pose = replace(
-                                pose,
-                                point_data=all_poses[i][0] if all_poses[i] else None
-                            )
-                            self.callback(updated_pose)
-                        else:
-                            # No pose detected, but still send back the original
-                            self.callback(pose)
+                    # Step 3: Post-process results and send callbacks
+                    self._postprocess_results(poses, data_samples)
 
             except Exception as e:
                 if self.verbose:
                     print(f"Pose Detection Error: {str(e)}")
-                    import traceback
                     traceback.print_exc()
-                continue
 
             if self.verbose:
                 detection_time = time.perf_counter() - start_time
                 if detection_time > self.interval:
                     print(f"Pose Detection Time: {detection_time:.3f} seconds")
+
+    def _preprocess_poses(self) -> tuple[list[Pose], list[np.ndarray]]:
+        """Extract poses from queue and prepare images for inference."""
+        poses_with_images: list[Pose] = []
+        poses_without_images: list[Pose] = []
+
+        for pose in self.get_poses(consume=True).values():
+            if pose.crop_image is not None:
+                poses_with_images.append(pose)
+            else:
+                poses_without_images.append(pose)
+
+        # Handle poses without images immediately (keep in pipeline)
+        for pose in poses_without_images:
+            self.callback(pose)
+
+        # Prepare images for inference
+        images: list[np.ndarray] = [pose.crop_image for pose in poses_with_images if pose.crop_image is not None]
+
+        return poses_with_images, images
+
+    def _postprocess_results(self, poses: list[Pose], data_samples: list[list[PoseDataSample]]) -> None:
+        """Process inference results and call callbacks with updated poses."""
+        point_data_list: list[PosePointData | None] = PoseDetection._extract_point_data_from_samples(
+            data_samples, self.model_width, self.model_height, self.confidence_threshold
+        )
+
+        # Match results with original poses
+        for i, pose in enumerate(poses):
+            if i < len(point_data_list) and point_data_list[i] is not None:
+                updated_pose: Pose = replace(
+                    pose,
+                    point_data=point_data_list[i]
+                )
+                self.callback(updated_pose)
+            else:
+                # No pose detected, callback with original pose
+                self.callback(pose)
 
     # GETTERS AND SETTERS
     def add_pose(self, pose: Pose) -> None:
@@ -148,12 +162,19 @@ class PoseDetection(Thread):
                     self.callback(existing_pose)
 
                     if self.verbose:
-                        diff1 = (pose.tracklet.time_stamp - existing_pose.tracklet.time_stamp).total_seconds()
-                        diff2 = (Timestamp.now() - self._poses_timestamp.get(pose.tracklet.id, Timestamp.now())).total_seconds()
+                        diff1: float = (pose.tracklet.time_stamp - existing_pose.tracklet.time_stamp).total_seconds()
+                        diff2: float = (Timestamp.now() - self._poses_timestamp.get(pose.tracklet.id, Timestamp.now())).total_seconds()
                         print(f"Pose Detection Warning: Pose ID {pose.tracklet.id} already in queue, overwriting. {diff1:.3f}, {diff2:.3f}")
 
                 self._poses_dict[pose.tracklet.id] = pose
                 self._poses_timestamp[pose.tracklet.id] = Timestamp.now()
+
+    def get_poses(self, consume: bool) -> dict[int, Pose]:
+        with self._poses_lock:
+            poses: dict[int, Pose] = self._poses_dict.copy()
+            if consume:
+                self._poses_dict = {}
+            return poses
 
     def notify_update(self) -> None:
         if self._running:
@@ -172,7 +193,7 @@ class PoseDetection(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def run_interference(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray], verbose: bool= False) -> list[list[PoseDataSample]]:
+    def _run_inference(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray], verbose: bool= False) -> list[list[PoseDataSample]]:
         with torch.cuda.amp.autocast(): # pyright: ignore
 
             start_time = time.perf_counter()
@@ -230,36 +251,42 @@ class PoseDetection(Thread):
                     start_idx += length
 
 
-            if verbose:
-                print(f"Pose Detection Processing Time: {time.perf_counter() - start_time  :.3f} seconds")
+            # if verbose:
+            #     print(f"Pose Detection Processing Time: {time.perf_counter() - start_time  :.3f} seconds")
 
             return results_by_image
 
     @staticmethod
-    def process_pose_data_samples(data_samples: list, model_width: int, model_height: int, confidence_threshold: float) -> list[list[PosePointData]]:
-        poses: list[list[PosePointData]] = []
-        for image_results in data_samples:
-            image_poses: list[PosePointData] = []
-            for result in image_results:
-                pred_instances = result.pred_instances
-                keypoints = pred_instances.keypoints
-                scores = pred_instances.keypoint_scores
+    def _extract_point_data_from_samples(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> list[PosePointData | None]:
+        """Process pose data samples and return only the first detected pose for each image."""
+        first_poses: list[PosePointData | None] = []
 
-                for i in range(len(keypoints)):
-                    person_keypoints: np.ndarray = keypoints[i]  # [num_keypoints, 2]
-                    person_scores: np.ndarray = scores[i]
+        for data_samples_for_image in data_samples:
+            pose_found = False
 
-                    # Normalize keypoints to [0, 1] range
-                    norm_keypoints: np.ndarray = person_keypoints.copy()
-                    norm_keypoints[:, 0] /= model_width   # x / width
-                    norm_keypoints[:, 1] /= model_height  # y / height
+            for data_sample in data_samples_for_image:
+                pred_instances: InstanceData = data_sample.pred_instances
+                keypoints: np.ndarray = pred_instances.get('keypoints', np.full((0, 17, 2), np.nan, dtype=np.float32))
+                scores: np.ndarray = pred_instances.get('keypoint_scores', np.zeros((0, 17), dtype=np.float32))
 
-                    pose = PosePointData(norm_keypoints, person_scores, confidence_threshold)
-                    image_poses.append(pose)
+                if keypoints.shape[0] == 0:
+                    continue  # No pose detected
 
-            poses.append(image_poses)
+                # Take only first person's pose in keypoints array
+                norm_keypoints: np.ndarray = keypoints[0].copy() / np.array([model_width, model_height])
+                person_scores: np.ndarray = scores[0].copy()
 
-        return poses
+                # Create pose and add to result
+                pose = PosePointData(norm_keypoints, person_scores, confidence_threshold)
+                first_poses.append(pose)
+                pose_found = True
+                break  # Stop after finding first pose
+
+            # If no pose found for this image, add None
+            if not pose_found:
+                first_poses.append(None)
+
+        return first_poses
 
     @staticmethod
     def resize_with_pad(image, target_width, target_height, padding_color=(0, 0, 0)) -> np.ndarray:

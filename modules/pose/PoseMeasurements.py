@@ -132,7 +132,7 @@ class PoseMeasurements:
                 estimates[limb_type] = height_estimate
 
         if not estimates:
-            print("No valid limb estimates for height")
+            # print("No valid limb estimates for height")
             return None
 
         best_limb: LimbType = max(estimates, key=lambda k: estimates[k])
