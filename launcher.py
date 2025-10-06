@@ -60,10 +60,12 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
                               '14442C10110AD3D200',
                               '14442C1031DDD2D200']
     if art_type_default == Settings.ArtType.HDT:
-        camera_list = ['19443010D1E4974800',
-                       '19443010D153874800',
-
+        camera_list = ['19443010D153874800',
+                       '19443010D1E4974800',
                        '19443010D14C874800']
+        camera_list = ['14442C101136D1D200', # STUDIO
+                       '14442C10F124D9D600',
+                       '14442C10110AD3D200']
 
     if args.cameras < len(camera_list):
         camera_list = camera_list[:args.cameras]
@@ -156,7 +158,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.camera_list =      camera_list[:settings.camera_num]
         settings.camera_flip_h =        True
         settings.camera_flip_v =        False
-        settings.camera_perspective =   0.28
+        settings.camera_perspective =   0 #0.28
         settings.tracker_type =     TrackerType.ONEPERCAM
         settings.render_monitor =   1
         settings.render_secondary_list =     [2,1,3]
@@ -167,7 +169,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         settings.gui_location_y =   -700
         settings.gui_on_top =       True
 
-        settings.pose_model_type =  PoseModelType.NONE if args.nopose else PoseModelType.LARGE
+        settings.pose_model_type =  PoseModelType.NONE if args.nopose else PoseModelType.SMALL
+        settings.pose_model_warmups =  settings.num_players
         settings.pose_verbose =     True
 
         settings.camera_color =     True
