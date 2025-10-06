@@ -119,8 +119,8 @@ class CamOverlayRender(BaseRender):
             glEnd()                 # End drawing
             glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
-        if pose_mesh.isInitialized():
-            pose_mesh.draw(x, y, width, height)
+        # if pose_mesh.isInitialized():
+        #     pose_mesh.draw(x, y, width, height)
 
         string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
         x += 9

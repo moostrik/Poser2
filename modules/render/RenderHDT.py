@@ -51,7 +51,7 @@ class RenderHDT(RenderBase):
 
         for i in range(self.num_cams):
             self.camera_renders[i] = CameraRender(self.data, self.pose_meshes, i)
-            self.centre_cam_renders[i] = CentreCameraRender(self.data, i)
+            self.centre_cam_renders[i] = CentreCameraRender(self.data, self.pose_meshes, i)
             self.movement_cam_renders[i] = MovementCamRender(self.data, i)
             self.overlay_renders[i] = CamOverlayRender(self.data, self.pose_meshes, i)
             self.sync_renders[i] = SynchronyCam(self.data, i)

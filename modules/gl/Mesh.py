@@ -75,7 +75,7 @@ class Mesh:
         glTranslatef(x, y, 0.0)
         glScalef(w, h, 1.0)
 
-        glLineWidth(3.0)
+        # glLineWidth(10.0)
 
         glDrawElements(GL_LINES, len(self.indices), GL_UNSIGNED_INT, None)
 

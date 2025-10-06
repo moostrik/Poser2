@@ -56,6 +56,7 @@ class CameraRender(BaseRender):
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         self.image.draw(0, 0, fbo.width, fbo.height)
+        glLineWidth(3.0)
         CameraRender.draw_camera_overlay(depth_tracklets, poses, meshes, 0, 0, fbo.width, fbo.height)
         fbo.end()
 

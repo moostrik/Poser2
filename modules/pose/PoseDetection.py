@@ -125,10 +125,10 @@ class PoseDetection(Thread):
                     print(f"Pose Detection Error: {str(e)}")
                     traceback.print_exc()
 
-            if self.verbose:
-                detection_time: float = time.perf_counter() - start_time
-                if detection_time > self.interval:
-                    print(f"Pose Detection Time: {detection_time:.3f} seconds")
+            # if self.verbose:
+            #     detection_time: float = time.perf_counter() - start_time
+            #     if detection_time > self.interval:
+            #         print(f"Pose Detection Time: {detection_time:.3f} seconds")
 
 
     # GETTERS AND SETTERS

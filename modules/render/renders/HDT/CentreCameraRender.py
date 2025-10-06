@@ -18,8 +18,11 @@ from modules.render.renders.BaseRender import BaseRender, Rect
 from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.utils.OneEuroInterpolation import NormalizedEuroInterpolator, OneEuroInterpolator, OneEuroSettings
 
+from modules.render.meshes.PoseMeshes import PoseMeshes
+from modules.gl.Mesh import Mesh
+
 class CentreCameraRender(BaseRender):
-    def __init__(self, data: DataManager, cam_id: int) -> None:
+    def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
         self.cam_id: int = cam_id
         self.cam_fbo: Fbo = Fbo()
@@ -28,6 +31,8 @@ class CentreCameraRender(BaseRender):
         self.rect_smoother: PoseSmoothRect = PoseSmoothRect()
         self.is_active: bool = False
 
+        self.pose_meshes: PoseMeshes = pose_meshes
+        self.last_pose_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
         # self.last_pose: Pose | None = None
         # self.last_Rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
@@ -61,6 +66,7 @@ class CentreCameraRender(BaseRender):
             if pose.tracklet.is_active:
                 self.is_active = True
                 self.rect_smoother.add_pose(pose)
+                self.last_pose_rect = pose.crop_rect if pose.crop_rect is not None else Rect(0.0, 0.0, 1.0, 1.0)
 
         if not self.is_active:
             return
@@ -70,13 +76,40 @@ class CentreCameraRender(BaseRender):
             self.cam_image.set_image(cam_image_np)
             self.cam_image.update()
 
+
         smooth_pose_rect: Rect = self.rect_smoother.get()
         smooth_cam_roi: Rect = CentreCameraRender.pose_rect_to_image_roi(smooth_pose_rect, self.cam_image.width, self.cam_image.height)
+
+        pose_mesh: Mesh = self.pose_meshes.meshes[key]
 
         BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
         self.cam_image.draw_roi(0, 0, self.cam_fbo.width, self.cam_fbo.height,
                                 smooth_cam_roi.x, smooth_cam_roi.y, smooth_cam_roi.width, smooth_cam_roi.height)
+        if pose_mesh.isInitialized():
+            glLineWidth(10.0)
+            glPushMatrix()
+
+            scale_x = self.cam_fbo.width / smooth_cam_roi.width
+            scale_y = self.cam_fbo.height / smooth_cam_roi.height
+            translate_x = -smooth_cam_roi.x * scale_x
+            translate_y = -smooth_cam_roi.y * scale_y
+
+            # Apply transformation
+            glTranslatef(translate_x, translate_y, 0.0)
+            glScalef(scale_x, scale_y, 1.0)
+
+            # Now draw the mesh with the last_pose_rect coordinates
+            # This maps from pose_rect to the transformed space
+            pose_mesh.draw(
+                self.last_pose_rect.x,
+                self.last_pose_rect.y,
+                self.last_pose_rect.width,
+                self.last_pose_rect.height
+            )
+
+            glPopMatrix()
+
         glColor4f(1.0, 1.0, 1.0, 1.0)
         self.cam_fbo.end()
 
