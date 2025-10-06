@@ -1,0 +1,112 @@
+# Standard library imports
+import numpy as np
+from dataclasses import dataclass
+from threading import Lock
+
+# Local imports
+
+from modules.pose.Pose import Pose
+from modules.pose.PoseTypes import PoseJoint
+
+from modules.utils.PointsAndRects import Rect
+from modules.utils.OneEuroInterpolation import NormalizedEuroInterpolator, OneEuroInterpolator, OneEuroSettings
+
+from modules.utils.HotReloadMethods import HotReloadMethods
+
+@dataclass
+class PoseSmoothRectSettings:
+    smooth_settings: OneEuroSettings
+    nose_dest_x: float = 0.5
+    nose_dest_y: float = 0.2
+    height_dest: float = 0.95
+    src_aspectratio: float = 16/9
+    dst_aspectratio: float = 9/16
+
+class PoseSmoothRect():
+    def __init__(self, settings: PoseSmoothRectSettings) -> None:
+        self.settings: PoseSmoothRectSettings = settings
+        self.src_aspectratio: float = settings.src_aspectratio
+        self.dst_aspectratio: float = settings.dst_aspectratio
+
+        self.center_x_interpolator: NormalizedEuroInterpolator = NormalizedEuroInterpolator(self.settings.smooth_settings)
+        self.center_y_interpolator: NormalizedEuroInterpolator = NormalizedEuroInterpolator(self.settings.smooth_settings)
+        self.height_interpolator: OneEuroInterpolator = OneEuroInterpolator(self.settings.smooth_settings)
+
+        self.active: bool = False
+        # self._lock = Lock()
+
+        hot_reload = HotReloadMethods(self.__class__, True, True)
+
+
+    def add_pose(self, pose: Pose) -> None:
+        # with self._lock:
+        if pose.tracklet.is_removed:
+            self.active = False
+            self.reset()
+            return
+
+        if pose.tracklet.is_active and not self.active:
+            self.active = True
+            self.reset()
+
+        if not self.active:
+            return
+
+        pose_rect: Rect | None = pose.crop_rect
+        pose_points: np.ndarray | None = pose.point_data.points if pose.point_data is not None else None
+        pose_height: float | None = pose.measurement_data.length_estimate if pose.measurement_data is not None else None
+
+        if pose_rect is None:
+            print(f"PoseSmoothRect: No crop rect for pose {pose.tracklet.id}, this should not happen")
+            return
+
+        # Always add data, OneEuroInterpolator will handle missing data
+        if pose_points is None or pose_height is None:
+            self.center_x_interpolator.add_sample(np.nan)
+            self.center_y_interpolator.add_sample(np.nan)
+            self.height_interpolator.add_sample(np.nan)
+            return
+
+        nose_x: float = pose_points[PoseJoint.nose.value][0] * pose_rect.width + pose_rect.x
+        nose_y: float = pose_points[PoseJoint.nose.value][1] * pose_rect.height + pose_rect.y
+        height: float = pose_height * pose_rect.height
+
+        self.center_x_interpolator.add_sample(nose_x)
+        self.center_y_interpolator.add_sample(nose_y)
+        self.height_interpolator.add_sample(height)
+
+    def get(self) -> Rect | None:
+        # with self._lock:
+        nose_x: float | None = self.center_x_interpolator.get()
+        nose_y: float | None = self.center_y_interpolator.get()
+        height: float | None = self.height_interpolator.get()
+
+        if nose_x is None or nose_y is None or height is None:
+            return None
+
+        # Apply height adjustment factor
+        height = height / self.settings.height_dest
+
+        # Calculate base width for destination aspect ratio
+        base_width: float = height * self.settings.dst_aspectratio
+
+        # Apply aspect ratio correction
+        # When converting from src_ar to dst_ar, we need to adjust width
+        # to maintain proper proportional representation
+        aspect_ratio_correction: float = self.settings.src_aspectratio / self.settings.dst_aspectratio
+
+        # Adjust width based on the relationship between source and destination aspect ratios
+        # This ensures proper scaling when converting between different aspect ratios
+        corrected_width: float = base_width * aspect_ratio_correction
+
+        # Calculate position, adjusting for the corrected width
+        left: float = nose_x - corrected_width * self.settings.nose_dest_x
+        top: float = nose_y - height * self.settings.nose_dest_y
+
+        return Rect(left, top, corrected_width, height)
+
+    def reset(self) -> None:
+        # with self._lock:
+        self.center_x_interpolator.reset()
+        self.center_y_interpolator.reset()
+        self.height_interpolator.reset()

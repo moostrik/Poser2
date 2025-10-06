@@ -15,32 +15,65 @@ Classes:
 """
 
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from OneEuroFilter import OneEuroFilter
 from collections import deque
 from time import time
+from typing import List, Callable, Any
+
 
 @dataclass
 class OneEuroSettings:
     """Configuration parameters for the 1€ Filter."""
+    frequency: float = 30.0     # Sampling frequency (Hz)
     min_cutoff: float = 1.0     # Minimum cutoff frequency
     beta: float = 0.0           # Speed coefficient
     d_cutoff: float = 1.0       # Cutoff frequency for derivative
 
+    def __post_init__(self) -> None:
+        # Initialize observers after dataclass fields are set
+        self._observers: List[Callable[[], None]] = []
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Notify observers when attributes change"""
+        super().__setattr__(name, value)
+        # Only notify after initialization is complete
+        if name != '_observers' and hasattr(self, '_observers'):
+            self._notify()
+
+    def add_observer(self, callback: Callable[[], None]) -> None:
+        """Add a callback function to be called when settings change"""
+        self._observers.append(callback)
+
+    def remove_observer(self, callback: Callable[[], None]) -> None:
+        """Remove a callback function"""
+        if callback in self._observers:
+            self._observers.remove(callback)
+
+    def _notify(self) -> None:
+        """Notify all observers of a change"""
+        for callback in self._observers:
+            callback()
+
 class OneEuroInterpolator:
     """Basic numeric value interpolator using 1€ Filter."""
 
-    def __init__(self, freq: float, settings: OneEuroSettings) -> None:
-        self.filter: OneEuroFilter = OneEuroFilter(freq, settings.min_cutoff, settings.beta, settings.d_cutoff)
-        self.interval: float = 1.0 / freq               # Expected time between samples
+    def __init__(self, settings: OneEuroSettings) -> None:
+        self.settings: OneEuroSettings = settings  # Store settings object
+        self.filter: OneEuroFilter = OneEuroFilter(settings.frequency, settings.min_cutoff, settings.beta, settings.d_cutoff)
+        self.interval: float = 1.0 / settings.frequency               # Expected time between samples
         self.buffer: deque[float] = deque(maxlen=4)     # Store recent filtered values
         self.last_time: float = time()                  # Timestamp of last sample
         self.last_real: float | None = None             # Last non-NaN value
 
-    def update_settings(self, settings: OneEuroSettings) -> None:
-        self.filter.setMinCutoff(settings.min_cutoff)
-        self.filter.setBeta(settings.beta)
-        self.filter.setDerivateCutoff(settings.d_cutoff)
+        settings.add_observer(self._update_filter_from_settings)
+
+    def _update_filter_from_settings(self) -> None:
+        """Update filter parameters from current settings"""
+        self.filter.setMinCutoff(self.settings.min_cutoff)
+        self.filter.setBeta(self.settings.beta)
+        self.filter.setDerivateCutoff(self.settings.d_cutoff)
+
 
     def add_sample(self, value: float) -> None:
         if np.isnan(value):
@@ -123,11 +156,8 @@ class OneEuroInterpolator:
 class NormalizedEuroInterpolator:
     """Interpolator for values in [0,1] range."""
 
-    def __init__(self, freq: float, settings: OneEuroSettings) -> None:
-        self.interp = OneEuroInterpolator(freq, settings)
-
-    def update_settings(self, settings: OneEuroSettings) -> None:
-        self.interp.update_settings(settings)
+    def __init__(self, settings: OneEuroSettings) -> None:
+        self.interp = OneEuroInterpolator(settings)
 
     def add_sample(self, value: float) -> None:
         """Add an sample in [0,1] range"""
@@ -147,13 +177,9 @@ class NormalizedEuroInterpolator:
 class AngleEuroInterpolator:
     """Interpolator for angular data in [-π,π] range."""
 
-    def __init__(self, freq: float, settings: OneEuroSettings) -> None:
-        self.sin_interp = OneEuroInterpolator(freq, settings)
-        self.cos_interp = OneEuroInterpolator(freq, settings)
-
-    def update_settings(self, settings: OneEuroSettings) -> None:
-        self.sin_interp.update_settings(settings)
-        self.cos_interp.update_settings(settings)
+    def __init__(self, settings: OneEuroSettings) -> None:
+        self.sin_interp = OneEuroInterpolator(settings)
+        self.cos_interp = OneEuroInterpolator(settings)
 
     def add_sample(self, angle: float) -> None:
         """Add an angular sample in [-π,π] range"""
@@ -197,15 +223,11 @@ class ArrayEuroInterpolator:
         self.interpolators: list[OneEuroInterpolator | AngleEuroInterpolator]
 
         if angular:
-            self.interpolators = [AngleEuroInterpolator(freq, settings)
+            self.interpolators = [AngleEuroInterpolator(settings)
                                  for _ in range(self.size)]
         else:
-            self.interpolators = [OneEuroInterpolator(freq, settings)
+            self.interpolators = [OneEuroInterpolator(settings)
                                  for _ in range(self.size)]
-
-    def update_settings(self, settings: OneEuroSettings) -> None:
-        for interp in self.interpolators:
-            interp.update_settings(settings)
 
     def add_sample(self, array: np.ndarray) -> None:
         flat_array: np.ndarray = array.flatten()

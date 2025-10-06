@@ -10,6 +10,7 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameTyp
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 from modules.pose.PoseStream import PoseStreamData
+from modules.pose.smooth.PoseSmoothManager import PoseSmoothManager, OneEuroSettings, PoseSmoothRectSettings
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.WS.WSOutput import WSOutput
 from modules.Settings import Settings
@@ -35,6 +36,17 @@ class DataManager:
         self.poses: Dict[int, DataItem[Pose]] = {}
         self.pose_streams: Dict[int, DataItem[PoseStreamData]] = {}
         self.r_streams: Dict[int, DataItem[PairCorrelationStreamData]] = {}
+
+        self.OneEuroSettings: OneEuroSettings = OneEuroSettings(25, 1.0, 0.1)
+        self.PoseSmoothRectSettings: PoseSmoothRectSettings = PoseSmoothRectSettings(
+            smooth_settings=self.OneEuroSettings,
+            nose_dest_x=0.5,
+            nose_dest_y=0.2,
+            height_dest=0.95,
+            src_aspectratio=16/9,
+            dst_aspectratio=9/16
+        )
+        self.pose_smooth_manager: PoseSmoothManager = PoseSmoothManager(self.OneEuroSettings, self.PoseSmoothRectSettings)
 
     def _set_data_dict(self, data_dict: Dict[int, DataItem[T]], data_key: int, value: T) -> None:
         with self.mutex:
@@ -96,6 +108,7 @@ class DataManager:
     # Pose management
     def set_pose(self, value: Pose) -> None:
         self._set_data_dict(self.poses, value.tracklet.id, value)
+        self.pose_smooth_manager.add_pose(value)
 
     def get_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
         return self._get_data_dict(self.poses, id, only_new_data, consumer_key)

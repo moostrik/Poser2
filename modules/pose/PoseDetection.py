@@ -175,6 +175,7 @@ class PoseDetection(Thread):
                         except Exception as e:
                             if self.verbose:
                                 print(f"Pose Detection Callback Error: {str(e)}")
+                                traceback.print_exc()
                 self._callback_queue.task_done()
             except Empty:
                 continue

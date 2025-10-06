@@ -78,6 +78,7 @@ class CentreCameraRender(BaseRender):
 
 
         smooth_pose_rect: Rect = self.rect_smoother.get()
+        # print(f"CentreCameraRender: smooth_pose_rect: {smooth_pose_rect}")
         smooth_cam_roi: Rect = CentreCameraRender.pose_rect_to_image_roi(smooth_pose_rect, self.cam_image.width, self.cam_image.height)
 
         pose_mesh: Mesh = self.pose_meshes.meshes[key]
@@ -145,15 +146,15 @@ class PoseSmoothRect():
         self.default_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
         self.current_rect: Rect | None = None
 
-        self.settings: OneEuroSettings = OneEuroSettings(1.0, 0.1)
+        self.settings: OneEuroSettings = OneEuroSettings(25, 1.0, 0.1)
 
-        self.smooth_centre_x: NormalizedEuroInterpolator = NormalizedEuroInterpolator(25, self.settings)
-        self.smooth_centre_y: NormalizedEuroInterpolator = NormalizedEuroInterpolator(25, self.settings)
-        self.smooth_height: OneEuroInterpolator = OneEuroInterpolator(25, self.settings)
+        self.smooth_centre_x: NormalizedEuroInterpolator = NormalizedEuroInterpolator(self.settings)
+        self.smooth_centre_y: NormalizedEuroInterpolator = NormalizedEuroInterpolator(self.settings)
+        self.smooth_height: OneEuroInterpolator = OneEuroInterpolator(self.settings)
 
         # Target relative positions
         self.nose_dest_x: float = 0.5
-        self.nose_dest_y: float = 0.33
+        self.nose_dest_y: float = 0.2
         self.height_dest: float = 0.95
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -172,7 +173,7 @@ class PoseSmoothRect():
 
         nose_x: float = pose_points[PoseJoint.nose.value][0] * pose_rect.width + pose_rect.x
         nose_y: float = pose_points[PoseJoint.nose.value][1] * pose_rect.height + pose_rect.y
-        height: float = pose_height * pose_rect.height + pose_rect.y
+        height: float = pose_height * pose_rect.height
 
         self.smooth_centre_x.add_sample(nose_x)
         self.smooth_centre_y.add_sample(nose_y)
@@ -181,7 +182,7 @@ class PoseSmoothRect():
     def get(self) -> Rect:
         self.nose_dest_x: float = 0.5
         self.nose_dest_y: float = 0.33
-        self.height_dest: float = 0.95
+        self.height_dest: float = 0.8
 
         nose_x: float | None = self.smooth_centre_x.get()
         nose_y: float | None = self.smooth_centre_y.get()
