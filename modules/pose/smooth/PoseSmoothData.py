@@ -11,7 +11,7 @@ from modules.utils.PointsAndRects import Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PoseSmoothManager:
+class PoseSmoothData:
     """
     Manages multiple PoseSmoothRect and PoseSmoothAngles instances for different poses.
     Uses tracklet IDs as keys to track different poses.

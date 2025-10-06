@@ -23,12 +23,26 @@ from modules.render.renders.HDT.SynchronyCam import SynchronyCam
 from modules.render.renders.CameraRender import CameraRender
 from modules.render.renders.RStreamRender import RStreamRender
 
+from modules.pose.smooth.PoseSmoothManager import PoseSmoothData, OneEuroSettings, PoseSmoothRectSettings
+
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 class RenderHDT(RenderBase):
     def __init__(self, settings: Settings) -> None:
-        self.data: DataManager =    DataManager()
+
+        self.OneEuroSettings: OneEuroSettings = OneEuroSettings(25, 1.0, 0.1)
+        self.PoseSmoothRectSettings: PoseSmoothRectSettings = PoseSmoothRectSettings(
+            smooth_settings=self.OneEuroSettings,
+            nose_dest_x=0.5,
+            nose_dest_y=0.2,
+            height_dest=0.95,
+            src_aspectratio=16/9,
+            dst_aspectratio=9/16
+        )
+        self.smooth_data: PoseSmoothData = PoseSmoothData(self.OneEuroSettings, self.PoseSmoothRectSettings)
+
+        self.data: DataManager =    DataManager(self.smooth_data)
 
         self.max_players: int =     settings.num_players
         self.num_cams: int =        settings.camera_num
@@ -51,7 +65,7 @@ class RenderHDT(RenderBase):
 
         for i in range(self.num_cams):
             self.camera_renders[i] = CameraRender(self.data, self.pose_meshes, i)
-            self.centre_cam_renders[i] = CentreCameraRender(self.data, self.pose_meshes, i)
+            self.centre_cam_renders[i] = CentreCameraRender(self.data, self.smooth_data, self.pose_meshes, i)
             self.movement_cam_renders[i] = MovementCamRender(self.data, i)
             self.overlay_renders[i] = CamOverlayRender(self.data, self.pose_meshes, i)
             self.sync_renders[i] = SynchronyCam(self.data, i)
@@ -125,6 +139,13 @@ class RenderHDT(RenderBase):
         self.pose_meshes.deallocate()
 
     def draw_main(self, width: int, height: int) -> None:
+
+        self.OneEuroSettings.min_cutoff = 0.1
+        self.OneEuroSettings.beta = 0.2
+
+        self.PoseSmoothRectSettings.nose_dest_y = 0.33
+
+
         self.pose_meshes.update()
 
         self.r_stream_render.update()

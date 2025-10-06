@@ -99,6 +99,8 @@ class PoseSmoothRect():
         # This ensures proper scaling when converting between different aspect ratios
         corrected_width: float = base_width * aspect_ratio_correction
 
+        corrected_width = base_width
+
         # Calculate position, adjusting for the corrected width
         left: float = nose_x - corrected_width * self.settings.nose_dest_x
         top: float = nose_y - height * self.settings.nose_dest_y
