@@ -10,7 +10,7 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameTyp
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 from modules.pose.PoseStream import PoseStreamData
-from modules.pose.smooth.PoseSmoothManager import PoseSmoothData
+from modules.pose.smooth.PoseSmoothData import PoseSmoothData
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.WS.WSOutput import WSOutput
 from modules.Settings import Settings
@@ -37,7 +37,6 @@ class DataManager:
         self.poses: Dict[int, DataItem[Pose]] = {}
         self.pose_streams: Dict[int, DataItem[PoseStreamData]] = {}
         self.r_streams: Dict[int, DataItem[PairCorrelationStreamData]] = {}
-
 
 
     def _set_data_dict(self, data_dict: Dict[int, DataItem[T]], data_key: int, value: T) -> None:

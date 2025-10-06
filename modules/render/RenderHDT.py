@@ -23,13 +23,20 @@ from modules.render.renders.HDT.SynchronyCam import SynchronyCam
 from modules.render.renders.CameraRender import CameraRender
 from modules.render.renders.RStreamRender import RStreamRender
 
-from modules.pose.smooth.PoseSmoothManager import PoseSmoothData, OneEuroSettings, PoseSmoothRectSettings
+from modules.pose.smooth.PoseSmoothData import PoseSmoothData, OneEuroSettings, PoseSmoothRectSettings
+
+from modules.render.HDTSoundOSC import HDTSoundOSC
 
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 class RenderHDT(RenderBase):
     def __init__(self, settings: Settings) -> None:
+
+        self.num_players: int =     settings.num_players
+        self.num_cams: int =        settings.camera_num
+        self.num_R_streams: int =   settings.render_R_num
+        self.ws_width: int =        settings.light_resolution
 
         self.OneEuroSettings: OneEuroSettings = OneEuroSettings(25, 1.0, 0.1)
         self.PoseSmoothRectSettings: PoseSmoothRectSettings = PoseSmoothRectSettings(
@@ -40,17 +47,14 @@ class RenderHDT(RenderBase):
             src_aspectratio=16/9,
             dst_aspectratio=9/16
         )
-        self.smooth_data: PoseSmoothData = PoseSmoothData(self.OneEuroSettings, self.PoseSmoothRectSettings)
+        self.smooth_data: PoseSmoothData = PoseSmoothData(self.num_players, self.OneEuroSettings, self.PoseSmoothRectSettings)
+        self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "127.0.0.1", 8000, 60.0)
+
 
         self.data: DataManager =    DataManager(self.smooth_data)
 
-        self.max_players: int =     settings.num_players
-        self.num_cams: int =        settings.camera_num
-        self.num_R_streams: int =   settings.render_R_num
-        self.ws_width: int =        settings.light_resolution
-
         # meshes
-        self.pose_meshes =          PoseMeshes(self.data, self.max_players)
+        self.pose_meshes =          PoseMeshes(self.data, self.num_players)
 
         # drawers
         self.camera_renders:        dict[int, CameraRender] = {}
@@ -74,7 +78,7 @@ class RenderHDT(RenderBase):
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name=CameraRender.key(),         columns=self.num_cams,      rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=CamOverlayRender.key(),     columns=self.max_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=CamOverlayRender.key(),     columns=self.num_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=RStreamRender.key(),        columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
@@ -112,6 +116,7 @@ class RenderHDT(RenderBase):
             self.sync_renders[key].allocate(2160, 3840, GL_RGBA32F)
 
         self.allocate_window_renders()
+        self.sound_osc.start()
 
     def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size(RStreamRender.key())
@@ -137,11 +142,12 @@ class RenderHDT(RenderBase):
             draw.deallocate()
 
         self.pose_meshes.deallocate()
+        self.sound_osc.stop()
 
     def draw_main(self, width: int, height: int) -> None:
 
-        self.OneEuroSettings.min_cutoff = 0.1
-        self.OneEuroSettings.beta = 0.2
+        self.OneEuroSettings.min_cutoff = 0.2
+        self.OneEuroSettings.beta = 0.5
 
         self.PoseSmoothRectSettings.nose_dest_y = 0.33
 

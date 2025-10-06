@@ -16,13 +16,18 @@ class PoseSmoothData:
     Manages multiple PoseSmoothRect and PoseSmoothAngles instances for different poses.
     Uses tracklet IDs as keys to track different poses.
     """
-    def __init__(self, angle_settings: OneEuroSettings, rect_settings: PoseSmoothRectSettings) -> None:
+    def __init__(self, num_players: int, angle_settings: OneEuroSettings, rect_settings: PoseSmoothRectSettings) -> None:
+        self.num_players: int = num_players
         self.angle_settings: OneEuroSettings = angle_settings
         self.rect_settings: PoseSmoothRectSettings = rect_settings
 
         # Dictionaries to store smoothers for each tracklet ID
         self.rect_smoothers: Dict[int, PoseSmoothRect] = {}
         self.angle_smoothers: Dict[int, PoseSmoothAngles] = {}
+
+        for i in range(num_players):
+            self.rect_smoothers[i] = PoseSmoothRect(self.rect_settings)
+            self.angle_smoothers[i] = PoseSmoothAngles(self.angle_settings)
 
         # Lock to ensure thread safety
         self._lock = Lock()
@@ -37,16 +42,20 @@ class PoseSmoothData:
         with self._lock:
             tracklet_id: int = pose.tracklet.id
 
-            # Create new smoothers if this is a new tracklet ID
-            if tracklet_id not in self.rect_smoothers:
-                self.rect_smoothers[tracklet_id] = PoseSmoothRect(self.rect_settings)
-
-            if tracklet_id not in self.angle_smoothers:
-                self.angle_smoothers[tracklet_id] = PoseSmoothAngles(self.angle_settings)
-
-            # Add pose data to the respective smoothers
             self.rect_smoothers[tracklet_id].add_pose(pose)
             self.angle_smoothers[tracklet_id].add_pose(pose)
+
+    def get_active_ids(self) -> list[int]:
+        """Get a list of currently active tracklet IDs."""
+        with self._lock:
+            return [tracklet_id for tracklet_id, smoother in self.rect_smoothers.items() if smoother.active]
+
+    def get_is_active(self, tracklet_id: int) -> bool:
+        """Check if the smoother for the specified tracklet ID is active."""
+        with self._lock:
+            if tracklet_id in self.rect_smoothers:
+                return self.rect_smoothers[tracklet_id].active
+            return False
 
     def get_smoothed_rect(self, tracklet_id: int) -> Optional[Rect]:
         """Get smoothed rectangle for the specified tracklet ID."""

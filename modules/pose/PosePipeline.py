@@ -99,7 +99,8 @@ class PosePipeline(Thread):
             crop_rect = pose_crop_rect,
             crop_image = pose_image
         )
-        if self.pose_detector is not None:
+
+        if self.pose_detector is not None and not tracklet.is_removed: # the tracklet.is_removed logic could be better
             if pose.crop_image is not None and pose.crop_rect is not None:
                 self.pose_detector.add_pose(pose)
             return

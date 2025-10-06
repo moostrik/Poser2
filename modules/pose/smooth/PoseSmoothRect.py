@@ -90,14 +90,14 @@ class PoseSmoothRect():
         # Calculate base width for destination aspect ratio
         base_width: float = height * self.settings.dst_aspectratio
 
-        # Apply aspect ratio correction
-        # When converting from src_ar to dst_ar, we need to adjust width
-        # to maintain proper proportional representation
-        aspect_ratio_correction: float = self.settings.src_aspectratio / self.settings.dst_aspectratio
+        # # Apply aspect ratio correction
+        # # When converting from src_ar to dst_ar, we need to adjust width
+        # # to maintain proper proportional representation
+        # aspect_ratio_correction: float = self.settings.src_aspectratio / self.settings.dst_aspectratio
 
-        # Adjust width based on the relationship between source and destination aspect ratios
-        # This ensures proper scaling when converting between different aspect ratios
-        corrected_width: float = base_width * aspect_ratio_correction
+        # # Adjust width based on the relationship between source and destination aspect ratios
+        # # This ensures proper scaling when converting between different aspect ratios
+        # corrected_width: float = base_width * aspect_ratio_correction
 
         corrected_width = base_width
 

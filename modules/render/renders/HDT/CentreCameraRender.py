@@ -11,7 +11,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
-from modules.pose.smooth.PoseSmoothManager import PoseSmoothData
+from modules.pose.smooth.PoseSmoothData import PoseSmoothData
 
 from modules.render.DataManager import DataManager
 from modules.render.renders.BaseRender import BaseRender, Rect
