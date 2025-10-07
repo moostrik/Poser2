@@ -28,8 +28,8 @@ class PoseSmoothRect():
         self.src_aspectratio: float = settings.src_aspectratio
         self.dst_aspectratio: float = settings.dst_aspectratio
 
-        self.center_x_interpolator: NormalizedEuroInterpolator = NormalizedEuroInterpolator(self.settings.smooth_settings)
-        self.center_y_interpolator: NormalizedEuroInterpolator = NormalizedEuroInterpolator(self.settings.smooth_settings)
+        self.center_x_interpolator: OneEuroInterpolator = OneEuroInterpolator(self.settings.smooth_settings)
+        self.center_y_interpolator: OneEuroInterpolator = OneEuroInterpolator(self.settings.smooth_settings)
         self.height_interpolator: OneEuroInterpolator = OneEuroInterpolator(self.settings.smooth_settings)
 
         self.active: bool = False

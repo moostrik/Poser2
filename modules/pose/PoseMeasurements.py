@@ -123,13 +123,14 @@ class PoseMeasurements:
                 estimates[limb_type] = height_estimate
 
         # If no primary estimates, calculate fallback estimates
-        for limb_type, config in LIMB_CONFIG.items():
-            if not config["fallback"]:
-                continue
-            limb_length: float | None = PoseMeasurements.calculate_limb_length(points, limb_type)
-            if limb_length is not None:
-                height_estimate: float = limb_length
-                estimates[limb_type] = height_estimate
+        if not estimates:
+            for limb_type, config in LIMB_CONFIG.items():
+                if not config["fallback"]:
+                    continue
+                limb_length: float | None = PoseMeasurements.calculate_limb_length(points, limb_type)
+                if limb_length is not None:
+                    height_estimate: float = limb_length
+                    estimates[limb_type] = height_estimate
 
         if not estimates:
             # print("No valid limb estimates for height")
@@ -137,7 +138,7 @@ class PoseMeasurements:
 
         best_limb: LimbType = max(estimates, key=lambda k: estimates[k])
         best_estimate: float = estimates[best_limb]
-        # print(best_estimate)
+        # print(best_limb)
 
         return PoseMeasurementData(length_estimate=best_estimate * crop_height)
 
