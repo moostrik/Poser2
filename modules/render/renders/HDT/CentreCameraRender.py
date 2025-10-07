@@ -52,12 +52,12 @@ class CentreCameraRender(BaseRender):
     def update(self) -> None:
         key: int = self.cam_id
 
-        if key != 0:
-            return
+        # if key != 0:
+        #     return
 
         pose: Pose | None = self.data.get_pose(key, only_new_data=True, consumer_key=self.key())
         if pose is not None:
-            print(f"CentreCameraRender: Updating render for pose {pose.tracklet.is_removed}")
+            # print(f"CentreCameraRender: Updating render for pose {pose.tracklet.is_removed}")
 
             if pose.tracklet.is_removed:
                 # print(f"CentreCameraRender: Pose {pose.tracklet.id} removed, clearing render")

@@ -69,7 +69,7 @@ class PoseSmoothRect():
 
         nose_x: float = pose_points[PoseJoint.nose.value][0] * pose_rect.width + pose_rect.x
         nose_y: float = pose_points[PoseJoint.nose.value][1] * pose_rect.height + pose_rect.y
-        height: float = pose_height * pose_rect.height
+        height: float = pose_height # * pose_rect.height -> this is already is based on height
 
         self.center_x_interpolator.add_sample(nose_x)
         self.center_y_interpolator.add_sample(nose_y)

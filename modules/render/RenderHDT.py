@@ -48,7 +48,7 @@ class RenderHDT(RenderBase):
             dst_aspectratio=9/16
         )
         self.smooth_data: PoseSmoothData = PoseSmoothData(self.num_players, self.OneEuroSettings, self.PoseSmoothRectSettings)
-        self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "127.0.0.1", 8000, 60.0)
+        self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.81", 8000, 60.0)
 
 
         self.data: DataManager =    DataManager(self.smooth_data)
@@ -149,7 +149,8 @@ class RenderHDT(RenderBase):
         self.OneEuroSettings.min_cutoff = 0.2
         self.OneEuroSettings.beta = 0.5
 
-        self.PoseSmoothRectSettings.nose_dest_y = 0.33
+        self.PoseSmoothRectSettings.nose_dest_y = 0.25
+        self.PoseSmoothRectSettings.height_dest = 0.8
 
 
         self.pose_meshes.update()
@@ -195,6 +196,8 @@ class RenderHDT(RenderBase):
         self.centre_cam_renders[camera_id].draw(Rect(0, 0, width, height))
         self.overlay_renders[camera_id].draw(Rect(0, 0, width, height))
         # self.movement_cam_renders[camera_id].draw(Rect(0, 0, width, height))
+        
+        # self.camera_renders[camera_id].draw(Rect(0, 0, width, height))
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)

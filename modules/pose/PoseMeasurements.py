@@ -119,7 +119,7 @@ class PoseMeasurements:
                 continue
             limb_length: float | None = PoseMeasurements.calculate_limb_length(points, limb_type)
             if limb_length is not None:
-                height_estimate: float = limb_length * crop_height
+                height_estimate: float = limb_length
                 estimates[limb_type] = height_estimate
 
         # If no primary estimates, calculate fallback estimates
@@ -128,7 +128,7 @@ class PoseMeasurements:
                 continue
             limb_length: float | None = PoseMeasurements.calculate_limb_length(points, limb_type)
             if limb_length is not None:
-                height_estimate: float = limb_length * crop_height
+                height_estimate: float = limb_length
                 estimates[limb_type] = height_estimate
 
         if not estimates:
@@ -137,7 +137,8 @@ class PoseMeasurements:
 
         best_limb: LimbType = max(estimates, key=lambda k: estimates[k])
         best_estimate: float = estimates[best_limb]
+        # print(best_estimate)
 
-        return PoseMeasurementData(length_estimate=best_estimate)
+        return PoseMeasurementData(length_estimate=best_estimate * crop_height)
 
 # PoseMeasurements.hotreload = HotReloadMethods(PoseMeasurements)
