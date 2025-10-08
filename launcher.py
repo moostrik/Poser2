@@ -63,9 +63,9 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         camera_list = ['19443010D153874800',
                        '19443010D1E4974800',
                        '19443010D14C874800']
-        camera_list = ['14442C101136D1D200', # STUDIO
-                       '14442C10F124D9D600',
-                       '14442C10110AD3D200']
+        # camera_list = ['14442C101136D1D200', # STUDIO
+        #                '14442C10F124D9D600',
+        #                '14442C10110AD3D200']
 
     if args.cameras < len(camera_list):
         camera_list = camera_list[:args.cameras]
