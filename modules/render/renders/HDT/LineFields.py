@@ -98,7 +98,7 @@ class LineFields(BaseRender):
             traceback.print_exc()
             return
 
-        self.left_image.set_image(self.Wh_L_array.reshape(1, -1))
+        self.left_image.set_image(self.Wh_L_array.reshape(-1, 1))
         self.rigt_image.set_image(self.Wh_R_array.reshape(-1, 1))
         self.left_image.update()
         self.rigt_image.update()
@@ -112,16 +112,18 @@ class LineFields(BaseRender):
         glColor3f(0.0, 1.0, 1.0)
         self.rigt_image.draw(0,0,self.fbo.width, self.fbo.height)
         self.fbo.end()
+        
+        glColor3f(1.0, 1.0, 1.0)
         glDisable(GL_BLEND)
 
     def make_patterns(self, W_L: np.ndarray, W_R: np.ndarray) -> None:
         id = self.cam_id
 
         P: LineFieldsSettings = LineFieldsSettings()
-        P.line_sharpness = 3
-        P.line_speed = 1.5
+        P.line_sharpness = 4
+        P.line_speed = 0
         P.line_width = 1.0
-        P.line_amount = 100.0
+        P.line_amount = 2.0
 
 
         resolution: int = len(W_L)
@@ -143,7 +145,8 @@ class LineFields(BaseRender):
         rigt_width: float = P.line_width        * ((np.cos(rigt_elbow) + 1.0) / 2.0) * ((np.cos(rigt_shoulder) + 1.0) / 2.0) * 0.8 + 0.2
         left_speed: float = P.line_speed        * ( np.sin(left_elbow))
         rigt_speed: float = P.line_speed        * ( np.sin(rigt_elbow))
-        sharpness: float =  P.line_sharpness
+        left_sharpness: float =  1.0 + P.line_sharpness * (abs(left_elbow) / PI)
+        rigt_sharpness: float =  1.0 + P.line_sharpness * (abs(rigt_elbow) / PI)
 
         self.left_pattern_time += self.interval * left_speed
         self.right_pattern_time += self.interval * rigt_speed
@@ -152,9 +155,8 @@ class LineFields(BaseRender):
 
         blend: BlendType = BlendType.MAX
 
-        LineFields.draw_waves(W_L,   0.5, 0.5,  left_count, left_width, sharpness, left_time,  0.0, 0.0, 0.0, blend)
-        LineFields.draw_waves(W_L,   0.5, -0.5,  left_count, left_width, sharpness, left_time,  0.0, 0.0, 0.0, blend)
-        LineFields.draw_waves(W_R,   0.25, -1.0,  rigt_count, rigt_width, sharpness, rigt_time,  0.5, 0.0, 0.0, blend)
+        LineFields.draw_waves(W_L,   0.0, 1.0,   left_count, left_width, left_sharpness, left_time,  0.0, 0.0, 0.0, blend)
+        LineFields.draw_waves(W_R,   0.0, -1.0,  rigt_count, rigt_width, rigt_sharpness, rigt_time,  0.5, 0.0, 0.0, blend)
 
     @staticmethod
     def draw_waves(array: np.ndarray, anchor: float, span: float, num_waves: float,
