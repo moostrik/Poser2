@@ -22,16 +22,16 @@ from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.gl.Mesh import Mesh
 
-class CentreCameraRender(BaseRender):
-    def __init__(self, data: DataManager, smooth_data: PoseSmoothData, cam_id: int) -> None:
+class CentrePoseRender(BaseRender):
+    def __init__(self, data: DataManager, smooth_data: PoseSmoothData, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
         self.smooth_data: PoseSmoothData = smooth_data
         self.cam_id: int = cam_id
         self.cam_fbo: Fbo = Fbo()
-        self.cam_image: Image = Image()
 
         self.is_active: bool = False
 
+        self.pose_meshes: PoseMeshes = pose_meshes
         self.last_pose_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
         
         text_init()
@@ -64,19 +64,42 @@ class CentreCameraRender(BaseRender):
         if not self.is_active:
             return
 
-        cam_image_np: np.ndarray | None = self.data.get_cam_image(key, True, self.key())
-        if cam_image_np is not None:
-            self.cam_image.set_image(cam_image_np)
-            self.cam_image.update()
-
         smooth_pose_rect: Rect | None = self.smooth_data.get_smoothed_rect(key)
         if smooth_pose_rect is None:
             return
 
+        pose_mesh: Mesh = self.pose_meshes.meshes[key]
+
         BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
-        self.cam_image.draw_roi(0, 0, self.cam_fbo.width, self.cam_fbo.height,
-                                smooth_pose_rect.x, smooth_pose_rect.y, smooth_pose_rect.width, smooth_pose_rect.height)
+        glClear(GL_COLOR_BUFFER_BIT)
+
+        if pose_mesh.isInitialized():
+
+            glLineWidth(10.0)
+            glPushMatrix()
+
+            scale_x = self.cam_fbo.width / smooth_pose_rect.width
+            scale_y = self.cam_fbo.height / smooth_pose_rect.height
+            translate_x = -smooth_pose_rect.x * scale_x
+            translate_y = -smooth_pose_rect.y * scale_y
+
+            # Apply transformation
+            glTranslatef(translate_x, translate_y, 0.0)
+            glScalef(scale_x, scale_y, 1.0)
+
+            # Now draw the mesh with the last_pose_rect coordinates
+            # This maps from pose_rect to the transformed space
+            pose_mesh.draw(
+                self.last_pose_rect.x,
+                self.last_pose_rect.y,
+                self.last_pose_rect.width,
+                self.last_pose_rect.height
+            )
+
+            glPopMatrix()
+
+        glColor4f(1.0, 1.0, 1.0, 1.0)
         self.cam_fbo.end()
 
 

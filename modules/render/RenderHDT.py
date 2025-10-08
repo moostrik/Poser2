@@ -17,11 +17,13 @@ from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
 from modules.render.renders.HDT.CentreCameraRender import CentreCameraRender
+from modules.render.renders.HDT.CentrePoseRender import CentrePoseRender
 from modules.render.renders.HDT.CamOverlayRender import CamOverlayRender
 from modules.render.renders.HDT.MovementCamRender import MovementCamRender
 from modules.render.renders.HDT.SynchronyCam import SynchronyCam
 from modules.render.renders.CameraRender import CameraRender
 from modules.render.renders.RStreamRender import RStreamRender
+from modules.render.renders.HDT.LineFields import LineFields
 
 from modules.pose.smooth.PoseSmoothData import PoseSmoothData, OneEuroSettings, PoseSmoothRectSettings
 
@@ -50,7 +52,6 @@ class RenderHDT(RenderBase):
         self.smooth_data: PoseSmoothData = PoseSmoothData(self.num_players, self.OneEuroSettings, self.PoseSmoothRectSettings)
         self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.81", 8000, 60.0)
 
-
         self.data: DataManager =    DataManager(self.smooth_data)
 
         # meshes
@@ -59,7 +60,9 @@ class RenderHDT(RenderBase):
         # drawers
         self.camera_renders:        dict[int, CameraRender] = {}
         self.centre_cam_renders:    dict[int, CentreCameraRender] = {}
+        self.centre_pose_renders:   dict[int, CentrePoseRender] = {}
         self.movement_cam_renders:  dict[int, MovementCamRender] = {}
+        self.line_field_renders:    dict[int, LineFields] = {}
 
         self.sync_renders:          dict[int, SynchronyCam] = {}
         self.overlay_renders:       dict[int, CamOverlayRender] = {}
@@ -69,8 +72,10 @@ class RenderHDT(RenderBase):
 
         for i in range(self.num_cams):
             self.camera_renders[i] = CameraRender(self.data, self.pose_meshes, i)
-            self.centre_cam_renders[i] = CentreCameraRender(self.data, self.smooth_data, self.pose_meshes, i)
+            self.centre_cam_renders[i] = CentreCameraRender(self.data, self.smooth_data, i)
+            self.centre_pose_renders[i] = CentrePoseRender(self.data, self.smooth_data, self.pose_meshes, i)
             self.movement_cam_renders[i] = MovementCamRender(self.data, i)
+            self.line_field_renders[i] = LineFields(self.smooth_data, i)
             self.overlay_renders[i] = CamOverlayRender(self.data, self.pose_meshes, i)
             self.sync_renders[i] = SynchronyCam(self.data, i)
             self.cam_fbos.append(self.movement_cam_renders[i].get_fbo())
@@ -112,7 +117,9 @@ class RenderHDT(RenderBase):
         self.pose_meshes.allocate()
         for key in self.centre_cam_renders.keys():
             self.centre_cam_renders[key].allocate(2160, 3840, GL_RGBA32F)
-            self.movement_cam_renders[key].allocate(2160, 3840, GL_RGBA32F)
+            self.centre_pose_renders[key].allocate(2160, 3840, GL_RGBA32F)
+            self.movement_cam_renders[key].allocate(2160, 3840, GL_RGBA32F) #??
+            self.line_field_renders[key].allocate(2160, 3840, GL_RGBA32F)
             self.sync_renders[key].allocate(2160, 3840, GL_RGBA32F)
 
         self.allocate_window_renders()
@@ -134,7 +141,11 @@ class RenderHDT(RenderBase):
             draw.deallocate()
         for draw in self.centre_cam_renders.values():
             draw.deallocate()
+        for draw in self.centre_pose_renders.values():
+            draw.deallocate()
         for draw in self.movement_cam_renders.values():
+            draw.deallocate()
+        for draw in self.line_field_renders.values():
             draw.deallocate()
         for draw in self.sync_renders.values():
             draw.deallocate()
@@ -146,6 +157,10 @@ class RenderHDT(RenderBase):
 
     def draw_main(self, width: int, height: int) -> None:
 
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        
         self.OneEuroSettings.min_cutoff = 0.2
         self.OneEuroSettings.beta = 0.5
 
@@ -160,12 +175,19 @@ class RenderHDT(RenderBase):
             self.camera_renders[i].update()
             self.overlay_renders[i].update()
             self.centre_cam_renders[i].update()
+            self.centre_pose_renders[i].update()
             self.movement_cam_renders[i].update(self.centre_cam_renders[i].get_fbo())
+            self.line_field_renders[i].update()
             self.sync_renders[i].update(self.cam_fbos, self.movement_cam_renders[i].movement_for_synchrony)
 
         self.draw_composition(width, height)
 
     def draw_composition(self, width:int, height: int) -> None:
+        
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        
         self.setView(width, height)
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
@@ -182,6 +204,12 @@ class RenderHDT(RenderBase):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
+        
+
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
 
@@ -194,7 +222,9 @@ class RenderHDT(RenderBase):
 
         # self.sync_renders[camera_id].draw(Rect(0, 0, width, height))
         self.centre_cam_renders[camera_id].draw(Rect(0, 0, width, height))
-        self.overlay_renders[camera_id].draw(Rect(0, 0, width, height))
+        self.centre_pose_renders[camera_id].draw(Rect(0, 0, width, height))
+        self.line_field_renders[camera_id].draw(Rect(0, 0, width, height))
+        # self.overlay_renders[camera_id].draw(Rect(0, 0, width, height))
         # self.movement_cam_renders[camera_id].draw(Rect(0, 0, width, height))
         
         # self.camera_renders[camera_id].draw(Rect(0, 0, width, height))
