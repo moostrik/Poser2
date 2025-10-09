@@ -162,7 +162,7 @@ class RenderHDT(RenderBase):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
         self.OneEuroSettings.min_cutoff = 0.2
-        self.OneEuroSettings.beta = 0.5
+        self.OneEuroSettings.beta = 0.2
 
         self.PoseSmoothRectSettings.nose_dest_y = 0.25
         self.PoseSmoothRectSettings.height_dest = 0.8

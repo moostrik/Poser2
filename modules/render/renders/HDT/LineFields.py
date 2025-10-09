@@ -61,8 +61,7 @@ class LF(BaseRender):
         self.Wh_L_array: np.ndarray 
         self.Wh_R_array: np.ndarray
         
-        self.left_pattern_time: float = 0.0
-        self.right_pattern_time: float = 0.0
+        self.pattern_time: float = 0.0
         
         self.interval = 1.0 / 60.0
 
@@ -110,18 +109,12 @@ class LF(BaseRender):
                    
         self.clear()
         
-        if not self.smooth_data.get_is_active(self.cam_id):
-            return
-        
-        amount = 10 + np.sin(time()) * 4
-        speed = 0.2
-        thickness = 0.5
-        min_thickness: float = 1.0 / self.fbo.height * amount
-        # print(t)
+        # if not self.smooth_data.get_is_active(self.cam_id):
+        #     return
         
         P: LineFieldsSettings = LineFieldsSettings()
         P.line_sharpness = 4
-        P.line_speed = 0
+        P.line_speed = 0.2
         P.line_width = 1.1
         P.line_amount = 2.0
         
@@ -131,32 +124,34 @@ class LF(BaseRender):
         rigt_shoulder: float = self.smooth_data.get_smoothed_angle(self.cam_id, PoseJoint.right_shoulder, symmetric=True)
         
         if not self.smooth_data.get_is_active(self.cam_id):
-            left_elbow: float = PI #np.sin(age) * PI
-            left_shoulder: float = 0.
-            rigt_elbow: float = 0.
-            rigt_shoulder: float = 0.
+            left_elbow: float =  PI #np.sin(age) * PI
+            left_shoulder: float = PI * 0.5
+            rigt_elbow: float = PI * 0.5
+            rigt_shoulder: float = PI * 0.5
         
         left_count: float = 5 + P.line_amount   * LF.n_cos_inv(left_shoulder)
         rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(rigt_shoulder)
-        left_width: float = P.line_width        * LF.n_cos(left_elbow) * LF.n_cos(left_shoulder) * 0.8 + 0.2
-        rigt_width: float = P.line_width        * LF.n_cos(rigt_elbow) * LF.n_cos(rigt_shoulder) * 0.8 + 0.2
-        left_speed: float = P.line_speed        * ( np.sin(left_elbow))
-        rigt_speed: float = P.line_speed        * ( np.sin(rigt_elbow))
-        left_sharp: float =  1.0 + P.line_sharpness * LF.n_abs(left_elbow)
-        rigt_sharp: float =  1.0 + P.line_sharpness * LF.n_abs(rigt_elbow)
+        left_width: float = P.line_width        * LF.n_cos(left_elbow) * LF.n_cos(left_shoulder) * 0.6 + 0.4
+        rigt_width: float = P.line_width        * LF.n_cos(rigt_elbow) * LF.n_cos(rigt_shoulder) * 0.6 + 0.4
+        left_sharp: float = P.line_sharpness    * LF.n_abs(left_elbow)
+        rigt_sharp: float = P.line_sharpness    * LF.n_abs(rigt_elbow)
+        left_speed: float = P.line_speed        * LF.n_cos_inv(left_elbow) + LF.n_cos_inv(left_shoulder)
+        rigt_speed: float = P.line_speed        * LF.n_cos_inv(rigt_elbow) + LF.n_cos_inv(rigt_shoulder)
 
+        self.pattern_time += self.interval * left_speed * rigt_speed
+        anchor = 1.0 - 0.25
 
         LF.line_shader.use(self.left_fbo.fbo_id, 
-                           speed=speed, 
+                           ex_time=self.pattern_time, 
                            phase=0.0, 
-                           anchor=0.75, 
+                           anchor=anchor, 
                            amount=left_count, 
                            thickness=left_width, 
                            sharpness=left_sharp)
         LF.line_shader.use(self.rigt_fbo.fbo_id, 
-                           speed=speed, 
+                           ex_time=self.pattern_time, 
                            phase=0.5, 
-                           anchor=0.75, 
+                           anchor=anchor, 
                            amount=rigt_count, 
                            thickness=rigt_width, 
                            sharpness=rigt_sharp)
@@ -212,9 +207,9 @@ class LF(BaseRender):
         
         # left_count = 11 + np.sin(age) * 5
 
-        self.left_pattern_time += self.interval * left_speed
+        self.pattern_time += self.interval * left_speed
         self.right_pattern_time += self.interval * rigt_speed
-        left_time: float = self.left_pattern_time
+        left_time: float = self.pattern_time
         rigt_time: float = self.right_pattern_time
 
         blend: BlendType = BlendType.MAX
