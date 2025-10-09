@@ -12,6 +12,9 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
 from modules.pose.smooth.PoseSmoothData import PoseSmoothData, PoseJoint
 
+
+from modules.gl.shaders.HDT_Lines import HDT_Lines
+
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 PI: float = np.pi
@@ -41,11 +44,16 @@ class LineFieldsSettings():
     line_amount: float = 20.0           # number of lines
 
 
-class LineFields(BaseRender):
+class LF(BaseRender):
+    
+    line_shader = HDT_Lines()
+    
     def __init__(self, smooth_data: PoseSmoothData, cam_id: int) -> None:
         self.smooth_data: PoseSmoothData = smooth_data
         self.cam_id: int = cam_id
         self.fbo: Fbo = Fbo()
+        self.left_fbo: Fbo = Fbo()
+        self.rigt_fbo: Fbo = Fbo()
 
         self.left_image: Image = Image()
         self.rigt_image: Image = Image()
@@ -63,16 +71,27 @@ class LineFields(BaseRender):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
         
+        self.left_fbo.allocate(1, height, GL_RGBA32F)
+        self.rigt_fbo.allocate(1, height, GL_RGBA32F)
+        
         self.left_image.allocate(1, height, GL_R32F)
         self.rigt_image.allocate(1, height, GL_R32F)
                                    
         self.Wh_L_array: np.ndarray = np.ones((height), dtype=np.float32)
         self.Wh_R_array: np.ndarray = np.ones((height), dtype=np.float32)
         
+        if not LF.line_shader.allocated:
+            LF.line_shader.allocate(monitor_file=True)
+        
     def deallocate(self) -> None:
         self.fbo.deallocate()
+        self.left_fbo.deallocate()
+        self.rigt_fbo.deallocate()
         self.left_image.deallocate()
         self.rigt_image.deallocate()
+        
+        if LF.line_shader.allocated:
+            LF.line_shader.deallocate
 
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -85,34 +104,72 @@ class LineFields(BaseRender):
         self.fbo.end()
         
     def update(self) -> None:
-        
+        if not LF.line_shader.allocated:
+            LF.line_shader.allocate(monitor_file=True)
+                   # print(1)
+                   
         self.clear()
+        
         if not self.smooth_data.get_is_active(self.cam_id):
             return
-        # return
         
-        try:
-            self.make_patterns(self.Wh_L_array, self.Wh_R_array)
-        except Exception as e:
-            print(f"Error in LineFields.make_patterns: {e}")
-            traceback.print_exc()
-            return
+        amount = 10 + np.sin(time()) * 4
+        speed = 0.2
+        thickness = 0.5
+        min_thickness: float = 1.0 / self.fbo.height * amount
+        # print(t)
+        
+        P: LineFieldsSettings = LineFieldsSettings()
+        P.line_sharpness = 4
+        P.line_speed = 0
+        P.line_width = 1.1
+        P.line_amount = 2.0
+        
+        left_elbow: float = self.smooth_data.get_smoothed_angle(self.cam_id, PoseJoint.left_elbow, symmetric=True)
+        left_shoulder: float = self.smooth_data.get_smoothed_angle(self.cam_id, PoseJoint.left_shoulder, symmetric=True)
+        rigt_elbow: float = self.smooth_data.get_smoothed_angle(self.cam_id, PoseJoint.right_elbow, symmetric=True)
+        rigt_shoulder: float = self.smooth_data.get_smoothed_angle(self.cam_id, PoseJoint.right_shoulder, symmetric=True)
+        
+        if not self.smooth_data.get_is_active(self.cam_id):
+            left_elbow: float = PI #np.sin(age) * PI
+            left_shoulder: float = 0.
+            rigt_elbow: float = 0.
+            rigt_shoulder: float = 0.
+        
+        left_count: float = 5 + P.line_amount   * LF.n_cos_inv(left_shoulder)
+        rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(rigt_shoulder)
+        left_width: float = P.line_width        * LF.n_cos(left_elbow) * LF.n_cos(left_shoulder) * 0.8 + 0.2
+        rigt_width: float = P.line_width        * LF.n_cos(rigt_elbow) * LF.n_cos(rigt_shoulder) * 0.8 + 0.2
+        left_speed: float = P.line_speed        * ( np.sin(left_elbow))
+        rigt_speed: float = P.line_speed        * ( np.sin(rigt_elbow))
+        left_sharp: float =  1.0 + P.line_sharpness * LF.n_abs(left_elbow)
+        rigt_sharp: float =  1.0 + P.line_sharpness * LF.n_abs(rigt_elbow)
 
-        self.left_image.set_image(self.Wh_L_array.reshape(-1, 1))
-        self.rigt_image.set_image(self.Wh_R_array.reshape(-1, 1))
-        self.left_image.update()
-        self.rigt_image.update()
+
+        LF.line_shader.use(self.left_fbo.fbo_id, 
+                           speed=speed, 
+                           phase=0.0, 
+                           anchor=0.75, 
+                           amount=left_count, 
+                           thickness=left_width, 
+                           sharpness=left_sharp)
+        LF.line_shader.use(self.rigt_fbo.fbo_id, 
+                           speed=speed, 
+                           phase=0.5, 
+                           anchor=0.75, 
+                           amount=rigt_count, 
+                           thickness=rigt_width, 
+                           sharpness=rigt_sharp)
         
         BaseRender.setView(self.fbo.width, self.fbo.height)
         glEnable(GL_BLEND)
         glBlendFunc(GL_ONE, GL_ONE)
         self.fbo.begin()
         glColor3f(1.0, 0.0, 0.0)
-        self.left_image.draw(0,0,self.fbo.width, self.fbo.height)
+        self.left_fbo.draw(0,0,self.fbo.width, self.fbo.height)
         glColor3f(0.0, 1.0, 1.0)
-        self.rigt_image.draw(0,0,self.fbo.width, self.fbo.height)
+        self.rigt_fbo.draw(0,0,self.fbo.width, self.fbo.height)
         self.fbo.end()
-        
         glColor3f(1.0, 1.0, 1.0)
         glDisable(GL_BLEND)
 
@@ -125,7 +182,6 @@ class LineFields(BaseRender):
         P.line_width = 1.0
         P.line_amount = 2.0
 
-
         resolution: int = len(W_L)
         W_L.fill(0.0)
         W_R.fill(0.0)
@@ -135,18 +191,26 @@ class LineFields(BaseRender):
         left_shoulder: float = self.smooth_data.get_smoothed_angle(id, PoseJoint.left_shoulder, symmetric=True)
         rigt_elbow: float = self.smooth_data.get_smoothed_angle(id, PoseJoint.right_elbow, symmetric=True)
         rigt_shoulder: float = self.smooth_data.get_smoothed_angle(id, PoseJoint.right_shoulder, symmetric=True)
+        
+        # left_elbow: float = PI #np.sin(age) * PI
+        # left_shoulder: float = 0.
+        # rigt_elbow: float = 0.
+        # rigt_shoulder: float = 0.
+        
 
         age_pattern_speed: float = 0.25
         age_pattern_power: float = 0.75
 
-        left_count: float = 5 + P.line_amount   * (1.0 - (np.cos(left_shoulder) + 1.0) / 2.0)
-        rigt_count: float = 5 + P.line_amount   * (1.0 - (np.cos(rigt_shoulder) + 1.0) / 2.0)
-        left_width: float = P.line_width        * ((np.cos(left_elbow) + 1.0) / 2.0) * ((np.cos(left_shoulder) + 1.0) / 2.0) * 0.8 + 0.2
-        rigt_width: float = P.line_width        * ((np.cos(rigt_elbow) + 1.0) / 2.0) * ((np.cos(rigt_shoulder) + 1.0) / 2.0) * 0.8 + 0.2
+        left_count: float = 5 + P.line_amount   * LF.n_cos_inv(left_shoulder)
+        rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(rigt_shoulder)
+        left_width: float = P.line_width        * LF.n_cos(left_elbow) * LF.n_cos(left_shoulder) * 0.8 + 0.2
+        rigt_width: float = P.line_width        * LF.n_cos(rigt_elbow) * LF.n_cos(rigt_shoulder) * 0.8 + 0.2
         left_speed: float = P.line_speed        * ( np.sin(left_elbow))
         rigt_speed: float = P.line_speed        * ( np.sin(rigt_elbow))
-        left_sharpness: float =  1.0 + P.line_sharpness * (abs(left_elbow) / PI)
-        rigt_sharpness: float =  1.0 + P.line_sharpness * (abs(rigt_elbow) / PI)
+        left_sharpness: float =  1.0 + P.line_sharpness * LF.n_abs(left_elbow)
+        rigt_sharpness: float =  1.0 + P.line_sharpness * LF.n_abs(rigt_elbow)
+        
+        # left_count = 11 + np.sin(age) * 5
 
         self.left_pattern_time += self.interval * left_speed
         self.right_pattern_time += self.interval * rigt_speed
@@ -155,8 +219,8 @@ class LineFields(BaseRender):
 
         blend: BlendType = BlendType.MAX
 
-        LineFields.draw_waves(W_L,   0.0, 1.0,   left_count, left_width, left_sharpness, left_time,  0.0, 0.0, 0.0, blend)
-        LineFields.draw_waves(W_R,   0.0, -1.0,  rigt_count, rigt_width, rigt_sharpness, rigt_time,  0.5, 0.0, 0.0, blend)
+        LF.draw_waves(W_L,   0.25, 1.0,   left_count, left_width, left_sharpness, age,  0.0, 0.0, 0.0, blend)
+        LF.draw_waves(W_R,   0.0, -1.0,  rigt_count, rigt_width, rigt_sharpness, age,  0.5, 0.0, 0.0, blend)
 
     @staticmethod
     def draw_waves(array: np.ndarray, anchor: float, span: float, num_waves: float,
@@ -201,7 +265,7 @@ class LineFields(BaseRender):
 
         # LineFields.draw_edge(intensities, edge_left, 1.5, EdgeSide.LEFT)
         # LineFields.draw_edge(intensities, edge_right, 1.5, EdgeSide.RIGHT)
-        LineFields.apply_circular(array, intensities, pixel_start, blend)
+        LF.apply_circular(array, intensities, pixel_start, blend)
 
     @staticmethod
     def draw_field(array: np.ndarray, centre: float, width: float, strength: float, edge: int, blend: BlendType) -> None:
@@ -214,9 +278,9 @@ class LineFields(BaseRender):
 
         edge_width: int = int(min(edge, field_width // 2))
         if edge_width > 0:
-            LineFields.draw_edge(values, edge_width, 1.5, EdgeSide.BOTH)
+            LF.draw_edge(values, edge_width, 1.5, EdgeSide.BOTH)
 
-        LineFields.apply_circular(array, values, idx_start, blend)
+        LF.apply_circular(array, values, idx_start, blend)
 
     @staticmethod
     def draw_edge(array: np.ndarray, edge: int, curve: float, edge_side: EdgeSide) -> None:
@@ -242,10 +306,10 @@ class LineFields(BaseRender):
         start_idx = start_idx % resolution
         end_idx: int = (start_idx + len(values)) % resolution
         if start_idx < end_idx:
-            LineFields.blend_values(array, values, start_idx, blend)
+            LF.blend_values(array, values, start_idx, blend)
         else:
-            LineFields.blend_values(array, values[:resolution - start_idx], start_idx, blend)
-            LineFields.blend_values(array, values[resolution - start_idx:], 0, blend)
+            LF.blend_values(array, values[:resolution - start_idx], start_idx, blend)
+            LF.blend_values(array, values[resolution - start_idx:], 0, blend)
 
     @staticmethod
     def blend_values(array: np.ndarray, values: np.ndarray, start_idx: int, blend: BlendType) -> None:
@@ -278,3 +342,22 @@ class LineFields(BaseRender):
                 array[start_idx:end_idx][mask] = values[mask]
 
         np.clip(array, 0, 1, out=array)
+        
+    @staticmethod
+    def n_cos(angle) -> float:
+        return (np.cos(angle) + 1.0) / 2.0
+        
+    def n_sin(angle) -> float:
+        return (np.sin(angle) + 1.0) / 2.0
+        
+    def n_abs(angle) -> float:
+        return abs(angle) / PI
+    
+    def n_cos_inv(angle) -> float:
+        return 1.0 - (np.cos(angle) + 1.0) / 2.0
+        
+    def n_sin_inv(angle) -> float:
+        return 1.0 - (np.sin(angle) + 1.0) / 2.0
+        
+    def n_abs_inv(angle) -> float:
+        return 1.0 - abs(angle) / PI

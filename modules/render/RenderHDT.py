@@ -23,7 +23,7 @@ from modules.render.renders.HDT.MovementCamRender import MovementCamRender
 from modules.render.renders.HDT.SynchronyCam import SynchronyCam
 from modules.render.renders.CameraRender import CameraRender
 from modules.render.renders.RStreamRender import RStreamRender
-from modules.render.renders.HDT.LineFields import LineFields
+from modules.render.renders.HDT.LineFields import LF
 
 from modules.pose.smooth.PoseSmoothData import PoseSmoothData, OneEuroSettings, PoseSmoothRectSettings
 
@@ -62,7 +62,7 @@ class RenderHDT(RenderBase):
         self.centre_cam_renders:    dict[int, CentreCameraRender] = {}
         self.centre_pose_renders:   dict[int, CentrePoseRender] = {}
         self.movement_cam_renders:  dict[int, MovementCamRender] = {}
-        self.line_field_renders:    dict[int, LineFields] = {}
+        self.line_field_renders:    dict[int, LF] = {}
 
         self.sync_renders:          dict[int, SynchronyCam] = {}
         self.overlay_renders:       dict[int, CamOverlayRender] = {}
@@ -75,7 +75,7 @@ class RenderHDT(RenderBase):
             self.centre_cam_renders[i] = CentreCameraRender(self.data, self.smooth_data, i)
             self.centre_pose_renders[i] = CentrePoseRender(self.data, self.smooth_data, self.pose_meshes, i)
             self.movement_cam_renders[i] = MovementCamRender(self.data, i)
-            self.line_field_renders[i] = LineFields(self.smooth_data, i)
+            self.line_field_renders[i] = LF(self.smooth_data, i)
             self.overlay_renders[i] = CamOverlayRender(self.data, self.pose_meshes, i)
             self.sync_renders[i] = SynchronyCam(self.data, i)
             self.cam_fbos.append(self.movement_cam_renders[i].get_fbo())
