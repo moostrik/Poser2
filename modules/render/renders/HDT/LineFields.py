@@ -132,6 +132,19 @@ class LF(BaseRender):
             # print(self.smooth_data.get_angular_motion(self.cam_id))
             pass
         
+        if left_elbow is None:
+            print("No left_elbow for cam", self.cam_id)
+            left_elbow = 0.0
+        if left_shoulder is None:
+            print("No left_shoulder for cam", self.cam_id)
+            left_shoulder = 0.0
+        if rigt_elbow is None:
+            print("No rigt_elbow for cam", self.cam_id)
+            rigt_elbow = 0.0
+        if rigt_shoulder is None:
+            print("No rigt_shoulder for cam", self.cam_id)
+            rigt_shoulder = 0.0
+        
         try:
             left_count: float = 5 + P.line_amount   * LF.n_cos_inv(left_shoulder)
             rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(rigt_shoulder)
