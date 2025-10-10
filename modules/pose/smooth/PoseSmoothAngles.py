@@ -13,6 +13,14 @@ from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSet
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # DEFINITIONS
+CUMULATIVE_CHANGE_JOINTS = [
+    PoseJoint.left_elbow,
+    PoseJoint.right_elbow,
+    PoseJoint.left_shoulder,
+    PoseJoint.right_shoulder
+]
+
+
 class SymmetricJointType(Enum):
     elbow = auto()
     hip = auto()
@@ -35,8 +43,10 @@ for joint_type, (left_joint, right_joint) in SYMMETRIC_JOINT_PAIRS.items():
 class PoseSmoothAngles():
     def __init__(self, one_euro_settings: OneEuroSettings) -> None:
         self.angle_smoothers: dict[PoseJoint, AngleEuroInterpolator] = {}
+        self.last_values: dict[PoseJoint, float | None] = {}
         for joint in POSE_ANGLE_JOINTS:
             self.angle_smoothers[joint] = AngleEuroInterpolator(one_euro_settings)
+            self.last_values[joint] = None
 
         self.active: bool = False
         # self._lock = Lock()
@@ -93,6 +103,46 @@ class PoseSmoothAngles():
                 return -angle
 
         return angle
+
+    # CUMULATIVE CHANGE METHODS
+    def get_smoothed_angle_motion(self, joint: PoseJoint) -> float:
+        """
+        Get cumulative angle change for specified joints.
+        returns change in radians
+        """
+        if not self.active:
+            return 0.0
+
+        if joint not in self.last_values:
+            print(f"Warning: Joint {joint} not in last values.")
+            return 0.0
+
+        current_value = self.angle_smoothers[joint].get()
+        last_value = self.last_values[joint]
+
+        if last_value is None:
+            self.last_values[joint] = current_value
+            return 0.0
+    
+        motion = abs(np.mod(current_value - last_value + np.pi, 2 * np.pi) - np.pi)
+        
+        self.last_values[joint] = current_value
+        
+        return motion
+        
+    
+    def get_smoothed_angle_motion_average(self) -> float:        
+        """Get total cumulative angle change across all tracked joints."""
+        if not self.active:
+            return 0.0
+
+        total_change: float = 0.0
+        for joint in CUMULATIVE_CHANGE_JOINTS:
+            total_change += self.get_smoothed_angle_motion(joint)
+        avg_change = total_change / len(CUMULATIVE_CHANGE_JOINTS)  # Average change across joints
+
+        avg_change /= np.pi  # Normalize by pi to get a value between 0 and 1
+        return avg_change
 
     # SYMMETRY METHODS
     def get_joint_symmetry(self, joint_type: SymmetricJointType) -> float | None:

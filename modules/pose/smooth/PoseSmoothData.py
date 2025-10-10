@@ -71,6 +71,13 @@ class PoseSmoothData:
                 return self.angle_smoothers[tracklet_id].get_smoothed_angle(joint, symmetric)
             return None
 
+    def get_angular_motion(self, tracklet_id: int) -> Optional[float]:
+        """Get smoothed angle change for the specified tracklet ID and joint."""
+        with self._lock:
+            if tracklet_id in self.angle_smoothers:
+                return self.angle_smoothers[tracklet_id].get_smoothed_angle_motion_average()
+            return None
+
     def get_joint_symmetry(self, tracklet_id: int, joint_type) -> Optional[float]:
         """Get joint symmetry for the specified tracklet ID and joint type."""
         with self._lock:

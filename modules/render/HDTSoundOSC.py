@@ -11,7 +11,6 @@ from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.smooth.PoseSmoothData import PoseSmoothData
 from modules.pose.PoseAngles import POSE_ANGLE_JOINTS
-from modules.pose.smooth.PoseSmoothAngles import SymmetricJointType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -83,6 +82,12 @@ class HDTSoundOSC:
         active_msg = OscMessageBuilder(address=f"/pose/{id}/active")
         active_msg.add_arg(1)
         bundle_builder.add_content(active_msg.build()) # type: ignore
+        
+        motion = self.smooth_data.get_angular_motion(id)
+        if motion is not None:
+            change_msg = OscMessageBuilder(address=f"/pose/{id}/motion")
+            change_msg.add_arg(float(motion))
+            bundle_builder.add_content(change_msg.build()) # type: ignore
 
         # Smoothed angles for key joints
         for joint in POSE_ANGLE_JOINTS:
@@ -92,10 +97,3 @@ class HDTSoundOSC:
                 angle_msg.add_arg(float(angle))
                 bundle_builder.add_content(angle_msg.build()) # type: ignore
 
-        # Symmetry metrics
-        for sym_type in SymmetricJointType:
-            symmetry: float | None = self.smooth_data.get_joint_symmetry(id, sym_type)
-            if symmetry is not None:
-                sym_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/{sym_type.name}")
-                sym_msg.add_arg(float(symmetry))
-                bundle_builder.add_content(sym_msg.build()) # type: ignore

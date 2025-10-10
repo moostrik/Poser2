@@ -128,15 +128,22 @@ class LF(BaseRender):
             left_shoulder: float = PI * 0.5
             rigt_elbow: float = PI * 0.5
             rigt_shoulder: float = PI * 0.5
+        else:
+            # print(self.smooth_data.get_angular_motion(self.cam_id))
+            pass
         
-        left_count: float = 5 + P.line_amount   * LF.n_cos_inv(left_shoulder)
-        rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(rigt_shoulder)
-        left_width: float = P.line_width        * LF.n_cos(left_elbow) * LF.n_cos(left_shoulder) * 0.6 + 0.4
-        rigt_width: float = P.line_width        * LF.n_cos(rigt_elbow) * LF.n_cos(rigt_shoulder) * 0.6 + 0.4
-        left_sharp: float = P.line_sharpness    * LF.n_abs(left_elbow)
-        rigt_sharp: float = P.line_sharpness    * LF.n_abs(rigt_elbow)
-        left_speed: float = P.line_speed        * LF.n_cos_inv(left_elbow) + LF.n_cos_inv(left_shoulder)
-        rigt_speed: float = P.line_speed        * LF.n_cos_inv(rigt_elbow) + LF.n_cos_inv(rigt_shoulder)
+        try:
+            left_count: float = 5 + P.line_amount   * LF.n_cos_inv(left_shoulder)
+            rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(rigt_shoulder)
+            left_width: float = P.line_width        * LF.n_cos(left_elbow) * LF.n_cos(left_shoulder) * 0.6 + 0.4
+            rigt_width: float = P.line_width        * LF.n_cos(rigt_elbow) * LF.n_cos(rigt_shoulder) * 0.6 + 0.4
+            left_sharp: float = P.line_sharpness    * LF.n_abs(left_elbow)
+            rigt_sharp: float = P.line_sharpness    * LF.n_abs(rigt_elbow)
+            left_speed: float = P.line_speed        * LF.n_cos_inv(left_elbow) + LF.n_cos_inv(left_shoulder)
+            rigt_speed: float = P.line_speed        * LF.n_cos_inv(rigt_elbow) + LF.n_cos_inv(rigt_shoulder)
+        except Exception as e:
+            print(e)
+            print(self.cam_id, self.smooth_data.get_is_active(self.cam_id), left_elbow, left_shoulder, rigt_elbow, rigt_shoulder)
 
         self.pattern_time += self.interval * left_speed * rigt_speed
         anchor = 1.0 - 0.25
