@@ -1,4 +1,3 @@
-
 """
 SmoothInterpolation Module
 
@@ -62,7 +61,7 @@ class OneEuroInterpolator:
         self.settings: OneEuroSettings = settings  # Store settings object
         self.filter: OneEuroFilter = OneEuroFilter(settings.frequency, settings.min_cutoff, settings.beta, settings.d_cutoff)
         self.interval: float = 1.0 / settings.frequency               # Expected time between samples
-        self.buffer: deque[float] = deque(maxlen=4)     # Store recent filtered values
+        self.buffer: deque[float] = deque(maxlen=5)     # Store recent filtered values
         self.last_time: float = time()                  # Timestamp of last sample
         self.last_real: float | None = None             # Last non-NaN value
 
@@ -73,7 +72,6 @@ class OneEuroInterpolator:
         self.filter.setMinCutoff(self.settings.min_cutoff)
         self.filter.setBeta(self.settings.beta)
         self.filter.setDerivateCutoff(self.settings.d_cutoff)
-
 
     def add_sample(self, value: float) -> None:
         if np.isnan(value):
@@ -87,71 +85,106 @@ class OneEuroInterpolator:
         self.buffer.append(smoothed)
         self.last_time = time()
 
-    def get(self) -> float | None:
+    def get(self, timestamp: float | None = None) -> float | None:
+        """
+        Get interpolated value at the specified timestamp or current time.
+
+        Args:
+            timestamp:  Optional timestamp to calculate value at.
+                        works within the range of last two samples.
+                        If None, uses current time (original behavior).
+        """
         if not self.buffer:
             return None
 
         if len(self.buffer) == 1:
             return self.buffer[0]
 
-        time_delta: float = time() - self.last_time
-        alpha: float = min(time_delta / self.interval, 1.5)  # Limit extrapolation factor
+        # Use provided timestamp or current time
+        reference_time: float = timestamp if timestamp is not None else time()
+        if reference_time > self.last_time:
+            alpha: float = (reference_time - self.last_time) / self.interval
+            if alpha > 1.0:
+                return self.buffer[-1]
 
-
-        if len(self.buffer) >= 3:
-            # Get last 3 points for interpolation
-            if len(self.buffer) >= 4:
-                p0, p1, p2, p3 = list(self.buffer)[-4:]
-            else:
-                # If only 3 points, duplicate first point
-                p0 = list(self.buffer)[-3]
+            if len(self.buffer) == 2:
+                return OneEuroInterpolator.linear_interpolate(self.buffer[-2], self.buffer[-1], alpha)
+            if len(self.buffer) == 3:
+                # Simple quadratic interpolation using last 3 points
                 p1, p2, p3 = list(self.buffer)[-3:]
+                p0 = p1  # Duplicate first point for lack of a fourth
+                return OneEuroInterpolator.cubic_hermite_interpolate(p0, p1, p2, p3, alpha)
+            if len(self.buffer) > 3:
+                # Cubic Hermite interpolation using last 4 points
+                p0, p1, p2, p3 = list(self.buffer)[-4:]
+                return OneEuroInterpolator.cubic_hermite_interpolate(p0, p1, p2, p3, alpha)
 
-            # Calculate velocities (approximations based on equal time intervals)
-            v1: float = p2 - p1
-            v0: float = p1 - p0
+        else: # reference_time <= self.last_time
+            alpha: float = (reference_time - (self.last_time - self.interval)) / self.interval
+            if len(self.buffer) == 2 or alpha <= 0.0:
+                return self.buffer[-2] # same as [0]
+            if len(self.buffer) == 3:
+                return OneEuroInterpolator.linear_interpolate(self.buffer[-3], self.buffer[-2], alpha)
+            if len(self.buffer) == 4:
+                p0, p1, p2 = list(self.buffer)[-4:-1]
+                p3 = p2  # Duplicate last point for lack of a fourth
+                return OneEuroInterpolator.cubic_hermite_interpolate(p0, p1, p2, p3, alpha)
+            if len(self.buffer) > 4:
+                p0, p1, p2, p3 = list(self.buffer)[-5:-1]
+                return OneEuroInterpolator.cubic_hermite_interpolate(p0, p1, p2, p3, alpha)
 
-            # Calculate acceleration
-            accel: float = v1 - v0
 
-            # Catmull-Rom style interpolation between p2 and p3
-            if alpha < 1.0:
-                # Interpolate between p2 and p3 with velocity influence
-                t: float = alpha
-                # Calculate Hermite basis functions
-                h00: float = 2*t**3 - 3*t**2 + 1    # position from p2
-                h10: float = t**3 - 2*t**2 + t      # velocity from p2
-                h01: float = -2*t**3 + 3*t**2       # position from p3
-                h11: float = t**3 - t**2            # velocity from p3
+    def get_delta(self, start_time: float, end_time: float) -> float:
+        """Get change in value since last sample at the specified timestamp."""
+        if not self.buffer or len(self.buffer) < 2:
+            return 0.0
 
-                # Use p2, p3 and their estimated velocities
-                return h00*p2 + h10*v1 + h01*p3 + h11*v1
-            else:
-                # Extrapolation case - use velocity and acceleration from last points
-                # Limit extrapolation to reduce instability
-                t = min(alpha - 1.0, 0.5)
-                return p3 + v1*t + 0.5*accel*t*t
-        else:
-            # Only have two points - enhanced extrapolation
-            v0, v1 = self.buffer[-2], self.buffer[-1]
-            velocity: float = v1 - v0
-
-            if alpha < 1.0:
-                # Simple linear interpolation between the two points
-                return v0 + alpha * velocity
-            else:
-                # Extrapolation with velocity decay
-                t = alpha - 1.0
-                return v1 + velocity * t
-                # Apply velocity decay factor (0.8) to simulate natural deceleration
-                # decay_factor = 1.0 / (1.0 + 0.5 * t)
-                # return v1 + velocity * t * decay_factor
+        start_value: float | None = self.get(start_time)
+        end_value: float | None = self.get(end_time)
+        if start_value is None or end_value is None:
+            return 0.0
+        return end_value - start_value
 
     def reset(self) -> None:
         self.buffer.clear()
         self.last_real = None
         self.last_time = time()
         self.filter.reset()
+
+    @staticmethod
+    def linear_interpolate(start: float, end: float, fraction: float) -> float:
+        """Linear interpolation between start and end by fraction (0.0-1.0)"""
+        return start + fraction * (end - start)
+
+    @staticmethod
+    def cubic_hermite_interpolate(p0: float, p1: float, p2: float, p3: float, t: float) -> float:
+        """Cubic Hermite interpolation with Catmull-Rom style tangents.
+
+        Interpolates between p2 and p3 using p0 and p1 to estimate tangents.
+        This creates smooth C1 continuous curves through the sample points.
+
+        Args:
+            p0: First control point (earliest)
+            p1: Second control point
+            p2: Third control point (interpolation starts here)
+            p3: Fourth control point (interpolation ends here)
+            t: Interpolation parameter [0.0-1.0]
+
+        Returns:
+            Interpolated value
+        """
+        # Calculate velocities (approximations based on equal time intervals)
+        v1: float = p2 - p1
+        v0: float = p1 - p0
+
+        # Calculate Hermite basis functions
+        h00: float = 2*t**3 - 3*t**2 + 1    # position from p2
+        h10: float = t**3 - 2*t**2 + t      # velocity from p2
+        h01: float = -2*t**3 + 3*t**2       # position from p3
+        h11: float = t**3 - t**2            # velocity from p3
+
+        # Use p2, p3 and their estimated velocities
+        return h00*p2 + h10*v1 + h01*p3 + h11*v1
 
 class NormalizedEuroInterpolator:
     """Interpolator for values in [0,1] range."""
