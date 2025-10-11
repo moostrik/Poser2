@@ -39,11 +39,9 @@ class LF(BaseRender):
         self.fbo: Fbo = Fbo()
         self.left_fbo: Fbo = Fbo()
         self.rigt_fbo: Fbo = Fbo()
-
-
+        self.interval: float = 1.0 / 60.0
         self.pattern_time: float = 0.0
 
-        self.interval: float = 1.0 / 60.0
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
@@ -63,20 +61,12 @@ class LF(BaseRender):
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
-    def clear(self) -> None:
-        BaseRender.setView(self.fbo.width, self.fbo.height)
-        self.fbo.begin()
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT)
-        self.fbo.end()
-
     def update(self) -> None:
         if not LF.line_shader.allocated:
             LF.line_shader.allocate(monitor_file=True)
 
-        self.clear()
-
         # if not self.smooth_data.get_is_active(self.cam_id):
+        #     self._clear()
         #     return
 
         if self.cam_id != 0:
@@ -88,76 +78,59 @@ class LF(BaseRender):
         P.line_width = 1.1
         P.line_amount = 2.0
 
-        left_elbow: float =     self.smooth_data.get_angle(self.cam_id, PoseJoint.left_elbow)
-        left_shoulder: float =  self.smooth_data.get_angle(self.cam_id, PoseJoint.left_shoulder)
-        rigt_elbow: float =     self.smooth_data.get_angle(self.cam_id, PoseJoint.right_elbow)
-        rigt_shoulder: float =  self.smooth_data.get_angle(self.cam_id, PoseJoint.right_shoulder)
-        head: float =           self.smooth_data.get_head_orientation(self.cam_id)
-        motion: float =         self.smooth_data.get_motion(self.cam_id)
-        age: float =            self.smooth_data.get_age(self.cam_id)
-        anchor: float =         1.0 - self.smooth_data.rect_settings.centre_dest_y
+        elbow_L: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.left_elbow)
+        shldr_L: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.left_shoulder)
+        elbow_R: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.right_elbow)
+        shldr_R: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.right_shoulder)
+        head: float     = self.smooth_data.get_head(self.cam_id)
+        motion: float   = self.smooth_data.get_motion(self.cam_id)
+        age: float      = self.smooth_data.get_age(self.cam_id)
+        anchor: float   = 1.0 - self.smooth_data.rect_settings.centre_dest_y
 
-        self.smooth_data.angle_settings.motion_threshold = 0.002
         # print(f"motion={motion:.2f}, age={age:.2f}")
 
-        # return
         if not self.smooth_data.get_is_active(self.cam_id):
-            left_elbow =    PI #np.sin(age) * PI
-            left_shoulder = PI * 0.5
-            rigt_elbow =    PI * 0.5
-            rigt_shoulder = PI * 0.5
-        else:
-            # print(self.smooth_data.get_angular_motion(self.cam_id))
-            pass
+            elbow_L =    PI #np.sin(age) * PI
+            shldr_L = PI * 0.5
+            elbow_R =    PI * 0.5
+            shldr_R = PI * 0.5
 
-        if left_elbow is None:
-            print("No left_elbow for cam", self.cam_id)
-            left_elbow = 0.0
-        if left_shoulder is None:
-            print("No left_shoulder for cam", self.cam_id)
-            left_shoulder = 0.0
-        if rigt_elbow is None:
-            print("No rigt_elbow for cam", self.cam_id)
-            rigt_elbow = 0.0
-        if rigt_shoulder is None:
-            print("No rigt_shoulder for cam", self.cam_id)
-            rigt_shoulder = 0.0
-
-        try:
-            left_count: float = 5 + P.line_amount   * LF.n_cos_inv(left_shoulder)
-            rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(rigt_shoulder)
-            left_width: float = P.line_width        * LF.n_cos(left_elbow) * LF.n_cos(left_shoulder) * 0.6 + 0.4
-            rigt_width: float = P.line_width        * LF.n_cos(rigt_elbow) * LF.n_cos(rigt_shoulder) * 0.6 + 0.4
-            left_sharp: float = P.line_sharpness    * LF.n_abs(left_elbow)
-            rigt_sharp: float = P.line_sharpness    * LF.n_abs(rigt_elbow)
-            left_speed: float = P.line_speed        * LF.n_cos_inv(left_elbow) + LF.n_cos_inv(left_shoulder)
-            rigt_speed: float = P.line_speed        * LF.n_cos_inv(rigt_elbow) + LF.n_cos_inv(rigt_shoulder)
-        except Exception as e:
-            print(e)
-            print(self.cam_id, self.smooth_data.get_is_active(self.cam_id), left_elbow, left_shoulder, rigt_elbow, rigt_shoulder)
+        left_count: float = 5 + P.line_amount   * LF.n_cos_inv(shldr_L)
+        rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(shldr_R)
+        left_width: float = P.line_width        * LF.n_cos(elbow_L) * LF.n_cos(shldr_L) * 0.6 + 0.4
+        rigt_width: float = P.line_width        * LF.n_cos(elbow_R) * LF.n_cos(shldr_R) * 0.6 + 0.4
+        left_sharp: float = P.line_sharpness    * LF.n_abs(elbow_L)
+        rigt_sharp: float = P.line_sharpness    * LF.n_abs(elbow_R)
+        left_speed: float = P.line_speed        * LF.n_cos_inv(elbow_L) + LF.n_cos_inv(shldr_L)
+        rigt_speed: float = P.line_speed        * LF.n_cos_inv(elbow_R) + LF.n_cos_inv(shldr_R)
 
         self.pattern_time  += self.interval * left_speed * rigt_speed
-        motion_time: float = motion * 0.1 #+ self.pattern_time
+        motion_time: float = motion * 0.1 + self.pattern_time
 
         LF.line_shader.use(self.left_fbo.fbo_id,
-                           ex_time=motion_time ,
+                           time=motion_time,
                            phase=0.0,
                            anchor=anchor,
                            amount=left_count,
                            thickness=left_width,
                            sharpness=left_sharp)
         LF.line_shader.use(self.rigt_fbo.fbo_id,
-                           ex_time=motion_time,
+                           time=motion_time,
                            phase=0.5,
                            anchor=anchor,
                            amount=rigt_count,
                            thickness=rigt_width,
                            sharpness=rigt_sharp)
 
+        self._render()
+
+    def _render(self) -> None:
         BaseRender.setView(self.fbo.width, self.fbo.height)
         glEnable(GL_BLEND)
         glBlendFunc(GL_ONE, GL_ONE)
         self.fbo.begin()
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
         glColor3f(1.0, 0.0, 0.0)
         self.left_fbo.draw(0,0,self.fbo.width, self.fbo.height)
         glColor3f(0.0, 1.0, 1.0)
@@ -165,6 +138,13 @@ class LF(BaseRender):
         self.fbo.end()
         glColor3f(1.0, 1.0, 1.0)
         glDisable(GL_BLEND)
+
+    def _clear(self) -> None:
+        BaseRender.setView(self.fbo.width, self.fbo.height)
+        self.fbo.begin()
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+        self.fbo.end()
 
     @staticmethod
     def n_cos(angle) -> float:

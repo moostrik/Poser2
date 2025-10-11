@@ -99,7 +99,7 @@ class HDTSoundOSC:
             angle_msg.add_arg(float(angle))
             bundle_builder.add_content(angle_msg.build()) # type: ignore
 
-        head_orientation: float = self.smooth_data.get_head_orientation(id)
+        head_orientation: float = self.smooth_data.get_head(id)
         head_msg = OscMessageBuilder(address=f"/pose/{id}/angle/head")
         head_msg.add_arg(float(head_orientation))
         bundle_builder.add_content(head_msg.build()) # type: ignore

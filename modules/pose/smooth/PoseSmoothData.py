@@ -93,7 +93,7 @@ class PoseSmoothData:
         with self._lock:
             return self._angle_smoothers[tracklet_id].total_motion
 
-    def get_head_orientation(self, tracklet_id: int) -> float:
+    def get_head(self, tracklet_id: int) -> float:
         """Get smoothed head angles for the specified tracklet ID."""
         with self._lock:
             return self._head_smoothers[tracklet_id].orientation
