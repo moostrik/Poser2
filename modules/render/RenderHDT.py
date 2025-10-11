@@ -25,7 +25,7 @@ from modules.render.renders.CameraRender import CameraRender
 from modules.render.renders.RStreamRender import RStreamRender
 from modules.render.renders.HDT.LineFields import LF
 
-from modules.pose.smooth.PoseSmoothData import PoseSmoothData, OneEuroSettings, PoseSmoothRectSettings
+from modules.pose.smooth.PoseSmoothData import PoseSmoothData, OneEuroSettings, PoseSmoothRectSettings, PoseSmoothAngleSettings
 
 from modules.render.HDTSoundOSC import HDTSoundOSC
 
@@ -43,13 +43,18 @@ class RenderHDT(RenderBase):
         self.OneEuroSettings: OneEuroSettings = OneEuroSettings(25, 1.0, 0.1)
         self.PoseSmoothRectSettings: PoseSmoothRectSettings = PoseSmoothRectSettings(
             smooth_settings=self.OneEuroSettings,
-            nose_dest_x=0.5,
-            nose_dest_y=0.2,
+            center_dest_x=0.5,
+            centre_dest_y=0.2,
             height_dest=0.95,
             src_aspectratio=16/9,
             dst_aspectratio=9/16
         )
-        self.smooth_data: PoseSmoothData = PoseSmoothData(self.num_players, self.OneEuroSettings, self.PoseSmoothRectSettings)
+        self.PoseSmoothAngleSettings: PoseSmoothAngleSettings = PoseSmoothAngleSettings(
+            smooth_settings=self.OneEuroSettings,
+            motion_threshold=0.1
+        )
+
+        self.smooth_data: PoseSmoothData = PoseSmoothData(self.num_players, self.PoseSmoothRectSettings, self.PoseSmoothAngleSettings)
         self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.81", 8000, 60.0)
 
         self.data: DataManager =    DataManager(self.smooth_data)
@@ -164,7 +169,7 @@ class RenderHDT(RenderBase):
         self.OneEuroSettings.min_cutoff = 0.2
         self.OneEuroSettings.beta = 0.2
 
-        self.PoseSmoothRectSettings.nose_dest_y = 0.25
+        self.PoseSmoothRectSettings.centre_dest_y = 0.25
         self.PoseSmoothRectSettings.height_dest = 0.8
 
         self.smooth_data.update()

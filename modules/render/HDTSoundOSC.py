@@ -63,7 +63,7 @@ class HDTSoundOSC:
     def _send_data(self) -> None:
         bundle_builder: OscBundleBuilder = OscBundleBuilder(IMMEDIATELY)  # type: ignore
 
-        for id in range(self.smooth_data.num_players):
+        for id in range(self.smooth_data._num_players):
             if not self.smooth_data.get_is_active(id):
                 self._build_inactive_message(id, bundle_builder)
             else:

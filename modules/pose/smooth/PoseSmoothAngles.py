@@ -1,4 +1,5 @@
 import numpy as np
+from dataclasses import dataclass
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
@@ -8,23 +9,22 @@ from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSet
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-# DEFINITIONS
-CUMULATIVE_CHANGE_JOINTS: list[PoseJoint] = [
-    PoseJoint.left_elbow,
-    PoseJoint.right_elbow,
-    PoseJoint.left_shoulder,
-    PoseJoint.right_shoulder
-]
+
+@dataclass
+class PoseSmoothAngleSettings:
+    smooth_settings: OneEuroSettings
+    motion_threshold: float = 0.002
 
 # CLASSES
 class PoseSmoothAngles():
-    def __init__(self, one_euro_settings: OneEuroSettings) -> None:
+    def __init__(self, settings: PoseSmoothAngleSettings) -> None:
         self._active: bool = False
+        self.settings: PoseSmoothAngleSettings = settings
         self._angle_smoothers: dict[PoseJoint, AngleEuroInterpolator] = {}
         self._cumulative_joint_motion: dict[PoseJoint, float] = {}
         self._cumulative_total_motion: float = 0.0
         for joint in POSE_ANGLE_JOINTS:
-            self._angle_smoothers[joint] = AngleEuroInterpolator(one_euro_settings)
+            self._angle_smoothers[joint] = AngleEuroInterpolator(settings.smooth_settings)
             self._cumulative_joint_motion[joint] = 0.0
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -79,6 +79,8 @@ class PoseSmoothAngles():
             self._angle_smoothers[joint].update()
             delta: float | None = self._angle_smoothers[joint]._smooth_delta
             movement: float = abs(delta) if delta is not None else 0.0
+            if movement < self.settings.motion_threshold:
+                movement = 0.0
             self._cumulative_joint_motion[joint] += movement
             total_movement += movement
         self._cumulative_total_motion += total_movement

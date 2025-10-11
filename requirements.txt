@@ -12,5 +12,6 @@ pandas==2.3.2                   # latest version
 Pillow==11.3.0                  # latest version
 psutil==7.0.0                   # latest version
 python-osc==1.9.3               # latest version
+pytweening==1.2.0               # latest version
 typing-extensions==4.15.0       # latest version for torch
 watchdog==6.0.0                 # latest version

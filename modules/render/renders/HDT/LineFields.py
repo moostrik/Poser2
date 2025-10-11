@@ -1,41 +1,27 @@
 
+# Standard library imports
 import numpy as np
 import traceback
-
 from dataclasses import dataclass
 from enum import Enum
 from time import time
 
+# Third-party imports
+import pytweening
 from OpenGL.GL import * # type: ignore
-from modules.pose.PoseHeadOrientation import PoseHeadData
-from modules.render.renders.BaseRender import BaseRender, Rect
+
+# Local imports
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
-from modules.pose.smooth.PoseSmoothData import PoseSmoothData, PoseJoint
-
-
 from modules.gl.shaders.HDT_Lines import HDT_Lines
+from modules.pose.smooth.PoseSmoothData import PoseSmoothData, PoseJoint
+from modules.render.renders.BaseRender import BaseRender, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 PI: float = np.pi
 TWOPI: float = 2 * np.pi
 HALFPI: float = np.pi / 2
-
-class EdgeSide(Enum):
-    NONE = 0
-    LEFT = 1
-    RIGHT = 2
-    BOTH = 3
-
-class BlendType(Enum):
-    NONE = "replace"
-    ADD = "add"
-    SUBTRACT = "subtract"
-    MULTIPLY = "multiply"
-    MAX = "max"
-    MIN = "min"
-    NON_ZERO = "non_zero"
 
 @dataclass
 class LineFieldsSettings():
@@ -44,9 +30,7 @@ class LineFieldsSettings():
     line_width: float = 0.1             # in normalized world width (0..1)
     line_amount: float = 20.0           # number of lines
 
-
 class LF(BaseRender):
-
     line_shader = HDT_Lines()
 
     def __init__(self, smooth_data: PoseSmoothData, cam_id: int) -> None:
@@ -56,30 +40,16 @@ class LF(BaseRender):
         self.left_fbo: Fbo = Fbo()
         self.rigt_fbo: Fbo = Fbo()
 
-        self.left_image: Image = Image()
-        self.rigt_image: Image = Image()
-
-        self.Wh_L_array: np.ndarray
-        self.Wh_R_array: np.ndarray
 
         self.pattern_time: float = 0.0
 
         self.interval: float = 1.0 / 60.0
-
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
-
         self.left_fbo.allocate(1, height, GL_RGBA32F)
         self.rigt_fbo.allocate(1, height, GL_RGBA32F)
-
-        self.left_image.allocate(1, height, GL_R32F)
-        self.rigt_image.allocate(1, height, GL_R32F)
-
-        self.Wh_L_array: np.ndarray = np.ones((height), dtype=np.float32)
-        self.Wh_R_array: np.ndarray = np.ones((height), dtype=np.float32)
-
         if not LF.line_shader.allocated:
             LF.line_shader.allocate(monitor_file=True)
 
@@ -87,9 +57,6 @@ class LF(BaseRender):
         self.fbo.deallocate()
         self.left_fbo.deallocate()
         self.rigt_fbo.deallocate()
-        self.left_image.deallocate()
-        self.rigt_image.deallocate()
-
         if LF.line_shader.allocated:
             LF.line_shader.deallocate
 
@@ -128,7 +95,10 @@ class LF(BaseRender):
         head: float =           self.smooth_data.get_head_orientation(self.cam_id)
         motion: float =         self.smooth_data.get_motion(self.cam_id)
         age: float =            self.smooth_data.get_age(self.cam_id)
-        print(f"motion={motion:.2f}, age={age:.2f}")
+        anchor: float =         1.0 - self.smooth_data.rect_settings.centre_dest_y
+
+        self.smooth_data.angle_settings.motion_threshold = 0.002
+        # print(f"motion={motion:.2f}, age={age:.2f}")
 
         # return
         if not self.smooth_data.get_is_active(self.cam_id):
@@ -166,18 +136,18 @@ class LF(BaseRender):
             print(e)
             print(self.cam_id, self.smooth_data.get_is_active(self.cam_id), left_elbow, left_shoulder, rigt_elbow, rigt_shoulder)
 
-        self.pattern_time += self.interval * left_speed * rigt_speed
-        anchor = 1.0 - 0.25
+        self.pattern_time  += self.interval * left_speed * rigt_speed
+        motion_time: float = motion * 0.1 #+ self.pattern_time
 
         LF.line_shader.use(self.left_fbo.fbo_id,
-                           ex_time=self.pattern_time,
+                           ex_time=motion_time ,
                            phase=0.0,
                            anchor=anchor,
                            amount=left_count,
                            thickness=left_width,
                            sharpness=left_sharp)
         LF.line_shader.use(self.rigt_fbo.fbo_id,
-                           ex_time=self.pattern_time,
+                           ex_time=motion_time,
                            phase=0.5,
                            anchor=anchor,
                            amount=rigt_count,

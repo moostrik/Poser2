@@ -14,8 +14,8 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 @dataclass
 class PoseSmoothRectSettings:
     smooth_settings: OneEuroSettings
-    nose_dest_x: float = 0.5
-    nose_dest_y: float = 0.2
+    center_dest_x: float = 0.5
+    centre_dest_y: float = 0.2
     height_dest: float = 0.95
     src_aspectratio: float = 16/9
     dst_aspectratio: float = 9/16
@@ -123,8 +123,8 @@ class PoseSmoothRect():
         corrected_width = base_width
 
         # Calculate position, adjusting for the corrected width
-        left: float = nose_x - corrected_width * self._settings.nose_dest_x
-        top: float = nose_y - height * self._settings.nose_dest_y
+        left: float = nose_x - corrected_width * self._settings.center_dest_x
+        top: float = nose_y - height * self._settings.centre_dest_y
 
         self._smoothed_rect = Rect(left, top, corrected_width, height)
 
