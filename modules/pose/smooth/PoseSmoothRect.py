@@ -78,12 +78,16 @@ class PoseSmoothRect():
             self._height_interpolator.add_sample(np.nan)
             return
 
-        nose_x: float = pose_points[PoseJoint.nose.value][0] * pose_rect.width + pose_rect.x
-        nose_y: float = pose_points[PoseJoint.nose.value][1] * pose_rect.height + pose_rect.y
+        left_eye: np.ndarray = pose_points[PoseJoint.left_eye.value]
+        right_eye: np.ndarray = pose_points[PoseJoint.right_eye.value]
+        eye_midpoint: np.ndarray = (left_eye + right_eye) / 2
+
+        centre_x: float = eye_midpoint[0] * pose_rect.width + pose_rect.x
+        centre_y: float = eye_midpoint[1] * pose_rect.height + pose_rect.y
         height: float = pose_height # * pose_rect.height -> this is already is based on height
 
-        self._center_x_interpolator.add_sample(nose_x)
-        self._center_y_interpolator.add_sample(nose_y)
+        self._center_x_interpolator.add_sample(centre_x)
+        self._center_y_interpolator.add_sample(centre_y)
         self._height_interpolator.add_sample(height)
 
     def update(self) -> None:
