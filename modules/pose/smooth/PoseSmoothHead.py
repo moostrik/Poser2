@@ -1,4 +1,5 @@
 import numpy as np
+from dataclasses import dataclass
 
 from modules.pose.Pose import Pose
 from modules.pose.smooth.PoseSmoothAngles import PoseSmoothAngleSettings
@@ -7,11 +8,17 @@ from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSet
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+@dataclass
+class PoseSmoothHeadSettings:
+    smooth_settings: OneEuroSettings
+    motion_threshold: float = 0.002
+    motion_weight: float = 2.0 # based on PoseSmoothAngleSettings motion weights
+
 # CLASSES
 class PoseSmoothHead():
-    def __init__(self, settings: PoseSmoothAngleSettings) -> None:
+    def __init__(self, settings: PoseSmoothHeadSettings) -> None:
         self._active: bool = False
-        self.settings: PoseSmoothAngleSettings = settings
+        self.settings: PoseSmoothHeadSettings = settings
         self._head_smoother: AngleEuroInterpolator = AngleEuroInterpolator(settings.smooth_settings)
 
         self._orientation: float = 0.0
@@ -65,7 +72,7 @@ class PoseSmoothHead():
         motion: float = abs(self._delta)
         if motion < self.settings.motion_threshold:
             motion = 0.0
-        self._motion += motion
+        self._motion += motion * self.settings.motion_weight
 
     def reset(self) -> None:
         self._head_smoother.reset()

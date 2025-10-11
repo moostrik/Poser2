@@ -4,7 +4,7 @@ from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.smooth.PoseSmoothRect import PoseSmoothRect, PoseSmoothRectSettings
 from modules.pose.smooth.PoseSmoothAngles import PoseSmoothAngles, PoseSmoothAngleSettings
-from modules.pose.smooth.PoseSmoothHead import PoseSmoothHead
+from modules.pose.smooth.PoseSmoothHead import PoseSmoothHead, PoseSmoothHeadSettings
 from modules.utils.OneEuroInterpolation import OneEuroSettings
 from modules.utils.PointsAndRects import Rect
 
@@ -15,10 +15,26 @@ class PoseSmoothData:
     Manages multiple PoseSmoothRect and PoseSmoothAngles instances for different poses.
     Uses tracklet IDs as keys to track different poses.
     """
-    def __init__(self, num_players: int, rect_settings: PoseSmoothRectSettings, angle_settings: PoseSmoothAngleSettings) -> None:
+    def __init__(self, num_players: int) -> None:
         self._num_players: int = num_players
-        self.angle_settings: PoseSmoothAngleSettings = angle_settings
-        self.rect_settings: PoseSmoothRectSettings = rect_settings
+
+        self.OneEuro_settings: OneEuroSettings = OneEuroSettings(25, 1.0, 0.1)
+        self.rect_settings: PoseSmoothRectSettings = PoseSmoothRectSettings(
+            smooth_settings=self.OneEuro_settings,
+            center_dest_x=0.5,
+            centre_dest_y=0.2,
+            height_dest=0.95,
+            src_aspectratio=16/9,
+            dst_aspectratio=9/16
+        )
+        self.angle_settings: PoseSmoothAngleSettings = PoseSmoothAngleSettings(
+            smooth_settings=self.OneEuro_settings,
+            motion_threshold=0.002
+        )
+        self.head_settings: PoseSmoothHeadSettings = PoseSmoothHeadSettings(
+            smooth_settings=self.OneEuro_settings,
+            motion_threshold=0.002
+        )
 
         # Dictionaries to store smoothers for each tracklet ID
         self._rect_smoothers: dict[int, PoseSmoothRect] = {}
@@ -28,7 +44,7 @@ class PoseSmoothData:
         for i in range(num_players):
             self._rect_smoothers[i] = PoseSmoothRect(self.rect_settings)
             self._angle_smoothers[i] = PoseSmoothAngles(self.angle_settings)
-            self._head_smoothers[i] = PoseSmoothHead(self.angle_settings)
+            self._head_smoothers[i] = PoseSmoothHead(self.head_settings)
 
         # Lock to ensure thread safety
         self._lock = Lock()

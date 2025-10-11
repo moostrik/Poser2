@@ -72,6 +72,12 @@ class LF(BaseRender):
         if self.cam_id != 0:
             return
 
+        self.smooth_data.OneEuro_settings.min_cutoff = 0.2
+        self.smooth_data.OneEuro_settings.beta = 0.2
+
+        self.smooth_data.rect_settings.centre_dest_y = 0.25
+        self.smooth_data.rect_settings.height_dest = 0.8
+
         P: LineFieldsSettings = LineFieldsSettings()
         P.line_sharpness = 4
         P.line_speed = 0.2

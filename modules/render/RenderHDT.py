@@ -40,21 +40,7 @@ class RenderHDT(RenderBase):
         self.num_R_streams: int =   settings.render_R_num
         self.ws_width: int =        settings.light_resolution
 
-        self.OneEuroSettings: OneEuroSettings = OneEuroSettings(25, 1.0, 0.1)
-        self.PoseSmoothRectSettings: PoseSmoothRectSettings = PoseSmoothRectSettings(
-            smooth_settings=self.OneEuroSettings,
-            center_dest_x=0.5,
-            centre_dest_y=0.2,
-            height_dest=0.95,
-            src_aspectratio=16/9,
-            dst_aspectratio=9/16
-        )
-        self.PoseSmoothAngleSettings: PoseSmoothAngleSettings = PoseSmoothAngleSettings(
-            smooth_settings=self.OneEuroSettings,
-            motion_threshold=0.1
-        )
-
-        self.smooth_data: PoseSmoothData = PoseSmoothData(self.num_players, self.PoseSmoothRectSettings, self.PoseSmoothAngleSettings)
+        self.smooth_data: PoseSmoothData = PoseSmoothData(self.num_players)
         self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.81", 8000, 60.0)
 
         self.data: DataManager =    DataManager(self.smooth_data)
@@ -166,12 +152,6 @@ class RenderHDT(RenderBase):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        self.OneEuroSettings.min_cutoff = 0.2
-        self.OneEuroSettings.beta = 0.2
-
-        self.PoseSmoothRectSettings.centre_dest_y = 0.25
-        self.PoseSmoothRectSettings.height_dest = 0.8
-
         self.smooth_data.update()
         self.pose_meshes.update()
 
@@ -205,6 +185,7 @@ class RenderHDT(RenderBase):
             # ADDITIVE
             glBlendFunc(GL_ONE, GL_ONE)
             self.centre_cam_renders[i].draw(self.subdivision.get_rect(CamOverlayRender.key(), i))
+            self.centre_pose_renders[i].draw(self.subdivision.get_rect(CamOverlayRender.key(), i))
             self.overlay_renders[i].draw(self.subdivision.get_rect(CamOverlayRender.key(), i))
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 

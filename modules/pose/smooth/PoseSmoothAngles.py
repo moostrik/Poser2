@@ -1,5 +1,5 @@
 import numpy as np
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
@@ -9,11 +9,22 @@ from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSet
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+POSE_ANGLE_MOTION_WEIGHTS: dict[PoseJoint, float] = {
+    PoseJoint.left_elbow:       0.5,
+    PoseJoint.right_elbow:      0.5,
+    PoseJoint.left_shoulder:    0.6,
+    PoseJoint.right_shoulder:   0.6,
+    PoseJoint.left_hip:         0.8,
+    PoseJoint.right_hip:        0.8,
+    PoseJoint.left_knee:        1.2,
+    PoseJoint.right_knee:       1.2
+}
 
 @dataclass
 class PoseSmoothAngleSettings:
     smooth_settings: OneEuroSettings
     motion_threshold: float = 0.002
+    motion_weights: dict[PoseJoint, float] = field(default_factory=lambda: POSE_ANGLE_MOTION_WEIGHTS)
 
 # CLASSES
 class PoseSmoothAngles():
@@ -81,6 +92,7 @@ class PoseSmoothAngles():
             movement: float = abs(delta) if delta is not None else 0.0
             if movement < self.settings.motion_threshold:
                 movement = 0.0
+            movement *= self.settings.motion_weights.get(joint, 1.0)
             self._cumulative_joint_motion[joint] += movement
             total_movement += movement
         self._cumulative_total_motion += total_movement
