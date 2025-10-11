@@ -33,7 +33,7 @@ class CentrePoseRender(BaseRender):
 
         self.pose_meshes: PoseMeshes = pose_meshes
         self.last_pose_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
-        
+
         text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -64,7 +64,7 @@ class CentrePoseRender(BaseRender):
         if not self.is_active:
             return
 
-        smooth_pose_rect: Rect | None = self.smooth_data.get_smoothed_rect(key)
+        smooth_pose_rect: Rect | None = self.smooth_data.get_rect(key)
         if smooth_pose_rect is None:
             return
 

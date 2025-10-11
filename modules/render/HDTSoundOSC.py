@@ -50,7 +50,7 @@ class HDTSoundOSC:
     def _send_loop(self) -> None:
         """Main loop for sending OSC data at regular intervals"""
         while self.running:
-            start_time = time.time()
+            start_time: float = time.time()
 
             # Make a copy of the active tracklet IDs to avoid locks during iteration
             self._send_data()
@@ -82,8 +82,8 @@ class HDTSoundOSC:
         active_msg = OscMessageBuilder(address=f"/pose/{id}/active")
         active_msg.add_arg(1)
         bundle_builder.add_content(active_msg.build()) # type: ignore
-        
-        motion = self.smooth_data.get_angular_motion(id)
+
+        motion: float = self.smooth_data.get_angular_motion(id)
         if motion is not None:
             change_msg = OscMessageBuilder(address=f"/pose/{id}/motion")
             change_msg.add_arg(float(motion))
@@ -91,7 +91,7 @@ class HDTSoundOSC:
 
         # Smoothed angles for key joints
         for joint in POSE_ANGLE_JOINTS:
-            angle: float | None = self.smooth_data.get_smoothed_angle(id, joint, symmetric=True)
+            angle: float | None = self.smooth_data.get_angle(id, joint)
             if angle is not None:
                 angle_msg = OscMessageBuilder(address=f"/pose/{id}/angle/{joint.name}")
                 angle_msg.add_arg(float(angle))

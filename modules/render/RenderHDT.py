@@ -160,14 +160,14 @@ class RenderHDT(RenderBase):
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        
+
         self.OneEuroSettings.min_cutoff = 0.2
         self.OneEuroSettings.beta = 0.2
 
         self.PoseSmoothRectSettings.nose_dest_y = 0.25
         self.PoseSmoothRectSettings.height_dest = 0.8
 
-
+        self.smooth_data.update()
         self.pose_meshes.update()
 
         self.r_stream_render.update()
@@ -183,11 +183,11 @@ class RenderHDT(RenderBase):
         self.draw_composition(width, height)
 
     def draw_composition(self, width:int, height: int) -> None:
-        
+
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        
+
         self.setView(width, height)
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
@@ -204,12 +204,12 @@ class RenderHDT(RenderBase):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        
+
 
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        
+
         self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
 
@@ -226,7 +226,7 @@ class RenderHDT(RenderBase):
         self.line_field_renders[camera_id].draw(Rect(0, 0, width, height))
         # self.overlay_renders[camera_id].draw(Rect(0, 0, width, height))
         # self.movement_cam_renders[camera_id].draw(Rect(0, 0, width, height))
-        
+
         # self.camera_renders[camera_id].draw(Rect(0, 0, width, height))
 
     def on_main_window_resize(self, width: int, height: int) -> None:

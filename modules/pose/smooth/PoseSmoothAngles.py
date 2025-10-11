@@ -1,9 +1,5 @@
 import numpy as np
 
-from enum import Enum, auto
-from threading import Lock
-
-
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.PoseAngles import POSE_ANGLE_JOINTS, POSE_ANGLE_JOINT_IDXS
@@ -13,173 +9,100 @@ from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSet
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # DEFINITIONS
-CUMULATIVE_CHANGE_JOINTS = [
+CUMULATIVE_CHANGE_JOINTS: list[PoseJoint] = [
     PoseJoint.left_elbow,
     PoseJoint.right_elbow,
     PoseJoint.left_shoulder,
     PoseJoint.right_shoulder
 ]
 
-
-class SymmetricJointType(Enum):
-    elbow = auto()
-    hip = auto()
-    knee = auto()
-    shoulder = auto()
-
-SYMMETRIC_JOINT_PAIRS: dict[SymmetricJointType, tuple[PoseJoint, PoseJoint]] = {
-    SymmetricJointType.shoulder: (PoseJoint.left_shoulder, PoseJoint.right_shoulder),
-    SymmetricJointType.elbow: (PoseJoint.left_elbow, PoseJoint.right_elbow),
-    SymmetricJointType.hip: (PoseJoint.left_hip, PoseJoint.right_hip),
-    SymmetricJointType.knee: (PoseJoint.left_knee, PoseJoint.right_knee)
-}
-
-SYMMETRIC_JOINT_TYPE_MAP: dict[PoseJoint, SymmetricJointType] = {}
-for joint_type, (left_joint, right_joint) in SYMMETRIC_JOINT_PAIRS.items():
-    SYMMETRIC_JOINT_TYPE_MAP[left_joint] = joint_type
-    SYMMETRIC_JOINT_TYPE_MAP[right_joint] = joint_type
-
 # CLASSES
 class PoseSmoothAngles():
     def __init__(self, one_euro_settings: OneEuroSettings) -> None:
-        self.angle_smoothers: dict[PoseJoint, AngleEuroInterpolator] = {}
-        self.last_values: dict[PoseJoint, float | None] = {}
+        self._active: bool = False
+        self._angle_smoothers: dict[PoseJoint, AngleEuroInterpolator] = {}
+        self._motion_times: dict[PoseJoint, float] = {}
+        self._total_motion_time: float = 0.0
         for joint in POSE_ANGLE_JOINTS:
-            self.angle_smoothers[joint] = AngleEuroInterpolator(one_euro_settings)
-            self.last_values[joint] = None
+            self._angle_smoothers[joint] = AngleEuroInterpolator(one_euro_settings)
+            self._motion_times[joint] = 0.0
 
-        self.active: bool = False
-        # self._lock = Lock()
+        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+    @property
+    def is_active(self) -> bool:
+        return self._active
 
-    def reset(self) -> None:
-        # with self._lock:
-        for smoother in self.angle_smoothers.values():
-            smoother.reset()
+    @property
+    def angles(self) -> dict[PoseJoint, float]:
+        return {joint: self.get_angle(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
+
+    @property
+    def deltas(self) -> dict[PoseJoint, float]:
+        return {joint: self.get_delta(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
+
+    @property
+    def motions(self) -> dict[PoseJoint, float]:
+        return self._motion_times
+
+    @property
+    def total_motion(self) -> float:
+        return self._total_motion_time
 
     def add_pose(self, pose: Pose) -> None:
-        # with self._lock:
         if pose.tracklet.is_removed:
-            self.active = False
+            self._active = False
             self.reset()
             return
 
-        if pose.tracklet.is_active and not self.active:
-            self.active = True
+        if pose.tracklet.is_active and not self._active:
+            self._active = True
             self.reset()
 
-        if not self.active:
+        if not self._active:
             return
 
         # Always add data, OneEuroInterpolator will handle missing data
         if pose.angle_data is None:
             for joint in POSE_ANGLE_JOINTS:
-                self.angle_smoothers[joint].add_sample(np.nan)
+                self._angle_smoothers[joint].add_sample(np.nan)
         else:
             for joint in POSE_ANGLE_JOINTS:
-                self.angle_smoothers[joint].add_sample(pose.angle_data.angles[POSE_ANGLE_JOINT_IDXS[joint]])
+                self._angle_smoothers[joint].add_sample(pose.angle_data.angles[POSE_ANGLE_JOINT_IDXS[joint]])
 
-    def get_smoothed_angle(self, joint: PoseJoint, symmetric: bool = False) -> float | None:
-        # with self._lock:
-        if not self.active:
-            return None
+    def update(self) -> None:
+        if not self._active:
+            return
 
-        if joint not in self.angle_smoothers:
-            print(f"Warning: Joint {joint} not in angle smoothers.")
-            return None
+        total_movement: float = 0.0
+        for joint in POSE_ANGLE_JOINTS:
+            self._angle_smoothers[joint].update()
+            delta: float | None = self._angle_smoothers[joint]._smooth_delta
+            movement: float = abs(delta) if delta is not None else 0.0
+            self._motion_times[joint] += movement
+            if joint in CUMULATIVE_CHANGE_JOINTS:
+                total_movement += movement
+        self._total_motion_time += total_movement / len(CUMULATIVE_CHANGE_JOINTS)
 
-        angle: float | None = self.angle_smoothers[joint].get()
+    def reset(self) -> None:
+        for smoother in self._angle_smoothers.values():
+            smoother.reset()
+        for motion_time in self._motion_times:
+            self._motion_times[motion_time] = 0.0
+        self._total_motion_time = 0.0
 
-        if not symmetric or angle is None:
-            return angle
-
-        if joint in SYMMETRIC_JOINT_TYPE_MAP:
-            joint_type: SymmetricJointType = SYMMETRIC_JOINT_TYPE_MAP[joint]
-            left_joint, right_joint = SYMMETRIC_JOINT_PAIRS[joint_type]
-
-            # Invert angle for right joints to maintain symmetry
-            if joint == right_joint:
-                return -angle
-
+    def get_angle(self, joint: PoseJoint, symmetric: bool = True) -> float:
+        angle: float | None = self._angle_smoothers[joint].smooth_value
+        if angle is None:
+            return 0.0
+        if symmetric and "right_" in joint.name and angle is not None:
+           angle = -angle
         return angle
 
-    # CUMULATIVE CHANGE METHODS
-    def get_smoothed_angle_motion(self, joint: PoseJoint) -> float:
-        """
-        Get cumulative angle change for specified joints.
-        returns change in radians
-        """
-        if not self.active:
+    def get_delta(self, joint: PoseJoint, symmetric: bool = True) -> float:
+        delta: float | None = self._angle_smoothers[joint].smooth_delta
+        if delta is None:
             return 0.0
-
-        if joint not in self.last_values:
-            print(f"Warning: Joint {joint} not in last values.")
-            return 0.0
-
-        current_value = self.angle_smoothers[joint].get()
-        last_value = self.last_values[joint]
-
-        if last_value is None:
-            self.last_values[joint] = current_value
-            return 0.0
-    
-        motion = abs(np.mod(current_value - last_value + np.pi, 2 * np.pi) - np.pi)
-        
-        self.last_values[joint] = current_value
-        
-        return motion
-        
-    
-    def get_smoothed_angle_motion_average(self) -> float:        
-        """Get total cumulative angle change across all tracked joints."""
-        if not self.active:
-            return 0.0
-
-        total_change: float = 0.0
-        for joint in CUMULATIVE_CHANGE_JOINTS:
-            total_change += self.get_smoothed_angle_motion(joint)
-        avg_change = total_change / len(CUMULATIVE_CHANGE_JOINTS)  # Average change across joints
-
-        avg_change /= np.pi  # Normalize by pi to get a value between 0 and 1
-        return avg_change
-
-    # SYMMETRY METHODS
-    def get_joint_symmetry(self, joint_type: SymmetricJointType) -> float | None:
-        """Get symmetry value based on left and right angles for a specific joint type."""
-        if not self.active:
-            return None
-
-        left_joint, right_joint = SYMMETRIC_JOINT_PAIRS[joint_type]
-
-        # Get the symmetrized angles for both left and right joints
-        left_angle: float | None = self.get_smoothed_angle(left_joint, symmetric=True)
-        right_angle: float | None = self.get_smoothed_angle(right_joint, symmetric=True)
-
-        # Calculate symmetry if both angles are available
-        if left_angle is not None and right_angle is not None:
-            # Symmetry is highest when difference is smallest
-            # Normalize by pi (assuming angles are in radians)
-            symmetry: float = 1.0 - abs(left_angle - right_angle) / np.pi
-            return symmetry
-
-        return None
-
-    def get_average_symmetry(self) -> float | None:
-        """Get average symmetry value across all symmetric joint pairs."""
-        if not self.active:
-            return None
-
-        symmetry_values: list[float] = []
-
-        # Use SYMMETRIC_JOINT_PAIRS to iterate through all joint types
-        for joint_type in SYMMETRIC_JOINT_PAIRS.keys():
-            joint_symmetry: float | None = self.get_joint_symmetry(joint_type)
-            if joint_symmetry is not None:
-                symmetry_values.append(joint_symmetry)
-
-        # Return average if we have values, otherwise None
-        if not symmetry_values:
-            return None
-
-        return sum(symmetry_values) / len(symmetry_values)
+        if symmetric and "right_" in joint.name and delta is not None:
+           delta = -delta
+        return delta

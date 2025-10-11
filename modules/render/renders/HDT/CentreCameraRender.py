@@ -33,7 +33,7 @@ class CentreCameraRender(BaseRender):
         self.is_active: bool = False
 
         self.last_pose_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
-        
+
         text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -69,7 +69,7 @@ class CentreCameraRender(BaseRender):
             self.cam_image.set_image(cam_image_np)
             self.cam_image.update()
 
-        smooth_pose_rect: Rect | None = self.smooth_data.get_smoothed_rect(key)
+        smooth_pose_rect: Rect | None = self.smooth_data.get_rect(key)
         if smooth_pose_rect is None:
             return
 

@@ -1,6 +1,4 @@
-import numpy as np
 from threading import Lock
-from typing import Dict, Optional
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
@@ -22,8 +20,8 @@ class PoseSmoothData:
         self.rect_settings: PoseSmoothRectSettings = rect_settings
 
         # Dictionaries to store smoothers for each tracklet ID
-        self.rect_smoothers: Dict[int, PoseSmoothRect] = {}
-        self.angle_smoothers: Dict[int, PoseSmoothAngles] = {}
+        self.rect_smoothers: dict[int, PoseSmoothRect] = {}
+        self.angle_smoothers: dict[int, PoseSmoothAngles] = {}
 
         for i in range(num_players):
             self.rect_smoothers[i] = PoseSmoothRect(self.rect_settings)
@@ -32,65 +30,62 @@ class PoseSmoothData:
         # Lock to ensure thread safety
         self._lock = Lock()
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def add_pose(self, pose: Pose) -> None:
-        """
-        Add a new pose data point for processing.
-        Creates new smoothers if this is a new tracklet ID.
-        """
+        """ Add a new pose data point for processing."""
         with self._lock:
             tracklet_id: int = pose.tracklet.id
-
             self.rect_smoothers[tracklet_id].add_pose(pose)
             self.angle_smoothers[tracklet_id].add_pose(pose)
+
+    def update(self) -> None:
+        """Update all active smoothers."""
+        with self._lock:
+            for smoother in self.rect_smoothers.values():
+                smoother.update()
+            for smoother in self.angle_smoothers.values():
+                smoother.update()
 
     def get_active_ids(self) -> list[int]:
         """Get a list of currently active tracklet IDs."""
         with self._lock:
-            return [tracklet_id for tracklet_id, smoother in self.rect_smoothers.items() if smoother.active]
+            return [tracklet_id for tracklet_id, smoother in self.rect_smoothers.items() if smoother.is_active]
 
     def get_is_active(self, tracklet_id: int) -> bool:
         """Check if the smoother for the specified tracklet ID is active."""
         with self._lock:
-            if tracklet_id in self.rect_smoothers:
-                return self.rect_smoothers[tracklet_id].active
-            return False
+            return self.rect_smoothers[tracklet_id].is_active
 
-    def get_smoothed_rect(self, tracklet_id: int) -> Optional[Rect]:
+    def get_rect(self, tracklet_id: int) -> Rect:
         """Get smoothed rectangle for the specified tracklet ID."""
         with self._lock:
-            if tracklet_id in self.rect_smoothers:
-                return self.rect_smoothers[tracklet_id].get()
-            return None
+            return self.rect_smoothers[tracklet_id].smoothed_rect
 
-    def get_smoothed_angle(self, tracklet_id: int, joint: PoseJoint, symmetric: bool = False) -> Optional[float]:
+    def get_angles(self, tracklet_id: int) -> dict[PoseJoint, float]:
+        """Get smoothed angles for all joints for the specified tracklet ID."""
+        with self._lock:
+            return self.angle_smoothers[tracklet_id].angles
+
+    def get_angle(self, tracklet_id: int, joint: PoseJoint) -> float:
         """Get smoothed angle for the specified tracklet ID and joint."""
         with self._lock:
-            if tracklet_id in self.angle_smoothers:
-                return self.angle_smoothers[tracklet_id].get_smoothed_angle(joint, symmetric)
-            return None
+            return self.angle_smoothers[tracklet_id].get_angle(joint, symmetric=True)
 
-    def get_angular_motion(self, tracklet_id: int) -> Optional[float]:
+    def get_deltas(self, tracklet_id: int) -> dict[PoseJoint, float]:
+        """Get smoothed angle changes for all joints for the specified tracklet ID."""
+        with self._lock:
+            return self.angle_smoothers[tracklet_id].deltas
+
+    def get_delta(self, tracklet_id: int, joint: PoseJoint) -> float:
+        """Get smoothed angle for the specified tracklet ID and joint."""
+        with self._lock:
+            return self.angle_smoothers[tracklet_id].get_delta(joint, symmetric=True)
+
+    def get_angular_motion(self, tracklet_id: int) -> float:
         """Get smoothed angle change for the specified tracklet ID and joint."""
         with self._lock:
-            if tracklet_id in self.angle_smoothers:
-                return self.angle_smoothers[tracklet_id].get_smoothed_angle_motion_average()
-            return None
-
-    def get_joint_symmetry(self, tracklet_id: int, joint_type) -> Optional[float]:
-        """Get joint symmetry for the specified tracklet ID and joint type."""
-        with self._lock:
-            if tracklet_id in self.angle_smoothers:
-                return self.angle_smoothers[tracklet_id].get_joint_symmetry(joint_type)
-            return None
-
-    def get_average_symmetry(self, tracklet_id: int) -> Optional[float]:
-        """Get average symmetry for the specified tracklet ID."""
-        with self._lock:
-            if tracklet_id in self.angle_smoothers:
-                return self.angle_smoothers[tracklet_id].get_average_symmetry()
-            return None
+            return self.angle_smoothers[tracklet_id].total_motion
 
     def reset(self) -> None:
         """Reset all smoothers for all tracklet IDs."""

@@ -1,15 +1,13 @@
 # Standard library imports
 import numpy as np
 from dataclasses import dataclass
-from threading import Lock
 
 # Local imports
-
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
 
 from modules.utils.PointsAndRects import Rect
-from modules.utils.OneEuroInterpolation import NormalizedEuroInterpolator, OneEuroInterpolator, OneEuroSettings
+from modules.utils.OneEuroInterpolation import OneEuroInterpolator, OneEuroSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -24,32 +22,38 @@ class PoseSmoothRectSettings:
 
 class PoseSmoothRect():
     def __init__(self, settings: PoseSmoothRectSettings) -> None:
-        self.settings: PoseSmoothRectSettings = settings
-        self.src_aspectratio: float = settings.src_aspectratio
-        self.dst_aspectratio: float = settings.dst_aspectratio
+        self._active: bool = False
+        self._settings: PoseSmoothRectSettings = settings
+        self._src_aspectratio: float = settings.src_aspectratio
+        self._dst_aspectratio: float = settings.dst_aspectratio
 
-        self.center_x_interpolator: OneEuroInterpolator = OneEuroInterpolator(self.settings.smooth_settings)
-        self.center_y_interpolator: OneEuroInterpolator = OneEuroInterpolator(self.settings.smooth_settings)
-        self.height_interpolator: OneEuroInterpolator = OneEuroInterpolator(self.settings.smooth_settings)
+        self._center_x_interpolator: OneEuroInterpolator = OneEuroInterpolator(self._settings.smooth_settings)
+        self._center_y_interpolator: OneEuroInterpolator = OneEuroInterpolator(self._settings.smooth_settings)
+        self._height_interpolator: OneEuroInterpolator = OneEuroInterpolator(self._settings.smooth_settings)
 
-        self.active: bool = False
-        # self._lock = Lock()
+        self._smoothed_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
+    @property
+    def is_active(self) -> bool:
+        return self._active
+
+    @property
+    def smoothed_rect(self) -> Rect:
+        return self._smoothed_rect
 
     def add_pose(self, pose: Pose) -> None:
-        # with self._lock:
         if pose.tracklet.is_removed:
-            self.active = False
+            self._active = False
             self.reset()
             return
 
-        if pose.tracklet.is_active and not self.active:
-            self.active = True
+        if pose.tracklet.is_active and not self._active:
+            self._active = True
             self.reset()
 
-        if not self.active:
+        if not self._active:
             return
 
         pose_rect: Rect | None = pose.crop_rect
@@ -62,33 +66,39 @@ class PoseSmoothRect():
 
         # Always add data, OneEuroInterpolator will handle missing data
         if pose_points is None or pose_height is None:
-            self.center_x_interpolator.add_sample(np.nan)
-            self.center_y_interpolator.add_sample(np.nan)
-            self.height_interpolator.add_sample(np.nan)
+            self._center_x_interpolator.add_sample(np.nan)
+            self._center_y_interpolator.add_sample(np.nan)
+            self._height_interpolator.add_sample(np.nan)
             return
 
         nose_x: float = pose_points[PoseJoint.nose.value][0] * pose_rect.width + pose_rect.x
         nose_y: float = pose_points[PoseJoint.nose.value][1] * pose_rect.height + pose_rect.y
         height: float = pose_height # * pose_rect.height -> this is already is based on height
 
-        self.center_x_interpolator.add_sample(nose_x)
-        self.center_y_interpolator.add_sample(nose_y)
-        self.height_interpolator.add_sample(height)
+        self._center_x_interpolator.add_sample(nose_x)
+        self._center_y_interpolator.add_sample(nose_y)
+        self._height_interpolator.add_sample(height)
 
-    def get(self) -> Rect | None:
-        # with self._lock:
-        nose_x: float | None = self.center_x_interpolator.get()
-        nose_y: float | None = self.center_y_interpolator.get()
-        height: float | None = self.height_interpolator.get()
+    def update(self) -> None:
+        if not self._active:
+            return
+
+        self._center_x_interpolator.update()
+        self._center_y_interpolator.update()
+        self._height_interpolator.update()
+
+        nose_x: float | None = self._center_x_interpolator._smooth_value
+        nose_y: float | None = self._center_y_interpolator._smooth_value
+        height: float | None = self._height_interpolator._smooth_value
 
         if nose_x is None or nose_y is None or height is None:
             return None
 
         # Apply height adjustment factor
-        height = height / self.settings.height_dest
+        height = height / self._settings.height_dest
 
         # Calculate base width for destination aspect ratio
-        base_width: float = height * self.settings.dst_aspectratio
+        base_width: float = height * self._settings.dst_aspectratio
 
         # # Apply aspect ratio correction
         # # When converting from src_ar to dst_ar, we need to adjust width
@@ -102,13 +112,13 @@ class PoseSmoothRect():
         corrected_width = base_width
 
         # Calculate position, adjusting for the corrected width
-        left: float = nose_x - corrected_width * self.settings.nose_dest_x
-        top: float = nose_y - height * self.settings.nose_dest_y
+        left: float = nose_x - corrected_width * self._settings.nose_dest_x
+        top: float = nose_y - height * self._settings.nose_dest_y
 
-        return Rect(left, top, corrected_width, height)
+        self._smoothed_rect = Rect(left, top, corrected_width, height)
 
     def reset(self) -> None:
-        # with self._lock:
-        self.center_x_interpolator.reset()
-        self.center_y_interpolator.reset()
-        self.height_interpolator.reset()
+        self._center_x_interpolator.reset()
+        self._center_y_interpolator.reset()
+        self._height_interpolator.reset()
+        self._smoothed_rect = Rect(0.0, 0.0, 1.0, 1.0)
