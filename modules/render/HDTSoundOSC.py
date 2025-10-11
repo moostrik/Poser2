@@ -83,17 +83,23 @@ class HDTSoundOSC:
         active_msg.add_arg(1)
         bundle_builder.add_content(active_msg.build()) # type: ignore
 
-        motion: float = self.smooth_data.get_angular_motion(id)
-        if motion is not None:
-            change_msg = OscMessageBuilder(address=f"/pose/{id}/motion")
-            change_msg.add_arg(float(motion))
-            bundle_builder.add_content(change_msg.build()) # type: ignore
+        motion: float = self.smooth_data.get_motion(id)
+        change_msg = OscMessageBuilder(address=f"/pose/{id}/time/motion")
+        change_msg.add_arg(float(motion))
+        bundle_builder.add_content(change_msg.build()) # type: ignore
 
-        # Smoothed angles for key joints
+        motion: float = self.smooth_data.get_age(id)
+        change_msg = OscMessageBuilder(address=f"/pose/{id}/time/age")
+        change_msg.add_arg(float(motion))
+        bundle_builder.add_content(change_msg.build()) # type: ignore
+
         for joint in POSE_ANGLE_JOINTS:
             angle: float | None = self.smooth_data.get_angle(id, joint)
-            if angle is not None:
-                angle_msg = OscMessageBuilder(address=f"/pose/{id}/angle/{joint.name}")
-                angle_msg.add_arg(float(angle))
-                bundle_builder.add_content(angle_msg.build()) # type: ignore
+            angle_msg = OscMessageBuilder(address=f"/pose/{id}/angle/{joint.name}")
+            angle_msg.add_arg(float(angle))
+            bundle_builder.add_content(angle_msg.build()) # type: ignore
 
+        head_orientation: float = self.smooth_data.get_head_orientation(id)
+        head_msg = OscMessageBuilder(address=f"/pose/{id}/angle/head")
+        head_msg.add_arg(float(head_orientation))
+        bundle_builder.add_content(head_msg.build()) # type: ignore

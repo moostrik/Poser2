@@ -8,7 +8,7 @@ from modules.utils.PointsAndRects import Rect
 from modules.pose.PosePoints import PosePointData
 from modules.pose.PoseVertices import PoseVertices, PoseVertexData
 from modules.pose.PoseAngles import PoseAngles, PoseAngleData
-from modules.pose.PoseHeadOrientation import PoseHeadOrientation, PoseHeadData
+from modules.pose.PoseHeadOrientation import PoseHead, PoseHeadData
 from modules.pose.PoseMeasurements import PoseMeasurements, PoseMeasurementData
 
 
@@ -41,7 +41,7 @@ class Pose:
     @property
     def head_data(self) -> Optional[PoseHeadData]:
         if self._head_data is None and self.point_data is not None:
-            object.__setattr__(self, '_head_data', PoseHeadOrientation.compute(self.point_data))
+            object.__setattr__(self, '_head_data', PoseHead.compute(self.point_data))
         return self._head_data
 
     @property

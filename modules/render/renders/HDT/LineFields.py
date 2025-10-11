@@ -7,6 +7,7 @@ from enum import Enum
 from time import time
 
 from OpenGL.GL import * # type: ignore
+from modules.pose.PoseHeadOrientation import PoseHeadData
 from modules.render.renders.BaseRender import BaseRender, Rect
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
@@ -124,10 +125,12 @@ class LF(BaseRender):
         left_shoulder: float =  self.smooth_data.get_angle(self.cam_id, PoseJoint.left_shoulder)
         rigt_elbow: float =     self.smooth_data.get_angle(self.cam_id, PoseJoint.right_elbow)
         rigt_shoulder: float =  self.smooth_data.get_angle(self.cam_id, PoseJoint.right_shoulder)
+        head: float =           self.smooth_data.get_head_orientation(self.cam_id)
+        motion: float =         self.smooth_data.get_motion(self.cam_id)
+        age: float =            self.smooth_data.get_age(self.cam_id)
+        print(f"motion={motion:.2f}, age={age:.2f}")
 
-        # print("LF:", self.cam_id, self.smooth_data.get_is_active(self.cam_id), left_elbow, left_shoulder, rigt_elbow, rigt_shoulder)
-
-        return
+        # return
         if not self.smooth_data.get_is_active(self.cam_id):
             left_elbow =    PI #np.sin(age) * PI
             left_shoulder = PI * 0.5

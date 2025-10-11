@@ -32,6 +32,7 @@ class PoseSmoothRect():
         self._height_interpolator: OneEuroInterpolator = OneEuroInterpolator(self._settings.smooth_settings)
 
         self._smoothed_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
+        self._age: float = 0.0
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -42,6 +43,10 @@ class PoseSmoothRect():
     @property
     def smoothed_rect(self) -> Rect:
         return self._smoothed_rect
+
+    @property
+    def age(self) -> float:
+        return self._age
 
     def add_pose(self, pose: Pose) -> None:
         if pose.tracklet.is_removed:
@@ -55,6 +60,8 @@ class PoseSmoothRect():
 
         if not self._active:
             return
+
+        self._age = pose.tracklet.age_in_seconds
 
         pose_rect: Rect | None = pose.crop_rect
         pose_points: np.ndarray | None = pose.point_data.points if pose.point_data is not None else None
@@ -122,3 +129,4 @@ class PoseSmoothRect():
         self._center_y_interpolator.reset()
         self._height_interpolator.reset()
         self._smoothed_rect = Rect(0.0, 0.0, 1.0, 1.0)
+        self._age = 0.0

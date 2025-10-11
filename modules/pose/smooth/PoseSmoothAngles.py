@@ -21,11 +21,11 @@ class PoseSmoothAngles():
     def __init__(self, one_euro_settings: OneEuroSettings) -> None:
         self._active: bool = False
         self._angle_smoothers: dict[PoseJoint, AngleEuroInterpolator] = {}
-        self._motion_times: dict[PoseJoint, float] = {}
-        self._total_motion_time: float = 0.0
+        self._cumulative_joint_motion: dict[PoseJoint, float] = {}
+        self._cumulative_total_motion: float = 0.0
         for joint in POSE_ANGLE_JOINTS:
             self._angle_smoothers[joint] = AngleEuroInterpolator(one_euro_settings)
-            self._motion_times[joint] = 0.0
+            self._cumulative_joint_motion[joint] = 0.0
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -43,11 +43,11 @@ class PoseSmoothAngles():
 
     @property
     def motions(self) -> dict[PoseJoint, float]:
-        return self._motion_times
+        return self._cumulative_joint_motion
 
     @property
     def total_motion(self) -> float:
-        return self._total_motion_time
+        return self._cumulative_total_motion
 
     def add_pose(self, pose: Pose) -> None:
         if pose.tracklet.is_removed:
@@ -79,17 +79,16 @@ class PoseSmoothAngles():
             self._angle_smoothers[joint].update()
             delta: float | None = self._angle_smoothers[joint]._smooth_delta
             movement: float = abs(delta) if delta is not None else 0.0
-            self._motion_times[joint] += movement
-            if joint in CUMULATIVE_CHANGE_JOINTS:
-                total_movement += movement
-        self._total_motion_time += total_movement / len(CUMULATIVE_CHANGE_JOINTS)
+            self._cumulative_joint_motion[joint] += movement
+            total_movement += movement
+        self._cumulative_total_motion += total_movement
 
     def reset(self) -> None:
         for smoother in self._angle_smoothers.values():
             smoother.reset()
-        for motion_time in self._motion_times:
-            self._motion_times[motion_time] = 0.0
-        self._total_motion_time = 0.0
+        for motion_time in self._cumulative_joint_motion:
+            self._cumulative_joint_motion[motion_time] = 0.0
+        self._cumulative_total_motion = 0.0
 
     def get_angle(self, joint: PoseJoint, symmetric: bool = True) -> float:
         angle: float | None = self._angle_smoothers[joint].smooth_value
