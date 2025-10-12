@@ -111,6 +111,10 @@ class LF(BaseLayer):
         self.pattern_time  += self.interval * left_speed * rigt_speed
         motion_time: float = motion * 0.1 + self.pattern_time
 
+
+        BaseLayer.setView(self.fbo.width, self.fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
         LF.line_shader.use(self.left_fbo.fbo_id,
                            time=motion_time,
                            phase=0.0,
