@@ -11,7 +11,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
-from modules.pose.smooth.PoseSmoothData import PoseSmoothData
+from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
 
 from modules.render.DataManager import DataManager
 from modules.render.renders.BaseRender import BaseRender, Rect
@@ -23,9 +23,9 @@ from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.gl.Mesh import Mesh
 
 class CentreCameraRender(BaseRender):
-    def __init__(self, data: DataManager, smooth_data: PoseSmoothData, cam_id: int) -> None:
+    def __init__(self, data: DataManager, smooth_data: PoseSmoothDataManager, cam_id: int) -> None:
         self.data: DataManager = data
-        self.smooth_data: PoseSmoothData = smooth_data
+        self.smooth_data: PoseSmoothDataManager = smooth_data
         self.cam_id: int = cam_id
         self.cam_fbo: Fbo = Fbo()
         self.cam_image: Image = Image()

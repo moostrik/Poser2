@@ -5,17 +5,14 @@ from enum import Enum
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.WindowManager import WindowManager
-from modules.gl.RenderBase import RenderBase
 from modules.gl.Fbo import Fbo, SwapFbo
-
+from modules.gl.RenderBase import RenderBase
+from modules.gl.WindowManager import WindowManager
 from modules.Settings import Settings
 
 from modules.render.DataManager import DataManager
 from modules.render.Subdivision import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.meshes.PoseMeshes import PoseMeshes
-from modules.render.meshes.AngleMeshes import AngleMeshes
-
 from modules.render.renders.HDT.CentreCameraRender import CentreCameraRender
 from modules.render.renders.HDT.CentrePoseRender import CentrePoseRender
 from modules.render.renders.HDT.CamOverlayRender import CamOverlayRender
@@ -25,7 +22,7 @@ from modules.render.renders.CameraRender import CameraRender
 from modules.render.renders.RStreamRender import RStreamRender
 from modules.render.renders.HDT.LineFields import LF
 
-from modules.pose.smooth.PoseSmoothData import PoseSmoothData, OneEuroSettings, PoseSmoothRectSettings, PoseSmoothAngleSettings
+from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
 
 from modules.render.HDTSoundOSC import HDTSoundOSC
 
@@ -40,7 +37,7 @@ class RenderHDT(RenderBase):
         self.num_R_streams: int =   settings.render_R_num
         self.ws_width: int =        settings.light_resolution
 
-        self.smooth_data: PoseSmoothData = PoseSmoothData(self.num_players)
+        self.smooth_data: PoseSmoothDataManager = PoseSmoothDataManager(self.num_players)
         self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.81", 8000, 60.0)
 
         self.data: DataManager =    DataManager(self.smooth_data)

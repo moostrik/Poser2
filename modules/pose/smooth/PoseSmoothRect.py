@@ -5,6 +5,7 @@ from dataclasses import dataclass
 # Local imports
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
+from modules.pose.smooth.PoseSmoothBase import PoseSmoothBase
 
 from modules.utils.PointsAndRects import Rect
 from modules.utils.OneEuroInterpolation import OneEuroInterpolator, OneEuroSettings
@@ -20,7 +21,7 @@ class PoseSmoothRectSettings:
     src_aspectratio: float = 16/9
     dst_aspectratio: float = 9/16
 
-class PoseSmoothRect():
+class PoseSmoothRect(PoseSmoothBase):
     def __init__(self, settings: PoseSmoothRectSettings) -> None:
         self._active: bool = False
         self._settings: PoseSmoothRectSettings = settings

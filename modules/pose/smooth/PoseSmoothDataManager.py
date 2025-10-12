@@ -1,7 +1,9 @@
 from threading import Lock
+from collections.abc import Mapping
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
+from modules.pose.smooth.PoseSmoothBase import PoseSmoothBase
 from modules.pose.smooth.PoseSmoothRect import PoseSmoothRect, PoseSmoothRectSettings
 from modules.pose.smooth.PoseSmoothAngles import PoseSmoothAngles, PoseSmoothAngleSettings
 from modules.pose.smooth.PoseSmoothHead import PoseSmoothHead, PoseSmoothHeadSettings
@@ -10,7 +12,7 @@ from modules.utils.PointsAndRects import Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PoseSmoothData:
+class PoseSmoothDataManager:
     """
     Manages multiple PoseSmoothRect and PoseSmoothAngles instances for different poses.
     Uses tracklet IDs as keys to track different poses.
@@ -45,6 +47,7 @@ class PoseSmoothData:
             self._rect_smoothers[i] = PoseSmoothRect(self.rect_settings)
             self._angle_smoothers[i] = PoseSmoothAngles(self.angle_settings)
             self._head_smoothers[i] = PoseSmoothHead(self.head_settings)
+        self._all_smoothers: list[Mapping[int, PoseSmoothBase]] = [self._rect_smoothers, self._angle_smoothers, self._head_smoothers]
 
         # Lock to ensure thread safety
         self._lock = Lock()
@@ -55,20 +58,24 @@ class PoseSmoothData:
         """ Add a new pose data point for processing."""
         with self._lock:
             tracklet_id: int = pose.tracklet.id
-            self._rect_smoothers[tracklet_id].add_pose(pose)
-            self._angle_smoothers[tracklet_id].add_pose(pose)
-            self._head_smoothers[tracklet_id].add_pose(pose)
+            for smoothers in self._all_smoothers:
+                smoothers[tracklet_id].add_pose(pose)
 
     def update(self) -> None:
         """Update all active smoothers."""
         with self._lock:
-            for smoother in self._rect_smoothers.values():
-                smoother.update()
-            for smoother in self._angle_smoothers.values():
-                smoother.update()
-            for smoother in self._head_smoothers.values():
-                smoother.update()
+            for smoothers in self._all_smoothers:
+                for smoother in smoothers.values():
+                    smoother.update()
 
+    def reset(self) -> None:
+        """Reset all smoothers for all tracklet IDs."""
+        with self._lock:
+            for smoothers in self._all_smoothers:
+                for smoother in smoothers.values():
+                    smoother.reset()
+
+    # ACCESSORS
     def get_active_ids(self) -> list[int]:
         """Get a list of currently active tracklet IDs."""
         with self._lock:
@@ -135,13 +142,3 @@ class PoseSmoothData:
         """Get the age in seconds since the tracklet was first detected."""
         with self._lock:
             return self._rect_smoothers[tracklet_id].age
-
-    def reset(self) -> None:
-        """Reset all smoothers for all tracklet IDs."""
-        with self._lock:
-            for smoother in self._rect_smoothers.values():
-                smoother.reset()
-            for smoother in self._angle_smoothers.values():
-                smoother.reset()
-            for smoother in self._head_smoothers.values():
-                smoother.reset()

@@ -10,7 +10,7 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameTyp
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 from modules.pose.PoseStream import PoseStreamData
-from modules.pose.smooth.PoseSmoothData import PoseSmoothData
+from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.WS.WSOutput import WSOutput
 from modules.Settings import Settings
@@ -25,9 +25,9 @@ class DataItem(Generic[T]):
 CorrelationStreamDict = Dict[int, Tuple[Tuple[int, int], np.ndarray]]
 
 class DataManager:
-    def __init__(self, PoseSmooth: PoseSmoothData | None = None) -> None:
+    def __init__(self, PoseSmooth: PoseSmoothDataManager | None = None) -> None:
         self.mutex: Lock = Lock()
-        self.pose_smooth_manager: PoseSmoothData | None = PoseSmooth
+        self.pose_smooth_manager: PoseSmoothDataManager | None = PoseSmooth
 
         # Data storage
         self.light_image: Dict[int, DataItem[WSOutput]] = {}

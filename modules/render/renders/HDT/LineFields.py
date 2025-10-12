@@ -1,22 +1,19 @@
 
 # Standard library imports
-import numpy as np
 import traceback
 from dataclasses import dataclass
-from enum import Enum
-from time import time
+import numpy as np
 
 # Third-party imports
 import pytweening
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import *  # type: ignore
 
 # Local imports
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
-from modules.pose.smooth.PoseSmoothData import PoseSmoothData, PoseJoint
+from modules.pose.smooth.PoseSmoothDataManager import PoseJoint, PoseSmoothDataManager
 from modules.render.renders.BaseRender import BaseRender, Rect
-
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 PI: float = np.pi
@@ -33,8 +30,8 @@ class LineFieldsSettings():
 class LF(BaseRender):
     line_shader = HDT_Lines()
 
-    def __init__(self, smooth_data: PoseSmoothData, cam_id: int) -> None:
-        self.smooth_data: PoseSmoothData = smooth_data
+    def __init__(self, smooth_data: PoseSmoothDataManager, cam_id: int) -> None:
+        self.smooth_data: PoseSmoothDataManager = smooth_data
         self.cam_id: int = cam_id
         self.fbo: Fbo = Fbo()
         self.left_fbo: Fbo = Fbo()

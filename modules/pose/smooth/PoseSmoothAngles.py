@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.PoseAngles import POSE_ANGLE_JOINTS, POSE_ANGLE_JOINT_IDXS
+from modules.pose.smooth.PoseSmoothBase import PoseSmoothBase
 
 from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSettings
 
@@ -27,7 +28,7 @@ class PoseSmoothAngleSettings:
     motion_weights: dict[PoseJoint, float] = field(default_factory=lambda: POSE_ANGLE_MOTION_WEIGHTS)
 
 # CLASSES
-class PoseSmoothAngles():
+class PoseSmoothAngles(PoseSmoothBase):
     def __init__(self, settings: PoseSmoothAngleSettings) -> None:
         self._active: bool = False
         self.settings: PoseSmoothAngleSettings = settings

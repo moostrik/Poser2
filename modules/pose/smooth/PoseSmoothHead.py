@@ -2,6 +2,7 @@ import numpy as np
 from dataclasses import dataclass
 
 from modules.pose.Pose import Pose
+from modules.pose.smooth.PoseSmoothBase import PoseSmoothBase
 from modules.pose.smooth.PoseSmoothAngles import PoseSmoothAngleSettings
 
 from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSettings
@@ -15,7 +16,7 @@ class PoseSmoothHeadSettings:
     motion_weight: float = 2.0 # based on PoseSmoothAngleSettings motion weights
 
 # CLASSES
-class PoseSmoothHead():
+class PoseSmoothHead(PoseSmoothBase):
     def __init__(self, settings: PoseSmoothHeadSettings) -> None:
         self._active: bool = False
         self.settings: PoseSmoothHeadSettings = settings
