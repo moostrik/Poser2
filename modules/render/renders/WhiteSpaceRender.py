@@ -11,12 +11,12 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.WS.WSOutput import WSOutput
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 
 from modules.gl.shaders.WS_Angles import WS_Angles
 from modules.gl.shaders.WS_Lines import WS_Lines
 
-class WhiteSpaceRender(BaseRender):
+class WhiteSpaceRender(BaseLayer):
     angles_shader = WS_Angles()
     lines_shader = WS_Lines()
 

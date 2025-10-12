@@ -7,9 +7,9 @@ import numpy as np
 from modules.gl.Mesh import Mesh
 from modules.pose.PoseStream import PoseStreamData
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 
-class AngleMeshes(BaseRender):
+class AngleMeshes(BaseLayer):
     def __init__(self, data: DataManager, amount: int) -> None:
         self.data: DataManager = data
         self.amount: int = amount

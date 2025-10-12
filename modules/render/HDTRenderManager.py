@@ -11,7 +11,7 @@ from modules.gl.WindowManager import WindowManager
 from modules.Settings import Settings
 
 from modules.render.DataManager import DataManager
-from modules.render.Subdivision import make_subdivision, SubdivisionRow, Subdivision
+from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.renders.HDT.CentreCameraRender import CentreCameraRender
 from modules.render.renders.HDT.CentrePoseRender import CentrePoseRender
@@ -29,7 +29,7 @@ from modules.render.HDTSoundOSC import HDTSoundOSC
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class RenderHDT(RenderBase):
+class HDTRenderManager(RenderBase):
     def __init__(self, settings: Settings) -> None:
 
         self.num_players: int =     settings.num_players

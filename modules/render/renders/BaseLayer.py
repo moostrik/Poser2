@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.utils.PointsAndRects import Rect
 
-class BaseRender(ABC):
+class BaseLayer(ABC):
     _key: str | None = None
 
     @classmethod

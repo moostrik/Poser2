@@ -15,13 +15,13 @@ from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 from modules.render.DataManager import DataManager
 from modules.pose.Pose import Pose
 from modules.render.meshes.PoseMeshes import PoseMeshes
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from modules.gl.shaders.Exposure import Exposure
 
-class OnePerCamTrackerRender(BaseRender):
+class OnePerCamTrackerRender(BaseLayer):
     exposure_shader = Exposure()
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
@@ -84,7 +84,7 @@ class OnePerCamTrackerRender(BaseRender):
         x: float = cam_image_roi.x + (cam_image_roi.width - width) / 2.0
 
 
-        BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
+        BaseLayer.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
         glColor4f(1.0, 01.0, 0.5, 0.1)
 
@@ -106,7 +106,7 @@ class OnePerCamTrackerRender(BaseRender):
 
 
     def clear_fbo(self) -> None:
-        BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
+        BaseLayer.setView(self.cam_fbo.width, self.cam_fbo.height)
 
         glColor4f(0.0, 0.0, 0.0, 0.05)
         self.exp_fbo.begin()

@@ -15,13 +15,13 @@ from modules.pose.Pose import Pose
 from modules.tracker.Tracklet import Tracklet
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CameraRender(BaseRender):
+class CameraRender(BaseLayer):
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
         self.pose_meshes: PoseMeshes = pose_meshes
@@ -52,7 +52,7 @@ class CameraRender(BaseRender):
         poses: list[Pose] = self.data.get_poses_for_cam(self.cam_id)
         meshes: dict[int, Mesh] = self.pose_meshes.meshes
 
-        BaseRender.setView(fbo.width, fbo.height)
+        BaseLayer.setView(fbo.width, fbo.height)
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         self.image.draw(0, 0, fbo.width, fbo.height)

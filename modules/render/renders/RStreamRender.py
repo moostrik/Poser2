@@ -11,12 +11,12 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 
 # Shaders
 from modules.gl.shaders.WS_RStream import WS_RStream
 
-class RStreamRender(BaseRender):
+class RStreamRender(BaseLayer):
     r_stream_shader = WS_RStream()
 
     def __init__(self, data: DataManager, num_streams: int) -> None:
@@ -52,7 +52,7 @@ class RStreamRender(BaseRender):
         self.image.set_image(image_np)
         self.image.update()
 
-        BaseRender.setView(self.fbo.width, self.fbo.height)
+        BaseLayer.setView(self.fbo.width, self.fbo.height)
         self.r_stream_shader.use(self.fbo.fbo_id, self.image.tex_id, self.image.width, self.image.height, 1.5 / self.fbo.height)
 
         step: float = self.fbo.height / self.num_streams

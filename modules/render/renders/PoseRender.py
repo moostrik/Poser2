@@ -16,7 +16,7 @@ from modules.pose.features.PoseAngles import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_N
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
@@ -25,7 +25,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # Shaders
 from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 
-class PoseRender(BaseRender):
+class PoseRender(BaseLayer):
     pose_stream_shader = WS_PoseStream()
 
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, angle_meshes: AngleMeshes, cam_id: int) -> None:
@@ -76,7 +76,7 @@ class PoseRender(BaseRender):
         if not PoseRender.pose_stream_shader.allocated:
             PoseRender.pose_stream_shader.allocate(monitor_file=False)
 
-        BaseRender.setView(self.fbo.width, self.fbo.height)
+        BaseLayer.setView(self.fbo.width, self.fbo.height)
         PoseRender.draw_pose(self.fbo, self.image, pose, pose_mesh, self.pose_stream_image, angle_mesh, PoseRender.pose_stream_shader)
         self.fbo.end()
 

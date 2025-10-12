@@ -11,11 +11,11 @@ from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PanoramicTrackerRender(BaseRender):
+class PanoramicTrackerRender(BaseLayer):
     def __init__(self, data: DataManager, num_cams: int) -> None:
         self.data: DataManager = data
         self.num_cams: int = num_cams
@@ -38,7 +38,7 @@ class PanoramicTrackerRender(BaseRender):
         if tracklets is None:
             return
         # print(f"PanoramicTrackerRender: Updating with {len(tracklets)} tracklets")
-        BaseRender.setView(self.fbo.width, self.fbo.height)
+        BaseLayer.setView(self.fbo.width, self.fbo.height)
         self.fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)

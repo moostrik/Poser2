@@ -11,11 +11,11 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.WS.WSOutput import WSOutput
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 
 from modules.gl.shaders.WS_Lines import WS_Lines
 
-class WSLinesRender(BaseRender):
+class WSLinesRender(BaseLayer):
     lines_shader = WS_Lines()
 
     def __init__(self, data: DataManager) -> None:

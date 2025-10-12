@@ -14,7 +14,7 @@ from modules.pose.PoseTypes import PoseJoint
 from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,7 +22,7 @@ from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.gl.Mesh import Mesh
 
-class CentreCameraRender(BaseRender):
+class CentreCameraRender(BaseLayer):
     def __init__(self, data: DataManager, smooth_data: PoseSmoothDataManager, cam_id: int) -> None:
         self.data: DataManager = data
         self.smooth_data: PoseSmoothDataManager = smooth_data
@@ -73,7 +73,7 @@ class CentreCameraRender(BaseRender):
         if smooth_pose_rect is None:
             return
 
-        BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
+        BaseLayer.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
         self.cam_image.draw_roi(0, 0, self.cam_fbo.width, self.cam_fbo.height,
                                 smooth_pose_rect.x, smooth_pose_rect.y, smooth_pose_rect.width, smooth_pose_rect.height)
@@ -81,7 +81,7 @@ class CentreCameraRender(BaseRender):
 
 
     def clear_render(self) -> None:
-        BaseRender.setView(self.cam_fbo.width, self.cam_fbo.height)
+        BaseLayer.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)

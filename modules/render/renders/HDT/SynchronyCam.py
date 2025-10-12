@@ -13,14 +13,14 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 
 from modules.gl.shaders.HD_Sync import HD_Sync
 from modules.gl.shaders.NoiseSimplex import NoiseSimplex
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class SynchronyCam(BaseRender):
+class SynchronyCam(BaseLayer):
 
     shader = HD_Sync()
     noise_shader = NoiseSimplex()
@@ -80,7 +80,7 @@ class SynchronyCam(BaseRender):
         other_fbo_1 = cam_fbos[other_keys[0]]
         other_fbo_2 = cam_fbos[other_keys[1]]
 
-        BaseRender.setView(self.fbo.width, self.fbo.height)
+        BaseLayer.setView(self.fbo.width, self.fbo.height)
 
         if not SynchronyCam.shader.allocated:
             SynchronyCam.shader.allocate(True)

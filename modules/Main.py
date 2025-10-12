@@ -12,8 +12,8 @@ from modules.correlation.PairCorrelationStream import PairCorrelationStreamManag
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseStream import PoseStreamManager
-from modules.render.RenderWhiteSpace import RenderWhiteSpace
-from modules.render.RenderHDT import RenderHDT
+from modules.render.WSRenderManager import WSRenderManager
+from modules.render.HDTRenderManager import HDTRenderManager
 from modules.Settings import Settings
 from modules.tracker.TrackerBase import TrackerType
 from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker
@@ -27,11 +27,11 @@ class Main():
         self.settings: Settings = settings
 
         self.WS: Optional[WSPipeline] = None
-        self.render = RenderWhiteSpace(settings)
+        self.render = WSRenderManager(settings)
         if settings.art_type == Settings.ArtType.WS:
             self.WS = WSPipeline(self.gui, settings)
         if settings.art_type == Settings.ArtType.HDT:
-            self.render = RenderHDT(settings)
+            self.render = HDTRenderManager(settings)
 
         self.cameras: list[DepthCam | DepthSimulator] = []
         self.recorder: Optional[Recorder] = None

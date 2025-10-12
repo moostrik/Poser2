@@ -13,14 +13,14 @@ from modules.pose.PoseStream import PoseStreamData
 from modules.tracker.Tracklet import Tracklet
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseRender import BaseRender, Rect
+from modules.render.renders.BaseLayer import BaseLayer, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from modules.gl.shaders.Exposure import Exposure
 from modules.gl.shaders.Contrast import Contrast
 
-class MovementCamRender(BaseRender):
+class MovementCamRender(BaseLayer):
     exposure_shader = Exposure()
     contrast_shader = Contrast()
 
@@ -94,7 +94,7 @@ class MovementCamRender(BaseRender):
 
 
 
-        BaseRender.setView(self.color_fbo.width, self.color_fbo.height)
+        BaseLayer.setView(self.color_fbo.width, self.color_fbo.height)
         self.color_fbo.begin()
         # glClearColor(0.0, 0.0, 0.0, 1.0)
         # glClear(GL_COLOR_BUFFER_BIT)
@@ -104,7 +104,7 @@ class MovementCamRender(BaseRender):
         self.color_fbo.end()
 
 
-        BaseRender.setView(self.exp_fbo.width, self.exp_fbo.height)
+        BaseLayer.setView(self.exp_fbo.width, self.exp_fbo.height)
 
         if not MovementCamRender.exposure_shader.allocated:
             MovementCamRender.exposure_shader.allocate()
@@ -130,7 +130,7 @@ class MovementCamRender(BaseRender):
         self.clear_fbo()
 
     def clear_fbo(self) -> None:
-        BaseRender.setView(self.exp_fbo.width, self.exp_fbo.height)
+        BaseLayer.setView(self.exp_fbo.width, self.exp_fbo.height)
 
         glColor4f(0.0, 0.0, 0.0, 0.05)
         self.exp_fbo.begin()
