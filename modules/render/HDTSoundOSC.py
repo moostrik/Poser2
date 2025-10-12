@@ -10,7 +10,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
-from modules.pose.PoseAngles import POSE_ANGLE_JOINTS
+from modules.pose.features.PoseAngles import POSE_ANGLE_JOINTS
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

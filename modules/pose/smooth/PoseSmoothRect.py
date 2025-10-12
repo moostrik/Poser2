@@ -18,15 +18,12 @@ class PoseSmoothRectSettings:
     center_dest_x: float = 0.5
     centre_dest_y: float = 0.2
     height_dest: float = 0.95
-    src_aspectratio: float = 16/9
     dst_aspectratio: float = 9/16
 
 class PoseSmoothRect(PoseSmoothBase):
     def __init__(self, settings: PoseSmoothRectSettings) -> None:
         self._active: bool = False
         self._settings: PoseSmoothRectSettings = settings
-        self._src_aspectratio: float = settings.src_aspectratio
-        self._dst_aspectratio: float = settings.dst_aspectratio
 
         self._center_x_interpolator: OneEuroInterpolator = OneEuroInterpolator(self._settings.smooth_settings)
         self._center_y_interpolator: OneEuroInterpolator = OneEuroInterpolator(self._settings.smooth_settings)
@@ -112,16 +109,7 @@ class PoseSmoothRect(PoseSmoothBase):
         # Calculate base width for destination aspect ratio
         base_width: float = height * self._settings.dst_aspectratio
 
-        # # Apply aspect ratio correction
-        # # When converting from src_ar to dst_ar, we need to adjust width
-        # # to maintain proper proportional representation
-        # aspect_ratio_correction: float = self.settings.src_aspectratio / self.settings.dst_aspectratio
-
-        # # Adjust width based on the relationship between source and destination aspect ratios
-        # # This ensures proper scaling when converting between different aspect ratios
-        # corrected_width: float = base_width * aspect_ratio_correction
-
-        corrected_width = base_width
+        corrected_width: float = base_width
 
         # Calculate position, adjusting for the corrected width
         left: float = nose_x - corrected_width * self._settings.center_dest_x

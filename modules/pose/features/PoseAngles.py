@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Optional, TYPE_CHECKING
 
 from modules.pose.PoseTypes import PoseJoint
-from modules.pose.PosePoints import PosePointData
+from modules.pose.features.PosePoints import PosePointData
 
 
 # DEFINITIONS

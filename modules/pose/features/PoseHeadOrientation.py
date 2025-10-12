@@ -4,7 +4,7 @@ from typing import Optional
 from enum import IntEnum
 
 from modules.pose.PoseTypes import PoseJoint
-from modules.pose.PosePoints import PosePointData
+from modules.pose.features.PosePoints import PosePointData
 
 
 class PoseHeadOrientation(IntEnum):

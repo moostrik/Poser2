@@ -1,3 +1,15 @@
+"""
+Manages multiple pose smoothing components for different poses and tracklets.
+Uses tracklet IDs as keys to track different poses.
+
+Key capabilities:
+1. Coordinates rect, angle, and head smoothing operations
+2. Provides thread-safe access to smoothed pose data
+3. Coordinates underlying smoothers that enable higher framerate output than input
+   through interpolation (queryable at higher rates than the input frequency)
+4. Note: Interpolation introduces a latency of approximately 1 input frame
+"""
+
 from threading import Lock
 from collections.abc import Mapping
 
@@ -13,10 +25,6 @@ from modules.utils.PointsAndRects import Rect
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 class PoseSmoothDataManager:
-    """
-    Manages multiple PoseSmoothRect and PoseSmoothAngles instances for different poses.
-    Uses tracklet IDs as keys to track different poses.
-    """
     def __init__(self, num_players: int) -> None:
         self._num_players: int = num_players
 
@@ -26,7 +34,6 @@ class PoseSmoothDataManager:
             center_dest_x=0.5,
             centre_dest_y=0.2,
             height_dest=0.95,
-            src_aspectratio=16/9,
             dst_aspectratio=9/16
         )
         self.angle_settings: PoseSmoothAngleSettings = PoseSmoothAngleSettings(
@@ -66,10 +73,11 @@ class PoseSmoothDataManager:
         with self._lock:
             for smoothers in self._all_smoothers:
                 for smoother in smoothers.values():
-                    smoother.update()
+                    if smoother.is_active:
+                        smoother.update()
 
     def reset(self) -> None:
-        """Reset all smoothers for all tracklet IDs."""
+        """Reset all smoothers."""
         with self._lock:
             for smoothers in self._all_smoothers:
                 for smoother in smoothers.values():

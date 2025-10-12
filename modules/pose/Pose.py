@@ -1,18 +1,19 @@
+# Standard library imports
 import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional, Callable
 
+# Local application imports
+from modules.pose.features.PosePoints import PosePointData
+from modules.pose.features.PoseVertices import PoseVertices, PoseVertexData
+from modules.pose.features.PoseAngles import PoseAngles, PoseAngleData
+from modules.pose.features.PoseHeadOrientation import PoseHead, PoseHeadData
+from modules.pose.features.PoseMeasurements import PoseMeasurements, PoseMeasurementData
+
 from modules.tracker.Tracklet import Tracklet
 from modules.utils.PointsAndRects import Rect
 
-from modules.pose.PosePoints import PosePointData
-from modules.pose.PoseVertices import PoseVertices, PoseVertexData
-from modules.pose.PoseAngles import PoseAngles, PoseAngleData
-from modules.pose.PoseHeadOrientation import PoseHead, PoseHeadData
-from modules.pose.PoseMeasurements import PoseMeasurements, PoseMeasurementData
 
-
-# THE POSE
 @dataclass (frozen=True)
 class Pose:
     # Set at first stage of pipeline
@@ -31,7 +32,7 @@ class Pose:
     _measurement_data: Optional[PoseMeasurementData] = field(init=False, default=None, repr=False)
     _vertex_data: Optional[PoseVertexData] = field(init=False, default=None, repr=False)
 
-    # LAZY PROPERTIES
+    # LAZY FEATURES
     @property
     def angle_data(self) -> Optional[PoseAngleData]:
         if self._angle_data is None:

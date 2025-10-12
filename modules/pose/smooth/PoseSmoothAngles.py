@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
-from modules.pose.PoseAngles import POSE_ANGLE_JOINTS, POSE_ANGLE_JOINT_IDXS
+from modules.pose.features.PoseAngles import POSE_ANGLE_JOINTS, POSE_ANGLE_JOINT_IDXS
 from modules.pose.smooth.PoseSmoothBase import PoseSmoothBase
 
 from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSettings

@@ -5,7 +5,7 @@ from typing import Optional, TYPE_CHECKING
 from modules.pose.PoseTypes import PoseJoint
 from modules.utils.PointsAndRects import Rect
 
-from modules.pose.PosePoints import PosePointData
+from modules.pose.features.PosePoints import PosePointData
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

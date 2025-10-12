@@ -12,7 +12,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
-from modules.pose.PoseAngles import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_NAMES
+from modules.pose.features.PoseAngles import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_NAMES
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager

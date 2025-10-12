@@ -15,7 +15,7 @@ from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 
 from modules.pose.PoseTypes import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
-from modules.pose.PoseAngles import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_NAMES
+from modules.pose.features.PoseAngles import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_NAMES
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager

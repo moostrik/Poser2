@@ -14,7 +14,7 @@ import numpy as np
 
 # Local application imports
 from modules.pose.Pose import Pose
-from modules.pose.PoseAngles import PoseAngleData, POSE_ANGLE_JOINT_NAMES
+from modules.pose.features.PoseAngles import PoseAngleData, POSE_ANGLE_JOINT_NAMES
 from modules.pose.PoseTypes import PoseJoint, POSE_NUM_JOINTS
 from modules.Settings import Settings
 

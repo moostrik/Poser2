@@ -2,8 +2,8 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import Optional
 
-from modules.pose.PosePoints import PosePointData
-from modules.pose.PoseAngles import PoseAngleData, POSE_ANGLE_JOINT_IDXS
+from modules.pose.features.PosePoints import PosePointData
+from modules.pose.features.PoseAngles import PoseAngleData, POSE_ANGLE_JOINT_IDXS
 from modules.pose.PoseTypes import PoseJoint, POSE_JOINT_COLORS
 from modules.pose.PoseTypes import POSE_COLOR_ALPHA_BASE, POSE_COLOR_LEFT_POSITIVE, POSE_COLOR_LEFT_NEGATIVE, POSE_COLOR_RIGHT_POSITIVE, POSE_COLOR_RIGHT_NEGATIVE
 
