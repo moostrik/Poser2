@@ -14,7 +14,7 @@ from modules.pose.PoseTypes import PoseJoint
 from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

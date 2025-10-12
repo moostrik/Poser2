@@ -19,7 +19,7 @@ from modules.pose.features.PoseAngles import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_N
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
@@ -28,7 +28,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # Shaders
 from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 
-class CamOverlayRender(BaseLayer):
+class PoseStreamLayer(BaseLayer):
     pose_stream_shader = WS_PoseStream()
 
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
@@ -43,13 +43,13 @@ class CamOverlayRender(BaseLayer):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
-        if not CamOverlayRender.pose_stream_shader.allocated:
-            CamOverlayRender.pose_stream_shader.allocate(monitor_file=True)
+        if not PoseStreamLayer.pose_stream_shader.allocated:
+            PoseStreamLayer.pose_stream_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
-        if CamOverlayRender.pose_stream_shader.allocated:
-            CamOverlayRender.pose_stream_shader.deallocate()
+        if PoseStreamLayer.pose_stream_shader.allocated:
+            PoseStreamLayer.pose_stream_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -67,11 +67,11 @@ class CamOverlayRender(BaseLayer):
             self.pose_stream_image.update()
 
         # shader gets reset on hot reload, so we need to check if it's allocated
-        if not CamOverlayRender.pose_stream_shader.allocated:
-            CamOverlayRender.pose_stream_shader.allocate(monitor_file=False)
+        if not PoseStreamLayer.pose_stream_shader.allocated:
+            PoseStreamLayer.pose_stream_shader.allocate(monitor_file=False)
 
         BaseLayer.setView(self.fbo.width, self.fbo.height)
-        CamOverlayRender.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, CamOverlayRender.pose_stream_shader)
+        PoseStreamLayer.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, PoseStreamLayer.pose_stream_shader)
         self.fbo.end()
 
     @staticmethod
@@ -86,7 +86,7 @@ class CamOverlayRender(BaseLayer):
         tracklet: Tracklet | None = pose.tracklet
         if tracklet is not None:
             draw_box: bool = tracklet.is_lost
-            CamOverlayRender.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
+            PoseStreamLayer.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
         fbo.end()
         shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, line_width=1.5 / fbo.height)
 

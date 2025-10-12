@@ -11,12 +11,12 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 
 # Shaders
 from modules.gl.shaders.WS_RStream import WS_RStream
 
-class RStreamRender(BaseLayer):
+class RStreamLayer(BaseLayer):
     r_stream_shader = WS_RStream()
 
     def __init__(self, data: DataManager, num_streams: int) -> None:
@@ -28,14 +28,14 @@ class RStreamRender(BaseLayer):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
-        if not RStreamRender.r_stream_shader.allocated:
-            RStreamRender.r_stream_shader.allocate(monitor_file=False)
+        if not RStreamLayer.r_stream_shader.allocated:
+            RStreamLayer.r_stream_shader.allocate(monitor_file=False)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
         self.image.deallocate()
-        if RStreamRender.r_stream_shader.allocated:
-            RStreamRender.r_stream_shader.deallocate()
+        if RStreamLayer.r_stream_shader.allocated:
+            RStreamLayer.r_stream_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)

@@ -1,5 +1,4 @@
 # Standard library imports
-from enum import Enum
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -13,14 +12,16 @@ from modules.Settings import Settings
 from modules.render.DataManager import DataManager
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.meshes.PoseMeshes import PoseMeshes
-from modules.render.renders.HDT.CentreCameraRender import CentreCameraRender
-from modules.render.renders.HDT.CentrePoseRender import CentrePoseRender
-from modules.render.renders.HDT.CamOverlayRender import CamOverlayRender
-from modules.render.renders.HDT.MovementCamRender import MovementCamRender
-from modules.render.renders.HDT.SynchronyCam import SynchronyCam
-from modules.render.renders.CameraRender import CameraRender
-from modules.render.renders.RStreamRender import RStreamRender
-from modules.render.renders.HDT.LineFields import LF
+
+from modules.render.layers.Generic.CameraLayer import CameraLayer
+from modules.render.layers.Generic.RStreamLayer import RStreamLayer
+from modules.render.layers.Generic.PoseStreamLayer import PoseStreamLayer
+from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
+from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
+from modules.render.layers.HDT.LineFieldsLayer import LF
+
+from modules.render.layers.Depricated.SynchronyCamLayer import SynchronyCamLayer
+from modules.render.layers.Depricated.MovementCamLayer import MovementCamLayer
 
 from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
 
@@ -46,33 +47,33 @@ class HDTRenderManager(RenderBase):
         self.pose_meshes =          PoseMeshes(self.data, self.num_players)
 
         # drawers
-        self.camera_renders:        dict[int, CameraRender] = {}
-        self.centre_cam_renders:    dict[int, CentreCameraRender] = {}
+        self.camera_renders:        dict[int, CameraLayer] = {}
+        self.centre_cam_renders:    dict[int, CentreCamLayer] = {}
         self.centre_pose_renders:   dict[int, CentrePoseRender] = {}
-        self.movement_cam_renders:  dict[int, MovementCamRender] = {}
+        self.movement_cam_renders:  dict[int, MovementCamLayer] = {}
         self.line_field_renders:    dict[int, LF] = {}
 
-        self.sync_renders:          dict[int, SynchronyCam] = {}
-        self.overlay_renders:       dict[int, CamOverlayRender] = {}
-        self.r_stream_render =      RStreamRender(self.data, self.num_R_streams)
+        self.sync_renders:          dict[int, SynchronyCamLayer] = {}
+        self.overlay_renders:       dict[int, PoseStreamLayer] = {}
+        self.r_stream_render =      RStreamLayer(self.data, self.num_R_streams)
 
         self.cam_fbos: list[Fbo] = []
 
         for i in range(self.num_cams):
-            self.camera_renders[i] = CameraRender(self.data, self.pose_meshes, i)
-            self.centre_cam_renders[i] = CentreCameraRender(self.data, self.smooth_data, i)
+            self.camera_renders[i] = CameraLayer(self.data, self.pose_meshes, i)
+            self.centre_cam_renders[i] = CentreCamLayer(self.data, self.smooth_data, i)
             self.centre_pose_renders[i] = CentrePoseRender(self.data, self.smooth_data, self.pose_meshes, i)
-            self.movement_cam_renders[i] = MovementCamRender(self.data, i)
+            self.movement_cam_renders[i] = MovementCamLayer(self.data, i)
             self.line_field_renders[i] = LF(self.smooth_data, i)
-            self.overlay_renders[i] = CamOverlayRender(self.data, self.pose_meshes, i)
-            self.sync_renders[i] = SynchronyCam(self.data, i)
+            self.overlay_renders[i] = PoseStreamLayer(self.data, self.pose_meshes, i)
+            self.sync_renders[i] = SynchronyCamLayer(self.data, i)
             self.cam_fbos.append(self.movement_cam_renders[i].get_fbo())
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name=CameraRender.key(),         columns=self.num_cams,      rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=CamOverlayRender.key(),     columns=self.num_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=RStreamRender.key(),        columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
+            SubdivisionRow(name=CameraLayer.key(),         columns=self.num_cams,      rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=PoseStreamLayer.key(),     columns=self.num_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=RStreamLayer.key(),        columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
@@ -114,13 +115,13 @@ class HDTRenderManager(RenderBase):
         self.sound_osc.start()
 
     def allocate_window_renders(self) -> None:
-        w, h = self.subdivision.get_allocation_size(RStreamRender.key())
+        w, h = self.subdivision.get_allocation_size(RStreamLayer.key())
         self.r_stream_render.allocate(w, h, GL_RGBA)
 
         for i in range(self.num_cams):
-            w, h = self.subdivision.get_allocation_size(CameraRender.key(), i)
+            w, h = self.subdivision.get_allocation_size(CameraLayer.key(), i)
             self.camera_renders[i].allocate(w , h, GL_RGBA)
-            w, h = self.subdivision.get_allocation_size(CamOverlayRender.key(), i)
+            w, h = self.subdivision.get_allocation_size(PoseStreamLayer.key(), i)
             self.overlay_renders[i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
@@ -175,15 +176,15 @@ class HDTRenderManager(RenderBase):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
-        self.r_stream_render.draw(self.subdivision.get_rect(RStreamRender.key()))
+        self.r_stream_render.draw(self.subdivision.get_rect(RStreamLayer.key()))
         for i in range(self.num_cams):
-            self.camera_renders[i].draw(self.subdivision.get_rect(CameraRender.key(), i))
+            self.camera_renders[i].draw(self.subdivision.get_rect(CameraLayer.key(), i))
 
             # ADDITIVE
             glBlendFunc(GL_ONE, GL_ONE)
-            self.centre_cam_renders[i].draw(self.subdivision.get_rect(CamOverlayRender.key(), i))
-            self.centre_pose_renders[i].draw(self.subdivision.get_rect(CamOverlayRender.key(), i))
-            self.overlay_renders[i].draw(self.subdivision.get_rect(CamOverlayRender.key(), i))
+            self.centre_cam_renders[i].draw(self.subdivision.get_rect(PoseStreamLayer.key(), i))
+            self.centre_pose_renders[i].draw(self.subdivision.get_rect(PoseStreamLayer.key(), i))
+            self.overlay_renders[i].draw(self.subdivision.get_rect(PoseStreamLayer.key(), i))
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:

@@ -14,7 +14,7 @@ from modules.pose.PoseTypes import PoseJoint
 from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,7 +22,7 @@ from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.gl.Mesh import Mesh
 
-class CentreCameraRender(BaseLayer):
+class CentreCamLayer(BaseLayer):
     def __init__(self, data: DataManager, smooth_data: PoseSmoothDataManager, cam_id: int) -> None:
         self.data: DataManager = data
         self.smooth_data: PoseSmoothDataManager = smooth_data

@@ -8,7 +8,7 @@ from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose, PoseVertexData
 from modules.pose.features.PoseVertices import POSE_VERTEX_INDICES
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 
 class PoseMeshes(BaseLayer):
     """Methods for updating meshes based on pose data."""

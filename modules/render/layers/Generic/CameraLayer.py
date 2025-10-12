@@ -15,13 +15,13 @@ from modules.pose.Pose import Pose
 from modules.tracker.Tracklet import Tracklet
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CameraRender(BaseLayer):
+class CameraLayer(BaseLayer):
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
         self.pose_meshes: PoseMeshes = pose_meshes
@@ -57,7 +57,7 @@ class CameraRender(BaseLayer):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         self.image.draw(0, 0, fbo.width, fbo.height)
         glLineWidth(3.0)
-        CameraRender.draw_camera_overlay(depth_tracklets, poses, meshes, 0, 0, fbo.width, fbo.height)
+        CameraLayer.draw_camera_overlay(depth_tracklets, poses, meshes, 0, 0, fbo.width, fbo.height)
         fbo.end()
 
     @staticmethod
@@ -75,10 +75,10 @@ class CameraRender(BaseLayer):
             roi_y: float = y + roi_y * height
             roi_w: float = roi_w * width
             roi_h: float = roi_h * height
-            CameraRender.draw_tracklet(tracklet, mesh, roi_x, roi_y, roi_w, roi_h)
+            CameraLayer.draw_tracklet(tracklet, mesh, roi_x, roi_y, roi_w, roi_h)
 
         for depth_tracklet in depth_tracklets:
-            CameraRender.draw_depth_tracklet(depth_tracklet, 0, 0, width, height)
+            CameraLayer.draw_depth_tracklet(depth_tracklet, 0, 0, width, height)
 
     @staticmethod
     def draw_depth_tracklet(tracklet: DepthTracklet, x: float, y: float, width: float, height: float) -> None:

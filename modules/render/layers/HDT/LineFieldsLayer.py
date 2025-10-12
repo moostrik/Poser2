@@ -13,7 +13,7 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
 from modules.pose.smooth.PoseSmoothDataManager import PoseJoint, PoseSmoothDataManager
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 PI: float = np.pi

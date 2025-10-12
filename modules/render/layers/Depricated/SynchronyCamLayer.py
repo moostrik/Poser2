@@ -13,14 +13,14 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 
 from modules.gl.shaders.HD_Sync import HD_Sync
 from modules.gl.shaders.NoiseSimplex import NoiseSimplex
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class SynchronyCam(BaseLayer):
+class SynchronyCamLayer(BaseLayer):
 
     shader = HD_Sync()
     noise_shader = NoiseSimplex()
@@ -39,18 +39,18 @@ class SynchronyCam(BaseLayer):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
         self.noise_fbo.allocate(width, height, internal_format)
-        if not SynchronyCam.shader.allocated:
-            SynchronyCam.shader.allocate(True)
-        if not SynchronyCam.noise_shader.allocated:
-            SynchronyCam.noise_shader.allocate(True)
+        if not SynchronyCamLayer.shader.allocated:
+            SynchronyCamLayer.shader.allocate(True)
+        if not SynchronyCamLayer.noise_shader.allocated:
+            SynchronyCamLayer.noise_shader.allocate(True)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
         self.noise_fbo.deallocate()
-        if SynchronyCam.shader.allocated:
-            SynchronyCam.shader.deallocate()
-        if SynchronyCam.noise_shader.allocated:
-            SynchronyCam.noise_shader.deallocate()
+        if SynchronyCamLayer.shader.allocated:
+            SynchronyCamLayer.shader.deallocate()
+        if SynchronyCamLayer.noise_shader.allocated:
+            SynchronyCamLayer.noise_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -82,10 +82,10 @@ class SynchronyCam(BaseLayer):
 
         BaseLayer.setView(self.fbo.width, self.fbo.height)
 
-        if not SynchronyCam.shader.allocated:
-            SynchronyCam.shader.allocate(True)
-        if not SynchronyCam.noise_shader.allocated:
-            SynchronyCam.noise_shader.allocate(True)
+        if not SynchronyCamLayer.shader.allocated:
+            SynchronyCamLayer.shader.allocate(True)
+        if not SynchronyCamLayer.noise_shader.allocated:
+            SynchronyCamLayer.noise_shader.allocate(True)
 
         # glColor4f(1.0, 1.0, 1.0, 1.0)
         # self.fbo.begin()
@@ -93,8 +93,8 @@ class SynchronyCam(BaseLayer):
         # glClear(GL_COLOR_BUFFER_BIT)
         # self.fbo.end()
 
-        SynchronyCam.noise_shader.use(self.noise_fbo.fbo_id, 40, 200, self.fbo.width, self.fbo.height)
-        SynchronyCam.shader.use(self.fbo.fbo_id, main_fbo.tex_id, other_fbo_1.tex_id, other_fbo_2.tex_id, self.noise_fbo.tex_id, score_1, score_2)
+        SynchronyCamLayer.noise_shader.use(self.noise_fbo.fbo_id, 40, 200, self.fbo.width, self.fbo.height)
+        SynchronyCamLayer.shader.use(self.fbo.fbo_id, main_fbo.tex_id, other_fbo_1.tex_id, other_fbo_2.tex_id, self.noise_fbo.tex_id, score_1, score_2)
 
 
 

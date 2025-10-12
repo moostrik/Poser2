@@ -11,11 +11,11 @@ from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PanoramicTrackerRender(BaseLayer):
+class TrackerPanoramicLayer(BaseLayer):
     def __init__(self, data: DataManager, num_cams: int) -> None:
         self.data: DataManager = data
         self.num_cams: int = num_cams

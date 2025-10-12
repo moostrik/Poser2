@@ -16,7 +16,7 @@ from modules.pose.features.PoseAngles import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_N
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
@@ -25,7 +25,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # Shaders
 from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 
-class PoseRender(BaseLayer):
+class PoseCamLayer(BaseLayer):
     pose_stream_shader = WS_PoseStream()
 
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, angle_meshes: AngleMeshes, cam_id: int) -> None:
@@ -42,14 +42,14 @@ class PoseRender(BaseLayer):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
-        if not PoseRender.pose_stream_shader.allocated:
-            PoseRender.pose_stream_shader.allocate(monitor_file=False)
+        if not PoseCamLayer.pose_stream_shader.allocated:
+            PoseCamLayer.pose_stream_shader.allocate(monitor_file=False)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
         self.image.deallocate()
-        if PoseRender.pose_stream_shader.allocated:
-            PoseRender.pose_stream_shader.deallocate()
+        if PoseCamLayer.pose_stream_shader.allocated:
+            PoseCamLayer.pose_stream_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -73,11 +73,11 @@ class PoseRender(BaseLayer):
         angle_mesh: Mesh = self.angle_meshes.meshes[pose.tracklet.id]
 
         # shader gets reset on hot reload, so we need to check if it's allocated
-        if not PoseRender.pose_stream_shader.allocated:
-            PoseRender.pose_stream_shader.allocate(monitor_file=False)
+        if not PoseCamLayer.pose_stream_shader.allocated:
+            PoseCamLayer.pose_stream_shader.allocate(monitor_file=False)
 
         BaseLayer.setView(self.fbo.width, self.fbo.height)
-        PoseRender.draw_pose(self.fbo, self.image, pose, pose_mesh, self.pose_stream_image, angle_mesh, PoseRender.pose_stream_shader)
+        PoseCamLayer.draw_pose(self.fbo, self.image, pose, pose_mesh, self.pose_stream_image, angle_mesh, PoseCamLayer.pose_stream_shader)
         self.fbo.end()
 
     @staticmethod
@@ -93,7 +93,7 @@ class PoseRender(BaseLayer):
         tracklet: Tracklet | None = pose.tracklet
         if tracklet is not None:
             draw_box: bool = tracklet.is_lost
-            PoseRender.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
+            PoseCamLayer.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
         if angle_mesh.isInitialized():
             angle_mesh.draw(0, 0, fbo.width, fbo.height)
         fbo.end()

@@ -15,13 +15,13 @@ from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 from modules.render.DataManager import DataManager
 from modules.pose.Pose import Pose
 from modules.render.meshes.PoseMeshes import PoseMeshes
-from modules.render.renders.BaseLayer import BaseLayer, Rect
+from modules.render.BaseGLForDataManager import BaseLayer, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from modules.gl.shaders.Exposure import Exposure
 
-class OnePerCamTrackerRender(BaseLayer):
+class TrackerOnePerCamLayer(BaseLayer):
     exposure_shader = Exposure()
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
@@ -36,14 +36,14 @@ class OnePerCamTrackerRender(BaseLayer):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.cam_fbo.allocate(width, height, internal_format)
         self.exp_fbo.allocate(width, height, internal_format)
-        if not OnePerCamTrackerRender.exposure_shader.allocated:
-            OnePerCamTrackerRender.exposure_shader.allocate()
+        if not TrackerOnePerCamLayer.exposure_shader.allocated:
+            TrackerOnePerCamLayer.exposure_shader.allocate()
 
     def deallocate(self) -> None:
         self.cam_fbo.deallocate()
         self.exp_fbo.deallocate()
-        if OnePerCamTrackerRender.exposure_shader.allocated:
-            OnePerCamTrackerRender.exposure_shader.deallocate()
+        if TrackerOnePerCamLayer.exposure_shader.allocated:
+            TrackerOnePerCamLayer.exposure_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self.exp_fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -95,9 +95,9 @@ class OnePerCamTrackerRender(BaseLayer):
         glColor4f(1.0, 1.0, 1.0, 1.0)
         self.cam_fbo.end()
 
-        if not OnePerCamTrackerRender.exposure_shader.allocated:
-            OnePerCamTrackerRender.exposure_shader.allocate()
-        OnePerCamTrackerRender.exposure_shader.use(self.exp_fbo.fbo_id, self.cam_fbo.tex_id, 1.5, 0.1, 0.2)
+        if not TrackerOnePerCamLayer.exposure_shader.allocated:
+            TrackerOnePerCamLayer.exposure_shader.allocate()
+        TrackerOnePerCamLayer.exposure_shader.use(self.exp_fbo.fbo_id, self.cam_fbo.tex_id, 1.5, 0.1, 0.2)
 
         # self.exp_fbo.begin()
         # glClearColor(0.0, 0.0, 0.0, 1.0)
