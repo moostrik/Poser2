@@ -6,6 +6,7 @@ import traceback
 from typing import Callable, Optional
 
 # Third-party imports
+from OpenGL.GL import glGetString, GL_VERSION
 import glfw
 
 # Local application imports
@@ -144,6 +145,13 @@ class WindowManager():
 
         # Make context current
         glfw.make_context_current(self.main_window)
+
+        version = glGetString(GL_VERSION)
+        if isinstance(version, bytes):
+            opengl_version: str = version.decode("utf-8")
+            print("OpenGL version:", opengl_version)
+        else:
+            raise RuntimeError("OpenGL context is not valid")
 
         # Set V-Sync
         glfw.swap_interval(1 if self.v_sync else 0)

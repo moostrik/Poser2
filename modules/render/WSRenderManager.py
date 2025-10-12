@@ -18,9 +18,9 @@ from modules.render.meshes.AngleMeshes import AngleMeshes
 from modules.render.layers.Generic.CameraLayer import CameraLayer
 from modules.render.layers.Generic.PoseCamLayer import PoseCamLayer
 from modules.render.layers.Generic.RStreamLayer import RStreamLayer
-from modules.render.layers.Generic.TrackerPanoramicLayer import TrackerPanoramicLayer as TrackerRender
-from modules.render.layers.WS.WSLightRender import WSLightRender
-from modules.render.layers.WS.WSLinesRender import WSLinesRender
+from modules.render.layers.Generic.TrackerPanoramicLayer import TrackerPanoramicLayer as TrackerLayer
+from modules.render.layers.WS.WSLightLayer import WSLightLayer
+from modules.render.layers.WS.WSLinesLayer import WSLinesLayer
 
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -39,10 +39,10 @@ class WSRenderManager(RenderBase):
         self.angle_meshes =         AngleMeshes(self.data, self.max_players)
 
         # drawers
-        self.ws_light_render =      WSLightRender(self.data)
-        self.ws_lines_render =      WSLinesRender(self.data)
+        self.ws_light_render =      WSLightLayer(self.data)
+        self.ws_lines_render =      WSLinesLayer(self.data)
         self.r_stream_render =      RStreamLayer(self.data, self.num_R_streams)
-        self.tracker_render =       TrackerRender(self.data, self.num_cams)
+        self.tracker_render =       TrackerLayer(self.data, self.num_cams)
         self.camera_renders:        dict[int, CameraLayer] = {}
         self.pose_renders:          dict[int, PoseCamLayer] = {}
 
@@ -54,9 +54,9 @@ class WSRenderManager(RenderBase):
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name=CameraLayer.key(),     columns=self.num_cams,      rows=1, src_aspect_ratio=16/9,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=TrackerRender.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name=WSLinesRender.key(),    columns=1,                  rows=1, src_aspect_ratio=40.0,  padding=Point2f(0.0, 1.0)),
-            SubdivisionRow(name=WSLightRender.key(),    columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=TrackerLayer.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=WSLinesLayer.key(),    columns=1,                  rows=1, src_aspect_ratio=40.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=WSLightLayer.key(),    columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name=PoseCamLayer.key(),       columns=self.max_players,   rows=1, src_aspect_ratio=0.75,   padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=RStreamLayer.key(),    columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
         ]
@@ -96,7 +96,7 @@ class WSRenderManager(RenderBase):
     def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size(RStreamLayer.key())
         self.r_stream_render.allocate(w, h, GL_RGBA)
-        w, h = self.subdivision.get_allocation_size(TrackerRender.key())
+        w, h = self.subdivision.get_allocation_size(TrackerLayer.key())
         self.tracker_render.allocate(w, h, GL_RGBA)
         for key in self.camera_renders.keys():
             w, h = self.subdivision.get_allocation_size(CameraLayer.key(), key)
@@ -136,9 +136,9 @@ class WSRenderManager(RenderBase):
     def draw_composition(self, width: int, height: int) -> None:
         self.setView(width, height)
 
-        self.ws_light_render.draw(self.subdivision.get_rect(WSLightRender.key()))
-        self.ws_lines_render.draw(self.subdivision.get_rect(WSLinesRender.key()))
-        self.tracker_render.draw(self.subdivision.get_rect(TrackerRender.key()))
+        self.ws_light_render.draw(self.subdivision.get_rect(WSLightLayer.key()))
+        self.ws_lines_render.draw(self.subdivision.get_rect(WSLinesLayer.key()))
+        self.tracker_render.draw(self.subdivision.get_rect(TrackerLayer.key()))
         self.r_stream_render.draw(self.subdivision.get_rect(RStreamLayer.key()))
         for i in range(self.num_cams):
             self.camera_renders[i].draw(self.subdivision.get_rect(CameraLayer.key(), i))

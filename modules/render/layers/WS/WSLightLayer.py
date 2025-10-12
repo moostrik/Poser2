@@ -16,7 +16,7 @@ from modules.render.BaseGLForDataManager import BaseLayer, Rect
 from modules.gl.shaders.WS_Angles import WS_Angles
 from modules.gl.shaders.WS_Lines import WS_Lines
 
-class WSLightRender(BaseLayer):
+class WSLightLayer(BaseLayer):
     angles_shader = WS_Angles()
 
     def __init__(self, data: DataManager) -> None:
@@ -27,14 +27,14 @@ class WSLightRender(BaseLayer):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo_angles.allocate(width, height, internal_format)
-        if not WSLightRender.angles_shader.allocated:
-            WSLightRender.angles_shader.allocate(monitor_file=True)
+        if not WSLightLayer.angles_shader.allocated:
+            WSLightLayer.angles_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self.fbo_angles.deallocate()
         self.image.deallocate()
-        if WSLightRender.angles_shader.allocated:
-            WSLightRender.angles_shader.deallocate()
+        if WSLightLayer.angles_shader.allocated:
+            WSLightLayer.angles_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         x, y, width, height = rect.x, rect.y, rect.width, rect.height

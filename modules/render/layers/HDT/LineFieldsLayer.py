@@ -92,7 +92,8 @@ class LF(BaseLayer):
 
         # print(f"motion={motion:.2f}, age={age:.2f}")
 
-        if not self.smooth_data.get_is_active(self.cam_id):
+        # if not self.smooth_data.get_is_active(self.cam_id):
+        if True:
             elbow_L =    PI #np.sin(age) * PI
             shldr_L = PI * 0.5
             elbow_R =    PI * 0.5

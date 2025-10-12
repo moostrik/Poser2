@@ -15,7 +15,7 @@ from modules.render.BaseGLForDataManager import BaseLayer, Rect
 
 from modules.gl.shaders.WS_Lines import WS_Lines
 
-class WSLinesRender(BaseLayer):
+class WSLinesLayer(BaseLayer):
     lines_shader = WS_Lines()
 
     def __init__(self, data: DataManager) -> None:
@@ -26,14 +26,14 @@ class WSLinesRender(BaseLayer):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo_lines.allocate(width, height, internal_format)
-        if not WSLinesRender.lines_shader.allocated:
-            WSLinesRender.lines_shader.allocate(monitor_file=True)
+        if not WSLinesLayer.lines_shader.allocated:
+            WSLinesLayer.lines_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self.fbo_lines.deallocate()
         self.image.deallocate()
-        if WSLinesRender.lines_shader.allocated:
-            WSLinesRender.lines_shader.deallocate()
+        if WSLinesLayer.lines_shader.allocated:
+            WSLinesLayer.lines_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         x, y, width, height = rect.x, rect.y, rect.width, rect.height
