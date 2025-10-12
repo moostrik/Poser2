@@ -58,6 +58,9 @@ class RStreamLayer(LayerBase):
 
         step: float = self.fbo.height / self.num_streams
 
+        LayerBase.setView(self.fbo.width, self.fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
         self.fbo.begin()
         glColor4f(1.0, 0.5, 0.5, 1.0)
         for i in range(num_pairs):

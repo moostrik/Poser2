@@ -50,6 +50,8 @@ class WSLightLayer(LayerBase):
         self.image.update()
 
         self.setView(self.fbo_angles.width, self.fbo_angles.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
         self.fbo_angles.begin()
         self.angles_shader.use(self.fbo_angles.fbo_id, self.image.tex_id, self.fbo_angles.width)
         self.fbo_angles.end()

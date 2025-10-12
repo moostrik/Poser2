@@ -15,7 +15,7 @@ from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRo
 from modules.render.DataManager import DataManager
 from modules.render.HDTSoundOSC import HDTSoundOSC
 
-from modules.render.layers.Generic.CameraLayer import CameraLayer
+from modules.render.layers.Generic.CamTrackPoseLayer import CamTrackPoseLayer
 from modules.render.layers.Generic.PoseStreamLayer import PoseStreamLayer
 from modules.render.layers.Generic.RStreamLayer import RStreamLayer
 from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
@@ -32,6 +32,7 @@ class HDTRenderManager(RenderBase):
         self.num_cams: int =        settings.camera_num
         self.num_R_streams: int =   settings.render_R_num
 
+        # data
         self.smooth_data: PoseSmoothDataManager = PoseSmoothDataManager(self.num_players)
         self.data: DataManager =    DataManager(self.smooth_data)
         self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.81", 8000, 60.0)
@@ -40,7 +41,7 @@ class HDTRenderManager(RenderBase):
         self.pose_meshes =          PoseMeshes(self.data, self.num_players)
 
         # layers
-        self.camera_layers:         dict[int, CameraLayer] = {}
+        self.camera_layers:         dict[int, CamTrackPoseLayer] = {}
         self.centre_cam_layers:     dict[int, CentreCamLayer] = {}
         self.centre_pose_layers:    dict[int, CentrePoseRender] = {}
         self.pose_overlays:         dict[int, PoseStreamLayer] = {}
@@ -50,8 +51,9 @@ class HDTRenderManager(RenderBase):
         # fbos
         self.cam_fbos: list[Fbo] = []
 
+        # populate
         for i in range(self.num_cams):
-            self.camera_layers[i] = CameraLayer(self.data, self.pose_meshes, i)
+            self.camera_layers[i] = CamTrackPoseLayer(self.data, self.pose_meshes, i)
             self.centre_cam_layers[i] = CentreCamLayer(self.data, self.smooth_data, i)
             self.centre_pose_layers[i] = CentrePoseRender(self.data, self.smooth_data, self.pose_meshes, i)
             self.pose_overlays[i] = PoseStreamLayer(self.data, self.pose_meshes, i)
@@ -60,7 +62,7 @@ class HDTRenderManager(RenderBase):
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name=CameraLayer.__name__,       columns=self.num_cams,      rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=CamTrackPoseLayer.__name__,       columns=self.num_cams,      rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=PoseStreamLayer.__name__,   columns=self.num_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=RStreamLayer.__name__,      columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
         ]
@@ -99,7 +101,7 @@ class HDTRenderManager(RenderBase):
         self.r_stream_layer.allocate(w, h, GL_RGBA)
 
         for i in range(self.num_cams):
-            w, h = self.subdivision.get_allocation_size(CameraLayer.__name__, i)
+            w, h = self.subdivision.get_allocation_size(CamTrackPoseLayer.__name__, i)
             self.camera_layers[i].allocate(w , h, GL_RGBA)
             w, h = self.subdivision.get_allocation_size(PoseStreamLayer.__name__, i)
             self.pose_overlays[i].allocate(w, h, GL_RGBA)
@@ -123,7 +125,6 @@ class HDTRenderManager(RenderBase):
     def draw_main(self, width: int, height: int) -> None:
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.smooth_data.update()
         self.pose_meshes.update()
@@ -147,18 +148,18 @@ class HDTRenderManager(RenderBase):
         self.r_stream_layer.draw(self.subdivision.get_rect(RStreamLayer.__name__))
         for i in range(self.num_cams):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            self.camera_layers[i].draw(self.subdivision.get_rect(CameraLayer.__name__, i))
+            self.camera_layers[i].draw(self.subdivision.get_rect(CamTrackPoseLayer.__name__, i))
 
-            glBlendFunc(GL_ONE, GL_ONE)
-            self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            # glBlendFunc(GL_ONE, GL_ONE)
+            # self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            # self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            # self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        self.setView(width, height)
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
+        self.setView(width, height)
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)

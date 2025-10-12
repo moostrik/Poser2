@@ -134,7 +134,6 @@ class LF(LayerBase):
 
     def _render(self) -> None:
         LayerBase.setView(self.fbo.width, self.fbo.height)
-        glEnable(GL_BLEND)
         glBlendFunc(GL_ONE, GL_ONE)
         self.fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
@@ -145,7 +144,6 @@ class LF(LayerBase):
         self.rigt_fbo.draw(0,0,self.fbo.width, self.fbo.height)
         self.fbo.end()
         glColor3f(1.0, 1.0, 1.0)
-        glDisable(GL_BLEND)
 
     def _clear(self) -> None:
         LayerBase.setView(self.fbo.width, self.fbo.height)

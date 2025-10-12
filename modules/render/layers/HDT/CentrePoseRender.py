@@ -72,6 +72,8 @@ class CentrePoseRender(LayerBase):
         pose_mesh: Mesh = self.pose_meshes.meshes[key]
 
         LayerBase.setView(self.cam_fbo.width, self.cam_fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
         self.cam_fbo.begin()
         glClear(GL_COLOR_BUFFER_BIT)
 

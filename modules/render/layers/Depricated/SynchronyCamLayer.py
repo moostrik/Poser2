@@ -82,6 +82,7 @@ class SynchronyCamLayer(LayerBase):
         other_fbo_2 = cam_fbos[other_keys[1]]
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         if not SynchronyCamLayer.shader.allocated:
             SynchronyCamLayer.shader.allocate(True)

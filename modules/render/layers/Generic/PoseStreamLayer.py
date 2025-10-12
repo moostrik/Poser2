@@ -72,8 +72,10 @@ class PoseStreamLayer(LayerBase):
             PoseStreamLayer.pose_stream_shader.allocate(monitor_file=False)
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
         PoseStreamLayer.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, PoseStreamLayer.pose_stream_shader)
-        self.fbo.end()
+
 
     @staticmethod
     def draw_pose(fbo: Fbo, pose: Pose, pose_mesh: Mesh, angle_image: Image, shader: WS_PoseStream) -> None:

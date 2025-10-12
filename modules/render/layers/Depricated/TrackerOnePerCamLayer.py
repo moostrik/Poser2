@@ -86,8 +86,10 @@ class TrackerOnePerCamLayer(LayerBase):
 
 
         LayerBase.setView(self.cam_fbo.width, self.cam_fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
         self.cam_fbo.begin()
-        glColor4f(1.0, 01.0, 0.5, 0.1)
+        glColor4f(1.0, 1.0, 0.5, 0.1)
 
         self.cam_image.draw_roi(0, 0, self.cam_fbo.width, self.cam_fbo.height,
                                 x, cam_image_roi.y, width, cam_image_roi.height)

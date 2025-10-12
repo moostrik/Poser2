@@ -40,6 +40,8 @@ class TrackerPanoramicLayer(LayerBase):
             return
         # print(f"PanoramicTrackerRender: Updating with {len(tracklets)} tracklets")
         LayerBase.setView(self.fbo.width, self.fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
         self.fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)

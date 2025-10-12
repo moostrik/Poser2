@@ -59,6 +59,8 @@ class WhiteSpaceRender(LayerBase):
         self.image.set_image(light_image.light_img)
         self.image.update()
 
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
         self.setView(self.fbo_lines.width, self.fbo_lines.height)
         self.fbo_lines.begin()
         self.lines_shader.use(self.fbo_lines.fbo_id, self.image.tex_id)

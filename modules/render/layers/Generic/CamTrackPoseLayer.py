@@ -21,7 +21,7 @@ from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CameraLayer(LayerBase):
+class CamTrackPoseLayer(LayerBase):
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
@@ -48,18 +48,20 @@ class CameraLayer(LayerBase):
         if frame is not None:
             self.image.set_image(frame)
             self.image.update()
-        fbo: Fbo = self.fbo
+
         depth_tracklets: list[DepthTracklet] | None = self.data.get_depth_tracklets(self.cam_id, False, self.data_consumer_key)
         poses: list[Pose] = self.data.get_poses_for_cam(self.cam_id)
         meshes: dict[int, Mesh] = self.pose_meshes.meshes
 
-        LayerBase.setView(fbo.width, fbo.height)
-        fbo.begin()
+        LayerBase.setView(self.fbo.width, self.fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        self.fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
-        self.image.draw(0, 0, fbo.width, fbo.height)
+        self.image.draw(0, 0, self.fbo.width, self.fbo.height)
         glLineWidth(3.0)
-        CameraLayer.draw_camera_overlay(depth_tracklets, poses, meshes, 0, 0, fbo.width, fbo.height)
-        fbo.end()
+        CamTrackPoseLayer.draw_camera_overlay(depth_tracklets, poses, meshes, 0, 0, self.fbo.width, self.fbo.height)
+        self.fbo.end()
 
     @staticmethod
     def draw_camera_overlay(depth_tracklets: list[DepthTracklet], poses: list[Pose], pose_meshes: dict[int, Mesh], x: float, y: float, width: float, height: float) -> None:
@@ -76,10 +78,10 @@ class CameraLayer(LayerBase):
             roi_y: float = y + roi_y * height
             roi_w: float = roi_w * width
             roi_h: float = roi_h * height
-            CameraLayer.draw_tracklet(tracklet, mesh, roi_x, roi_y, roi_w, roi_h)
+            CamTrackPoseLayer.draw_tracklet(tracklet, mesh, roi_x, roi_y, roi_w, roi_h)
 
         for depth_tracklet in depth_tracklets:
-            CameraLayer.draw_depth_tracklet(depth_tracklet, 0, 0, width, height)
+            CamTrackPoseLayer.draw_depth_tracklet(depth_tracklet, 0, 0, width, height)
 
     @staticmethod
     def draw_depth_tracklet(tracklet: DepthTracklet, x: float, y: float, width: float, height: float) -> None:

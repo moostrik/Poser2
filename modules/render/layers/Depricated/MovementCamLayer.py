@@ -96,6 +96,8 @@ class MovementCamLayer(LayerBase):
 
 
         LayerBase.setView(self.color_fbo.width, self.color_fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
         self.color_fbo.begin()
         # glClearColor(0.0, 0.0, 0.0, 1.0)
         # glClear(GL_COLOR_BUFFER_BIT)
