@@ -13,19 +13,20 @@ from modules.pose.PoseStream import PoseStreamData
 from modules.tracker.Tracklet import Tracklet
 
 from modules.render.DataManager import DataManager
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from modules.gl.shaders.Exposure import Exposure
 from modules.gl.shaders.Contrast import Contrast
 
-class MovementCamLayer(BaseLayer):
+class MovementCamLayer(LayerBase):
     exposure_shader = Exposure()
     contrast_shader = Contrast()
 
     def __init__(self, data: DataManager, cam_id: int) -> None:
         self.data: DataManager = data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.cam_id: int = cam_id
         self.color_fbo: Fbo = Fbo()
         self.exp_fbo: Fbo = Fbo()
@@ -73,7 +74,7 @@ class MovementCamLayer(BaseLayer):
             return
 
         glColor4f(0.0, 0., 0., 0.01)
-        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.key())
+        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
             self.movement_for_synchrony = pose_stream.mean_movement
             if pose_stream.mean_movement > 0.009:
@@ -94,7 +95,7 @@ class MovementCamLayer(BaseLayer):
 
 
 
-        BaseLayer.setView(self.color_fbo.width, self.color_fbo.height)
+        LayerBase.setView(self.color_fbo.width, self.color_fbo.height)
         self.color_fbo.begin()
         # glClearColor(0.0, 0.0, 0.0, 1.0)
         # glClear(GL_COLOR_BUFFER_BIT)
@@ -104,7 +105,7 @@ class MovementCamLayer(BaseLayer):
         self.color_fbo.end()
 
 
-        BaseLayer.setView(self.exp_fbo.width, self.exp_fbo.height)
+        LayerBase.setView(self.exp_fbo.width, self.exp_fbo.height)
 
         if not MovementCamLayer.exposure_shader.allocated:
             MovementCamLayer.exposure_shader.allocate()
@@ -130,7 +131,7 @@ class MovementCamLayer(BaseLayer):
         self.clear_fbo()
 
     def clear_fbo(self) -> None:
-        BaseLayer.setView(self.exp_fbo.width, self.exp_fbo.height)
+        LayerBase.setView(self.exp_fbo.width, self.exp_fbo.height)
 
         glColor4f(0.0, 0.0, 0.0, 0.05)
         self.exp_fbo.begin()

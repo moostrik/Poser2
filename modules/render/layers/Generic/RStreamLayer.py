@@ -11,16 +11,17 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
 # Shaders
 from modules.gl.shaders.WS_RStream import WS_RStream
 
-class RStreamLayer(BaseLayer):
+class RStreamLayer(LayerBase):
     r_stream_shader = WS_RStream()
 
     def __init__(self, data: DataManager, num_streams: int) -> None:
         self.data: DataManager = data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.num_streams: int = num_streams
@@ -41,7 +42,7 @@ class RStreamLayer(BaseLayer):
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        correlation_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams(True, self.key())
+        correlation_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams(True, self.data_consumer_key)
         if correlation_streams is None:
             return
 
@@ -52,7 +53,7 @@ class RStreamLayer(BaseLayer):
         self.image.set_image(image_np)
         self.image.update()
 
-        BaseLayer.setView(self.fbo.width, self.fbo.height)
+        LayerBase.setView(self.fbo.width, self.fbo.height)
         self.r_stream_shader.use(self.fbo.fbo_id, self.image.tex_id, self.image.width, self.image.height, 1.5 / self.fbo.height)
 
         step: float = self.fbo.height / self.num_streams

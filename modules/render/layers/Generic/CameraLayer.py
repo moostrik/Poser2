@@ -15,15 +15,16 @@ from modules.pose.Pose import Pose
 from modules.tracker.Tracklet import Tracklet
 
 from modules.render.DataManager import DataManager
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
+from modules.gl.LayerBase import LayerBase, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CameraLayer(BaseLayer):
+class CameraLayer(LayerBase):
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.pose_meshes: PoseMeshes = pose_meshes
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
@@ -43,16 +44,16 @@ class CameraLayer(BaseLayer):
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        frame: np.ndarray | None = self.data.get_cam_image(self.cam_id, True, self.key())
+        frame: np.ndarray | None = self.data.get_cam_image(self.cam_id, True, self.data_consumer_key)
         if frame is not None:
             self.image.set_image(frame)
             self.image.update()
         fbo: Fbo = self.fbo
-        depth_tracklets: list[DepthTracklet] | None = self.data.get_depth_tracklets(self.cam_id, False, self.key())
+        depth_tracklets: list[DepthTracklet] | None = self.data.get_depth_tracklets(self.cam_id, False, self.data_consumer_key)
         poses: list[Pose] = self.data.get_poses_for_cam(self.cam_id)
         meshes: dict[int, Mesh] = self.pose_meshes.meshes
 
-        BaseLayer.setView(fbo.width, fbo.height)
+        LayerBase.setView(fbo.width, fbo.height)
         fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         self.image.draw(0, 0, fbo.width, fbo.height)

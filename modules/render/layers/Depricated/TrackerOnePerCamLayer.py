@@ -15,16 +15,17 @@ from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 from modules.render.DataManager import DataManager
 from modules.pose.Pose import Pose
 from modules.render.meshes.PoseMeshes import PoseMeshes
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from modules.gl.shaders.Exposure import Exposure
 
-class TrackerOnePerCamLayer(BaseLayer):
+class TrackerOnePerCamLayer(LayerBase):
     exposure_shader = Exposure()
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.pose_meshes: PoseMeshes = pose_meshes
         self.cam_id: int = cam_id
         self.cam_fbo: Fbo = Fbo()
@@ -72,8 +73,8 @@ class TrackerOnePerCamLayer(BaseLayer):
         cam_image_roi: Rect = getattr(tracklet.metadata, "smooth_rect", Rect(0.0, 0.0, 1.0, 1.0))
         # print(draw_rect)
 
-        pose: Pose | None = self.data.get_pose(key, True, self.key())
-        cam_image_np: np.ndarray | None = self.data.get_cam_image(key, True, self.key())
+        pose: Pose | None = self.data.get_pose(key, True, self.data_consumer_key)
+        cam_image_np: np.ndarray | None = self.data.get_cam_image(key, True, self.data_consumer_key)
 
         if cam_image_np is not None:
             self.cam_image.set_image(cam_image_np)
@@ -84,7 +85,7 @@ class TrackerOnePerCamLayer(BaseLayer):
         x: float = cam_image_roi.x + (cam_image_roi.width - width) / 2.0
 
 
-        BaseLayer.setView(self.cam_fbo.width, self.cam_fbo.height)
+        LayerBase.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
         glColor4f(1.0, 01.0, 0.5, 0.1)
 
@@ -106,7 +107,7 @@ class TrackerOnePerCamLayer(BaseLayer):
 
 
     def clear_fbo(self) -> None:
-        BaseLayer.setView(self.cam_fbo.width, self.cam_fbo.height)
+        LayerBase.setView(self.cam_fbo.width, self.cam_fbo.height)
 
         glColor4f(0.0, 0.0, 0.0, 0.05)
         self.exp_fbo.begin()

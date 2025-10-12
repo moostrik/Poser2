@@ -7,11 +7,12 @@ import numpy as np
 from modules.gl.Mesh import Mesh
 from modules.pose.PoseStream import PoseStreamData
 from modules.render.DataManager import DataManager
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
-class AngleMeshes(BaseLayer):
+class AngleMeshes(LayerBase):
     def __init__(self, data: DataManager, amount: int) -> None:
         self.data: DataManager = data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.amount: int = amount
         self.meshes: dict[int, Mesh] = {}
 
@@ -32,7 +33,7 @@ class AngleMeshes(BaseLayer):
 
     def update(self) -> None:
         for id in range(self.amount):
-            pose: PoseStreamData | None = self.data.get_pose_stream(id, True, self.key())
+            pose: PoseStreamData | None = self.data.get_pose_stream(id, True, self.data_consumer_key)
             mesh: Mesh | None = self.meshes.get(id, None)
             if pose is not None and mesh is not None:
                 AngleMeshes.update_angle_mesh(pose, mesh)

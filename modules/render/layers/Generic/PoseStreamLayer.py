@@ -8,6 +8,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Mesh import Mesh
+from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 from modules.gl.Texture import Texture
 
@@ -19,7 +20,6 @@ from modules.pose.features.PoseAngles import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_N
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
@@ -28,11 +28,12 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # Shaders
 from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 
-class PoseStreamLayer(BaseLayer):
+class PoseStreamLayer(LayerBase):
     pose_stream_shader = WS_PoseStream()
 
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.cam_id: int = cam_id
         self.pose_stream_image: Image = Image()
@@ -56,11 +57,11 @@ class PoseStreamLayer(BaseLayer):
 
     def update(self) -> None:
         key: int = self.cam_id
-        pose: Pose | None = self.data.get_pose(key, True, self.key())
+        pose: Pose | None = self.data.get_pose(key, True, self.data_consumer_key)
         if pose is None:
             return #??
         pose_mesh: Mesh = self.pose_meshes.meshes[pose.tracklet.id]
-        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.key())
+        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
             stream_image: np.ndarray = WS_PoseStream.pose_stream_to_image(pose_stream)
             self.pose_stream_image.set_image(stream_image)
@@ -70,7 +71,7 @@ class PoseStreamLayer(BaseLayer):
         if not PoseStreamLayer.pose_stream_shader.allocated:
             PoseStreamLayer.pose_stream_shader.allocate(monitor_file=False)
 
-        BaseLayer.setView(self.fbo.width, self.fbo.height)
+        LayerBase.setView(self.fbo.width, self.fbo.height)
         PoseStreamLayer.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, PoseStreamLayer.pose_stream_shader)
         self.fbo.end()
 

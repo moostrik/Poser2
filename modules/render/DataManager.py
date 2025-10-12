@@ -25,6 +25,8 @@ class DataItem(Generic[T]):
 CorrelationStreamDict = Dict[int, Tuple[Tuple[int, int], np.ndarray]]
 
 class DataManager:
+    _consumer_counter: int = 0  # Class variable for unique IDs
+
     def __init__(self, PoseSmooth: PoseSmoothDataManager | None = None) -> None:
         self.mutex: Lock = Lock()
         self.pose_smooth_manager: PoseSmoothDataManager | None = PoseSmooth
@@ -38,6 +40,11 @@ class DataManager:
         self.pose_streams: Dict[int, DataItem[PoseStreamData]] = {}
         self.r_streams: Dict[int, DataItem[PairCorrelationStreamData]] = {}
 
+    @classmethod
+    def get_unique_consumer_key(cls) -> str:
+        """Generate a unique consumer key using a counter."""
+        cls._consumer_counter += 1
+        return f"C_{cls._consumer_counter}"
 
     def _set_data_dict(self, data_dict: Dict[int, DataItem[T]], data_key: int, value: T) -> None:
         with self.mutex:

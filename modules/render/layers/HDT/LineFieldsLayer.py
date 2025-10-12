@@ -13,7 +13,7 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
 from modules.pose.smooth.PoseSmoothDataManager import PoseJoint, PoseSmoothDataManager
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
+from modules.gl.LayerBase import LayerBase, Rect
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 PI: float = np.pi
@@ -27,7 +27,7 @@ class LineFieldsSettings():
     line_width: float = 0.1             # in normalized world width (0..1)
     line_amount: float = 20.0           # number of lines
 
-class LF(BaseLayer):
+class LF(LayerBase):
     line_shader = HDT_Lines()
 
     def __init__(self, smooth_data: PoseSmoothDataManager, cam_id: int) -> None:
@@ -112,7 +112,7 @@ class LF(BaseLayer):
         motion_time: float = motion * 0.1 + self.pattern_time
 
 
-        BaseLayer.setView(self.fbo.width, self.fbo.height)
+        LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         LF.line_shader.use(self.left_fbo.fbo_id,
@@ -133,7 +133,7 @@ class LF(BaseLayer):
         self._render()
 
     def _render(self) -> None:
-        BaseLayer.setView(self.fbo.width, self.fbo.height)
+        LayerBase.setView(self.fbo.width, self.fbo.height)
         glEnable(GL_BLEND)
         glBlendFunc(GL_ONE, GL_ONE)
         self.fbo.begin()
@@ -148,7 +148,7 @@ class LF(BaseLayer):
         glDisable(GL_BLEND)
 
     def _clear(self) -> None:
-        BaseLayer.setView(self.fbo.width, self.fbo.height)
+        LayerBase.setView(self.fbo.width, self.fbo.height)
         self.fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)

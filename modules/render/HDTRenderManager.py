@@ -32,8 +32,8 @@ class HDTRenderManager(RenderBase):
         self.num_cams: int =        settings.camera_num
         self.num_R_streams: int =   settings.render_R_num
 
-        self.data: DataManager =    DataManager(self.smooth_data)
         self.smooth_data: PoseSmoothDataManager = PoseSmoothDataManager(self.num_players)
+        self.data: DataManager =    DataManager(self.smooth_data)
         self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.81", 8000, 60.0)
 
         # meshes
@@ -144,15 +144,15 @@ class HDTRenderManager(RenderBase):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
-        self.r_stream_layer.draw(self.subdivision.get_rect(RStreamLayer.key()))
+        self.r_stream_layer.draw(self.subdivision.get_rect(RStreamLayer.__name__))
         for i in range(self.num_cams):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            self.camera_layers[i].draw(self.subdivision.get_rect(CameraLayer.key(), i))
+            self.camera_layers[i].draw(self.subdivision.get_rect(CameraLayer.__name__, i))
 
             glBlendFunc(GL_ONE, GL_ONE)
-            self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.key(), i))
-            self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.key(), i))
-            self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.key(), i))
+            self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:

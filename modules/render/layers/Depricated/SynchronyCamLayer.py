@@ -13,20 +13,21 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.render.DataManager import DataManager
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.gl.shaders.HD_Sync import HD_Sync
 from modules.gl.shaders.NoiseSimplex import NoiseSimplex
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class SynchronyCamLayer(BaseLayer):
+class SynchronyCamLayer(LayerBase):
 
     shader = HD_Sync()
     noise_shader = NoiseSimplex()
 
     def __init__(self, data: DataManager, cam_id: int) -> None:
         self.data: DataManager = data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.cam_id: int = cam_id
         self.fbo: Fbo = Fbo()
         self.noise_fbo: Fbo = Fbo()
@@ -63,7 +64,7 @@ class SynchronyCamLayer(BaseLayer):
         key: int = self.cam_id
         other_keys: list[int] = [i for i in range(len(cam_fbos)) if i != key]
 
-        syncs: PairCorrelationStreamData | None = self.data.get_correlation_streams(False, self.key())
+        syncs: PairCorrelationStreamData | None = self.data.get_correlation_streams(False, self.data_consumer_key)
 
 
         score_1: float = 0.0
@@ -80,7 +81,7 @@ class SynchronyCamLayer(BaseLayer):
         other_fbo_1 = cam_fbos[other_keys[0]]
         other_fbo_2 = cam_fbos[other_keys[1]]
 
-        BaseLayer.setView(self.fbo.width, self.fbo.height)
+        LayerBase.setView(self.fbo.width, self.fbo.height)
 
         if not SynchronyCamLayer.shader.allocated:
             SynchronyCamLayer.shader.allocate(True)

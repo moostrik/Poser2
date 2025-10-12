@@ -11,17 +11,18 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.WS.WSOutput import WSOutput
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.gl.shaders.WS_Angles import WS_Angles
 from modules.gl.shaders.WS_Lines import WS_Lines
 
-class WhiteSpaceRender(BaseLayer):
+class WhiteSpaceRender(LayerBase):
     angles_shader = WS_Angles()
     lines_shader = WS_Lines()
 
     def __init__(self, data: DataManager) -> None:
         self.data: DataManager = data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo_lines: Fbo = Fbo()
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
@@ -51,7 +52,7 @@ class WhiteSpaceRender(BaseLayer):
         self.fbo_angles.draw(x, y+half_height, width, half_height)
 
     def update(self) -> None:
-        light_image: WSOutput | None = self.data.get_light_image(True, self.key())
+        light_image: WSOutput | None = self.data.get_light_image(True, self.data_consumer_key)
         if light_image is None:
             return
 

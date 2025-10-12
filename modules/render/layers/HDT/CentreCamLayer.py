@@ -14,7 +14,7 @@ from modules.pose.PoseTypes import PoseJoint
 from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
 
 from modules.render.DataManager import DataManager
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,10 +22,11 @@ from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.gl.Mesh import Mesh
 
-class CentreCamLayer(BaseLayer):
+class CentreCamLayer(LayerBase):
     def __init__(self, data: DataManager, smooth_data: PoseSmoothDataManager, cam_id: int) -> None:
         self.data: DataManager = data
         self.smooth_data: PoseSmoothDataManager = smooth_data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.cam_id: int = cam_id
         self.cam_fbo: Fbo = Fbo()
         self.cam_image: Image = Image()
@@ -49,7 +50,7 @@ class CentreCamLayer(BaseLayer):
     def update(self) -> None:
         key: int = self.cam_id
 
-        pose: Pose | None = self.data.get_pose(key, only_new_data=True, consumer_key=self.key())
+        pose: Pose | None = self.data.get_pose(key, only_new_data=True, consumer_key=self.data_consumer_key)
         if pose is not None:
 
             if pose.tracklet.is_removed:
@@ -64,7 +65,7 @@ class CentreCamLayer(BaseLayer):
         if not self.is_active:
             return
 
-        cam_image_np: np.ndarray | None = self.data.get_cam_image(key, True, self.key())
+        cam_image_np: np.ndarray | None = self.data.get_cam_image(key, True, self.data_consumer_key)
         if cam_image_np is not None:
             self.cam_image.set_image(cam_image_np)
             self.cam_image.update()
@@ -73,7 +74,7 @@ class CentreCamLayer(BaseLayer):
         if smooth_pose_rect is None:
             return
 
-        BaseLayer.setView(self.cam_fbo.width, self.cam_fbo.height)
+        LayerBase.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
         self.cam_image.draw_roi(0, 0, self.cam_fbo.width, self.cam_fbo.height,
                                 smooth_pose_rect.x, smooth_pose_rect.y, smooth_pose_rect.width, smooth_pose_rect.height)
@@ -81,7 +82,7 @@ class CentreCamLayer(BaseLayer):
 
 
     def clear_render(self) -> None:
-        BaseLayer.setView(self.cam_fbo.width, self.cam_fbo.height)
+        LayerBase.setView(self.cam_fbo.width, self.cam_fbo.height)
         self.cam_fbo.begin()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)

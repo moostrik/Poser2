@@ -16,7 +16,7 @@ from modules.pose.features.PoseAngles import POSE_NUM_ANGLES, POSE_ANGLE_JOINT_N
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.render.DataManager import DataManager
-from modules.render.BaseGLForDataManager import BaseLayer, Rect
+from modules.gl.LayerBase import LayerBase, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
@@ -25,11 +25,12 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # Shaders
 from modules.gl.shaders.WS_PoseStream import WS_PoseStream
 
-class PoseCamLayer(BaseLayer):
+class PoseCamLayer(LayerBase):
     pose_stream_shader = WS_PoseStream()
 
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, angle_meshes: AngleMeshes, cam_id: int) -> None:
         self.data: DataManager = data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.cam_id: int = cam_id
@@ -56,7 +57,7 @@ class PoseCamLayer(BaseLayer):
 
     def update(self) -> None:
         key: int = self.cam_id
-        pose: Pose | None = self.data.get_pose(key, True, self.key())
+        pose: Pose | None = self.data.get_pose(key, True, self.data_consumer_key)
         if pose is None:
             return #??
         pose_image_np: np.ndarray | None = pose.crop_image
@@ -64,7 +65,7 @@ class PoseCamLayer(BaseLayer):
             self.image.set_image(pose_image_np)
             self.image.update()
         pose_mesh: Mesh = self.pose_meshes.meshes[pose.tracklet.id]
-        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.key())
+        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
             stream_image: np.ndarray = WS_PoseStream.pose_stream_to_image(pose_stream)
             self.pose_stream_image.set_image(stream_image)
@@ -76,7 +77,7 @@ class PoseCamLayer(BaseLayer):
         if not PoseCamLayer.pose_stream_shader.allocated:
             PoseCamLayer.pose_stream_shader.allocate(monitor_file=False)
 
-        BaseLayer.setView(self.fbo.width, self.fbo.height)
+        LayerBase.setView(self.fbo.width, self.fbo.height)
         PoseCamLayer.draw_pose(self.fbo, self.image, pose, pose_mesh, self.pose_stream_image, angle_mesh, PoseCamLayer.pose_stream_shader)
         self.fbo.end()
 
