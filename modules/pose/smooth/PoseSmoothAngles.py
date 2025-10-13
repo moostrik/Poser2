@@ -58,10 +58,10 @@ class PoseSmoothAngles(PoseSmoothBase):
             self._angle_smoothers[joint] = AngleEuroInterpolator(settings.smooth_settings)
             self._cumulative_joint_motion[joint] = 0.0
 
-        self._synchronies: dict[SymmetricJointType, float] = {}
-        self._mean_synchrony: float = 0.0
+        self._symmetries: dict[SymmetricJointType, float] = {}
+        self._mean_symmetry: float = 0.0
         for joint_type in SYMMETRIC_JOINT_PAIRS.keys():
-            self._synchronies[joint_type] = 0.0
+            self._symmetries[joint_type] = 0.0
 
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -87,12 +87,12 @@ class PoseSmoothAngles(PoseSmoothBase):
         return self._cumulative_total_motion
 
     @property
-    def synchronies(self) -> dict[SymmetricJointType, float]:
-        return self._synchronies
+    def symmetries(self) -> dict[SymmetricJointType, float]:
+        return self._symmetries
 
     @property
-    def mean_synchrony(self) -> float:
-        return self._mean_synchrony
+    def mean_symmetry(self) -> float:
+        return self._mean_symmetry
 
     def add_pose(self, pose: Pose) -> None:
         if pose.tracklet.is_removed:
@@ -131,7 +131,7 @@ class PoseSmoothAngles(PoseSmoothBase):
             total_movement += movement
         self._cumulative_total_motion += total_movement
 
-        total_synchrony: float = 0.0
+        total_symmetry: float = 0.0
         for sym_type, (left_joint, right_joint) in SYMMETRIC_JOINT_PAIRS.items():
             left_angle: float | None = self.get_angle(left_joint, symmetric=True)
             right_angle: float | None = self.get_angle(right_joint, symmetric=True)
@@ -141,18 +141,21 @@ class PoseSmoothAngles(PoseSmoothBase):
                 if angle_diff > np.pi:
                     angle_diff = 2 * np.pi - angle_diff
                 symmetry: float = 1.0 - angle_diff / np.pi
-                self._synchronies[sym_type] = symmetry
-                total_synchrony += symmetry
+                self._symmetries[sym_type] = symmetry
+                total_symmetry += symmetry
             else:
-                self._synchronies[sym_type] = 0.0
-        self._mean_synchrony = total_synchrony / len(SYMMETRIC_JOINT_PAIRS)
+                self._symmetries[sym_type] = 0.0
+        self._mean_symmetry = total_symmetry / len(SYMMETRIC_JOINT_PAIRS)
 
     def reset(self) -> None:
         for smoother in self._angle_smoothers.values():
             smoother.reset()
-        for motion_time in self._cumulative_joint_motion:
-            self._cumulative_joint_motion[motion_time] = 0.0
+        for key in self._cumulative_joint_motion.keys():
+            self._cumulative_joint_motion[key] = 0.0
         self._cumulative_total_motion = 0.0
+        for key in self._symmetries.keys():
+            self._symmetries[key] = 0.0
+        self._mean_symmetry = 0.0
 
     def get_angle(self, joint: PoseJoint, symmetric: bool = True) -> float:
         angle: float | None = self._angle_smoothers[joint].smooth_value
@@ -172,4 +175,4 @@ class PoseSmoothAngles(PoseSmoothBase):
 
     # SYMMETRY METHODS
     def get_symmetry(self, joint_type: SymmetricJointType) -> float:
-        return self._synchronies.get(joint_type, 0.0)
+        return self._symmetries.get(joint_type, 0.0)

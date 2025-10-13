@@ -151,12 +151,12 @@ class PoseSmoothDataManager:
         with self._lock:
             return self._rect_smoothers[tracklet_id].age
 
-    def get_synchrony(self, tracklet_id: int, type: SymmetricJointType) -> float:
+    def get_symmetry(self, tracklet_id: int, type: SymmetricJointType) -> float:
         """Get the synchrony value for the specified symmetric joint type."""
         with self._lock:
             return self._angle_smoothers[tracklet_id].get_symmetry(type)
 
-    def get_mean_synchrony(self, tracklet_id: int) -> float:
+    def get_mean_symmetry(self, tracklet_id: int) -> float:
         """Get the mean synchrony value across all symmetric joint types."""
         with self._lock:
-            return self._angle_smoothers[tracklet_id].mean_synchrony
+            return self._angle_smoothers[tracklet_id].mean_symmetry

@@ -9,7 +9,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
-from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
+from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager, SymmetricJointType
 from modules.pose.features.PoseAngles import POSE_ANGLE_JOINTS
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -103,3 +103,14 @@ class HDTSoundOSC:
         head_msg = OscMessageBuilder(address=f"/pose/{id}/angle/head")
         head_msg.add_arg(float(head_orientation))
         bundle_builder.add_content(head_msg.build()) # type: ignore
+
+        head_orientation: float = self.smooth_data.get_mean_symmetry(id)
+        head_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/mean")
+        head_msg.add_arg(float(head_orientation))
+        bundle_builder.add_content(head_msg.build()) # type: ignore
+
+        for sym_type in SymmetricJointType:
+            symmetry: float = self.smooth_data.get_symmetry(id, sym_type)
+            sym_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/{sym_type.name}")
+            sym_msg.add_arg(float(symmetry))
+            bundle_builder.add_content(sym_msg.build()) # type: ignore

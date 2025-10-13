@@ -93,7 +93,7 @@ class LF(LayerBase):
         motion: float   = self.smooth_data.get_motion(self.cam_id)
         age: float      = self.smooth_data.get_age(self.cam_id)
         anchor: float   = 1.0 - self.smooth_data.rect_settings.centre_dest_y
-        synchrony: float= self.smooth_data.get_mean_synchrony(self.cam_id)
+        synchrony: float= self.smooth_data.get_mean_symmetry(self.cam_id)
 
         # print(f"motion={motion:.2f}, age={age:.2f}")
 
