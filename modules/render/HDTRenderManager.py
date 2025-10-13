@@ -150,11 +150,10 @@ class HDTRenderManager(RenderBase):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             self.camera_layers[i].draw(self.subdivision.get_rect(CamTrackPoseLayer.__name__, i))
 
-            # glBlendFunc(GL_ONE, GL_ONE)
-            # self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            # self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            # self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glBlendFunc(GL_ONE, GL_ONE)
+            self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glEnable(GL_TEXTURE_2D)

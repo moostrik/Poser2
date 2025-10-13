@@ -3,6 +3,7 @@
 import traceback
 from dataclasses import dataclass
 import numpy as np
+from time import time
 
 # Third-party imports
 import pytweening
@@ -12,7 +13,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
-from modules.pose.smooth.PoseSmoothDataManager import PoseJoint, PoseSmoothDataManager
+from modules.pose.smooth.PoseSmoothDataManager import PoseJoint, PoseSmoothDataManager, SymmetricJointType
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -66,11 +67,11 @@ class LF(LayerBase):
         #     self._clear()
         #     return
 
-        if self.cam_id != 0:
-            return
+        # if self.cam_id != 0:
+        #     return
 
-        self.smooth_data.OneEuro_settings.min_cutoff = 0.2
-        self.smooth_data.OneEuro_settings.beta = 0.2
+        self.smooth_data.OneEuro_settings.min_cutoff = 0.1
+        self.smooth_data.OneEuro_settings.beta = 0.3
 
         self.smooth_data.rect_settings.centre_dest_y = 0.25
         self.smooth_data.rect_settings.height_dest = 0.8
@@ -79,7 +80,7 @@ class LF(LayerBase):
         P.line_sharpness = 4
         P.line_speed = 0.2
         P.line_width = 1.1
-        P.line_amount = 2.0
+        P.line_amount = 5.0
 
         elbow_L: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.left_elbow)
         shldr_L: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.left_shoulder)
@@ -89,46 +90,62 @@ class LF(LayerBase):
         motion: float   = self.smooth_data.get_motion(self.cam_id)
         age: float      = self.smooth_data.get_age(self.cam_id)
         anchor: float   = 1.0 - self.smooth_data.rect_settings.centre_dest_y
+        synchrony: float= self.smooth_data.get_mean_synchrony(self.cam_id)
 
         # print(f"motion={motion:.2f}, age={age:.2f}")
 
-        # if not self.smooth_data.get_is_active(self.cam_id):
-        if True:
-            elbow_L =    PI #np.sin(age) * PI
-            shldr_L = PI * 0.5
-            elbow_R =    PI * 0.5
-            shldr_R = PI * 0.5
+        if not self.smooth_data.get_is_active(self.cam_id):
+        # if True:
+            m = 0.1
+            elbow_L = m*PI# * 0.5 #np.sin(age) * PI
+            shldr_L = m*PI #* 0.5
+            elbow_R = m*-PI # * 0.5
+            shldr_R = m*-PI #* 0.5
+            # motion = self.pattern_time
 
         left_count: float = 5 + P.line_amount   * LF.n_cos_inv(shldr_L)
         rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(shldr_R)
-        left_width: float = P.line_width        * LF.n_cos(elbow_L) * LF.n_cos(shldr_L) * 0.6 + 0.4
-        rigt_width: float = P.line_width        * LF.n_cos(elbow_R) * LF.n_cos(shldr_R) * 0.6 + 0.4
+        left_width: float = P.line_width        * pytweening.easeInExpo(LF.n_cos(elbow_L) * LF.n_cos(shldr_L)) * 0.9 + 0.3
+        rigt_width: float = P.line_width        * pytweening.easeInExpo(LF.n_cos(elbow_R) * LF.n_cos(shldr_R)) * 0.9 + 0.3
         left_sharp: float = P.line_sharpness    * LF.n_abs(elbow_L)
         rigt_sharp: float = P.line_sharpness    * LF.n_abs(elbow_R)
         left_speed: float = P.line_speed        * LF.n_cos_inv(elbow_L) + LF.n_cos_inv(shldr_L)
         rigt_speed: float = P.line_speed        * LF.n_cos_inv(elbow_R) + LF.n_cos_inv(shldr_R)
 
         self.pattern_time  += self.interval * left_speed * rigt_speed
-        motion_time: float = motion * 0.1 + self.pattern_time
+        line_time: float = motion * 0.1 + self.pattern_time * 0.1
+        left_strth: float = pytweening.easeInOutQuad(LF.n_cos(shldr_L))
+        rigt_strth: float = pytweening.easeInOutQuad(LF.n_cos(shldr_R))
+        mess: float = 0.0# (1.0 - synchrony) * 1
+        p01: float = np.sin(motion * 0.1) * 0.5 + 1.0
 
+
+        # print(self.smooth_data.get_angle(self.cam_id, PoseJoint.left_elbow), self.smooth_data.get_synchrony(self.cam_id, SymmetricJointType.elbow))
+        # print(LF.n_cos(PI), pytweening.easeInExpo(LF.n_cos(PI) * LF.n_cos(PI)) * 0.6 + 0.4)
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         LF.line_shader.use(self.left_fbo.fbo_id,
-                           time=motion_time,
-                           phase=0.0,
+                           time=line_time,
+                           phase=0.0 + (1.0 - synchrony),
                            anchor=anchor,
                            amount=left_count,
                            thickness=left_width,
-                           sharpness=left_sharp)
+                           sharpness=left_sharp,
+                           stretch=left_strth,
+                           mess=mess,
+                           param01=p01)
         LF.line_shader.use(self.rigt_fbo.fbo_id,
-                           time=motion_time,
-                           phase=0.5,
+                           time=line_time,
+                           phase=0.5 + (1.0 - synchrony),
                            anchor=anchor,
                            amount=rigt_count,
                            thickness=rigt_width,
-                           sharpness=rigt_sharp)
+                           sharpness=rigt_sharp,
+                           stretch=rigt_strth,
+                           mess=mess,
+                           param01=p01)
 
         self._render()
 

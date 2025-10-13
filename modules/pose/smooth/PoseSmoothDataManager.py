@@ -17,7 +17,7 @@ from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.smooth.PoseSmoothBase import PoseSmoothBase
 from modules.pose.smooth.PoseSmoothRect import PoseSmoothRect, PoseSmoothRectSettings
-from modules.pose.smooth.PoseSmoothAngles import PoseSmoothAngles, PoseSmoothAngleSettings
+from modules.pose.smooth.PoseSmoothAngles import PoseSmoothAngles, PoseSmoothAngleSettings, SymmetricJointType
 from modules.pose.smooth.PoseSmoothHead import PoseSmoothHead, PoseSmoothHeadSettings
 from modules.utils.OneEuroInterpolation import OneEuroSettings
 from modules.utils.PointsAndRects import Rect
@@ -150,3 +150,13 @@ class PoseSmoothDataManager:
         """Get the age in seconds since the tracklet was first detected."""
         with self._lock:
             return self._rect_smoothers[tracklet_id].age
+
+    def get_synchrony(self, tracklet_id: int, type: SymmetricJointType) -> float:
+        """Get the synchrony value for the specified symmetric joint type."""
+        with self._lock:
+            return self._angle_smoothers[tracklet_id].get_symmetry(type)
+
+    def get_mean_synchrony(self, tracklet_id: int) -> float:
+        """Get the mean synchrony value across all symmetric joint types."""
+        with self._lock:
+            return self._angle_smoothers[tracklet_id].mean_synchrony

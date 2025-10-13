@@ -9,12 +9,13 @@ class HDT_Lines(Shader):
         super().__init__()
         self.shader_name = self.__class__.__name__
 
-        self.hot_reloader = HotReloadMethods(self.__class__, True)
+        # self.hot_reloader = HotReloadMethods(self.__class__, True)
 
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, time: float, phase: float, anchor: float, amount: float, thickness: float, sharpness: float) -> None:
+    def use(self, fbo: int, time: float, phase: float, anchor: float, amount: float, thickness: float, sharpness: float, stretch: float, mess: float,
+            param01: float = 0.0, param02: float = 0.0, param03: float = 0.0, param04: float = 0.0, param05: float = 0.0) -> None:
         super().use()
         if not self.allocated:
             return
@@ -32,6 +33,13 @@ class HDT_Lines(Shader):
         glUniform1f(glGetUniformLocation(s, "amount"), amount)
         glUniform1f(glGetUniformLocation(s, "thickness"), thickness)
         glUniform1f(glGetUniformLocation(s, "sharpness"), c_sharpness)
+        glUniform1f(glGetUniformLocation(s, "stretch"), stretch)
+        glUniform1f(glGetUniformLocation(s, "mess"), mess)
+        glUniform1f(glGetUniformLocation(s, "param01"), param01)
+        glUniform1f(glGetUniformLocation(s, "param02"), param02)
+        glUniform1f(glGetUniformLocation(s, "param03"), param03)
+        glUniform1f(glGetUniformLocation(s, "param04"), param04)
+        glUniform1f(glGetUniformLocation(s, "param05"), param05)
 
         glBindFramebuffer(GL_FRAMEBUFFER, fbo)
         draw_quad()
