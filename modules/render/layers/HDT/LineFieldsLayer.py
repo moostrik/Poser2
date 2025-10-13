@@ -67,7 +67,7 @@ class LF(LayerBase):
         #     self._clear()
         #     return
 
-        # if self.cam_id != 0:
+        # if self.cam_id != 1:
         #     return
 
         self.smooth_data.OneEuro_settings.min_cutoff = 0.1
@@ -75,6 +75,9 @@ class LF(LayerBase):
 
         self.smooth_data.rect_settings.centre_dest_y = 0.25
         self.smooth_data.rect_settings.height_dest = 0.8
+
+        self.smooth_data.angle_settings.motion_threshold = 0.003
+        self.smooth_data.head_settings.motion_threshold = 0.003
 
         P: LineFieldsSettings = LineFieldsSettings()
         P.line_sharpness = 4
@@ -96,7 +99,7 @@ class LF(LayerBase):
 
         if not self.smooth_data.get_is_active(self.cam_id):
         # if True:
-            m = 0.1
+            m = 1.0
             elbow_L = m*PI# * 0.5 #np.sin(age) * PI
             shldr_L = m*PI #* 0.5
             elbow_R = m*-PI # * 0.5
@@ -116,7 +119,7 @@ class LF(LayerBase):
         line_time: float = motion * 0.1 + self.pattern_time * 0.1
         left_strth: float = pytweening.easeInOutQuad(LF.n_cos(shldr_L))
         rigt_strth: float = pytweening.easeInOutQuad(LF.n_cos(shldr_R))
-        mess: float = 0.0# (1.0 - synchrony) * 1
+        mess: float = (1.0 - synchrony) * 1
         p01: float = np.sin(motion * 0.1) * 0.5 + 1.0
 
 
@@ -128,7 +131,7 @@ class LF(LayerBase):
 
         LF.line_shader.use(self.left_fbo.fbo_id,
                            time=line_time,
-                           phase=0.0 + (1.0 - synchrony),
+                           phase=0.0,# + (1.0 - synchrony),
                            anchor=anchor,
                            amount=left_count,
                            thickness=left_width,
@@ -138,7 +141,7 @@ class LF(LayerBase):
                            param01=p01)
         LF.line_shader.use(self.rigt_fbo.fbo_id,
                            time=line_time,
-                           phase=0.5 + (1.0 - synchrony),
+                           phase=0.5,# + (1.0 - synchrony),
                            anchor=anchor,
                            amount=rigt_count,
                            thickness=rigt_width,
