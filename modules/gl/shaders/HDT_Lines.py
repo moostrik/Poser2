@@ -23,8 +23,7 @@ class HDT_Lines(Shader):
         if s is None:
             return
 
-        c_sharpness: float = max(min(sharpness, 0.0), 0.9999)
-
+        c_sharpness: float = min(max(sharpness, 0.0), 0.9999)
         glUseProgram(s)
         glUniform1f(glGetUniformLocation(s, "time"), time)
         glUniform1f(glGetUniformLocation(s, "speed"), 1.0)
@@ -48,4 +47,3 @@ class HDT_Lines(Shader):
         glUseProgram(0)
 
         glBindTexture(GL_TEXTURE_2D, 0)
-

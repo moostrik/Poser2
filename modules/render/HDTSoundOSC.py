@@ -104,6 +104,17 @@ class HDTSoundOSC:
         head_msg.add_arg(float(head_orientation))
         bundle_builder.add_content(head_msg.build()) # type: ignore
 
+        for joint in POSE_ANGLE_JOINTS:
+            angle: float | None = self.smooth_data.get_velocity(id, joint)
+            angle_msg = OscMessageBuilder(address=f"/pose/{id}/delta/{joint.name}")
+            angle_msg.add_arg(float(angle))
+            bundle_builder.add_content(angle_msg.build()) # type: ignore
+
+        head_orientation: float = self.smooth_data.get_head_delta(id)
+        head_msg = OscMessageBuilder(address=f"/pose/{id}/delta/head")
+        head_msg.add_arg(float(head_orientation))
+        bundle_builder.add_content(head_msg.build()) # type: ignore
+
         head_orientation: float = self.smooth_data.get_mean_symmetry(id)
         head_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/mean")
         head_msg.add_arg(float(head_orientation))

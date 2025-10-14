@@ -17,9 +17,15 @@ from modules.pose.smooth.PoseSmoothDataManager import PoseJoint, PoseSmoothDataM
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+
+from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSettings
+
 PI: float = np.pi
 TWOPI: float = 2 * np.pi
 HALFPI: float = np.pi / 2
+
+
+
 
 @dataclass
 class LineFieldsSettings():
@@ -39,6 +45,11 @@ class LF(LayerBase):
         self.rigt_fbo: Fbo = Fbo()
         self.interval: float = 1.0 / 60.0
         self.pattern_time: float = 0.0
+
+        self.left_width_OneEuro = AngleEuroInterpolator(OneEuroSettings(60, 1.1, 0.2))
+        self.rigt_width_OneEuro = AngleEuroInterpolator(self.left_width_OneEuro.settings)
+        self.left_sharp_OneEuro = AngleEuroInterpolator(OneEuroSettings(60, 1.1, 0.2))
+        self.rigt_sharp_OneEuro = AngleEuroInterpolator(self.left_sharp_OneEuro.settings)
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
@@ -80,15 +91,19 @@ class LF(LayerBase):
         self.smooth_data.head_settings.motion_threshold = 0.003
 
         P: LineFieldsSettings = LineFieldsSettings()
-        P.line_sharpness = 4
+        P.line_sharpness = 1
         P.line_speed = 0.2
         P.line_width = 1.1
         P.line_amount = 5.0
 
         elbow_L: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.left_elbow)
+        elbow_L_Vel: float  = self.smooth_data.get_velocity(self.cam_id, PoseJoint.left_elbow)
         shldr_L: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.left_shoulder)
+        shldr_L_Vel: float  = self.smooth_data.get_velocity(self.cam_id, PoseJoint.left_shoulder)
         elbow_R: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.right_elbow)
+        elbow_R_Vel: float  = self.smooth_data.get_velocity(self.cam_id, PoseJoint.right_elbow)
         shldr_R: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.right_shoulder)
+        shldr_R_Vel: float  = self.smooth_data.get_velocity(self.cam_id, PoseJoint.right_shoulder)
         head: float     = self.smooth_data.get_head(self.cam_id)
         motion: float   = self.smooth_data.get_motion(self.cam_id)
         age: float      = self.smooth_data.get_age(self.cam_id)
@@ -108,10 +123,41 @@ class LF(LayerBase):
 
         left_count: float = 5 + P.line_amount   * LF.n_cos_inv(shldr_L)
         rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(shldr_R)
-        left_width: float = P.line_width        * pytweening.easeInExpo(LF.n_cos(elbow_L) * LF.n_cos(shldr_L)) * 0.9 + 0.3
-        rigt_width: float = P.line_width        * pytweening.easeInExpo(LF.n_cos(elbow_R) * LF.n_cos(shldr_R)) * 0.9 + 0.3
-        left_sharp: float = P.line_sharpness    * LF.n_abs(elbow_L)
-        rigt_sharp: float = P.line_sharpness    * LF.n_abs(elbow_R)
+
+        self.rigt_width_OneEuro.settings.min_cutoff = 1
+        self.rigt_width_OneEuro.settings.beta = 0.2
+        self.left_width_OneEuro.add_sample(abs(shldr_L_Vel))
+        self.left_width_OneEuro.update()
+        self.rigt_width_OneEuro.add_sample(abs(shldr_R_Vel))
+        self.rigt_width_OneEuro.update()
+
+        self.left_sharp_OneEuro.settings.min_cutoff = 0.75
+        self.left_sharp_OneEuro.settings.beta = 0.0
+        self.left_sharp_OneEuro.add_sample((abs(shldr_L_Vel) + abs(elbow_L_Vel)) / 2)
+        self.left_sharp_OneEuro.update()
+        self.rigt_sharp_OneEuro.add_sample((abs(shldr_L_Vel) + abs(elbow_R_Vel)) / 2)
+        self.rigt_sharp_OneEuro.update()
+
+        #     print(self.left_width_OneEuro.smooth_value)
+        left_width: float = 0.5
+        rigt_width: float = 0.5
+        left_width = P.line_width * pytweening.easeInQuad(LF.limb_up(elbow_L, shldr_L)) * 0.7 + 0.3 * P.line_width
+        rigt_width = P.line_width * pytweening.easeInQuad(LF.limb_up(elbow_R, shldr_R)) * 0.7 + 0.3 * P.line_width
+        left_width *= 1.0 - pytweening.easeInSine(min(self.left_width_OneEuro.smooth_value * TWOPI, 1.0)) * 0.9
+        rigt_width *= 1.0 - pytweening.easeInSine(min(self.rigt_width_OneEuro.smooth_value * TWOPI, 1.0)) * 0.9
+
+        left_sharp: float = 1.0
+        rigt_sharp: float = 1.0
+        left_sharp = pytweening.easeOutQuart(LF.n_cos_inv(shldr_L)) * 1.5
+        rigt_sharp = pytweening.easeOutQuart(LF.n_cos_inv(shldr_R)) * 1.5
+        left_sharp -= (left_sharp) * pytweening.easeOutQuart(min(self.left_sharp_OneEuro.smooth_value * 12, 1.0))
+        rigt_sharp -= (rigt_sharp) * pytweening.easeOutQuart(min(self.rigt_sharp_OneEuro.smooth_value * 12, 1.0))
+
+        # left_sharp = 1.0 -  pytweening.easeOutQuad(min(self.left_speed_OneEuro.smooth_value * TWOPI, 1.0))
+        # rigt_sharp = 1.0 -  pytweening.easeOutQuad(min(self.rigt_speed_OneEuro.smooth_value * TWOPI, 1.0))
+
+        # if self.cam_id == 2:
+        #     print(left_sharp)
         left_speed: float = P.line_speed        * LF.n_cos_inv(elbow_L) + LF.n_cos_inv(shldr_L)
         rigt_speed: float = P.line_speed        * LF.n_cos_inv(elbow_R) + LF.n_cos_inv(shldr_R)
 
@@ -121,7 +167,6 @@ class LF(LayerBase):
         rigt_strth: float = pytweening.easeInOutQuad(LF.n_cos(shldr_R))
         mess: float = (1.0 - synchrony) * 1
         p01: float = np.sin(motion * 0.1) * 0.5 + 1.0
-
 
         # print(self.smooth_data.get_angle(self.cam_id, PoseJoint.left_elbow), self.smooth_data.get_synchrony(self.cam_id, SymmetricJointType.elbow))
         # print(LF.n_cos(PI), pytweening.easeInExpo(LF.n_cos(PI) * LF.n_cos(PI)) * 0.6 + 0.4)
@@ -195,3 +240,7 @@ class LF(LayerBase):
     @staticmethod
     def n_abs_inv(angle) -> float:
         return 1.0 - abs(angle) / PI
+
+    @staticmethod
+    def limb_up(angle0: float, angle1: float) -> float:
+        return LF.n_cos(angle0) * LF.n_cos(angle1)

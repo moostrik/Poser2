@@ -75,8 +75,12 @@ class PoseSmoothAngles(PoseSmoothBase):
         return {joint: self.get_angle(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
 
     @property
-    def deltas(self) -> dict[PoseJoint, float]:
-        return {joint: self.get_delta(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
+    def velocities(self) -> dict[PoseJoint, float]:
+        return {joint: self.get_velocity(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
+
+    @property
+    def accelerations(self) -> dict[PoseJoint, float]:
+        return {joint: self.get_acceleration(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
 
     @property
     def motions(self) -> dict[PoseJoint, float]:
@@ -122,7 +126,7 @@ class PoseSmoothAngles(PoseSmoothBase):
         total_movement: float = 0.0
         for joint in POSE_ANGLE_JOINTS:
             self._angle_smoothers[joint].update()
-            delta: float | None = self._angle_smoothers[joint]._smooth_delta
+            delta: float | None = self._angle_smoothers[joint]._smooth_velocity
             movement: float = abs(delta) if delta is not None else 0.0
             if movement < self.settings.motion_threshold:
                 movement = 0.0
@@ -165,13 +169,21 @@ class PoseSmoothAngles(PoseSmoothBase):
            angle = -angle
         return angle
 
-    def get_delta(self, joint: PoseJoint, symmetric: bool = True) -> float:
-        delta: float | None = self._angle_smoothers[joint].smooth_delta
-        if delta is None:
+    def get_velocity(self, joint: PoseJoint, symmetric: bool = True) -> float:
+        velocity: float | None = self._angle_smoothers[joint].smooth_velocity
+        if velocity is None:
             return 0.0
-        if symmetric and "right_" in joint.name and delta is not None:
-           delta = -delta
-        return delta
+        if symmetric and "right_" in joint.name and velocity is not None:
+           velocity = -velocity
+        return velocity
+
+    def get_acceleration(self, joint: PoseJoint, symmetric: bool = True) -> float:
+        acceleration: float | None = self._angle_smoothers[joint].smooth_acceleration
+        if acceleration is None:
+            return 0.0
+        if symmetric and "right_" in joint.name and acceleration is not None:
+           acceleration = -acceleration
+        return acceleration
 
     # SYMMETRY METHODS
     def get_symmetry(self, joint_type: SymmetricJointType) -> float:

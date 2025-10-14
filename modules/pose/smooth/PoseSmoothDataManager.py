@@ -109,15 +109,25 @@ class PoseSmoothDataManager:
         with self._lock:
             return self._angle_smoothers[tracklet_id].get_angle(joint, symmetric=True)
 
-    def get_deltas(self, tracklet_id: int) -> dict[PoseJoint, float]:
+    def get_velocities(self, tracklet_id: int) -> dict[PoseJoint, float]:
         """Get smoothed angle changes for all joints for the specified tracklet ID."""
         with self._lock:
-            return self._angle_smoothers[tracklet_id].deltas
+            return self._angle_smoothers[tracklet_id].velocities
 
-    def get_delta(self, tracklet_id: int, joint: PoseJoint) -> float:
+    def get_velocity(self, tracklet_id: int, joint: PoseJoint) -> float:
         """Get smoothed angle for the specified tracklet ID and joint."""
         with self._lock:
-            return self._angle_smoothers[tracklet_id].get_delta(joint, symmetric=True)
+            return self._angle_smoothers[tracklet_id].get_velocity(joint, symmetric=True)
+
+    def get_accelerations(self, tracklet_id: int) -> dict[PoseJoint, float]:
+        """Get smoothed angle changes for all joints for the specified tracklet ID."""
+        with self._lock:
+            return self._angle_smoothers[tracklet_id].accelerations
+
+    def get_acceleration(self, tracklet_id: int, joint: PoseJoint) -> float:
+        """Get smoothed angle for the specified tracklet ID and joint."""
+        with self._lock:
+            return self._angle_smoothers[tracklet_id].get_acceleration(joint, symmetric=True)
 
     def get_angular_motion(self, tracklet_id: int) -> float:
         """Get smoothed angle change for the specified tracklet ID and joint."""
@@ -127,12 +137,12 @@ class PoseSmoothDataManager:
     def get_head(self, tracklet_id: int) -> float:
         """Get smoothed head angles for the specified tracklet ID."""
         with self._lock:
-            return self._head_smoothers[tracklet_id].orientation
+            return self._head_smoothers[tracklet_id].angle
 
     def get_head_delta(self, tracklet_id: int) -> float:
         """Get smoothed head angle changes for the specified tracklet ID."""
         with self._lock:
-            return self._head_smoothers[tracklet_id].delta
+            return self._head_smoothers[tracklet_id].velocity
 
     def get_head_motion(self, tracklet_id: int) -> float:
         """Get smoothed head motion for the specified tracklet ID."""

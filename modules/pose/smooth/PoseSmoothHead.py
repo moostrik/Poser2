@@ -22,8 +22,10 @@ class PoseSmoothHead(PoseSmoothBase):
         self.settings: PoseSmoothHeadSettings = settings
         self._head_smoother: AngleEuroInterpolator = AngleEuroInterpolator(settings.smooth_settings)
 
-        self._orientation: float = 0.0
-        self._delta: float = 0.0
+        self._angle: float = 0.0
+        self._velocity: float = 0.0
+        self._acceleration: float = 0.0
+
         self._motion: float = 0.0
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -33,13 +35,16 @@ class PoseSmoothHead(PoseSmoothBase):
         return self._active
 
     @property
-    def orientation(self) -> float:
-        return self._orientation
+    def angle(self) -> float:
+        return self._angle
 
     @property
-    def delta(self) -> float:
-        return self._delta
+    def velocity(self) -> float:
+        return self._velocity
 
+    @property
+    def acceleration(self) -> float:
+        return self._acceleration
     @property
     def motion(self) -> float:
         return self._motion
@@ -67,16 +72,19 @@ class PoseSmoothHead(PoseSmoothBase):
             return
 
         self._head_smoother.update()
-        self._orientation = self._head_smoother.smooth_value if self._head_smoother.smooth_value is not None else 0.0
-        delta: float | None = self._head_smoother._smooth_delta
-        self._delta = delta if delta is not None else 0.0
-        motion: float = abs(self._delta)
+
+
+        self._angle = self._head_smoother.smooth_value if self._head_smoother.smooth_value is not None else 0.0
+        self._velocity = self._head_smoother._smooth_velocity if self._head_smoother._smooth_velocity is not None else 0.0
+        self._acceleration = self._head_smoother._smooth_acceleration if self._head_smoother._smooth_acceleration is not None else 0.0
+
+        motion: float = abs(self._velocity)
         if motion < self.settings.motion_threshold:
             motion = 0.0
         self._motion += motion * self.settings.motion_weight
 
     def reset(self) -> None:
         self._head_smoother.reset()
-        self._orientation = 0.0
-        self._delta = 0.0
+        self._angle = 0.0
+        self._velocity = 0.0
         self._motion = 0.0

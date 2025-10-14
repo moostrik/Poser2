@@ -62,10 +62,11 @@ class OneEuroInterpolator:
         self._interval: float = 1.0 / settings.frequency               # Expected time between samples
         self._buffer: deque[float] = deque(maxlen=4)     # Store recent filtered values
         self._last_time: float = time()                  # Timestamp of last sample
-        self._last_real: float | None = None             # Last non-NaN value
+        self._last_valid_input_value: float | None = None             # Last non-NaN value
 
         self._smooth_value: float | None = None
-        self._smooth_delta: float | None = None
+        self._smooth_velocity: float | None = None
+        self._smooth_acceleration: float | None = None
 
         settings.add_observer(self._update_filter_from_settings)
 
@@ -74,8 +75,16 @@ class OneEuroInterpolator:
         return self._smooth_value
 
     @property
-    def smooth_delta(self) -> float | None:
-        return self._smooth_delta
+    def smooth_velocity(self) -> float | None:
+        return self._smooth_velocity
+
+    @property
+    def smooth_acceleration(self) -> float | None:
+        return self._smooth_acceleration
+
+    @property
+    def settings(self) -> OneEuroSettings:
+        return self._settings
 
     def _update_filter_from_settings(self) -> None:
         """Update filter parameters from current settings"""
@@ -85,17 +94,17 @@ class OneEuroInterpolator:
 
     def add_sample(self, value: float) -> None:
         if np.isnan(value):
-            if self._last_real is None:
+            if self._last_valid_input_value is None:
                 return
-            value = self._last_real
+            value = self._last_valid_input_value
         else:
-            self._last_real = value
+            self._last_valid_input_value = value
 
         smoothed: float = self._filter(value)
         self._buffer.append(smoothed)
         self._last_time = time()
 
-    def update(self) -> None:
+    def update(self) -> tuple[float, float, float]:
         """
         Get an interpolated value based on current time and previously added samples.
 
@@ -127,12 +136,23 @@ class OneEuroInterpolator:
         if self._smooth_value is None:
             self._smooth_value = value
 
-        self._smooth_delta = value - self._smooth_value
+        velocity = value - self._smooth_value
+        if self._smooth_velocity is None:
+            self._smooth_velocity = velocity
+
+        acceleration = velocity - self._smooth_velocity
+
         self._smooth_value = value
+        self._smooth_velocity = velocity
+        self._smooth_acceleration = acceleration
+
+        return [self._smooth_value if self._smooth_value is not None else 0.0,
+                self._smooth_velocity if self._smooth_velocity is not None else 0.0,
+                self._smooth_acceleration if self._smooth_acceleration is not None else 0.0]
 
     def reset(self) -> None:
         self._buffer.clear()
-        self._last_real = None
+        self._last_valid_input_value = None
         self._last_time = time()
         self._filter.reset()
 
@@ -182,15 +202,24 @@ class AngleEuroInterpolator:
         self._sin_interp = OneEuroInterpolator(settings)
         self._cos_interp = OneEuroInterpolator(settings)
         self._smooth_value: float | None = None
-        self._smooth_delta: float | None = None
+        self._smooth_velocity: float | None = None
+        self._smooth_acceleration: float | None = None
 
     @property
     def smooth_value(self) -> float | None:
         return self._smooth_value
 
     @property
-    def smooth_delta(self) -> float | None:
-        return self._smooth_delta
+    def smooth_velocity(self) -> float | None:
+        return self._smooth_velocity
+
+    @property
+    def smooth_acceleration(self) -> float | None:
+        return self._smooth_acceleration
+
+    @property
+    def settings(self) -> OneEuroSettings:
+        return self._sin_interp.settings
 
     def add_sample(self, angle: float) -> None:
         """Add an angular sample in [-π,π] range"""
@@ -200,7 +229,7 @@ class AngleEuroInterpolator:
         self._sin_interp.add_sample(sin_val)
         self._cos_interp.add_sample(cos_val)
 
-    def update(self) -> None:
+    def update(self) -> tuple[float, float, float]:
         """Get interpolated angle in [-π,π] range"""
         self._sin_interp.update()
         self._cos_interp.update()
@@ -214,8 +243,19 @@ class AngleEuroInterpolator:
         value: float = float(np.arctan2(sin_val, cos_val))
         if self._smooth_value is None:
             self._smooth_value = value
-        self._smooth_delta = float(np.mod(value - self._smooth_value + np.pi, 2 * np.pi) - np.pi)
+
+        velocity = float(np.mod(value - self._smooth_value + np.pi, 2 * np.pi) - np.pi)
+        if self._smooth_velocity is None:
+            self._smooth_velocity = velocity
+
+        acceleration = float(np.mod(velocity - self._smooth_velocity + np.pi, 2 * np.pi) - np.pi)
+
         self._smooth_value = value
+        self._smooth_velocity = velocity
+        self._smooth_acceleration = acceleration
+        return [self._smooth_value if self._smooth_value is not None else 0.0,
+                self._smooth_velocity if self._smooth_velocity is not None else 0.0,
+                self._smooth_acceleration if self._smooth_acceleration is not None else 0.0]
 
     def reset(self) -> None:
         self._sin_interp.reset()
