@@ -2,8 +2,9 @@
 # Standard library imports
 import traceback
 from dataclasses import dataclass
-import numpy as np
+# import numpy as np
 from time import time
+import math
 
 # Third-party imports
 import pytweening
@@ -15,14 +16,12 @@ from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
 from modules.pose.smooth.PoseSmoothDataManager import PoseJoint, PoseSmoothDataManager, SymmetricJointType
 from modules.gl.LayerBase import LayerBase, Rect
+from modules.utils.Smoothing import OneEuroFilterAngular
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-
-from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSettings
-
-PI: float = np.pi
-TWOPI: float = 2 * np.pi
-HALFPI: float = np.pi / 2
+PI: float = math.pi
+TWOPI: float = 2 * math.pi
+HALFPI: float = math.pi / 2
 
 
 
@@ -46,10 +45,10 @@ class LF(LayerBase):
         self.interval: float = 1.0 / 60.0
         self.pattern_time: float = 0.0
 
-        self.left_width_OneEuro = AngleEuroInterpolator(OneEuroSettings(60, 1.1, 0.2))
-        self.rigt_width_OneEuro = AngleEuroInterpolator(self.left_width_OneEuro.settings)
-        self.left_sharp_OneEuro = AngleEuroInterpolator(OneEuroSettings(60, 1.1, 0.2))
-        self.rigt_sharp_OneEuro = AngleEuroInterpolator(self.left_sharp_OneEuro.settings)
+        self.left_width_OneEuro = OneEuroFilterAngular(60, 1.1, 0.2)
+        self.rigt_width_OneEuro = OneEuroFilterAngular(60, 1.1, 0.2)
+        self.left_sharp_OneEuro = OneEuroFilterAngular(60, 1.1, 0.2)
+        self.rigt_sharp_OneEuro = OneEuroFilterAngular(60, 1.1, 0.2)
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
@@ -124,34 +123,30 @@ class LF(LayerBase):
         left_count: float = 5 + P.line_amount   * LF.n_cos_inv(shldr_L)
         rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(shldr_R)
 
-        self.rigt_width_OneEuro.settings.min_cutoff = 1
-        self.rigt_width_OneEuro.settings.beta = 0.2
-        self.left_width_OneEuro.add_sample(abs(shldr_L_Vel))
-        self.left_width_OneEuro.update()
-        self.rigt_width_OneEuro.add_sample(abs(shldr_R_Vel))
-        self.rigt_width_OneEuro.update()
+        self.rigt_width_OneEuro.setMinCutoff(1)
+        self.rigt_width_OneEuro.setBeta(0.2)
+        self.left_width_OneEuro(abs(shldr_L_Vel))
+        self.rigt_width_OneEuro(abs(shldr_R_Vel))
 
-        self.left_sharp_OneEuro.settings.min_cutoff = 0.75
-        self.left_sharp_OneEuro.settings.beta = 0.0
-        self.left_sharp_OneEuro.add_sample((abs(shldr_L_Vel) + abs(elbow_L_Vel)) / 2)
-        self.left_sharp_OneEuro.update()
-        self.rigt_sharp_OneEuro.add_sample((abs(shldr_L_Vel) + abs(elbow_R_Vel)) / 2)
-        self.rigt_sharp_OneEuro.update()
+        self.left_sharp_OneEuro.setMinCutoff(0.75)
+        self.left_sharp_OneEuro.setBeta(0.0)
+        self.left_sharp_OneEuro.filter((abs(shldr_L_Vel) + abs(elbow_L_Vel)) / 2)
+        self.rigt_sharp_OneEuro.filter((abs(shldr_L_Vel) + abs(elbow_R_Vel)) / 2)
 
         #     print(self.left_width_OneEuro.smooth_value)
         left_width: float = 0.5
         rigt_width: float = 0.5
         left_width = P.line_width * pytweening.easeInQuad(LF.limb_up(elbow_L, shldr_L)) * 0.7 + 0.3 * P.line_width
         rigt_width = P.line_width * pytweening.easeInQuad(LF.limb_up(elbow_R, shldr_R)) * 0.7 + 0.3 * P.line_width
-        left_width *= 1.0 - pytweening.easeInSine(min(self.left_width_OneEuro.smooth_value * TWOPI, 1.0)) * 0.9
-        rigt_width *= 1.0 - pytweening.easeInSine(min(self.rigt_width_OneEuro.smooth_value * TWOPI, 1.0)) * 0.9
+        left_width *= 1.0 - pytweening.easeInSine(min(self.left_width_OneEuro.value * TWOPI, 1.0)) * 0.9
+        rigt_width *= 1.0 - pytweening.easeInSine(min(self.rigt_width_OneEuro.value * TWOPI, 1.0)) * 0.9
 
         left_sharp: float = 1.0
         rigt_sharp: float = 1.0
         left_sharp = pytweening.easeOutQuart(LF.n_cos_inv(shldr_L)) * 1.5
         rigt_sharp = pytweening.easeOutQuart(LF.n_cos_inv(shldr_R)) * 1.5
-        left_sharp -= (left_sharp) * pytweening.easeOutQuart(min(self.left_sharp_OneEuro.smooth_value * 12, 1.0))
-        rigt_sharp -= (rigt_sharp) * pytweening.easeOutQuart(min(self.rigt_sharp_OneEuro.smooth_value * 12, 1.0))
+        left_sharp -= (left_sharp) * pytweening.easeOutQuart(min(self.left_sharp_OneEuro.value * 12, 1.0))
+        rigt_sharp -= (rigt_sharp) * pytweening.easeOutQuart(min(self.rigt_sharp_OneEuro.value * 12, 1.0))
 
         # left_sharp = 1.0 -  pytweening.easeOutQuad(min(self.left_speed_OneEuro.smooth_value * TWOPI, 1.0))
         # rigt_sharp = 1.0 -  pytweening.easeOutQuad(min(self.rigt_speed_OneEuro.smooth_value * TWOPI, 1.0))
@@ -166,7 +161,7 @@ class LF(LayerBase):
         left_strth: float = pytweening.easeInOutQuad(LF.n_cos(shldr_L))
         rigt_strth: float = pytweening.easeInOutQuad(LF.n_cos(shldr_R))
         mess: float = (1.0 - synchrony) * 1
-        p01: float = np.sin(motion * 0.1) * 0.5 + 1.0
+        p01: float = math.sin(motion * 0.1) * 0.5 + 1.0
 
         # print(self.smooth_data.get_angle(self.cam_id, PoseJoint.left_elbow), self.smooth_data.get_synchrony(self.cam_id, SymmetricJointType.elbow))
         # print(LF.n_cos(PI), pytweening.easeInExpo(LF.n_cos(PI) * LF.n_cos(PI)) * 0.6 + 0.4)
@@ -219,11 +214,11 @@ class LF(LayerBase):
 
     @staticmethod
     def n_cos(angle) -> float:
-        return (np.cos(angle) + 1.0) / 2.0
+        return (math.cos(angle) + 1.0) / 2.0
 
     @staticmethod
     def n_sin(angle) -> float:
-        return (np.sin(angle) + 1.0) / 2.0
+        return (math.sin(angle) + 1.0) / 2.0
 
     @staticmethod
     def n_abs(angle) -> float:
@@ -231,11 +226,11 @@ class LF(LayerBase):
 
     @staticmethod
     def n_cos_inv(angle) -> float:
-        return 1.0 - (np.cos(angle) + 1.0) / 2.0
+        return 1.0 - (math.cos(angle) + 1.0) / 2.0
 
     @staticmethod
     def n_sin_inv(angle) -> float:
-        return 1.0 - (np.sin(angle) + 1.0) / 2.0
+        return 1.0 - (math.sin(angle) + 1.0) / 2.0
 
     @staticmethod
     def n_abs_inv(angle) -> float:

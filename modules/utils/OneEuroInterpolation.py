@@ -12,7 +12,7 @@ Classes:
     --ArrayEuroInterpolator: Interpolator for multi-dimensional numpy arrays--
 """
 
-import numpy as np
+import math
 from dataclasses import dataclass, field
 from OneEuroFilter import OneEuroFilter
 from collections import deque
@@ -93,7 +93,7 @@ class OneEuroInterpolator:
         self._filter.setDerivateCutoff(self._settings.d_cutoff)
 
     def add_sample(self, value: float) -> None:
-        if np.isnan(value):
+        if math.isnan(value):
             if self._last_valid_input_value is None:
                 return
             value = self._last_valid_input_value
@@ -104,7 +104,7 @@ class OneEuroInterpolator:
         self._buffer.append(smoothed)
         self._last_time = time()
 
-    def update(self) -> tuple[float, float, float]:
+    def update(self) -> None:
         """
         Get an interpolated value based on current time and previously added samples.
 
@@ -120,7 +120,7 @@ class OneEuroInterpolator:
         """
 
         if not self._buffer:
-            return None
+            return
 
         reference_time: float = time()
         alpha: float = (reference_time - self._last_time) / self._interval
@@ -145,10 +145,6 @@ class OneEuroInterpolator:
         self._smooth_value = value
         self._smooth_velocity = velocity
         self._smooth_acceleration = acceleration
-
-        return [self._smooth_value if self._smooth_value is not None else 0.0,
-                self._smooth_velocity if self._smooth_velocity is not None else 0.0,
-                self._smooth_acceleration if self._smooth_acceleration is not None else 0.0]
 
     def reset(self) -> None:
         self._buffer.clear()
@@ -223,13 +219,13 @@ class AngleEuroInterpolator:
 
     def add_sample(self, angle: float) -> None:
         """Add an angular sample in [-π,π] range"""
-        sin_val: float = np.sin(angle)
-        cos_val: float = np.cos(angle)
+        sin_val: float = math.sin(angle)
+        cos_val: float = math.cos(angle)
 
         self._sin_interp.add_sample(sin_val)
         self._cos_interp.add_sample(cos_val)
 
-    def update(self) -> tuple[float, float, float]:
+    def update(self) -> None:
         """Get interpolated angle in [-π,π] range"""
         self._sin_interp.update()
         self._cos_interp.update()
@@ -238,24 +234,21 @@ class AngleEuroInterpolator:
         cos_val: float | None = self._cos_interp._smooth_value
 
         if sin_val is None or cos_val is None:
-            return None
+            return
 
-        value: float = float(np.arctan2(sin_val, cos_val))
+        value: float = float(math.atan2(sin_val, cos_val))
         if self._smooth_value is None:
             self._smooth_value = value
 
-        velocity = float(np.mod(value - self._smooth_value + np.pi, 2 * np.pi) - np.pi)
+        velocity = float((value - self._smooth_value + math.pi) % (2 * math.pi) - math.pi)
         if self._smooth_velocity is None:
             self._smooth_velocity = velocity
 
-        acceleration = float(np.mod(velocity - self._smooth_velocity + np.pi, 2 * np.pi) - np.pi)
+        acceleration = float((velocity - self._smooth_velocity + math.pi) % (2 * math.pi) - math.pi)
 
         self._smooth_value = value
         self._smooth_velocity = velocity
         self._smooth_acceleration = acceleration
-        return [self._smooth_value if self._smooth_value is not None else 0.0,
-                self._smooth_velocity if self._smooth_velocity is not None else 0.0,
-                self._smooth_acceleration if self._smooth_acceleration is not None else 0.0]
 
     def reset(self) -> None:
         self._sin_interp.reset()
