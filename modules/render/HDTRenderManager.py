@@ -35,7 +35,7 @@ class HDTRenderManager(RenderBase):
         # data
         self.smooth_data: PoseSmoothDataManager = PoseSmoothDataManager(self.num_players)
         self.data: DataManager =    DataManager(self.smooth_data)
-        self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.81", 8000, 60.0)
+        self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.65", 8000, 60.0)
 
         # meshes
         self.pose_meshes =          PoseMeshes(self.data, self.num_players)
@@ -49,7 +49,7 @@ class HDTRenderManager(RenderBase):
         self.r_stream_layer =       RStreamLayer(self.data, self.num_R_streams)
 
         # fbos
-        self.cam_fbos: list[Fbo] = []
+        self.cam_fbos: dict[int, Fbo] = {}
 
         # populate
         for i in range(self.num_cams):
@@ -57,8 +57,8 @@ class HDTRenderManager(RenderBase):
             self.centre_cam_layers[i] = CentreCamLayer(self.data, self.smooth_data, i)
             self.centre_pose_layers[i] = CentrePoseRender(self.data, self.smooth_data, self.pose_meshes, i)
             self.pose_overlays[i] = PoseStreamLayer(self.data, self.pose_meshes, i)
-            self.line_field_layers[i] = LineFieldLayer(self.smooth_data, i)
-            self.cam_fbos.append(self.centre_cam_layers[i].get_fbo())
+            self.line_field_layers[i] = LineFieldLayer(self.smooth_data, self.cam_fbos, i)
+            self.cam_fbos[i] = self.centre_cam_layers[i].get_fbo()
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
@@ -145,6 +145,7 @@ class HDTRenderManager(RenderBase):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         self.r_stream_layer.draw(self.subdivision.get_rect(RStreamLayer.__name__))
         for i in range(self.num_cams):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -166,7 +167,7 @@ class HDTRenderManager(RenderBase):
         glBlendFunc(GL_ONE, GL_ONE)
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
-        self.centre_cam_layers[camera_id].draw(Rect(0, 0, width, height))
+        # self.centre_cam_layers[camera_id].draw(Rect(0, 0, width, height))
         self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
 
         if self.smooth_data.get_is_active(camera_id):

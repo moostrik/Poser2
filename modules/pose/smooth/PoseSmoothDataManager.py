@@ -21,6 +21,7 @@ from modules.pose.smooth.PoseSmoothAngles import PoseSmoothAngles, PoseSmoothAng
 from modules.pose.smooth.PoseSmoothHead import PoseSmoothHead, PoseSmoothHeadSettings
 from modules.utils.OneEuroInterpolation import OneEuroSettings
 from modules.utils.PointsAndRects import Rect
+from modules.correlation.PairCorrelation import PairCorrelationBatch
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -56,6 +57,8 @@ class PoseSmoothDataManager:
             self._head_smoothers[i] = PoseSmoothHead(self.head_settings)
         self._all_smoothers: list[Mapping[int, PoseSmoothBase]] = [self._rect_smoothers, self._angle_smoothers, self._head_smoothers]
 
+        self.correlation: PairCorrelationBatch = PairCorrelationBatch([])
+
         # Lock to ensure thread safety
         self._lock = Lock()
 
@@ -67,6 +70,12 @@ class PoseSmoothDataManager:
             tracklet_id: int = pose.tracklet.id
             for smoothers in self._all_smoothers:
                 smoothers[tracklet_id].add_pose(pose)
+
+    def set_correlation_batch(self, batch: PairCorrelationBatch) -> None:
+        """ Set the correlation data for synchrony calculations."""
+        with self._lock:
+            self.correlation = batch
+            # print(f"Set correlation: {self.correlation}")
 
     def update(self) -> None:
         """Update all active smoothers."""
@@ -170,3 +179,9 @@ class PoseSmoothDataManager:
         """Get the mean synchrony value across all symmetric joint types."""
         with self._lock:
             return self._angle_smoothers[tracklet_id].mean_symmetry
+
+    def get_motion_correlation(self, id1: int, id2: int) -> float:
+        """Get the correlation value between two tracklet IDs."""
+        with self._lock:
+            pair_id = (id1, id2) if id1 <= id2 else (id2, id1)
+            return self.correlation.get_similarity(pair_id)

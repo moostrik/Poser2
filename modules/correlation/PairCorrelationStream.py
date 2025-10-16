@@ -101,6 +101,13 @@ class PairCorrelationStreamData:
                     correlations[other_id] = last_row['similarity']
         return correlations
 
+    def get_last_value_for(self, x: int, y:int) -> float:
+        pair_id = (x,y) if x <= y else (y,x)
+        if pair_id in self.pair_history and not self.pair_history[pair_id].empty:
+            return float(self.pair_history[pair_id].iloc[-1]['similarity'])
+        return 0.0
+
+
 PairCorrelationStreamDataCallback = Callable[[PairCorrelationStreamData], None]
 
 class PairCorrelationStreamManager:
@@ -187,6 +194,7 @@ class PairCorrelationStreamManager:
                         callback(data)
                     except Exception as e:
                         print(f"Error in callback: {e}")
+                        traceback.print_exc()
             except:
                 continue
 

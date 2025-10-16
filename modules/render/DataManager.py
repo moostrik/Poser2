@@ -12,8 +12,11 @@ from modules.pose.Pose import Pose
 from modules.pose.PoseStream import PoseStreamData
 from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
 from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
+from modules.correlation.PairCorrelation import PairCorrelationBatch
 from modules.WS.WSOutput import WSOutput
 from modules.Settings import Settings
+
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 T = TypeVar('T')
 
@@ -39,6 +42,8 @@ class DataManager:
         self.poses: Dict[int, DataItem[Pose]] = {}
         self.pose_streams: Dict[int, DataItem[PoseStreamData]] = {}
         self.r_streams: Dict[int, DataItem[PairCorrelationStreamData]] = {}
+
+        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @classmethod
     def get_unique_consumer_key(cls) -> str:
@@ -124,6 +129,10 @@ class DataManager:
         return self._get_data_dict(self.pose_streams, id, only_new_data, consumer_key)
 
     # Correlation window management
+    def set_correlation(self, batch: PairCorrelationBatch) -> None:
+        if self.pose_smooth_manager is not None:
+            self.pose_smooth_manager.set_correlation_batch(batch)
+
     def set_correlation_stream(self, value: PairCorrelationStreamData) -> None:
         self._set_data_dict(self.r_streams, 0, value)
 

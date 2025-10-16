@@ -125,3 +125,12 @@ class HDTSoundOSC:
             sym_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/{sym_type.name}")
             sym_msg.add_arg(float(symmetry))
             bundle_builder.add_content(sym_msg.build()) # type: ignore
+
+        for id in range(3):
+            for other_id in range(3):
+                if id == other_id:
+                    continue
+                synchrony: float = self.smooth_data.get_motion_correlation(id, other_id)
+                sync_msg = OscMessageBuilder(address=f"/correlation/motion/{id}/{other_id}")
+                sync_msg.add_arg(float(synchrony))
+                bundle_builder.add_content(sync_msg.build()) # type: ignore

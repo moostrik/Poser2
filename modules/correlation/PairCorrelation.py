@@ -44,5 +44,12 @@ class PairCorrelationBatch:
             return None
         return max(self.pair_correlations, key=lambda r: r.similarity_score)
 
-PoseCorrelationBatchCallback = Callable[[PairCorrelationBatch], None]
+    def get_similarity(self, pair_id: tuple[int, int]) -> float:
+        id1, id2 = pair_id
+        pair_id = (id1, id2) if id1 <= id2 else (id2, id1)
+        for pc in self.pair_correlations:
+            if pc.pair_id == pair_id:
+                return pc.similarity_score
+        return 0.0
 
+PoseCorrelationBatchCallback = Callable[[PairCorrelationBatch], None]

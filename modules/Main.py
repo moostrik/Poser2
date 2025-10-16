@@ -81,6 +81,7 @@ class Main():
             self.correlation_streamer.start()
 
             self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_correlation)
+            self.dtw_correlator.add_correlation_callback(self.render.data.set_correlation)
             self.dtw_correlator.start()
 
             self.pose_streamer.add_stream_callback(self.dtw_correlator.set_pose_stream)

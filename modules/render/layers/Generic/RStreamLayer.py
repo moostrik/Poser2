@@ -13,6 +13,8 @@ from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
 from modules.gl.LayerBase import LayerBase, Rect
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 # Shaders
 from modules.gl.shaders.WS_RStream import WS_RStream
 
@@ -26,6 +28,8 @@ class RStreamLayer(LayerBase):
         self.image: Image = Image()
         self.num_streams: int = num_streams
         text_init()
+        # hot reloader
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
@@ -54,12 +58,19 @@ class RStreamLayer(LayerBase):
         self.image.update()
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        self.fbo.begin()
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+        self.fbo.end()
+
+
         self.r_stream_shader.use(self.fbo.fbo_id, self.image.tex_id, self.image.width, self.image.height, 1.5 / self.fbo.height)
 
         step: float = self.fbo.height / self.num_streams
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.fbo.begin()
         glColor4f(1.0, 0.5, 0.5, 1.0)

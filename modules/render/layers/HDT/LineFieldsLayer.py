@@ -7,7 +7,7 @@ from time import time
 import math
 
 # Third-party imports
-import pytweening
+from pytweening import *
 from OpenGL.GL import *  # type: ignore
 
 # Local imports
@@ -36,8 +36,9 @@ class LineFieldsSettings():
 class LF(LayerBase):
     line_shader = HDT_Lines()
 
-    def __init__(self, smooth_data: PoseSmoothDataManager, cam_id: int) -> None:
+    def __init__(self, smooth_data: PoseSmoothDataManager, cam_fbos: dict[int, Fbo], cam_id: int) -> None:
         self.smooth_data: PoseSmoothDataManager = smooth_data
+        self.cam_fbos: dict[int, Fbo] = cam_fbos
         self.cam_id: int = cam_id
         self.fbo: Fbo = Fbo()
         self.left_fbo: Fbo = Fbo()
@@ -107,7 +108,12 @@ class LF(LayerBase):
         motion: float   = self.smooth_data.get_motion(self.cam_id)
         age: float      = self.smooth_data.get_age(self.cam_id)
         anchor: float   = 1.0 - self.smooth_data.rect_settings.centre_dest_y
-        synchrony: float= self.smooth_data.get_mean_symmetry(self.cam_id)
+        symmetry: float= self.smooth_data.get_mean_symmetry(self.cam_id)
+
+        if self.cam_id == 1:
+            synchrony = self.smooth_data.get_motion_correlation(1, 0)
+            if synchrony > 0.0:
+                print (synchrony)
 
         # print(f"motion={motion:.2f}, age={age:.2f}")
 
@@ -119,6 +125,7 @@ class LF(LayerBase):
             elbow_R = m*-PI # * 0.5
             shldr_R = m*-PI #* 0.5
             # motion = self.pattern_time
+            age = 10.0
 
         left_count: float = 5 + P.line_amount   * LF.n_cos_inv(shldr_L)
         rigt_count: float = 5 + P.line_amount   * LF.n_cos_inv(shldr_R)
@@ -136,17 +143,17 @@ class LF(LayerBase):
         #     print(self.left_width_OneEuro.smooth_value)
         left_width: float = 0.5
         rigt_width: float = 0.5
-        left_width = P.line_width * pytweening.easeInQuad(LF.limb_up(elbow_L, shldr_L)) * 0.7 + 0.3 * P.line_width
-        rigt_width = P.line_width * pytweening.easeInQuad(LF.limb_up(elbow_R, shldr_R)) * 0.7 + 0.3 * P.line_width
-        left_width *= 1.0 - pytweening.easeInSine(min(self.left_width_OneEuro.value * TWOPI, 1.0)) * 0.9
-        rigt_width *= 1.0 - pytweening.easeInSine(min(self.rigt_width_OneEuro.value * TWOPI, 1.0)) * 0.9
+        left_width = P.line_width * easeInQuad(LF.limb_up(elbow_L, shldr_L)) * 0.7 + 0.3 * P.line_width
+        rigt_width = P.line_width * easeInQuad(LF.limb_up(elbow_R, shldr_R)) * 0.7 + 0.3 * P.line_width
+        left_width *= 1.0 - easeInSine(min(self.left_width_OneEuro.value * TWOPI, 1.0)) * 0.9
+        rigt_width *= 1.0 - easeInSine(min(self.rigt_width_OneEuro.value * TWOPI, 1.0)) * 0.9
 
         left_sharp: float = 1.0
         rigt_sharp: float = 1.0
-        left_sharp = pytweening.easeOutQuart(LF.n_cos_inv(shldr_L)) * 1.5
-        rigt_sharp = pytweening.easeOutQuart(LF.n_cos_inv(shldr_R)) * 1.5
-        left_sharp -= (left_sharp) * pytweening.easeOutQuart(min(self.left_sharp_OneEuro.value * 12, 1.0))
-        rigt_sharp -= (rigt_sharp) * pytweening.easeOutQuart(min(self.rigt_sharp_OneEuro.value * 12, 1.0))
+        left_sharp = easeOutQuart(LF.n_cos_inv(shldr_L)) * 1.5
+        rigt_sharp = easeOutQuart(LF.n_cos_inv(shldr_R)) * 1.5
+        left_sharp -= (left_sharp) * easeOutQuart(min(self.left_sharp_OneEuro.value * 12, 1.0))
+        rigt_sharp -= (rigt_sharp) * easeOutQuart(min(self.rigt_sharp_OneEuro.value * 12, 1.0))
 
         # left_sharp = 1.0 -  pytweening.easeOutQuad(min(self.left_speed_OneEuro.smooth_value * TWOPI, 1.0))
         # rigt_sharp = 1.0 -  pytweening.easeOutQuad(min(self.rigt_speed_OneEuro.smooth_value * TWOPI, 1.0))
@@ -158,9 +165,9 @@ class LF(LayerBase):
 
         self.pattern_time  += self.interval * left_speed * rigt_speed
         line_time: float = motion * 0.1 + self.pattern_time * 0.1
-        left_strth: float = pytweening.easeInOutQuad(LF.n_cos(shldr_L))
-        rigt_strth: float = pytweening.easeInOutQuad(LF.n_cos(shldr_R))
-        mess: float = (1.0 - synchrony) * 1
+        left_strth: float = easeInOutQuad(LF.n_cos(shldr_L))
+        rigt_strth: float = easeInOutQuad(LF.n_cos(shldr_R))
+        mess: float = (1.0 - symmetry) * 1
         p01: float = math.sin(motion * 0.1) * 0.5 + 1.0
 
         # print(self.smooth_data.get_angle(self.cam_id, PoseJoint.left_elbow), self.smooth_data.get_synchrony(self.cam_id, SymmetricJointType.elbow))
@@ -178,7 +185,8 @@ class LF(LayerBase):
                            sharpness=left_sharp,
                            stretch=left_strth,
                            mess=mess,
-                           param01=p01)
+                           param01=p01,
+                           param05=1.0)
         LF.line_shader.use(self.rigt_fbo.fbo_id,
                            time=line_time,
                            phase=0.5,# + (1.0 - synchrony),
@@ -188,22 +196,31 @@ class LF(LayerBase):
                            sharpness=rigt_sharp,
                            stretch=rigt_strth,
                            mess=mess,
-                           param01=p01)
+                           param01=p01,
+                           param05=1.0)
 
-        self._render()
+        # RENDER
+        fade_in_cam_time: float = 1.1
+        fade_in_color_time: float = 2.9
+        fade_cam = easeOutQuad(min(age, fade_in_cam_time) / fade_in_cam_time)
+        fade_color = easeInSine(min(max(age - 1.0, 0.0), fade_in_cam_time) / fade_in_cam_time)
+        # if self.cam_id == 1 and age > 0.0:
+        #     print(age)
 
-    def _render(self) -> None:
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_ONE, GL_ONE)
         self.fbo.begin()
+
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        glColor3f(1.0, 0.0, 0.0)
+        glColor4f(fade_cam, fade_cam, fade_cam, 1.0)
+        self.cam_fbos[self.cam_id].draw(0,0,self.fbo.width, self.fbo.height)
+        glColor4f(fade_color, 0, 0, 1.0)
         self.left_fbo.draw(0,0,self.fbo.width, self.fbo.height)
-        glColor3f(0.0, 1.0, 1.0)
+        glColor4f(0.0, fade_color, fade_color, 1.0)
         self.rigt_fbo.draw(0,0,self.fbo.width, self.fbo.height)
         self.fbo.end()
-        glColor3f(1.0, 1.0, 1.0)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
 
     def _clear(self) -> None:
         LayerBase.setView(self.fbo.width, self.fbo.height)
