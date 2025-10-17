@@ -59,7 +59,7 @@ class HDTRenderManager(RenderBase):
             self.pose_overlays[i] = PoseStreamLayer(self.data, self.pose_meshes, i)
             self.line_field_layers[i] = LineFieldLayer(self.smooth_data, self.cam_fbos, i)
             self.cam_fbos[i] = self.centre_cam_layers[i].get_fbo()
-
+            # self.cam_fbos[i] = self.camera_layers[i].fbo
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name=CamTrackPoseLayer.__name__,       columns=self.num_cams,      rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
