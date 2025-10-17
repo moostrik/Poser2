@@ -258,8 +258,8 @@ class LF(LayerBase):
         sync_0 = self.smooth_data.get_motion_correlation(this_cam_id, other_cam_id_0)
         sync_1 = self.smooth_data.get_motion_correlation(this_cam_id, other_cam_id_1)
 
-        sync_0 = max((sync_0 - 0.6) / 0.4, 0.0)
-        sync_1 = max((sync_1 - 0.6) / 0.4, 0.0)
+        sync_0 = easeOutQuad(min(max((sync_0 - 0.6) / 0.3, 0.0), 1.0))
+        sync_1 = easeOutQuad(min(max((sync_1 - 0.6) / 0.3, 0.0), 1.0))
 
         # if self.cam_id == 1:
         #     print(f"sync0={sync_0:.2f}, sync1={sync_1:.2f}")

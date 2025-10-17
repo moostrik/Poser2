@@ -15,7 +15,7 @@ class SyncRecorderGui(SyncRecorder):
         super().__init__(settings)
 
         self.osc_clients = [
-            SimpleUDPClient("172.119.0.24", port) for port in range(8600, 8610)
+            SimpleUDPClient("10.0.0.148", port) for port in range(8600, 8610)
         ]
 
         elem: list = []
