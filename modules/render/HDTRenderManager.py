@@ -170,9 +170,9 @@ class HDTRenderManager(RenderBase):
         # self.centre_cam_layers[camera_id].draw(Rect(0, 0, width, height))
         self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
 
-        if self.smooth_data.get_is_active(camera_id):
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
-            self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))
-            glBlendEquation(GL_FUNC_ADD)
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # if self.smooth_data.get_is_active(camera_id):
+        #     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        #     glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
+        #     self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))
+        #     glBlendEquation(GL_FUNC_ADD)
+        #     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)

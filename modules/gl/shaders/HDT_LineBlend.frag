@@ -57,5 +57,5 @@ void main(){
     result = mix(target_color.rgb, result, visibility);
 
     // fragColor = vec4(0.5, 0.5, 0.0, line);
-    fragColor = vec4(result, line);
+    fragColor = vec4(result, min(line, param1));
 }

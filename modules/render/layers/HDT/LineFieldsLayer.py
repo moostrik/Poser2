@@ -27,8 +27,8 @@ HALFPI: float = math.pi / 2
 
 CAM_COLOR = np.array([
     (1.0, 0.0, 0.0, 1.0),  # 0
-    (0.0, 1.0, 1.0, 1.0),  # 1
-    (1.0, 1.0, 0.0, 1.0),  # 2
+    (1.0, 1.0, 0.0, 1.0),  # 1
+    (0.0, 1.0, 1.0, 1.0),  # 2
 ])
 
 @dataclass
@@ -103,9 +103,9 @@ class LF(LayerBase):
         if not LF.line_blend_shader.allocated:
             LF.line_blend_shader.allocate(monitor_file=True)
 
-        # if not self.smooth_data.get_is_active(self.cam_id):
-        #     self._clear()
-        #     return
+        if not self.smooth_data.get_is_active(self.cam_id):
+            self._clear(self.fbo, CAM_COLOR[self.cam_id])
+            return
 
         # if self.cam_id != 1:
         #     return
@@ -242,18 +242,18 @@ class LF(LayerBase):
         #         print (synchrony)
 
         fade_in_cam_time: float = 1.1
-        fade_in_color_time: float = 2.9
+        fade_in_color_time: float = 5
         fade_cam = easeOutQuad(min(age, fade_in_cam_time) / fade_in_cam_time)
-        fade_color = easeInSine(min(max(age - 1.0, 0.0), fade_in_cam_time) / fade_in_cam_time)
+        fade_color = easeInOutQuad(min(max(age - 0., 0.0), fade_in_color_time) / fade_in_color_time)
 
         this_cam_id = self.cam_id
         other_cam_id_0 = (self.cam_id + 1) % 3
         other_cam_id_1 = (self.cam_id + 2) % 3
 
 
-        cam_color = CAM_COLOR[this_cam_id] * fade_color
-        other_cam_color_0 = CAM_COLOR[other_cam_id_0] * fade_color
-        other_cam_color_1 = CAM_COLOR[other_cam_id_1] * fade_color
+        cam_color = CAM_COLOR[this_cam_id]
+        other_cam_color_0 = CAM_COLOR[other_cam_id_0]
+        other_cam_color_1 = CAM_COLOR[other_cam_id_1]
 
         sync_0 = self.smooth_data.get_motion_correlation(this_cam_id, other_cam_id_0)
         sync_1 = self.smooth_data.get_motion_correlation(this_cam_id, other_cam_id_1)
@@ -261,14 +261,14 @@ class LF(LayerBase):
         sync_0 = max((sync_0 - 0.6) / 0.4, 0.0)
         sync_1 = max((sync_1 - 0.6) / 0.4, 0.0)
 
-        if self.cam_id == 1:
-            print(f"sync0={sync_0:.2f}, sync1={sync_1:.2f}")
+        # if self.cam_id == 1:
+        #     print(f"sync0={sync_0:.2f}, sync1={sync_1:.2f}")
 
         LF.line_blend_shader.use(self.this_cam_fbo.fbo_id,
                                  self.cam_fbos[this_cam_id].tex_id,
                                  self.white_line_fbo.tex_id,
                                  color=cam_color,
-                                 visibility=1.0,
+                                 visibility=fade_cam,
                                  param0=0.0,
                                  param1=1.0)
 
@@ -278,7 +278,7 @@ class LF(LayerBase):
                                  color=other_cam_color_0,
                                  visibility=sync_0,
                                  param0=0.0,
-                                 param1=1.0)
+                                 param1=fade_color)
 
         LF.line_blend_shader.use(self.rigt_cam_fbo.fbo_id,
                                  self.cam_fbos[other_cam_id_1].tex_id,
@@ -286,7 +286,7 @@ class LF(LayerBase):
                                  color=other_cam_color_1,
                                  visibility=sync_1,
                                  param0=0.0,
-                                 param1=1.0)
+                                 param1=fade_color)
 
 
 
@@ -295,25 +295,27 @@ class LF(LayerBase):
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         # glBlendFunc(GL_ONE, GL_ONE)
         self.fbo.begin()
 
-        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClearColor(*CAM_COLOR[this_cam_id])
         glClear(GL_COLOR_BUFFER_BIT)
 
 
         # glColor4f(1.0, 1.0, 1.0, 0.75)
+        # glBlendFunc(GL_ONE, GL_ONE)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.this_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
+        # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         self.left_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
         self.rigt_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
         self.fbo.end()
 
-    def _clear(self, fbo:Fbo) -> None:
+    def _clear(self, fbo:Fbo, color: tuple[float, float, float, float] = (0.0,0.0,0.0,0.0)) -> None:
         LayerBase.setView(fbo.width, fbo.height)
         fbo.begin()
-        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glClearColor(*color)
         glClear(GL_COLOR_BUFFER_BIT)
         fbo.end()
 
