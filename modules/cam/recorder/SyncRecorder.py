@@ -13,8 +13,8 @@ from modules.cam.depthcam.Definitions import FrameType, FRAME_TYPE_LABEL_DICT
 def make_file_name(c: int, t: FrameType, chunk: int, format: str) -> str:
     return f"{c}_{FRAME_TYPE_LABEL_DICT[t]}_{chunk:03d}{format}"
 
-def make_folder_name(num_cams: int, square: bool, color: bool, stereo: bool) -> str:
-    return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_square' if square else '_wide') + ('_color' if color else '_mono') + ('_stereo' if stereo else '')
+def make_folder_name(num_cams: int, square: bool, color: bool, stereo: bool, group_id: str ="") -> str:
+    return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_square' if square else '_wide') + ('_color' if color else '_mono') + ('_stereo' if stereo else '') + '_' + group_id
 
 def is_folder_for_settings(name: str, settings: Settings) -> bool:
     parts: list[str] = name.split('_')
@@ -77,7 +77,10 @@ class SyncRecorder(Thread):
         self.state: RecState = RecState.IDLE
         self.state_lock = Lock()
         self.settings_lock = Lock()
+        self.group_id_lock = Lock()
         self.stop_event = Event()
+
+        self.group_id: str = 'no_id'
 
     def stop(self) -> None:
         self.stop_event.set()
@@ -103,7 +106,7 @@ class SyncRecorder(Thread):
 
     def _start_recording(self) -> None:
 
-        self.folder_path = self.output_path / make_folder_name(self.settings.camera_num, self.settings.camera_square, self.settings.camera_color, self.settings.camera_stereo)
+        self.folder_path = self.output_path / make_folder_name(self.settings.camera_num, self.settings.camera_square, self.settings.camera_color, self.settings.camera_stereo, self.get_group_id())
         self.folder_path.mkdir(parents=True, exist_ok=True)
 
         self.chunk_index = 0
@@ -175,3 +178,10 @@ class SyncRecorder(Thread):
         else:
             self._set_state(RecState.STOP)
 
+    def set_group_id(self, value: str) -> None:
+        with self.group_id_lock:
+            self.group_id = value
+
+    def get_group_id(self) -> str:
+        with self.group_id_lock:
+            return self.group_id
