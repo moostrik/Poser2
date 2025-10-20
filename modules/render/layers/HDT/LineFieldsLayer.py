@@ -53,6 +53,7 @@ class LF(LayerBase):
         self.this_cam_fbo: Fbo = Fbo()
         self.left_cam_fbo: Fbo = Fbo()
         self.rigt_cam_fbo: Fbo = Fbo()
+        self.other_cam_fbo: Fbo = Fbo()
         self.interval: float = 1.0 / 60.0
         self.pattern_time: float = 0.0
 
@@ -76,6 +77,7 @@ class LF(LayerBase):
         self.this_cam_fbo.allocate(width, height, GL_RGBA32F)
         self.left_cam_fbo.allocate(width, height, GL_RGBA32F)
         self.rigt_cam_fbo.allocate(width, height, GL_RGBA32F)
+        self.other_cam_fbo.allocate(width, height, GL_RGBA32F)
         if not LF.line_shader.allocated:
             LF.line_shader.allocate(monitor_file=True)
         if not LF.line_blend_shader.allocated:
@@ -89,6 +91,7 @@ class LF(LayerBase):
         self.this_cam_fbo.deallocate()
         self.left_cam_fbo.deallocate()
         self.rigt_cam_fbo.deallocate()
+        self.other_cam_fbo.deallocate()
         if LF.line_shader.allocated:
             LF.line_shader.deallocate()
         if LF.line_blend_shader.allocated:
@@ -122,7 +125,7 @@ class LF(LayerBase):
         P: LineFieldsSettings = LineFieldsSettings()
         P.line_sharpness = 1
         P.line_speed = 0.2
-        P.line_width = 1.1
+        P.line_width = 0.8
         P.line_amount = 5.0
 
         elbow_L: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.left_elbow)
@@ -166,11 +169,10 @@ class LF(LayerBase):
         self.left_sharp_OneEuro.filter((abs(shldr_L_Vel) + abs(elbow_L_Vel)) / 2)
         self.rigt_sharp_OneEuro.filter((abs(shldr_L_Vel) + abs(elbow_R_Vel)) / 2)
 
-        #     print(self.left_width_OneEuro.smooth_value)
         left_width: float = 0.5
         rigt_width: float = 0.5
-        left_width = P.line_width * easeInQuad(LF.limb_up(elbow_L, shldr_L)) * 0.7 + 0.3 * P.line_width
-        rigt_width = P.line_width * easeInQuad(LF.limb_up(elbow_R, shldr_R)) * 0.7 + 0.3 * P.line_width
+        left_width = P.line_width * easeInQuad(1.0 - LF.limb_up(elbow_L, shldr_L)) * 0.7 + 0.3 * P.line_width
+        rigt_width = P.line_width * easeInQuad(1.0 - LF.limb_up(elbow_R, shldr_R)) * 0.7 + 0.3 * P.line_width
         left_width *= 1.0 - easeInSine(min(self.left_width_OneEuro.value * TWOPI, 1.0)) * 0.9
         rigt_width *= 1.0 - easeInSine(min(self.rigt_width_OneEuro.value * TWOPI, 1.0)) * 0.9
 
@@ -204,6 +206,7 @@ class LF(LayerBase):
         self._clear(self.this_cam_fbo)
         self._clear(self.left_cam_fbo)
         self._clear(self.rigt_cam_fbo)
+        self._clear(self.other_cam_fbo)
 
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
@@ -258,10 +261,10 @@ class LF(LayerBase):
         sync_0 = self.smooth_data.get_motion_correlation(this_cam_id, other_cam_id_0)
         sync_1 = self.smooth_data.get_motion_correlation(this_cam_id, other_cam_id_1)
 
-        sync_0 = easeOutQuad(min(max((sync_0 - 0.6) / 0.3, 0.0), 1.0))
-        sync_1 = easeOutQuad(min(max((sync_1 - 0.6) / 0.3, 0.0), 1.0))
+        sync_0 = (min(max((sync_0 - 0.5) / 0.5, 0.0), 1.0))
+        sync_1 = (min(max((sync_1 - 0.5) / 0.5, 0.0), 1.0))
 
-        # if self.cam_id == 1:
+        # if self.cam_id == 0:
         #     print(f"sync0={sync_0:.2f}, sync1={sync_1:.2f}")
 
         LF.line_blend_shader.use(self.this_cam_fbo.fbo_id,
@@ -288,12 +291,19 @@ class LF(LayerBase):
                                  param0=0.0,
                                  param1=fade_color)
 
-
-
-        # if self.cam_id == 1 and age > 0.0:
-        #     print(age)
-
         LayerBase.setView(self.fbo.width, self.fbo.height)
+        self.other_cam_fbo.begin()
+        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+
+        glBlendFunc(GL_ONE, GL_ONE)
+        glColor4f(0.75, 0.75, 0.75, 0.5)
+        self.left_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
+        self.rigt_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+        self.other_cam_fbo.end()
+
+
         glEnable(GL_BLEND)
         # glBlendFunc(GL_ONE, GL_ONE)
         self.fbo.begin()
@@ -307,9 +317,10 @@ class LF(LayerBase):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.this_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
+        self.other_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
         # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        self.left_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
-        self.rigt_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
+        # self.left_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
+        # self.rigt_cam_fbo.draw(0,0,self.fbo.width, self.fbo.height)
         self.fbo.end()
 
     def _clear(self, fbo:Fbo, color: tuple[float, float, float, float] = (0.0,0.0,0.0,0.0)) -> None:

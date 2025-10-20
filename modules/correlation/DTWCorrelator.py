@@ -175,6 +175,8 @@ class DTWCorrelator():
             with self._input_lock:
                 pose_streams: PoseStreamDataDict = self._input_pose_streams.copy()
 
+            # print(pose_streams)
+            pose_streams = self._filter_streams_by_angles(pose_streams, 4) # use only arms
             pose_streams = self._filter_streams_by_time(pose_streams, self.stream_timeout)
             angle_pairs: list[AnglePair] = self._generate_naive_angle_pairs(pose_streams, self.buffer_capacity)
 
@@ -243,6 +245,22 @@ class DTWCorrelator():
                 if (now - last_time).total_seconds() <= max_age_s:
                     filtered[id] = data
         return filtered
+
+    @staticmethod
+    def _filter_streams_by_angles(streams: PoseStreamDataDict, num_angles) -> PoseStreamDataDict:
+        for key, data in streams.items():
+            # angles: pd.DataFrame = data.angles.head(num_angles) # keep ony first angles
+            # confidences: pd.DataFrame = data.confidences.head(num_angles) # keep ony first angles
+            angles: pd.DataFrame = data.angles.iloc[:, :num_angles] # keep ony first angles
+            confidences: pd.DataFrame = data.confidences.iloc[:, :num_angles] # keep ony first angles
+            # print(angles)
+
+            streams[key] = replace(
+                data,
+                angles=angles,
+                confidences=confidences
+            )
+        return streams
 
     @staticmethod
     def _filter_streams_by_length(streams: PoseStreamDataDict, min_length: int = 20) -> PoseStreamDataDict:
@@ -501,6 +519,3 @@ class DTWCorrelator():
         normalized_distance: float = (distance / path_length) / np.pi
         similarity: float = (1.0 - normalized_distance)**similarity_exponent
         return max(0.0, min(1.0, similarity))
-
-
-

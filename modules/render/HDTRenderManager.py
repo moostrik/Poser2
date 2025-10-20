@@ -128,13 +128,13 @@ class HDTRenderManager(RenderBase):
 
         self.smooth_data.update()
         self.pose_meshes.update()
-        self.r_stream_layer.update()
+        # self.r_stream_layer.update()
 
         for i in range(self.num_cams):
             self.camera_layers[i].update()
             self.centre_cam_layers[i].update()
             self.centre_pose_layers[i].update()
-            self.pose_overlays[i].update()
+            # self.pose_overlays[i].update()
             self.line_field_layers[i].update()
 
         self.draw_composition(width, height)
@@ -146,15 +146,16 @@ class HDTRenderManager(RenderBase):
         glClear(GL_COLOR_BUFFER_BIT)
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        self.r_stream_layer.draw(self.subdivision.get_rect(RStreamLayer.__name__))
+        # self.r_stream_layer.draw(self.subdivision.get_rect(RStreamLayer.__name__))
         for i in range(self.num_cams):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             self.camera_layers[i].draw(self.subdivision.get_rect(CamTrackPoseLayer.__name__, i))
 
             glBlendFunc(GL_ONE, GL_ONE)
-            self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            # self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            # self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            # self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glEnable(GL_TEXTURE_2D)

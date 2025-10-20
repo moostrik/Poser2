@@ -209,7 +209,7 @@ class WindowManager():
                 else:
                     if -remaining > self.frame_interval:
                         # If we're behind, reset next_frame_time to now to avoid spiral of death
-                        print("Warning: Frame time exceeded by ", -remaining / 1_000_000, "ms")
+                        # print("Warning: Frame time exceeded by ", -remaining / 1_000_000, "ms")
                         next_frame_time: int = now
 
 
@@ -512,4 +512,3 @@ class WindowManager():
                 self._setup_secondary_window(win, monitor_id, True)
             else:
                 self._setup_secondary_window(win, monitor_id, False)
-
