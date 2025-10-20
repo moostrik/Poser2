@@ -15,13 +15,14 @@ class SyncRecorderGui(SyncRecorder):
         super().__init__(settings)
 
         self.osc_clients = [
-            SimpleUDPClient("10.0.0.148", port) for port in range(8600, 8610)
+            SimpleUDPClient("10.0.0.148", port) for port in range(8600)
         ]
 
         elem: list = []
-        elem.append([E(eT.CHCK, 'Rec',    self.gui_record, False),
-                     E(eT.BTTN, 'End', self.gui_marker_1, False),
-                     E(eT.BTTN, 'Baseline', self.gui_marker_2, False)])
+        elem.append([E(eT.BTTN, 'Start Recording', self.gui_start_recording, False),
+                     E(eT.BTTN, 'Stop Recording', self.gui_stop_recording, False),
+                     E(eT.CHCK, 'Rec', None, False)])
+        elem.append([E(eT.BTTN, 'Baseline Marker', self.gui_marker_2, False)])
 
         self.rec_signal: bool = False
         self.rec_signal_time: float = 0.0
@@ -43,28 +44,28 @@ class SyncRecorderGui(SyncRecorder):
         if self.gui is not None:
             self.gui.updateElement('Rec', False)
 
+    def gui_start_recording(self) -> None:
+        self.record(True)
+        self.rec_signal = True
+        self.rec_signal_time = time.time()
+        self.gui.updateElement('Rec', True)
 
-    def gui_record(self, rec: bool) -> None:
-        self.record(rec)
-        print(f"Sending record command: {rec}")
-        if rec == True:
-            self.rec_signal = True
-            self.rec_signal_time = time.time()
-        # self.osc_client.send_message("/HDT/record", int(rec))
+    def gui_stop_recording(self) -> None:
+        self.record(False)
+        self.rec_signal = True
+        self.rec_signal_time = time.time()
+        self.gui.updateElement('Rec', False)
+        self.gui_marker_1()
 
     def gui_marker_1(self) -> None:
         print("Sending signal to HDT")
         self.marker_signal_1 = True
         self.marker_signal_1_time = time.time()
-        if self.gui is not None:
-            self.gui.updateElement('Rec', False)
-        # self.osc_client.send_message("/HDT/signal", 1)
 
     def gui_marker_2(self) -> None:
         print("Sending signal to HDT")
         self.marker_signal_2 = True
         self.marker_signal_2_time = time.time()
-        # self.osc_client.send_message("/HDT/signal", 2)
 
     def send_osc_loop(self):
         while True:
