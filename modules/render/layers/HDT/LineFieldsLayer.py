@@ -1,3 +1,12 @@
+# 2DO
+# monolithic shader
+# pose correlation
+# pose snapshots
+# pose deviation form neutral (snapshot)
+# pose deviation form other (snapshots)
+# external osc events
+# start and stop event (from external rec event)
+# lut color system
 
 # Standard library imports
 import traceback

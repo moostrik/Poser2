@@ -92,7 +92,7 @@ class PoseSmoothDataManager:
                 for smoother in smoothers.values():
                     smoother.reset()
 
-    # ACCESSORS
+    # ID
     def get_active_ids(self) -> list[int]:
         """Get a list of currently active tracklet IDs."""
         with self._lock:
@@ -103,35 +103,38 @@ class PoseSmoothDataManager:
         with self._lock:
             return self._rect_smoothers[tracklet_id].is_active
 
+    # RECT
     def get_rect(self, tracklet_id: int) -> Rect:
         """Get smoothed rectangle for the specified tracklet ID."""
         with self._lock:
             return self._rect_smoothers[tracklet_id].smoothed_rect
 
+    #  BODY JOINT ANGLES (OBSOLETE?)
     def get_angles(self, tracklet_id: int) -> dict[PoseJoint, float]:
         """Get smoothed angles for all joints for the specified tracklet ID."""
         with self._lock:
             return self._angle_smoothers[tracklet_id].angles
-
-    def get_angle(self, tracklet_id: int, joint: PoseJoint) -> float:
-        """Get smoothed angle for the specified tracklet ID and joint."""
-        with self._lock:
-            return self._angle_smoothers[tracklet_id].get_angle(joint, symmetric=True)
 
     def get_velocities(self, tracklet_id: int) -> dict[PoseJoint, float]:
         """Get smoothed angle changes for all joints for the specified tracklet ID."""
         with self._lock:
             return self._angle_smoothers[tracklet_id].velocities
 
-    def get_velocity(self, tracklet_id: int, joint: PoseJoint) -> float:
-        """Get smoothed angle for the specified tracklet ID and joint."""
-        with self._lock:
-            return self._angle_smoothers[tracklet_id].get_velocity(joint, symmetric=True)
-
     def get_accelerations(self, tracklet_id: int) -> dict[PoseJoint, float]:
         """Get smoothed angle changes for all joints for the specified tracklet ID."""
         with self._lock:
             return self._angle_smoothers[tracklet_id].accelerations
+
+    #  BODY JOINT ANGLES
+    def get_angle(self, tracklet_id: int, joint: PoseJoint) -> float:
+        """Get smoothed angle for the specified tracklet ID and joint."""
+        with self._lock:
+            return self._angle_smoothers[tracklet_id].get_angle(joint, symmetric=True)
+
+    def get_velocity(self, tracklet_id: int, joint: PoseJoint) -> float:
+        """Get smoothed angle for the specified tracklet ID and joint."""
+        with self._lock:
+            return self._angle_smoothers[tracklet_id].get_velocity(joint, symmetric=True)
 
     def get_acceleration(self, tracklet_id: int, joint: PoseJoint) -> float:
         """Get smoothed angle for the specified tracklet ID and joint."""
@@ -143,6 +146,7 @@ class PoseSmoothDataManager:
         with self._lock:
             return self._angle_smoothers[tracklet_id].total_motion
 
+    # HEAD ANGLE
     def get_head(self, tracklet_id: int) -> float:
         """Get smoothed head angles for the specified tracklet ID."""
         with self._lock:
@@ -158,6 +162,7 @@ class PoseSmoothDataManager:
         with self._lock:
             return self._head_smoothers[tracklet_id].motion
 
+    # TIME
     def get_motion(self, tracklet_id: int) -> float:
         """Get combined motion (body + head) for the specified tracklet ID."""
         with self._lock:
@@ -170,6 +175,7 @@ class PoseSmoothDataManager:
         with self._lock:
             return self._rect_smoothers[tracklet_id].age
 
+    # BODY JOINT SYMMETRY
     def get_symmetry(self, tracklet_id: int, type: SymmetricJointType) -> float:
         """Get the synchrony value for the specified symmetric joint type."""
         with self._lock:
@@ -179,6 +185,10 @@ class PoseSmoothDataManager:
         """Get the mean synchrony value across all symmetric joint types."""
         with self._lock:
             return self._angle_smoothers[tracklet_id].mean_symmetry
+
+    # CORRELATION
+    def get_pose_correlation(self, id1: int, id2: int) -> float:
+        return 0.0
 
     def get_motion_correlation(self, id1: int, id2: int) -> float:
         """Get the correlation value between two tracklet IDs."""
