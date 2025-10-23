@@ -27,27 +27,9 @@ class PoseSmoothHead(PoseSmoothBase):
         self._acceleration: float = 0.0
 
         self._motion: float = 0.0
+        self._cumulative_motion: float = 0.0
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
-
-    @property
-    def is_active(self) -> bool:
-        return self._active
-
-    @property
-    def angle(self) -> float:
-        return self._angle
-
-    @property
-    def velocity(self) -> float:
-        return self._velocity
-
-    @property
-    def acceleration(self) -> float:
-        return self._acceleration
-    @property
-    def motion(self) -> float:
-        return self._motion
 
     def add_pose(self, pose: Pose) -> None:
         if pose.tracklet.is_removed:
@@ -73,7 +55,6 @@ class PoseSmoothHead(PoseSmoothBase):
 
         self._head_smoother.update()
 
-
         self._angle = self._head_smoother.smooth_value if self._head_smoother.smooth_value is not None else 0.0
         self._velocity = self._head_smoother._smooth_velocity if self._head_smoother._smooth_velocity is not None else 0.0
         self._acceleration = self._head_smoother._smooth_acceleration if self._head_smoother._smooth_acceleration is not None else 0.0
@@ -81,10 +62,37 @@ class PoseSmoothHead(PoseSmoothBase):
         motion: float = abs(self._velocity)
         if motion < self.settings.motion_threshold:
             motion = 0.0
-        self._motion += motion * self.settings.motion_weight
+        self._motion = motion * self.settings.motion_weight
+        self._cumulative_motion += motion * self.settings.motion_weight
 
     def reset(self) -> None:
         self._head_smoother.reset()
         self._angle = 0.0
         self._velocity = 0.0
+        self._acceleration = 0.0
         self._motion = 0.0
+        self._cumulative_motion = 0.0
+
+    @property
+    def is_active(self) -> bool:
+        return self._active
+
+    @property
+    def angle(self) -> float:
+        return self._angle
+
+    @property
+    def velocity(self) -> float:
+        return self._velocity
+
+    @property
+    def acceleration(self) -> float:
+        return self._acceleration
+
+    @property
+    def motion(self) -> float:
+        return self._motion
+
+    @property
+    def cumulative_motion(self) -> float:
+        return self._cumulative_motion

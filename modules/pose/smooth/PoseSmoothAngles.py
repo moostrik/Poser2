@@ -52,51 +52,20 @@ class PoseSmoothAngles(PoseSmoothBase):
         self._active: bool = False
         self.settings: PoseSmoothAngleSettings = settings
         self._angle_smoothers: dict[PoseJoint, AngleEuroInterpolator] = {}
-        self._cumulative_joint_motion: dict[PoseJoint, float] = {}
+        self._motions: dict[PoseJoint, float] = {}
+        self._total_motion: float = 0.0
+        self._cumulative_motions: dict[PoseJoint, float] = {}
         self._cumulative_total_motion: float = 0.0
         for joint in POSE_ANGLE_JOINTS:
             self._angle_smoothers[joint] = AngleEuroInterpolator(settings.smooth_settings)
-            self._cumulative_joint_motion[joint] = 0.0
+            self._cumulative_motions[joint] = 0.0
 
         self._symmetries: dict[SymmetricJointType, float] = {}
         self._mean_symmetry: float = 0.0
         for joint_type in SYMMETRIC_JOINT_PAIRS.keys():
             self._symmetries[joint_type] = 0.0
 
-
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
-
-    @property
-    def is_active(self) -> bool:
-        return self._active
-
-    @property
-    def angles(self) -> dict[PoseJoint, float]:
-        return {joint: self.get_angle(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
-
-    @property
-    def velocities(self) -> dict[PoseJoint, float]:
-        return {joint: self.get_velocity(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
-
-    @property
-    def accelerations(self) -> dict[PoseJoint, float]:
-        return {joint: self.get_acceleration(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
-
-    @property
-    def motions(self) -> dict[PoseJoint, float]:
-        return self._cumulative_joint_motion
-
-    @property
-    def total_motion(self) -> float:
-        return self._cumulative_total_motion
-
-    @property
-    def symmetries(self) -> dict[SymmetricJointType, float]:
-        return self._symmetries
-
-    @property
-    def mean_symmetry(self) -> float:
-        return self._mean_symmetry
 
     def add_pose(self, pose: Pose) -> None:
         if pose.tracklet.is_removed:
@@ -123,17 +92,19 @@ class PoseSmoothAngles(PoseSmoothBase):
         if not self._active:
             return
 
-        total_movement: float = 0.0
+        total_motion: float = 0.0
         for joint in POSE_ANGLE_JOINTS:
             self._angle_smoothers[joint].update()
             delta: float | None = self._angle_smoothers[joint]._smooth_velocity
-            movement: float = abs(delta) if delta is not None else 0.0
-            if movement < self.settings.motion_threshold:
-                movement = 0.0
-            movement *= self.settings.motion_weights.get(joint, 1.0)
-            self._cumulative_joint_motion[joint] += movement
-            total_movement += movement
-        self._cumulative_total_motion += total_movement
+            motion: float = abs(delta) if delta is not None else 0.0
+            if motion < self.settings.motion_threshold:
+                motion = 0.0
+            motion *= self.settings.motion_weights.get(joint, 1.0)
+            self._motions[joint] = motion
+            self._cumulative_motions[joint] += motion
+            total_motion += motion
+        self._total_motion = total_motion
+        self._cumulative_total_motion += total_motion
 
         total_symmetry: float = 0.0
         for sym_type, (left_joint, right_joint) in SYMMETRIC_JOINT_PAIRS.items():
@@ -154,13 +125,17 @@ class PoseSmoothAngles(PoseSmoothBase):
     def reset(self) -> None:
         for smoother in self._angle_smoothers.values():
             smoother.reset()
-        for key in self._cumulative_joint_motion.keys():
-            self._cumulative_joint_motion[key] = 0.0
+        for key in self._motions.keys():
+            self._motions[key] = 0.0
+        self._total_motion = 0.0
+        for key in self._cumulative_motions.keys():
+            self._cumulative_motions[key] = 0.0
         self._cumulative_total_motion = 0.0
         for key in self._symmetries.keys():
             self._symmetries[key] = 0.0
         self._mean_symmetry = 0.0
 
+    # GETTERS
     def get_angle(self, joint: PoseJoint, symmetric: bool = True) -> float:
         angle: float | None = self._angle_smoothers[joint].smooth_value
         if angle is None:
@@ -185,6 +160,61 @@ class PoseSmoothAngles(PoseSmoothBase):
            acceleration = -acceleration
         return acceleration
 
-    # SYMMETRY METHODS
+    def get_motion(self, joint: PoseJoint) -> float:
+        return self._motions.get(joint, 0.0)
+
+    def get_cumulative_motion(self, joint: PoseJoint) -> float:
+        return self._cumulative_motions.get(joint, 0.0)
+
+    def get_total_motion(self) -> float:
+        return self._total_motion
+
+    def get_cumulative_total_motion(self) -> float:
+        return self._cumulative_total_motion
+
     def get_symmetry(self, joint_type: SymmetricJointType) -> float:
         return self._symmetries.get(joint_type, 0.0)
+
+    def get_mean_symmetry(self) -> float:
+        return self._mean_symmetry
+
+    # PROPERTIES
+    @property
+    def is_active(self) -> bool:
+        return self._active
+
+    @property
+    def angles(self) -> dict[PoseJoint, float]:
+        return {joint: self.get_angle(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
+
+    @property
+    def velocities(self) -> dict[PoseJoint, float]:
+        return {joint: self.get_velocity(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
+
+    @property
+    def accelerations(self) -> dict[PoseJoint, float]:
+        return {joint: self.get_acceleration(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
+
+    @property
+    def motions(self) -> dict[PoseJoint, float]:
+        return self._motions
+
+    @property
+    def total_motion(self) -> float:
+        return self._total_motion
+
+    @property
+    def cumulative_motions(self) -> dict[PoseJoint, float]:
+        return self._cumulative_motions
+
+    @property
+    def cumulative_total_motion(self) -> float:
+        return self._cumulative_total_motion
+
+    @property
+    def symmetries(self) -> dict[SymmetricJointType, float]:
+        return self._symmetries
+
+    @property
+    def mean_symmetry(self) -> float:
+        return self._mean_symmetry

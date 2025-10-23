@@ -92,12 +92,7 @@ class PoseSmoothDataManager:
                 for smoother in smoothers.values():
                     smoother.reset()
 
-    # ID
-    def get_active_ids(self) -> list[int]:
-        """Get a list of currently active tracklet IDs."""
-        with self._lock:
-            return [tracklet_id for tracklet_id, smoother in self._rect_smoothers.items() if smoother.is_active]
-
+    # ACTIVE
     def get_is_active(self, tracklet_id: int) -> bool:
         """Check if the smoother for the specified tracklet ID is active."""
         with self._lock:
@@ -108,22 +103,6 @@ class PoseSmoothDataManager:
         """Get smoothed rectangle for the specified tracklet ID."""
         with self._lock:
             return self._rect_smoothers[tracklet_id].smoothed_rect
-
-    #  BODY JOINT ANGLES (OBSOLETE?)
-    def get_angles(self, tracklet_id: int) -> dict[PoseJoint, float]:
-        """Get smoothed angles for all joints for the specified tracklet ID."""
-        with self._lock:
-            return self._angle_smoothers[tracklet_id].angles
-
-    def get_velocities(self, tracklet_id: int) -> dict[PoseJoint, float]:
-        """Get smoothed angle changes for all joints for the specified tracklet ID."""
-        with self._lock:
-            return self._angle_smoothers[tracklet_id].velocities
-
-    def get_accelerations(self, tracklet_id: int) -> dict[PoseJoint, float]:
-        """Get smoothed angle changes for all joints for the specified tracklet ID."""
-        with self._lock:
-            return self._angle_smoothers[tracklet_id].accelerations
 
     #  BODY JOINT ANGLES
     def get_angle(self, tracklet_id: int, joint: PoseJoint) -> float:
@@ -136,44 +115,10 @@ class PoseSmoothDataManager:
         with self._lock:
             return self._angle_smoothers[tracklet_id].get_velocity(joint, symmetric=True)
 
-    def get_acceleration(self, tracklet_id: int, joint: PoseJoint) -> float:
-        """Get smoothed angle for the specified tracklet ID and joint."""
-        with self._lock:
-            return self._angle_smoothers[tracklet_id].get_acceleration(joint, symmetric=True)
-
-    def get_angular_motion(self, tracklet_id: int) -> float:
+    def get_motion(self, tracklet_id: int, joint: PoseJoint) -> float:
         """Get smoothed angle change for the specified tracklet ID and joint."""
         with self._lock:
-            return self._angle_smoothers[tracklet_id].total_motion
-
-    # HEAD ANGLE
-    def get_head(self, tracklet_id: int) -> float:
-        """Get smoothed head angles for the specified tracklet ID."""
-        with self._lock:
-            return self._head_smoothers[tracklet_id].angle
-
-    def get_head_delta(self, tracklet_id: int) -> float:
-        """Get smoothed head angle changes for the specified tracklet ID."""
-        with self._lock:
-            return self._head_smoothers[tracklet_id].velocity
-
-    def get_head_motion(self, tracklet_id: int) -> float:
-        """Get smoothed head motion for the specified tracklet ID."""
-        with self._lock:
-            return self._head_smoothers[tracklet_id].motion
-
-    # TIME
-    def get_motion(self, tracklet_id: int) -> float:
-        """Get combined motion (body + head) for the specified tracklet ID."""
-        with self._lock:
-            body_motion: float = self._angle_smoothers[tracklet_id].total_motion
-            head_motion: float = self._head_smoothers[tracklet_id].motion
-            return body_motion + head_motion
-
-    def get_age(self, tracklet_id: int) -> float:
-        """Get the age in seconds since the tracklet was first detected."""
-        with self._lock:
-            return self._rect_smoothers[tracklet_id].age
+            return self._angle_smoothers[tracklet_id].get_motion(joint)
 
     # BODY JOINT SYMMETRY
     def get_symmetry(self, tracklet_id: int, type: SymmetricJointType) -> float:
@@ -185,6 +130,35 @@ class PoseSmoothDataManager:
         """Get the mean synchrony value across all symmetric joint types."""
         with self._lock:
             return self._angle_smoothers[tracklet_id].mean_symmetry
+
+    # HEAD ANGLE
+    def get_head(self, tracklet_id: int) -> float:
+        """Get smoothed head angles for the specified tracklet ID."""
+        with self._lock:
+            return self._head_smoothers[tracklet_id].angle
+
+    def get_head_velocity(self, tracklet_id: int) -> float:
+        """Get smoothed head angle changes for the specified tracklet ID."""
+        with self._lock:
+            return self._head_smoothers[tracklet_id].velocity
+
+    def get_head_motion(self, tracklet_id: int) -> float:
+        """Get smoothed head motion for the specified tracklet ID."""
+        with self._lock:
+            return self._head_smoothers[tracklet_id].motion
+
+    # TIME
+    def get_cumulative_motion(self, tracklet_id: int) -> float:
+        """Get combined motion (body + head) for the specified tracklet ID."""
+        with self._lock:
+            body_motion: float = self._angle_smoothers[tracklet_id].cumulative_total_motion
+            head_motion: float = self._head_smoothers[tracklet_id].cumulative_motion
+            return body_motion + head_motion
+
+    def get_age(self, tracklet_id: int) -> float:
+        """Get the age in seconds since the tracklet was first detected."""
+        with self._lock:
+            return self._rect_smoothers[tracklet_id].age
 
     # CORRELATION
     def get_pose_correlation(self, id1: int, id2: int) -> float:

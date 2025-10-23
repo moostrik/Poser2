@@ -146,7 +146,7 @@ class LF(LayerBase):
         shldr_R: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.right_shoulder)
         shldr_R_Vel: float  = self.smooth_data.get_velocity(self.cam_id, PoseJoint.right_shoulder)
         head: float     = self.smooth_data.get_head(self.cam_id)
-        motion: float   = self.smooth_data.get_motion(self.cam_id)
+        motion: float   = self.smooth_data.get_cumulative_motion(self.cam_id)
         age: float      = self.smooth_data.get_age(self.cam_id)
         anchor: float   = 1.0 - self.smooth_data.rect_settings.centre_dest_y
         symmetry: float= self.smooth_data.get_mean_symmetry(self.cam_id)

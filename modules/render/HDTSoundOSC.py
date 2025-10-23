@@ -83,7 +83,7 @@ class HDTSoundOSC:
         active_msg.add_arg(1)
         bundle_builder.add_content(active_msg.build()) # type: ignore
 
-        motion: float = self.smooth_data.get_motion(id)
+        motion: float = self.smooth_data.get_cumulative_motion(id)
         change_msg = OscMessageBuilder(address=f"/pose/{id}/time/motion")
         change_msg.add_arg(float(motion))
         bundle_builder.add_content(change_msg.build()) # type: ignore
@@ -110,7 +110,7 @@ class HDTSoundOSC:
             angle_msg.add_arg(float(angle))
             bundle_builder.add_content(angle_msg.build()) # type: ignore
 
-        head_orientation: float = self.smooth_data.get_head_delta(id)
+        head_orientation: float = self.smooth_data.get_head_velocity(id)
         head_msg = OscMessageBuilder(address=f"/pose/{id}/delta/head")
         head_msg.add_arg(float(head_orientation))
         bundle_builder.add_content(head_msg.build()) # type: ignore
