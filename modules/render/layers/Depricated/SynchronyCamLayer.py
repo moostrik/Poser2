@@ -7,7 +7,7 @@ import math
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
+from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.gl.Image import Image
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init

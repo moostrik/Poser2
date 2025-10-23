@@ -5,7 +5,7 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.pose.PoseStream import PoseStreamData
 import numpy as np
 
-class WS_PoseStream(Shader):
+class StreamPose(Shader):
     def __init__(self) -> None:
         super().__init__()
         self.shader_name = self.__class__.__name__

@@ -9,17 +9,17 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
+from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
-from modules.gl.shaders.WS_RStream import WS_RStream
+from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 
-class RStreamLayer(LayerBase):
-    r_stream_shader = WS_RStream()
+class CorrelationStreamLayer(LayerBase):
+    r_stream_shader = StreamCorrelation()
 
     def __init__(self, data: DataManager, num_streams: int) -> None:
         self.data: DataManager = data
@@ -33,14 +33,14 @@ class RStreamLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
-        if not RStreamLayer.r_stream_shader.allocated:
-            RStreamLayer.r_stream_shader.allocate(monitor_file=False)
+        if not CorrelationStreamLayer.r_stream_shader.allocated:
+            CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=False)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
         self.image.deallocate()
-        if RStreamLayer.r_stream_shader.allocated:
-            RStreamLayer.r_stream_shader.deallocate()
+        if CorrelationStreamLayer.r_stream_shader.allocated:
+            CorrelationStreamLayer.r_stream_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -53,7 +53,7 @@ class RStreamLayer(LayerBase):
         pairs: list[tuple[int, int]] = correlation_streams.get_top_pairs(self.num_streams)
         num_pairs: int = len(pairs)
 
-        image_np: np.ndarray = WS_RStream.r_stream_to_image(correlation_streams, self.num_streams)
+        image_np: np.ndarray = StreamCorrelation.r_stream_to_image(correlation_streams, self.num_streams)
         self.image.set_image(image_np)
         self.image.update()
 

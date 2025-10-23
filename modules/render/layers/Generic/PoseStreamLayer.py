@@ -26,10 +26,10 @@ from modules.render.meshes.AngleMeshes import AngleMeshes
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
-from modules.gl.shaders.WS_PoseStream import WS_PoseStream
+from modules.gl.shaders.StreamPose import StreamPose
 
 class PoseStreamLayer(LayerBase):
-    pose_stream_shader = WS_PoseStream()
+    pose_stream_shader = StreamPose()
 
     def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataManager = data
@@ -63,7 +63,7 @@ class PoseStreamLayer(LayerBase):
         pose_mesh: Mesh = self.pose_meshes.meshes[pose.tracklet.id]
         pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
-            stream_image: np.ndarray = WS_PoseStream.pose_stream_to_image(pose_stream)
+            stream_image: np.ndarray = StreamPose.pose_stream_to_image(pose_stream)
             self.pose_stream_image.set_image(stream_image)
             self.pose_stream_image.update()
 
@@ -78,7 +78,7 @@ class PoseStreamLayer(LayerBase):
 
 
     @staticmethod
-    def draw_pose(fbo: Fbo, pose: Pose, pose_mesh: Mesh, angle_image: Image, shader: WS_PoseStream) -> None:
+    def draw_pose(fbo: Fbo, pose: Pose, pose_mesh: Mesh, angle_image: Image, shader: StreamPose) -> None:
         fbo.begin()
 
         glClearColor(0.0, 0.0, 0.0, 1.0)

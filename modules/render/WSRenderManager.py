@@ -17,7 +17,7 @@ from modules.render.meshes.AngleMeshes import AngleMeshes
 
 from modules.render.layers.Generic.CamTrackPoseLayer import CamTrackPoseLayer
 from modules.render.layers.Generic.PoseLayer import PoseLayer
-from modules.render.layers.Generic.RStreamLayer import RStreamLayer
+from modules.render.layers.Generic.CorrelationStreamLayer import CorrelationStreamLayer
 from modules.render.layers.Generic.TrackerPanoramicLayer import TrackerPanoramicLayer as TrackerLayer
 from modules.render.layers.WS.WSLightLayer import WSLightLayer
 from modules.render.layers.WS.WSLinesLayer import WSLinesLayer
@@ -41,7 +41,7 @@ class WSRenderManager(RenderBase):
         # drawers
         self.ws_light_render =      WSLightLayer(self.data)
         self.ws_lines_render =      WSLinesLayer(self.data)
-        self.r_stream_render =      RStreamLayer(self.data, self.num_R_streams)
+        self.r_stream_render =      CorrelationStreamLayer(self.data, self.num_R_streams)
         self.tracker_render =       TrackerLayer(self.data, self.num_cams)
         self.camera_renders:        dict[int, CamTrackPoseLayer] = {}
         self.pose_renders:          dict[int, PoseLayer] = {}
@@ -58,7 +58,7 @@ class WSRenderManager(RenderBase):
             SubdivisionRow(name=WSLinesLayer.__name__,  columns=1,                  rows=1, src_aspect_ratio=40.0,  padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name=WSLightLayer.__name__,  columns=1,                  rows=1, src_aspect_ratio=10.0,  padding=Point2f(0.0, 1.0)),
             SubdivisionRow(name=PoseLayer.__name__,  columns=self.max_players,   rows=1, src_aspect_ratio=0.75,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=RStreamLayer.__name__,  columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
+            SubdivisionRow(name=CorrelationStreamLayer.__name__,  columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
@@ -94,7 +94,7 @@ class WSRenderManager(RenderBase):
         self.ws_lines_render.allocate(self.ws_width, 100, GL_RGBA32F)
 
     def allocate_window_renders(self) -> None:
-        w, h = self.subdivision.get_allocation_size(RStreamLayer.__name__)
+        w, h = self.subdivision.get_allocation_size(CorrelationStreamLayer.__name__)
         self.r_stream_render.allocate(w, h, GL_RGBA)
         w, h = self.subdivision.get_allocation_size(TrackerLayer.__name__)
         self.tracker_render.allocate(w, h, GL_RGBA)
@@ -139,7 +139,7 @@ class WSRenderManager(RenderBase):
         self.ws_light_render.draw(self.subdivision.get_rect(WSLightLayer.__name__))
         self.ws_lines_render.draw(self.subdivision.get_rect(WSLinesLayer.__name__))
         self.tracker_render.draw(self.subdivision.get_rect(TrackerLayer.__name__))
-        self.r_stream_render.draw(self.subdivision.get_rect(RStreamLayer.__name__))
+        self.r_stream_render.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__))
         for i in range(self.num_cams):
             self.camera_renders[i].draw(self.subdivision.get_rect(CamTrackPoseLayer.__name__, i))
         for i in range(self.max_players):

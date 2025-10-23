@@ -9,7 +9,7 @@ from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.WS.WSOutput import WSOutput
-from modules.correlation.PairCorrelationStream import PairCorrelationStreamData
+from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.render.DataManager import DataManager
 from modules.gl.LayerBase import LayerBase, Rect
 

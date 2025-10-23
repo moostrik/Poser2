@@ -6,7 +6,7 @@ from queue import Queue, Empty
 from threading import Thread, Event, Lock
 from typing import Callable, Optional, Dict, Tuple, Set
 
-from modules.correlation.PairCorrelation import PairCorrelationBatch
+from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods

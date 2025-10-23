@@ -17,7 +17,7 @@ from modules.render.HDTSoundOSC import HDTSoundOSC
 
 from modules.render.layers.Generic.CamTrackPoseLayer import CamTrackPoseLayer
 from modules.render.layers.Generic.PoseStreamLayer import PoseStreamLayer
-from modules.render.layers.Generic.RStreamLayer import RStreamLayer
+from modules.render.layers.Generic.CorrelationStreamLayer import CorrelationStreamLayer
 from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
 from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
 from modules.render.layers.HDT.LineFieldsLayer import LF as LineFieldLayer
@@ -46,7 +46,7 @@ class HDTRenderManager(RenderBase):
         self.centre_pose_layers:    dict[int, CentrePoseRender] = {}
         self.pose_overlays:         dict[int, PoseStreamLayer] = {}
         self.line_field_layers:     dict[int, LineFieldLayer] = {}
-        self.r_stream_layer =       RStreamLayer(self.data, self.num_R_streams)
+        self.r_stream_layer =       CorrelationStreamLayer(self.data, self.num_R_streams)
 
         # fbos
         self.cam_fbos: dict[int, Fbo] = {}
@@ -64,7 +64,7 @@ class HDTRenderManager(RenderBase):
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name=CamTrackPoseLayer.__name__,       columns=self.num_cams,      rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=PoseStreamLayer.__name__,   columns=self.num_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=RStreamLayer.__name__,      columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
+            SubdivisionRow(name=CorrelationStreamLayer.__name__,      columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
@@ -97,7 +97,7 @@ class HDTRenderManager(RenderBase):
         self.sound_osc.start()
 
     def allocate_window_renders(self) -> None:
-        w, h = self.subdivision.get_allocation_size(RStreamLayer.__name__)
+        w, h = self.subdivision.get_allocation_size(CorrelationStreamLayer.__name__)
         self.r_stream_layer.allocate(w, h, GL_RGBA)
 
         for i in range(self.num_cams):
@@ -146,7 +146,7 @@ class HDTRenderManager(RenderBase):
         glClear(GL_COLOR_BUFFER_BIT)
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        self.r_stream_layer.draw(self.subdivision.get_rect(RStreamLayer.__name__))
+        self.r_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__))
         for i in range(self.num_cams):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             self.camera_layers[i].draw(self.subdivision.get_rect(CamTrackPoseLayer.__name__, i))

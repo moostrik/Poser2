@@ -21,7 +21,7 @@ from modules.pose.smooth.PoseSmoothAngles import PoseSmoothAngles, PoseSmoothAng
 from modules.pose.smooth.PoseSmoothHead import PoseSmoothHead, PoseSmoothHeadSettings
 from modules.utils.OneEuroInterpolation import OneEuroSettings
 from modules.utils.PointsAndRects import Rect
-from modules.correlation.PairCorrelation import PairCorrelationBatch
+from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -160,7 +160,7 @@ class PoseSmoothDataManager:
         with self._lock:
             return self._rect_smoothers[tracklet_id].age
 
-    # CORRELATION
+    # CORRELATION (SHOULD NOT BE HERE)
     def get_pose_correlation(self, id1: int, id2: int) -> float:
         return 0.0
 
