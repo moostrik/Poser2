@@ -111,7 +111,7 @@ class PairCorrelationStream(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__(daemon=True)
 
-        self.settings = settings
+        self.settings: Settings = settings
 
         # Thread synchronization
         self._stop_event = Event()
@@ -147,7 +147,7 @@ class PairCorrelationStream(Thread):
             except Empty:
                 pass
 
-            self._remove_old_pairs()
+            self._prune_by_timeout()
 
         self._pair_history.clear()
 
@@ -160,7 +160,7 @@ class PairCorrelationStream(Thread):
 
         # Process each pair correlation in the batch
         for pair_corr in batch.pair_correlations:
-            pair_id: Tuple[int, int] = self.get_canonical_pair_id(pair_corr.pair_id)
+            pair_id: Tuple[int, int] = self._get_canonical_pair_id(pair_corr.pair_id)
 
             # Create a new row with the similarity score and joint correlations
             new_data: Dict[str, float] = {'similarity': pair_corr.similarity_score}
@@ -178,23 +178,20 @@ class PairCorrelationStream(Thread):
             # Ensure the DataFrame is sorted by timestamp
             self._pair_history[pair_id] = self._pair_history[pair_id].sort_index()
 
-        # Prune old data
-        self._prune_history(self.buffer_capacity)
+        # Prune old data by capacity
+        self._prune_by_capacity()
 
         # Notify callbacks
         self._notify_callbacks()
 
-    def _prune_history(self, max_capacity: int) -> None:
+    def _prune_by_capacity(self) -> None:
         """
-        Remove data points older than max_capacity from all pairs.
-
-        Args:
-            max_capacity: Maximum number of entries to keep per pair
+        Remove oldest entries exceeding max_capacity from all pairs.
         """
         pairs_to_remove: list[Tuple[int, int]] = []
 
         for pair_id, df in self._pair_history.items():
-            pruned_df: pd.DataFrame = df.iloc[-max_capacity:]
+            pruned_df: pd.DataFrame = df.iloc[-self.buffer_capacity:]
 
             if pruned_df.empty:
                 pairs_to_remove.append(pair_id)
@@ -205,7 +202,7 @@ class PairCorrelationStream(Thread):
         for pair_id in pairs_to_remove:
             del self._pair_history[pair_id]
 
-    def _remove_old_pairs(self) -> None:
+    def _prune_by_timeout(self) -> None:
         """Remove pairs that have not been updated within the timeout period."""
         pairs_to_remove: list[Tuple[int, int]] = []
 
@@ -256,6 +253,6 @@ class PairCorrelationStream(Thread):
         self._data_callbacks.add(callback)
 
     @staticmethod
-    def get_canonical_pair_id(pair_id: Tuple[int, int]) -> Tuple[int, int]:
-        """ Create a canonical pair ID by ensuring the smaller ID is always first. """
+    def _get_canonical_pair_id(pair_id: Tuple[int, int]) -> Tuple[int, int]:
+        """Create a canonical pair ID by ensuring the smaller ID is always first."""
         return (pair_id[0], pair_id[1]) if pair_id[0] <= pair_id[1] else (pair_id[1], pair_id[0])
