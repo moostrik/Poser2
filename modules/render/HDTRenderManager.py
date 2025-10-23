@@ -128,7 +128,7 @@ class HDTRenderManager(RenderBase):
 
         self.smooth_data.update()
         self.pose_meshes.update()
-        # self.r_stream_layer.update()
+        self.r_stream_layer.update()
 
         for i in range(self.num_cams):
             self.camera_layers[i].update()
@@ -146,7 +146,7 @@ class HDTRenderManager(RenderBase):
         glClear(GL_COLOR_BUFFER_BIT)
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        # self.r_stream_layer.draw(self.subdivision.get_rect(RStreamLayer.__name__))
+        self.r_stream_layer.draw(self.subdivision.get_rect(RStreamLayer.__name__))
         for i in range(self.num_cams):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             self.camera_layers[i].draw(self.subdivision.get_rect(CamTrackPoseLayer.__name__, i))

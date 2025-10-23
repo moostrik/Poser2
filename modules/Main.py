@@ -8,7 +8,7 @@ from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.correlation.DTWCorrelator import DTWCorrelator
-from modules.correlation.PairCorrelationStream import PairCorrelationStreamManager
+from modules.correlation.PairCorrelationStream import PairCorrelationStream
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseStream import PoseStreamManager
@@ -55,10 +55,10 @@ class Main():
         self.pose_streamer = PoseStreamManager(settings)
 
         self.dtw_correlator: Optional[DTWCorrelator] = None
-        self.correlation_streamer: Optional[PairCorrelationStreamManager] = None
+        self.correlation_streamer: Optional[PairCorrelationStream] = None
         if settings.art_type == Settings.ArtType.HDT:
             self.dtw_correlator = DTWCorrelator(settings)
-            self.correlation_streamer = PairCorrelationStreamManager(settings)
+            self.correlation_streamer = PairCorrelationStream(settings)
 
         self.is_running: bool = False
         self.is_finished: bool = False
