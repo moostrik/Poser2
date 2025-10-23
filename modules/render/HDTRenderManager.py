@@ -33,9 +33,10 @@ class HDTRenderManager(RenderBase):
         self.num_R_streams: int =   settings.render_R_num
 
         # data
-        self.smooth_data: PoseSmoothDataManager = PoseSmoothDataManager(self.num_players)
+        self.smooth_data: PoseSmoothDataManager = PoseSmoothDataManager(settings)
         self.data: DataManager =    DataManager(self.smooth_data)
         self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.65", 8000, 60.0)
+        self.data_key: str = self.data.get_unique_consumer_key()
 
         # meshes
         self.pose_meshes =          PoseMeshes(self.data, self.num_players)
@@ -46,7 +47,8 @@ class HDTRenderManager(RenderBase):
         self.centre_pose_layers:    dict[int, CentrePoseRender] = {}
         self.pose_overlays:         dict[int, PoseStreamLayer] = {}
         self.line_field_layers:     dict[int, LineFieldLayer] = {}
-        self.r_stream_layer =       CorrelationStreamLayer(self.data, self.num_R_streams)
+        self.motion_corr_stream_layer = CorrelationStreamLayer(self.num_R_streams)
+        self.pose_corr_stream_layer =   CorrelationStreamLayer(self.num_R_streams)
 
         # fbos
         self.cam_fbos: dict[int, Fbo] = {}
@@ -62,9 +64,9 @@ class HDTRenderManager(RenderBase):
             # self.cam_fbos[i] = self.camera_layers[i].fbo
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name=CamTrackPoseLayer.__name__,       columns=self.num_cams,      rows=1, src_aspect_ratio=1.0,   padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=PoseStreamLayer.__name__,   columns=self.num_players,   rows=1, src_aspect_ratio=9/16,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=CorrelationStreamLayer.__name__,      columns=1,                  rows=1, src_aspect_ratio=12.0,  padding=Point2f(0.0, 1.0))
+            SubdivisionRow(name=CamTrackPoseLayer.__name__,      columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=PoseStreamLayer.__name__,        columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=CorrelationStreamLayer.__name__, columns=2,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
@@ -97,8 +99,9 @@ class HDTRenderManager(RenderBase):
         self.sound_osc.start()
 
     def allocate_window_renders(self) -> None:
-        w, h = self.subdivision.get_allocation_size(CorrelationStreamLayer.__name__)
-        self.r_stream_layer.allocate(w, h, GL_RGBA)
+        w, h = self.subdivision.get_allocation_size(CorrelationStreamLayer.__name__, 0)
+        self.motion_corr_stream_layer.allocate(w, h, GL_RGBA)
+        self.pose_corr_stream_layer.allocate(w, h, GL_RGBA)
 
         for i in range(self.num_cams):
             w, h = self.subdivision.get_allocation_size(CamTrackPoseLayer.__name__, i)
@@ -108,7 +111,8 @@ class HDTRenderManager(RenderBase):
 
     def deallocate(self) -> None:
         self.pose_meshes.deallocate()
-        self.r_stream_layer.deallocate()
+        self.motion_corr_stream_layer.deallocate()
+        self.pose_corr_stream_layer.deallocate()
         for draw in self.camera_layers.values():
             draw.deallocate()
         for draw in self.centre_cam_layers.values():
@@ -128,7 +132,8 @@ class HDTRenderManager(RenderBase):
 
         self.smooth_data.update()
         self.pose_meshes.update()
-        self.r_stream_layer.update()
+        self.motion_corr_stream_layer.update(self.data.get_correlation_streams(True, self.data_key))
+        self.pose_corr_stream_layer.update(self.smooth_data.get_correlation_streams())
 
         for i in range(self.num_cams):
             self.camera_layers[i].update()
@@ -146,7 +151,8 @@ class HDTRenderManager(RenderBase):
         glClear(GL_COLOR_BUFFER_BIT)
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        self.r_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__))
+        self.motion_corr_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__, 0))
+        self.pose_corr_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__, 1))
         for i in range(self.num_cams):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             self.camera_layers[i].draw(self.subdivision.get_rect(CamTrackPoseLayer.__name__, i))

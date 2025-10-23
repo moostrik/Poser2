@@ -7,7 +7,6 @@ from threading import Thread, Event, Lock
 from typing import Callable, Optional, Dict, Tuple, Set
 
 from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
-from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -108,21 +107,21 @@ PairCorrelationStreamDataCallback = Callable[[PairCorrelationStreamData], None]
 
 
 class PairCorrelationStream(Thread):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, capacity: int, timeout: float) -> None:
         super().__init__(daemon=True)
-
-        self.settings: Settings = settings
 
         # Thread synchronization
         self._stop_event = Event()
         self._input_queue: Queue[PairCorrelationBatch] = Queue()
+        self._output_lock = Lock()
 
         # Callbacks for sending data
         self._data_callbacks: Set[PairCorrelationStreamDataCallback] = set()
+        self._output_data: Optional[PairCorrelationStreamData] = None
 
         # Store settings values
-        self.buffer_capacity: int = settings.corr_stream_capacity
-        self.timeout: float = settings.corr_stream_timeout
+        self.buffer_capacity: int = capacity
+        self.timeout: float = timeout
 
         # Initialize pair history
         self._pair_history: Dict[Tuple[int, int], pd.DataFrame] = {}
@@ -163,8 +162,8 @@ class PairCorrelationStream(Thread):
             pair_id: Tuple[int, int] = self._get_canonical_pair_id(pair_corr.pair_id)
 
             # Create a new row with the similarity score and joint correlations
-            new_data: Dict[str, float] = {'similarity': pair_corr.similarity_score}
-            new_data.update(pair_corr.joint_correlations)
+            new_data: Dict[str, float] = {'similarity': pair_corr.mean_correlation}
+            new_data.update(pair_corr.correlations)
 
             # Create a DataFrame with one row
             new_row = pd.DataFrame(new_data, index=[timestamp])
@@ -233,6 +232,9 @@ class PairCorrelationStream(Thread):
             capacity=self.buffer_capacity
         )
 
+        with self._output_lock:
+            self._output_data = data
+
         # Call callbacks with snapshot
         for callback in self._data_callbacks.copy():
             try:
@@ -251,6 +253,11 @@ class PairCorrelationStream(Thread):
     def add_stream_callback(self, callback: PairCorrelationStreamDataCallback) -> None:
         """Register a callback to receive processed data."""
         self._data_callbacks.add(callback)
+
+    def get_stream_data(self) -> PairCorrelationStreamData | None:
+        """Get the latest processed stream data."""
+        with self._output_lock:
+            return self._output_data
 
     @staticmethod
     def _get_canonical_pair_id(pair_id: Tuple[int, int]) -> Tuple[int, int]:

@@ -21,9 +21,7 @@ from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 class CorrelationStreamLayer(LayerBase):
     r_stream_shader = StreamCorrelation()
 
-    def __init__(self, data: DataManager, num_streams: int) -> None:
-        self.data: DataManager = data
-        self.data_consumer_key: str = data.get_unique_consumer_key()
+    def __init__(self, num_streams: int) -> None:
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.num_streams: int = num_streams
@@ -45,8 +43,7 @@ class CorrelationStreamLayer(LayerBase):
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
-    def update(self) -> None:
-        correlation_streams: PairCorrelationStreamData | None = self.data.get_correlation_streams(True, self.data_consumer_key)
+    def update(self, correlation_streams: PairCorrelationStreamData | None) -> None:
         if correlation_streams is None:
             return
 

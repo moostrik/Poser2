@@ -156,15 +156,15 @@ class PoseStreamCorrelator():
                 try:
                     callback(batch)
                 except Exception as e:
-                    print(f"[{self.__class__.__name__}] Callback error: {e}")
+                    print(f"PoseStreamCorrelator: [{self.__class__.__name__}] Callback error: {e}")
 
     def start(self) -> None:
         self._correlation_thread.start()
 
     def stop(self) -> None:
         self._stop_event.set()
-        self._correlation_thread.join()
         self._process_pool.shutdown(wait=True, cancel_futures=True)
+        self._correlation_thread.join()
         with self._callback_lock:
             self._callbacks.clear()
 
@@ -190,11 +190,11 @@ class PoseStreamCorrelator():
                             )
                             future_to_pair[future] = pair
                         except BrokenProcessPool as bpe:
-                            print(f"Failed to submit analysis for pair {pair.id_1}-{pair.id_2}: {bpe}")
+                            print(f"PoseStreamCorrelator: Failed to submit analysis for pair {pair.id_1}-{pair.id_2}: {bpe}")
                             self._stop_event.set()
                             break
                 except BrokenProcessPool as bpe:
-                    print(f"Process pool broken during submission: {bpe}")
+                    print(f"PoseStreamCorrelator: Process pool broken during submission: {bpe}")
                     self._stop_event.set()
                     break
 
@@ -207,9 +207,9 @@ class PoseStreamCorrelator():
                             if correlation:
                                 correlations.append(correlation)
                         except Exception as e:
-                            print(f"Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
+                            print(f"PoseStreamCorrelator: Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
                 except BrokenProcessPool as bpe:
-                    print(f"Process pool broken during result collection: {bpe}")
+                    print(f"PoseStreamCorrelator: Process pool broken during result collection: {bpe}")
                     self._stop_event.set()
                     break
 
@@ -455,7 +455,7 @@ class PoseStreamCorrelator():
             Optional[PoseCorrelation]: Correlation results for the pair, or None if no valid joints.
         """
 
-        joint_correlations: dict[str, float] = {}
+        correlations: dict[str, float] = {}
         angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
 
         for column in angles_columns:
@@ -476,22 +476,22 @@ class PoseStreamCorrelator():
 
             # Skip correlation if too many NaNs
             if nan_ratio_1 > maximum_nan_ratio or nan_ratio_2 > maximum_nan_ratio:
-                joint_correlations[column] = 0.0
+                correlations[column] = 0.0
                 continue
 
             # Calculate similarity
             try:
                 similarity: float = PoseStreamCorrelator._compute_correlation(angles_1, angles_2, dtw_band, similarity_exponent)
-                joint_correlations[column] = similarity
+                correlations[column] = similarity
             except Exception as e:
-                print(f"{column}: correlation failed - {e}")
+                print(f"PoseStreamCorrelator: {column}: correlation failed - {e}")
                 continue
 
-        if joint_correlations:
+        if correlations:
             return PairCorrelation.from_ids(
                 id_1=pair.id_1,
                 id_2=pair.id_2,
-                joint_correlations=joint_correlations
+                correlations=correlations
             )
         return None
 

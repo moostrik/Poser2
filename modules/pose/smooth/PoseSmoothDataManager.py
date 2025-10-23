@@ -14,10 +14,13 @@ from threading import Lock
 from collections.abc import Mapping
 
 from modules.pose.Pose import Pose
+from modules.pose.correlation.PoseSmoothCorrelator import PoseSmoothCorrelator, PairCorrelation, PairCorrelationBatch
+from modules.pose.correlation.PairCorrelationStream import PairCorrelationStream, PairCorrelationStreamData
 from modules.pose.features.PoseAngles import AngleJoint
 from modules.pose.smooth.PoseSmoothBase import PoseSmoothBase
 from modules.pose.smooth.PoseSmoothRect import PoseSmoothRect, PoseSmoothRectSettings
 from modules.pose.smooth.PoseSmoothAngles import PoseSmoothAngles, PoseSmoothAngleSettings, SymmetricJointType
+from modules.Settings import Settings
 from modules.utils.OneEuroInterpolation import OneEuroSettings
 from modules.utils.PointsAndRects import Rect
 from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
@@ -25,8 +28,8 @@ from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 class PoseSmoothDataManager:
-    def __init__(self, num_players: int) -> None:
-        self._num_players: int = num_players
+    def __init__(self, settings: Settings) -> None:
+        self._num_players: int = settings.num_players
 
         self.OneEuro_settings: OneEuroSettings = OneEuroSettings(25, 1.0, 0.1)
         self.rect_settings: PoseSmoothRectSettings = PoseSmoothRectSettings(
@@ -45,10 +48,17 @@ class PoseSmoothDataManager:
         self._rect_smoothers: dict[int, PoseSmoothRect] = {}
         self._angle_smoothers: dict[int, PoseSmoothAngles] = {}
 
-        for i in range(num_players):
+        for i in range(self._num_players):
             self._rect_smoothers[i] = PoseSmoothRect(self.rect_settings)
             self._angle_smoothers[i] = PoseSmoothAngles(self.angle_settings)
         self._all_smoothers: list[Mapping[int, PoseSmoothBase]] = [self._rect_smoothers, self._angle_smoothers]
+
+        self.smooth_correlator: PoseSmoothCorrelator = PoseSmoothCorrelator(settings)
+        self.smooth_correlation_stream: PairCorrelationStream = PairCorrelationStream(60 * 10, 0.5)
+        self.smooth_correlator.start()
+        self.smooth_correlation_stream.start()
+        self.smooth_correlator.add_correlation_callback(self.smooth_correlation_stream.add_correlation)
+        self.smooth_correlator.add_correlation_callback(self.set_correlation_batch)
 
         self.correlation: PairCorrelationBatch = PairCorrelationBatch([])
 
@@ -70,6 +80,11 @@ class PoseSmoothDataManager:
             self.correlation = batch
             # print(f"Set correlation: {self.correlation}")
 
+    def get_correlation_streams(self) -> PairCorrelationStreamData | None:
+        """ Get the correlation stream data."""
+        with self._lock:
+            return self.smooth_correlation_stream.get_stream_data()
+
     def update(self) -> None:
         """Update all active smoothers."""
         with self._lock:
@@ -77,8 +92,7 @@ class PoseSmoothDataManager:
                 for smoother in smoothers.values():
                     if smoother.is_active:
                         smoother.update()
-
-
+        self.smooth_correlator.add_input_data(self.get_active_angles())
 
     def reset(self) -> None:
         """Reset all smoothers."""
@@ -145,4 +159,14 @@ class PoseSmoothDataManager:
         """Get the correlation value between two tracklet IDs."""
         with self._lock:
             pair_id: tuple[int, int] = (id1, id2) if id1 <= id2 else (id2, id1)
-            return self.correlation.get_similarity(pair_id)
+            return self.correlation.get_mean_correlation_for_pair(pair_id)
+
+    # CONVENIENCE METHODS
+    def get_active_angles(self) -> dict[int, dict[AngleJoint, float]]:
+        """Get smoothed angles for all active tracklets."""
+        active_angles: dict[int, dict[AngleJoint, float]] = {}
+        with self._lock:
+            for tracklet_id, smoother in self._angle_smoothers.items():
+                if smoother.is_active:
+                    active_angles[tracklet_id] = smoother.angles
+        return active_angles

@@ -28,6 +28,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class WSRenderManager(RenderBase):
     def __init__(self, settings: Settings) -> None:
         self.data: DataManager =    DataManager()
+        self.data_key: str = self.data.get_unique_consumer_key()
 
         self.max_players: int =     settings.num_players
         self.num_cams: int =        settings.camera_num
@@ -41,7 +42,7 @@ class WSRenderManager(RenderBase):
         # drawers
         self.ws_light_render =      WSLightLayer(self.data)
         self.ws_lines_render =      WSLinesLayer(self.data)
-        self.r_stream_render =      CorrelationStreamLayer(self.data, self.num_R_streams)
+        self.r_stream_render =      CorrelationStreamLayer(self.num_R_streams)
         self.tracker_render =       TrackerLayer(self.data, self.num_cams)
         self.camera_renders:        dict[int, CamTrackPoseLayer] = {}
         self.pose_renders:          dict[int, PoseLayer] = {}
@@ -124,7 +125,7 @@ class WSRenderManager(RenderBase):
 
         self.ws_light_render.update()
         self.ws_lines_render.update()
-        self.r_stream_render.update()
+        self.r_stream_render.update(self.data.get_correlation_streams(True, self.data_key))
         self.tracker_render.update()
         for i in range(self.num_cams):
             self.camera_renders[i].update()

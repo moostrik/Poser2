@@ -1,7 +1,7 @@
 import numpy as np
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.features.PosePoints import PosePointData
