@@ -54,36 +54,23 @@ class PoseSmoothDataManager:
         self._all_smoothers: list[Mapping[int, PoseSmoothBase]] = [self._rect_smoothers, self._angle_smoothers]
 
         self.smooth_correlator: PoseSmoothCorrelator = PoseSmoothCorrelator(settings)
-        self.smooth_correlation_stream: PairCorrelationStream = PairCorrelationStream(60 * 10, 0.5)
-        self.smooth_correlator.start()
-        self.smooth_correlation_stream.start()
-        self.smooth_correlator.add_correlation_callback(self.smooth_correlation_stream.add_correlation)
-        self.smooth_correlator.add_correlation_callback(self.set_correlation_batch)
 
-        self.correlation: PairCorrelationBatch = PairCorrelationBatch([])
+        self.smooth_correlation_stream: PairCorrelationStream = PairCorrelationStream(60 * 10, 0.5)
+        self.smooth_correlator.add_correlation_callback(self.smooth_correlation_stream.add_correlation)
+        self.motion_correlation: PairCorrelationBatch = PairCorrelationBatch([])
 
         # Lock to ensure thread safety
         self._lock = Lock()
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
-    def add_pose(self, pose: Pose) -> None:
-        """ Add a new pose data point for processing."""
-        with self._lock:
-            tracklet_id: int = pose.tracklet.id
-            for smoothers in self._all_smoothers:
-                smoothers[tracklet_id].add_pose(pose)
+    def start(self) -> None:
+        self.smooth_correlator.start()
+        self.smooth_correlation_stream.start()
 
-    def set_correlation_batch(self, batch: PairCorrelationBatch) -> None:
-        """ Set the correlation data for synchrony calculations."""
-        with self._lock:
-            self.correlation = batch
-            # print(f"Set correlation: {self.correlation}")
-
-    def get_correlation_streams(self) -> PairCorrelationStreamData | None:
-        """ Get the correlation stream data."""
-        with self._lock:
-            return self.smooth_correlation_stream.get_stream_data()
+    def stop(self) -> None:
+        self.smooth_correlator.stop()
+        self.smooth_correlation_stream.stop()
 
     def update(self) -> None:
         """Update all active smoothers."""
@@ -92,7 +79,7 @@ class PoseSmoothDataManager:
                 for smoother in smoothers.values():
                     if smoother.is_active:
                         smoother.update()
-        self.smooth_correlator.add_input_data(self.get_active_angles())
+        self.smooth_correlator.set_input_data(self.get_active_angles())
 
     def reset(self) -> None:
         """Reset all smoothers."""
@@ -100,6 +87,24 @@ class PoseSmoothDataManager:
             for smoothers in self._all_smoothers:
                 for smoother in smoothers.values():
                     smoother.reset()
+
+    def add_pose(self, pose: Pose) -> None:
+        """ Add a new pose data point for processing."""
+        with self._lock:
+            tracklet_id: int = pose.tracklet.id
+            for smoothers in self._all_smoothers:
+                smoothers[tracklet_id].add_pose(pose)
+
+    def get_correlation_streams(self) -> PairCorrelationStreamData | None:
+        """ Get the correlation stream data."""
+        with self._lock:
+            return self.smooth_correlation_stream.get_stream_data()
+
+    def set_correlation_batch(self, batch: PairCorrelationBatch) -> None:
+        """ Set the correlation data for synchrony calculations."""
+        with self._lock:
+            self.motion_correlation = batch
+            # print(f"Set correlation: {self.correlation}")
 
     # ACTIVE
     def get_is_active(self, tracklet_id: int) -> bool:
@@ -151,15 +156,21 @@ class PoseSmoothDataManager:
         with self._lock:
             return self._rect_smoothers[tracklet_id].age
 
-    # CORRELATION (SHOULD NOT BE HERE)
+    # CORRELATION
+    def get_pose_correlation_batch(self) -> PairCorrelationBatch | None:
+        return self.smooth_correlator.get_output_data()
+
     def get_pose_correlation(self, id1: int, id2: int) -> float:
-        return 0.0
+        """Get the correlation value between two tracklet IDs."""
+        batch: PairCorrelationBatch | None = self.get_pose_correlation_batch()
+        if batch is None:
+            return 0.0
+        return batch.get_mean_correlation_for_pair((id1, id2))
 
     def get_motion_correlation(self, id1: int, id2: int) -> float:
         """Get the correlation value between two tracklet IDs."""
         with self._lock:
-            pair_id: tuple[int, int] = (id1, id2) if id1 <= id2 else (id2, id1)
-            return self.correlation.get_mean_correlation_for_pair(pair_id)
+            return self.motion_correlation.get_mean_correlation_for_pair((id1, id2))
 
     # CONVENIENCE METHODS
     def get_active_angles(self) -> dict[int, dict[AngleJoint, float]]:

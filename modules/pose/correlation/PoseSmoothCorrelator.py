@@ -49,10 +49,12 @@ class PoseSmoothCorrelator():
 
         # INPUTS - Just store the latest data with a lock
         self._input_lock = threading.Lock()
-        self._latest_data: Optional[input_data] = None
+        self._input_data: Optional[input_data] = None
         self._new_data_available = threading.Event()
 
-        # CALLBACKS
+        # OUTPUT AND CALLBACKS
+        self._output_lock = threading.Lock()
+        self._output_data: Optional[PairCorrelationBatch] = None
         self._callback_lock = threading.Lock()
         self._callbacks: set[PoseCorrelationBatchCallback] = set()
 
@@ -78,7 +80,7 @@ class PoseSmoothCorrelator():
 
             # Get the latest data
             with self._input_lock:
-                data: input_data| None = self._latest_data
+                data: input_data| None = self._input_data
                 self._new_data_available.clear()
 
             if data is None:
@@ -120,13 +122,20 @@ class PoseSmoothCorrelator():
                     break
 
                 batch = PairCorrelationBatch(pair_correlations=correlations)
+                with self._output_lock:
+                    self._output_data = batch
                 self._notify_callbacks(batch)
 
-    def add_input_data(self, data: input_data) -> None:
+    def set_input_data(self, data: input_data) -> None:
         """Add new pose data. Replaces any previous unprocessed data."""
         with self._input_lock:
-            self._latest_data = data
+            self._input_data = data
             self._new_data_available.set()
+
+    def get_output_data(self) -> Optional[PairCorrelationBatch]:
+        """Get the latest computed correlation batch."""
+        with self._output_lock:
+            return self._output_data
 
     def add_correlation_callback(self, callback: PoseCorrelationBatchCallback) -> None:
         """ Register a callback to receive the last correlation batch. """

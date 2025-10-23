@@ -26,6 +26,7 @@ class CorrelationStreamLayer(LayerBase):
         self.image: Image = Image()
         self.num_streams: int = num_streams
         text_init()
+
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 

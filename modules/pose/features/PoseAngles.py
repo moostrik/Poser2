@@ -47,7 +47,7 @@ POSE_JOINT_TO_ANGLE_IDX: dict[PoseJoint, int] = {
     PoseJoint.right_eye:      AngleJoint.head.value
 }
 
-POSE_ANGLE_ROTATIONS: dict[AngleJoint, float] = {
+ANGLE_JOINT_ROTATIONS: dict[AngleJoint, float] = {
     AngleJoint.left_shoulder:    0.0,
     AngleJoint.right_shoulder:   0.0,
     AngleJoint.left_elbow:       np.pi,
@@ -58,6 +58,8 @@ POSE_ANGLE_ROTATIONS: dict[AngleJoint, float] = {
     AngleJoint.right_knee:       np.pi,
     AngleJoint.head:             0.0
 }
+
+
 
 # CLASSES
 @dataclass(frozen=True)
@@ -88,7 +90,7 @@ class PoseAngles:
 
             if not (np.isnan(p1).any() or np.isnan(p2).any() or np.isnan(p3).any()):
                 # All points are valid (not NaN), calculate the angle
-                rotate_by: float = POSE_ANGLE_ROTATIONS[joint]
+                rotate_by: float = ANGLE_JOINT_ROTATIONS[joint]
 
                 if joint == AngleJoint.head:
                     angle: float = PoseAngles.calculate_head_yaw(p1, p2, p3, rotate_by)

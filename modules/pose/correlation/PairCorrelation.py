@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Dict, Tuple
+from typing import Callable, List, Optional, Tuple
 
 @dataclass(frozen=True)
 class PairCorrelation:
@@ -24,7 +24,7 @@ class PairCorrelationBatch:
     timestamp: pd.Timestamp = field(default_factory=pd.Timestamp.now)
     mean_correlation: float = field(init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         mean: float = (
             sum(r.mean_correlation for r in self.pair_correlations) / len(self.pair_correlations)
             if self.pair_correlations else 0.0
@@ -45,8 +45,7 @@ class PairCorrelationBatch:
         return max(self.pair_correlations, key=lambda r: r.mean_correlation)
 
     def get_mean_correlation_for_pair(self, pair_id: tuple[int, int]) -> float:
-        id1, id2 = pair_id
-        pair_id = (id1, id2) if id1 <= id2 else (id2, id1)
+        pair_id = (min(pair_id), max(pair_id))
         for pc in self.pair_correlations:
             if pc.pair_id == pair_id:
                 return pc.mean_correlation

@@ -97,6 +97,7 @@ class HDTRenderManager(RenderBase):
 
         self.allocate_window_renders()
         self.sound_osc.start()
+        self.smooth_data.start()
 
     def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size(CorrelationStreamLayer.__name__, 0)
@@ -125,6 +126,7 @@ class HDTRenderManager(RenderBase):
             draw.deallocate()
 
         self.sound_osc.stop()
+        self.smooth_data.stop()
 
     def draw_main(self, width: int, height: int) -> None:
         glEnable(GL_TEXTURE_2D)
