@@ -173,7 +173,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
         settings.pose_model_type =  PoseModelType.NONE if args.nopose else PoseModelType.SMALL
         settings.pose_model_warmups =  settings.num_players
-        settings.pose_verbose =     True
+        settings.pose_verbose =     False
 
         settings.camera_color =     True
         settings.camera_square =    True

@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from modules.pose.features.PosePoints import PosePointData
-from modules.pose.features.PoseAngles import PoseAngleData, POSE_ANGLE_JOINT_IDXS
+from modules.pose.features.PoseAngles import PoseAngleData, POSE_JOINT_TO_ANGLE_IDX
 from modules.pose.PoseTypes import PoseJoint, POSE_JOINT_COLORS
 from modules.pose.PoseTypes import POSE_COLOR_ALPHA_BASE, POSE_COLOR_LEFT_POSITIVE, POSE_COLOR_LEFT_NEGATIVE, POSE_COLOR_RIGHT_POSITIVE, POSE_COLOR_RIGHT_NEGATIVE
 
@@ -69,7 +69,7 @@ class PoseVertices:
 
         for i, (p1, p2) in enumerate(POSE_VERTEX_LIST):
             for joint_pos, joint in enumerate((p1, p2)):
-                idx: int | None = POSE_ANGLE_JOINT_IDXS.get(joint)
+                idx: int | None = POSE_JOINT_TO_ANGLE_IDX.get(joint)
                 if idx is not None:
                     angle: float = angle_data.angles[idx]
                     if not np.isnan(angle):

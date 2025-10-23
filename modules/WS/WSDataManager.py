@@ -6,7 +6,7 @@ from time import time
 from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose, PosePointData, PoseAngleData, PoseMeasurementData
-from modules.pose.features.PoseAngles import POSE_ANGLE_JOINTS, POSE_ANGLE_JOINT_NAMES
+from modules.pose.features.PoseAngles import AngleJoint, ANGLE_JOINT_NAMES
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.PoseStream import PoseStreamData
 from modules.utils.PointsAndRects import Rect
@@ -41,8 +41,8 @@ class WSData:
 
         self.filters["world_angle"] = SmoothOneEuroCircular(frequency)
         self.filters["approximate_person_length"] = SmoothOneEuro(frequency)
-        for key in POSE_ANGLE_JOINTS:
-            angle_name: str = key.name
+        for joint in AngleJoint:
+            angle_name: str = joint.name
             self.filters[angle_name] = SmoothOneEuroCircular(frequency)
 
         self.present: bool = False
@@ -60,7 +60,7 @@ class WSData:
             if value is None:
                 return 0.0
             return value
-        raise AttributeError(f"'SmoothMetrics' object has no attribute '{name}'")
+        raise AttributeError(f"'WSData' object has no attribute '{name}'")
 
     def __setattr__(self, name, value) -> None:
         # Avoid recursion for internal attributes
@@ -84,19 +84,17 @@ class WSData:
                 self.start_age = time()
             self.present = True
 
-
-            angle_data: PoseAngleData | None  = pose.angle_data
+            angle_data: PoseAngleData | None = pose.angle_data
             if angle_data is not None:
-                # print(angles)
-                for i, name in enumerate(POSE_ANGLE_JOINT_NAMES):
+                for i, name in enumerate(ANGLE_JOINT_NAMES):
                     angle: float = angle_data.angles[i]
                     score: float = angle_data.scores[i]
-                    if score > 0.0 and angle is not np.nan:
+                    if score > 0.0 and not np.isnan(angle):
                         setattr(self, name, angle)
 
             pose_measurement_data: PoseMeasurementData | None = pose.measurement_data
             if pose_measurement_data is not None:
-                self.approximate_person_length = pose_measurement_data.length_estimate #* min(self.age, 1.0)
+                self.approximate_person_length = pose_measurement_data.length_estimate
 
             world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
             nose_angle_offset: float | None = None
@@ -107,19 +105,15 @@ class WSData:
                 nose_conf = pose_points.scores[PoseJoint.nose.value]
                 if nose_conf > 0.3:
                     # calculate nose offset from center of crop rect
-                    crop_center_x: float = crop_rect.center.x
                     nose_offset_x: float = nose_x - 0.5
                     # convert to angle in degrees, assuming 110 degree horizontal FOV
                     fov_degrees: float = 110.0
                     nose_angle_offset = nose_offset_x * crop_rect.width * fov_degrees
-                    # print(f"nose_offset_x: {nose_offset_x}, nose_angle_offset: {crop_rect.width}")
-
 
             world_angle += nose_angle_offset if nose_angle_offset is not None else 0.0
 
             # convert from [0...360] to [-pi, pi]
             self.world_angle: float = np.deg2rad(world_angle - 180)
-            # print (self.world_angle)
 
         if pose.tracklet.is_removed:
             self.reset()
@@ -127,12 +121,6 @@ class WSData:
     def add_stream(self, stream: PoseStreamData) -> None:
         if not self.present:
             return
-
-        # angles: list[float] = stream.get_last_angles()
-        # for i, angle in enumerate(angles):
-        #     name: str = PoseAngleNames[i]
-        #     if angle is not np.nan:
-        #         setattr(self, name, angle)
 
     def reset(self) -> None:
         """Reset all smoothers"""
@@ -149,7 +137,6 @@ class WSData:
     def set_responsiveness(self, value: float) -> None:
         for smoother in self.filters.values():
             smoother.set_responsiveness(value)
-
 
 
 class WSDataManager:
@@ -174,7 +161,7 @@ class WSDataManager:
 
         self.hot_reloader = HotReloadMethods(self.__class__, True)
 
-    @ property
+    @property
     def num_active_players(self) -> int:
         count: int = 0
         for i in range(self.num_players):
@@ -195,8 +182,6 @@ class WSDataManager:
     def add_streams(self, streams: list) -> None:
         for stream in streams:
             self.smooth_metrics_dict[stream.id].add_stream(stream)
-
-            # print(stream.id, stream.get_last_angles())
 
     def update(self) -> None:
         if self.settings.is_updated:

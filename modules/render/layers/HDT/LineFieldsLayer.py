@@ -16,15 +16,16 @@ from time import time
 import math
 
 # Third-party imports
-from pytweening import *
-from OpenGL.GL import *  # type: ignore
+from pytweening import *    # type: ignore
+from OpenGL.GL import *     # type: ignore
 
 # Local imports
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
 from modules.gl.shaders.HDT_LineBlend import HDT_LineBlend
-from modules.pose.smooth.PoseSmoothDataManager import PoseJoint, PoseSmoothDataManager, SymmetricJointType
+from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager, SymmetricJointType
+from modules.pose.features.PoseAngles import AngleJoint
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.utils.Smoothing import OneEuroFilterAngular
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -129,7 +130,6 @@ class LF(LayerBase):
         self.smooth_data.rect_settings.height_dest = 0.8
 
         self.smooth_data.angle_settings.motion_threshold = 0.003
-        self.smooth_data.head_settings.motion_threshold = 0.003
 
         P: LineFieldsSettings = LineFieldsSettings()
         P.line_sharpness = 1
@@ -137,15 +137,15 @@ class LF(LayerBase):
         P.line_width = 0.8
         P.line_amount = 5.0
 
-        elbow_L: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.left_elbow)
-        elbow_L_Vel: float  = self.smooth_data.get_velocity(self.cam_id, PoseJoint.left_elbow)
-        shldr_L: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.left_shoulder)
-        shldr_L_Vel: float  = self.smooth_data.get_velocity(self.cam_id, PoseJoint.left_shoulder)
-        elbow_R: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.right_elbow)
-        elbow_R_Vel: float  = self.smooth_data.get_velocity(self.cam_id, PoseJoint.right_elbow)
-        shldr_R: float  = self.smooth_data.get_angle(self.cam_id, PoseJoint.right_shoulder)
-        shldr_R_Vel: float  = self.smooth_data.get_velocity(self.cam_id, PoseJoint.right_shoulder)
-        head: float     = self.smooth_data.get_head(self.cam_id)
+        elbow_L: float  = self.smooth_data.get_angle(self.cam_id, AngleJoint.left_elbow)
+        elbow_L_Vel: float  = self.smooth_data.get_velocity(self.cam_id, AngleJoint.left_elbow)
+        shldr_L: float  = self.smooth_data.get_angle(self.cam_id, AngleJoint.left_shoulder)
+        shldr_L_Vel: float  = self.smooth_data.get_velocity(self.cam_id, AngleJoint.left_shoulder)
+        elbow_R: float  = self.smooth_data.get_angle(self.cam_id, AngleJoint.right_elbow)
+        elbow_R_Vel: float  = self.smooth_data.get_velocity(self.cam_id, AngleJoint.right_elbow)
+        shldr_R: float  = self.smooth_data.get_angle(self.cam_id, AngleJoint.right_shoulder)
+        shldr_R_Vel: float  = self.smooth_data.get_velocity(self.cam_id, AngleJoint.right_shoulder)
+        head: float     = self.smooth_data.get_angle(self.cam_id, AngleJoint.head)
         motion: float   = self.smooth_data.get_cumulative_motion(self.cam_id)
         age: float      = self.smooth_data.get_age(self.cam_id)
         anchor: float   = 1.0 - self.smooth_data.rect_settings.centre_dest_y

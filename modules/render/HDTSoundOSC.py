@@ -10,7 +10,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager, SymmetricJointType
-from modules.pose.features.PoseAngles import POSE_ANGLE_JOINTS
+from modules.pose.features.PoseAngles import AngleJoint
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -93,32 +93,22 @@ class HDTSoundOSC:
         change_msg.add_arg(float(motion))
         bundle_builder.add_content(change_msg.build()) # type: ignore
 
-        for joint in POSE_ANGLE_JOINTS:
+        for joint in AngleJoint:
             angle: float | None = self.smooth_data.get_angle(id, joint)
             angle_msg = OscMessageBuilder(address=f"/pose/{id}/angle/{joint.name}")
             angle_msg.add_arg(float(angle))
             bundle_builder.add_content(angle_msg.build()) # type: ignore
 
-        head_orientation: float = self.smooth_data.get_head(id)
-        head_msg = OscMessageBuilder(address=f"/pose/{id}/angle/head")
-        head_msg.add_arg(float(head_orientation))
-        bundle_builder.add_content(head_msg.build()) # type: ignore
+        for joint in AngleJoint:
+            velocity: float | None = self.smooth_data.get_velocity(id, joint)
+            velocity_msg = OscMessageBuilder(address=f"/pose/{id}/delta/{joint.name}")
+            velocity_msg.add_arg(float(velocity))
+            bundle_builder.add_content(velocity_msg.build()) # type: ignore
 
-        for joint in POSE_ANGLE_JOINTS:
-            angle: float | None = self.smooth_data.get_velocity(id, joint)
-            angle_msg = OscMessageBuilder(address=f"/pose/{id}/delta/{joint.name}")
-            angle_msg.add_arg(float(angle))
-            bundle_builder.add_content(angle_msg.build()) # type: ignore
-
-        head_orientation: float = self.smooth_data.get_head_velocity(id)
-        head_msg = OscMessageBuilder(address=f"/pose/{id}/delta/head")
-        head_msg.add_arg(float(head_orientation))
-        bundle_builder.add_content(head_msg.build()) # type: ignore
-
-        head_orientation: float = self.smooth_data.get_mean_symmetry(id)
-        head_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/mean")
-        head_msg.add_arg(float(head_orientation))
-        bundle_builder.add_content(head_msg.build()) # type: ignore
+        mean_symmetry: float = self.smooth_data.get_mean_symmetry(id)
+        symmetry_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/mean")
+        symmetry_msg.add_arg(float(mean_symmetry))
+        bundle_builder.add_content(symmetry_msg.build()) # type: ignore
 
         for sym_type in SymmetricJointType:
             symmetry: float = self.smooth_data.get_symmetry(id, sym_type)

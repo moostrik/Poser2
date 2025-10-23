@@ -18,6 +18,9 @@ class PoseHeadData:
     yaw: float =        np.nan  # left/right rotation
     pitch: float =      np.nan  # up/down tilt
     roll: float =       np.nan  # side tilt
+    yaw_score: float =  0.0     # confidence for yaw
+    pitch_score: float=0.0     # confidence for pitch
+    roll_score: float = 0.0     # confidence for roll
 
     def __getitem__(self, orientation: PoseHeadOrientation) -> float:
         if orientation ==   PoseHeadOrientation.yaw:
@@ -40,6 +43,8 @@ class PoseHead:
             return PoseHeadData()
 
         points: np.ndarray = point_data.points
+        scores: np.ndarray = point_data.scores
+
         # Check if we have all necessary points (eyes and nose)
         left_eye = points[PoseJoint.left_eye.value]
         right_eye = points[PoseJoint.right_eye.value]
@@ -50,17 +55,33 @@ class PoseHead:
             np.isnan(nose).any()):
             return PoseHeadData()  # NaN values if points are missing
 
+        # Get scores for the points
+        left_eye_score = scores[PoseJoint.left_eye.value]
+        right_eye_score = scores[PoseJoint.right_eye.value]
+        nose_score = scores[PoseJoint.nose.value]
+
         # Calculate eye midpoint
         eye_midpoint = (left_eye + right_eye) / 2
+        eye_width = float(np.linalg.norm(right_eye - left_eye))
 
         roll: float = PoseHead.calculate_roll(left_eye, right_eye)
-        yaw: float = PoseHead.calculate_yaw(nose, eye_midpoint, float(np.linalg.norm(right_eye - left_eye)))
-        pitch: float = PoseHead.calculate_pitch(nose, eye_midpoint, float(np.linalg.norm(right_eye - left_eye)))
+        yaw: float = PoseHead.calculate_yaw(nose, eye_midpoint, eye_width)
+        pitch: float = PoseHead.calculate_pitch(nose, eye_midpoint, eye_width)
+
+        # Calculate scores for each orientation
+        # Roll uses only eye points
+        roll_score = min(left_eye_score, right_eye_score)
+        # Yaw and pitch use nose and eye points
+        yaw_score = min(nose_score, left_eye_score, right_eye_score)
+        pitch_score = min(nose_score, left_eye_score, right_eye_score)
 
         return PoseHeadData(
             yaw=float(yaw),
             pitch=float(pitch),
             roll=float(roll),
+            yaw_score=float(yaw_score),
+            pitch_score=float(pitch_score),
+            roll_score=float(roll_score)
         )
 
     @staticmethod

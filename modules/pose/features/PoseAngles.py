@@ -1,43 +1,69 @@
 import numpy as np
 from dataclasses import dataclass, field
+from enum import IntEnum
 from typing import Optional, TYPE_CHECKING
 
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.features.PosePoints import PosePointData
 
+class AngleJoint(IntEnum):
+    left_shoulder =  0
+    right_shoulder = 1
+    left_elbow =     2
+    right_elbow =    3
+    left_hip =       4
+    right_hip =      5
+    left_knee =      6
+    right_knee =     7
+    head =           8
+
+ANGLE_JOINT_NAMES: list[str] = [e.name for e in AngleJoint]
+ANGLE_NUM_JOINTS: int = len(AngleJoint)
 
 # DEFINITIONS
-POSE_ANGLE_JOINT_TRIPLETS: dict[PoseJoint, tuple[PoseJoint, PoseJoint, PoseJoint]] = {
-    PoseJoint.left_shoulder:  ( PoseJoint.left_hip,       PoseJoint.left_shoulder,  PoseJoint.left_elbow  ),
-    PoseJoint.right_shoulder: ( PoseJoint.right_hip,      PoseJoint.right_shoulder, PoseJoint.right_elbow ),
-    PoseJoint.left_elbow:     ( PoseJoint.left_shoulder,  PoseJoint.left_elbow,     PoseJoint.left_wrist  ),
-    PoseJoint.right_elbow:    ( PoseJoint.right_shoulder, PoseJoint.right_elbow,    PoseJoint.right_wrist ),
-    PoseJoint.left_hip:       ( PoseJoint.left_shoulder,  PoseJoint.left_hip,       PoseJoint.left_knee   ),
-    PoseJoint.right_hip:      ( PoseJoint.right_shoulder, PoseJoint.right_hip,      PoseJoint.right_knee  ),
-    PoseJoint.left_knee:      ( PoseJoint.left_hip,       PoseJoint.left_knee,      PoseJoint.left_ankle  ),
-    PoseJoint.right_knee:     ( PoseJoint.right_hip,      PoseJoint.right_knee,     PoseJoint.right_ankle )
+ANGLE_JOINT_TRIPLETS: dict[AngleJoint, tuple[PoseJoint, PoseJoint, PoseJoint]] = {
+    AngleJoint.left_shoulder:  ( PoseJoint.left_hip,       PoseJoint.left_shoulder,  PoseJoint.left_elbow  ),
+    AngleJoint.right_shoulder: ( PoseJoint.right_hip,      PoseJoint.right_shoulder, PoseJoint.right_elbow ),
+    AngleJoint.left_elbow:     ( PoseJoint.left_shoulder,  PoseJoint.left_elbow,     PoseJoint.left_wrist  ),
+    AngleJoint.right_elbow:    ( PoseJoint.right_shoulder, PoseJoint.right_elbow,    PoseJoint.right_wrist ),
+    AngleJoint.left_hip:       ( PoseJoint.left_shoulder,  PoseJoint.left_hip,       PoseJoint.left_knee   ),
+    AngleJoint.right_hip:      ( PoseJoint.right_shoulder, PoseJoint.right_hip,      PoseJoint.right_knee  ),
+    AngleJoint.left_knee:      ( PoseJoint.left_hip,       PoseJoint.left_knee,      PoseJoint.left_ankle  ),
+    AngleJoint.right_knee:     ( PoseJoint.right_hip,      PoseJoint.right_knee,     PoseJoint.right_ankle ),
+    AngleJoint.head:           ( PoseJoint.nose,           PoseJoint.left_eye,       PoseJoint.right_eye   )
 }
-POSE_ANGLE_JOINTS: list[PoseJoint] = list(POSE_ANGLE_JOINT_TRIPLETS.keys())
-POSE_ANGLE_JOINT_NAMES: list[str] = [e.name for e in POSE_ANGLE_JOINTS]
-POSE_ANGLE_JOINT_IDXS: dict[PoseJoint, int] = {joint: idx for idx, joint in enumerate(POSE_ANGLE_JOINTS)}
 
-POSE_NUM_ANGLES: int = len(POSE_ANGLE_JOINT_TRIPLETS)
-POSE_ANGLE_ROTATIONS: dict[PoseJoint, float] = {
-    PoseJoint.left_shoulder:    0.0,
-    PoseJoint.right_shoulder:   0.0,
-    PoseJoint.left_elbow:       np.pi,
-    PoseJoint.right_elbow:      np.pi,
-    PoseJoint.left_hip:         np.pi,
-    PoseJoint.right_hip:        np.pi,
-    PoseJoint.left_knee:        np.pi,
-    PoseJoint.right_knee:       np.pi
+POSE_JOINT_TO_ANGLE_IDX: dict[PoseJoint, int] = {
+    PoseJoint.left_shoulder:  AngleJoint.left_shoulder.value,
+    PoseJoint.right_shoulder: AngleJoint.right_shoulder.value,
+    PoseJoint.left_elbow:     AngleJoint.left_elbow.value,
+    PoseJoint.right_elbow:    AngleJoint.right_elbow.value,
+    PoseJoint.left_hip:       AngleJoint.left_hip.value,
+    PoseJoint.right_hip:      AngleJoint.right_hip.value,
+    PoseJoint.left_knee:      AngleJoint.left_knee.value,
+    PoseJoint.right_knee:     AngleJoint.right_knee.value,
+    PoseJoint.nose:           AngleJoint.head.value,
+    PoseJoint.left_eye:       AngleJoint.head.value,
+    PoseJoint.right_eye:      AngleJoint.head.value
+}
+
+POSE_ANGLE_ROTATIONS: dict[AngleJoint, float] = {
+    AngleJoint.left_shoulder:    0.0,
+    AngleJoint.right_shoulder:   0.0,
+    AngleJoint.left_elbow:       np.pi,
+    AngleJoint.right_elbow:      np.pi,
+    AngleJoint.left_hip:         np.pi,
+    AngleJoint.right_hip:        np.pi,
+    AngleJoint.left_knee:        np.pi,
+    AngleJoint.right_knee:       np.pi,
+    AngleJoint.head:             0.0
 }
 
 # CLASSES
 @dataclass(frozen=True)
 class PoseAngleData:
-    angles: np.ndarray = field(default_factory=lambda: np.full(POSE_NUM_ANGLES, np.nan, dtype=np.float32))
-    scores: np.ndarray = field(default_factory=lambda: np.zeros(POSE_NUM_ANGLES, dtype=np.float32))
+    angles: np.ndarray = field(default_factory=lambda: np.full(ANGLE_NUM_JOINTS, np.nan, dtype=np.float32))
+    scores: np.ndarray = field(default_factory=lambda: np.zeros(ANGLE_NUM_JOINTS, dtype=np.float32))
 
 
 class PoseAngles:
@@ -53,17 +79,21 @@ class PoseAngles:
         point_values: np.ndarray = point_data.points
         point_scores: np.ndarray = point_data.scores
 
-        angle_values: np.ndarray = np.full(POSE_NUM_ANGLES, np.nan, dtype=np.float32)
-        angle_scores: np.ndarray = np.zeros(POSE_NUM_ANGLES, dtype=np.float32)
+        angle_values: np.ndarray = np.full(ANGLE_NUM_JOINTS, np.nan, dtype=np.float32)
+        angle_scores: np.ndarray = np.zeros(ANGLE_NUM_JOINTS, dtype=np.float32)
 
-        for i, (joint, (kp1, kp2, kp3)) in enumerate(POSE_ANGLE_JOINT_TRIPLETS.items()):
+        for i, (joint, (kp1, kp2, kp3)) in enumerate(ANGLE_JOINT_TRIPLETS.items()):
             idx1, idx2, idx3 = kp1.value, kp2.value, kp3.value
             p1, p2, p3 = point_values[idx1], point_values[idx2], point_values[idx3]
 
             if not (np.isnan(p1).any() or np.isnan(p2).any() or np.isnan(p3).any()):
                 # All points are valid (not NaN), calculate the angle
                 rotate_by: float = POSE_ANGLE_ROTATIONS[joint]
-                angle: float = PoseAngles.calculate_angle(p1, p2, p3, rotate_by)
+
+                if joint == AngleJoint.head:
+                    angle: float = PoseAngles.calculate_head_yaw(p1, p2, p3, rotate_by)
+                else:
+                    angle: float = PoseAngles.calculate_angle(p1, p2, p3, rotate_by)
                 angle_values[i] = angle
 
                 s1, s2, s3 = point_scores[idx1], point_scores[idx2], point_scores[idx3]
@@ -99,3 +129,34 @@ class PoseAngles:
         angle = ((angle + np.pi) % (2 * np.pi)) - np.pi
 
         return angle
+
+
+    @staticmethod
+    def calculate_head_yaw(nose: np.ndarray, left_eye: np.ndarray, right_eye: np.ndarray, rotate_by: float = 0) -> float:
+        """
+        Calculate yaw angle from nose and eye positions.
+
+        Args:
+            nose: Nose point coordinates [x, y]
+            left_eye: Left eye point coordinates [x, y]
+            right_eye: Right eye point coordinates [x, y]
+            rotate_by: Rotation offset in radians
+
+        Returns:
+            Yaw angle in radians, or NaN if eye_width is invalid
+        """
+        eye_midpoint = (left_eye + right_eye) / 2
+        eye_width = float(np.linalg.norm(right_eye - left_eye))
+
+        if eye_width > 0:
+            nose_offset_x = (nose[0] - eye_midpoint[0]) / eye_width
+            yaw = np.arctan(nose_offset_x * 2)
+
+            # Apply rotation offset
+            yaw += rotate_by
+
+            # Normalize to [-π, π) range
+            yaw = ((yaw + np.pi) % (2 * np.pi)) - np.pi
+
+            return float(yaw)
+        return np.nan

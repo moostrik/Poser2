@@ -4,22 +4,23 @@ from enum import Enum, auto
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
-from modules.pose.features.PoseAngles import POSE_ANGLE_JOINTS, POSE_ANGLE_JOINT_IDXS
+from modules.pose.features.PoseAngles import AngleJoint, ANGLE_JOINT_NAMES, ANGLE_NUM_JOINTS
 from modules.pose.smooth.PoseSmoothBase import PoseSmoothBase
 
 from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-POSE_ANGLE_MOTION_WEIGHTS: dict[PoseJoint, float] = {
-    PoseJoint.left_elbow:       0.5,
-    PoseJoint.right_elbow:      0.5,
-    PoseJoint.left_shoulder:    0.6,
-    PoseJoint.right_shoulder:   0.6,
-    PoseJoint.left_hip:         0.8,
-    PoseJoint.right_hip:        0.8,
-    PoseJoint.left_knee:        1.2,
-    PoseJoint.right_knee:       1.2
+POSE_ANGLE_MOTION_WEIGHTS: dict[AngleJoint, float] = {
+    AngleJoint.left_elbow:       0.5,
+    AngleJoint.right_elbow:      0.5,
+    AngleJoint.left_shoulder:    0.6,
+    AngleJoint.right_shoulder:   0.6,
+    AngleJoint.left_hip:         0.8,
+    AngleJoint.right_hip:        0.8,
+    AngleJoint.left_knee:        1.2,
+    AngleJoint.right_knee:       1.2,
+    AngleJoint.head:         2.0
 }
 
 class SymmetricJointType(Enum):
@@ -28,14 +29,14 @@ class SymmetricJointType(Enum):
     knee = auto()
     shoulder = auto()
 
-SYMMETRIC_JOINT_PAIRS: dict[SymmetricJointType, tuple[PoseJoint, PoseJoint]] = {
-    SymmetricJointType.shoulder: (PoseJoint.left_shoulder, PoseJoint.right_shoulder),
-    SymmetricJointType.elbow: (PoseJoint.left_elbow, PoseJoint.right_elbow),
-    SymmetricJointType.hip: (PoseJoint.left_hip, PoseJoint.right_hip),
-    SymmetricJointType.knee: (PoseJoint.left_knee, PoseJoint.right_knee)
+SYMMETRIC_JOINT_PAIRS: dict[SymmetricJointType, tuple[AngleJoint, AngleJoint]] = {
+    SymmetricJointType.shoulder: (AngleJoint.left_shoulder, AngleJoint.right_shoulder),
+    SymmetricJointType.elbow: (AngleJoint.left_elbow, AngleJoint.right_elbow),
+    SymmetricJointType.hip: (AngleJoint.left_hip, AngleJoint.right_hip),
+    SymmetricJointType.knee: (AngleJoint.left_knee, AngleJoint.right_knee)
 }
 
-SYMMETRIC_JOINT_TYPE_MAP: dict[PoseJoint, SymmetricJointType] = {}
+SYMMETRIC_JOINT_TYPE_MAP: dict[AngleJoint, SymmetricJointType] = {}
 for joint_type, (left_joint, right_joint) in SYMMETRIC_JOINT_PAIRS.items():
     SYMMETRIC_JOINT_TYPE_MAP[left_joint] = joint_type
     SYMMETRIC_JOINT_TYPE_MAP[right_joint] = joint_type
@@ -44,19 +45,19 @@ for joint_type, (left_joint, right_joint) in SYMMETRIC_JOINT_PAIRS.items():
 class PoseSmoothAngleSettings:
     smooth_settings: OneEuroSettings
     motion_threshold: float = 0.002
-    motion_weights: dict[PoseJoint, float] = field(default_factory=lambda: POSE_ANGLE_MOTION_WEIGHTS)
+    motion_weights: dict[AngleJoint, float] = field(default_factory=lambda: POSE_ANGLE_MOTION_WEIGHTS)
 
 # CLASSES
 class PoseSmoothAngles(PoseSmoothBase):
     def __init__(self, settings: PoseSmoothAngleSettings) -> None:
         self._active: bool = False
         self.settings: PoseSmoothAngleSettings = settings
-        self._angle_smoothers: dict[PoseJoint, AngleEuroInterpolator] = {}
-        self._motions: dict[PoseJoint, float] = {}
+        self._angle_smoothers: dict[AngleJoint, AngleEuroInterpolator] = {}
+        self._motions: dict[AngleJoint, float] = {}
         self._total_motion: float = 0.0
-        self._cumulative_motions: dict[PoseJoint, float] = {}
+        self._cumulative_motions: dict[AngleJoint, float] = {}
         self._cumulative_total_motion: float = 0.0
-        for joint in POSE_ANGLE_JOINTS:
+        for joint in AngleJoint:
             self._angle_smoothers[joint] = AngleEuroInterpolator(settings.smooth_settings)
             self._cumulative_motions[joint] = 0.0
 
@@ -82,18 +83,18 @@ class PoseSmoothAngles(PoseSmoothBase):
 
         # Always add data, OneEuroInterpolator will handle missing data
         if pose.angle_data is None:
-            for joint in POSE_ANGLE_JOINTS:
+            for joint in AngleJoint:
                 self._angle_smoothers[joint].add_sample(np.nan)
         else:
-            for joint in POSE_ANGLE_JOINTS:
-                self._angle_smoothers[joint].add_sample(pose.angle_data.angles[POSE_ANGLE_JOINT_IDXS[joint]])
+            for joint in AngleJoint:
+                self._angle_smoothers[joint].add_sample(pose.angle_data.angles[joint.value])
 
     def update(self) -> None:
         if not self._active:
             return
 
         total_motion: float = 0.0
-        for joint in POSE_ANGLE_JOINTS:
+        for joint in AngleJoint:
             self._angle_smoothers[joint].update()
             delta: float | None = self._angle_smoothers[joint]._smooth_velocity
             motion: float = abs(delta) if delta is not None else 0.0
@@ -136,7 +137,7 @@ class PoseSmoothAngles(PoseSmoothBase):
         self._mean_symmetry = 0.0
 
     # GETTERS
-    def get_angle(self, joint: PoseJoint, symmetric: bool = True) -> float:
+    def get_angle(self, joint: AngleJoint, symmetric: bool = True) -> float:
         angle: float | None = self._angle_smoothers[joint].smooth_value
         if angle is None:
             return 0.0
@@ -144,7 +145,7 @@ class PoseSmoothAngles(PoseSmoothBase):
            angle = -angle
         return angle
 
-    def get_velocity(self, joint: PoseJoint, symmetric: bool = True) -> float:
+    def get_velocity(self, joint: AngleJoint, symmetric: bool = True) -> float:
         velocity: float | None = self._angle_smoothers[joint].smooth_velocity
         if velocity is None:
             return 0.0
@@ -152,7 +153,7 @@ class PoseSmoothAngles(PoseSmoothBase):
            velocity = -velocity
         return velocity
 
-    def get_acceleration(self, joint: PoseJoint, symmetric: bool = True) -> float:
+    def get_acceleration(self, joint: AngleJoint, symmetric: bool = True) -> float:
         acceleration: float | None = self._angle_smoothers[joint].smooth_acceleration
         if acceleration is None:
             return 0.0
@@ -160,10 +161,10 @@ class PoseSmoothAngles(PoseSmoothBase):
            acceleration = -acceleration
         return acceleration
 
-    def get_motion(self, joint: PoseJoint) -> float:
+    def get_motion(self, joint: AngleJoint) -> float:
         return self._motions.get(joint, 0.0)
 
-    def get_cumulative_motion(self, joint: PoseJoint) -> float:
+    def get_cumulative_motion(self, joint: AngleJoint) -> float:
         return self._cumulative_motions.get(joint, 0.0)
 
     def get_total_motion(self) -> float:
@@ -184,19 +185,19 @@ class PoseSmoothAngles(PoseSmoothBase):
         return self._active
 
     @property
-    def angles(self) -> dict[PoseJoint, float]:
-        return {joint: self.get_angle(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
+    def angles(self) -> dict[AngleJoint, float]:
+        return {joint: self.get_angle(joint, symmetric=True) for joint in AngleJoint}
 
     @property
-    def velocities(self) -> dict[PoseJoint, float]:
-        return {joint: self.get_velocity(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
+    def velocities(self) -> dict[AngleJoint, float]:
+        return {joint: self.get_velocity(joint, symmetric=True) for joint in AngleJoint}
 
     @property
-    def accelerations(self) -> dict[PoseJoint, float]:
-        return {joint: self.get_acceleration(joint, symmetric=True) for joint in POSE_ANGLE_JOINTS}
+    def accelerations(self) -> dict[AngleJoint, float]:
+        return {joint: self.get_acceleration(joint, symmetric=True) for joint in AngleJoint}
 
     @property
-    def motions(self) -> dict[PoseJoint, float]:
+    def motions(self) -> dict[AngleJoint, float]:
         return self._motions
 
     @property
@@ -204,7 +205,7 @@ class PoseSmoothAngles(PoseSmoothBase):
         return self._total_motion
 
     @property
-    def cumulative_motions(self) -> dict[PoseJoint, float]:
+    def cumulative_motions(self) -> dict[AngleJoint, float]:
         return self._cumulative_motions
 
     @property

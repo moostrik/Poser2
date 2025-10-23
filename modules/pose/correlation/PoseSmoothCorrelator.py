@@ -108,7 +108,7 @@ def dtw_angular_sakoe_chiba_path(x: np.ndarray, y: np.ndarray, band) -> tuple[fl
 def ignore_keyboard_interrupt() -> None:
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-class DTWCorrelator():
+class PoseSmoothCorrelator():
     def __init__(self, settings: Settings) -> None:
 
         self.interval: float = 1.0 / settings.corr_rate_hz
@@ -481,7 +481,7 @@ class DTWCorrelator():
 
             # Calculate similarity
             try:
-                similarity: float = DTWCorrelator._compute_correlation(angles_1, angles_2, dtw_band, similarity_exponent)
+                similarity: float = PoseSmoothCorrelator._compute_correlation(angles_1, angles_2, dtw_band, similarity_exponent)
                 joint_correlations[column] = similarity
             except Exception as e:
                 print(f"{column}: correlation failed - {e}")
