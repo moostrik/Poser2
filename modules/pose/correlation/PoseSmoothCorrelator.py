@@ -47,8 +47,10 @@ class PoseSmoothCorrelator():
         self._correlation_thread = threading.Thread(target=self.run)
         self._stop_event = threading.Event()
 
-        # INPUTS
-        self._input_queue: Queue[input_data] = Queue()
+        # INPUTS - Just store the latest data with a lock
+        self._input_lock = threading.Lock()
+        self._latest_data: Optional[input_data] = None
+        self._new_data_available = threading.Event()
 
         # CALLBACKS
         self._callback_lock = threading.Lock()
@@ -70,9 +72,16 @@ class PoseSmoothCorrelator():
 
     def run(self) -> None:
         while not self._stop_event.is_set():
-            try:
-                data: input_data = self._input_queue.get(timeout=0.1)
-            except Empty:
+            # Wait for new data with timeout
+            if not self._new_data_available.wait(timeout=0.1):
+                continue
+
+            # Get the latest data
+            with self._input_lock:
+                data: input_data| None = self._latest_data
+                self._new_data_available.clear()
+
+            if data is None:
                 continue
 
             angle_pairs: list[AnglePair] = self._generate_angle_pairs(data)
@@ -114,7 +123,10 @@ class PoseSmoothCorrelator():
                 self._notify_callbacks(batch)
 
     def add_input_data(self, data: input_data) -> None:
-        self._input_queue.put(data)
+        """Add new pose data. Replaces any previous unprocessed data."""
+        with self._input_lock:
+            self._latest_data = data
+            self._new_data_available.set()
 
     def add_correlation_callback(self, callback: PoseCorrelationBatchCallback) -> None:
         """ Register a callback to receive the last correlation batch. """
