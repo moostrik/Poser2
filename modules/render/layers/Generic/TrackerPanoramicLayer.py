@@ -10,14 +10,14 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
-from modules.data.CaptureDataHub import DataManager
+from modules.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 class TrackerPanoramicLayer(LayerBase):
-    def __init__(self, data: DataManager, num_cams: int) -> None:
-        self.data: DataManager = data
+    def __init__(self, data: CaptureDataHub, num_cams: int) -> None:
+        self.data: CaptureDataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.num_cams: int = num_cams
         self.fbo: Fbo = Fbo()

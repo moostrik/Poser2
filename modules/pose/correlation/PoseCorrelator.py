@@ -27,7 +27,7 @@ class AnglePair:
     angles_1: dict[AngleJoint, float]
     angles_2: dict[AngleJoint, float]
 
-class PoseSmoothCorrelator():
+class PoseCorrelator():
     def __init__(self, settings: Settings) -> None:
 
         self.similarity_exponent: float = settings.corr_similarity_exp

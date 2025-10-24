@@ -15,8 +15,6 @@ from threading import Lock
 from collections.abc import Mapping
 
 from modules.pose.Pose import Pose
-from modules.pose.correlation.PoseSmoothCorrelatorProcess import PoseSmoothCorrelator, PairCorrelation, PairCorrelationBatch
-from modules.pose.correlation.PairCorrelationStream import PairCorrelationStream, PairCorrelationStreamData
 from modules.pose.features.PoseAngles import AngleJoint
 from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
 from modules.pose.interpolation.PoseViewportInterpolator import PoseViewportInterpolator, PoseViewportInterpolatorSettings
@@ -28,7 +26,7 @@ from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PoseRenderCoordinator:
+class RenderDataHub:
     def __init__(self, settings: Settings) -> None:
         self._num_players: int = settings.num_players
 
@@ -54,24 +52,10 @@ class PoseRenderCoordinator:
             self._angle_smoothers[i] = PoseKinematicsInterpolator(self.angle_settings)
         self._all_smoothers: list[Mapping[int, PoseInterpolationBase]] = [self._rect_smoothers, self._angle_smoothers]
 
-        self.smooth_correlator: PoseSmoothCorrelator = PoseSmoothCorrelator(settings)
-
-        self.smooth_correlation_stream: PairCorrelationStream = PairCorrelationStream(60 * 10, 0.5)
-        self.smooth_correlator.add_correlation_callback(self.smooth_correlation_stream.add_correlation)
-        self.motion_correlation: PairCorrelationBatch = PairCorrelationBatch([])
-
         # Lock to ensure thread safety
         self._lock = Lock()
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
-
-    def start(self) -> None:
-        self.smooth_correlator.start()
-        self.smooth_correlation_stream.start()
-
-    def stop(self) -> None:
-        self.smooth_correlator.stop()
-        self.smooth_correlation_stream.stop()
 
     def update(self) -> None:
         """Update all active smoothers."""
@@ -80,7 +64,6 @@ class PoseRenderCoordinator:
                 for smoother in smoothers.values():
                     if smoother.is_active:
                         smoother.update()
-        self.smooth_correlator.set_input_data(self.get_active_angles())
 
     def reset(self) -> None:
         """Reset all smoothers."""
@@ -96,16 +79,11 @@ class PoseRenderCoordinator:
             for smoothers in self._all_smoothers:
                 smoothers[tracklet_id].add_pose(pose)
 
-    def get_correlation_streams(self) -> PairCorrelationStreamData | None:
-        """ Get the correlation stream data."""
-        with self._lock:
-            return self.smooth_correlation_stream.get_stream_data()
+    def add_pose_correlation(self, batch: PairCorrelationBatch) -> None:
+        pass
 
-    def set_correlation_batch(self, batch: PairCorrelationBatch) -> None:
-        """ Set the correlation data for synchrony calculations."""
-        with self._lock:
-            self.motion_correlation = batch
-            # print(f"Set correlation: {self.correlation}")
+    def add_motion_correlation(self, batch: PairCorrelationBatch) -> None:
+        pass
 
     # ACTIVE
     def get_is_active(self, tracklet_id: int) -> bool:
@@ -159,7 +137,7 @@ class PoseRenderCoordinator:
 
     # CORRELATION
     def get_pose_correlation_batch(self) -> PairCorrelationBatch | None:
-        return self.smooth_correlator.get_output_data()
+        return None
 
     def get_pose_correlation(self, id1: int, id2: int) -> float:
         """Get the correlation value between two tracklet IDs."""
@@ -170,8 +148,7 @@ class PoseRenderCoordinator:
 
     def get_motion_correlation(self, id1: int, id2: int) -> float:
         """Get the correlation value between two tracklet IDs."""
-        with self._lock:
-            return self.motion_correlation.get_mean_correlation_for_pair((id1, id2))
+        return 0.0
 
     # CONVENIENCE METHODS
     def get_active_angles(self) -> dict[int, dict[AngleJoint, float]]:

@@ -10,7 +10,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.WS.WSOutput import WSOutput
 from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
-from modules.data.CaptureDataHub import DataManager
+from modules.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.gl.shaders.WS_Angles import WS_Angles
@@ -19,8 +19,8 @@ from modules.gl.shaders.WS_Lines import WS_Lines
 class WSLightLayer(LayerBase):
     angles_shader = WS_Angles()
 
-    def __init__(self, data: DataManager) -> None:
-        self.data: DataManager = data
+    def __init__(self, data: CaptureDataHub) -> None:
+        self.data: CaptureDataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()

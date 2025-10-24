@@ -15,7 +15,7 @@ from modules.pose.Pose import Pose
 from modules.pose.features.PoseAngles import ANGLE_NUM_JOINTS, ANGLE_JOINT_NAMES
 from modules.pose.PoseStream import PoseStreamData
 
-from modules.data.CaptureDataHub import DataManager
+from modules.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
@@ -28,8 +28,8 @@ from modules.gl.shaders.StreamPose import StreamPose
 class PoseLayer(LayerBase):
     pose_stream_shader = StreamPose()
 
-    def __init__(self, data: DataManager, pose_meshes: PoseMeshes, angle_meshes: AngleMeshes, cam_id: int) -> None:
-        self.data: DataManager = data
+    def __init__(self, data: CaptureDataHub, pose_meshes: PoseMeshes, angle_meshes: AngleMeshes, cam_id: int) -> None:
+        self.data: CaptureDataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()

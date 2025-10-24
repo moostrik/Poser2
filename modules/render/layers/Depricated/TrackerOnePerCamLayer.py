@@ -12,7 +12,7 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
-from modules.data.CaptureDataHub import DataManager
+from modules.CaptureDataHub import CaptureDataHub
 from modules.pose.Pose import Pose
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.gl.LayerBase import LayerBase, Rect
@@ -23,8 +23,8 @@ from modules.gl.shaders.Exposure import Exposure
 
 class TrackerOnePerCamLayer(LayerBase):
     exposure_shader = Exposure()
-    def __init__(self, data: DataManager, pose_meshes: PoseMeshes, cam_id: int) -> None:
-        self.data: DataManager = data
+    def __init__(self, data: CaptureDataHub, pose_meshes: PoseMeshes, cam_id: int) -> None:
+        self.data: CaptureDataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.pose_meshes: PoseMeshes = pose_meshes
         self.cam_id: int = cam_id

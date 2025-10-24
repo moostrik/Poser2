@@ -3,12 +3,14 @@ from math import ceil
 from typing import Optional
 
 # Local application imports
+from modules.CaptureDataHub import CaptureDataHub
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.gui.PyReallySimpleGui import Gui
+from modules.pose.correlation.PoseCorrelator import PoseCorrelator
 from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
-from modules.pose.correlation.PairCorrelationStream import PairCorrelationStream
+from modules.RenderDataHub import RenderDataHub
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseStream import PoseStreamManager
 from modules.render.WSRenderManager import WSRenderManager
@@ -26,12 +28,15 @@ class Main():
 
         self.settings: Settings = settings
 
+        self.capture_data_hub = CaptureDataHub()
+        self.render_data_hub = RenderDataHub(settings)
+
         self.WS: Optional[WSPipeline] = None
-        self.render = WSRenderManager(settings)
+        # self.render = WSRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, settings)
         if settings.art_type == Settings.ArtType.WS:
             self.WS = WSPipeline(self.gui, settings)
         if settings.art_type == Settings.ArtType.HDT:
-            self.render = HDTRenderManager(settings)
+            self.render = HDTRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, settings)
 
         self.cameras: list[DepthCam | DepthSimulator] = []
         self.recorder: Optional[Recorder] = None
@@ -54,11 +59,8 @@ class Main():
         self.pose_detection = PosePipeline(settings)
         self.pose_streamer = PoseStreamManager(settings)
 
-        self.dtw_correlator: Optional[PoseStreamCorrelator] = None
-        self.correlation_streamer: Optional[PairCorrelationStream] = None
-        if settings.art_type == Settings.ArtType.HDT:
-            self.dtw_correlator = PoseStreamCorrelator(settings)
-            self.correlation_streamer = PairCorrelationStream(settings.corr_stream_capacity, settings.corr_stream_timeout)
+        self.pose_correlator: Optional[PoseCorrelator] = PoseCorrelator(settings)
+        self.motion_correlator: Optional[PoseStreamCorrelator] = PoseStreamCorrelator(settings)
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -66,41 +68,44 @@ class Main():
     def start(self) -> None:
 
         for camera in self.cameras:
-            camera.add_preview_callback(self.render.data.set_cam_image)
+            camera.add_preview_callback(self.capture_data_hub.set_cam_image)
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.pose_detection.set_image)
             camera.add_frame_callback(self.tracker.notify_update_from_image)
             camera.add_frame_callback(self.pose_detection.notify_update_from_image)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
-            camera.add_tracker_callback(self.render.data.set_depth_tracklets)
+            camera.add_tracker_callback(self.capture_data_hub.set_depth_tracklets)
             camera.start()
 
-        if self.correlation_streamer and self.dtw_correlator:
-            self.correlation_streamer.add_stream_callback(self.render.data.set_correlation_stream)
-            self.correlation_streamer.start()
+        if self.motion_correlator:
+            self.motion_correlator.add_correlation_callback(self.capture_data_hub.set_motion_correlation)
+            self.motion_correlator.add_correlation_callback(self.render_data_hub.add_motion_correlation)
+            self.motion_correlator.start()
+            self.pose_streamer.add_stream_callback(self.motion_correlator.set_pose_stream)
 
-            self.dtw_correlator.add_correlation_callback(self.correlation_streamer.add_correlation)
-            # self.dtw_correlator.add_correlation_callback(self.render.data.set_correlation)
-            self.dtw_correlator.start()
+        if self.pose_correlator:
+            self.pose_correlator.add_correlation_callback(self.capture_data_hub.set_pose_correlation)
+            self.pose_correlator.add_correlation_callback(self.render_data_hub.add_pose_correlation)
+            self.pose_correlator.start()
+            # self.pose_streamer.add_stream_callback(self.pose_correlator.set_pose_stream)
 
-            self.pose_streamer.add_stream_callback(self.dtw_correlator.set_pose_stream)
-
-        self.pose_streamer.add_stream_callback(self.render.data.set_pose_stream)
+        self.pose_streamer.add_stream_callback(self.capture_data_hub.set_pose_stream)
         self.pose_streamer.start()
 
         self.pose_detection.add_pose_callback(self.pose_streamer.add_pose)
-        self.pose_detection.add_pose_callback(self.render.data.set_pose)
+        self.pose_detection.add_pose_callback(self.capture_data_hub.set_pose)
+        self.pose_detection.add_pose_callback(self.render_data_hub.add_pose)
         self.pose_detection.start()
 
         self.tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
-        self.tracker.add_tracklet_callback(self.render.data.set_tracklet)
+        self.tracker.add_tracklet_callback(self.capture_data_hub.set_tracklet)
         self.tracker.start()
 
         if self.WS:
             self.pose_detection.add_pose_callback(self.WS.add_pose)
             self.pose_streamer.add_stream_callback(self.WS.add_pose_stream)
-            self.WS.add_output_callback(self.render.data.set_light_image)
+            self.WS.add_output_callback(self.capture_data_hub.set_light_image)
             self.WS.start()
 
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
@@ -164,10 +169,8 @@ class Main():
             self.pose_detection.stop()
         if self.pose_streamer:
             self.pose_streamer.stop()
-        if self.dtw_correlator:
-            self.dtw_correlator.stop()
-        if self.correlation_streamer:
-            self.correlation_streamer.stop()
+        if self.motion_correlator:
+            self.motion_correlator.stop()
 
         # print('stop av')
         if self.WS:

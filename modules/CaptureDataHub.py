@@ -10,7 +10,7 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameTyp
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 from modules.pose.PoseStream import PoseStreamData
-from modules.pose.interpolation.PoseRenderCoordinator import PoseRenderCoordinator
+from modules.RenderDataHub import RenderDataHub
 from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
 from modules.WS.WSOutput import WSOutput
@@ -25,14 +25,11 @@ class DataItem(Generic[T]):
     value: T
     accessed: dict[str, bool] = field(default_factory=dict)
 
-CorrelationStreamDict = Dict[int, Tuple[Tuple[int, int], np.ndarray]]
-
-class DataManager:
+class CaptureDataHub:
     _consumer_counter: int = 0  # Class variable for unique IDs
 
-    def __init__(self, PoseSmooth: PoseRenderCoordinator | None = None) -> None:
+    def __init__(self) -> None:
         self.mutex: Lock = Lock()
-        self.pose_smooth_manager: PoseRenderCoordinator | None = PoseSmooth
 
         # Data storage
         self.light_image: Dict[int, DataItem[WSOutput]] = {}
@@ -41,7 +38,8 @@ class DataManager:
         self.tracklets: Dict[int, DataItem[Tracklet]] = {}
         self.poses: Dict[int, DataItem[Pose]] = {}
         self.pose_streams: Dict[int, DataItem[PoseStreamData]] = {}
-        self.r_streams: Dict[int, DataItem[PairCorrelationStreamData]] = {}
+        self.pose_correlation: Dict[int, DataItem[PairCorrelationBatch]] = {}
+        self.motion_correlation: Dict[int, DataItem[PairCorrelationBatch]] = {}
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -110,8 +108,6 @@ class DataManager:
     # Pose management
     def set_pose(self, value: Pose) -> None:
         self._set_data_dict(self.poses, value.tracklet.id, value)
-        if self.pose_smooth_manager is not None:
-            self.pose_smooth_manager.add_pose(value)
 
     def get_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
         return self._get_data_dict(self.poses, id, only_new_data, consumer_key)
@@ -128,13 +124,15 @@ class DataManager:
         return self._get_data_dict(self.pose_streams, id, only_new_data, consumer_key)
 
     # Correlation window management
-    def set_correlation(self, batch: PairCorrelationBatch) -> None:
-        if self.pose_smooth_manager is not None:
-            self.pose_smooth_manager.set_correlation_batch(batch)
+    def set_pose_correlation(self, value: PairCorrelationBatch) -> None:
+        self._set_data_dict(self.pose_correlation, 0, value)
 
-    def set_correlation_stream(self, value: PairCorrelationStreamData) -> None:
-        self._set_data_dict(self.r_streams, 0, value)
+    def get_pose_correlation(self, only_new_data: bool, consumer_key: str) -> Optional[PairCorrelationBatch]:
+        return self._get_data_dict(self.pose_correlation, 0, only_new_data, consumer_key)
 
-    def get_correlation_streams(self, only_new_data: bool, consumer_key: str) -> Optional[PairCorrelationStreamData]:
-        return self._get_data_dict(self.r_streams, 0, only_new_data, consumer_key)
+    def set_motion_correlation(self, value: PairCorrelationBatch) -> None:
+        self._set_data_dict(self.motion_correlation, 0, value)
+
+    def get_motion_correlation(self, only_new_data: bool, consumer_key: str) -> Optional[PairCorrelationBatch]:
+        return self._get_data_dict(self.motion_correlation, 0, only_new_data, consumer_key)
 

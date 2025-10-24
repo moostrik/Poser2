@@ -6,12 +6,12 @@ import numpy as np
 # Local application imports
 from modules.gl.Mesh import Mesh
 from modules.pose.PoseStream import PoseStreamData
-from modules.data.CaptureDataHub import DataManager
+from modules.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
 class AngleMeshes(LayerBase):
-    def __init__(self, data: DataManager, amount: int) -> None:
-        self.data: DataManager = data
+    def __init__(self, data: CaptureDataHub, amount: int) -> None:
+        self.data: CaptureDataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.amount: int = amount
         self.meshes: dict[int, Mesh] = {}

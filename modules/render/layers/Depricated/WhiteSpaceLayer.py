@@ -10,7 +10,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.WS.WSOutput import WSOutput
 from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
-from modules.data.CaptureDataHub import DataManager
+from modules.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.gl.shaders.WS_Angles import WS_Angles
@@ -20,8 +20,8 @@ class WhiteSpaceRender(LayerBase):
     angles_shader = WS_Angles()
     lines_shader = WS_Lines()
 
-    def __init__(self, data: DataManager) -> None:
-        self.data: DataManager = data
+    def __init__(self, data: CaptureDataHub) -> None:
+        self.data: CaptureDataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo_lines: Fbo = Fbo()
         self.fbo_angles: Fbo = Fbo()

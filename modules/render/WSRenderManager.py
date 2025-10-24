@@ -10,7 +10,7 @@ from modules.gl.RenderBase import RenderBase
 
 from modules.Settings import Settings
 
-from modules.data.CaptureDataHub import DataManager
+from modules.CaptureDataHub import CaptureDataHub
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
@@ -27,7 +27,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class WSRenderManager(RenderBase):
     def __init__(self, settings: Settings) -> None:
-        self.data: DataManager =    DataManager()
+        self.data: CaptureDataHub =    CaptureDataHub()
         self.data_key: str = self.data.get_unique_consumer_key()
 
         self.max_players: int =     settings.num_players

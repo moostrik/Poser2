@@ -8,13 +8,15 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.RenderBase import RenderBase
 from modules.gl.WindowManager import WindowManager
 from modules.Settings import Settings
-from modules.pose.interpolation.PoseRenderCoordinator import PoseRenderCoordinator
+from modules.RenderDataHub import RenderDataHub
 from modules.utils.PointsAndRects import Rect, Point2f
 
-from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.data.CaptureDataHub import DataManager
+from modules.gui.PyReallySimpleGui import Gui
+from modules.CaptureDataHub import CaptureDataHub
+from modules.RenderDataHub import RenderDataHub
 from modules.render.HDTSoundOSC import HDTSoundOSC
 
+from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.layers.Generic.CamTrackPoseLayer import CamTrackPoseLayer
 from modules.render.layers.Generic.PoseStreamLayer import PoseStreamLayer
 from modules.render.layers.Generic.CorrelationStreamLayer import CorrelationStreamLayer
@@ -27,19 +29,19 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class HDTRenderManager(RenderBase):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, gui: Gui, capture_data_hub: CaptureDataHub, render_data_hub: RenderDataHub, settings: Settings) -> None:
         self.num_players: int =     settings.num_players
         self.num_cams: int =        settings.camera_num
         self.num_R_streams: int =   settings.render_R_num
 
         # data
-        self.smooth_data: PoseRenderCoordinator = PoseRenderCoordinator(settings)
-        self.data: DataManager =    DataManager(self.smooth_data)
-        self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.65", 8000, 60.0)
-        self.data_key: str = self.data.get_unique_consumer_key()
+        self.render_data: RenderDataHub =   render_data_hub
+        self.capture_data: CaptureDataHub = capture_data_hub
+        self.capture_data_key: str =        self.capture_data.get_unique_consumer_key()
+        self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data, "10.0.0.65", 8000, 60.0)
 
         # meshes
-        self.pose_meshes =          PoseMeshes(self.data, self.num_players)
+        self.pose_meshes =          PoseMeshes(self.capture_data, self.num_players)
 
         # layers
         self.camera_layers:         dict[int, CamTrackPoseLayer] = {}
@@ -55,11 +57,11 @@ class HDTRenderManager(RenderBase):
 
         # populate
         for i in range(self.num_cams):
-            self.camera_layers[i] = CamTrackPoseLayer(self.data, self.pose_meshes, i)
-            self.centre_cam_layers[i] = CentreCamLayer(self.data, self.smooth_data, i)
-            self.centre_pose_layers[i] = CentrePoseRender(self.data, self.smooth_data, self.pose_meshes, i)
-            self.pose_overlays[i] = PoseStreamLayer(self.data, self.pose_meshes, i)
-            self.line_field_layers[i] = LineFieldLayer(self.smooth_data, self.cam_fbos, i)
+            self.camera_layers[i] = CamTrackPoseLayer(self.capture_data, self.pose_meshes, i)
+            self.centre_cam_layers[i] = CentreCamLayer(self.capture_data, self.render_data, i)
+            self.centre_pose_layers[i] = CentrePoseRender(self.capture_data, self.render_data, self.pose_meshes, i)
+            self.pose_overlays[i] = PoseStreamLayer(self.capture_data, self.pose_meshes, i)
+            self.line_field_layers[i] = LineFieldLayer(self.render_data, self.cam_fbos, i)
             self.cam_fbos[i] = self.centre_cam_layers[i].get_fbo()
             # self.cam_fbos[i] = self.camera_layers[i].fbo
         # composition
@@ -97,7 +99,6 @@ class HDTRenderManager(RenderBase):
 
         self.allocate_window_renders()
         self.sound_osc.start()
-        self.smooth_data.start()
 
     def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size(CorrelationStreamLayer.__name__, 0)
@@ -126,16 +127,15 @@ class HDTRenderManager(RenderBase):
             draw.deallocate()
 
         self.sound_osc.stop()
-        self.smooth_data.stop()
 
     def draw_main(self, width: int, height: int) -> None:
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
 
-        self.smooth_data.update()
+        self.render_data.update()
         self.pose_meshes.update()
-        self.motion_corr_stream_layer.update(self.data.get_correlation_streams(True, self.data_key))
-        self.pose_corr_stream_layer.update(self.smooth_data.get_correlation_streams())
+        self.motion_corr_stream_layer.update(self.capture_data.get_motion_correlation(True, self.capture_data_key))
+        # self.pose_corr_stream_layer.update(self.render_data.get_correlation_streams())
 
         for i in range(self.num_cams):
             self.camera_layers[i].update()
