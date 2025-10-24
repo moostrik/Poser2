@@ -4,6 +4,7 @@ import time
 import threading
 from dataclasses import dataclass
 from itertools import combinations
+import traceback
 from typing import Optional
 
 # Third-party imports
@@ -30,13 +31,12 @@ class PoseCorrelator():
 
         self.similarity_exponent: float = settings.corr_similarity_exp
 
-        self._correlation_thread = threading.Thread(target=self.run)
+        self._correlation_thread = threading.Thread(target=self.run, daemon=True)
         self._stop_event = threading.Event()
-        self._angle_data: dict[int, dict[AngleJoint, float]] = {}
 
         # INPUTS - Just store the latest data with a lock
         self._input_lock = threading.Lock()
-        self._input_poses: PoseDict
+        self._input_poses: PoseDict = {}
         self._update_event = threading.Event()
 
         # OUTPUT AND CALLBACKS
@@ -53,22 +53,23 @@ class PoseCorrelator():
 
     def stop(self) -> None:
         self._stop_event.set()
-        self._correlation_thread.join()
+        self._update_event.set()  # Wake the thread so it can see stop_event
         with self._callback_lock:
             self._callbacks.clear()
 
     def run(self) -> None:
-        while not self._stop_event.is_set():
-            # Wait for new data with timeout
-            if not self._update_event.wait(timeout=0.1):
-                continue
+        while True:
+            self._update_event.wait()
+
+            if self._stop_event.is_set():
+                break
+
+            self._update_event.clear()
 
             start_time: float = time.perf_counter()
 
-            # Get the latest data
             with self._input_lock:
                 poses: PoseDict = self._input_poses
-                self._update_event.clear()
 
             angle_data: dict[int, dict[AngleJoint, float]] = self._update_angles_from_poses(poses)
             angle_pairs: list[AnglePair] = self._generate_angle_pairs(angle_data)
@@ -81,7 +82,7 @@ class PoseCorrelator():
                     if correlation:
                         correlations.append(correlation)
                 except Exception as e:
-                    print(f"PoseSmoothCorrelatorThread: Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
+                    print(f"PoseCorrelator: Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
 
             end_time: float = time.perf_counter()
             elapsed_time: float = end_time - start_time
@@ -114,7 +115,8 @@ class PoseCorrelator():
                 try:
                     callback(batch)
                 except Exception as e:
-                    print(f"PoseSmoothCorrelatorThread: [{self.__class__.__name__}] Callback error: {e}")
+                    print(f"PoseCorrelator: [{self.__class__.__name__}] Callback error: {e}")
+                    traceback.print_exc()
 
     @staticmethod
     def _update_angles_from_poses(poses: PoseDict) -> dict[int, dict[AngleJoint, float]]:
@@ -126,15 +128,15 @@ class PoseCorrelator():
         angle_data: dict[int, dict[AngleJoint, float]] = {}
 
         for tracklet_id, pose in poses.items():
-
             if pose.tracklet.is_active and pose.angle_data is not None:
                 angles: np.ndarray = pose.angle_data.angles
-                angle_dict: dict[AngleJoint, float] = {}
 
-                for joint in AngleJoint:
-                    angle = angles[joint]
-                    if not np.isnan(angle):
-                        angle_dict[joint] = angle
+                # More concise:
+                angle_dict: dict[AngleJoint, float] = {
+                    joint: angles[joint]
+                    for joint in AngleJoint
+                    if not np.isnan(angles[joint])
+                }
 
                 if angle_dict:
                     angle_data[tracklet_id] = angle_dict
