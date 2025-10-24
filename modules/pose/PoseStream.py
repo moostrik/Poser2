@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 
 # Local application imports
-from modules.pose.Pose import Pose
+from modules.pose.Pose import Pose, PoseDict
 from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_JOINT_NAMES, ANGLE_NUM_JOINTS
 from modules.pose.PoseTypes import PoseJoint, POSE_NUM_JOINTS
 from modules.Settings import Settings
@@ -146,15 +146,16 @@ class PoseStreamManager:
                 processor.terminate()
                 processor.join(timeout=1.0)
 
-    def add_pose(self, pose) -> None:
+    def add_poses(self, poses: PoseDict) -> None:
         """Add pose to the appropriate processor's queue based on pose id."""
-        try:
-            pose_stream_input: PoseStreamInput = PoseStreamInput.from_pose(pose)
-            # Distribute by id modulo number of processors
-            processor_idx = pose_stream_input.id % len(self.processors)
-            self.processors[processor_idx].add_pose(pose_stream_input)
-        except Exception as e:
-            print(f"[PoseStream] Error adding pose: {e}")
+        for pose in poses.values():
+            try:
+                pose_stream_input: PoseStreamInput = PoseStreamInput.from_pose(pose)
+                # Distribute by id modulo number of processors
+                processor_idx = pose_stream_input.id % len(self.processors)
+                self.processors[processor_idx].add_pose(pose_stream_input)
+            except Exception as e:
+                print(f"[PoseStream] Error adding pose: {e}")
 
     def add_stream_callback(self, callback: PoseStreamDataCallback) -> None:
         """Register a callback to receive processed data."""

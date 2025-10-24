@@ -77,5 +77,6 @@ class Pose:
 
         return real_PoseJoints
 
-PoseDict = dict[int, Pose]
 PoseCallback = Callable[[Pose], None]
+PoseDict = dict[int, Pose]
+PoseDictCallback = Callable[[PoseDict], None]

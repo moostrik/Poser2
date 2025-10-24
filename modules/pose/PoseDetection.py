@@ -21,7 +21,7 @@ from mmpose.structures import PoseDataSample
 from mmpose.structures.bbox import bbox_xywh2xyxy
 
 # Local application imports
-from modules.pose.Pose import Pose, PosePointData
+from modules.pose.Pose import Pose, PosePointData, PoseDict
 
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
@@ -66,18 +66,17 @@ class PoseDetection(Thread):
 
         self.interval: float = 1.0 / fps
 
-
         self.verbose: bool = verbose
         self._running: bool = False
 
         self._poses_dict: dict[int, Pose] = {}
-        self._poses_timestamp: dict[int, Timestamp] = {}
+        self._pose_timestamp: Timestamp = Timestamp.now()
         self._poses_lock: Lock = Lock()  # Add lock for thread safety
         self._callbacks: set = set()
 
         self._notify_update_event: Event = Event()
 
-        self._callback_queue: Queue[list[Pose]] = Queue(maxsize=2)  # Limit queue size
+        self._callback_queue: Queue[PoseDict] = Queue(maxsize=2)  # Limit queue size
         self._callback_thread = Thread(target=self._callback_worker, daemon=True)
         self._callback_running = False
 
@@ -93,7 +92,7 @@ class PoseDetection(Thread):
         self._notify_update_event.set()  # Wake up the thread if waiting
         self.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            self._callback_queue.put([])
+            self._callback_queue.put({})
             self._callback_thread.join(timeout=2.0)
 
     def run(self) -> None:
@@ -111,13 +110,32 @@ class PoseDetection(Thread):
             start_time: float = time.perf_counter()
 
             try:
-                poses: list[Pose] = self.get_poses(consume=True)
-                images: list[np.ndarray] = [pose.crop_image for pose in poses if pose.crop_image is not None]
+                poses: PoseDict = self.get_poses(consume=True)
 
-                data_samples: list[list[PoseDataSample]] = PoseDetection._run_inference(model, pipeline, images, False)
-                point_data_list: list[PosePointData | None] = PoseDetection._extract_point_data_from_samples(data_samples, self.model_width, self.model_height, self.confidence_threshold)
+                # Separate poses with and without crop_image
+                poses_with_images: list[Pose] = [pose for pose in poses.values() if pose.crop_image is not None]
+                images: list[np.ndarray] = [pose.crop_image for pose in poses_with_images if pose.crop_image is not None]
 
-                updated_poses: list[Pose] = [replace(pose, point_data=point_data_list[i]) for i, pose in enumerate(poses)]
+                # Run inference only on poses with images
+                if images:
+                    data_samples: list[list[PoseDataSample]] = PoseDetection._run_inference(model, pipeline, images, False)
+                    point_data_list: list[PosePointData | None] = PoseDetection._extract_point_data_from_samples(data_samples, self.model_width, self.model_height, self.confidence_threshold)
+
+                    # Create updated poses dict with all poses
+                    updated_poses: PoseDict = {}
+                    image_idx = 0
+                    for pose in poses.values():
+                        if pose.crop_image is not None:
+                            # Update pose with point_data
+                            updated_poses[pose.tracklet.id] = replace(pose, point_data=point_data_list[image_idx])
+                            image_idx += 1
+                        else:
+                            # Keep pose as-is without point_data update
+                            updated_poses[pose.tracklet.id] = pose
+                else:
+                    # No images to process, keep all poses as-is
+                    updated_poses = poses
+
                 self._callback_queue.put(updated_poses)
 
             except Exception as e:
@@ -132,27 +150,21 @@ class PoseDetection(Thread):
 
 
     # GETTERS AND SETTERS
-    def add_pose(self, pose: Pose) -> None:
-        if self._running and pose.tracklet.id is not None:
+    def add_poses(self, poses: PoseDict) -> None:
+        if self._running:
             with self._poses_lock:
-                if self._poses_dict.get(pose.tracklet.id) is not None:
-                    existing_pose: Pose = self._poses_dict[pose.tracklet.id]
-                    self._callback_queue.put([existing_pose])
+                if self._poses_dict:
+                    self._callback_queue.put(self._poses_dict)
+                    print(f"Pose Detection Warning: Poses dict not empty when adding new poses, possible consumer lag, {(Timestamp.now() - self._poses_timestamp).total_seconds():.3f} seconds")
+                self._poses_dict = poses
+                self._poses_timestamp: Timestamp = Timestamp.now()
 
-                    if self.verbose:
-                        diff1: float = (pose.tracklet.time_stamp - existing_pose.tracklet.time_stamp).total_seconds()
-                        diff2: float = (Timestamp.now() - self._poses_timestamp.get(pose.tracklet.id, Timestamp.now())).total_seconds()
-                        print(f"Pose Detection Warning: Pose ID {pose.tracklet.id} already in queue, skipping last. {diff1:.3f}, {diff2:.3f}")
-
-                self._poses_dict[pose.tracklet.id] = pose
-                self._poses_timestamp[pose.tracklet.id] = Timestamp.now()
-
-    def get_poses(self, consume: bool) -> list[Pose]:
+    def get_poses(self, consume: bool) -> PoseDict:
         with self._poses_lock:
             poses: dict[int, Pose] = self._poses_dict.copy()
             if consume:
                 self._poses_dict = {}
-            return list(poses.values())
+            return poses
 
     def notify_update(self) -> None:
         if self._running:
@@ -166,16 +178,15 @@ class PoseDetection(Thread):
                 if self._callback_queue.qsize() > 1 and self.verbose:
                     print("Pose Detection Warning: Callback queue size > 1, consumers may be falling behind")
 
-                pose_list: list[Pose] = self._callback_queue.get(timeout=0.5)
+                poses: PoseDict = self._callback_queue.get(timeout=0.5)
 
-                for pose in pose_list:
-                    for c in self._callbacks:
-                        try:
-                            c(pose)
-                        except Exception as e:
-                            if self.verbose:
-                                print(f"Pose Detection Callback Error: {str(e)}")
-                                traceback.print_exc()
+                for c in self._callbacks:
+                    try:
+                        c(poses)
+                    except Exception as e:
+                        if self.verbose:
+                            print(f"Pose Detection Callback Error: {str(e)}")
+                            traceback.print_exc()
                 self._callback_queue.task_done()
             except Empty:
                 continue

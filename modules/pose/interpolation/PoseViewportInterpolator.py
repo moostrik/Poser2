@@ -65,12 +65,12 @@ class PoseViewportInterpolator(PoseInterpolationBase):
         pose_points: np.ndarray | None = pose.point_data.points if pose.point_data is not None else None
         pose_height: float | None = pose.measurement_data.length_estimate if pose.measurement_data is not None else None
 
-        if pose_rect is None:
-            print(f"PoseSmoothRect: No crop rect for pose {pose.tracklet.id}, this should not happen")
-            return
+        # if pose_rect is None:
+        #     print(f"PoseViewportInterpolator: No crop rect for pose {pose.tracklet.id}, this should not happen")
+        #     return
 
         # Always add data, OneEuroInterpolator will handle missing data
-        if pose_points is None or pose_height is None:
+        if pose_points is None or pose_height is None or pose_rect is None:
             self._center_x_interpolator.add_sample(np.nan)
             self._center_y_interpolator.add_sample(np.nan)
             self._height_interpolator.add_sample(np.nan)

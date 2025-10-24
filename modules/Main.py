@@ -1,7 +1,3 @@
-# 2DO
-# notify updates based on the current step of the pipeline
-# e.g. after frame sync, after tracker update, after pose detection update
-
 # Standard library imports
 from math import ceil
 from typing import Optional
@@ -100,20 +96,19 @@ class Main():
         self.pose_streamer.add_stream_callback(self.capture_data_hub.set_pose_stream)
         self.pose_streamer.start()
 
-        self.pose_detection.add_pose_callback(self.pose_streamer.add_pose)
+        self.pose_detection.add_pose_callback(self.pose_streamer.add_poses)
         self.pose_detection.add_pose_callback(self.capture_data_hub.set_pose)
         self.pose_detection.add_pose_callback(self.render_data_hub.add_pose)
         self.pose_detection.start()
 
-        self.tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
-        self.tracker.add_tracklet_callback(self.capture_data_hub.set_tracklet)
+        self.tracker.add_tracklet_callback(self.pose_detection.add_tracklets)
+        self.tracker.add_tracklet_callback(self.capture_data_hub.set_tracklets)
         self.tracker.start()
 
         self.sync_bang.add_callback(self.tracker.notify_update)
-        self.sync_bang.add_callback(self.pose_detection.notify_update)
 
         if self.WS:
-            self.pose_detection.add_pose_callback(self.WS.add_pose)
+            self.pose_detection.add_pose_callback(self.WS.add_poses)
             self.pose_streamer.add_stream_callback(self.WS.add_pose_stream)
             self.WS.add_output_callback(self.capture_data_hub.set_light_image)
             self.WS.start()

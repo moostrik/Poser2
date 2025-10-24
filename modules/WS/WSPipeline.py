@@ -15,7 +15,7 @@ from modules.WS.WSOutput import WSOutput, WSOutputCallback
 from modules.WS.WSUdpSender import WSUdpSender, WSUdpSenderSettings
 
 from modules.Settings import Settings
-from modules.pose.Pose import Pose
+from modules.pose.Pose import Pose, PoseDict
 from modules.pose.PoseStream import PoseStreamData
 
 from modules.gl.Utils import FpsCounter
@@ -126,8 +126,9 @@ class WSPipeline(Thread):
         self.gui.update_fps(self.FPS.get_fps())
 
     # SETTERS
-    def add_pose(self, pose: Pose) -> None:
-        self.pose_input_queue.put(pose)
+    def add_poses(self, poses: PoseDict) -> None:
+        for pose in poses.values():
+            self.pose_input_queue.put(pose)
 
     def get_poses(self) -> list[Pose]:
         poses: list[Pose] = []

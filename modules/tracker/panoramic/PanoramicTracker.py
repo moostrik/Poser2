@@ -9,7 +9,7 @@ from typing import Optional
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
-from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
+from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
 from modules.tracker.panoramic.PanoramicTrackletManager import PanoramicTrackletManager
 from modules.tracker.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
 from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
@@ -59,7 +59,7 @@ class PanoramicTracker(Thread, BaseTracker):
         self.cam_360_hysteresis_factor: float = CAM_360_HYSTERESIS_FACTOR
 
         self.callback_lock = Lock()
-        self.tracklet_callbacks: set[TrackletCallback] = set()
+        self.tracklet_callbacks: set[TrackletDictCallback] = set()
         self.gui = PanoramicTrackerGui(gui, self, settings)
 
         hot_reload = HotReloadMethods(self.__class__)
@@ -150,9 +150,11 @@ class PanoramicTracker(Thread, BaseTracker):
             self.tracklet_manager.merge_tracklets(overlap.keep_id, overlap.remove_id)
 
     def _notify_and_reset_changes(self) -> None:
+        callback_tracklets: TrackletDict = {}
         for tracklet in self.tracklet_manager.all_tracklets():
             if tracklet.needs_notification:
-                self._notify_callback(tracklet)
+                callback_tracklets[tracklet.id] = tracklet
+        self._notify_callback(callback_tracklets)
 
         self.tracklet_manager.mark_all_as_notified()
 
@@ -221,41 +223,42 @@ class PanoramicTracker(Thread, BaseTracker):
         return overlap_sets
 
     # CALLBACKS
-    def _notify_callback(self, tracklet: Tracklet) -> None:
+    def _notify_callback(self, tracklets: TrackletDict) -> None:
         # self._notify_callback_multi_sim(tracklet)
         # return
 
         with self.callback_lock:
             for c in self.tracklet_callbacks:
-                c(tracklet)
+                c(tracklets)
 
     def _notify_callback_multi_sim(self, tracklet: Tracklet) -> None:
-        with self.callback_lock:
-            if tracklet.id < 2:
-                for c in self.tracklet_callbacks:
-                    c(tracklet)
+        pass
+        # with self.callback_lock:
+        #     if tracklet.id < 2:
+        #         for c in self.tracklet_callbacks:
+        #             c(tracklet)
 
-            if tracklet.id == 0:
-                addtracklets = []
-                for i in range(2, 5):
-                    # Create a new tracklet with a different ID
-                    another_tracklet: Tracklet = replace(tracklet, id=i)
-                    addtracklets.append(another_tracklet)
-                for at in addtracklets:
-                    for c in self.tracklet_callbacks:
-                        c(at)
+        #     if tracklet.id == 0:
+        #         addtracklets = []
+        #         for i in range(2, 5):
+        #             # Create a new tracklet with a different ID
+        #             another_tracklet: Tracklet = replace(tracklet, id=i)
+        #             addtracklets.append(another_tracklet)
+        #         for at in addtracklets:
+        #             for c in self.tracklet_callbacks:
+        #                 c(at)
 
-            if tracklet.id == 1:
-                addtracklets = []
-                for i in range(5, 8):
-                    # Create a new tracklet with a different ID
-                    another_tracklet: Tracklet = replace(tracklet, id=i)
-                    addtracklets.append(another_tracklet)
-                for at in addtracklets:
-                    for c in self.tracklet_callbacks:
-                        c(at)
+        #     if tracklet.id == 1:
+        #         addtracklets = []
+        #         for i in range(5, 8):
+        #             # Create a new tracklet with a different ID
+        #             another_tracklet: Tracklet = replace(tracklet, id=i)
+        #             addtracklets.append(another_tracklet)
+        #         for at in addtracklets:
+        #             for c in self.tracklet_callbacks:
+        #                 c(at)
 
-    def add_tracklet_callback(self, callback: TrackletCallback) -> None:
+    def add_tracklet_callback(self, callback: TrackletDictCallback) -> None:
         with self.callback_lock:
             self.tracklet_callbacks.add(callback)
 

@@ -8,8 +8,8 @@ import numpy as np
 
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
-from modules.tracker.Tracklet import Tracklet, Rect
-from modules.pose.Pose import Pose, PoseCallback
+from modules.tracker.Tracklet import Tracklet, Rect, TrackletDict
+from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 from modules.pose.PoseDetection import PoseDetection, POSE_MODEL_TYPE_NAMES
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.Settings import Settings
@@ -21,7 +21,7 @@ class PosePipeline(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__()
         self._stop_event = Event()
-        self.tracklet_input_queue: Queue[Tracklet] = Queue()
+        self.tracklet_input_queue: Queue[TrackletDict] = Queue()
 
         self.input_mutex: Lock = Lock()
         self.input_frames: dict[int, np.ndarray] = {}
@@ -47,7 +47,7 @@ class PosePipeline(Thread):
 
         # Callbacks
         self.callback_lock = Lock()
-        self.pose_output_callbacks: set[PoseCallback] = set()
+        self.pose_output_callbacks: set[PoseDictCallback] = set()
 
         hot_reloader = HotReloadMethods(self.__class__)
 
@@ -79,20 +79,30 @@ class PosePipeline(Thread):
         """
         while not self._stop_event.is_set():
             try:
-                tracklet: Optional[Tracklet] = self.tracklet_input_queue.get(block=True, timeout=0.01)
-                if tracklet is not None:
-                    self._process(tracklet)
+                tracklets: TrackletDict = self.tracklet_input_queue.get(block=True, timeout=0.01)
+                pre_poses: PoseDict = self._process_tracklets(tracklets)
+                if self.pose_detector is not None:
+                    self.pose_detector.add_poses(pre_poses)
+                    self.pose_detector.notify_update()
             except Empty:
                 continue
 
-    def _process(self, tracklet: Tracklet) -> None:
+    def _process_tracklets(self, tracklets: TrackletDict) -> PoseDict:
+        poses: PoseDict = {}
+        for tracklet in tracklets.values():
+            pose: Pose = self._process_tracklet(tracklet)
+            poses[tracklet.id] = pose
+        return poses
 
+    def _process_tracklet(self, tracklet: Tracklet) -> Pose:
         pose_image: Optional[np.ndarray] = None
         pose_crop_rect: Optional[Rect] = None
         cam_image: Optional[np.ndarray] = self._get_image(tracklet.cam_id)
 
         if cam_image is not None and tracklet.is_active:
             pose_image, pose_crop_rect = self.image_processor.process_pose_image(tracklet, cam_image)
+            # if tracklet.is_lost:
+            #     print("lost", tracklet.id, pose_crop_rect)
 
         pose = Pose(
             tracklet=tracklet,
@@ -100,15 +110,11 @@ class PosePipeline(Thread):
             crop_image = pose_image
         )
 
-        if self.pose_detector is not None and not tracklet.is_removed: # the tracklet.is_removed logic could be better
-            if pose.crop_image is not None and pose.crop_rect is not None:
-                self.pose_detector.add_pose(pose)
-            return
-        self._notify_pose_callback(pose)
+        return pose
 
      # INPUTS
-    def add_tracklet(self, tracklet: Tracklet) -> None:
-        self.tracklet_input_queue.put(tracklet)
+    def add_tracklets(self, tracklets: TrackletDict) -> None:
+        self.tracklet_input_queue.put(tracklets)
 
     def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None :
         if frame_type != FrameType.VIDEO:
@@ -122,16 +128,12 @@ class PosePipeline(Thread):
                 return self.input_frames[id]
             return None
 
-    def notify_update(self) -> None:
-        if self.pose_detector is not None:
-            self.pose_detector.notify_update()
-
     # External Output Callbacks
-    def add_pose_callback(self, callback: PoseCallback) -> None:
+    def add_pose_callback(self, callback: PoseDictCallback) -> None:
         with self.callback_lock:
             self.pose_output_callbacks.add(callback)
 
-    def _notify_pose_callback(self, pose: Pose) -> None:
+    def _notify_pose_callback(self, poses: PoseDict) -> None:
         with self.callback_lock:
             for callback in self.pose_output_callbacks:
-                callback(pose)
+                callback(poses)

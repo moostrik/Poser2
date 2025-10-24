@@ -10,7 +10,7 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 
 # Forward declaration to avoid circular import
 if TYPE_CHECKING:
-    from modules.tracker.Tracklet import TrackletCallback
+    from modules.tracker.Tracklet import TrackletDictCallback
 
 class TrackerType(Enum):
     UNKNOWN = "unknown"
@@ -35,7 +35,7 @@ class BaseTracker(ABC):
     def add_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None: ...
 
     @abstractmethod
-    def add_tracklet_callback(self, callback: TrackletCallback) -> None: ...
+    def add_tracklet_callback(self, callback: TrackletDictCallback) -> None: ...
 
     @abstractmethod
     def tracker_type(self) -> TrackerType: ...

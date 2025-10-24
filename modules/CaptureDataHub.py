@@ -7,8 +7,8 @@ from typing import Optional, TypeVar, Generic
 
 
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameType
-from modules.tracker.Tracklet import Tracklet
-from modules.pose.Pose import Pose
+from modules.tracker.Tracklet import Tracklet, TrackletDict
+from modules.pose.Pose import Pose, PoseDict
 from modules.pose.PoseStream import PoseStreamData
 from modules.RenderDataHub import RenderDataHub
 from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
@@ -87,8 +87,9 @@ class CaptureDataHub:
         return result if result is not None else []
 
     # Tracklet management
-    def set_tracklet(self, value: Tracklet) -> None:
-        self._set_data_dict(self.tracklets, value.id, value)
+    def set_tracklets(self, tracklets: TrackletDict) -> None:
+        for value in tracklets.values():
+            self._set_data_dict(self.tracklets, value.id, value)
 
     def get_tracklet(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Tracklet]:
         return self._get_data_dict(self.tracklets, id, only_new_data, consumer_key)
@@ -106,8 +107,9 @@ class CaptureDataHub:
             return [v.value for v in self.tracklets.values() if v.value is not None and v.value.cam_id == cam_id and v.value.is_active]
 
     # Pose management
-    def set_pose(self, value: Pose) -> None:
-        self._set_data_dict(self.poses, value.tracklet.id, value)
+    def set_pose(self, poses: PoseDict) -> None:
+        for pose in poses.values():
+            self._set_data_dict(self.poses, pose.tracklet.id, pose)
 
     def get_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
         return self._get_data_dict(self.poses, id, only_new_data, consumer_key)

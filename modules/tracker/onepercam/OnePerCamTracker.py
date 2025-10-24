@@ -8,7 +8,7 @@ from typing import List, Optional
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.Settings import Settings
-from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus
+from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.onepercam.OnePerCamSmoothRect import OnePerCamSmoothRect
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
@@ -34,7 +34,7 @@ class OnePerCamTracker(Thread, BaseTracker):
         self._update_event: Event = Event()
         self._input_queue: Queue[List[Tracklet]] = Queue()
         self._callback_lock = Lock()
-        self._tracklet_callbacks: set[TrackletCallback] = set()
+        self._tracklet_callbacks: set[TrackletDictCallback] = set()
 
         self._num_cams: int =               settings.camera_num
         self.tracklet_min_age: int =        settings.tracker_min_age
@@ -162,9 +162,11 @@ class OnePerCamTracker(Thread, BaseTracker):
                     self.tracklet_manager.set_metadata(tracklet.id, metadata)
 
         # Notify callbacks
+        callback_tracklets: TrackletDict = {}
         for tracklet in self.tracklet_manager.all_tracklets():
             if tracklet.needs_notification:
-                self._notify_callback(tracklet)
+                callback_tracklets[tracklet.id] = tracklet
+        self._notify_callback(callback_tracklets)
 
         self.tracklet_manager.mark_all_as_notified()
 
@@ -173,12 +175,12 @@ class OnePerCamTracker(Thread, BaseTracker):
             if tracklet.status == TrackingStatus.REMOVED:
                 self.tracklet_manager.remove_tracklet(tracklet.id)
 
-    def _notify_callback(self, tracklet: Tracklet) -> None:
+    def _notify_callback(self, tracklets: TrackletDict) -> None:
         with self._callback_lock:
             for callback in self._tracklet_callbacks:
-                callback(tracklet)
+                callback(tracklets)
 
-    def add_tracklet_callback(self, callback: TrackletCallback) -> None:
+    def add_tracklet_callback(self, callback: TrackletDictCallback) -> None:
         with self._callback_lock:
             self._tracklet_callbacks.add(callback)
 

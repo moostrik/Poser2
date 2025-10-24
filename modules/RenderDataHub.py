@@ -14,7 +14,7 @@ Key capabilities:
 from threading import Lock
 from collections.abc import Mapping
 
-from modules.pose.Pose import Pose
+from modules.pose.Pose import Pose, PoseDict
 from modules.pose.features.PoseAngles import AngleJoint
 from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
 from modules.pose.interpolation.PoseViewportInterpolator import PoseViewportInterpolator, PoseViewportInterpolatorSettings
@@ -72,12 +72,13 @@ class RenderDataHub:
                 for smoother in smoothers.values():
                     smoother.reset()
 
-    def add_pose(self, pose: Pose) -> None:
+    def add_pose(self, poses: PoseDict) -> None:
         """ Add a new pose data point for processing."""
         with self._lock:
-            tracklet_id: int = pose.tracklet.id
-            for smoothers in self._all_smoothers:
-                smoothers[tracklet_id].add_pose(pose)
+            for pose in poses.values():
+                tracklet_id: int = pose.tracklet.id
+                for smoothers in self._all_smoothers:
+                    smoothers[tracklet_id].add_pose(pose)
 
     def add_pose_correlation(self, batch: PairCorrelationBatch) -> None:
         pass
