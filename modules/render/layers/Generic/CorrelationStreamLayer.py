@@ -35,7 +35,7 @@ class CorrelationStreamLayer(LayerBase):
         self.fbo.allocate(width, height, internal_format)
         self.correlation_stream.start()
         if not CorrelationStreamLayer.r_stream_shader.allocated:
-            CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=False)
+            CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
@@ -48,6 +48,8 @@ class CorrelationStreamLayer(LayerBase):
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self, correlation_batch: PairCorrelationBatch | None) -> None:
+        if not CorrelationStreamLayer.r_stream_shader.allocated:
+            CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=True)
         if correlation_batch is None:
             return
         self.correlation_stream.add_correlation(correlation_batch)

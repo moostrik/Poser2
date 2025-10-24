@@ -10,15 +10,13 @@ from typing import Optional
 import numpy as np
 
 # Local application imports
+from modules.pose.Pose import Pose, PosePointData, PoseDict
 from modules.pose.correlation.PairCorrelation import PairCorrelation, PairCorrelationBatch, PoseCorrelationBatchCallback
 from modules.pose.PoseStream import PoseStreamData, PoseStreamDataDict
 from modules.Settings import Settings
 
 from modules.pose.features.PoseAngles import AngleJoint
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
-input_data = dict[int, dict[AngleJoint, float]]
 
 @dataclass
 class AnglePair:
@@ -34,11 +32,12 @@ class PoseCorrelator():
 
         self._correlation_thread = threading.Thread(target=self.run)
         self._stop_event = threading.Event()
+        self._angle_data: dict[int, dict[AngleJoint, float]] = {}
 
         # INPUTS - Just store the latest data with a lock
         self._input_lock = threading.Lock()
-        self._input_data: Optional[input_data] = None
-        self._new_data_available = threading.Event()
+        self._input_poses: PoseDict
+        self._update_event = threading.Event()
 
         # OUTPUT AND CALLBACKS
         self._output_lock = threading.Lock()
@@ -47,8 +46,7 @@ class PoseCorrelator():
         self._callbacks: set[PoseCorrelationBatchCallback] = set()
 
         # HOT RELOADER
-        self.hot_reloader = HotReloadMethods(self.__class__, False, False)
-        self.hot_reloader.add_file_changed_callback(self._reload_and_restart)
+        self.hot_reloader = HotReloadMethods(self.__class__)
 
     def start(self) -> None:
         self._correlation_thread.start()
@@ -62,22 +60,21 @@ class PoseCorrelator():
     def run(self) -> None:
         while not self._stop_event.is_set():
             # Wait for new data with timeout
-            if not self._new_data_available.wait(timeout=0.1):
-                continue
-
-            # Get the latest data
-            with self._input_lock:
-                data: input_data | None = self._input_data
-                self._new_data_available.clear()
-
-            if data is None:
+            if not self._update_event.wait(timeout=0.1):
                 continue
 
             start_time: float = time.perf_counter()
 
-            angle_pairs: list[AnglePair] = self._generate_angle_pairs(data)
+            # Get the latest data
+            with self._input_lock:
+                poses: PoseDict = self._input_poses
+                self._update_event.clear()
+
+            angle_data: dict[int, dict[AngleJoint, float]] = self._update_angles_from_poses(poses)
+            angle_pairs: list[AnglePair] = self._generate_angle_pairs(angle_data)
 
             correlations: list[PairCorrelation] = []
+
             for pair in angle_pairs:
                 try:
                     correlation: Optional[PairCorrelation] = self._analyse_pair(pair, self.similarity_exponent)
@@ -95,14 +92,10 @@ class PoseCorrelator():
                 self._output_data = batch
             self._notify_callbacks(batch)
 
-    def set_pose_stream(self, data: PoseStreamData) -> None:
-        """Add new pose data. Replaces any previous unprocessed data."""
-        # print(data.get_last_angles())
-        pass
-
-        # with self._input_lock:
-        #     self._input_data = data
-        #     self._new_data_available.set()
+    def add_poses(self, poses: PoseDict) -> None:
+        with self._input_lock:
+            self._input_poses = poses
+            self._update_event.set()
 
     def get_output_data(self) -> Optional[PairCorrelationBatch]:
         """Get the latest computed correlation batch."""
@@ -123,24 +116,39 @@ class PoseCorrelator():
                 except Exception as e:
                     print(f"PoseSmoothCorrelatorThread: [{self.__class__.__name__}] Callback error: {e}")
 
-    def _reload_and_restart(self) -> None:
-        self._stop_event.set()
-        self._correlation_thread.join()
+    @staticmethod
+    def _update_angles_from_poses(poses: PoseDict) -> dict[int, dict[AngleJoint, float]]:
+        """
+        Update the angle data dictionary from the current poses.
+        Only stores poses that have angle data.
+        """
 
-        self.hot_reloader.reload_methods()
+        angle_data: dict[int, dict[AngleJoint, float]] = {}
 
-        self._stop_event.clear()
-        self._correlation_thread = threading.Thread(target=self.run)
-        self._correlation_thread.start()
+        for tracklet_id, pose in poses.items():
+
+            if pose.tracklet.is_active and pose.angle_data is not None:
+                angles: np.ndarray = pose.angle_data.angles
+                angle_dict: dict[AngleJoint, float] = {}
+
+                for joint in AngleJoint:
+                    angle = angles[joint]
+                    if not np.isnan(angle):
+                        angle_dict[joint] = angle
+
+                if angle_dict:
+                    angle_data[tracklet_id] = angle_dict
+
+        return angle_data
 
     @staticmethod
-    def _generate_angle_pairs(data: input_data) -> list[AnglePair]:
+    def _generate_angle_pairs(angle_data: dict[int, dict[AngleJoint, float]]) -> list[AnglePair]:
         """
         Generate angle pairs from current angle data.
         Returns a list of AnglePair(id1, id2, angles1, angles2).
         """
         pairs: list[AnglePair] = []
-        data_items: list[tuple[int, dict[AngleJoint, float]]] = list(data.items())
+        data_items: list[tuple[int, dict[AngleJoint, float]]] = list(angle_data.items())
 
         for (id1, angles_1), (id2, angles_2) in combinations(data_items, 2):
             P = AnglePair(
@@ -179,14 +187,12 @@ class PoseCorrelator():
 
         # Iterate through all AngleJoint types
         for angle_joint in AngleJoint:
-            # Get angle values for both poses
-            angle_1: float = pair.angles_1.get(angle_joint, np.nan)
-            angle_2: float = pair.angles_2.get(angle_joint, np.nan)
 
-            # Skip if either angle is NaN
-            if np.isnan(angle_1) or np.isnan(angle_2):
-                correlations[angle_joint.name] = 0.0
+            if angle_joint not in pair.angles_1 or angle_joint not in pair.angles_2:
                 continue
+
+            angle_1: float = pair.angles_1[angle_joint]
+            angle_2: float = pair.angles_2[angle_joint]
 
             # Calculate angular difference (accounting for circular nature of angles)
             diff: float = abs(angle_1 - angle_2)

@@ -60,7 +60,7 @@ class Main():
         self.pose_detection = PosePipeline(settings)
         self.pose_streamer = PoseStreamManager(settings)
 
-        self.pose_correlator: Optional[PoseCorrelator] = PoseCorrelator(settings)
+        self.pose_correlator: PoseCorrelator = PoseCorrelator(settings)
         self.motion_correlator: Optional[PoseStreamCorrelator] = PoseStreamCorrelator(settings)
 
         self.sync_bang = FrameSyncBang(settings)
@@ -87,18 +87,17 @@ class Main():
             self.motion_correlator.start()
             self.pose_streamer.add_stream_callback(self.motion_correlator.set_pose_stream)
 
-        if self.pose_correlator:
-            self.pose_correlator.add_correlation_callback(self.capture_data_hub.set_pose_correlation)
-            self.pose_correlator.add_correlation_callback(self.render_data_hub.add_pose_correlation)
-            self.pose_correlator.start()
-            self.pose_streamer.add_stream_callback(self.pose_correlator.set_pose_stream)
+        self.pose_correlator.add_correlation_callback(self.capture_data_hub.set_pose_correlation)
+        self.pose_correlator.add_correlation_callback(self.render_data_hub.add_pose_correlation)
+        self.pose_correlator.start()
 
         self.pose_streamer.add_stream_callback(self.capture_data_hub.set_pose_stream)
         self.pose_streamer.start()
 
         self.pose_detection.add_pose_callback(self.pose_streamer.add_poses)
-        self.pose_detection.add_pose_callback(self.capture_data_hub.set_pose)
-        self.pose_detection.add_pose_callback(self.render_data_hub.add_pose)
+        self.pose_detection.add_pose_callback(self.pose_correlator.add_poses)
+        self.pose_detection.add_pose_callback(self.capture_data_hub.set_poses)
+        self.pose_detection.add_pose_callback(self.render_data_hub.add_poses)
         self.pose_detection.start()
 
         self.tracker.add_tracklet_callback(self.pose_detection.add_tracklets)

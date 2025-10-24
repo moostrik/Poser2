@@ -107,7 +107,7 @@ class CaptureDataHub:
             return [v.value for v in self.tracklets.values() if v.value is not None and v.value.cam_id == cam_id and v.value.is_active]
 
     # Pose management
-    def set_pose(self, poses: PoseDict) -> None:
+    def set_poses(self, poses: PoseDict) -> None:
         for pose in poses.values():
             self._set_data_dict(self.poses, pose.tracklet.id, pose)
 

@@ -155,7 +155,8 @@ class PoseDetection(Thread):
             with self._poses_lock:
                 if self._poses_dict:
                     self._callback_queue.put(self._poses_dict)
-                    print(f"Pose Detection Warning: Poses dict not empty when adding new poses, possible consumer lag, {(Timestamp.now() - self._poses_timestamp).total_seconds():.3f} seconds")
+                    if self.verbose:
+                        print(f"Pose Detection Warning: Poses dict not empty when adding new poses, possible consumer lag, {(Timestamp.now() - self._poses_timestamp).total_seconds():.3f} seconds")
                 self._poses_dict = poses
                 self._poses_timestamp: Timestamp = Timestamp.now()
 

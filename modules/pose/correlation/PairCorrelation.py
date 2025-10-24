@@ -1,4 +1,4 @@
-import numpy as np
+import math
 import pandas as pd
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Tuple
@@ -7,11 +7,15 @@ from typing import Callable, List, Optional, Tuple
 class PairCorrelation:
     pair_id: Tuple[int, int]
     correlations: dict[str, float]
-    mean_correlation: float =  field(init=False)
+    mean: float =  field(init=False)
+    geometric_mean: float = field(init=False)
 
     def __post_init__(self) -> None:
-        mean: float = float(np.mean(list(self.correlations.values()))) if self.correlations else 0.0
-        object.__setattr__(self, 'mean_correlation', mean)
+        mean: float = sum(self.correlations.values()) / len(self.correlations) if self.correlations else 0.0
+        num_values: int = len(self.correlations)
+        geometric_mean: float = math.exp(sum(math.log(v) for v in self.correlations.values()) / num_values) if num_values > 0 else 0.0
+        object.__setattr__(self, 'mean', mean)
+        object.__setattr__(self, 'geometric_mean', geometric_mean)
 
     @classmethod
     def from_ids(cls, id_1: int, id_2: int, correlations: dict[str, float]):
@@ -26,7 +30,7 @@ class PairCorrelationBatch:
 
     def __post_init__(self) -> None:
         mean: float = (
-            sum(r.mean_correlation for r in self.pair_correlations) / len(self.pair_correlations)
+            sum(r.mean for r in self.pair_correlations) / len(self.pair_correlations)
             if self.pair_correlations else 0.0
         )
         object.__setattr__(self, 'mean_correlation', mean)
@@ -42,13 +46,13 @@ class PairCorrelationBatch:
     def get_most_correlated_pair(self) -> Optional[PairCorrelation]:
         if not self.pair_correlations:
             return None
-        return max(self.pair_correlations, key=lambda r: r.mean_correlation)
+        return max(self.pair_correlations, key=lambda r: r.mean)
 
     def get_mean_correlation_for_pair(self, pair_id: tuple[int, int]) -> float:
         pair_id = (min(pair_id), max(pair_id))
         for pc in self.pair_correlations:
             if pc.pair_id == pair_id:
-                return pc.mean_correlation
+                return pc.mean
         return 0.0
 
 PoseCorrelationBatchCallback = Callable[[PairCorrelationBatch], None]

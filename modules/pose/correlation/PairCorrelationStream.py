@@ -162,7 +162,7 @@ class PairCorrelationStream(Thread):
             pair_id: Tuple[int, int] = self._get_canonical_pair_id(pair_corr.pair_id)
 
             # Create a new row with the similarity score and joint correlations
-            new_data: Dict[str, float] = {'similarity': pair_corr.mean_correlation}
+            new_data: Dict[str, float] = {'similarity': pair_corr.geometric_mean}
             new_data.update(pair_corr.correlations)
 
             # Create a DataFrame with one row

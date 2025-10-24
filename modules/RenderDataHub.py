@@ -72,7 +72,7 @@ class RenderDataHub:
                 for smoother in smoothers.values():
                     smoother.reset()
 
-    def add_pose(self, poses: PoseDict) -> None:
+    def add_poses(self, poses: PoseDict) -> None:
         """ Add a new pose data point for processing."""
         with self._lock:
             for pose in poses.values():

@@ -71,10 +71,12 @@ void main() {
     // Distance from fragment to the line
     float dist = length(uv - closest_point);
 
+    vec3 line_color = mix(vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), 1.0 -curr_value);
+
     // Set color based on distance (white if close enough, bg_color otherwise)
-    vec3 bg_color = ((stream_id & 1) == 0) ? vec3(0.15) : vec3(0.25);
+    vec3 bg_color = ((stream_id & 1) == 0) ? vec3(0.15) : vec3(0.35);
     if (dist <= line_width) {
-        fragColor = vec4(1.0, 1.0, 1.0, 1.0); // White line
+        fragColor = vec4(line_color, 1.0); // White line
     } else {
         fragColor = vec4(bg_color, 1.0); // Background
     }

@@ -135,7 +135,7 @@ class HDTRenderManager(RenderBase):
         self.render_data.update()
         self.pose_meshes.update()
         self.motion_corr_stream_layer.update(self.capture_data.get_motion_correlation(True, self.capture_data_key))
-        # self.pose_corr_stream_layer.update(self.render_data.get_correlation_streams())
+        self.pose_corr_stream_layer.update(self.capture_data.get_pose_correlation(True, self.capture_data_key))
 
         for i in range(self.num_cams):
             self.camera_layers[i].update()
