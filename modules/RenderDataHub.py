@@ -145,7 +145,7 @@ class RenderDataHub:
         batch: PairCorrelationBatch | None = self.get_pose_correlation_batch()
         if batch is None:
             return 0.0
-        return batch.get_mean_correlation_for_pair((id1, id2))
+        return batch.get_pair_metric((id1, id2))
 
     def get_motion_correlation(self, id1: int, id2: int) -> float:
         """Get the correlation value between two tracklet IDs."""
