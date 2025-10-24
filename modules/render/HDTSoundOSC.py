@@ -9,7 +9,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
-from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager, SymmetricJointType
+from modules.pose.interpolation.PoseRenderCoordinator import PoseRenderCoordinator, SymmetricJointType
 from modules.pose.features.PoseAngles import AngleJoint
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -18,8 +18,8 @@ class HDTSoundOSC:
     """
     Sends smooth pose data over OSC at a configurable frame rate in its own thread.
     """
-    def __init__(self, smooth_data: PoseSmoothDataManager, ip: str = "127.0.0.1", port: int = 9000, frame_rate: float = 60.0) -> None:
-        self.smooth_data: PoseSmoothDataManager = smooth_data
+    def __init__(self, smooth_data: PoseRenderCoordinator, ip: str = "127.0.0.1", port: int = 9000, frame_rate: float = 60.0) -> None:
+        self.smooth_data: PoseRenderCoordinator = smooth_data
         self.client = udp_client.SimpleUDPClient(ip, port)
         self.frame_interval: float = 1.0 / frame_rate
         print(f"HDTSoundOSC: Initialized OSC client to {ip}:{port} at {frame_rate} FPS")

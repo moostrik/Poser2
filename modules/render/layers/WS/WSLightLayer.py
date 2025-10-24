@@ -10,7 +10,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.WS.WSOutput import WSOutput
 from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
-from modules.render.DataManager import DataManager
+from modules.data.CaptureDataHub import DataManager
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.gl.shaders.WS_Angles import WS_Angles

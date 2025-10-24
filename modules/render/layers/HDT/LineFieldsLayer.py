@@ -24,7 +24,7 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
 from modules.gl.shaders.HDT_LineBlend import HDT_LineBlend
-from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager, SymmetricJointType
+from modules.pose.interpolation.PoseRenderCoordinator import PoseRenderCoordinator, SymmetricJointType
 from modules.pose.features.PoseAngles import AngleJoint
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.utils.Smoothing import OneEuroFilterAngular
@@ -52,8 +52,8 @@ class LF(LayerBase):
     line_shader = HDT_Lines()
     line_blend_shader = HDT_LineBlend()
 
-    def __init__(self, smooth_data: PoseSmoothDataManager, cam_fbos: dict[int, Fbo], cam_id: int) -> None:
-        self.smooth_data: PoseSmoothDataManager = smooth_data
+    def __init__(self, smooth_data: PoseRenderCoordinator, cam_fbos: dict[int, Fbo], cam_id: int) -> None:
+        self.smooth_data: PoseRenderCoordinator = smooth_data
         self.cam_fbos: dict[int, Fbo] = cam_fbos
         self.cam_id: int = cam_id
         self.fbo: Fbo = Fbo()

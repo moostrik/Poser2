@@ -10,7 +10,7 @@ from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
-from modules.render.DataManager import DataManager
+from modules.data.CaptureDataHub import DataManager
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods

@@ -5,7 +5,7 @@ from enum import Enum, auto
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.features.PoseAngles import AngleJoint, ANGLE_JOINT_NAMES, ANGLE_NUM_JOINTS
-from modules.pose.smooth.PoseSmoothBase import PoseSmoothBase
+from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
 
 from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSettings
 
@@ -42,16 +42,16 @@ for joint_type, (left_joint, right_joint) in SYMMETRIC_JOINT_PAIRS.items():
     SYMMETRIC_JOINT_TYPE_MAP[right_joint] = joint_type
 
 @dataclass
-class PoseSmoothAngleSettings:
+class PoseKinematicsInterpolatorSettings:
     smooth_settings: OneEuroSettings
     motion_threshold: float = 0.002
     motion_weights: dict[AngleJoint, float] = field(default_factory=lambda: POSE_ANGLE_MOTION_WEIGHTS)
 
 # CLASSES
-class PoseSmoothAngles(PoseSmoothBase):
-    def __init__(self, settings: PoseSmoothAngleSettings) -> None:
+class PoseKinematicsInterpolator(PoseInterpolationBase):
+    def __init__(self, settings: PoseKinematicsInterpolatorSettings) -> None:
         self._active: bool = False
-        self.settings: PoseSmoothAngleSettings = settings
+        self.settings: PoseKinematicsInterpolatorSettings = settings
         self._angle_smoothers: dict[AngleJoint, AngleEuroInterpolator] = {}
         self._motions: dict[AngleJoint, float] = {}
         self._total_motion: float = 0.0

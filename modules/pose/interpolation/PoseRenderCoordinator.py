@@ -7,19 +7,20 @@ Key capabilities:
 2. Provides thread-safe access to smoothed pose data
 3. Coordinates underlying smoothers that enable higher framerate output than input
    through interpolation (queryable at higher rates than the input frequency)
-4. Note: Interpolation introduces a latency of approximately 1 input frame
+4. Manages pose correlation analysis
+5. Note: Interpolation introduces a latency of approximately 1 input frame
 """
 
 from threading import Lock
 from collections.abc import Mapping
 
 from modules.pose.Pose import Pose
-from modules.pose.correlation.PoseSmoothCorrelator import PoseSmoothCorrelator, PairCorrelation, PairCorrelationBatch
+from modules.pose.correlation.PoseSmoothCorrelatorProcess import PoseSmoothCorrelator, PairCorrelation, PairCorrelationBatch
 from modules.pose.correlation.PairCorrelationStream import PairCorrelationStream, PairCorrelationStreamData
 from modules.pose.features.PoseAngles import AngleJoint
-from modules.pose.smooth.PoseSmoothBase import PoseSmoothBase
-from modules.pose.smooth.PoseSmoothRect import PoseSmoothRect, PoseSmoothRectSettings
-from modules.pose.smooth.PoseSmoothAngles import PoseSmoothAngles, PoseSmoothAngleSettings, SymmetricJointType
+from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
+from modules.pose.interpolation.PoseViewportInterpolator import PoseViewportInterpolator, PoseViewportInterpolatorSettings
+from modules.pose.interpolation.PoseKinematicsInterpolator import PoseKinematicsInterpolator, PoseKinematicsInterpolatorSettings, SymmetricJointType
 from modules.Settings import Settings
 from modules.utils.OneEuroInterpolation import OneEuroSettings
 from modules.utils.PointsAndRects import Rect
@@ -27,31 +28,31 @@ from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PoseSmoothDataManager:
+class PoseRenderCoordinator:
     def __init__(self, settings: Settings) -> None:
         self._num_players: int = settings.num_players
 
         self.OneEuro_settings: OneEuroSettings = OneEuroSettings(25, 1.0, 0.1)
-        self.rect_settings: PoseSmoothRectSettings = PoseSmoothRectSettings(
+        self.rect_settings: PoseViewportInterpolatorSettings = PoseViewportInterpolatorSettings(
             smooth_settings=self.OneEuro_settings,
             center_dest_x=0.5,
             centre_dest_y=0.2,
             height_dest=0.95,
             dst_aspectratio=9/16
         )
-        self.angle_settings: PoseSmoothAngleSettings = PoseSmoothAngleSettings(
+        self.angle_settings: PoseKinematicsInterpolatorSettings = PoseKinematicsInterpolatorSettings(
             smooth_settings=self.OneEuro_settings,
             motion_threshold=0.002
         )
 
         # Dictionaries to store smoothers for each tracklet ID
-        self._rect_smoothers: dict[int, PoseSmoothRect] = {}
-        self._angle_smoothers: dict[int, PoseSmoothAngles] = {}
+        self._rect_smoothers: dict[int, PoseViewportInterpolator] = {}
+        self._angle_smoothers: dict[int, PoseKinematicsInterpolator] = {}
 
         for i in range(self._num_players):
-            self._rect_smoothers[i] = PoseSmoothRect(self.rect_settings)
-            self._angle_smoothers[i] = PoseSmoothAngles(self.angle_settings)
-        self._all_smoothers: list[Mapping[int, PoseSmoothBase]] = [self._rect_smoothers, self._angle_smoothers]
+            self._rect_smoothers[i] = PoseViewportInterpolator(self.rect_settings)
+            self._angle_smoothers[i] = PoseKinematicsInterpolator(self.angle_settings)
+        self._all_smoothers: list[Mapping[int, PoseInterpolationBase]] = [self._rect_smoothers, self._angle_smoothers]
 
         self.smooth_correlator: PoseSmoothCorrelator = PoseSmoothCorrelator(settings)
 

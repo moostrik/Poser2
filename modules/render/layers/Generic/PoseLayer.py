@@ -15,7 +15,7 @@ from modules.pose.Pose import Pose
 from modules.pose.features.PoseAngles import ANGLE_NUM_JOINTS, ANGLE_JOINT_NAMES
 from modules.pose.PoseStream import PoseStreamData
 
-from modules.render.DataManager import DataManager
+from modules.data.CaptureDataHub import DataManager
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes

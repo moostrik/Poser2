@@ -11,9 +11,9 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
-from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
+from modules.pose.interpolation.PoseRenderCoordinator import PoseRenderCoordinator
 
-from modules.render.DataManager import DataManager
+from modules.data.CaptureDataHub import DataManager
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -23,9 +23,9 @@ from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.gl.Mesh import Mesh
 
 class CentreCamLayer(LayerBase):
-    def __init__(self, data: DataManager, smooth_data: PoseSmoothDataManager, cam_id: int) -> None:
+    def __init__(self, data: DataManager, smooth_data: PoseRenderCoordinator, cam_id: int) -> None:
         self.data: DataManager = data
-        self.smooth_data: PoseSmoothDataManager = smooth_data
+        self.smooth_data: PoseRenderCoordinator = smooth_data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.cam_id: int = cam_id
         self.cam_fbo: Fbo = Fbo()

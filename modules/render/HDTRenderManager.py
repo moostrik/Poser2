@@ -8,11 +8,11 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.RenderBase import RenderBase
 from modules.gl.WindowManager import WindowManager
 from modules.Settings import Settings
-from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
+from modules.pose.interpolation.PoseRenderCoordinator import PoseRenderCoordinator
 from modules.utils.PointsAndRects import Rect, Point2f
 
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.DataManager import DataManager
+from modules.data.CaptureDataHub import DataManager
 from modules.render.HDTSoundOSC import HDTSoundOSC
 
 from modules.render.layers.Generic.CamTrackPoseLayer import CamTrackPoseLayer
@@ -33,7 +33,7 @@ class HDTRenderManager(RenderBase):
         self.num_R_streams: int =   settings.render_R_num
 
         # data
-        self.smooth_data: PoseSmoothDataManager = PoseSmoothDataManager(settings)
+        self.smooth_data: PoseRenderCoordinator = PoseRenderCoordinator(settings)
         self.data: DataManager =    DataManager(self.smooth_data)
         self.sound_osc: HDTSoundOSC = HDTSoundOSC(self.smooth_data, "10.0.0.65", 8000, 60.0)
         self.data_key: str = self.data.get_unique_consumer_key()

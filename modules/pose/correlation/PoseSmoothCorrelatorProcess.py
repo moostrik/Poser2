@@ -1,9 +1,15 @@
 # Standard library imports
+# from multiprocessing.synchronize import Event
+
 import signal
 import time
 import threading
-from dataclasses import dataclass
+from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
+from dataclasses import dataclass, replace
 from itertools import combinations
+from multiprocessing import cpu_count
+from queue import Queue, Empty
 from typing import Optional
 
 # Third-party imports
@@ -27,11 +33,17 @@ class AnglePair:
     angles_1: dict[AngleJoint, float]
     angles_2: dict[AngleJoint, float]
 
+def ignore_keyboard_interrupt() -> None:
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
 class PoseSmoothCorrelator():
     def __init__(self, settings: Settings) -> None:
 
         self.similarity_exponent: float = settings.corr_similarity_exp
 
+        self._max_workers: int = max(min(cpu_count(), 4), 1)
+
+        self._process_pool = ProcessPoolExecutor(max_workers=self._max_workers, initializer=ignore_keyboard_interrupt)
         self._correlation_thread = threading.Thread(target=self.run)
         self._stop_event = threading.Event()
 
@@ -55,6 +67,7 @@ class PoseSmoothCorrelator():
 
     def stop(self) -> None:
         self._stop_event.set()
+        self._process_pool.shutdown(wait=True, cancel_futures=True)
         self._correlation_thread.join()
         with self._callback_lock:
             self._callbacks.clear()
@@ -67,7 +80,7 @@ class PoseSmoothCorrelator():
 
             # Get the latest data
             with self._input_lock:
-                data: input_data | None = self._input_data
+                data: input_data| None = self._input_data
                 self._new_data_available.clear()
 
             if data is None:
@@ -77,23 +90,47 @@ class PoseSmoothCorrelator():
 
             angle_pairs: list[AnglePair] = self._generate_angle_pairs(data)
 
-            correlations: list[PairCorrelation] = []
-            for pair in angle_pairs:
+            if angle_pairs:
+                future_to_pair: dict[Future, AnglePair] = {}
                 try:
-                    correlation: Optional[PairCorrelation] = self._analyse_pair(pair, self.similarity_exponent)
-                    if correlation:
-                        correlations.append(correlation)
-                except Exception as e:
-                    print(f"PoseSmoothCorrelatorThread: Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
+                    for pair in angle_pairs:
+                        try:
+                            future: Future[PairCorrelation | None] = self._process_pool.submit(
+                                self._analyse_pair, pair, self.similarity_exponent
+                            )
+                            future_to_pair[future] = pair
+                        except BrokenProcessPool as bpe:
+                            print(f"PoseSmoothCorrelator: Failed to submit analysis for pair {pair.id_1}-{pair.id_2}: {bpe}")
+                            self._stop_event.set()
+                            break
+                except BrokenProcessPool as bpe:
+                    print(f"PoseSmoothCorrelator: Process pool broken during submission: {bpe}")
+                    self._stop_event.set()
+                    break
 
-            end_time: float = time.perf_counter()
-            elapsed_time: float = end_time - start_time
-            # print(f"PoseSmoothCorrelatorThread: Processed batch in {elapsed_time:.4f} seconds, 28 would be {elapsed_time / len(angle_pairs) * 28:.4f} seconds" if angle_pairs else "No pairs to process.")
+                correlations: list[PairCorrelation] = []
+                try:
+                    for future in as_completed(future_to_pair):
+                        pair: AnglePair = future_to_pair[future]
+                        try:
+                            correlation: Optional[PairCorrelation] = future.result()
+                            if correlation:
+                                correlations.append(correlation)
+                        except Exception as e:
+                            print(f"PoseSmoothCorrelator: Analysis failed for pair {pair.id_1}-{pair.id_2}: {e}")
+                except BrokenProcessPool as bpe:
+                    print(f"PoseSmoothCorrelator: Process pool broken during result collection: {bpe}")
+                    self._stop_event.set()
+                    break
 
-            batch = PairCorrelationBatch(pair_correlations=correlations)
-            with self._output_lock:
-                self._output_data = batch
-            self._notify_callbacks(batch)
+                end_time: float = time.perf_counter()
+                elapsed_time: float = end_time - start_time
+                # print(f"PoseSmoothCorrelator: Processed batch in {elapsed_time:.2f} seconds, 28 would be {elapsed_time / len(angle_pairs) * 28:.2f} seconds")
+
+                batch = PairCorrelationBatch(pair_correlations=correlations)
+                with self._output_lock:
+                    self._output_data = batch
+                self._notify_callbacks(batch)
 
     def set_input_data(self, data: input_data) -> None:
         """Add new pose data. Replaces any previous unprocessed data."""
@@ -118,14 +155,16 @@ class PoseSmoothCorrelator():
                 try:
                     callback(batch)
                 except Exception as e:
-                    print(f"PoseSmoothCorrelatorThread: [{self.__class__.__name__}] Callback error: {e}")
+                    print(f"PoseSmoothCorrelator: [{self.__class__.__name__}] Callback error: {e}")
 
     def _reload_and_restart(self) -> None:
         self._stop_event.set()
+        self._process_pool.shutdown(wait=True)
         self._correlation_thread.join()
 
         self.hot_reloader.reload_methods()
 
+        self._process_pool = ProcessPoolExecutor(max_workers=self._max_workers,initializer = ignore_keyboard_interrupt)
         self._stop_event.clear()
         self._correlation_thread = threading.Thread(target=self.run)
         self._correlation_thread.start()

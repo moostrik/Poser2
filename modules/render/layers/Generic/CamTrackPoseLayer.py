@@ -14,7 +14,7 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.pose.Pose import Pose
 from modules.tracker.Tracklet import Tracklet
 
-from modules.render.DataManager import DataManager
+from modules.data.CaptureDataHub import DataManager
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 

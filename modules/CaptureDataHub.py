@@ -10,7 +10,7 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameTyp
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 from modules.pose.PoseStream import PoseStreamData
-from modules.pose.smooth.PoseSmoothDataManager import PoseSmoothDataManager
+from modules.pose.interpolation.PoseRenderCoordinator import PoseRenderCoordinator
 from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
 from modules.WS.WSOutput import WSOutput
@@ -30,9 +30,9 @@ CorrelationStreamDict = Dict[int, Tuple[Tuple[int, int], np.ndarray]]
 class DataManager:
     _consumer_counter: int = 0  # Class variable for unique IDs
 
-    def __init__(self, PoseSmooth: PoseSmoothDataManager | None = None) -> None:
+    def __init__(self, PoseSmooth: PoseRenderCoordinator | None = None) -> None:
         self.mutex: Lock = Lock()
-        self.pose_smooth_manager: PoseSmoothDataManager | None = PoseSmooth
+        self.pose_smooth_manager: PoseRenderCoordinator | None = PoseSmooth
 
         # Data storage
         self.light_image: Dict[int, DataItem[WSOutput]] = {}
@@ -102,7 +102,6 @@ class DataManager:
     def get_tracklets_for_cam(self, cam_id: int) -> list[Tracklet]:
         with self.mutex:
             return [v.value for v in self.tracklets.values() if v.value is not None and v.value.cam_id == cam_id]
-
 
     def get_active_tracklets_for_cam(self, cam_id: int) -> list[Tracklet]:
         with self.mutex:

@@ -10,7 +10,7 @@ from modules.gl.RenderBase import RenderBase
 
 from modules.Settings import Settings
 
-from modules.render.DataManager import DataManager
+from modules.data.CaptureDataHub import DataManager
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes

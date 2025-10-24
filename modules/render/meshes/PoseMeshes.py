@@ -7,7 +7,7 @@ import numpy as np
 from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose, PoseVertexData
 from modules.pose.features.PoseVertices import POSE_VERTEX_INDICES
-from modules.render.DataManager import DataManager
+from modules.data.CaptureDataHub import DataManager
 from modules.gl.LayerBase import LayerBase, Rect
 
 class PoseMeshes(LayerBase):

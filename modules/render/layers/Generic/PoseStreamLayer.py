@@ -19,7 +19,7 @@ from modules.pose.PoseTypes import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.PoseAngles import ANGLE_NUM_JOINTS, ANGLE_JOINT_NAMES
 from modules.pose.PoseStream import PoseStreamData
 
-from modules.render.DataManager import DataManager
+from modules.data.CaptureDataHub import DataManager
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 

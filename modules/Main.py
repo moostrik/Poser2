@@ -3,13 +3,12 @@ from math import ceil
 from typing import Optional
 
 # Local application imports
-from modules.WS.WSPipeline import WSPipeline
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
+from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
 from modules.pose.correlation.PairCorrelationStream import PairCorrelationStream
-from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.PosePipeline import PosePipeline
 from modules.pose.PoseStream import PoseStreamManager
 from modules.render.WSRenderManager import WSRenderManager
@@ -18,6 +17,7 @@ from modules.Settings import Settings
 from modules.tracker.TrackerBase import TrackerType
 from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker
 from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
+from modules.WS.WSPipeline import WSPipeline
 
 
 class Main():
