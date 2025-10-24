@@ -69,15 +69,11 @@ class OnePerCamTracker(Thread, BaseTracker):
         with self._callback_lock:
             self._tracklet_callbacks.clear()
         self.join(timeout=1.0)
-        
+
     def notify_update(self) -> None:
         if self._running:
             self._update_event.set()
 
-    def notify_update_from_image(self, cam_id: int, frame_type, image) -> None:
-        if cam_id == 0:
-            self.notify_update()
-            
     def run(self) -> None:
 
         while self._running:

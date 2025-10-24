@@ -86,10 +86,6 @@ class PanoramicTracker(Thread, BaseTracker):
         if self.running:
             self.update_event.set()
 
-    def notify_update_from_image(self, cam_id: int, frame_type, image) -> None:
-        if cam_id == 0:
-            self.notify_update()
-
     def run(self) -> None:
         while self.running:
             self.update_event.wait(timeout=0.1)

@@ -122,8 +122,8 @@ class PosePipeline(Thread):
                 return self.input_frames[id]
             return None
 
-    def notify_update_from_image(self, cam_id: int, frame_type, image) -> None:
-        if cam_id == 0 and self.pose_detector is not None:
+    def notify_update(self) -> None:
+        if self.pose_detector is not None:
             self.pose_detector.notify_update()
 
     # External Output Callbacks

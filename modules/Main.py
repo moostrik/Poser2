@@ -1,3 +1,7 @@
+# 2DO
+# notify updates based on the current step of the pipeline
+# e.g. after frame sync, after tracker update, after pose detection update
+
 # Standard library imports
 from math import ceil
 from typing import Optional
@@ -71,14 +75,12 @@ class Main():
     def start(self) -> None:
 
         for camera in self.cameras:
-            camera.add_frame_callback(self.sync_bang.add_frame)
 
             camera.add_preview_callback(self.capture_data_hub.set_cam_image)
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.pose_detection.set_image)
-            camera.add_frame_callback(self.tracker.notify_update_from_image)
-            camera.add_frame_callback(self.pose_detection.notify_update_from_image)
+            camera.add_frame_callback(self.sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.capture_data_hub.set_depth_tracklets)
             camera.start()
@@ -106,6 +108,9 @@ class Main():
         self.tracker.add_tracklet_callback(self.pose_detection.add_tracklet)
         self.tracker.add_tracklet_callback(self.capture_data_hub.set_tracklet)
         self.tracker.start()
+
+        self.sync_bang.add_callback(self.tracker.notify_update)
+        self.sync_bang.add_callback(self.pose_detection.notify_update)
 
         if self.WS:
             self.pose_detection.add_pose_callback(self.WS.add_pose)

@@ -32,9 +32,6 @@ class BaseTracker(ABC):
     def notify_update(self) -> None: ...
 
     @abstractmethod
-    def notify_update_from_image(self) -> None: ...
-
-    @abstractmethod
     def add_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None: ...
 
     @abstractmethod

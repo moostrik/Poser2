@@ -1,132 +1,133 @@
 from threading import Lock
-from typing import Callable, Optional
+from typing import Callable
 import numpy as np
 import time
+from collections import deque
 
 from modules.cam.depthcam.Definitions import FrameType
 from modules.Settings import Settings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-
 class FrameSyncBang:
-    """
-    Synchronizes frames from multiple cameras and notifies when all frames are received.
-    Uses timestamp-based matching with "keep latest frame" strategy for minimal latency.
-    """
 
     def __init__(self, settings: Settings) -> None:
-        """
-        Initialize the frame synchronizer.
-
-        Args:
-            camera_ids: List of camera IDs to synchronize
-            frame_type: Type of frames to synchronize (default: VIDEO)
-            max_time_diff_ms: Maximum allowed time difference between frames in milliseconds
-        """
-        self.camera_ids: set[int] = set(range(settings.camera_num))
-        self.max_time_diff_ms: float = 1000 / settings.camera_fps
-        self._lock = Lock()
-        self._current_frames: dict[int, float] = {}  # cam_id -> (frame, timestamp)
+        num_cams: int = settings.camera_num
+        self.max_gap_s: float = 1.0 / settings.camera_fps
+        self._timestamp_history: deque[tuple[int, float]] = deque(maxlen=10 * num_cams)
         self._callbacks: set[Callable[[], None]] = set()
+        self._lock = Lock()
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def add_frame(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
-        self.add(cam_id)
 
-    def add(self, cam_id: int) -> None:
-        """
-        Add a frame from a camera. Keeps only the latest frame per camera.
-        Notifies callbacks if all frames are received and within time threshold.
-
-        Args:
-            cam_id: Camera ID
-            frame_type: Type of frame
-            frame: Frame data
-            timestamp: Frame timestamp in seconds (uses current time if None)
-        """
-
-        if cam_id not in self.camera_ids:
-            return
-
-        timestamp = time.time()
+        timestamp: float = time.time()
 
         with self._lock:
-            # Always replace with latest frame (strategy #4: predictive dropping)
-            self._current_frames[cam_id] = (timestamp)
+            self._timestamp_history.append((cam_id, timestamp))
+            trigger_cam_id: int = FrameSyncBang._find_sync_trigger_camera(self._timestamp_history, self.max_gap_s)
 
-            # Check if all cameras have frames
-            if len(self._current_frames) == len(self.camera_ids):
-                # Get timestamp range
-                timestamps: list[float] = [ts for ts in self._current_frames.values()]
-                min_ts: float = min(timestamps)
-                max_ts: float = max(timestamps)
-                time_diff_ms: float = (max_ts - min_ts) * 1000
+            if cam_id == trigger_cam_id:
+                # print(f"Max time diff: {FrameSyncBang._get_max_time_diff(self._timestamp_history):.3f}, from cam {cam_id}")
+                self._notify_callbacks()
 
-                # Only sync if frames are close enough in time
-                if time_diff_ms <= self.max_time_diff_ms:
-                    print(f"FrameSyncBang: Synchronized frames with time diff {time_diff_ms:.2f} ms, max allowed {self.max_time_diff_ms} ms")
-                    self._notify_callbacks()
-                    self._current_frames.clear()
-
-    def add_callback(self, callback: Callable[[], None]) -> None:
+    @staticmethod
+    def _find_sync_trigger_camera(timestamp_history: deque[tuple[int, float]], max_gap_s: float) -> int:
         """
-        Add a callback to be notified when all frames are received.
+        Find the camera that should trigger synchronization.
+        This is the camera with the largest gap to the next frame, ensuring
+        all cameras have their closest possible frame combination when triggered.
 
         Args:
-            callback: Function to call when all frames are received
+            timestamp_history: History of (cam_id, timestamp) tuples
+            max_gap_s: Maximum gap in seconds to consider (filters out dropped frames)
+
+        Returns:
+            Camera ID that should trigger the sync callback
         """
+
+        camera_ids: set[int] = FrameSyncBang._get_unique_cameras_in_history(timestamp_history)
+
+        if len(timestamp_history) < 2:
+            return next(iter(camera_ids))
+
+        # Calculate average gap to next frame for each camera
+        cam_gaps: dict[int, list[float]] = {cam_id: [] for cam_id in camera_ids}
+
+        # Look through history and find gap from each cam_id to next timestamp
+        for i in range(len(timestamp_history) - 1):
+            cam_id, timestamp = timestamp_history[i]
+            next_timestamp: float = timestamp_history[i + 1][1]
+            gap: float = next_timestamp - timestamp
+
+            # Only include gaps within normal range
+            if gap <= max_gap_s:
+                cam_gaps[cam_id].append(gap)
+
+        # Find camera with largest average gap
+        max_avg_gap = 0.0
+        trigger_cam: int = next(iter(camera_ids))
+        has_valid_gaps = False
+
+        for cam_id, gaps in cam_gaps.items():
+            if gaps:
+                has_valid_gaps = True
+                avg_gap: float = sum(gaps) / len(gaps)
+                if avg_gap > max_avg_gap:
+                    max_avg_gap: float = avg_gap
+                    trigger_cam = cam_id
+
+        # Fallback: if all gaps filtered, use any camera
+        if not has_valid_gaps:
+            # print(f"Warning: All frame gaps exceeded {max_gap_s:.3f}s threshold")
+            trigger_cam = next(iter(camera_ids))
+
+        return trigger_cam
+
+    @staticmethod
+    def _get_max_time_diff(timestamp_history: deque[tuple[int, float]]) -> float:
+        """
+        Find the maximum time difference between the latest frames of all cameras.
+
+        Returns:
+            Maximum time difference in seconds, or 0.0 if not all cameras have frames
+        """
+        if len(timestamp_history) == 0:
+            return 0.0
+
+        camera_ids: set[int] = FrameSyncBang._get_unique_cameras_in_history(timestamp_history)
+
+        if not camera_ids:  # Extra safety
+            return 0.0
+
+        # Find the latest timestamp for each camera
+        latest_timestamps: dict[int, float] = {}
+
+        for cam_id, timestamp in reversed(timestamp_history):
+            if cam_id not in latest_timestamps:
+                latest_timestamps[cam_id] = timestamp
+            if len(latest_timestamps) == len(camera_ids):
+                break
+
+        # Need at least 2 cameras for meaningful diff
+        if len(latest_timestamps) < 2:
+            return 0.0
+
+        timestamps = list(latest_timestamps.values())
+        return max(timestamps) - min(timestamps)
+
+    @staticmethod
+    def _get_unique_cameras_in_history(timestamp_history: deque[tuple[int, float]]) -> set[int]:
+        cameras: set[int] = set()
+        for cam_id, _ in timestamp_history:
+            cameras.add(cam_id)
+        return cameras
+
+    def add_callback(self, callback: Callable[[], None]) -> None:
         with self._lock:
             self._callbacks.add(callback)
 
-    def remove_callback(self, callback: Callable[[], None]) -> None:
-        """
-        Remove a callback.
-
-        Args:
-            callback: Callback to remove
-        """
-        with self._lock:
-            self._callbacks.discard(callback)
-
     def _notify_callbacks(self) -> None:
-        """
-        Notify all registered callbacks with the synchronized frames.
-
-        Args:
-            frames: Dictionary of {cam_id: frame}
-        """
         for callback in self._callbacks:
             callback()
-
-    def reset(self) -> None:
-        """
-        Clear current frames and start fresh synchronization.
-        """
-        with self._lock:
-            self._current_frames.clear()
-
-    def clear_callbacks(self) -> None:
-        """
-        Remove all callbacks.
-        """
-        with self._lock:
-            self._callbacks.clear()
-
-    def get_sync_stats(self) -> dict[int, float]:
-        """
-        Get current synchronization statistics.
-
-        Returns:
-            Dict with camera IDs and their frame ages in milliseconds
-        """
-        with self._lock:
-            if not self._current_frames:
-                return {}
-
-            current_time: float = time.time()
-            return {
-                cam_id: (current_time - ts) * 1000
-                for cam_id, ts in self._current_frames.items()
-            }
