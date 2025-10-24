@@ -7,6 +7,7 @@ from modules.CaptureDataHub import CaptureDataHub
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
+from modules.cam.FrameSyncBang import FrameSyncBang
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.correlation.PoseCorrelator import PoseCorrelator
 from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
@@ -62,12 +63,16 @@ class Main():
         self.pose_correlator: Optional[PoseCorrelator] = PoseCorrelator(settings)
         self.motion_correlator: Optional[PoseStreamCorrelator] = PoseStreamCorrelator(settings)
 
+        self.sync_bang = FrameSyncBang(settings)
+
         self.is_running: bool = False
         self.is_finished: bool = False
 
     def start(self) -> None:
 
         for camera in self.cameras:
+            camera.add_frame_callback(self.sync_bang.add_frame)
+
             camera.add_preview_callback(self.capture_data_hub.set_cam_image)
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
@@ -88,7 +93,7 @@ class Main():
             self.pose_correlator.add_correlation_callback(self.capture_data_hub.set_pose_correlation)
             self.pose_correlator.add_correlation_callback(self.render_data_hub.add_pose_correlation)
             self.pose_correlator.start()
-            # self.pose_streamer.add_stream_callback(self.pose_correlator.set_pose_stream)
+            self.pose_streamer.add_stream_callback(self.pose_correlator.set_pose_stream)
 
         self.pose_streamer.add_stream_callback(self.capture_data_hub.set_pose_stream)
         self.pose_streamer.start()

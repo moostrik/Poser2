@@ -95,11 +95,14 @@ class PoseCorrelator():
                 self._output_data = batch
             self._notify_callbacks(batch)
 
-    def set_input_data(self, data: input_data) -> None:
+    def set_pose_stream(self, data: PoseStreamData) -> None:
         """Add new pose data. Replaces any previous unprocessed data."""
-        with self._input_lock:
-            self._input_data = data
-            self._new_data_available.set()
+        # print(data.get_last_angles())
+        pass
+
+        # with self._input_lock:
+        #     self._input_data = data
+        #     self._new_data_available.set()
 
     def get_output_data(self) -> Optional[PairCorrelationBatch]:
         """Get the latest computed correlation batch."""
