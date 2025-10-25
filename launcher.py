@@ -118,11 +118,11 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.corr_rate_hz =         args.fps
     settings.corr_num_workers =     10
-    settings.corr_buffer_duration = int(1.5 * args.fps)
+    settings.corr_buffer_duration = int(3 * args.fps)
     settings.corr_stream_timeout =  settings.tracker_timeout # seconds
     settings.corr_max_nan_ratio =   0.15 # maximum ratio of NaN values in a window
     settings.corr_dtw_band =        10 # maximum distance between two points in a window
-    settings.corr_similarity_exp =  2.0 # exponent for similarity calculation
+    settings.corr_similarity_exp =  4.0 # exponent for similarity calculation
     settings.corr_stream_capacity = int(10 * args.fps)
 
     settings.light_resolution =     3600
@@ -173,7 +173,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
         settings.pose_model_type =  PoseModelType.NONE if args.nopose else PoseModelType.SMALL
         settings.pose_model_warmups =  settings.num_players
-        settings.pose_verbose =     False
+        settings.pose_verbose =     True
 
         settings.camera_color =     True
         settings.camera_square =    True

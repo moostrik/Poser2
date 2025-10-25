@@ -71,7 +71,7 @@ LIMB_CONFIG: dict[LimbType, dict] = {
 # CLASSES
 @dataclass(frozen=True)
 class PoseMeasurementData:
-    length_estimate: float = 1.0
+    length_estimate: float = np.nan
 
 class PoseMeasurements:
     hotreload: HotReloadMethods | None = None
@@ -101,12 +101,12 @@ class PoseMeasurements:
         return None
 
     @staticmethod
-    def compute(point_data: Optional['PosePointData'], crop_rect: Optional[Rect]) -> PoseMeasurementData | None:
+    def compute(point_data: Optional['PosePointData'], crop_rect: Optional[Rect]) -> PoseMeasurementData:
         if PoseMeasurements.hotreload is None:
             PoseMeasurements.hotreload = HotReloadMethods(PoseMeasurements)
 
         if point_data is None or crop_rect is None:
-            return None
+            return PoseMeasurementData()
 
         points: np.ndarray = point_data.points
         crop_height: float = crop_rect.height
@@ -134,7 +134,7 @@ class PoseMeasurements:
 
         if not estimates:
             # print("No valid limb estimates for height")
-            return None
+            return PoseMeasurementData()
 
         best_limb: LimbType = max(estimates, key=lambda k: estimates[k])
         best_estimate: float = estimates[best_limb]

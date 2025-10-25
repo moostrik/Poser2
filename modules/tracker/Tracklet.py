@@ -66,6 +66,10 @@ class Tracklet:
         return self.status in (TrackingStatus.NEW, TrackingStatus.TRACKED)
 
     @property
+    def is_being_tracked(self) -> bool:
+        return self.status in (TrackingStatus.NEW, TrackingStatus.TRACKED, TrackingStatus.LOST)
+
+    @property
     def age_in_seconds(self) -> float:
         """Get how long this person has been tracked"""
         return (self.last_active - self.created_at).total_seconds()

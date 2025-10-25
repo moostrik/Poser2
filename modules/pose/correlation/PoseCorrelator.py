@@ -21,14 +21,20 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 @dataclass
 class AnglePair:
+    """Pair of poses with their angle data for correlation analysis."""
     id_1: int
     id_2: int
     angles_1: dict[AngleJoint, float]
     angles_2: dict[AngleJoint, float]
 
-class PoseCorrelator():
-    def __init__(self, settings: Settings) -> None:
+class PoseCorrelator:
+    """Computes pairwise pose correlations in a background thread.
 
+    Processes pose angle data from active tracklets and computes similarity metrics
+    for all pairs. Results are published via callbacks to registered listeners.
+    """
+
+    def __init__(self, settings: Settings) -> None:
         self.similarity_exponent: float = settings.corr_similarity_exp
 
         self._correlation_thread = threading.Thread(target=self.run, daemon=True)
@@ -49,15 +55,18 @@ class PoseCorrelator():
         self.hot_reloader = HotReloadMethods(self.__class__)
 
     def start(self) -> None:
+        """Start the correlation processing thread."""
         self._correlation_thread.start()
 
     def stop(self) -> None:
+        """Stop the correlation processing thread and clear callbacks."""
         self._stop_event.set()
         self._update_event.set()  # Wake the thread so it can see stop_event
         with self._callback_lock:
             self._callbacks.clear()
 
     def run(self) -> None:
+        """Main correlation processing loop (runs in background thread)."""
         while True:
             self._update_event.wait()
 
@@ -71,7 +80,7 @@ class PoseCorrelator():
             with self._input_lock:
                 poses: PoseDict = self._input_poses
 
-            angle_data: dict[int, dict[AngleJoint, float]] = self._update_angles_from_poses(poses)
+            angle_data: dict[int, dict[AngleJoint, float]] = self._extract_angles_from_poses(poses)
             angle_pairs: list[AnglePair] = self._generate_angle_pairs(angle_data)
 
             correlations: list[PairCorrelation] = []
@@ -86,7 +95,6 @@ class PoseCorrelator():
 
             end_time: float = time.perf_counter()
             elapsed_time: float = end_time - start_time
-            # print(f"PoseSmoothCorrelatorThread: Processed batch in {elapsed_time:.4f} seconds, 28 would be {elapsed_time / len(angle_pairs) * 28:.4f} seconds" if angle_pairs else "No pairs to process.")
 
             batch = PairCorrelationBatch(pair_correlations=correlations)
             with self._output_lock:
@@ -94,6 +102,11 @@ class PoseCorrelator():
             self._notify_callbacks(batch)
 
     def add_poses(self, poses: PoseDict) -> None:
+        """Update input poses and trigger correlation processing.
+
+        Args:
+            poses: Dictionary mapping tracklet IDs to Pose objects
+        """
         with self._input_lock:
             self._input_poses = poses
             self._update_event.set()
@@ -104,113 +117,123 @@ class PoseCorrelator():
             return self._output_data
 
     def add_correlation_callback(self, callback: PoseCorrelationBatchCallback) -> None:
-        """ Register a callback to receive the last correlation batch. """
+        """Register a callback to receive correlation batch updates.
+
+        Args:
+            callback: Function to call with PairCorrelationBatch
+        """
         with self._callback_lock:
             self._callbacks.add(callback)
 
     def _notify_callbacks(self, batch: PairCorrelationBatch) -> None:
-        """ Call all registered callbacks with the current batch. """
+        """Call all registered callbacks with the current batch."""
         with self._callback_lock:
             for callback in self._callbacks:
                 try:
                     callback(batch)
                 except Exception as e:
-                    print(f"PoseCorrelator: [{self.__class__.__name__}] Callback error: {e}")
+                    print(f"PoseCorrelator: Callback error: {e}")
                     traceback.print_exc()
 
     @staticmethod
-    def _update_angles_from_poses(poses: PoseDict) -> dict[int, dict[AngleJoint, float]]:
-        """
-        Update the angle data dictionary from the current poses.
-        Only stores poses that have angle data.
-        """
+    def _extract_angles_from_poses(poses: PoseDict) -> dict[int, dict[AngleJoint, float]]:
+        """Extract angle data from active poses.
 
+        Only processes poses with active tracklets. Uses PoseAngleData.get_angle()
+        to access individual joint angles (may be NaN for occluded/missing joints).
+
+        Args:
+            poses: Dictionary mapping tracklet IDs to Pose objects
+
+        Returns:
+            Dictionary mapping tracklet IDs to their angle dictionaries
+        """
         angle_data: dict[int, dict[AngleJoint, float]] = {}
 
         for tracklet_id, pose in poses.items():
-            if pose.tracklet.is_active and pose.angle_data is not None:
-                angles: np.ndarray = pose.angle_data.angles
-
-                # More concise:
-                angle_dict: dict[AngleJoint, float] = {
-                    joint: angles[joint]
+            if pose.tracklet.is_active:
+                # Use the improved PoseAngleData API
+                angles: dict[AngleJoint, float] = {
+                    joint: pose.angle_data.get_angle(joint)
                     for joint in AngleJoint
-                    if not np.isnan(angles[joint])
                 }
-
-                if angle_dict:
-                    angle_data[tracklet_id] = angle_dict
+                angle_data[tracklet_id] = angles
 
         return angle_data
 
     @staticmethod
     def _generate_angle_pairs(angle_data: dict[int, dict[AngleJoint, float]]) -> list[AnglePair]:
-        """
-        Generate angle pairs from current angle data.
-        Returns a list of AnglePair(id1, id2, angles1, angles2).
+        """Generate all pairwise combinations of angle data.
+
+        Args:
+            angle_data: Dictionary mapping tracklet IDs to angle dictionaries
+
+        Returns:
+            List of AnglePair objects for correlation analysis
         """
         pairs: list[AnglePair] = []
         data_items: list[tuple[int, dict[AngleJoint, float]]] = list(angle_data.items())
 
         for (id1, angles_1), (id2, angles_2) in combinations(data_items, 2):
-            P = AnglePair(
+            pair = AnglePair(
                 id_1=id1,
                 id_2=id2,
                 angles_1=angles_1,
                 angles_2=angles_2,
             )
-            pairs.append(P)
+            pairs.append(pair)
 
         return pairs
 
     @staticmethod
     def _analyse_pair(pair: AnglePair, similarity_exponent: float) -> Optional[PairCorrelation]:
-        """
-        Analyse a single pair of current poses for all angle joints and compute their similarity.
+        """Compute similarity scores for all joints in a pose pair.
 
-        For each AngleJoint in the provided AnglePair, this method:
-        - Extracts the angle values from both poses
-        - Skips the joint if either angle is NaN
-        - Computes the angular difference between the two angles
-        - Calculates similarity as (1 - normalized_difference)^similarity_exponent
-        - Collects the similarity scores for all valid joints into a dictionary
+        For each joint:
+        - If either angle is NaN, stores NaN (joint not available for comparison)
+        - Otherwise, computes angular difference and similarity score
+        - Similarity = (1 - normalized_diff)^similarity_exponent
 
-        Returns a PairCorrelation object containing the per-joint similarity scores if any valid correlations are found, otherwise returns None.
+        The PairCorrelation object automatically filters NaN values when computing
+        statistics (mean, geometric_mean, etc.), so NaN joints don't affect results.
 
         Args:
-            pair (AnglePair): The pair of angle dictionaries to compare.
-            similarity_exponent (float): Exponent for similarity emphasis (e.g., 2.0 for quadratic).
+            pair: AnglePair containing two poses' angle data
+            similarity_exponent: Exponent for similarity emphasis (e.g., 2.0 for quadratic)
 
         Returns:
-            Optional[PairCorrelation]: Correlation results for the pair, or None if no valid joints.
+            PairCorrelation with per-joint similarities, or None if no correlations computed
         """
-
         correlations: dict[str, float] = {}
 
-        # Iterate through all AngleJoint types
         for angle_joint in AngleJoint:
+            # Get angles from both poses (may be NaN)
+            angle_1: float = pair.angles_1.get(angle_joint, np.nan)
+            angle_2: float = pair.angles_2.get(angle_joint, np.nan)
 
-            if angle_joint not in pair.angles_1 or angle_joint not in pair.angles_2:
+            # If either angle is NaN, mark correlation as NaN
+            # PairCorrelation will filter these out when computing stats
+            if np.isnan(angle_1) or np.isnan(angle_2):
+                correlations[angle_joint.name] = np.nan
                 continue
 
-            angle_1: float = pair.angles_1[angle_joint]
-            angle_2: float = pair.angles_2[angle_joint]
-
-            # Calculate angular difference (accounting for circular nature of angles)
+            # Calculate angular difference (accounting for circular nature)
             diff: float = abs(angle_1 - angle_2)
+
             # Normalize to [0, π] range (shortest angular distance)
             if diff > np.pi:
                 diff = 2 * np.pi - diff
 
-            # Normalize by π so that 0 = identical, 1 = opposite
+            # Normalize by π: 0 = identical, 1 = opposite
             normalized_diff: float = diff / np.pi
 
-            # Calculate similarity
+            # Calculate similarity with exponent for emphasis
             similarity: float = (1.0 - normalized_diff) ** similarity_exponent
-            similarity = max(0.0, min(1.0, similarity))
+            similarity = max(0.0, min(1.0, similarity))  # Clamp to [0, 1]
 
             correlations[angle_joint.name] = similarity
 
+        # Return PairCorrelation if we have any correlations (even if all NaN)
         if correlations:
             return PairCorrelation.from_ids(
                 id_1=pair.id_1,

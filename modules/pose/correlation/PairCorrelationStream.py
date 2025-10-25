@@ -1,3 +1,4 @@
+import math  # ✅ Added
 import traceback
 import numpy as np
 import pandas as pd
@@ -12,6 +13,18 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 @dataclass(frozen=True)
 class PairCorrelationStreamData:
+    """Immutable snapshot of pose pair correlation history.
+
+    Stores time-series data for each pose pair including similarity metrics
+    and per-joint correlations. NaN values indicate frames where the pair
+    couldn't be compared (occlusion, missing detection, etc).
+
+    Attributes:
+        pair_history: Dictionary mapping pair IDs to their DataFrame history.
+                     DataFrames may contain NaN values for similarity and joints.
+        timestamp: Timestamp when this snapshot was created
+        capacity: Maximum number of samples stored per pair
+    """
     pair_history: Dict[Tuple[int, int], pd.DataFrame]
     timestamp: pd.Timestamp
     capacity: int
@@ -26,7 +39,8 @@ class PairCorrelationStreamData:
             min_similarity: If provided, only include pairs with similarity >= this value
 
         Returns:
-            List of tuples containing (id_1, id_2) sorted by similarity
+            List of tuples containing (id_1, id_2) sorted by similarity.
+            Pairs with all NaN values in the window are excluded.
         """
         result: list[Tuple[int, int, float]] = []
 
@@ -37,9 +51,13 @@ class PairCorrelationStreamData:
                 filtered_df: pd.DataFrame = df[df.index >= window_cutoff]
                 if filtered_df.empty:
                     continue
-                avg_similarity: float = filtered_df['similarity'].mean()
+                avg_similarity: float = filtered_df['similarity'].mean(skipna=True)  # ✅ Added skipna
             else:
-                avg_similarity = df['similarity'].mean()
+                avg_similarity = df['similarity'].mean(skipna=True)  # ✅ Added skipna
+
+            # ✅ Skip pairs where all values in window were NaN
+            if pd.isna(avg_similarity):
+                continue
 
             if min_similarity is not None and avg_similarity < min_similarity:
                 continue
@@ -53,7 +71,7 @@ class PairCorrelationStreamData:
 
     def get_metric_window(self, pair_id: Tuple[int, int], metric_name: str = "similarity", duration: Optional[float] = None) -> Optional[np.ndarray]:
         """
-        Get the time series data for a specific joint of a pose pair.
+        Get the time series data for a specific metric of a pose pair.
 
         Args:
             pair_id: Tuple containing (id_1, id_2)
@@ -61,7 +79,8 @@ class PairCorrelationStreamData:
             duration: If provided, only return data from the last X seconds
 
         Returns:
-            Numpy array of joint values over time, or None if the pair is not found
+            Numpy array of metric values over time (may contain NaN), or None if pair not found.
+            NaN values indicate frames where the metric couldn't be computed.
         """
         if pair_id not in self.pair_history:
             return None
@@ -76,17 +95,19 @@ class PairCorrelationStreamData:
         if df.empty or metric_name not in df.columns:
             return None
 
-        return df[metric_name].to_numpy()
+        return df[metric_name].to_numpy()  # ✅ Returns array with NaN values
 
-    def get_correlation_for_key(self, index: int) -> Dict[int, float]:
+    def get_correlation_for_key(self, index: int, valid_only: bool = False) -> Dict[int, float]:
         """
         Get the correlation values for a specific pose index.
 
         Args:
             index: The index of the pose to retrieve correlations for
+            valid_only: If True, exclude pairs where last similarity is NaN
 
         Returns:
-            Dictionary mapping other_id to similarity_score
+            Dictionary mapping other_id to similarity_score.
+            Values may be NaN if valid_only=False and last sample is NaN.
         """
         correlations: Dict[int, float] = {}
         for pair_id, df in self.pair_history.items():
@@ -94,14 +115,95 @@ class PairCorrelationStreamData:
                 if not df.empty:
                     last_row = df.iloc[-1]
                     other_id = pair_id[1] if pair_id[0] == index else pair_id[0]
-                    correlations[other_id] = last_row['similarity']
+                    similarity = last_row['similarity']
+
+                    # ✅ Optionally filter NaN values
+                    if valid_only and pd.isna(similarity):
+                        continue
+
+                    correlations[other_id] = similarity
         return correlations
 
     def get_last_value_for(self, x: int, y: int) -> float:
+        """Get the last similarity value for a pose pair.
+
+        Args:
+            x: First pose ID
+            y: Second pose ID
+
+        Returns:
+            Last similarity value, or math.nan if pair not found or last value is NaN.
+        """
         pair_id = (x, y) if x <= y else (y, x)
         if pair_id in self.pair_history and not self.pair_history[pair_id].empty:
-            return float(self.pair_history[pair_id].iloc[-1]['similarity'])
-        return 0.0
+            last_value = self.pair_history[pair_id].iloc[-1]['similarity']
+            # ✅ Return the actual value (may be NaN)
+            return float(last_value) if not pd.isna(last_value) else math.nan
+        return math.nan  # ✅ Changed from 0.0
+
+    def get_valid_sample_count(self, pair_id: Tuple[int, int], duration: Optional[float] = None) -> int:
+        """Get the count of non-NaN samples for a pair.
+
+        Args:
+            pair_id: Tuple containing (id_1, id_2)
+            duration: If provided, only count samples from the last X seconds
+
+        Returns:
+            Number of valid (non-NaN) similarity samples
+        """
+        if pair_id not in self.pair_history:
+            return 0
+
+        df: pd.DataFrame = self.pair_history[pair_id]
+
+        if duration is not None and not df.empty:
+            stream_end: pd.Timestamp = df.index[-1]
+            window_cutoff: pd.Timestamp = stream_end - pd.Timedelta(seconds=duration)
+            df = df[df.index >= window_cutoff]
+
+        return int(df['similarity'].notna().sum())
+
+    def get_data_quality(self, pair_id: Tuple[int, int], duration: Optional[float] = None) -> float:
+        """Get the ratio of valid samples for a pair.
+
+        Args:
+            pair_id: Tuple containing (id_1, id_2)
+            duration: If provided, only consider samples from the last X seconds
+
+        Returns:
+            Ratio [0.0, 1.0] of valid samples, or 0.0 if pair not found
+        """
+        if pair_id not in self.pair_history:
+            return 0.0
+
+        df: pd.DataFrame = self.pair_history[pair_id]
+
+        if duration is not None and not df.empty:
+            stream_end: pd.Timestamp = df.index[-1]
+            window_cutoff: pd.Timestamp = stream_end - pd.Timedelta(seconds=duration)
+            df = df[df.index >= window_cutoff]
+
+        if df.empty:
+            return 0.0
+
+        valid_count = df['similarity'].notna().sum()
+        total_count = len(df)
+
+        return float(valid_count / total_count)
+
+    def get_all_qualities(self, duration: Optional[float] = None) -> Dict[Tuple[int, int], float]:
+        """Get data quality ratios for all pairs.
+
+        Args:
+            duration: If provided, only consider samples from the last X seconds
+
+        Returns:
+            Dictionary mapping pair_id to quality ratio [0.0, 1.0]
+        """
+        return {
+            pair_id: self.get_data_quality(pair_id, duration)
+            for pair_id in self.pair_history.keys()
+        }
 
 PairCorrelationStreamDataCallback = Callable[[PairCorrelationStreamData], None]
 
@@ -151,7 +253,11 @@ class PairCorrelationStream(Thread):
         self._pair_history.clear()
 
     def _process_batch(self, batch: PairCorrelationBatch) -> None:
-        """Process a correlation batch and update the pair history."""
+        """Process a correlation batch and update the pair history.
+
+        Stores all pairs including those with NaN metrics (occlusion, missing data).
+        NaN values are preserved in the DataFrame for gap analysis and visualization.
+        """
         if batch.is_empty:
             return
 
@@ -162,8 +268,9 @@ class PairCorrelationStream(Thread):
             pair_id: Tuple[int, int] = self._get_canonical_pair_id(pair_corr.pair_id)
 
             # Create a new row with the similarity score and joint correlations
+            # ✅ This now stores NaN if geometric_mean is NaN (empty pair)
             new_data: Dict[str, float] = {'similarity': pair_corr.geometric_mean}
-            new_data.update(pair_corr.correlations)
+            new_data.update(pair_corr.correlations)  # ✅ Per-joint NaN also stored
 
             # Create a DataFrame with one row
             new_row = pd.DataFrame(new_data, index=[timestamp])
