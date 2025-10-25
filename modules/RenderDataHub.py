@@ -20,9 +20,9 @@ from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBa
 from modules.pose.interpolation.PoseViewportInterpolator import PoseViewportInterpolator, PoseViewportInterpolatorSettings
 from modules.pose.interpolation.PoseKinematicsInterpolator import PoseKinematicsInterpolator, PoseKinematicsInterpolatorSettings, SymmetricJointType
 from modules.Settings import Settings
-from modules.utils.OneEuroInterpolation import OneEuroSettings
+from modules.utils.OneEuroInterpolation import OneEuroSettings, OneEuroInterpolator
 from modules.utils.PointsAndRects import Rect
-from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
+from modules.pose.correlation.PairCorrelation import PairCorrelationBatch, SimilarityMetric
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -52,6 +52,10 @@ class RenderDataHub:
             self._angle_smoothers[i] = PoseKinematicsInterpolator(self.angle_settings)
         self._all_smoothers: list[Mapping[int, PoseInterpolationBase]] = [self._rect_smoothers, self._angle_smoothers]
 
+        # Correlation smoothing (automatically managed)
+        self._pose_correlation_smoothers: dict[tuple[int, int], OneEuroInterpolator] = {}
+        self._motion_correlation_smoothers: dict[tuple[int, int], OneEuroInterpolator] = {}
+
         # Lock to ensure thread safety
         self._lock = Lock()
 
@@ -60,10 +64,17 @@ class RenderDataHub:
     def update(self) -> None:
         """Update all active smoothers."""
         with self._lock:
+            # Update pose/rect smoothers
             for smoothers in self._all_smoothers:
                 for smoother in smoothers.values():
                     if smoother.is_active:
                         smoother.update()
+
+            # Update correlation smoothers
+            for smoother in self._pose_correlation_smoothers.values():
+                smoother.update()
+            for smoother in self._motion_correlation_smoothers.values():
+                smoother.update()
 
     def reset(self) -> None:
         """Reset all smoothers."""
@@ -71,6 +82,12 @@ class RenderDataHub:
             for smoothers in self._all_smoothers:
                 for smoother in smoothers.values():
                     smoother.reset()
+
+            # Reset correlation smoothers
+            for smoother in self._pose_correlation_smoothers.values():
+                smoother.reset()
+            for smoother in self._motion_correlation_smoothers.values():
+                smoother.reset()
 
     def add_poses(self, poses: PoseDict) -> None:
         """ Add a new pose data point for processing."""
@@ -81,10 +98,39 @@ class RenderDataHub:
                     smoothers[tracklet_id].add_pose(pose)
 
     def add_pose_correlation(self, batch: PairCorrelationBatch) -> None:
-        pass
+        """Add new pose correlation and  manage smoothers.
+           Smoothers for pairs not in batch are automatically removed.
+        """
+
+        with self._lock:
+            batch_pair_ids: set[tuple[int, int]] = {pair.pair_id for pair in batch}
+            pairs_to_remove: set[tuple[int, int]] = set(self._pose_correlation_smoothers.keys()) - batch_pair_ids
+
+            for pair_id in pairs_to_remove:
+                del self._pose_correlation_smoothers[pair_id]
+
+            for pair in batch:
+                pair_id: tuple[int, int] = pair.pair_id
+                if pair_id not in self._pose_correlation_smoothers:
+                    self._pose_correlation_smoothers[pair_id] = OneEuroInterpolator(self.OneEuro_settings)
+                self._pose_correlation_smoothers[pair_id].add_sample(pair.geometric_mean)
 
     def add_motion_correlation(self, batch: PairCorrelationBatch) -> None:
-        pass
+        """Add new motion correlation and manage smoothers.
+           Smoothers for pairs not in batch are automatically removed.
+        """
+        with self._lock:
+            batch_pair_ids: set[tuple[int, int]] = {pair.pair_id for pair in batch}
+            pairs_to_remove: set[tuple[int, int]] = set(self._motion_correlation_smoothers.keys()) - batch_pair_ids
+
+            for pair_id in pairs_to_remove:
+                del self._motion_correlation_smoothers[pair_id]
+
+            for pair in batch:
+                pair_id: tuple[int, int] = pair.pair_id
+                if pair_id not in self._motion_correlation_smoothers:
+                    self._motion_correlation_smoothers[pair_id] = OneEuroInterpolator(self.OneEuro_settings)
+                self._motion_correlation_smoothers[pair_id].add_sample(pair.geometric_mean)
 
     # ACTIVE
     def get_is_active(self, tracklet_id: int) -> bool:
@@ -137,26 +183,22 @@ class RenderDataHub:
             return self._rect_smoothers[tracklet_id].age
 
     # CORRELATION
-    def get_pose_correlation_batch(self) -> PairCorrelationBatch | None:
-        return None
-
     def get_pose_correlation(self, id1: int, id2: int) -> float:
-        """Get the correlation value between two tracklet IDs."""
-        batch: PairCorrelationBatch | None = self.get_pose_correlation_batch()
-        if batch is None:
-            return 0.0
-        return batch.get_pair_metric((id1, id2))
+        """Get smoothed pose correlation between two tracklets."""
+        with self._lock:
+            pair_id: tuple[int, int] = (min(id1, id2), max(id1, id2))
+            smoother: OneEuroInterpolator | None = self._pose_correlation_smoothers.get(pair_id)
+            if smoother is None:
+                return 0.0
+            value: float | None = smoother.smooth_value
+            return value if value is not None else 0.0
 
     def get_motion_correlation(self, id1: int, id2: int) -> float:
-        """Get the correlation value between two tracklet IDs."""
-        return 0.0
-
-    # CONVENIENCE METHODS
-    def get_active_angles(self) -> dict[int, dict[AngleJoint, float]]:
-        """Get smoothed angles for all active tracklets."""
-        active_angles: dict[int, dict[AngleJoint, float]] = {}
+        """Get smoothed motion correlation between two tracklets."""
         with self._lock:
-            for tracklet_id, smoother in self._angle_smoothers.items():
-                if smoother.is_active:
-                    active_angles[tracklet_id] = smoother.angles
-        return active_angles
+            pair_id: tuple[int, int] = (min(id1, id2), max(id1, id2))
+            smoother: OneEuroInterpolator | None = self._motion_correlation_smoothers.get(pair_id)
+            if smoother is None:
+                return 0.0
+            value: float | None = smoother.smooth_value
+            return value if value is not None else 0.0
