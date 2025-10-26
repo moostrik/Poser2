@@ -82,7 +82,7 @@ class OnePerCamTracker(Thread, BaseTracker):
 
             while True:
                 try:
-                    tracklets: list[Tracklet] = self._input_queue.get(timeout=0.001)
+                    tracklets: list[Tracklet] = self._input_queue.get(block=False)
                     self._add_tracklet(tracklets)
                 except Empty:
                     break
@@ -164,8 +164,8 @@ class OnePerCamTracker(Thread, BaseTracker):
         # Notify callbacks
         callback_tracklets: TrackletDict = {}
         for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.needs_notification:
-                callback_tracklets[tracklet.id] = tracklet
+            # if tracklet.needs_notification:
+            callback_tracklets[tracklet.id] = tracklet
         self._notify_callback(callback_tracklets)
 
         self.tracklet_manager.mark_all_as_notified()

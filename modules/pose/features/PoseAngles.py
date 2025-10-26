@@ -90,46 +90,37 @@ class PoseAngleData:
         return f"PoseAngleData(valid={self.valid_count}/{ANGLE_NUM_JOINTS}, mean={self.mean_angle:.2f}°)"
 
     def __getitem__(self, joint: AngleJoint) -> float:
-        """Dict-like access: angle_data[AngleJoint.LEFT_ELBOW]"""
+        """Dict-like access: angle_data[AngleJoint.left_elbow]"""
         return self.angles[joint]
 
-    def get_angle(self, joint: AngleJoint) -> float:
-        """Get angle for specific joint (alias for __getitem__)"""
-        return self[joint]
-
-    def get_score(self, joint: AngleJoint) -> float:
-        """Get confidence score for specific joint"""
-        return self.scores[joint]
-
-    def is_valid(self, joint: AngleJoint) -> bool:
-        """Check if joint has valid (non-NaN) angle"""
-        return joint in self
+    @cached_property
+    def valid_mask(self) -> np.ndarray:
+        """Boolean mask indicating which joints have valid (non-NaN) angles"""
+        return ~np.isnan(self.angles)
 
     @cached_property
     def valid_count(self) -> int:
         """Number of joints with valid (non-NaN) angles"""
-        return int(np.count_nonzero(~np.isnan(self.angles)))
+        return int(np.sum(self.valid_mask))
 
     @cached_property
-    def is_empty(self) -> bool:
-        """True if no valid angles available"""
-        return self.valid_count == 0
+    def has_data(self) -> bool:
+        """True if at least one valid angle available"""
+        return self.valid_count > 0
 
     @cached_property
     def mean_angle(self) -> float:
         """Mean of all valid angles (in degrees). Returns 0.0 if no valid angles."""
-        if self.is_empty:
+        if not self.has_data:
             return 0.0
         return float(np.rad2deg(np.nanmean(self.angles)))
 
     @cached_property
     def mean_score(self) -> float:
         """Mean confidence score of all valid joints. Returns 0.0 if no valid angles."""
-        if self.is_empty:
+        if not self.has_data:
             return 0.0
-        # Only average scores where angle is valid
-        valid_mask = ~np.isnan(self.angles)
-        return float(np.mean(self.scores[valid_mask]))
+        return float(np.mean(self.scores[self.valid_mask]))
 
     @cached_property
     def std_angle(self) -> float:
@@ -138,30 +129,9 @@ class PoseAngleData:
             return 0.0
         return float(np.rad2deg(np.nanstd(self.angles)))
 
-    def get_valid_angles(self) -> dict[AngleJoint, float]:
-        """Get dict of only valid (non-NaN) angles"""
-        return {
-            joint: angle
-            for joint, angle, _ in self
-            if not np.isnan(angle)
-        }
-
-    def get_valid_scores(self) -> dict[AngleJoint, float]:
-        """Get dict of scores for valid joints"""
-        return {
-            joint: score
-            for joint, angle, score in self
-            if not np.isnan(angle)
-        }
-
-    def to_degrees(self) -> np.ndarray:
-        """Convert all angles to degrees (NaN preserved)"""
-        return np.rad2deg(self.angles)
-
-    def to_dict(self) -> dict[str, float]:
-        """Convert to dict with joint names as keys (includes NaN values)"""
-        return {joint.name: self.angles[joint] for joint in AngleJoint}
-
+    def to_dict(self) -> dict[AngleJoint, float]:
+        """Convert to dict with joint names as keys. Note: Includes NaN values for invalid/low-confidence joints."""
+        return {joint: float(self.angles[joint]) for joint in AngleJoint}
 
 class PoseAngles:
     @staticmethod

@@ -139,8 +139,8 @@ class PoseCorrelator:
     def _extract_angles_from_poses(poses: PoseDict) -> dict[int, dict[AngleJoint, float]]:
         """Extract angle data from active poses.
 
-        Only processes poses with active tracklets. Uses PoseAngleData.get_angle()
-        to access individual joint angles (may be NaN for occluded/missing joints).
+        Only processes poses with active tracklets. Uses PoseAngleData.to_dict()
+        to get all joint angles (includes NaN for occluded/missing joints).
 
         Args:
             poses: Dictionary mapping tracklet IDs to Pose objects
@@ -148,18 +148,16 @@ class PoseCorrelator:
         Returns:
             Dictionary mapping tracklet IDs to their angle dictionaries
         """
-        angle_data: dict[int, dict[AngleJoint, float]] = {}
 
-        for tracklet_id, pose in poses.items():
-            if pose.tracklet.is_active:
-                # Use the improved PoseAngleData API
-                angles: dict[AngleJoint, float] = {
-                    joint: pose.angle_data.get_angle(joint)
-                    for joint in AngleJoint
-                }
-                angle_data[tracklet_id] = angles
+        angle_dict: dict[int, dict[AngleJoint, float]] = {
+            tracklet_id: pose.angle_data.to_dict()
+            for tracklet_id, pose in poses.items()
+            if pose.tracklet.is_active
+        }
+        # print(f"PoseCorrelator: Extracted angles for {len(angle_dict)} active poses.")
 
-        return angle_data
+        return angle_dict
+
 
     @staticmethod
     def _generate_angle_pairs(angle_data: dict[int, dict[AngleJoint, float]]) -> list[AnglePair]:

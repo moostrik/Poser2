@@ -21,7 +21,8 @@ from mmpose.structures import PoseDataSample
 from mmpose.structures.bbox import bbox_xywh2xyxy
 
 # Local application imports
-from modules.pose.Pose import Pose, PosePointData, PoseDict
+from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
+from modules.pose.features.PosePoints import PosePointData
 
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
@@ -50,67 +51,88 @@ POSE_MODEL_FILE_NAMES: list[tuple[str, str]] = [
     ('rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth')
 ]
 
-
 class PoseDetection(Thread):
-    def __init__(self, path: str, model_type:PoseModelType, model_warmup: int, fps: float = 30.0, confidence_threshold: float = 0.3, verbose: bool = False) -> None:
+    def __init__(self, path: str, model_type: PoseModelType, num_warmups: int, confidence_threshold: float = 0.3, verbose: bool = False) -> None:
         super().__init__()
 
         if model_type is PoseModelType.NONE:
             print('Pose Detection WARNING: ModelType is NONE')
+
         self.model_config_file: str = path + '/' + POSE_MODEL_FILE_NAMES[model_type.value][0]
         self.model_checkpoint_file: str = path + '/' + POSE_MODEL_FILE_NAMES[model_type.value][1]
-        self.model_width: int = 192
-        self.model_height: int = 256
-        self.model_warmup: int = model_warmup
+        self.model_width: int = POSE_MODEL_WIDTH
+        self.model_height: int = POSE_MODEL_HEIGHT
+        self.model_num_warmups: int = num_warmups
         self.confidence_threshold: float = confidence_threshold
 
-        self.interval: float = 1.0 / fps
-
         self.verbose: bool = verbose
-        self._running: bool = False
 
+        # Thread coordination
+        self._shutdown_event: Event = Event()
+        self._notify_update_event: Event = Event()
+        self._model_ready: Event = Event()
+
+        # Pose data
+        self._poses_lock: Lock = Lock()
         self._poses_dict: dict[int, Pose] = {}
         self._pose_timestamp: Timestamp = Timestamp.now()
-        self._poses_lock: Lock = Lock()  # Add lock for thread safety
-        self._callbacks: set = set()
 
-        self._notify_update_event: Event = Event()
+        # Callbacks
+        self._callbacks: set[PoseDictCallback] = set()
+        self._callback_queue: Queue[PoseDict | None] = Queue(maxsize=2)
+        self._callback_thread: Thread = Thread(target=self._callback_worker, daemon=True)
 
-        self._callback_queue: Queue[PoseDict] = Queue(maxsize=2)  # Limit queue size
-        self._callback_thread = Thread(target=self._callback_worker, daemon=True)
-        self._callback_running = False
+        self._hot_reloader = HotReloadMethods(self.__class__)
 
-        hot_reloader = HotReloadMethods(self.__class__)
+    @property
+    def is_ready(self) -> bool:
+        """Check if model is loaded and system is ready to process poses"""
+        return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
 
     def start(self) -> None:
-        self._callback_running = True
         self._callback_thread.start()
         super().start()
 
     def stop(self) -> None:
-        self._running = False
-        self._notify_update_event.set()  # Wake up the thread if waiting
+        """Stop both inference and callback threads gracefully"""
+        self._shutdown_event.set()
+
+        # Wake up inference thread
+        self._notify_update_event.set()
         self.join(timeout=2.0)
-        if self._callback_thread.is_alive():
-            self._callback_queue.put({})
-            self._callback_thread.join(timeout=2.0)
+
+        if self.is_alive() and self.verbose:
+            print("Warning: Inference thread did not stop cleanly")
+
+        # Wake up callback thread with sentinel
+        try:
+            self._callback_queue.put_nowait(None)
+        except:
+            pass
+
+        self._callback_thread.join(timeout=2.0)
+        if self._callback_thread.is_alive() and self.verbose:
+            print("Warning: Callback thread did not stop cleanly")
 
     def run(self) -> None:
-        model:torch.nn.Module = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
+        model: torch.nn.Module = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
         model.half()
         pipeline: Compose = Compose(model.cfg.test_dataloader.dataset.pipeline) # pyright: ignore
+        self._model_warmup(model, pipeline, self.model_num_warmups, self.verbose)
+        self._model_ready.set()  # Signal model is ready
 
-        self._model_warmup(model, pipeline, self.model_warmup, self.verbose)
-
-        self._running = True
-
-        while self._running:
+        while not self._shutdown_event.is_set():
             self._notify_update_event.wait(timeout=1.0)
+
+            if self._shutdown_event.is_set():
+                break
+
             self._notify_update_event.clear()
-            start_time: float = time.perf_counter()
 
             try:
-                poses: PoseDict = self.get_poses(consume=True)
+                with self._poses_lock:
+                    poses: PoseDict = self._poses_dict
+                    self._poses_dict = {}
 
                 # Separate poses with and without crop_image
                 poses_with_images: list[Pose] = [pose for pose in poses.values() if pose.crop_image is not None]
@@ -126,14 +148,11 @@ class PoseDetection(Thread):
                     image_idx = 0
                     for pose in poses.values():
                         if pose.crop_image is not None:
-                            # Update pose with point_data
                             updated_poses[pose.tracklet.id] = replace(pose, point_data=point_data_list[image_idx])
                             image_idx += 1
                         else:
-                            # Keep pose as-is without point_data update
                             updated_poses[pose.tracklet.id] = pose
                 else:
-                    # No images to process, keep all poses as-is
                     updated_poses = poses
 
                 self._callback_queue.put(updated_poses)
@@ -143,43 +162,48 @@ class PoseDetection(Thread):
                     print(f"Pose Detection Error: {str(e)}")
                     traceback.print_exc()
 
-            # if self.verbose:
-            #     detection_time: float = time.perf_counter() - start_time
-            #     if detection_time > self.interval:
-            #         print(f"Pose Detection Time: {detection_time:.3f} seconds")
+        if self.verbose:
+            print("PoseDetection: Inference thread stopped")
 
+        if self.verbose:
+            print("PoseDetection: Callback worker thread stopped")
 
-    # GETTERS AND SETTERS
-    def add_poses(self, poses: PoseDict) -> None:
-        if self._running:
-            with self._poses_lock:
-                if self._poses_dict:
-                    self._callback_queue.put(self._poses_dict)
-                    if self.verbose:
-                        print(f"Pose Detection Warning: Poses dict not empty when adding new poses, possible consumer lag, {(Timestamp.now() - self._poses_timestamp).total_seconds():.3f} seconds")
-                self._poses_dict = poses
-                self._poses_timestamp: Timestamp = Timestamp.now()
+    def submit_poses(self, poses: PoseDict) -> None:
+        """Submit new poses for detection processing."""
+        if self._shutdown_event.is_set():
+            return
 
-    def get_poses(self, consume: bool) -> PoseDict:
+        old_poses: PoseDict | None = None
+        lag: float = 0.0
+
         with self._poses_lock:
-            poses: dict[int, Pose] = self._poses_dict.copy()
-            if consume:
-                self._poses_dict = {}
-            return poses
+            if self._poses_dict:
+                old_poses = self._poses_dict
+                lag = (Timestamp.now() - self._pose_timestamp).total_seconds()
+            self._poses_dict = poses
+            self._pose_timestamp = Timestamp.now()
 
-    def notify_update(self) -> None:
-        if self._running:
-            self._notify_update_event.set()
+        if old_poses is not None:
+            try:
+                self._callback_queue.put_nowait(old_poses)
+            except:
+                if self.verbose:
+                    print(f"Pose Detection Warning: Callback queue full, dropped batch (lag: {lag:.3f}s)")
 
-    # CALLBACKS
+        self._notify_update_event.set()
+
+    # CALLBACK
     def _callback_worker(self) -> None:
         """Worker thread that processes callbacks without blocking the main thread"""
-        while self._callback_running:
+        while not self._shutdown_event.is_set():
             try:
                 if self._callback_queue.qsize() > 1 and self.verbose:
                     print("Pose Detection Warning: Callback queue size > 1, consumers may be falling behind")
 
-                poses: PoseDict = self._callback_queue.get(timeout=0.5)
+                poses: PoseDict | None = self._callback_queue.get(timeout=0.5)
+
+                if poses is None:
+                    break
 
                 for c in self._callbacks:
                     try:
@@ -188,15 +212,13 @@ class PoseDetection(Thread):
                         if self.verbose:
                             print(f"Pose Detection Callback Error: {str(e)}")
                             traceback.print_exc()
+
                 self._callback_queue.task_done()
             except Empty:
                 continue
 
-    def addMessageCallback(self, callback) -> None:
+    def add_poses_callback(self, callback: PoseDictCallback) -> None:
         self._callbacks.add(callback)
-
-    def clearMessageCallbacks(self) -> None:
-        self._callbacks = set()
 
     # STATIC METHODS
     @staticmethod
@@ -219,14 +241,13 @@ class PoseDetection(Thread):
         if verbose:
             print("PoseDetection: Model warmup complete")
 
-
     @staticmethod
     def _run_inference(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray], verbose: bool) -> list[list[PoseDataSample]]:
         if not imgs:
             return []
         with torch.cuda.amp.autocast(): # pyright: ignore
 
-            start_time = time.perf_counter()
+            start_time: float = time.perf_counter()
 
             scope = model.cfg.get('default_scope', 'mmpose') # pyright: ignore
             if scope is not None:
@@ -267,12 +288,8 @@ class PoseDetection(Thread):
                 # Process all images in a single batch
                 batch = pseudo_collate(data_list)
 
-
-                start_time = time.perf_counter()
                 with torch.no_grad():
                     all_results = model.test_step(batch) # pyright: ignore
-                    end_time = time.perf_counter()
-                    # print(f"Pose Detection: Inference time: {end_time - start_time:.4f} seconds")
 
                 # Split results back by image
                 start_idx = 0
@@ -281,7 +298,7 @@ class PoseDetection(Thread):
                     start_idx += length
 
             if verbose:
-                print(f"Pose Detection Processing Time: {time.perf_counter() - start_time  :.3f} seconds")
+                print(f"Pose Detection Processing Time: {time.perf_counter() - start_time  :.3f}s, batch={len(imgs)})")
 
             return results_by_image
 
@@ -316,34 +333,3 @@ class PoseDetection(Thread):
                 first_poses.append(None)
 
         return first_poses
-
-    @staticmethod
-    def resize_with_pad(image, target_width, target_height, padding_color=(0, 0, 0)) -> np.ndarray:
-        # Get the original dimensions
-        original_height, original_width = image.shape[:2]
-
-        # Calculate the aspect ratio
-        aspect_ratio: float = original_width / original_height
-
-        # Determine the new dimensions while maintaining the aspect ratio
-        if target_width / target_height > aspect_ratio:
-            new_height: int = target_height
-            new_width = int(target_height * aspect_ratio)
-        else:
-            new_width: int = target_width
-            new_height = int(target_width / aspect_ratio)
-
-        # Resize the image
-        resized_image: np.ndarray = cv2.resize(image, (new_width, new_height))
-
-        # Create a new image with the target dimensions and the padding color
-        padded_image: np.ndarray = np.full((target_height, target_width, 3), padding_color, dtype=np.uint8)
-
-        # Calculate the position to place the resized image
-        x_offset: int = (target_width - new_width) // 2
-        y_offset: int = (target_height - new_height) // 2
-
-        # Place the resized image on the padded image
-        padded_image[y_offset:y_offset+new_height, x_offset:x_offset+new_width] = resized_image
-
-        return padded_image

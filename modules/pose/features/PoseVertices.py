@@ -53,7 +53,7 @@ class PoseVertices:
         return vertex_data
 
     @staticmethod
-    def compute_angled_vertices(point_data: Optional[PosePointData], angle_data: Optional[PoseAngleData]) -> Optional[PoseVertexData]:
+    def compute_angled_vertices(point_data: Optional[PosePointData], angle_data: PoseAngleData) -> Optional[PoseVertexData]:
 
         if point_data is None:
             return None
@@ -62,10 +62,10 @@ class PoseVertices:
         if vertex_data is None:
             return None
 
-        if angle_data is None:
+        if not angle_data.has_data:
             return vertex_data
 
-        colors: np.ndarray = vertex_data.colors.copy()
+        colors: np.ndarray = vertex_data.colors
 
         for i, (p1, p2) in enumerate(POSE_VERTEX_LIST):
             for joint_pos, joint in enumerate((p1, p2)):

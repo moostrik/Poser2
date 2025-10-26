@@ -100,11 +100,13 @@ class Main():
         self.pose_detection.add_pose_callback(self.render_data_hub.add_poses)
         self.pose_detection.start()
 
-        self.tracker.add_tracklet_callback(self.pose_detection.add_tracklets)
+        self.tracker.add_tracklet_callback(self.pose_detection.set_tracklets)
         self.tracker.add_tracklet_callback(self.capture_data_hub.set_tracklets)
         self.tracker.start()
 
         self.sync_bang.add_callback(self.tracker.notify_update)
+
+        self.sync_bang.add_callback(self.pose_detection.notify_update)
 
         if self.WS:
             self.pose_detection.add_pose_callback(self.WS.add_poses)

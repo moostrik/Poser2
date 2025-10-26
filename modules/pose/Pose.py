@@ -4,6 +4,8 @@ from functools import cached_property
 from dataclasses import dataclass, field
 from typing import Optional, Callable
 
+from pandas import Timestamp
+
 # Local application imports
 from modules.pose.features.PosePoints import PosePointData
 from modules.pose.features.PoseVertices import PoseVertices, PoseVertexData
@@ -16,31 +18,44 @@ from modules.utils.PointsAndRects import Rect
 
 
 @dataclass(frozen=True)
-class Pose:    
+class Pose:
     """Immutable pose data structure with lazy feature computation.
-    
+
     Designed for multi-stage pipeline:
-    1. Detection: tracklet assigned
-    2. Cropping: crop_rect and crop_image added
-    3. Keypoint detection: point_data added
-    4. Feature extraction: computed on-demand via cached properties
-    
+    1. Input: tracklet, time_stamp, crop_rect and crop_image added
+    2. Keypoint detection: point_data added
+    3. Feature extraction: computed on-demand via cached properties
+
     All computed features return valid objects even when input data is missing,
     using NaN values to indicate unavailable data. This allows for consistent
     API without null checks, with validity determined by NaN presence.
-    
+
     Only vertex_data and absolute_points return None when dependencies are unavailable.
     """
-    
+
     # Set at first stage of pipeline
-    tracklet: Tracklet = field(repr=False)
+    tracklet: Tracklet = field(init=True)
+    crop_rect: Optional[Rect] = field(init=True)
+    crop_image: Optional[np.ndarray] = field(init=True)
+    time_stamp: Timestamp = field(init=True)
 
     # Set at second stage of pipeline
-    crop_rect: Optional[Rect] = field(default=None)
-    crop_image: Optional[np.ndarray] = field(default=None, repr=False)
+    point_data: Optional[PosePointData] = field(default=None)
 
-    # Set at third stage of pipeline
-    point_data: Optional[PosePointData] = field(default=None, repr=False)
+    def __repr__(self) -> str:
+        return (f"Pose(id={self.tracklet.id}, valid={self.has_data}, "
+                f"points={self.point_data.valid_count if self.point_data else 0}, "
+                f"age={self.age:.2f}s)")
+
+    @property
+    def has_data(self) -> bool:
+        """Check if pose has minimum required data for feature extraction"""
+        return self.point_data is not None and self.point_data.has_data
+
+    @property
+    def age(self) -> float:
+        """Time in seconds since pose was captured"""
+        return (Timestamp.now() - self.time_stamp).total_seconds()
 
     # LAZY FEATURES
     @cached_property
