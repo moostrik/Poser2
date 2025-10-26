@@ -37,7 +37,6 @@ class HDTRenderManager(RenderBase):
         # data
         self.render_data: RenderDataHub =   render_data_hub
         self.capture_data: CaptureDataHub = capture_data_hub
-        self.capture_data_key: str =        self.capture_data.get_unique_consumer_key()
         self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data, "10.0.0.65", 8000, 60.0)
 
         # meshes
@@ -49,8 +48,8 @@ class HDTRenderManager(RenderBase):
         self.centre_pose_layers:    dict[int, CentrePoseRender] = {}
         self.pose_overlays:         dict[int, PoseStreamLayer] = {}
         self.line_field_layers:     dict[int, LineFieldLayer] = {}
-        self.motion_corr_stream_layer = CorrelationStreamLayer(self.num_R_streams)
-        self.pose_corr_stream_layer =   CorrelationStreamLayer(self.num_R_streams)
+        self.motion_corr_stream_layer = CorrelationStreamLayer(self.capture_data, self.num_R_streams)
+        self.pose_corr_stream_layer =   CorrelationStreamLayer(self.capture_data, self.num_R_streams)
 
         # fbos
         self.cam_fbos: dict[int, Fbo] = {}
@@ -135,8 +134,8 @@ class HDTRenderManager(RenderBase):
         self.render_data.update()
         self.pose_meshes.update()
 
-        self.motion_corr_stream_layer.update(self.capture_data.get_motion_correlation(True, self.capture_data_key))
-        self.pose_corr_stream_layer.update(self.capture_data.get_pose_correlation(True, self.capture_data_key))
+        self.motion_corr_stream_layer.update()
+        self.pose_corr_stream_layer.update()
 
         for i in range(self.num_cams):
             self.camera_layers[i].update()

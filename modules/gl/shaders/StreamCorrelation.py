@@ -46,7 +46,7 @@ class StreamCorrelation(Shader):
         capacity: int = r_streams.capacity
 
         # ✅ Get pairs and windows in one call
-        pairs_with_windows = r_streams.get_top_pairs_with_windows(num_streams, capacity, "similarity")
+        pairs_with_windows = r_streams.get_top_pairs_with_windows(num_streams, capacity)
 
         image: np.ndarray = np.zeros((num_streams, capacity, 3), dtype=np.float32)
 

@@ -9,8 +9,9 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.correlation.PairCorrelationStream import PairCorrelationStream, PairCorrelationStreamData, PairCorrelationBatch
+from modules.pose.correlation.PairCorrelationStream import PairCorrelationStream, PairCorrelationStreamData, PairCorrelationBatch, SimilarityMetric
 from modules.gl.LayerBase import LayerBase, Rect
+from modules.CaptureDataHub import CaptureDataHub
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -20,12 +21,13 @@ from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 class CorrelationStreamLayer(LayerBase):
     r_stream_shader = StreamCorrelation()
 
-    def __init__(self, num_streams: int) -> None:
+    def __init__(self, data: CaptureDataHub, num_streams: int) -> None:
+        self.data: CaptureDataHub = data
+        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.num_streams: int = num_streams
-        self.correlation_stream = PairCorrelationStream(10 * 24, 2)
-        self.correlation_stream.start()
+        self.correlation_stream = PairCorrelationStream(10 * 24)
 
         text_init()
 
@@ -46,26 +48,21 @@ class CorrelationStreamLayer(LayerBase):
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
-    def update(self, correlation_batch: PairCorrelationBatch | None) -> None:
+    def update(self) -> None:
         if not CorrelationStreamLayer.r_stream_shader.allocated:
             CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=True)
+
+        correlation_batch: PairCorrelationBatch | None = self.data.get_pose_correlation(True, self.data_consumer_key)
         if correlation_batch is None:
             return
 
-        self.correlation_stream.add_correlation(correlation_batch)
-        stream_data: PairCorrelationStreamData | None = self.correlation_stream.get_stream_data()
-        if stream_data is None:
-            return
+        self.correlation_stream.update(correlation_batch, SimilarityMetric.GEOMETRIC_MEAN)
+        stream_data: PairCorrelationStreamData = self.correlation_stream.get_stream_data()
 
-        # ✅ Use optimized combined method instead of separate calls
         pairs_with_data = stream_data.get_top_pairs_with_windows(
             self.num_streams,
-            stream_data.capacity,
-            "similarity"
+            stream_data.capacity
         )
-
-        if not pairs_with_data:
-            return
 
         # Extract just the pairs for rendering
         pairs: list[tuple[int, int]] = [pair_id for pair_id, _ in pairs_with_data]
