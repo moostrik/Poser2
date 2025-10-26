@@ -11,8 +11,10 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class FrameSyncBang:
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, verbose: bool = False, stream_name: str = '') -> None:
         num_cams: int = settings.camera_num
+        self.verbose: bool = verbose
+        self.stream_name: str = stream_name
         self.max_gap_s: float = 1.0 / settings.camera_fps
         self._timestamp_history: deque[tuple[int, float]] = deque(maxlen=10 * num_cams)
         self._callbacks: set[Callable[[], None]] = set()
@@ -20,8 +22,8 @@ class FrameSyncBang:
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
-    def add_frame(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
-
+    def add_frame(self, *args) -> None:
+        cam_id: int = args[0]
         timestamp: float = time.time()
 
         with self._lock:
@@ -29,7 +31,8 @@ class FrameSyncBang:
             trigger_cam_id: int = FrameSyncBang._find_sync_trigger_camera(self._timestamp_history, self.max_gap_s)
 
             if cam_id == trigger_cam_id:
-                # print(f"Max time diff: {FrameSyncBang._get_max_time_diff(self._timestamp_history):.3f}, from cam {cam_id}")
+                if self.verbose:
+                    print(f"{self.stream_name}Max time diff: {FrameSyncBang._get_max_time_diff(self._timestamp_history):.3f}, from cam {cam_id}")
                 self._notify_callbacks()
 
     @staticmethod

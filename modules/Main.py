@@ -63,7 +63,8 @@ class Main():
         self.pose_correlator: PoseCorrelator = PoseCorrelator(settings)
         self.motion_correlator: Optional[PoseStreamCorrelator] = PoseStreamCorrelator(settings)
 
-        self.sync_bang = FrameSyncBang(settings)
+        self.frame_sync_bang = FrameSyncBang(settings, False, 'frame_sync')
+        self.tracklet_sync_bang = FrameSyncBang(settings, False, 'tracklet_sync')
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -76,9 +77,10 @@ class Main():
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.pose_detection.set_image)
-            camera.add_frame_callback(self.sync_bang.add_frame)
+            camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.capture_data_hub.set_depth_tracklets)
+            camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
             camera.start()
 
         if self.motion_correlator:
@@ -104,9 +106,8 @@ class Main():
         self.tracker.add_tracklet_callback(self.capture_data_hub.set_tracklets)
         self.tracker.start()
 
-        self.sync_bang.add_callback(self.tracker.notify_update)
-
-        self.sync_bang.add_callback(self.pose_detection.notify_update)
+        self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
+        self.frame_sync_bang.add_callback(self.pose_detection.notify_update)
 
         if self.WS:
             self.pose_detection.add_pose_callback(self.WS.add_poses)
