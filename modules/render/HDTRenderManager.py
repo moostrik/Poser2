@@ -91,8 +91,8 @@ class HDTRenderManager(RenderBase):
 
     def allocate(self) -> None:
         for i in range(self.num_cams):
-            self.centre_cam_layers[i].allocate(2160, 3840, GL_RGBA32F)
-            self.centre_pose_layers[i].allocate(2160, 3840, GL_RGBA32F)
+            self.centre_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
+            self.centre_pose_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
 
         self.pose_meshes.allocate()
@@ -134,6 +134,7 @@ class HDTRenderManager(RenderBase):
 
         self.render_data.update()
         self.pose_meshes.update()
+
         self.motion_corr_stream_layer.update(self.capture_data.get_motion_correlation(True, self.capture_data_key))
         self.pose_corr_stream_layer.update(self.capture_data.get_pose_correlation(True, self.capture_data_key))
 

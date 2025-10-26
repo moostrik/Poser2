@@ -267,8 +267,8 @@ class LF(LayerBase):
         other_cam_color_0 = CAM_COLOR[other_cam_id_0]
         other_cam_color_1 = CAM_COLOR[other_cam_id_1]
 
-        sync_0 = self.smooth_data.get_motion_correlation(this_cam_id, other_cam_id_0)
-        sync_1 = self.smooth_data.get_motion_correlation(this_cam_id, other_cam_id_1)
+        sync_0 = self.smooth_data.get_pose_correlation(this_cam_id, other_cam_id_0)
+        sync_1 = self.smooth_data.get_pose_correlation(this_cam_id, other_cam_id_1)
 
         sync_0 = (min(max((sync_0 - 0.5) / 0.5, 0.0), 1.0))
         sync_1 = (min(max((sync_1 - 0.5) / 0.5, 0.0), 1.0))

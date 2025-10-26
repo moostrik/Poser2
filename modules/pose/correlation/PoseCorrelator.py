@@ -209,7 +209,7 @@ class PoseCorrelator:
             # If either angle is NaN, mark correlation as NaN
             # PairCorrelation will filter these out when computing stats
             if np.isnan(angle_1) or np.isnan(angle_2):
-                correlations[angle_joint.name] = np.nan
+                # correlations[angle_joint.name] = np.nan
                 continue
 
             # Calculate angular difference (accounting for circular nature)

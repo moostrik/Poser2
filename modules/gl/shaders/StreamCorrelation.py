@@ -42,53 +42,35 @@ class StreamCorrelation(Shader):
 
     @staticmethod
     def r_stream_to_image(r_streams: PairCorrelationStreamData, num_streams: int) -> np.ndarray:
-        """Convert stream data to RGB image with mask.
-
-        Returns:
-            RGB image array (num_streams, capacity, 3) where:
-            - Channel 0 (R): Unused (zeros)
-            - Channel 1 (G): Validity mask (1.0 = valid data, 0.0 = NaN gap)
-            - Channel 2 (B): Similarity value (NaN replaced with 0.0)
-        """
-        pairs: list[Tuple[int, int]] = r_streams.get_top_pairs(num_streams)
-        num_pairs: int = len(pairs)
+        """Convert stream data to RGB image with mask - OPTIMIZED."""
         capacity: int = r_streams.capacity
+
+        # ✅ Get pairs and windows in one call
+        pairs_with_windows = r_streams.get_top_pairs_with_windows(num_streams, capacity, "similarity")
 
         image: np.ndarray = np.zeros((num_streams, capacity, 3), dtype=np.float32)
 
-        for i in range(num_pairs):
-            pair: Tuple[int, int] = pairs[i]
-            stream: np.ndarray | None = r_streams.get_metric_window(pair)
+        for i, (pair_id, stream) in enumerate(pairs_with_windows):
+            stream_len: int = stream.shape[0]
 
-            if stream is not None:
-                stream_len: int = stream.shape[0]
+            if stream_len >= capacity:
+                data = stream[-capacity:]
+            else:
+                data = np.zeros(capacity, dtype=np.float32)
+                start_idx: int = capacity - stream_len
+                data[start_idx:] = stream
 
-                if stream_len >= capacity:
-                    # Take most recent capacity samples
-                    data = stream[-capacity:]
-                else:
-                    # Pad with zeros at start
-                    data = np.zeros(capacity, dtype=np.float32)
-                    start_idx: int = capacity - stream_len
-                    data[start_idx:] = stream
+            valid_mask = ~np.isnan(data)
 
-                # ✅ Create validity mask for non-NaN values
-                valid_mask = ~np.isnan(data)
+            image[i, :, 2] = np.nan_to_num(data, nan=0.0)
+            image[i, valid_mask, 1] = 1.0
+            image[i, ~valid_mask, 1] = 0.0
 
-                # ✅ Channel 2 (B): Similarity value (NaN → 0.0)
-                image[i, :, 2] = np.nan_to_num(data, nan=0.0)
-
-                # ✅ Channel 1 (G): Validity mask (1.0 = valid, 0.0 = NaN)
-                image[i, valid_mask, 1] = 1.0
-                image[i, ~valid_mask, 1] = 0.0
-
-                # ✅ Mark stream start boundaries (if data doesn't fill capacity)
-                if stream_len < capacity:
-                    start_idx = capacity - stream_len
-                    # Use red channel to mark boundaries (optional)
-                    image[i, start_idx, 0] = 1.0
-                    if stream_len > 1:
-                        image[i, start_idx + 1, 0] = 1.0
+            if stream_len < capacity:
+                start_idx = capacity - stream_len
+                image[i, start_idx, 0] = 1.0
+                if stream_len > 1:
+                    image[i, start_idx + 1, 0] = 1.0
 
         return image
 
@@ -111,7 +93,7 @@ class StreamCorrelation(Shader):
 
         for i in range(num_pairs):
             pair: Tuple[int, int] = pairs[i]
-            r: np.ndarray | None = r_streams.get_metric_window(pair)
+            r: np.ndarray | None = r_streams.get_metric_window_array(pair)
 
             if r is not None:
                 if r.shape[0] <= capacity:

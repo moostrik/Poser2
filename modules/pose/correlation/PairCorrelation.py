@@ -27,14 +27,13 @@ class PairCorrelation:
     Attributes:
         pair_id:        Tuple of (smaller_id, larger_id) for consistent ordering.
         correlations:   Dict mapping joint names to similarity scores [0.0, 1.0].
-                        Can contain NaN values for joints not available in both poses.
+                        Contains only joints available in both poses.
         joint_weights:  Optional dict mapping joint names to weights (non-negative floats).
                         Missing keys default to 1.0.
 
     Note:
-        All statistical methods (mean, geometric_mean, etc.) automatically filter out
-        NaN values, treating them as "joints not available for comparison" rather than
-        "zero similarity". This ensures statistics reflect only comparable joints.
+        The correlations dict only includes joints that were successfully compared.
+        Joints not available in both poses are simply not included in the dict.
     """
     pair_id: tuple[int, int]
     correlations: dict[str, float]
@@ -52,6 +51,12 @@ class PairCorrelation:
             raise ValueError(f"Cannot correlate pose with itself: {self.id_1}")
         if self.id_1 > self.id_2:
             raise ValueError(f"pair_id must be ordered as (smaller_id, larger_id), got {self.pair_id}")
+
+        # Validate that correlations don't contain NaN
+        for joint, value in self.correlations.items():
+            if math.isnan(value):
+                raise ValueError(f"Correlation for joint '{joint}' is NaN. Only include valid correlations.")
+
         if self.joint_weights is not None:
             for joint, weight in self.joint_weights.items():
                 if weight < 0:
@@ -89,77 +94,68 @@ class PairCorrelation:
 
     @cached_property
     def joint_count(self) -> int:
-        """Total number of joints in correlations dict (includes NaN)"""
+        """Total number of joints with valid correlations"""
         return len(self.correlations)
 
     @cached_property
     def valid_joint_count(self) -> int:
-        """Number of joints with valid (non-NaN) correlations"""
-        return sum(1 for v in self.correlations.values() if not math.isnan(v))
+        """Number of joints with valid correlations (same as joint_count)"""
+        return self.joint_count
 
     @cached_property
     def nan_joint_count(self) -> int:
-        """Number of joints with NaN correlations (not comparable)"""
-        return self.joint_count - self.valid_joint_count
+        """Number of joints with NaN correlations (always 0)"""
+        return 0
 
     @cached_property
     def matching_joint_count(self) -> int:
-        """Number of valid joints with similarity > 0"""
-        return sum(1 for v in self.correlations.values() if not math.isnan(v) and v > 0)
+        """Number of joints with similarity > 0"""
+        return sum(1 for v in self.correlations.values() if v > 0)
 
     @cached_property
     def is_empty(self) -> bool:
-        """True if no valid correlations available"""
-        return self.valid_joint_count == 0
+        """True if no correlations available"""
+        return len(self.correlations) == 0
 
     @cached_property
     def mean(self) -> float:
-        """Arithmetic mean of valid correlations. Weighted if joint_weights provided. Ignores NaN.
+        """Arithmetic mean of correlations. Weighted if joint_weights provided.
 
         Returns:
-            Mean similarity [0.0, 1.0], or NaN if no valid correlations available.
+            Mean similarity [0.0, 1.0], or NaN if no correlations available.
         """
         if self.is_empty:
             return math.nan
 
         if self.joint_weights is None:
-            valid_values: list[float] = [v for v in self.correlations.values() if not math.isnan(v)]
-            return sum(valid_values) / len(valid_values)
+            return sum(self.correlations.values()) / len(self.correlations)
 
         # Weighted mean
-        valid_items: list[tuple[str, float]] = [
-            (joint, v) for joint, v in self.correlations.items() if not math.isnan(v)
-        ]
         weighted_sum: float = float(sum(
-            v * self.joint_weights.get(joint, 1.0) for joint, v in valid_items
+            v * self.joint_weights.get(joint, 1.0) for joint, v in self.correlations.items()
         ))
         weight_total: float = float(sum(
-            self.joint_weights.get(joint, 1.0) for joint, _ in valid_items
+            self.joint_weights.get(joint, 1.0) for joint in self.correlations.keys()
         ))
         return weighted_sum / weight_total if weight_total > 0 else math.nan
 
     @cached_property
     def geometric_mean(self) -> float:
-        """Geometric mean of valid correlations. Weighted if joint_weights provided. Ignores NaN.
+        """Geometric mean of correlations. Weighted if joint_weights provided.
 
         Returns:
-            Geometric mean [0.0, 1.0], or NaN if no valid correlations available.
+            Geometric mean [0.0, 1.0], or NaN if no correlations available.
         """
         if self.is_empty:
             return math.nan
 
         if self.joint_weights is None:
-            valid_values: list[float] = [
-                max(v, EPSILON) for v in self.correlations.values() if not math.isnan(v)
-            ]
-            return float(gmean(valid_values))
+            values: list[float] = [max(v, EPSILON) for v in self.correlations.values()]
+            return float(gmean(values))
 
         # Weighted geometric mean
-        valid_items: list[tuple[str, float]] = [
-            (joint, v) for joint, v in self.correlations.items() if not math.isnan(v)
-        ]
-        weights: list[float] = [self.joint_weights.get(joint, 1.0) for joint, _ in valid_items]
-        values: list[float] = [v for _, v in valid_items]
+        weights: list[float] = [self.joint_weights.get(joint, 1.0) for joint in self.correlations.keys()]
+        values: list[float] = list(self.correlations.values())
         weight_total: float = float(sum(weights))
 
         if weight_total == 0:
@@ -170,26 +166,21 @@ class PairCorrelation:
 
     @cached_property
     def harmonic_mean(self) -> float:
-        """Harmonic mean of valid correlations. Weighted if joint_weights provided. Ignores NaN.
+        """Harmonic mean of correlations. Weighted if joint_weights provided.
 
         Returns:
-            Harmonic mean [0.0, 1.0], or NaN if no valid correlations available.
+            Harmonic mean [0.0, 1.0], or NaN if no correlations available.
         """
         if self.is_empty:
             return math.nan
 
         if self.joint_weights is None:
-            valid_values: list[float] = [
-                max(v, EPSILON) for v in self.correlations.values() if not math.isnan(v)
-            ]
-            return float(hmean(valid_values))
+            values: list[float] = [max(v, EPSILON) for v in self.correlations.values()]
+            return float(hmean(values))
 
         # Weighted harmonic mean
-        valid_items: list[tuple[str, float]] = [
-            (joint, v) for joint, v in self.correlations.items() if not math.isnan(v)
-        ]
-        weights: list[float] = [self.joint_weights.get(joint, 1.0) for joint, _ in valid_items]
-        values: list[float] = [v for _, v in valid_items]
+        weights: list[float] = [self.joint_weights.get(joint, 1.0) for joint in self.correlations.keys()]
+        values: list[float] = list(self.correlations.values())
         weight_total: float = float(sum(weights))
 
         if weight_total == 0:
@@ -200,45 +191,39 @@ class PairCorrelation:
 
     @cached_property
     def min_similarity(self) -> float:
-        """Worst (minimum) valid joint similarity. Ignores NaN.
+        """Worst (minimum) joint similarity.
 
         Returns:
-            Min similarity [0.0, 1.0], or NaN if no valid joints.
+            Min similarity [0.0, 1.0], or NaN if no joints.
         """
         if self.is_empty:
             return math.nan
-        valid_values: list[float] = [v for v in self.correlations.values() if not math.isnan(v)]
-        return min(valid_values)
+        return min(self.correlations.values())
 
     @cached_property
     def max_similarity(self) -> float:
-        """Best (maximum) valid joint similarity. Ignores NaN.
+        """Best (maximum) joint similarity.
 
         Returns:
-            Max similarity [0.0, 1.0], or NaN if no valid joints.
+            Max similarity [0.0, 1.0], or NaN if no joints.
         """
         if self.is_empty:
             return math.nan
-        valid_values: list[float] = [v for v in self.correlations.values() if not math.isnan(v)]
-        return max(valid_values)
+        return max(self.correlations.values())
 
     @cached_property
     def std_deviation(self) -> float:
-        """Standard deviation of valid joint similarities (always unweighted). Ignores NaN.
+        """Standard deviation of joint similarities (always unweighted).
 
         Returns:
-            Standard deviation, or NaN if < 2 valid joints.
+            Standard deviation, or NaN if < 2 joints.
         """
-        if self.is_empty:
+        if self.is_empty or len(self.correlations) < 2:
             return math.nan
 
-        valid_values: list[float] = [v for v in self.correlations.values() if not math.isnan(v)]
-
-        if len(valid_values) < 2:
-            return math.nan
-
-        unweighted_mean: float = sum(valid_values) / len(valid_values)
-        variance: float = sum((v - unweighted_mean) ** 2 for v in valid_values) / len(valid_values)
+        values: list[float] = list(self.correlations.values())
+        mean_val: float = sum(values) / len(values)
+        variance: float = sum((v - mean_val) ** 2 for v in values) / len(values)
         return math.sqrt(variance)
 
     def get_metric_value(self, metric: SimilarityMetric) -> float:
@@ -253,6 +238,10 @@ class PairCorrelationBatch:
     Attributes:
         pair_correlations: List of all pairwise correlations
         timestamp: When this batch was created
+
+    Note:
+        All pair correlations are expected to have valid (non-NaN) metrics.
+        Empty pairs (with no joints) may have NaN metrics, which are handled appropriately.
     """
     pair_correlations: list[PairCorrelation]
     timestamp: pd.Timestamp = field(default_factory=pd.Timestamp.now)
@@ -278,7 +267,8 @@ class PairCorrelationBatch:
 
     def __repr__(self) -> str:
         """Readable string representation"""
-        return (f"PairCorrelationBatch(pairs={self.pair_count}, mean={self.mean:.3f}, timestamp={self.timestamp})")
+        mean_str = f"{self.mean:.3f}" if not math.isnan(self.mean) else "NaN"
+        return f"PairCorrelationBatch(pairs={self.pair_count}, mean={mean_str}, timestamp={self.timestamp})"
 
     @cached_property
     def pair_count(self) -> int:
@@ -287,55 +277,74 @@ class PairCorrelationBatch:
 
     @cached_property
     def is_empty(self) -> bool:
+        """True if batch contains no pairs"""
         return self.pair_count == 0
 
     @cached_property
     def mean(self) -> float:
-        """Average arithmetic mean across all pairs. Returns NaN if batch is empty."""
+        """Average arithmetic mean across all non-empty pairs.
+
+        Returns:
+            Mean of all pair means [0.0, 1.0], or NaN if batch is empty or all pairs are empty.
+        """
         if self.is_empty:
             return math.nan
-        valid_means: list[float] = [r.mean for r in self.pair_correlations if not math.isnan(r.mean)]
-        if not valid_means:
-            return math.nan
-        return sum(valid_means) / len(valid_means)
+
+        means: list[float] = [r.mean for r in self.pair_correlations if not r.is_empty]
+        return sum(means) / len(means) if means else math.nan
 
     @cached_property
     def geometric_mean(self) -> float:
-        """Geometric mean of all non-empty pair geometric means. Returns NaN if batch is empty."""
+        """Geometric mean of all non-empty pair geometric means.
+
+        Returns:
+            Geometric mean [0.0, 1.0], or NaN if batch is empty or all pairs are empty.
+        """
         if self.is_empty:
             return math.nan
+
         values: list[float] = [
             r.geometric_mean
             for r in self.pair_correlations
-            if not math.isnan(r.geometric_mean) and r.geometric_mean > 0
+            if not r.is_empty
         ]
-        if not values:
-            return math.nan
-        return float(gmean(values))
+        return float(gmean(values)) if values else math.nan
 
     @cached_property
     def harmonic_mean(self) -> float:
-        """Harmonic mean of all non-empty pair harmonic means. Returns NaN if batch is empty."""
+        """Harmonic mean of all non-empty pair harmonic means.
+
+        Returns:
+            Harmonic mean [0.0, 1.0], or NaN if batch is empty or all pairs are empty.
+        """
         if self.is_empty:
             return math.nan
+
         values: list[float] = [
             r.harmonic_mean
             for r in self.pair_correlations
-            if not math.isnan(r.harmonic_mean) and r.harmonic_mean > 0
+            if not r.is_empty
         ]
-        if not values:
-            return math.nan
-        return float(hmean(values))
+        return float(hmean(values)) if values else math.nan
 
     def get_most_correlated_pair(self, metric: SimilarityMetric = SimilarityMetric.MEAN) -> Optional[PairCorrelation]:
-        """Get the pair with highest similarity based on the specified metric
+        """Get the pair with highest similarity based on the specified metric.
 
         Args:
             metric: Which similarity metric to use
+
+        Returns:
+            PairCorrelation with highest metric value, or None if batch is empty.
+            Empty pairs (with NaN metrics) are excluded.
         """
         if self.is_empty:
             return None
-        return max(self.pair_correlations, key=lambda r: r.get_metric_value(metric))
+
+        non_empty_pairs = [pc for pc in self.pair_correlations if not pc.is_empty]
+        if not non_empty_pairs:
+            return None
+
+        return max(non_empty_pairs, key=lambda r: r.get_metric_value(metric))
 
     def get_top_n_pairs(self, n: int = 5, metric: SimilarityMetric = SimilarityMetric.MEAN) -> list[PairCorrelation]:
         """Get top N most similar pairs.
@@ -343,27 +352,34 @@ class PairCorrelationBatch:
         Args:
             n: Number of pairs to return
             metric: Which similarity metric to use
+
+        Returns:
+            List of up to N pairs sorted by metric (highest first).
+            Empty pairs are excluded.
         """
         if self.is_empty:
             return []
+
+        non_empty_pairs = [pc for pc in self.pair_correlations if not pc.is_empty]
         return sorted(
-            self.pair_correlations,
+            non_empty_pairs,
             key=lambda r: r.get_metric_value(metric),
             reverse=True
         )[:n]
 
     def get_pair_metric(self, pair_id: tuple[int, int], metric: SimilarityMetric = SimilarityMetric.MEAN) -> float:
-        """Get mean similarity for specific pair (O(1) lookup).
+        """Get metric value for specific pair (O(1) lookup).
 
         Args:
             pair_id: Tuple of (id1, id2) in any order
+            metric: Which similarity metric to use
 
         Returns:
-            Mean similarity score, or 0.0 if pair not found
+            Metric value [0.0, 1.0], or NaN if pair not found or is empty.
         """
         pair_id = (min(pair_id), max(pair_id))
         pc: PairCorrelation | None = self._pair_lookup.get(pair_id)
-        return pc.get_metric_value(metric) if pc else 0.0
+        return pc.get_metric_value(metric) if pc else math.nan
 
     def get_pair(self, pair_id: tuple[int, int]) -> Optional[PairCorrelation]:
         """Get full correlation object for specific pair (O(1) lookup).

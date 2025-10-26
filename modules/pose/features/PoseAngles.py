@@ -1,7 +1,7 @@
 import numpy as np
 import math
-from dataclasses import dataclass, field
 from functools import cached_property
+from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Optional, Iterator
 

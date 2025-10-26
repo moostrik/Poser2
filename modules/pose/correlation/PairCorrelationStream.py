@@ -1,7 +1,8 @@
-import math  # ✅ Added
+import math
 import traceback
 import numpy as np
 import pandas as pd
+from functools import cached_property
 from dataclasses import dataclass
 from queue import Queue, Empty
 from threading import Thread, Event, Lock
@@ -29,100 +30,76 @@ class PairCorrelationStreamData:
     timestamp: pd.Timestamp
     capacity: int
 
-    def get_top_pairs(self, n: int = 5, duration: Optional[float] = None, min_similarity: Optional[float] = None) -> list[Tuple[int, int]]:
+    @cached_property
+    def _sorted_pairs_by_similarity(self) -> list[Tuple[Tuple[int, int], float]]:
+        """Pre-compute sorted pairs by average similarity (descending).
+
+        Returns:
+            List of ((id_1, id_2), avg_similarity) tuples, sorted by similarity.
+            Pairs with all NaN values are excluded.
+        """
+        result: list[Tuple[Tuple[int, int], float]] = []
+
+        for pair_id, df in self.pair_history.items():
+            avg_similarity = df['similarity'].mean(skipna=True)
+            if not pd.isna(avg_similarity):
+                result.append((pair_id, avg_similarity))
+
+        result.sort(key=lambda x: x[1], reverse=True)
+        return result
+
+    def get_top_pairs(self, n: int = 5) -> list[Tuple[int, int]]:
         """
         Get the top N most similar pose pairs based on average similarity scores.
 
         Args:
             n: Number of top pairs to return
-            duration: If provided, only consider data from the last X seconds
-            min_similarity: If provided, only include pairs with similarity >= this value
 
         Returns:
             List of tuples containing (id_1, id_2) sorted by similarity.
             Pairs with all NaN values in the window are excluded.
         """
-        result: list[Tuple[int, int, float]] = []
+        # Fast path: use cached result if no duration/filter specified
+        return [pair_id for pair_id, _ in self._sorted_pairs_by_similarity[:n]]
 
-        for pair_id, df in self.pair_history.items():
-            if duration is not None and not df.empty:
-                stream_end: pd.Timestamp = df.index[-1]
-                window_cutoff: pd.Timestamp = stream_end - pd.Timedelta(seconds=duration)
-                filtered_df: pd.DataFrame = df[df.index >= window_cutoff]
-                if filtered_df.empty:
-                    continue
-                avg_similarity: float = filtered_df['similarity'].mean(skipna=True)  # ✅ Added skipna
-            else:
-                avg_similarity = df['similarity'].mean(skipna=True)  # ✅ Added skipna
-
-            # ✅ Skip pairs where all values in window were NaN
-            if pd.isna(avg_similarity):
-                continue
-
-            if min_similarity is not None and avg_similarity < min_similarity:
-                continue
-
-            # Store as (id_1, id_2, avg_similarity)
-            result.append((pair_id[0], pair_id[1], avg_similarity))
-
-        # Sort by similarity score (descending) and take top N
-        result.sort(key=lambda x: x[2], reverse=True)
-        return [(id1, id2) for id1, id2, _ in result[:n]]
-
-    def get_metric_window(self, pair_id: Tuple[int, int], metric_name: str = "similarity", duration: Optional[float] = None) -> Optional[np.ndarray]:
+    def get_metric_window_array(self, pair_id: Tuple[int, int], metric_name: str = "similarity",
+                                 max_samples: Optional[int] = None) -> Optional[np.ndarray]:
         """
-        Get the time series data for a specific metric of a pose pair.
+        Get fixed-size metric array padded/truncated to max_samples.
+        Optimized for rendering where array size must be consistent.
 
         Args:
             pair_id: Tuple containing (id_1, id_2)
             metric_name: The metric to retrieve (default is 'similarity')
-            duration: If provided, only return data from the last X seconds
+            max_samples: Fixed array size. If None, returns full history.
 
         Returns:
-            Numpy array of metric values over time (may contain NaN), or None if pair not found.
-            NaN values indicate frames where the metric couldn't be computed.
+            Numpy array of metric values (may contain NaN).
+            If max_samples specified, array is right-aligned (most recent data).
         """
         if pair_id not in self.pair_history:
             return None
 
         df: pd.DataFrame = self.pair_history[pair_id]
 
-        if duration is not None:
-            stream_end: pd.Timestamp = df.index[-1]
-            window_cutoff: pd.Timestamp = stream_end - pd.Timedelta(seconds=duration)
-            df = df[df.index >= window_cutoff]
-
         if df.empty or metric_name not in df.columns:
             return None
 
-        return df[metric_name].to_numpy()  # ✅ Returns array with NaN values
+        values: np.ndarray = df[metric_name].to_numpy()
 
-    def get_correlation_for_key(self, index: int, valid_only: bool = False) -> Dict[int, float]:
-        """
-        Get the correlation values for a specific pose index.
+        if max_samples is None or len(values) <= max_samples:
+            return values
 
-        Args:
-            index: The index of the pose to retrieve correlations for
-            valid_only: If True, exclude pairs where last similarity is NaN
+        # Return most recent samples
+        return values[-max_samples:]
 
-        Returns:
-            Dictionary mapping other_id to similarity_score.
-            Values may be NaN if valid_only=False and last sample is NaN.
-        """
-        correlations: Dict[int, float] = {}
-        for pair_id, df in self.pair_history.items():
-            if index in pair_id:
-                if not df.empty:
-                    last_row = df.iloc[-1]
-                    other_id = pair_id[1] if pair_id[0] == index else pair_id[0]
-                    similarity = last_row['similarity']
-
-                    # ✅ Optionally filter NaN values
-                    if valid_only and pd.isna(similarity):
-                        continue
-
-                    correlations[other_id] = similarity
-        return correlations
+    @cached_property
+    def _last_similarities(self) -> Dict[Tuple[int, int], float]:
+        """Pre-compute last similarity values for all pairs."""
+        return {
+            pair_id: (df.iloc[-1]['similarity'] if not df.empty else math.nan)
+            for pair_id, df in self.pair_history.items()
+        }
 
     def get_last_value_for(self, x: int, y: int) -> float:
         """Get the last similarity value for a pose pair.
@@ -135,75 +112,46 @@ class PairCorrelationStreamData:
             Last similarity value, or math.nan if pair not found or last value is NaN.
         """
         pair_id = (x, y) if x <= y else (y, x)
-        if pair_id in self.pair_history and not self.pair_history[pair_id].empty:
-            last_value = self.pair_history[pair_id].iloc[-1]['similarity']
-            # ✅ Return the actual value (may be NaN)
-            return float(last_value) if not pd.isna(last_value) else math.nan
-        return math.nan  # ✅ Changed from 0.0
+        value = self._last_similarities.get(pair_id, math.nan)
+        return float(value) if not pd.isna(value) else math.nan
 
-    def get_valid_sample_count(self, pair_id: Tuple[int, int], duration: Optional[float] = None) -> int:
-        """Get the count of non-NaN samples for a pair.
+    @cached_property
+    def _precomputed_windows(self) -> Dict[Tuple[int, int], np.ndarray]:
+        """Pre-compute all similarity windows once per snapshot."""
+        result = {}
+        for pair_id, df in self.pair_history.items():
+            if not df.empty and 'similarity' in df.columns:
+                result[pair_id] = df['similarity'].to_numpy()
+        return result
 
-        Args:
-            pair_id: Tuple containing (id_1, id_2)
-            duration: If provided, only count samples from the last X seconds
-
-        Returns:
-            Number of valid (non-NaN) similarity samples
+    def get_top_pairs_with_windows(self, n: int, max_samples: int,
+                                   metric_name: str = "similarity") -> list[Tuple[Tuple[int, int], np.ndarray]]:
         """
-        if pair_id not in self.pair_history:
-            return 0
-
-        df: pd.DataFrame = self.pair_history[pair_id]
-
-        if duration is not None and not df.empty:
-            stream_end: pd.Timestamp = df.index[-1]
-            window_cutoff: pd.Timestamp = stream_end - pd.Timedelta(seconds=duration)
-            df = df[df.index >= window_cutoff]
-
-        return int(df['similarity'].notna().sum())
-
-    def get_data_quality(self, pair_id: Tuple[int, int], duration: Optional[float] = None) -> float:
-        """Get the ratio of valid samples for a pair.
-
-        Args:
-            pair_id: Tuple containing (id_1, id_2)
-            duration: If provided, only consider samples from the last X seconds
-
-        Returns:
-            Ratio [0.0, 1.0] of valid samples, or 0.0 if pair not found
+        Combined method optimized for rendering: get top pairs with their metric arrays.
         """
-        if pair_id not in self.pair_history:
-            return 0.0
+        top_pairs = self.get_top_pairs(n)
+        result: list[Tuple[Tuple[int, int], np.ndarray]] = []
 
-        df: pd.DataFrame = self.pair_history[pair_id]
+        # ✅ Use pre-computed windows when requesting similarity
+        if metric_name == "similarity":
+            for pair_id in top_pairs:
+                if pair_id in self._precomputed_windows:
+                    values = self._precomputed_windows[pair_id]
+                    if len(values) > max_samples:
+                        values = values[-max_samples:]
+                    result.append((pair_id, values))
+        else:
+            # Slow path for other metrics
+            for pair_id in top_pairs:
+                if pair_id in self.pair_history:
+                    df = self.pair_history[pair_id]
+                    if metric_name in df.columns:
+                        values = df[metric_name].to_numpy()
+                        if len(values) > max_samples:
+                            values = values[-max_samples:]
+                        result.append((pair_id, values))
 
-        if duration is not None and not df.empty:
-            stream_end: pd.Timestamp = df.index[-1]
-            window_cutoff: pd.Timestamp = stream_end - pd.Timedelta(seconds=duration)
-            df = df[df.index >= window_cutoff]
-
-        if df.empty:
-            return 0.0
-
-        valid_count = df['similarity'].notna().sum()
-        total_count = len(df)
-
-        return float(valid_count / total_count)
-
-    def get_all_qualities(self, duration: Optional[float] = None) -> Dict[Tuple[int, int], float]:
-        """Get data quality ratios for all pairs.
-
-        Args:
-            duration: If provided, only consider samples from the last X seconds
-
-        Returns:
-            Dictionary mapping pair_id to quality ratio [0.0, 1.0]
-        """
-        return {
-            pair_id: self.get_data_quality(pair_id, duration)
-            for pair_id in self.pair_history.keys()
-        }
+        return result
 
 PairCorrelationStreamDataCallback = Callable[[PairCorrelationStreamData], None]
 
@@ -253,41 +201,31 @@ class PairCorrelationStream(Thread):
         self._pair_history.clear()
 
     def _process_batch(self, batch: PairCorrelationBatch) -> None:
-        """Process a correlation batch and update the pair history.
-
-        Stores all pairs including those with NaN metrics (occlusion, missing data).
-        NaN values are preserved in the DataFrame for gap analysis and visualization.
-        """
+        """Process a correlation batch - OPTIMIZED for similarity only."""
         if batch.is_empty:
             return
 
         timestamp: pd.Timestamp = batch.timestamp
 
-        # Process each pair correlation in the batch
         for pair_corr in batch.pair_correlations:
             pair_id: Tuple[int, int] = self._get_canonical_pair_id(pair_corr.pair_id)
 
-            # Create a new row with the similarity score and joint correlations
-            # ✅ This now stores NaN if geometric_mean is NaN (empty pair)
+            # ✅ Only store similarity - massive memory/speed improvement
             new_data: Dict[str, float] = {'similarity': pair_corr.geometric_mean}
-            new_data.update(pair_corr.correlations)  # ✅ Per-joint NaN also stored
+            # ❌ REMOVED: new_data.update(pair_corr.correlations)
 
-            # Create a DataFrame with one row
             new_row = pd.DataFrame(new_data, index=[timestamp])
 
-            # Add to existing DataFrame or create a new one
             if pair_id in self._pair_history:
                 self._pair_history[pair_id] = pd.concat([self._pair_history[pair_id], new_row])
             else:
                 self._pair_history[pair_id] = new_row
 
-            # Ensure the DataFrame is sorted by timestamp
-            self._pair_history[pair_id] = self._pair_history[pair_id].sort_index()
+        # ✅ Only prune periodically, not every batch
+        self._batch_count = getattr(self, '_batch_count', 0) + 1
+        if self._batch_count % 10 == 0:
+            self._prune_by_capacity()
 
-        # Prune old data by capacity
-        self._prune_by_capacity()
-
-        # Notify callbacks
         self._notify_callbacks()
 
     def _prune_by_capacity(self) -> None:
@@ -326,15 +264,16 @@ class PairCorrelationStream(Thread):
             self._notify_callbacks()
 
     def _notify_callbacks(self) -> None:
-        """Notify all registered callbacks with current data snapshot."""
-        # Create snapshot with current timestamp
+        """Notify all registered callbacks - OPTIMIZED."""
         if self._pair_history:
             latest_ts: pd.Timestamp = max(df.index[-1] for df in self._pair_history.values() if not df.empty)
         else:
             latest_ts = pd.Timestamp.now()
 
+        # ✅ Use view() instead of copy() if callbacks are read-only
+        # Or implement copy-on-write semantics
         data = PairCorrelationStreamData(
-            pair_history={k: v.copy() for k, v in self._pair_history.items()},
+            pair_history=self._pair_history.copy(),  # Shallow copy of dict
             timestamp=latest_ts,
             capacity=self.buffer_capacity
         )
@@ -342,7 +281,6 @@ class PairCorrelationStream(Thread):
         with self._output_lock:
             self._output_data = data
 
-        # Call callbacks with snapshot
         for callback in self._data_callbacks.copy():
             try:
                 callback(data)

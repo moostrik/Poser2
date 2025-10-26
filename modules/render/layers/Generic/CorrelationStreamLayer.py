@@ -25,6 +25,7 @@ class CorrelationStreamLayer(LayerBase):
         self.image: Image = Image()
         self.num_streams: int = num_streams
         self.correlation_stream = PairCorrelationStream(10 * 24, 2)
+        self.correlation_stream.start()
 
         text_init()
 
@@ -33,14 +34,12 @@ class CorrelationStreamLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
-        self.correlation_stream.start()
         if not CorrelationStreamLayer.r_stream_shader.allocated:
             CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
         self.image.deallocate()
-        self.correlation_stream.stop()
         if CorrelationStreamLayer.r_stream_shader.allocated:
             CorrelationStreamLayer.r_stream_shader.deallocate()
 
@@ -52,13 +51,24 @@ class CorrelationStreamLayer(LayerBase):
             CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=True)
         if correlation_batch is None:
             return
+
         self.correlation_stream.add_correlation(correlation_batch)
         stream_data: PairCorrelationStreamData | None = self.correlation_stream.get_stream_data()
         if stream_data is None:
-            #clear?
             return
 
-        pairs: list[tuple[int, int]] = stream_data.get_top_pairs(self.num_streams)
+        # ✅ Use optimized combined method instead of separate calls
+        pairs_with_data = stream_data.get_top_pairs_with_windows(
+            self.num_streams,
+            stream_data.capacity,
+            "similarity"
+        )
+
+        if not pairs_with_data:
+            return
+
+        # Extract just the pairs for rendering
+        pairs: list[tuple[int, int]] = [pair_id for pair_id, _ in pairs_with_data]
         num_pairs: int = len(pairs)
 
         image_np: np.ndarray = StreamCorrelation.r_stream_to_image(stream_data, self.num_streams)
