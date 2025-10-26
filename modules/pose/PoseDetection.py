@@ -117,8 +117,18 @@ class PoseDetection(Thread):
     def run(self) -> None:
         model: torch.nn.Module = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
         model.half()
-        pipeline: Compose = Compose(model.cfg.test_dataloader.dataset.pipeline) # pyright: ignore
+
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        torch.backends.cudnn.benchmark = True
+
+        scope = model.cfg.get('default_scope', 'mmpose') # pyright: ignore
+        if scope is not None:
+            init_default_scope(scope)
+        pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline) # pyright: ignore
+
         self._model_warmup(model, pipeline, self.model_num_warmups, self.verbose)
+
         self._model_ready.set()  # Signal model is ready
 
         while not self._shutdown_event.is_set():
@@ -140,6 +150,7 @@ class PoseDetection(Thread):
 
                 # Run inference only on poses with images
                 if images:
+                    # Pass pipeline to inference
                     data_samples: list[list[PoseDataSample]] = PoseDetection._run_inference(model, pipeline, images, False)
                     point_data_list: list[PosePointData | None] = PoseDetection._extract_point_data_from_samples(data_samples, self.model_width, self.model_height, self.confidence_threshold)
 
@@ -251,60 +262,48 @@ class PoseDetection(Thread):
     def _run_inference(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray], verbose: bool) -> list[list[PoseDataSample]]:
         if not imgs:
             return []
-        with torch.cuda.amp.autocast(): # pyright: ignore
 
-            start_time: float = time.perf_counter()
+        with torch.cuda.amp.autocast(dtype=torch.float16):
+            total_start = time.perf_counter()
 
-            scope = model.cfg.get('default_scope', 'mmpose') # pyright: ignore
-            if scope is not None:
-                init_default_scope(scope)
-            # pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
+            # Cache frequently used values
+            model_meta = model.dataset_meta
+            batch_size = len(imgs)
 
-            bboxes = [None] * len(imgs)
+            # Pre-allocate and reuse arrays
+            data_list = [None] * batch_size
+            bbox_score = np.ones(1, dtype=np.float32)
 
-            # Process each image and its bboxes to create data samples
-            data_list = []
-            img_lengths = []  # Track number of data samples per image
+            prep_start = time.perf_counter()
 
-            for img_idx, (img, img_bboxes) in enumerate(zip(imgs, bboxes)):
+            # Optimized loop
+            for idx, img in enumerate(imgs):
                 h, w = img.shape[:2]
 
-                # Handle bboxes for this image
-                if img_bboxes is None or len(img_bboxes) == 0:
-                    img_bboxes = np.array([[0, 0, w, h]], dtype=np.float32)
-                else:
-                    if isinstance(img_bboxes, list):
-                        img_bboxes = np.array(img_bboxes)
+                # Single dict creation with unpacking
+                data_info = {
+                    'img': img,
+                    'bbox': np.array([[0, 0, w, h]], dtype=np.float32),
+                    'bbox_score': bbox_score,
+                    **model_meta # pyright: ignore
+                }
+                data_list[idx] = pipeline(data_info) # pyright: ignore
 
-                    img_bboxes = bbox_xywh2xyxy(img_bboxes)
+            batch = pseudo_collate(data_list)
+            prep_time = time.perf_counter() - prep_start
 
-                # Create data samples for each bbox in this image
-                for bbox in img_bboxes:
-                    data_info = dict(img=img)
-                    data_info['bbox'] = bbox[None]  # shape (1, 4)
-                    data_info['bbox_score'] = np.ones(1, dtype=np.float32)
-                    data_info.update(model.dataset_meta) # pyright: ignore
-                    data_list.append(pipeline(data_info))
+            inference_start = time.perf_counter()
+            with torch.inference_mode():
+                all_results = model.test_step(batch) # pyright: ignore
 
-                img_lengths.append(len(img_bboxes))
+            torch.cuda.synchronize()
+            inference_time = time.perf_counter() - inference_start
 
-            results_by_image = []
-
-            if data_list:
-                # Process all images in a single batch
-                batch = pseudo_collate(data_list)
-
-                with torch.no_grad():
-                    all_results = model.test_step(batch) # pyright: ignore
-
-                # Split results back by image
-                start_idx = 0
-                for length in img_lengths:
-                    results_by_image.append(all_results[start_idx:start_idx + length])
-                    start_idx += length
+            # Optimized result extraction
+            results_by_image = [[sample] for sample in all_results]
 
             if verbose:
-                print(f"Pose Detection Processing Time: {time.perf_counter() - start_time  :.3f}s, batch={len(imgs)})")
+                print(f"  Preparation:   {prep_time*1000:.1f}ms,   Inference:   {inference_time*1000:.1f}ms,   batch size:   {batch_size}")
 
             return results_by_image
 

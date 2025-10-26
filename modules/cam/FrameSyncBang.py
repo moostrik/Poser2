@@ -16,6 +16,9 @@ class FrameSyncBang:
         self.verbose: bool = verbose
         self.stream_name: str = stream_name
         self.max_gap_s: float = 1.0 / settings.camera_fps
+        self.min_bang_interval_s: float = 0.75 / settings.camera_fps
+        self.last_bang_time_s: float = 0.0
+
         self._timestamp_history: deque[tuple[int, float]] = deque(maxlen=10 * num_cams)
         self._callbacks: set[Callable[[], None]] = set()
         self._lock = Lock()
@@ -31,9 +34,18 @@ class FrameSyncBang:
             trigger_cam_id: int = FrameSyncBang._find_sync_trigger_camera(self._timestamp_history, self.max_gap_s)
 
             if cam_id == trigger_cam_id:
-                if self.verbose:
-                    print(f"{self.stream_name}Max time diff: {FrameSyncBang._get_max_time_diff(self._timestamp_history):.3f}, from cam {cam_id}")
-                self._notify_callbacks()
+                # if self.verbose:
+                #     print(f"{self.stream_name}Max time diff: {FrameSyncBang._get_max_time_diff(self._timestamp_history):.3f}, from cam {cam_id}")
+
+                current_time_s: float = time.time()
+                time_since_last_bang: float = current_time_s - self.last_bang_time_s
+                self.last_bang_time_s = current_time_s
+
+                if time_since_last_bang >= self.min_bang_interval_s:
+                    self._notify_callbacks()
+                else:
+                    if self.verbose:
+                        print(f"{self.stream_name}Skipped bang (only {time_since_last_bang:.3f}s since last, from cam {cam_id})")
 
     @staticmethod
     def _find_sync_trigger_camera(timestamp_history: deque[tuple[int, float]], max_gap_s: float) -> int:
