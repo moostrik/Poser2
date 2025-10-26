@@ -143,6 +143,8 @@ class PoseDetection(Thread):
                     data_samples: list[list[PoseDataSample]] = PoseDetection._run_inference(model, pipeline, images, False)
                     point_data_list: list[PosePointData | None] = PoseDetection._extract_point_data_from_samples(data_samples, self.model_width, self.model_height, self.confidence_threshold)
 
+                    # time.sleep(0.1)  # Yield to check if submit_poses works properly
+
                     # Create updated poses dict with all poses
                     updated_poses: PoseDict = {}
                     image_idx = 0
@@ -155,7 +157,11 @@ class PoseDetection(Thread):
                 else:
                     updated_poses = poses
 
-                self._callback_queue.put(updated_poses)
+                try:
+                    self._callback_queue.put_nowait(updated_poses)
+                except:
+                    if self.verbose:
+                        print("Pose Detection Warning: Callback queue full, dropping inference results")
 
             except Exception as e:
                 if self.verbose:
@@ -184,11 +190,11 @@ class PoseDetection(Thread):
             self._pose_timestamp = Timestamp.now()
 
         if old_poses is not None:
+            print(f"Pose Detection Warning: Still processing, dropped batch (lag: {lag:.3f}s)")
             try:
                 self._callback_queue.put_nowait(old_poses)
             except:
-                if self.verbose:
-                    print(f"Pose Detection Warning: Callback queue full, dropped batch (lag: {lag:.3f}s)")
+                print("Pose Detection Warning: Callback queue full, dropped batch completely")
 
         self._notify_update_event.set()
 

@@ -67,7 +67,7 @@ class CamTrackPoseLayer(LayerBase):
     def draw_camera_overlay(depth_tracklets: list[DepthTracklet], poses: list[Pose], pose_meshes: dict[int, Mesh], x: float, y: float, width: float, height: float) -> None:
         for pose in poses:
             tracklet: Tracklet | None = pose.tracklet
-            if tracklet is None or tracklet.is_removed or tracklet.is_lost:
+            if tracklet is None or tracklet.is_removed:
                 continue
             roi: Rect | None = pose.crop_rect
             mesh: Mesh = pose_meshes[pose.tracklet.id]

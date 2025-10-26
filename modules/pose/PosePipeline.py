@@ -12,7 +12,7 @@ from pandas import Timestamp
 from modules.cam.depthcam.Definitions import FrameType
 from modules.tracker.Tracklet import Tracklet, Rect, TrackletDict
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
-from modules.pose.PoseDetection import PoseDetection, POSE_MODEL_TYPE_NAMES
+from modules.pose.PoseDetection import PoseDetection, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.Settings import Settings
 
@@ -34,8 +34,8 @@ class PosePipeline(Thread):
 
         # Configuration
         self.pose_active: bool = settings.pose_active
-        self.pose_detector_frame_width: int = 192
-        self.pose_detector_frame_height: int = 256
+        self.pose_detector_frame_width: int = POSE_MODEL_WIDTH
+        self.pose_detector_frame_height: int = POSE_MODEL_HEIGHT
         self.pose_crop_expansion: float = settings.pose_crop_expansion
         self.max_detectors: int = settings.num_players
         self.verbose: bool = settings.pose_verbose
@@ -64,8 +64,7 @@ class PosePipeline(Thread):
         self.callback_lock: Lock = Lock()
         self.pose_output_callbacks: set[PoseDictCallback] = set()
 
-        if self.verbose:
-            self._hot_reloader = HotReloadMethods(self.__class__)
+        self._hot_reloader = HotReloadMethods(self.__class__)
 
     @property
     def is_running(self) -> bool:
@@ -170,7 +169,7 @@ class PosePipeline(Thread):
         pose_crop_rect: Optional[Rect] = None
         cam_image: Optional[np.ndarray] = self._get_image(tracklet.cam_id)
 
-        if cam_image is not None and tracklet.is_active:
+        if cam_image is not None and tracklet.is_being_tracked:
             pose_image, pose_crop_rect = self.image_processor.process_pose_image(tracklet, cam_image)
 
         pose = Pose(

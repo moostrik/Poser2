@@ -58,7 +58,7 @@ class CentrePoseRender(LayerBase):
                 self.is_active = False
                 return
 
-            if pose.tracklet.is_active:
+            if pose.tracklet.is_being_tracked:
                 self.is_active = True
                 self.last_pose_rect = pose.crop_rect if pose.crop_rect is not None else Rect(0.0, 0.0, 1.0, 1.0)
 
