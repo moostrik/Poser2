@@ -16,7 +16,7 @@ from typing import Optional
 import numpy as np
 
 # Local application imports
-from modules.pose.correlation.PairCorrelation import PairCorrelation, PairCorrelationBatch, PoseCorrelationBatchCallback
+from modules.pose.correlation.PairCorrelation import PairCorrelation, PairCorrelationBatch, PairCorrelationBatchCallback
 from modules.pose.PoseStream import PoseStreamData, PoseStreamDataDict
 from modules.Settings import Settings
 
@@ -56,7 +56,7 @@ class PoseSmoothCorrelator():
         self._output_lock = threading.Lock()
         self._output_data: Optional[PairCorrelationBatch] = None
         self._callback_lock = threading.Lock()
-        self._callbacks: set[PoseCorrelationBatchCallback] = set()
+        self._callbacks: set[PairCorrelationBatchCallback] = set()
 
         # HOT RELOADER
         self.hot_reloader = HotReloadMethods(self.__class__, False, False)
@@ -143,7 +143,7 @@ class PoseSmoothCorrelator():
         with self._output_lock:
             return self._output_data
 
-    def add_correlation_callback(self, callback: PoseCorrelationBatchCallback) -> None:
+    def add_correlation_callback(self, callback: PairCorrelationBatchCallback) -> None:
         """ Register a callback to receive the last correlation batch. """
         with self._callback_lock:
             self._callbacks.add(callback)

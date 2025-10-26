@@ -18,7 +18,7 @@ from numba import njit
 import pandas as pd
 
 # Local application imports
-from modules.pose.correlation.PairCorrelation import PairCorrelation, PairCorrelationBatch, PoseCorrelationBatchCallback
+from modules.pose.correlation.PairCorrelation import PairCorrelation, PairCorrelationBatch, PairCorrelationBatchCallback
 from modules.pose.PoseStream import PoseStreamData, PoseStreamDataDict
 from modules.Settings import Settings
 
@@ -133,7 +133,7 @@ class PoseStreamCorrelator():
 
         # CALLBACKS
         self._callback_lock = threading.Lock()
-        self._callbacks: set[PoseCorrelationBatchCallback] = set()
+        self._callbacks: set[PairCorrelationBatchCallback] = set()
 
         # HOT RELOADER
         self.hot_reloader = HotReloadMethods(self.__class__, False, False)
@@ -144,7 +144,7 @@ class PoseStreamCorrelator():
             self._input_pose_streams[data.id] = data
         return
 
-    def add_correlation_callback(self, callback: PoseCorrelationBatchCallback) -> None:
+    def add_correlation_callback(self, callback: PairCorrelationBatchCallback) -> None:
         """ Register a callback to receive the last correlation batch. """
         with self._callback_lock:
             self._callbacks.add(callback)

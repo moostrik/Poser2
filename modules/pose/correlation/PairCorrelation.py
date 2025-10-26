@@ -377,4 +377,4 @@ class PairCorrelationBatch:
         pair_id = (min(pair_id), max(pair_id))
         return self._pair_lookup.get(pair_id)
 
-PoseCorrelationBatchCallback = Callable[[PairCorrelationBatch], None]
+PairCorrelationBatchCallback = Callable[[PairCorrelationBatch], None]

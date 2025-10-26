@@ -202,10 +202,6 @@ class PoseDetection(Thread):
 
         if old_poses is not None:
             print(f"Pose Detection Warning: Still processing, dropped batch (lag: {lag:.3f}s)")
-            try:
-                self._callback_queue.put_nowait(old_poses)
-            except:
-                print("Pose Detection Warning: Callback queue full, dropped batch completely")
 
         self._notify_update_event.set()
 

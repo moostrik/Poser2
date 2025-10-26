@@ -136,7 +136,9 @@ class PosePipeline(Thread):
                 pre_poses: PoseDict = self._process_tracklets(tracklets)
 
                 # Submit to detector if ready
-                if self.pose_detector is not None and self.pose_detector.is_ready:
+                if self.pose_detector is None:
+                    self._notify_pose_callback(pre_poses)
+                elif self.pose_detector is not None and self.pose_detector.is_ready:
                     self.pose_detector.submit_poses(pre_poses)
                 elif self.pose_detector is not None and self.verbose:
                     print("PosePipeline: Detector not ready, skipping submission")
@@ -151,6 +153,7 @@ class PosePipeline(Thread):
 
     def _process_tracklets(self, tracklets: TrackletDict) -> PoseDict:
         """Convert tracklets to pre-poses (with crop images but no keypoints)"""
+
         poses: PoseDict = {}
         time_stamp: Timestamp = Timestamp.now()
 
