@@ -79,7 +79,7 @@ class Main():
             camera.add_frame_callback(self.pose_detection.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
-            camera.add_tracker_callback(self.capture_data_hub.set_depth_tracklets)
+            camera.add_tracker_callback(self.capture_data_hub.set_cam_tracklets)
             camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
             camera.start()
 

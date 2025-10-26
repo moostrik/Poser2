@@ -124,9 +124,6 @@ class PosePipeline(Thread):
                     print(f"PosePipeline Error: {str(e)}")
                     traceback.print_exc()
 
-        if self.verbose:
-            print("PosePipeline: Pipeline thread stopped")
-
     def _process(self) -> None:
         tracklets: list[Tracklet] = list(self.get_tracklets().values())
 

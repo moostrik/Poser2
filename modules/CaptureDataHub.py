@@ -79,7 +79,7 @@ class CaptureDataHub:
         return self._get_data_dict(self.cam_image, key, only_new_data, consumer_key)
 
     # Depth tracklet management
-    def set_depth_tracklets(self, key: int, value: list[DepthTracklet]) -> None:
+    def set_cam_tracklets(self, key: int, value: list[DepthTracklet]) -> None:
         self._set_data_dict(self.depth_tracklets, key, value)
 
     def get_depth_tracklets(self, key: int, only_new_data: bool, consumer_key: str) -> list[DepthTracklet]:

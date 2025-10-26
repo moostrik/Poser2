@@ -108,6 +108,7 @@ class PoseStreamLayer(LayerBase):
             clr: int = i % 2
 
             draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
+        fbo.end()
 
 
     @staticmethod

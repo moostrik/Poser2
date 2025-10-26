@@ -93,6 +93,7 @@ class PoseCorrelator:
 
             end_time: float = time.perf_counter()
             elapsed_time: float = end_time - start_time
+            # print(f"PoseCorrelator: Processed {len(angle_pairs)} pairs in {elapsed_time:.3f}s")
 
             batch = PairCorrelationBatch(pair_correlations=correlations)
             with self._output_lock:
@@ -152,7 +153,6 @@ class PoseCorrelator:
             for tracklet_id, pose in poses.items()
             if pose.tracklet.is_being_tracked
         }
-        # print(f"PoseCorrelator: Extracted angles for {(angle_dict)} active poses.")
 
         return angle_dict
 

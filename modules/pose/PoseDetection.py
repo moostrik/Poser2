@@ -90,6 +90,7 @@ class PoseDetection(Thread):
         self._input_lock: Lock = Lock()
         self._pending_input: PoseDetectionInput | None = None
         self._input_timestamp: Timestamp = Timestamp.now()
+        self._last_dropped_id: int = 0
 
         # Callbacks
         self._callbacks: set[PoseDetectionOutputCallback] = set()
@@ -208,7 +209,8 @@ class PoseDetection(Thread):
             self._input_timestamp = Timestamp.now()
 
         if old_input is not None and self.verbose:
-            print(f"Pose Detection Warning: Still processing, dropped batch {old_input.batch_id} (lag: {lag:.3f}s)")
+            print(f"Pose Detection: Dropped batch   {old_input.batch_id - self._last_dropped_id:03d}   good, last lag:   {lag:.3f}s   )")
+            self._last_dropped_id = old_input.batch_id
 
         self._notify_update_event.set()
 

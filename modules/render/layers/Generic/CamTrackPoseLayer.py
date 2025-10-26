@@ -44,14 +44,15 @@ class CamTrackPoseLayer(LayerBase):
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
+
         frame: np.ndarray | None = self.data.get_cam_image(self.cam_id, True, self.data_consumer_key)
+        depth_tracklets: list[DepthTracklet] = self.data.get_depth_tracklets(self.cam_id, False, self.data_consumer_key)
+        poses: list[Pose] = self.data.get_poses_for_cam(self.cam_id)
+        meshes: dict[int, Mesh] = self.pose_meshes.meshes
+
         if frame is not None:
             self.image.set_image(frame)
             self.image.update()
-
-        depth_tracklets: list[DepthTracklet] | None = self.data.get_depth_tracklets(self.cam_id, False, self.data_consumer_key)
-        poses: list[Pose] = self.data.get_poses_for_cam(self.cam_id)
-        meshes: dict[int, Mesh] = self.pose_meshes.meshes
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -60,15 +61,15 @@ class CamTrackPoseLayer(LayerBase):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         self.image.draw(0, 0, self.fbo.width, self.fbo.height)
         glLineWidth(3.0)
-        CamTrackPoseLayer.draw_camera_overlay(depth_tracklets, poses, meshes, 0, 0, self.fbo.width, self.fbo.height)
+
+        CamTrackPoseLayer.draw_poses(poses, meshes, 0, 0, self.fbo.width, self.fbo.height)
+        CamTrackPoseLayer.draw_depth_tracklets(depth_tracklets, 0, 0, self.fbo.width,  self.fbo.height)
         self.fbo.end()
 
+
     @staticmethod
-    def draw_camera_overlay(depth_tracklets: list[DepthTracklet], poses: list[Pose], pose_meshes: dict[int, Mesh], x: float, y: float, width: float, height: float) -> None:
+    def draw_poses(poses: list[Pose], pose_meshes: dict[int, Mesh], x: float, y: float, width: float, height: float) -> None:
         for pose in poses:
-            tracklet: Tracklet | None = pose.tracklet
-            if tracklet is None or tracklet.is_removed:
-                continue
             roi: Rect | None = pose.crop_rect
             mesh: Mesh = pose_meshes[pose.tracklet.id]
             if roi is None or not mesh.isInitialized():
@@ -78,10 +79,27 @@ class CamTrackPoseLayer(LayerBase):
             roi_y: float = y + roi_y * height
             roi_w: float = roi_w * width
             roi_h: float = roi_h * height
-            CamTrackPoseLayer.draw_tracklet(tracklet, mesh, roi_x, roi_y, roi_w, roi_h)
+            CamTrackPoseLayer.draw_pose(mesh, roi_x, roi_y, roi_w, roi_h)
 
+    @staticmethod
+    def draw_pose(pose_mesh: Mesh, x: float, y: float, width: float, height: float) -> None:
+        glColor4f(0.0, 0.0, 0.0, 0.1)
+        glBegin(GL_QUADS)
+        glVertex2f(x, y)        # Bottom left
+        glVertex2f(x, y + height)    # Bottom right
+        glVertex2f(x + width, y + height)# Top right
+        glVertex2f(x + width, y)    # Top left
+        glEnd()                 # End drawing
+        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+
+        if pose_mesh.isInitialized():
+            pose_mesh.draw(x, y, width, height)
+
+
+    @staticmethod
+    def draw_depth_tracklets(depth_tracklets: list[DepthTracklet], x: float, y: float, width: float, height: float) -> None:
         for depth_tracklet in depth_tracklets:
-            CamTrackPoseLayer.draw_depth_tracklet(depth_tracklet, 0, 0, width, height)
+            CamTrackPoseLayer.draw_depth_tracklet(depth_tracklet, x, y, width, height)
 
     @staticmethod
     def draw_depth_tracklet(tracklet: DepthTracklet, x: float, y: float, width: float, height: float) -> None:
@@ -126,18 +144,5 @@ class CamTrackPoseLayer(LayerBase):
         string = f'Age: {tracklet.age}'
         draw_box_string(t_x, t_y, string)
 
-    @staticmethod
-    def draw_tracklet(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, width: float, height: float) -> None:
-        glColor4f(0.0, 0.0, 0.0, 0.1)
-        glBegin(GL_QUADS)
-        glVertex2f(x, y)        # Bottom left
-        glVertex2f(x, y + height)    # Bottom right
-        glVertex2f(x + width, y + height)# Top right
-        glVertex2f(x + width, y)    # Top left
-        glEnd()                 # End drawing
-        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
-
-        if pose_mesh.isInitialized():
-            pose_mesh.draw(x, y, width, height)
 
 
