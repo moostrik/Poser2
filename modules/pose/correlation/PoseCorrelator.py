@@ -69,10 +69,8 @@ class PoseCorrelator:
         """Main correlation processing loop (runs in background thread)."""
         while True:
             self._update_event.wait()
-
             if self._stop_event.is_set():
                 break
-
             self._update_event.clear()
 
             start_time: float = time.perf_counter()
@@ -152,12 +150,11 @@ class PoseCorrelator:
         angle_dict: dict[int, dict[AngleJoint, float]] = {
             tracklet_id: pose.angle_data.to_dict()
             for tracklet_id, pose in poses.items()
-            if pose.tracklet.is_active
+            if pose.tracklet.is_being_tracked
         }
-        # print(f"PoseCorrelator: Extracted angles for {len(angle_dict)} active poses.")
+        # print(f"PoseCorrelator: Extracted angles for {(angle_dict)} active poses.")
 
         return angle_dict
-
 
     @staticmethod
     def _generate_angle_pairs(angle_data: dict[int, dict[AngleJoint, float]]) -> list[AnglePair]:

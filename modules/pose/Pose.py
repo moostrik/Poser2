@@ -35,8 +35,8 @@ class Pose:
 
     # Set at first stage of pipeline
     tracklet: Tracklet = field(init=True)
-    crop_rect: Optional[Rect] = field(init=True)
-    crop_image: Optional[np.ndarray] = field(init=True)
+    crop_rect: Rect = field(init=True)
+    crop_image: np.ndarray = field(init=True)
     time_stamp: Timestamp = field(init=True)
 
     # Set at second stage of pipeline

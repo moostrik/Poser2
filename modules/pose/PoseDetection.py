@@ -2,11 +2,11 @@
 from queue import Queue, Empty
 import time
 import traceback
-from dataclasses import replace
 from threading import Thread, Lock, Event
+from dataclasses import dataclass
+from typing import Callable
 
 # Third-party imports
-import cv2
 from mmengine.structures.instance_data import InstanceData
 import numpy as np
 import torch
@@ -17,19 +17,14 @@ from mmpose.apis import init_model
 from mmpose.structures import PoseDataSample
 from mmengine.dataset import Compose, pseudo_collate
 from mmengine.registry import init_default_scope
-from mmpose.structures import PoseDataSample
-from mmpose.structures.bbox import bbox_xywh2xyxy
 
 # Local application imports
-from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 from modules.pose.features.PosePoints import PosePointData
 
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
 
 # DEFINITIONS
 POSE_MODEL_WIDTH = 192
@@ -50,6 +45,25 @@ POSE_MODEL_FILE_NAMES: list[tuple[str, str]] = [
     ('rtmpose-s_8xb256-420e_aic-coco-256x192.py', 'rtmpose-s_simcc-aic-coco_pt-aic-coco_420e-256x192-fcb2599b_20230126.pth'),
     ('rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth')
 ]
+
+@dataclass
+class PoseDetectionInput:
+    batch_id: int
+    images: list[np.ndarray]
+
+    def __post_init__(self) -> None:
+        # check if images have right shape
+        for i, img in enumerate(self.images):
+            if img.shape[:2] != (POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH):
+                raise ValueError(f"Image {i} has incorrect shape: {img.shape}")
+
+@dataclass
+class PoseDetectionOutput:
+    batch_id: int
+    point_data_list: list[PosePointData | None]
+    inference_time_ms: float = 0.0  # For monitoring
+
+PoseDetectionOutputCallback = Callable[[PoseDetectionOutput], None]
 
 class PoseDetection(Thread):
     def __init__(self, path: str, model_type: PoseModelType, num_warmups: int, confidence_threshold: float = 0.3, verbose: bool = False) -> None:
@@ -72,15 +86,15 @@ class PoseDetection(Thread):
         self._notify_update_event: Event = Event()
         self._model_ready: Event = Event()
 
-        # Pose data
-        self._poses_lock: Lock = Lock()
-        self._poses_dict: dict[int, Pose] = {}
-        self._pose_timestamp: Timestamp = Timestamp.now()
+        # Input queue
+        self._input_lock: Lock = Lock()
+        self._pending_input: PoseDetectionInput | None = None
+        self._input_timestamp: Timestamp = Timestamp.now()
 
         # Callbacks
-        self._callbacks: set[PoseDictCallback] = set()
-        self._callback_queue: Queue[PoseDict | None] = Queue(maxsize=2)
-        self._callback_thread: Thread = Thread(target=self._callback_worker, daemon=True)
+        self._callbacks: set[PoseDetectionOutputCallback] = set()
+        self._callback_queue: Queue[PoseDetectionOutput | None] = Queue(maxsize=2)
+        self._callback_thread: Thread = Thread(target=self._callback_worker_loop, daemon=True)
 
         self._hot_reloader = HotReloadMethods(self.__class__)
 
@@ -101,7 +115,7 @@ class PoseDetection(Thread):
         self._notify_update_event.set()
         self.join(timeout=2.0)
 
-        if self.is_alive() and self.verbose:
+        if self.is_alive():
             print("Warning: Inference thread did not stop cleanly")
 
         # Wake up callback thread with sentinel
@@ -111,25 +125,26 @@ class PoseDetection(Thread):
             pass
 
         self._callback_thread.join(timeout=2.0)
-        if self._callback_thread.is_alive() and self.verbose:
+        if self._callback_thread.is_alive():
             print("Warning: Callback thread did not stop cleanly")
 
     def run(self) -> None:
-        model: torch.nn.Module = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
-        model.half()
-
+        torch.cuda.set_device(0)
+        stream = torch.cuda.Stream(device=0, priority=-1)
+        torch.cuda.set_stream(stream)
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
 
+        model: torch.nn.Module = init_model(self.model_config_file, self.model_checkpoint_file, device='cuda:0')
+        model.half()
         scope = model.cfg.get('default_scope', 'mmpose') # pyright: ignore
         if scope is not None:
             init_default_scope(scope)
         pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline) # pyright: ignore
-
-        self._model_warmup(model, pipeline, self.model_num_warmups, self.verbose)
-
+        self._model_warmup(model, pipeline, self.model_num_warmups)
         self._model_ready.set()  # Signal model is ready
+        print("PoseDetection: Model warmup complete")
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait(timeout=1.0)
@@ -140,102 +155,93 @@ class PoseDetection(Thread):
             self._notify_update_event.clear()
 
             try:
-                with self._poses_lock:
-                    poses: PoseDict = self._poses_dict
-                    self._poses_dict = {}
-
-                # Separate poses with and without crop_image
-                poses_with_images: list[Pose] = [pose for pose in poses.values() if pose.crop_image is not None]
-                images: list[np.ndarray] = [pose.crop_image for pose in poses_with_images if pose.crop_image is not None]
-
-                # Run inference only on poses with images
-                if images:
-                    # Pass pipeline to inference
-                    data_samples: list[list[PoseDataSample]] = PoseDetection._run_inference(model, pipeline, images, False)
-                    point_data_list: list[PosePointData | None] = PoseDetection._extract_point_data_from_samples(data_samples, self.model_width, self.model_height, self.confidence_threshold)
-
-                    # time.sleep(0.1)  # Yield to check if submit_poses works properly
-
-                    # Create updated poses dict with all poses
-                    updated_poses: PoseDict = {}
-                    image_idx = 0
-                    for pose in poses.values():
-                        if pose.crop_image is not None:
-                            updated_poses[pose.tracklet.id] = replace(pose, point_data=point_data_list[image_idx])
-                            image_idx += 1
-                        else:
-                            updated_poses[pose.tracklet.id] = pose
-                else:
-                    updated_poses = poses
-
-                try:
-                    self._callback_queue.put_nowait(updated_poses)
-                except:
-                    if self.verbose:
-                        print("Pose Detection Warning: Callback queue full, dropping inference results")
+                self._process_pending_batch(model, pipeline, stream)
 
             except Exception as e:
-                if self.verbose:
-                    print(f"Pose Detection Error: {str(e)}")
-                    traceback.print_exc()
+                print(f"Pose Detection Error: {str(e)}")
+                traceback.print_exc()
 
-        if self.verbose:
-            print("PoseDetection: Inference thread stopped")
+    def _process_pending_batch(self, model: torch.nn.Module, pipeline: Compose, stream: torch.cuda.Stream) -> None:
+        # Get pending input
+        with self._input_lock:
+            input_data: PoseDetectionInput | None = self._pending_input
+            self._pending_input = None
 
-        if self.verbose:
-            print("PoseDetection: Callback worker thread stopped")
+        if input_data is None:
+            return
 
-    def submit_poses(self, poses: PoseDict) -> None:
-        """Submit new poses for detection processing."""
+        # Run inference
+        if input_data.images:
+            batch_start = time.perf_counter()
+
+            with torch.cuda.stream(stream):
+                data_samples: list[list[PoseDataSample]] = PoseDetection._infer_batch(model, pipeline, input_data.images)
+                point_data_list: list[PosePointData | None] = PoseDetection._extract_pose_point_data(data_samples, self.model_width, self.model_height, self.confidence_threshold)
+                stream.synchronize()
+
+            inference_time_ms: float = (time.perf_counter() - batch_start) * 1000.0
+
+            # print(f"Pose Detection: Processed batch {input_data.batch_id} with {len(input_data.images)} images in   {inference_time_ms:.0f}   ms")
+
+            # Create output
+            output = PoseDetectionOutput(input_data.batch_id, point_data_list, inference_time_ms)
+
+            # Queue for callbacks
+            try:
+                self._callback_queue.put_nowait(output)
+            except Exception:
+                print("Pose Detection Warning: Callback queue full, dropping inference results")
+
+    def submit_batch(self, input_data: PoseDetectionInput) -> None:
+        """Submit new batch for detection processing."""
         if self._shutdown_event.is_set():
             return
 
-        old_poses: PoseDict | None = None
+        old_input: PoseDetectionInput | None = None
         lag: float = 0.0
 
-        with self._poses_lock:
-            if self._poses_dict:
-                old_poses = self._poses_dict
-                lag = (Timestamp.now() - self._pose_timestamp).total_seconds()
-            self._poses_dict = poses
-            self._pose_timestamp = Timestamp.now()
+        with self._input_lock:
+            if self._pending_input is not None:
+                old_input = self._pending_input
+                lag = (Timestamp.now() - self._input_timestamp).total_seconds()
+            self._pending_input = input_data
+            self._input_timestamp = Timestamp.now()
 
-        if old_poses is not None:
-            print(f"Pose Detection Warning: Still processing, dropped batch (lag: {lag:.3f}s)")
+        if old_input is not None and self.verbose:
+            print(f"Pose Detection Warning: Still processing, dropped batch {old_input.batch_id} (lag: {lag:.3f}s)")
 
         self._notify_update_event.set()
 
     # CALLBACK
-    def _callback_worker(self) -> None:
+    def _callback_worker_loop(self) -> None:
         """Worker thread that processes callbacks without blocking the main thread"""
         while not self._shutdown_event.is_set():
             try:
-                if self._callback_queue.qsize() > 1 and self.verbose:
+                if self._callback_queue.qsize() > 1:
                     print("Pose Detection Warning: Callback queue size > 1, consumers may be falling behind")
 
-                poses: PoseDict | None = self._callback_queue.get(timeout=0.5)
+                output: PoseDetectionOutput | None = self._callback_queue.get(timeout=0.5)
 
-                if poses is None:
+                if output is None:
                     break
 
-                for c in self._callbacks:
+                for callback in self._callbacks:
                     try:
-                        c(poses)
+                        callback(output)
                     except Exception as e:
-                        if self.verbose:
-                            print(f"Pose Detection Callback Error: {str(e)}")
-                            traceback.print_exc()
+                        print(f"Pose Detection Callback Error: {str(e)}")
+                        traceback.print_exc()
 
                 self._callback_queue.task_done()
             except Empty:
                 continue
 
-    def add_poses_callback(self, callback: PoseDictCallback) -> None:
+    def register_callback(self, callback: PoseDetectionOutputCallback) -> None:
         self._callbacks.add(callback)
 
     # STATIC METHODS
     @staticmethod
-    def _model_warmup(model: torch.nn.Module, pipeline: Compose, num_imgs: int, verbose: bool) -> None:
+    def _model_warmup(model: torch.nn.Module, pipeline: Compose, num_imgs: int) -> None:
         """Pre-warm the model with dummy inputs to initialize CUDA kernels and memory"""
         if num_imgs <= 0:
             return
@@ -246,22 +252,17 @@ class PoseDetection(Thread):
         for batch_size in dummy_sizes:
             # Create batch of dummy images
             dummy_imgs: list[np.ndarray] = [np.zeros((POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH, 3), dtype=np.uint8) for _ in range(batch_size)]
-            _: list[list[PoseDataSample]] = PoseDetection._run_inference(model, pipeline, dummy_imgs, False)
+            _: list[list[PoseDataSample]] = PoseDetection._infer_batch(model, pipeline, dummy_imgs)
 
             # Ensure GPU operations are complete
             torch.cuda.synchronize()
 
-        if verbose:
-            print("PoseDetection: Model warmup complete")
-
     @staticmethod
-    def _run_inference(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray], verbose: bool) -> list[list[PoseDataSample]]:
+    def _infer_batch(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray]) -> list[list[PoseDataSample]]:
         if not imgs:
             return []
 
         with torch.cuda.amp.autocast(dtype=torch.float16):
-            total_start = time.perf_counter()
-
             # Cache frequently used values
             model_meta = model.dataset_meta
             batch_size = len(imgs)
@@ -269,8 +270,6 @@ class PoseDetection(Thread):
             # Pre-allocate and reuse arrays
             data_list = [None] * batch_size
             bbox_score = np.ones(1, dtype=np.float32)
-
-            prep_start = time.perf_counter()
 
             # Optimized loop
             for idx, img in enumerate(imgs):
@@ -286,25 +285,17 @@ class PoseDetection(Thread):
                 data_list[idx] = pipeline(data_info) # pyright: ignore
 
             batch = pseudo_collate(data_list)
-            prep_time = time.perf_counter() - prep_start
 
-            inference_start = time.perf_counter()
             with torch.inference_mode():
                 all_results = model.test_step(batch) # pyright: ignore
-
-            torch.cuda.synchronize()
-            inference_time = time.perf_counter() - inference_start
 
             # Optimized result extraction
             results_by_image = [[sample] for sample in all_results]
 
-            if verbose:
-                print(f"  Preparation:   {prep_time*1000:.1f}ms,   Inference:   {inference_time*1000:.1f}ms,   batch size:   {batch_size}")
-
             return results_by_image
 
     @staticmethod
-    def _extract_point_data_from_samples(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> list[PosePointData | None]:
+    def _extract_pose_point_data(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> list[PosePointData | None]:
         """Process pose data samples and return only the first detected pose for each image."""
         first_poses: list[PosePointData | None] = []
 

@@ -3,6 +3,7 @@ from queue import Empty
 from threading import Event, Lock, Thread
 from typing import Optional
 import traceback
+from dataclasses import dataclass
 
 # Third-party imports
 import numpy as np
@@ -12,12 +13,19 @@ from pandas import Timestamp
 from modules.cam.depthcam.Definitions import FrameType
 from modules.tracker.Tracklet import Tracklet, Rect, TrackletDict
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
-from modules.pose.PoseDetection import PoseDetection, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
+from modules.pose.PoseDetection import PoseDetection, PoseDetectionInput, PoseDetectionOutput, PoseDetectionOutputCallback, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
 from modules.pose.PoseImageProcessor import PoseImageProcessor
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+@dataclass
+class PendingPoseRequest:
+    batch_id: int  # For debugging/logging
+    time_stamp: Timestamp
+    tracklets: list[Tracklet]
+    crop_rects: list[Rect]
+    crop_images: list[np.ndarray]
 
 class PosePipeline(Thread):
     def __init__(self, settings: Settings) -> None:
@@ -32,6 +40,10 @@ class PosePipeline(Thread):
         self.input_tracklets: TrackletDict = {}
         self.input_frames: dict[int, np.ndarray] = {}
 
+        self.batch_counter: int = 0
+        self._pending_lock: Lock = Lock()
+        self._pending_requests: dict[int, PendingPoseRequest] = {}
+
         # Configuration
         self.pose_active: bool = settings.pose_active
         self.pose_detector_frame_width: int = POSE_MODEL_WIDTH
@@ -42,11 +54,7 @@ class PosePipeline(Thread):
 
         # Components
         self.pose_detector: PoseDetection | None = None
-        self.image_processor: PoseImageProcessor = PoseImageProcessor(
-            crop_expansion=self.pose_crop_expansion,
-            output_width=self.pose_detector_frame_width,
-            output_height=self.pose_detector_frame_height
-        )
+        self.image_processor: PoseImageProcessor = PoseImageProcessor(self.pose_crop_expansion, self.pose_detector_frame_width, self.pose_detector_frame_height)
 
         if self.pose_active:
             self.pose_detector = PoseDetection(
@@ -73,27 +81,11 @@ class PosePipeline(Thread):
 
     def start(self) -> None:
         """Start the pose pipeline and detector"""
-        if self.is_alive():
-            print("PosePipeline is already running.")
-            return
 
         # Start detector first
         if self.pose_detector is not None:
-            self.pose_detector.add_poses_callback(self._notify_pose_callback)
+            self.pose_detector.register_callback(self._notify_detection_callback)
             self.pose_detector.start()
-
-            # Wait for detector to be ready (optional, but safer)
-            import time
-            timeout = 10.0  # seconds
-            start_time = time.time()
-            while not self.pose_detector.is_ready:
-                if time.time() - start_time > timeout:
-                    print("Warning: PoseDetection not ready after timeout")
-                    break
-                time.sleep(0.1)
-
-            if self.verbose and self.pose_detector.is_ready:
-                print("PosePipeline: PoseDetection ready")
 
         super().start()
 
@@ -107,10 +99,6 @@ class PosePipeline(Thread):
         self.join(timeout=2.0)
         if self.is_alive() and self.verbose:
             print("Warning: PosePipeline thread did not stop cleanly")
-
-        # Clear callbacks
-        with self.callback_lock:
-            self.pose_output_callbacks.clear()
 
         # Stop detector
         if self.pose_detector is not None:
@@ -129,19 +117,7 @@ class PosePipeline(Thread):
             self._update_event.clear()
 
             try:
-                # Get current tracklets
-                tracklets: TrackletDict = self.get_tracklets()
-
-                # Process tracklets into pre-poses
-                pre_poses: PoseDict = self._process_tracklets(tracklets)
-
-                # Submit to detector if ready
-                if self.pose_detector is None:
-                    self._notify_pose_callback(pre_poses)
-                elif self.pose_detector is not None and self.pose_detector.is_ready:
-                    self.pose_detector.submit_poses(pre_poses)
-                elif self.pose_detector is not None and self.verbose:
-                    print("PosePipeline: Detector not ready, skipping submission")
+                self._process()
 
             except Exception as e:
                 if self.verbose:
@@ -151,38 +127,69 @@ class PosePipeline(Thread):
         if self.verbose:
             print("PosePipeline: Pipeline thread stopped")
 
-    def _process_tracklets(self, tracklets: TrackletDict) -> PoseDict:
-        """Convert tracklets to pre-poses (with crop images but no keypoints)"""
+    def _process(self) -> None:
+        tracklets: list[Tracklet] = list(self.get_tracklets().values())
 
-        poses: PoseDict = {}
+        if not tracklets:
+            return
+
+        self.batch_counter += 1
+        batch_id: int = self.batch_counter
         time_stamp: Timestamp = Timestamp.now()
+        pose_images: list[np.ndarray] = []
+        pose_crop_rects: list[Rect] = []
 
-        for tracklet in tracklets.values():
-            pose: Pose = self._process_tracklet(tracklet, time_stamp)
-            poses[tracklet.id] = pose
-
-        # if self.verbose:
-        #     print(f"PosePipeline In: {[(pid, f'{pose.time_stamp.second}.{int(pose.time_stamp.microsecond/1000):03d}') for pid, pose in poses.items()]}")
-
-        return poses
-
-    def _process_tracklet(self, tracklet: Tracklet, time_stamp: Timestamp) -> Pose:
-        """Process a single tracklet into a pre-pose"""
-        pose_image: Optional[np.ndarray] = None
-        pose_crop_rect: Optional[Rect] = None
-        cam_image: Optional[np.ndarray] = self._get_image(tracklet.cam_id)
-
-        if cam_image is not None and tracklet.is_being_tracked:
+        for tracklet in tracklets:
+            cam_image: np.ndarray = self._get_image(tracklet.cam_id)
             pose_image, pose_crop_rect = self.image_processor.process_pose_image(tracklet, cam_image)
+            pose_images.append(pose_image)
+            pose_crop_rects.append(pose_crop_rect)
 
-        pose = Pose(
-            tracklet=tracklet,
-            crop_rect=pose_crop_rect,
-            crop_image=pose_image,
-            time_stamp=time_stamp
+        pending_request = PendingPoseRequest(
+            batch_id=batch_id,
+            time_stamp=time_stamp,
+            tracklets=tracklets,
+            crop_rects=pose_crop_rects,
+            crop_images=pose_images
         )
 
-        return pose
+        with self._pending_lock:
+            self._pending_requests[batch_id] = pending_request
+
+        if self.pose_detector is not None and self.pose_detector.is_ready:
+            pose_data_input = PoseDetectionInput(pending_request.batch_id, pending_request.crop_images)
+            self.pose_detector.submit_batch(pose_data_input)
+
+    def _notify_detection_callback(self, poses: PoseDetectionOutput) -> None:
+
+        """Handle completed pose detection results"""
+        with self._pending_lock:
+            pending_request: PendingPoseRequest | None = self._pending_requests.pop(poses.batch_id, None)
+            # delete andy pending request with a lower batch id to avoid memory leak
+            obsolete_keys: list[int] = [key for key in self._pending_requests if key < poses.batch_id]
+            # if self.verbose and obsolete_keys:
+            #     print(f"PosePipeline: Cleaning up {len(obsolete_keys)} obsolete pending requests: {obsolete_keys}")
+            for key in obsolete_keys:
+                del self._pending_requests[key]
+
+        if pending_request is None:
+            if self.verbose:
+                print(f"PosePipeline: No pending request found for batch ID {poses.batch_id}")
+            return
+
+        pose_dict: PoseDict = {}
+
+        for i, tracklet in enumerate(pending_request.tracklets):
+            pose = Pose(
+                tracklet=tracklet,
+                crop_rect = pending_request.crop_rects[i],
+                crop_image = pending_request.crop_images[i],
+                time_stamp = pending_request.time_stamp,
+                point_data = poses.point_data_list[i]
+            )
+            pose_dict[tracklet.id] = pose
+
+        self._notify_pose_callbacks(pose_dict)
 
     # INPUT METHODS
     def set_tracklets(self, tracklets: TrackletDict) -> None:
@@ -202,10 +209,13 @@ class PosePipeline(Thread):
         with self.input_mutex:
             self.input_frames[id] = image
 
-    def _get_image(self, id: int) -> Optional[np.ndarray]:
+    def _get_image(self, id: int) -> np.ndarray:
         """Get the camera image for a specific camera ID (thread-safe)"""
         with self.input_mutex:
-            return self.input_frames.get(id)
+            image: np.ndarray | None = self.input_frames.get(id)
+            if image is None:
+                raise ValueError(f"PosePipeline: No image available for camera ID {id}")
+            return image
 
     def notify_update(self) -> None:
         """Signal the pipeline to process current tracklets"""
@@ -219,15 +229,13 @@ class PosePipeline(Thread):
         with self.callback_lock:
             self.pose_output_callbacks.add(callback)
 
-    def _notify_pose_callback(self, poses: PoseDict) -> None:
-        """Internal callback invoked by PoseDetection when poses are ready
-
-        Note: Error handling is performed by PoseDetection's callback worker thread.
-              Any exceptions raised here will be caught and logged by PoseDetection.
-        """
-        # if self.verbose:
-        #     print(f"PosePipeline Out: {[(pid, f'{pose.time_stamp.second}.{int(pose.time_stamp.microsecond/1000):03d}') for pid, pose in poses.items()]}")
-
+    def _notify_pose_callbacks(self, poses: PoseDict) -> None:
+        """Invoke all registered pose output callbacks"""
         with self.callback_lock:
             for callback in self.pose_output_callbacks:
-                callback(poses)
+                try:
+                    callback(poses)
+                except Exception as e:
+                    if self.verbose:
+                        print(f"PosePipeline: Error in pose output callback: {str(e)}")
+                        traceback.print_exc()
