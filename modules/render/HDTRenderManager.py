@@ -32,7 +32,8 @@ class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, capture_data_hub: CaptureDataHub, render_data_hub: RenderDataHub, settings: Settings) -> None:
         self.num_players: int =     settings.num_players
         self.num_cams: int =        settings.camera_num
-        self.num_R_streams: int =   settings.render_R_num
+        num_R_streams: int =   settings.render_R_num
+        R_stream_capacity: int = settings.camera_fps * 10  # 10 seconds buffer
 
         # data
         self.render_data: RenderDataHub =   render_data_hub
@@ -48,8 +49,8 @@ class HDTRenderManager(RenderBase):
         self.centre_pose_layers:    dict[int, CentrePoseRender] = {}
         self.pose_overlays:         dict[int, PoseStreamLayer] = {}
         self.line_field_layers:     dict[int, LineFieldLayer] = {}
-        self.motion_corr_stream_layer = CorrelationStreamLayer(self.capture_data, self.num_R_streams)
-        self.pose_corr_stream_layer =   CorrelationStreamLayer(self.capture_data, self.num_R_streams)
+        self.motion_corr_stream_layer = CorrelationStreamLayer(self.capture_data, num_R_streams, R_stream_capacity)
+        self.pose_corr_stream_layer =   CorrelationStreamLayer(self.capture_data, num_R_streams, R_stream_capacity)
 
         # fbos
         self.cam_fbos: dict[int, Fbo] = {}

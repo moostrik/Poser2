@@ -18,16 +18,17 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # Shaders
 from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 
+
 class CorrelationStreamLayer(LayerBase):
     r_stream_shader = StreamCorrelation()
 
-    def __init__(self, data: CaptureDataHub, num_streams: int) -> None:
+    def __init__(self, data: CaptureDataHub, num_streams: int, capacity: int) -> None:
         self.data: CaptureDataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.num_streams: int = num_streams
-        self.correlation_stream = PairCorrelationStream(10 * 24)
+        self.correlation_stream: PairCorrelationStream = PairCorrelationStream(capacity)
 
         text_init()
 
@@ -49,6 +50,17 @@ class CorrelationStreamLayer(LayerBase):
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
+        """Update and render correlation streams.
+        Pipeline:
+        1. Fetch new correlation batch from data hub
+        2. Update circular buffer with new similarities
+        3. Extract top N pairs by average similarity
+        4. Convert to GPU texture (num_streams × capacity × RGB)
+        5. Render with shader and overlay pair ID labels
+
+        The FBO is always cleared, even if no data is available.
+        """
+        # reallocate shader if needed if hot-reloaded
         if not CorrelationStreamLayer.r_stream_shader.allocated:
             CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=True)
 
@@ -59,41 +71,34 @@ class CorrelationStreamLayer(LayerBase):
         self.correlation_stream.update(correlation_batch, SimilarityMetric.GEOMETRIC_MEAN)
         stream_data: PairCorrelationStreamData = self.correlation_stream.get_stream_data()
 
-        pairs_with_data = stream_data.get_top_pairs_with_windows(
-            self.num_streams,
-            stream_data.capacity
-        )
+        LayerBase.setView(self.fbo.width, self.fbo.height)
+        self.fbo.begin()
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+        self.fbo.end()
 
-        # Extract just the pairs for rendering
-        pairs: list[tuple[int, int]] = [pair_id for pair_id, _ in pairs_with_data]
-        num_pairs: int = len(pairs)
+        if stream_data.is_empty:
+            return
 
-        image_np: np.ndarray = StreamCorrelation.r_stream_to_image(stream_data, self.num_streams)
+        pairs: list[tuple[int, int]] = stream_data.get_top_pairs(self.num_streams)
+        pair_arrays: list[np.ndarray] = [stream_data.get_similarities(pair_id) for pair_id in pairs]
+        image_np: np.ndarray = StreamCorrelation.r_stream_to_image(pair_arrays, self.num_streams)
         self.image.set_image(image_np)
         self.image.update()
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        self.fbo.begin()
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT)
-        self.fbo.end()
-
-
         self.r_stream_shader.use(self.fbo.fbo_id, self.image.tex_id, self.image.width, self.image.height, 1.5 / self.fbo.height)
 
         step: float = self.fbo.height / self.num_streams
 
-        LayerBase.setView(self.fbo.width, self.fbo.height)
-
         self.fbo.begin()
         glColor4f(1.0, 0.5, 0.5, 1.0)
-        for i in range(num_pairs):
-            pair: tuple[int, int] = pairs[i]
+        for i, pair in enumerate(pairs):
             string: str = f'{pair[0]} | {pair[1]}'
             x: int = self.fbo.width - 100
-            y: int = self.fbo.height - (int(self.fbo.height - (i + 0.5) * step) - 12)
+            y: int = int((i + 0.5) * step) + 12
             draw_box_string(x, y, string, big=True)
         glColor4f(1.0, 1.0, 1.0, 1.0)
         self.fbo.end()
