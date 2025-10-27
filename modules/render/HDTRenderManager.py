@@ -1,4 +1,5 @@
 # Standard library imports
+from time import perf_counter
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -49,8 +50,8 @@ class HDTRenderManager(RenderBase):
         self.centre_pose_layers:    dict[int, CentrePoseRender] = {}
         self.pose_overlays:         dict[int, PoseStreamLayer] = {}
         self.line_field_layers:     dict[int, LineFieldLayer] = {}
-        self.motion_corr_stream_layer = CorrelationStreamLayer(self.capture_data, num_R_streams, R_stream_capacity)
-        self.pose_corr_stream_layer =   CorrelationStreamLayer(self.capture_data, num_R_streams, R_stream_capacity)
+        self.pose_corr_stream_layer =   CorrelationStreamLayer(self.capture_data, num_R_streams, R_stream_capacity, use_motion=False)
+        self.motion_corr_stream_layer = CorrelationStreamLayer(self.capture_data, num_R_streams, R_stream_capacity, use_motion=True)
 
         # fbos
         self.cam_fbos: dict[int, Fbo] = {}
@@ -145,6 +146,9 @@ class HDTRenderManager(RenderBase):
             # self.pose_overlays[i].update()
             self.line_field_layers[i].update()
 
+        # if (t5-t0) * 1000 > 10:
+        #     print(f"t1 {(t1 - t0)*1000:4.0f} | t2 {(t2 - t1)*1000:4.0f} | t3 {(t3 - t2)*1000:4.0f} | t4 {(t4 - t3)*1000:4.0f} | t5 {(t5 - t4)*1000:4.0f} | total {(t5 - t0)*1000:4.0f} ms")
+
         self.draw_composition(width, height)
 
     def draw_composition(self, width:int, height: int) -> None:
@@ -163,7 +167,7 @@ class HDTRenderManager(RenderBase):
             glBlendFunc(GL_ONE, GL_ONE)
             # self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
             self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            # self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
             # self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:

@@ -204,12 +204,12 @@ class PoseDetection(Thread):
         with self._input_lock:
             if self._pending_input is not None:
                 old_input = self._pending_input
-                lag = (Timestamp.now() - self._input_timestamp).total_seconds()
+                lag = int((Timestamp.now() - self._input_timestamp).total_seconds() * 1000)
             self._pending_input = input_data
             self._input_timestamp = Timestamp.now()
 
         if old_input is not None and self.verbose:
-            print(f"Pose Detection: Dropped batch   {old_input.batch_id - self._last_dropped_id:03d}   good, last lag:   {lag:.3f}s   )")
+            print(f"Pose Detection: Dropped a batch {old_input.batch_id} after  {old_input.batch_id - self._last_dropped_id:4d}   samples, with a lag of {lag:3d} ms")
             self._last_dropped_id = old_input.batch_id
 
         self._notify_update_event.set()

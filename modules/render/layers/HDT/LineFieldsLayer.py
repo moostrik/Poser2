@@ -1,10 +1,9 @@
-# 2DO
-# monolithic shader
-# pose correlation
+# TODO
 # pose snapshots
 # pose deviation form neutral (snapshot)
 # pose deviation form other (snapshots)
 # external osc events
+# monolithic shader / cleanup this class / better alpha
 # start and stop event (from external rec event)
 # lut color system
 

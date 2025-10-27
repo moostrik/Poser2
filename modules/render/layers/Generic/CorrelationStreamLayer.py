@@ -22,13 +22,14 @@ from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 class CorrelationStreamLayer(LayerBase):
     r_stream_shader = StreamCorrelation()
 
-    def __init__(self, data: CaptureDataHub, num_streams: int, capacity: int) -> None:
+    def __init__(self, data: CaptureDataHub, num_streams: int, capacity: int, use_motion: bool = False) -> None:
         self.data: CaptureDataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.num_streams: int = num_streams
         self.correlation_stream: PairCorrelationStream = PairCorrelationStream(capacity)
+        self.use_motion: bool = use_motion
 
         text_init()
 
@@ -64,7 +65,11 @@ class CorrelationStreamLayer(LayerBase):
         if not CorrelationStreamLayer.r_stream_shader.allocated:
             CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=True)
 
-        correlation_batch: PairCorrelationBatch | None = self.data.get_pose_correlation(True, self.data_consumer_key)
+        if self.use_motion:
+            correlation_batch: PairCorrelationBatch | None = self.data.get_motion_correlation(True, self.data_consumer_key)
+        else:
+            correlation_batch: PairCorrelationBatch | None = self.data.get_pose_correlation(True, self.data_consumer_key)
+
         if correlation_batch is None:
             return
 
