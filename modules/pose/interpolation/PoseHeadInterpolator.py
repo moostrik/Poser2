@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from modules.pose.Pose import Pose
 from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
-from modules.pose.interpolation.PoseKinematicsInterpolator import PoseKinematicsInterpolatorSettings
+from modules.pose.interpolation.PoseAngleInterpolator import PoseAngleInterpolatorSettings
 
 from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSettings
 

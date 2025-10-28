@@ -61,13 +61,24 @@ ANGLE_JOINT_ROTATIONS: dict[AngleJoint, float] = {
     AngleJoint.head:             0.0
 }
 
+# Right-side joints are mirrored (negated) for symmetric representation
+ANGLE_JOINT_SYMMETRIC_MIRROR: set[AngleJoint] = {
+    AngleJoint.right_shoulder,
+    AngleJoint.right_elbow,
+    AngleJoint.right_hip,
+    AngleJoint.right_knee
+}
 
 @dataclass(frozen=True)
 class PoseAngleData:
-    """Joint angle data with convenient access methods and summary statistics.
+    """Container for joint angle measurements with convenient access and statistics.
 
-    Stores angles and confidence scores for all joints. Individual angles/scores
-    can be NaN/0.0 to indicate missing or low-confidence detections.
+    Stores angle values (in radians) and confidence scores for body joints.
+    Provides dict-like access, iteration, and summary statistics over valid angles.
+
+    Individual angles can be NaN to indicate missing/uncomputable joints.
+    Scores represent detection confidence: 0.0 (missing/invalid) to 1.0 (full confidence).
+    For computed angles, score is the minimum confidence of the three constituent keypoints.
     """
     angles: np.ndarray = field(default_factory=lambda: np.full(ANGLE_NUM_JOINTS, np.nan, dtype=np.float32))
     scores: np.ndarray = field(default_factory=lambda: np.zeros(ANGLE_NUM_JOINTS, dtype=np.float32))
@@ -136,7 +147,11 @@ class PoseAngleData:
 class PoseAngles:
     @staticmethod
     def compute(point_data: Optional['PosePointData']) -> PoseAngleData:
-        """Calculate angle data from point data. Returns NaN-filled PoseAngleData if point_data is None."""
+        """Calculate angle data from point data with transformations applied.
+
+        Applies rotation offsets and mirrors right-side angles for symmetric representation.
+        Returns NaN-filled PoseAngleData if point_data is None.
+        """
         if point_data is None:
             return PoseAngleData()
 
@@ -158,7 +173,10 @@ class PoseAngles:
                 else:
                     angle: float = PoseAngles.calculate_angle(p1, p2, p3, rotate_by)
 
-                if not np.isnan(angle):  # Only set if calculation succeeded
+                if not np.isnan(angle):
+                    if joint in ANGLE_JOINT_SYMMETRIC_MIRROR:
+                        angle = -angle
+
                     angle_values[i] = angle
                     s1, s2, s3 = point_scores[idx1], point_scores[idx2], point_scores[idx3]
                     angle_scores[i] = min(s1, s2, s3)

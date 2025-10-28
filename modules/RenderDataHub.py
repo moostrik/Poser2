@@ -18,7 +18,7 @@ from modules.pose.Pose import Pose, PoseDict
 from modules.pose.features.PoseAngles import AngleJoint
 from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
 from modules.pose.interpolation.PoseViewportInterpolator import PoseViewportInterpolator, PoseViewportInterpolatorSettings
-from modules.pose.interpolation.PoseKinematicsInterpolator import PoseKinematicsInterpolator, PoseKinematicsInterpolatorSettings, SymmetricJointType
+from modules.pose.interpolation.PoseAngleInterpolator import PoseAngleInterpolator, PoseAngleInterpolatorSettings, SymmetricJointType
 from modules.Settings import Settings
 from modules.utils.OneEuroInterpolation import OneEuroSettings, OneEuroInterpolator
 from modules.utils.PointsAndRects import Rect
@@ -38,18 +38,18 @@ class RenderDataHub:
             height_dest=0.95,
             dst_aspectratio=9/16
         )
-        self.angle_settings: PoseKinematicsInterpolatorSettings = PoseKinematicsInterpolatorSettings(
+        self.angle_settings: PoseAngleInterpolatorSettings = PoseAngleInterpolatorSettings(
             smooth_settings=self.OneEuro_settings,
             motion_threshold=0.002
         )
 
         # Dictionaries to store smoothers for each tracklet ID
         self._rect_smoothers: dict[int, PoseViewportInterpolator] = {}
-        self._angle_smoothers: dict[int, PoseKinematicsInterpolator] = {}
+        self._angle_smoothers: dict[int, PoseAngleInterpolator] = {}
 
         for i in range(self._num_players):
             self._rect_smoothers[i] = PoseViewportInterpolator(self.rect_settings)
-            self._angle_smoothers[i] = PoseKinematicsInterpolator(self.angle_settings)
+            self._angle_smoothers[i] = PoseAngleInterpolator(self.angle_settings)
         self._all_smoothers: list[Mapping[int, PoseInterpolationBase]] = [self._rect_smoothers, self._angle_smoothers]
 
         # Correlation smoothing (automatically managed)

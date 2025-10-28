@@ -42,16 +42,16 @@ for joint_type, (left_joint, right_joint) in SYMMETRIC_JOINT_PAIRS.items():
     SYMMETRIC_JOINT_TYPE_MAP[right_joint] = joint_type
 
 @dataclass
-class PoseKinematicsInterpolatorSettings:
+class PoseAngleInterpolatorSettings:
     smooth_settings: OneEuroSettings
     motion_threshold: float = 0.002
     motion_weights: dict[AngleJoint, float] = field(default_factory=lambda: POSE_ANGLE_MOTION_WEIGHTS)
 
 # CLASSES
-class PoseKinematicsInterpolator(PoseInterpolationBase):
-    def __init__(self, settings: PoseKinematicsInterpolatorSettings) -> None:
+class PoseAngleInterpolator(PoseInterpolationBase):
+    def __init__(self, settings: PoseAngleInterpolatorSettings) -> None:
         self._active: bool = False
-        self.settings: PoseKinematicsInterpolatorSettings = settings
+        self.settings: PoseAngleInterpolatorSettings = settings
         self._angle_smoothers: dict[AngleJoint, AngleEuroInterpolator] = {}
         self._motions: dict[AngleJoint, float] = {}
         self._total_motion: float = 0.0
