@@ -149,9 +149,7 @@ class PoseCorrelator:
         """
 
         angle_dict: dict[int, dict[AngleJoint, float]] = {
-            tracklet_id: pose.angle_data.to_dict()
-            for tracklet_id, pose in poses.items()
-            if pose.tracklet.is_being_tracked
+            tracklet_id: pose.angle_data.to_dict() for tracklet_id, pose in poses.items() if pose.tracklet.is_being_tracked
         }
 
         return angle_dict

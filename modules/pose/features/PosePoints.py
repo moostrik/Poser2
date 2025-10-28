@@ -65,6 +65,11 @@ class PosePointData:
         return self.points[joint]
 
     @cached_property
+    def valid_joints(self) -> list[PoseJoint]:
+        """List of joints with valid angles"""
+        return [joint for joint, is_valid in zip(PoseJoint, self.valid_mask) if is_valid]
+
+    @cached_property
     def valid_mask(self) -> np.ndarray:
         """Boolean mask indicating which joints have valid (non-NaN) points"""
         return ~np.isnan(self.points).any(axis=1)

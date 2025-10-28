@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from modules.pose.features.PosePoints import PosePointData
-from modules.pose.features.PoseAngles import PoseAngleData, POSE_JOINT_TO_ANGLE_IDX
+from modules.pose.features.PoseAngles import PoseAngleData, AngleJoint, ANGLE_JOINT_KEYPOINTS
 from modules.pose.PoseTypes import PoseJoint, POSE_JOINT_COLORS
 from modules.pose.PoseTypes import POSE_COLOR_ALPHA_BASE, POSE_COLOR_LEFT_POSITIVE, POSE_COLOR_LEFT_NEGATIVE, POSE_COLOR_RIGHT_POSITIVE, POSE_COLOR_RIGHT_NEGATIVE
 
@@ -27,6 +27,15 @@ POSE_VERTEX_LIST: list[list[PoseJoint]] = [
 ]
 POSE_VERTEX_ARRAY: np.ndarray = np.array([kp.value for pose in POSE_VERTEX_LIST for kp in pose], dtype=np.int32)
 POSE_VERTEX_INDICES: np.ndarray = np.arange(len(POSE_VERTEX_ARRAY), dtype=np.int32)
+
+POSE_JOINT_TO_ANGLE_IDX: dict[PoseJoint, int] = {}
+for angle_joint, keypoints in ANGLE_JOINT_KEYPOINTS.items():
+    if len(keypoints) == 3:
+        # For triplets, map the middle point (vertex) to this angle
+        POSE_JOINT_TO_ANGLE_IDX[keypoints[1]] = angle_joint.value
+    elif angle_joint == AngleJoint.head:
+        # For head, map nose and eyes to head angle
+        POSE_JOINT_TO_ANGLE_IDX[PoseJoint.nose] = angle_joint.value
 
 # CLASSES
 @dataclass(frozen=True)
