@@ -221,6 +221,7 @@ class PoseAngleData:
         similarity_values: np.ndarray = np.power(1.0 - np.abs(diff_data.values) / np.pi, exponent)
         return PoseAngleData(values=similarity_values, scores=diff_data.scores)
 
+
 class PoseAngleFactory:
 
     @staticmethod
