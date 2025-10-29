@@ -106,11 +106,13 @@ class PoseAngleSymmetry:
     """Utility class for computing symmetry metrics from angle data."""
 
     @staticmethod
-    def compute(angle_data: 'PoseAngleData') -> PoseSymmetryData:
+    def compute(angle_data: 'PoseAngleData', symmetry_exponent: float = 1.0) -> PoseSymmetryData:
         """Calculate symmetry metrics from angle data.
 
         Args:
             angle_data: Angle measurements (angles should already be mirrored)
+            symmetry_exponent: Exponent to emphasize symmetry differences (e.g., 2.0 for quadratic).
+                              Higher values penalize asymmetries more severely.
 
         Returns:
             PoseSymmetryData with individual joint pair scores and aggregate metrics
@@ -118,8 +120,8 @@ class PoseAngleSymmetry:
         symmetries = {}
 
         for joint_type, (left_joint, right_joint) in SYMMETRIC_JOINT_PAIRS.items():
-            left_angle = angle_data.angles[left_joint]
-            right_angle = angle_data.angles[right_joint]
+            left_angle = angle_data.values[left_joint]
+            right_angle = angle_data.values[right_joint]
 
             if np.isnan(left_angle) or np.isnan(right_angle):
                 symmetries[joint_type] = np.nan
@@ -128,6 +130,10 @@ class PoseAngleSymmetry:
                 angle_diff = abs(left_angle - right_angle)
                 if angle_diff > np.pi:
                     angle_diff = 2 * np.pi - angle_diff
-                symmetries[joint_type] = float(1.0 - angle_diff / np.pi)
+
+                # Normalize to [0, 1] and apply exponent for emphasis
+                normalized_diff = angle_diff / np.pi
+                symmetry = (1.0 - normalized_diff) ** symmetry_exponent
+                symmetries[joint_type] = float(max(0.0, min(1.0, symmetry)))
 
         return PoseSymmetryData(symmetries)

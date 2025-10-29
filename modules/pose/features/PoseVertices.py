@@ -80,7 +80,7 @@ class PoseVertices:
             for joint_pos, joint in enumerate((p1, p2)):
                 idx: int | None = POSE_JOINT_TO_ANGLE_IDX.get(joint)
                 if idx is not None:
-                    angle: float = angle_data.angles[idx]
+                    angle: float = angle_data.values[idx]
                     if not np.isnan(angle):
                         if joint.value % 2 == 1:  # Left side
                             colors[i*2 + joint_pos][0:3] = POSE_COLOR_LEFT_POSITIVE if angle >= 0 else POSE_COLOR_LEFT_NEGATIVE

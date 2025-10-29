@@ -290,7 +290,7 @@ class PoseStreamProcessor(Process):
             return empty, empty.copy()
 
         timestamps: list[pd.Timestamp] = [pose.time_stamp for pose in poses if pose.angles is not None]
-        angle_data: list[np.ndarray] = [pose.angles.angles for pose in poses if pose.angles is not None]
+        angle_data: list[np.ndarray] = [pose.angles.values for pose in poses if pose.angles is not None]
         conf_data: list[np.ndarray] = [pose.angles.scores for pose in poses if pose.angles is not None]
 
         angles_df = pd.DataFrame(angle_data, index=timestamps, columns=ANGLE_JOINT_NAMES, dtype=float)

@@ -87,7 +87,7 @@ class WSData:
             angle_data: PoseAngleData | None = pose.angle_data
             if angle_data is not None:
                 for i, name in enumerate(ANGLE_JOINT_NAMES):
-                    angle: float = angle_data.angles[i]
+                    angle: float = angle_data.values[i]
                     score: float = angle_data.scores[i]
                     if score > 0.0 and not np.isnan(angle):
                         setattr(self, name, angle)

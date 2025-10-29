@@ -50,7 +50,7 @@ class Pose:
     @property
     def has_data(self) -> bool:
         """Check if pose has minimum required data for feature extraction"""
-        return self.point_data is not None and self.point_data.has_data
+        return self.point_data is not None
 
     @property
     def age(self) -> float:

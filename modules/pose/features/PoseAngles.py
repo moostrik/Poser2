@@ -2,7 +2,7 @@ import numpy as np
 from functools import cached_property
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Optional, Iterator
+from typing import Optional, Iterator, Callable, Mapping
 
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.features.PosePoints import PosePointData
@@ -67,10 +67,8 @@ ANGLE_JOINT_SYMMETRIC_MIRROR: set[AngleJoint] = {
 class PoseAngleData:
     """Container for joint angle measurements with convenient access and statistics.
 
-    Stores angle values (in radians) and confidence scores for body joints.
+    Stores angle values (in radians) or its derivative values and confidence scores for body joints.
     Provides dict-like access, iteration, and summary statistics over valid angles.
-
-    All angles are stored in radians and normalized to range [-π, π).
 
     Individual angles can be NaN to indicate missing/uncomputable joints.
     Scores represent detection confidence: 0.0 (missing/invalid) to 1.0 (full confidence).
@@ -78,83 +76,119 @@ class PoseAngleData:
 
     Note: Right-side angles are mirrored in compute(), so symmetric poses have similar left/right values.
     """
-    angles: np.ndarray = field(default_factory=lambda: np.full(ANGLE_NUM_JOINTS, np.nan, dtype=np.float32))
+    values: np.ndarray = field(default_factory=lambda: np.full(ANGLE_NUM_JOINTS, np.nan, dtype=np.float32))
     scores: np.ndarray = field(default_factory=lambda: np.zeros(ANGLE_NUM_JOINTS, dtype=np.float32))
-
-    def __len__(self) -> int:
-        """Total number of joint angles"""
-        return ANGLE_NUM_JOINTS
-
-    def __contains__(self, joint: AngleJoint) -> bool:
-        """Check if joint has valid (non-NaN) angle. Supports 'joint in angle_data' syntax."""
-        return not np.isnan(self.angles[joint])
-
-    def __iter__(self) -> Iterator[tuple[AngleJoint, float, float]]:
-        """Iterate over (joint, angle, score) tuples. Supports 'for joint, angle, score in angle_data'."""
-        for joint in AngleJoint:
-            yield joint, self.angles[joint], self.scores[joint]
 
     def __repr__(self) -> str:
         """Readable string representation"""
-        return f"PoseAngleData(valid={self.valid_count}/{ANGLE_NUM_JOINTS}, mean={self.mean_angle:.2f} rad)"
+        if not self.has_data:
+            return f"PoseAngleData(valid=0/{ANGLE_NUM_JOINTS})"
+        return f"PoseAngleData(valid={self.valid_count}/{ANGLE_NUM_JOINTS}, mean={self.mean_value:.3f}, score={self.mean_score:.2f})"
+
+    def __len__(self) -> int:
+        """Total number of joint values"""
+        return ANGLE_NUM_JOINTS
+
+    def __contains__(self, joint: AngleJoint) -> bool:
+        """Check if joint has valid (non-NaN) value. Supports 'joint in angle_data' syntax."""
+        return not np.isnan(self.values[joint])
+
+    def __iter__(self) -> Iterator[tuple[AngleJoint, float, float]]:
+        """Iterate over (joint, value, score) tuples. Supports 'for joint, value, score in angle_data'."""
+        for joint in AngleJoint:
+            yield joint, self.values[joint], self.scores[joint]
 
     def __getitem__(self, joint: AngleJoint) -> float:
         """Dict-like access: angle_data[AngleJoint.left_elbow]"""
-        return self.angles[joint]
+        return self.values[joint]
+
+    def items(self) -> Iterator[tuple[AngleJoint, float]]:
+        """Iterate over (joint, value) pairs, similar to dict.items()"""
+        for joint in AngleJoint:
+            yield joint, self.values[joint]
+
+    def get(self, joint: AngleJoint, default: float = np.nan) -> float:
+        """Get value for joint with optional default if NaN."""
+        value = self.values[joint]
+        return value if not np.isnan(value) else default
 
     @cached_property
     def valid_joints(self) -> list[AngleJoint]:
-        """List of joints with valid angles"""
+        """List of joints with valid values"""
         return [joint for joint, is_valid in zip(AngleJoint, self.valid_mask) if is_valid]
 
     @cached_property
     def valid_mask(self) -> np.ndarray:
-        """Boolean mask indicating which joints have valid (non-NaN) angles"""
-        return ~np.isnan(self.angles)
+        """Boolean mask indicating which joints have valid (non-NaN) values"""
+        return ~np.isnan(self.values)
 
     @cached_property
     def valid_count(self) -> int:
-        """Number of joints with valid (non-NaN) angles"""
+        """Number of joints with valid (non-NaN) values"""
         return int(np.sum(self.valid_mask))
 
     @cached_property
     def has_data(self) -> bool:
-        """True if at least one valid angle available"""
+        """True if at least one valid value available"""
         return self.valid_count > 0
 
     @cached_property
-    def mean_angle(self) -> float:
-        """Mean of all valid angles. Returns 0.0 if no valid angles."""
+    def mean_value(self) -> float:
+        """Mean of all valid values. Returns NaN if no valid values."""
         if not self.has_data:
-            return 0.0
-        return float(np.nanmean(self.angles))
+            return np.nan
+        return float(np.nanmean(self.values))
 
     @cached_property
     def mean_score(self) -> float:
-        """Mean confidence score of all valid joints. Returns 0.0 if no valid angles."""
+        """Mean quality score of all valid joints. Returns NaN if no valid values."""
         if not self.has_data:
-            return 0.0
+            return np.nan
         return float(np.mean(self.scores[self.valid_mask]))
 
     @cached_property
-    def std_angle(self) -> float:
-        """Standard deviation of valid angles. Returns 0.0 if < 2 valid angles."""
+    def std_value(self) -> float:
+        """Standard deviation of valid values. Returns NaN if < 2 valid values."""
         if self.valid_count < 2:
-            return 0.0
-        return float(np.nanstd(self.angles))
+            return np.nan
+        return float(np.nanstd(self.values))
+
+    @cached_property
+    def max_value(self) -> float:
+        """Maximum valid value. Returns NaN if no valid values."""
+        if not self.has_data:
+            return np.nan
+        return float(np.nanmax(self.values))
+
+    @cached_property
+    def min_value(self) -> float:
+        """Minimum valid value. Returns NaN if no valid values."""
+        if not self.has_data:
+            return np.nan
+        return float(np.nanmin(self.values))
 
     def to_dict(self) -> dict[AngleJoint, float]:
         """Convert to dict with AngleJoint enum as keys."""
-        return {joint: float(self.angles[joint]) for joint in AngleJoint}
+        return {joint: float(self.values[joint]) for joint in AngleJoint}
+
+    def safe(self, default: float = 0.0) -> 'PoseAngleData':
+        """Return copy with NaN replaced by default value.
+
+        Creates a new PoseAngleData where all NaN values are replaced with
+        the specified default. Scores are preserved unchanged.
+        """
+        safe_values = self.values.copy()
+        safe_values[np.isnan(safe_values)] = default
+        return PoseAngleData(values=safe_values, scores=self.scores)
 
 
 class PoseAngles:
     @staticmethod
-    def compute(point_data: Optional['PosePointData']) -> PoseAngleData:
-        """Calculate angle data from point data with transformations applied.
+    def from_points(point_data: Optional[PosePointData]) -> PoseAngleData:
+        """Create angle measurements from keypoint data.
 
-        Applies rotation offsets and mirrors right-side angles for symmetric representation.
-        Returns NaN-filled PoseAngleData if point_data is None.
+        Computes joint angles from 2D keypoint positions, applies rotation offsets,
+        and mirrors right-side angles for symmetric representation.
         """
         if point_data is None:
             return PoseAngleData()
@@ -194,7 +228,7 @@ class PoseAngles:
                 scores = [point_data.scores[kp.value] for kp in keypoints]
                 angle_scores[joint.value] = min(scores)
 
-        return PoseAngleData(angle_values, angle_scores)
+        return PoseAngleData(values=angle_values, scores=angle_scores)
 
     @staticmethod
     def calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, rotate_by: float = 0) -> float:
@@ -207,8 +241,12 @@ class PoseAngles:
             rotate_by: Rotation offset in radians
 
         Returns:
-            Angle in radians in range [-π, π)
+            Angle in radians in range [-π, π), or NaN if points contain NaN
         """
+        # Early return if any coordinate is NaN
+        if np.any(np.isnan(p1)) or np.any(np.isnan(p2)) or np.any(np.isnan(p3)):
+            return np.nan
+
         v1: np.ndarray = p1 - p2
         v2: np.ndarray = p3 - p2
 
@@ -296,3 +334,86 @@ class PoseAngles:
 
             return float(rotation)
         return np.nan
+
+    @staticmethod
+    def from_values(values: Mapping[AngleJoint, float | None],
+                   scores: Mapping[AngleJoint, float] | None = None) -> PoseAngleData:
+        """Create PoseAngleData from joint value and optional score dictionaries.
+
+        Useful for constructing angle data from computed/smoothed values rather than
+        raw keypoint measurements.
+
+        Args:
+            values: Dictionary mapping joints to angle values (radians, velocities, etc.)
+                   None values are converted to NaN
+            scores: Optional dictionary mapping joints to quality scores [0, 1]
+                   If None, assigns 1.0 to all valid (non-NaN) values, 0.0 to NaN
+
+        Returns:
+            PoseAngleData with specified values and scores
+
+        Examples:
+            >>> # From smoothed angle values
+            >>> values = {AngleJoint.left_elbow: 1.2, AngleJoint.right_elbow: -1.1}
+            >>> angle_data = PoseAngles.from_values(values)
+            >>>
+            >>> # With custom scores
+            >>> scores = {AngleJoint.left_elbow: 0.95, AngleJoint.right_elbow: 0.87}
+            >>> angle_data = PoseAngles.from_values(values, scores)
+        """
+        # Build values array
+        values_array = np.array([
+            value if (value := values.get(joint)) is not None else np.nan
+            for joint in AngleJoint
+        ], dtype=np.float32)
+
+        # Build scores array
+        if scores is None:
+            # Default: 1.0 for valid values, 0.0 for NaN
+            scores_array = np.where(~np.isnan(values_array), 1.0, 0.0).astype(np.float32)
+        else:
+            scores_array = np.array([
+                scores.get(joint, 0.0) for joint in AngleJoint
+            ], dtype=np.float32)
+
+        return PoseAngleData(values=values_array, scores=scores_array)
+
+    @staticmethod
+    def from_getters(value_getter: Callable[[AngleJoint], float | None],
+                    score_getter: Callable[[AngleJoint], float] | None = None) -> PoseAngleData:
+        """Create PoseAngleData from value and optional score getter functions.
+
+        Functional interface for constructing angle data when values are computed
+        on-demand rather than stored in dictionaries.
+
+        Args:
+            value_getter: Function mapping joints to values (or None for missing)
+            score_getter: Optional function mapping joints to scores [0, 1]
+                         If None, assigns 1.0 to valid values, 0.0 to NaN
+
+        Returns:
+            PoseAngleData with computed values and scores
+
+        Examples:
+            >>> # From smoothers
+            >>> angle_data = PoseAngles.from_getters(
+            ...     lambda j: smoothers[j].smooth_value
+            ... )
+            >>>
+            >>> # With score computation
+            >>> angle_data = PoseAngles.from_getters(
+            ...     lambda j: smoothers[j].smooth_value,
+            ...     lambda j: original_scores[j] * 0.9  # Reduce confidence
+            ... )
+        """
+        values_array = np.array([
+            value if (value := value_getter(joint)) is not None else np.nan
+            for joint in AngleJoint
+        ], dtype=np.float32)
+
+        if score_getter is None:
+            scores_array = np.where(~np.isnan(values_array), 1.0, 0.0).astype(np.float32)
+        else:
+            scores_array = np.array([score_getter(joint) for joint in AngleJoint], dtype=np.float32)
+
+        return PoseAngleData(values=values_array, scores=scores_array)
