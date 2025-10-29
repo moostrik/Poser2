@@ -9,7 +9,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.correlation.PairCorrelationStream import PairCorrelationStream, PairCorrelationStreamData, PairCorrelationBatch, SimilarityMetric
+from modules.pose.correlation.PoseSimilarityStream import PoseSimilarityStream, PoseSimilarityStreamData, PoseSimilarityBatch , FeatureStatistic
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.CaptureDataHub import CaptureDataHub
 
@@ -28,7 +28,7 @@ class CorrelationStreamLayer(LayerBase):
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.num_streams: int = num_streams
-        self.correlation_stream: PairCorrelationStream = PairCorrelationStream(capacity)
+        self.correlation_stream: PoseSimilarityStream = PoseSimilarityStream(capacity)
         self.use_motion: bool = use_motion
 
         text_init()
@@ -66,15 +66,15 @@ class CorrelationStreamLayer(LayerBase):
             CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=True)
 
         if self.use_motion:
-            correlation_batch: PairCorrelationBatch | None = self.data.get_motion_correlation(True, self.data_consumer_key)
+            correlation_batch: PoseSimilarityBatch  | None = self.data.get_motion_correlation(True, self.data_consumer_key)
         else:
-            correlation_batch: PairCorrelationBatch | None = self.data.get_pose_correlation(True, self.data_consumer_key)
+            correlation_batch: PoseSimilarityBatch  | None = self.data.get_pose_correlation(True, self.data_consumer_key)
 
         if correlation_batch is None:
             return
 
-        self.correlation_stream.update(correlation_batch, SimilarityMetric.GEOMETRIC_MEAN)
-        stream_data: PairCorrelationStreamData = self.correlation_stream.get_stream_data()
+        self.correlation_stream.update(correlation_batch, FeatureStatistic.GEOMETRIC_MEAN)
+        stream_data: PoseSimilarityStreamData = self.correlation_stream.get_stream_data()
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         self.fbo.begin()

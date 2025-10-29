@@ -1,11 +1,12 @@
-import numpy as np
 from functools import cached_property
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Optional, Iterator, Callable, Mapping
+from typing import Optional
+import numpy as np
 
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.features.PosePoints import PosePointData
+from modules.pose.features.PoseFeatureBase import PoseFeatureBase
 
 class AngleJoint(IntEnum):
     left_shoulder =  0
@@ -64,10 +65,10 @@ ANGLE_JOINT_SYMMETRIC_MIRROR: set[AngleJoint] = {
 
 
 @dataclass(frozen=True)
-class PoseAngleData:
+class PoseAngleData(PoseFeatureBase[AngleJoint]):
     """Container for joint angle measurements with convenient access and statistics.
 
-    Stores angle values (in radians) or its derivative values and confidence scores for body joints.
+    Stores angle values (in radians) and confidence scores for body joints.
     Provides dict-like access, iteration, and summary statistics over valid angles.
 
     Individual angles can be NaN to indicate missing/uncomputable joints.
@@ -76,152 +77,48 @@ class PoseAngleData:
 
     Note: Right-side angles are mirrored in compute(), so symmetric poses have similar left/right values.
     """
+
     values: np.ndarray = field(default_factory=lambda: np.full(ANGLE_NUM_JOINTS, np.nan, dtype=np.float32))
     scores: np.ndarray = field(default_factory=lambda: np.zeros(ANGLE_NUM_JOINTS, dtype=np.float32))
 
-    def __post_init__(self) -> None:
-        """Validate data integrity and freeze arrays for immutability."""
-        # Make arrays immutable
-        self.values.flags.writeable = False
-        self.scores.flags.writeable = False
+    @property
+    def joint_enum(self) -> type[AngleJoint]:
+        """Return the AngleJoint enum class."""
+        return AngleJoint
 
-        # Validate data integrity: NaN values must have 0.0 scores."""
-        nan_mask: np.ndarray = np.isnan(self.values)
-        score_mask = self.scores > 0.0
-        invalid = nan_mask & score_mask
+    def validate(self) -> None:
+        """Validate that all non-NaN angles are in [-π, π] range."""
+        valid_values = self.values[~np.isnan(self.values)]
+        if valid_values.size > 0:
+            if np.any((valid_values < -np.pi) | (valid_values > np.pi)):
+                out_of_range = valid_values[(valid_values < -np.pi) | (valid_values > np.pi)]
+                raise ValueError(
+                    f"Angle values must be in range [-π, π]. "
+                    f"Found values outside range: {out_of_range}"
+                )
 
-        if np.any(invalid):
-            invalid_joints: list[str] = [AngleJoint(i).name for i in np.where(invalid)[0]]
-            raise ValueError(
-                f"Data integrity violation: NaN values must have 0.0 scores. "
-                f"Invalid joints: {', '.join(invalid_joints)}"
-            )
-    def __repr__(self) -> str:
-        """Readable string representation."""
-        if not self.any_valid:
-            return f"PoseAngleData(0/{ANGLE_NUM_JOINTS})"
-
-        mean_val = float(np.mean(self.values[self.valid_mask]))
-        return f"PoseAngleData({self.valid_count}/{ANGLE_NUM_JOINTS}, μ_score={mean_val:.2f})"
-
-    # ========== ACCESS ==========
-
-    def get(self, joint: AngleJoint, default: float = np.nan) -> float:
-        """Get value with default for NaN."""
-        value = self.values[joint]
-        return value if not np.isnan(value) else default
-
-    def get_score(self, joint: AngleJoint, default: float = 0.0) -> float:
-        """Get score with default."""
-        score = self.scores[joint]
-        return score if score > 0.0 else default
-
-    # ========== ITERATION ==========
-
-    def items(self) -> Iterator[tuple[AngleJoint, float]]:
-        """Iterate all (joint, value) pairs."""
-        for joint in AngleJoint:
-            yield joint, self.values[joint]
-
-    def items_with_scores(self) -> Iterator[tuple[AngleJoint, float, float]]:
-        """Iterate all (joint, value, score) tuples."""
-        for joint in AngleJoint:
-            yield joint, self.values[joint], self.scores[joint]
-
-    # ========== CONVERSION ==========
-
-    def to_dict(self) -> dict[AngleJoint, float]:
-        """Convert to dictionary mapping joints to angle values (includes NaN)."""
-        return dict(self.items())
-
-    def safe(self, default: float = 0.0) -> 'PoseAngleData':
-        """Return copy with NaN replaced by default value."""
-        safe_values: np.ndarray = self.values.copy()
-        safe_values[np.isnan(safe_values)] = default
-        return PoseAngleData(values=safe_values, scores=self.scores)
-
-    # ========== VALIDATION ==========
-
-    @cached_property
-    def valid_mask(self) -> np.ndarray:
-        """Boolean array indicating which joints have valid (non-zero score) angles."""
-        return self.scores > 0.0
-
-    @cached_property
-    def valid_count(self) -> int:
-        """Number of joints with valid (non-zero score) angles."""
-        return int(np.sum(self.valid_mask))
-
-    @cached_property
-    def any_valid(self) -> bool:
-        """True if at least one valid (non-zero score) angle is available."""
-        return self.valid_count > 0
-
-    @cached_property
-    def valid_values(self) -> np.ndarray:
-        """Array of valid (non-zero score) angle values."""
-        return self.values[self.valid_mask]
-
-    @cached_property
-    def valid_joints(self) -> list[AngleJoint]:
-        """List of joints with valid (non-zero score) angles."""
-        return [joint for joint in AngleJoint if self.scores[joint] > 0.0]
-
-    # ========== STATISTICS ==========
-
-    @cached_property
-    def mean(self) -> float:
-        """Mean of valid angle values, or NaN if none are valid."""
-        return float(np.nanmean(self.values))
-
-    @cached_property
-    def geometric_mean(self) -> float:
-        """Geometric mean of valid angle values, or NaN if none are valid."""
-        valid: np.ndarray = self.values[~np.isnan(self.values)]
-        if valid.size == 0:
-            return np.nan
-        return float(np.exp(np.mean(np.log(np.abs(valid)))))
-
-    @cached_property
-    def harmonic_mean(self) -> float:
-        """Harmonic mean of valid angle values, or NaN if none are valid."""
-        valid_values: np.ndarray = self.values[self.valid_mask]
-        if valid_values.size == 0:
-            return np.nan
-        reciprocal_sum = np.sum(1.0 / valid_values)
-        harm_mean = valid_values.size / reciprocal_sum
-        return float(harm_mean)
-
-    @cached_property
-    def std(self) -> float:
-        """Standard deviation of valid angle values, or NaN if none are valid."""
-        return float(np.nanstd(self.values))
-
-    @cached_property
-    def median(self) -> float:
-        """Median of valid angle values, or NaN if none are valid."""
-        return float(np.nanmedian(self.values))
-
-    # ========== COMPARISON ==========
+    # ========== ANGLE-SPECIFIC OPERATIONS =========
 
     def subtract(self, other: 'PoseAngleData') -> 'PoseAngleData':
-        """Computes angular differences with proper wrapping to [-π, π] range. """
+        """Computes angular differences with proper wrapping to [-π, π] range."""
         diff: np.ndarray = self.values - other.values
         # Wrap angles to [-π, π] range (shortest angular distance)
         wrapped_diff: np.ndarray = np.arctan2(np.sin(diff), np.cos(diff))
         min_scores: np.ndarray = np.minimum(self.scores, other.scores)
-
         return PoseAngleData(values=wrapped_diff, scores=min_scores)
 
     def similarity(self, other: 'PoseAngleData', exponent: float) -> 'PoseAngleData':
         """Computes similarity scores between two PoseAngleData objects.
-        Similarity for each joint is: (1 - (|angle_1 - angle_2| / π)) ^ exponent
+
+        Similarity for each joint is calculated as:
+            similarity = (1 - (|angle_1 - angle_2| / π)) ^ exponent
         """
         diff_data: PoseAngleData = self.subtract(other)
         similarity_values: np.ndarray = np.power(1.0 - np.abs(diff_data.values) / np.pi, exponent)
         return PoseAngleData(values=similarity_values, scores=diff_data.scores)
 
 
+# ========== FACTORY ==========
 class PoseAngleFactory:
 
     @staticmethod

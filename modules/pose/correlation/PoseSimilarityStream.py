@@ -3,12 +3,12 @@ import numpy as np
 from functools import cached_property
 from dataclasses import dataclass
 
-from modules.pose.correlation.PairCorrelation import PairCorrelationBatch, SimilarityMetric
+from modules.pose.features.PoseSimilarities import PoseSimilarityBatch, FeatureStatistic
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass(frozen=True)
-class PairCorrelationStreamData:
+class PoseSimilarityStreamData:
     """Immutable snapshot of pose pair correlation history.
 
     Stores time-series similarity data for each pose pair.
@@ -57,24 +57,24 @@ class PairCorrelationStreamData:
         return similarities[-max_samples:]
 
 
-class PairCorrelationStream:
+class PoseSimilarityStream:
     """Non-threaded correlation stream processor with circular buffers."""
 
     def __init__(self, capacity: int) -> None:
         """Initialize stream with fixed buffer capacity."""
         self.buffer_capacity: int = capacity
         self._pair_history: dict[tuple[int, int], tuple[np.ndarray, int]] = {}
-        self._output_data: PairCorrelationStreamData | None = None
+        self._output_data: PoseSimilarityStreamData | None = None
         self._snapshot_dirty: bool = True
         self.hot_reload = HotReloadMethods(self.__class__, True, True)
 
-    def update(self, batch: PairCorrelationBatch,
-               metric: SimilarityMetric = SimilarityMetric.GEOMETRIC_MEAN) -> None:
+    def update(self, batch: PoseSimilarityBatch ,
+               statistic: FeatureStatistic = FeatureStatistic.GEOMETRIC_MEAN) -> None:
         """Update stream with new correlation batch.
 
         Args:
             batch: Batch of pair correlations to process
-            metric: Similarity metric to use (default: geometric mean)
+            statistic: Similarity statistic to use (default: geometric mean)
         """
         current_pairs: set[tuple[int, int]] = set()
 
@@ -83,7 +83,7 @@ class PairCorrelationStream:
             pair_id: tuple[int, int] = (min(pair_corr.pair_id), max(pair_corr.pair_id))
             current_pairs.add(pair_id)
 
-            similarity: float = pair_corr.get_metric_value(metric)
+            similarity: float = pair_corr.get_stat(statistic)
 
             if pair_id in self._pair_history:
                 similarities, write_idx = self._pair_history[pair_id]
@@ -102,7 +102,7 @@ class PairCorrelationStream:
 
         self._snapshot_dirty = True
 
-    def get_stream_data(self) -> PairCorrelationStreamData:
+    def get_stream_data(self) -> PoseSimilarityStreamData:
         """Get lazily computed immutable snapshot of current stream state."""
         if self._snapshot_dirty or self._output_data is None:
             snapshot_history: dict[tuple[int, int], np.ndarray] = {}
@@ -117,7 +117,7 @@ class PairCorrelationStream:
             for arr in snapshot_history.values():
                 arr.flags.writeable = False
 
-            self._output_data = PairCorrelationStreamData(
+            self._output_data = PoseSimilarityStreamData(
                 pair_history=snapshot_history,
                 capacity=self.buffer_capacity
             )

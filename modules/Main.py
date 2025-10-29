@@ -9,7 +9,7 @@ from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.cam.FrameSyncBang import FrameSyncBang
 from modules.gui.PyReallySimpleGui import Gui
-from modules.pose.correlation.PoseCorrelator import PoseCorrelator
+from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
 from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
 from modules.RenderDataHub import RenderDataHub
 from modules.pose.PosePipeline import PosePipeline
@@ -60,7 +60,7 @@ class Main():
         self.pose_detection = PosePipeline(settings)
         self.pose_streamer = PoseStreamManager(settings)
 
-        self.pose_correlator: PoseCorrelator = PoseCorrelator(settings)
+        self.pose_correlator: PoseSimilarityComputer = PoseSimilarityComputer(settings)
         self.motion_correlator: Optional[PoseStreamCorrelator] = PoseStreamCorrelator(settings)
 
         self.frame_sync_bang = FrameSyncBang(settings, False, 'frame_sync')

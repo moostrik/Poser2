@@ -18,7 +18,7 @@ from numba import njit
 import pandas as pd
 
 # Local application imports
-from modules.pose.correlation.PairCorrelation import PairCorrelation, PairCorrelationBatch, PairCorrelationBatchCallback
+from modules.pose.features.PoseSimilarities import PoseSimilarity , PoseSimilarityBatch , PoseSimilarityBatchCallback
 from modules.pose.PoseStream import PoseStreamData, PoseStreamDataDict
 from modules.Settings import Settings
 
@@ -133,7 +133,7 @@ class PoseStreamCorrelator():
 
         # CALLBACKS
         self._callback_lock = threading.Lock()
-        self._callbacks: set[PairCorrelationBatchCallback] = set()
+        self._callbacks: set[PoseSimilarityBatchCallback] = set()
 
         # HOT RELOADER
         self.hot_reloader = HotReloadMethods(self.__class__, False, False)
@@ -144,12 +144,12 @@ class PoseStreamCorrelator():
             self._input_pose_streams[data.id] = data
         return
 
-    def add_correlation_callback(self, callback: PairCorrelationBatchCallback) -> None:
+    def add_correlation_callback(self, callback: PoseSimilarityBatchCallback) -> None:
         """ Register a callback to receive the last correlation batch. """
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def _notify_callbacks(self, batch: PairCorrelationBatch) -> None:
+    def _notify_callbacks(self, batch: PoseSimilarityBatch ) -> None:
         """ Call all registered callbacks with the current batch. """
         with self._callback_lock:
             for callback in self._callbacks:
@@ -185,7 +185,7 @@ class PoseStreamCorrelator():
                 try:
                     for pair in angle_pairs:
                         try:
-                            future: Future[PairCorrelation | None] = self._process_pool.submit(
+                            future: Future[PoseSimilarity  | None] = self._process_pool.submit(
                                 self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band, self.similarity_exponent
                             )
                             future_to_pair[future] = pair
@@ -198,12 +198,12 @@ class PoseStreamCorrelator():
                     self._stop_event.set()
                     break
 
-                correlations: list[PairCorrelation] = []
+                correlations: list[PoseSimilarity ] = []
                 try:
                     for future in as_completed(future_to_pair):
                         pair: AnglePair = future_to_pair[future]
                         try:
-                            correlation: Optional[PairCorrelation] = future.result()
+                            correlation: Optional[PoseSimilarity ] = future.result()
                             if correlation:
                                 correlations.append(correlation)
                         except Exception as e:
@@ -213,7 +213,7 @@ class PoseStreamCorrelator():
                     self._stop_event.set()
                     break
 
-                batch = PairCorrelationBatch(pair_correlations=correlations)
+                batch = PoseSimilarityBatch (pair_correlations=correlations)
                 self._notify_callbacks(batch)
 
             elapsed: float = time.perf_counter() - loop_start
@@ -433,33 +433,34 @@ class PoseStreamCorrelator():
         return pairs
 
     @staticmethod
-    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int, similarity_exponent: float) -> Optional[PairCorrelation]:
-        """
-        Analyse a single pair of angle sequences for all joints and compute their similarity.
-
-        For each numeric joint/column in the provided AnglePair, this method:
-        - Extracts the angle sequences from both streams and removes NaN values independently.
-        - Calculates the ratio of NaN values for each sequence and skips the joint if either exceeds the maximum allowed ratio.
-        - Computes the similarity between the two cleaned angle sequences using DTW with an angular cost, applying the specified Sakoe-Chiba band and similarity exponent.
-        - Collects the similarity scores for all valid joints into a dictionary.
-
-        Returns a PoseCorrelation object containing the per-joint similarity scores if any valid correlations are found, otherwise returns None.
+    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int, similarity_exponent: float) -> Optional[PoseSimilarity]:
+        """Analyse a single pair of angle sequences for all joints and compute their similarity.
 
         Args:
-            pair (AnglePair): The pair of angle DataFrames and metadata to compare.
-            maximum_nan_ratio (float): Maximum allowed ratio of NaN values per sequence.
-            dtw_band (int): Sakoe-Chiba band width for DTW.
-            similarity_exponent (float): Exponent for similarity emphasis (e.g., 2.0 for quadratic).
+            pair: The pair of angle DataFrames and metadata to compare
+            maximum_nan_ratio: Maximum allowed ratio of NaN values per sequence
+            dtw_band: Sakoe-Chiba band width for DTW
+            similarity_exponent: Exponent for similarity emphasis (e.g., 2.0 for quadratic)
 
         Returns:
-            Optional[PoseCorrelation]: Correlation results for the pair, or None if no valid joints.
+            PoseSimilarity with per-joint similarity scores, or None if no valid joints
         """
+        from modules.pose.features.PoseAngles import AngleJoint
 
-        correlations: dict[str, float] = {}
+        # Initialize arrays for all joints
+        num_joints = len(AngleJoint)
+        values = np.full(num_joints, np.nan, dtype=np.float32)
+
         angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
 
         for column in angles_columns:
             if column not in pair.angles_2.columns:
+                continue
+
+            # Map column name to joint enum
+            try:
+                joint = AngleJoint[column]
+            except KeyError:
                 continue
 
             # Get angle sequences as NumPy arrays
@@ -474,25 +475,30 @@ class PoseStreamCorrelator():
             nan_ratio_1: float = 1.0 - (len(angles_1) / len(angles_1_nan)) if len(angles_1_nan) > 0 else 1.0
             nan_ratio_2: float = 1.0 - (len(angles_2) / len(angles_2_nan)) if len(angles_2_nan) > 0 else 1.0
 
-            # Skip correlation if too many NaNs
+            # Skip if too many NaNs
             if nan_ratio_1 > maximum_nan_ratio or nan_ratio_2 > maximum_nan_ratio:
-                correlations[column] = 0.0
                 continue
 
             # Calculate similarity
             try:
                 similarity: float = PoseStreamCorrelator._compute_correlation(angles_1, angles_2, dtw_band, similarity_exponent)
-                correlations[column] = similarity
+                values[joint] = similarity
             except Exception as e:
                 print(f"PoseStreamCorrelator: {column}: correlation failed - {e}")
                 continue
 
-        if correlations:
-            return PairCorrelation.from_ids(
-                id_1=pair.id_1,
-                id_2=pair.id_2,
-                correlations=correlations
+        # Only return if we have at least one valid joint
+        if np.any(~np.isnan(values)):
+            # Compute scores: 1.0 for valid values, 0.0 for NaN
+            scores = np.where(np.isnan(values), 0.0, 1.0).astype(np.float32)
+
+            pair_id = (pair.id_1, pair.id_2) if pair.id_1 <= pair.id_2 else (pair.id_2, pair.id_1)
+            return PoseSimilarity(
+                pair_id=pair_id,
+                values=values,
+                scores=scores
             )
+
         return None
 
     @staticmethod

@@ -51,7 +51,7 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameTyp
 from modules.tracker.Tracklet import Tracklet, TrackletDict
 from modules.pose.Pose import Pose, PoseDict
 from modules.pose.PoseStream import PoseStreamData
-from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
+from modules.pose.features.PoseSimilarities import PoseSimilarityBatch
 from modules.WS.WSOutput import WSOutput
 from modules.Settings import Settings
 
@@ -77,8 +77,8 @@ class CaptureDataHub:
         self.tracklets: dict[int, DataItem[Tracklet]] = {}
         self.poses: dict[int, DataItem[Pose]] = {}
         self.pose_streams: dict[int, DataItem[PoseStreamData]] = {}
-        self.pose_correlation: dict[int, DataItem[PairCorrelationBatch]] = {}
-        self.motion_correlation: dict[int, DataItem[PairCorrelationBatch]] = {}
+        self.pose_correlation: dict[int, DataItem[PoseSimilarityBatch ]] = {}
+        self.motion_correlation: dict[int, DataItem[PoseSimilarityBatch ]] = {}
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -165,15 +165,15 @@ class CaptureDataHub:
         return self._get_data_dict(self.pose_streams, id, only_new_data, consumer_key)
 
     # Correlation window management
-    def set_pose_correlation(self, value: PairCorrelationBatch) -> None:
+    def set_pose_correlation(self, value: PoseSimilarityBatch ) -> None:
         self._set_data_dict(self.pose_correlation, 0, value)
 
-    def get_pose_correlation(self, only_new_data: bool, consumer_key: str) -> Optional[PairCorrelationBatch]:
+    def get_pose_correlation(self, only_new_data: bool, consumer_key: str) -> Optional[PoseSimilarityBatch ]:
         return self._get_data_dict(self.pose_correlation, 0, only_new_data, consumer_key)
 
-    def set_motion_correlation(self, value: PairCorrelationBatch) -> None:
+    def set_motion_correlation(self, value: PoseSimilarityBatch ) -> None:
         self._set_data_dict(self.motion_correlation, 0, value)
 
-    def get_motion_correlation(self, only_new_data: bool, consumer_key: str) -> Optional[PairCorrelationBatch]:
+    def get_motion_correlation(self, only_new_data: bool, consumer_key: str) -> Optional[PoseSimilarityBatch ]:
         return self._get_data_dict(self.motion_correlation, 0, only_new_data, consumer_key)
 

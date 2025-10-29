@@ -29,7 +29,7 @@ from modules.pose.trackers.PoseAngleTracker import PoseAngleTracker, PoseAngleTr
 from modules.Settings import Settings
 from modules.utils.SmoothedInterpolator import OneEuroSettings, SmoothedInterpolator
 from modules.utils.PointsAndRects import Rect
-from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
+from modules.pose.features.PoseSimilarities import PoseSimilarityBatch
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -102,7 +102,7 @@ class RenderDataHub:
                 self._viewport_trackers[tracklet_id].add_pose(pose)
                 self._angle_trackers[tracklet_id].add_pose(pose)
 
-    def _add_correlation(self, batch: PairCorrelationBatch, smoothers: dict[tuple[int, int], SmoothedInterpolator]
+    def _add_correlation(self, batch: PoseSimilarityBatch , smoothers: dict[tuple[int, int], SmoothedInterpolator]
     ) -> None:
         """Helper to add correlation data and manage smoother lifecycle."""
         batch_pair_ids: set[tuple[int, int]] = {pair.pair_id for pair in batch}
@@ -116,7 +116,7 @@ class RenderDataHub:
                 smoothers[pair.pair_id] = SmoothedInterpolator(self.one_euro_settings)
             smoothers[pair.pair_id].add_sample(pair.geometric_mean)
 
-    def add_pose_correlation(self, batch: PairCorrelationBatch) -> None:
+    def add_pose_correlation(self, batch: PoseSimilarityBatch ) -> None:
         """Add new pose correlation and manage smoothers.
            Smoothers for pairs not in batch are automatically removed.
         """
@@ -124,7 +124,7 @@ class RenderDataHub:
         with self._lock:
             self._add_correlation(batch, self._pose_correlation_smoothers)
 
-    def add_motion_correlation(self, batch: PairCorrelationBatch) -> None:
+    def add_motion_correlation(self, batch: PoseSimilarityBatch ) -> None:
         """Add new motion correlation and manage smoothers.
            Smoothers for pairs not in batch are automatically removed.
         """

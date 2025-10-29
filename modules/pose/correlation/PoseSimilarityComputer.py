@@ -10,14 +10,14 @@ from typing import Optional
 
 # Local application imports
 from modules.pose.Pose import PoseDict
-from modules.pose.correlation.PairCorrelation import PairCorrelation, PairCorrelationBatch, PairCorrelationBatchCallback
+from modules.pose.features.PoseSimilarities import PoseSimilarity , PoseSimilarityBatch , PoseSimilarityBatchCallback
 from modules.Settings import Settings
 
 from modules.pose.features.PoseAngles import PoseAngleData
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PoseCorrelator:
-    """Computes pairwise pose correlations in a background thread.
+class PoseSimilarityComputer:
+    """Computes pairwise pose similarities in a background thread.
 
     Processes pose angle data from active tracklets and computes similarity metrics
     for all pairs. Results are published via callbacks to registered listeners.
@@ -36,9 +36,9 @@ class PoseCorrelator:
 
         # OUTPUT AND CALLBACKS
         self._output_lock = threading.Lock()
-        self._output_data: Optional[PairCorrelationBatch] = None
+        self._output_data: Optional[PoseSimilarityBatch ] = None
         self._callback_lock = threading.Lock()
-        self._callbacks: set[PairCorrelationBatchCallback] = set()
+        self._callbacks: set[PoseSimilarityBatchCallback] = set()
 
         # HOT RELOADER
         self.hot_reloader = HotReloadMethods(self.__class__)
@@ -70,7 +70,7 @@ class PoseCorrelator:
                     poses: PoseDict = self._input_poses
 
                 # Process correlations
-                batch: PairCorrelationBatch = self._process_correlations(poses)
+                batch: PoseSimilarityBatch  = self._evaluate_pose_similarity(poses)
 
                 # Store and notify
                 with self._output_lock:
@@ -84,7 +84,7 @@ class PoseCorrelator:
                 print(f"PoseCorrelator: Processing error: {e}")
                 traceback.print_exc()
 
-    def _process_correlations(self, poses: PoseDict) -> PairCorrelationBatch:
+    def _evaluate_pose_similarity(self, poses: PoseDict) -> PoseSimilarityBatch :
         """Process all pose pairs and compute their correlations."""
         # Extract angle data from actively tracked poses
         angle_data: dict[int, PoseAngleData] = {
@@ -94,23 +94,26 @@ class PoseCorrelator:
         }
 
         if len(angle_data) < 2:
-            return PairCorrelationBatch(pair_correlations=[])
+            return PoseSimilarityBatch(pair_correlations=[])
 
         # Compute correlations for each pair
-        correlations: list[PairCorrelation] = []
+        similarities: list[PoseSimilarity] = []
         for (id1, angles_1), (id2, angles_2) in combinations(angle_data.items(), 2):
             # Compute similarity scores
             similarity_data: PoseAngleData = angles_1.similarity(angles_2, self.similarity_exponent)
-            correlations_dict: dict[str, float] = {joint.name: similarity_data.values[joint] for joint in similarity_data.valid_joints}
 
-            if correlations_dict:
-                correlations.append(PairCorrelation.from_ids(
-                    id_1=id1,
-                    id_2=id2,
-                    correlations=correlations_dict
+            # Only include pairs with at least one valid joint
+            if similarity_data.any_valid:
+                # Normalize pair_id ordering
+                pair_id = (id1, id2) if id1 <= id2 else (id2, id1)
+
+                similarities.append(PoseSimilarity(
+                    pair_id=pair_id,
+                    values=similarity_data.values,
+                    scores=similarity_data.scores
                 ))
 
-        return PairCorrelationBatch(pair_correlations=correlations)
+        return PoseSimilarityBatch(pair_correlations=similarities)
 
     def add_poses(self, poses: PoseDict) -> None:
         """Update input poses and trigger correlation processing.
@@ -122,12 +125,12 @@ class PoseCorrelator:
             self._input_poses = poses
             self._update_event.set()
 
-    def get_output_data(self) -> Optional[PairCorrelationBatch]:
+    def get_output_data(self) -> Optional[PoseSimilarityBatch ]:
         """Get the latest computed correlation batch."""
         with self._output_lock:
             return self._output_data
 
-    def add_correlation_callback(self, callback: PairCorrelationBatchCallback) -> None:
+    def add_correlation_callback(self, callback: PoseSimilarityBatchCallback) -> None:
         """Register a callback to receive correlation batch updates.
 
         Args:
@@ -136,7 +139,7 @@ class PoseCorrelator:
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def _notify_callbacks(self, batch: PairCorrelationBatch) -> None:
+    def _notify_callbacks(self, batch: PoseSimilarityBatch ) -> None:
         """Call all registered callbacks with the current batch."""
         with self._callback_lock:
             for callback in self._callbacks:
