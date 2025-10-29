@@ -43,7 +43,7 @@ class PoseVertexData:
     vertices: np.ndarray
     colors: np.ndarray
 
-class PoseVertices:
+class PoseVertexFactory:
     @staticmethod
     def compute_vertices(point_data: Optional[PosePointData]) -> Optional[PoseVertexData]:
         if point_data is None:
@@ -67,7 +67,7 @@ class PoseVertices:
         if point_data is None:
             return None
 
-        vertex_data: Optional[PoseVertexData] = PoseVertices.compute_vertices(point_data)
+        vertex_data: Optional[PoseVertexData] = PoseVertexFactory.compute_vertices(point_data)
         if vertex_data is None:
             return None
 

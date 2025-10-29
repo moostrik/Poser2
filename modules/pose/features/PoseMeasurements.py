@@ -73,7 +73,7 @@ LIMB_CONFIG: dict[LimbType, dict] = {
 class PoseMeasurementData:
     length_estimate: float = np.nan
 
-class PoseMeasurements:
+class PoseMeasurementFactory:
     hotreload: HotReloadMethods | None = None
 
     @staticmethod
@@ -102,8 +102,8 @@ class PoseMeasurements:
 
     @staticmethod
     def compute(point_data: Optional['PosePointData'], crop_rect: Optional[Rect]) -> PoseMeasurementData:
-        if PoseMeasurements.hotreload is None:
-            PoseMeasurements.hotreload = HotReloadMethods(PoseMeasurements)
+        if PoseMeasurementFactory.hotreload is None:
+            PoseMeasurementFactory.hotreload = HotReloadMethods(PoseMeasurementFactory)
 
         if point_data is None or crop_rect is None:
             return PoseMeasurementData()
@@ -117,7 +117,7 @@ class PoseMeasurements:
         for limb_type, config in LIMB_CONFIG.items():
             if config["fallback"]:
                 continue
-            limb_length: float | None = PoseMeasurements.calculate_limb_length(points, limb_type)
+            limb_length: float | None = PoseMeasurementFactory.calculate_limb_length(points, limb_type)
             if limb_length is not None:
                 height_estimate: float = limb_length
                 estimates[limb_type] = height_estimate
@@ -127,7 +127,7 @@ class PoseMeasurements:
             for limb_type, config in LIMB_CONFIG.items():
                 if not config["fallback"]:
                     continue
-                limb_length: float | None = PoseMeasurements.calculate_limb_length(points, limb_type)
+                limb_length: float | None = PoseMeasurementFactory.calculate_limb_length(points, limb_type)
                 if limb_length is not None:
                     height_estimate: float = limb_length
                     estimates[limb_type] = height_estimate

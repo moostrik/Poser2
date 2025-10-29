@@ -16,7 +16,7 @@ from modules.pose.correlation.PairCorrelation import PairCorrelation, PairCorrel
 from modules.pose.PoseStream import PoseStreamData, PoseStreamDataDict
 from modules.Settings import Settings
 
-from modules.pose.features.PoseAngles import AngleJoint
+from modules.pose.features.PoseAngles import AngleJoint, PoseAngleData, PoseAngleFactory
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 @dataclass

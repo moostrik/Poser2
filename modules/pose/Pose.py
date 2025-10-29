@@ -8,10 +8,10 @@ from pandas import Timestamp
 
 # Local application imports
 from modules.pose.features.PosePoints import PosePointData
-from modules.pose.features.PoseVertices import PoseVertices, PoseVertexData
-from modules.pose.features.PoseAngles import PoseAngles, PoseAngleData
-from modules.pose.features.PoseHeadOrientation import PoseHead, PoseHeadData
-from modules.pose.features.PoseMeasurements import PoseMeasurements, PoseMeasurementData
+from modules.pose.features.PoseVertices import PoseVertexData, PoseVertexFactory
+from modules.pose.features.PoseAngles import PoseAngleData, PoseAngleFactory
+from modules.pose.features.PoseHeadOrientation import PoseHeadData,PoseHeadFactory
+from modules.pose.features.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
 
 from modules.tracker.Tracklet import Tracklet
 from modules.utils.PointsAndRects import Rect
@@ -61,22 +61,22 @@ class Pose:
     @cached_property
     def angle_data(self) -> PoseAngleData:
         """Compute joint angles. Returns NaN values if point_data is None. Cached after first access."""
-        return PoseAngles.from_points(self.point_data)
+        return PoseAngleFactory.from_points(self.point_data)
 
     @cached_property
     def head_data(self) -> PoseHeadData:
         """Compute head orientation. Returns NaN values if point_data is None. Cached after first access."""
-        return PoseHead.from_points(self.point_data)
+        return PoseHeadFactory.from_points(self.point_data)
 
     @cached_property
     def measurement_data(self) -> PoseMeasurementData:
         """Compute body measurements. Returns NaN values if point_data or crop_rect is None. Cached after first access."""
-        return PoseMeasurements.compute(self.point_data, self.crop_rect)
+        return PoseMeasurementFactory.compute(self.point_data, self.crop_rect)
 
     @cached_property
     def vertex_data(self) -> Optional[PoseVertexData]:
         """Compute skeleton vertices for rendering. Returns None if dependencies are unavailable. Cached after first access."""
-        return PoseVertices.compute_angled_vertices(self.point_data, self.angle_data)
+        return PoseVertexFactory.compute_angled_vertices(self.point_data, self.angle_data)
 
     @cached_property
     def absolute_points(self) -> Optional[np.ndarray]:

@@ -32,7 +32,7 @@ class PoseHeadData:
         else:
             raise KeyError(f"Unknown orientation: {orientation}")
 
-class PoseHead:
+class PoseHeadFactory:
     @staticmethod
     def from_points(point_data: Optional['PosePointData']) -> PoseHeadData:
         """
@@ -64,9 +64,9 @@ class PoseHead:
         eye_midpoint = (left_eye + right_eye) / 2
         eye_width = float(np.linalg.norm(right_eye - left_eye))
 
-        roll: float = PoseHead.calculate_roll(left_eye, right_eye)
-        yaw: float = PoseHead.calculate_yaw(nose, eye_midpoint, eye_width)
-        pitch: float = PoseHead.calculate_pitch(nose, eye_midpoint, eye_width)
+        roll: float = PoseHeadFactory.calculate_roll(left_eye, right_eye)
+        yaw: float = PoseHeadFactory.calculate_yaw(nose, eye_midpoint, eye_width)
+        pitch: float = PoseHeadFactory.calculate_pitch(nose, eye_midpoint, eye_width)
 
         # Calculate scores for each orientation
         # Roll uses only eye points
