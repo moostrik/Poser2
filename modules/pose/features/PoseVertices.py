@@ -71,7 +71,7 @@ class PoseVertices:
         if vertex_data is None:
             return None
 
-        if not angle_data.has_data:
+        if not angle_data.any_valid:
             return vertex_data
 
         colors: np.ndarray = vertex_data.colors

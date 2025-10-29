@@ -9,7 +9,8 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
-from modules.RenderDataHub import RenderDataHub, SymmetricJointType
+from modules.pose.features.PoseAngleSymmetry import SymmetricJointType
+from modules.RenderDataHub import RenderDataHub
 from modules.pose.features.PoseAngles import AngleJoint
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -94,24 +95,24 @@ class HDTSoundOSC:
         bundle_builder.add_content(change_msg.build()) # type: ignore
 
         for joint in AngleJoint:
-            angle: float | None = self.smooth_data.get_angle(id, joint)
+            angle: float | None = self.smooth_data.get_angles(id).get(joint)
             angle_msg = OscMessageBuilder(address=f"/pose/{id}/angle/{joint.name}")
             angle_msg.add_arg(float(angle))
             bundle_builder.add_content(angle_msg.build()) # type: ignore
 
         for joint in AngleJoint:
-            velocity: float | None = self.smooth_data.get_velocity(id, joint)
+            velocity: float | None = self.smooth_data.get_velocities(id).get(joint)
             velocity_msg = OscMessageBuilder(address=f"/pose/{id}/delta/{joint.name}")
             velocity_msg.add_arg(float(velocity))
             bundle_builder.add_content(velocity_msg.build()) # type: ignore
 
-        mean_symmetry: float = self.smooth_data.get_mean_symmetry(id)
+        mean_symmetry: float = self.smooth_data.get_symmetries(id).geometric_mean
         symmetry_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/mean")
         symmetry_msg.add_arg(float(mean_symmetry))
         bundle_builder.add_content(symmetry_msg.build()) # type: ignore
 
         for sym_type in SymmetricJointType:
-            symmetry: float = self.smooth_data.get_symmetry(id, sym_type)
+            symmetry: float = self.smooth_data.get_symmetries(id)[sym_type]
             sym_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/{sym_type.name}")
             sym_msg.add_arg(float(symmetry))
             bundle_builder.add_content(sym_msg.build()) # type: ignore

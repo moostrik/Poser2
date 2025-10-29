@@ -13,7 +13,7 @@ class PosePointData:
     to indicate missing or low-confidence detections.
     """
     raw_points: np.ndarray = field(repr=False)  # shape (17, 2)
-    raw_scores: np.ndarray = field(repr=False)  # shape (17,) - flattened
+    raw_scores: np.ndarray = field(repr=False)  # shape (17,)
     score_threshold: float = field(default=0.5)
 
     points: np.ndarray = field(init=False, repr=False)   # filtered points (NaN where score < threshold)
@@ -39,65 +39,84 @@ class PosePointData:
         # Normalize scores based on threshold
         normalized: np.ndarray = np.zeros_like(self.raw_scores)
         above_threshold = self.raw_scores >= self.score_threshold
-        denominator: float = max(1.0 - self.score_threshold, 1e-6)  # Avoid division by zero
+        denominator: float = max(1.0 - self.score_threshold, 1e-6)
         normalized[above_threshold] = (self.raw_scores[above_threshold] - self.score_threshold) / denominator
         object.__setattr__(self, 'scores', normalized)
 
-    def __len__(self) -> int:
-        """Total number of keypoints"""
-        return POSE_NUM_JOINTS
+    def __repr__(self) -> str:
+        """Readable string representation."""
 
-    def __contains__(self, joint: PoseJoint) -> bool:
-        """Check if joint has valid (non-NaN) point. Both x and y coordinates must be valid. Supports 'joint in point_data' syntax."""
-        return not np.isnan(self.points[joint]).any()
+        if not self.any_valid:
+            return f"PosePointData(0/{POSE_NUM_JOINTS})"
 
-    def __iter__(self) -> Iterator[tuple[PoseJoint, np.ndarray, float]]:
-        """Iterate over (joint, point, score) tuples. Supports 'for joint, point, score in point_data' syntax."""
+        mean_score = float(np.mean(self.scores[self.valid_mask]))
+        return f"PosePointData({self.valid_count}/{POSE_NUM_JOINTS}, μ_score={mean_score:.2f})"
+
+    # ========== ACCESS ==========
+
+    def get(self, joint: PoseJoint, default: np.ndarray | None = None) -> np.ndarray:
+        """Get point with default for NaN."""
+        point = self.points[joint]
+        if np.isnan(point).any():
+            return default if default is not None else np.array([np.nan, np.nan])
+        return point
+
+    def get_score(self, joint: PoseJoint, default: float = 0.0) -> float:
+        """Get score with default."""
+        score = self.scores[joint]
+        return score if score > 0.0 else default
+
+    # ========== ITERATION ==========
+
+    def items(self) -> Iterator[tuple[PoseJoint, np.ndarray]]:
+        """Iterate all (joint, point) pairs."""
+        for joint in PoseJoint:
+            yield joint, self.points[joint]
+
+    def items_with_scores(self) -> Iterator[tuple[PoseJoint, np.ndarray, float]]:
+        """Iterate all (joint, point, score) tuples."""
         for joint in PoseJoint:
             yield joint, self.points[joint], self.scores[joint]
 
-    def __repr__(self) -> str:
-        """Readable string representation"""
-        return f"PosePointData(valid={self.valid_count}/{POSE_NUM_JOINTS}, mean_score={self.mean_score:.2f})"
-
-    def __getitem__(self, joint: PoseJoint) -> np.ndarray:
-        """Dict-like access: point_data[PoseJoint.nose]"""
-        return self.points[joint]
-
-    @cached_property
-    def valid_joints(self) -> list[PoseJoint]:
-        """List of joints with valid angles"""
-        return [joint for joint, is_valid in zip(PoseJoint, self.valid_mask) if is_valid]
+    # ========== VALIDATION ==========
 
     @cached_property
     def valid_mask(self) -> np.ndarray:
-        """Boolean mask indicating which joints have valid (non-NaN) points"""
+        """Boolean mask indicating which joints have valid (non-NaN) points."""
         return ~np.isnan(self.points).any(axis=1)
 
     @cached_property
     def valid_count(self) -> int:
-        """Number of joints with valid (non-NaN) points"""
+        """Number of joints with valid (non-NaN) points."""
         return int(np.sum(self.valid_mask))
 
     @cached_property
-    def has_data(self) -> bool:
-        """True if at least one valid point available (opposite of is_empty)"""
+    def any_valid(self) -> bool:
+        """True if at least one valid (non-NaN) angle is available."""
         return self.valid_count > 0
 
-    @cached_property
-    def mean_score(self) -> float:
-        """Mean confidence score of all valid joints. Returns 0.0 if no valid points."""
-        if not self.has_data:
-            return 0.0
-        return float(np.mean(self.scores[self.valid_mask]))
-
-    @cached_property
-    def std_score(self) -> float:
-        """Standard deviation of valid scores. Returns 0.0 if < 2 valid points."""
-        if self.valid_count < 2:
-            return 0.0
-        return float(np.std(self.scores[self.valid_mask]))
+    # ========== CONVERSION ==========
 
     def to_dict(self) -> dict[PoseJoint, tuple[float, float]]:
-        """Convert to dict with joint names as keys.Note: Includes NaN values for invalid/low-confidence joints."""
-        return {joint: (float(self.points[joint, 0]), float(self.points[joint, 1])) for joint in PoseJoint}
+        """Convert to dictionary mapping joints to (x, y) coordinate tuples (includes NaN)."""
+        return {joint: (float(point[0]), float(point[1])) for joint, point in self.items()}
+
+    def safe(self, default: np.ndarray | None = None) -> 'PosePointData':
+        """Return copy with NaN replaced by default value."""
+        if default is None:
+            default = np.array([0.0, 0.0])
+
+        safe_points: np.ndarray = self.points.copy()
+        nan_mask: np.ndarray = np.isnan(safe_points).any(axis=1)
+        safe_points[nan_mask] = default
+
+        # Return new instance with safe points
+        result = PosePointData(
+            raw_points=self.raw_points,
+            raw_scores=self.raw_scores,
+            score_threshold=self.score_threshold
+        )
+        object.__setattr__(result, 'points', safe_points)
+        object.__setattr__(result, 'scores', self.scores)
+
+        return result

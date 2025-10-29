@@ -34,7 +34,7 @@ class PoseHeadData:
 
 class PoseHead:
     @staticmethod
-    def compute(point_data: Optional['PosePointData']) -> PoseHeadData:
+    def from_points(point_data: Optional['PosePointData']) -> PoseHeadData:
         """
         Calculate head orientation data from point data.
         Returns HeadPoseData with calculated angles or default values if calculation not possible.

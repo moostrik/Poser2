@@ -23,7 +23,8 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
 from modules.gl.shaders.HDT_LineBlend import HDT_LineBlend
-from modules.RenderDataHub import RenderDataHub, SymmetricJointType
+from modules.RenderDataHub import RenderDataHub
+from modules.pose.features.PoseAngleSymmetry import PoseSymmetryData
 from modules.pose.features.PoseAngles import AngleJoint
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.utils.Smoothing import OneEuroFilterAngular
@@ -136,19 +137,19 @@ class LF(LayerBase):
         P.line_width = 0.8
         P.line_amount = 5.0
 
-        elbow_L: float  = self.smooth_data.get_angle(self.cam_id, AngleJoint.left_elbow)
-        elbow_L_Vel: float  = self.smooth_data.get_velocity(self.cam_id, AngleJoint.left_elbow)
-        shldr_L: float  = self.smooth_data.get_angle(self.cam_id, AngleJoint.left_shoulder)
-        shldr_L_Vel: float  = self.smooth_data.get_velocity(self.cam_id, AngleJoint.left_shoulder)
-        elbow_R: float  = self.smooth_data.get_angle(self.cam_id, AngleJoint.right_elbow)
-        elbow_R_Vel: float  = self.smooth_data.get_velocity(self.cam_id, AngleJoint.right_elbow)
-        shldr_R: float  = self.smooth_data.get_angle(self.cam_id, AngleJoint.right_shoulder)
-        shldr_R_Vel: float  = self.smooth_data.get_velocity(self.cam_id, AngleJoint.right_shoulder)
-        head: float     = self.smooth_data.get_angle(self.cam_id, AngleJoint.head)
+        elbow_L: float  = self.smooth_data.get_angles(self.cam_id).get(AngleJoint.left_elbow)
+        elbow_L_Vel: float  = self.smooth_data.get_velocities(self.cam_id).get(AngleJoint.left_elbow)
+        shldr_L: float  = self.smooth_data.get_angles(self.cam_id).get(AngleJoint.left_shoulder)
+        shldr_L_Vel: float  = self.smooth_data.get_velocities(self.cam_id).get(AngleJoint.left_shoulder)
+        elbow_R: float  = self.smooth_data.get_angles(self.cam_id).get(AngleJoint.right_elbow)
+        elbow_R_Vel: float  = self.smooth_data.get_velocities(self.cam_id).get(AngleJoint.right_elbow)
+        shldr_R: float  = self.smooth_data.get_angles(self.cam_id).get(AngleJoint.right_shoulder)
+        shldr_R_Vel: float  = self.smooth_data.get_velocities(self.cam_id).get(AngleJoint.right_shoulder)
+        head: float     = self.smooth_data.get_angles(self.cam_id).get(AngleJoint.head)
         motion: float   = self.smooth_data.get_cumulative_motion(self.cam_id)
         age: float      = self.smooth_data.get_age(self.cam_id)
         anchor: float   = 1.0 - self.smooth_data.rect_settings.centre_dest_y
-        symmetry: float= self.smooth_data.get_mean_symmetry(self.cam_id)
+        symmetry: float= self.smooth_data.get_symmetries(self.cam_id).geometric_mean
 
 
 

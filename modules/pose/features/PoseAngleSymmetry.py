@@ -33,15 +33,23 @@ class PoseSymmetryData:
     Attributes:
         symmetries: Dict of symmetry scores [0, 1] per joint type, NaN if missing data
     """
-    symmetries: dict[SymmetricJointType, float]
+
+    symmetries: dict[SymmetricJointType, float] = field(default_factory=lambda: {joint_type: math.nan for joint_type in SymmetricJointType})
+
+    def __repr__(self) -> str:
+        valid_count = sum(1 for s in self.symmetries.values() if not np.isnan(s))
+        return f"PoseSymmetryData(valid={valid_count}/4, mean={self.mean:.3f})"
 
     def __getitem__(self, joint_type: SymmetricJointType) -> float:
         """Dict-like access: symmetry_data[SymmetricJointType.elbow]"""
         return self.symmetries[joint_type]
 
-    def __repr__(self) -> str:
-        valid_count = sum(1 for s in self.symmetries.values() if not np.isnan(s))
-        return f"PoseSymmetryData(valid={valid_count}/4, mean={self.mean:.3f})"
+    def safe(self, default: float = 0.0) -> 'PoseSymmetryData':
+        """Return copy with NaN replaced by default value."""
+        safe_symmetries: dict[SymmetricJointType, float] = {
+            joint_type: (symmetry if not np.isnan(symmetry) else default) for joint_type, symmetry in self.symmetries.items()
+        }
+        return PoseSymmetryData(safe_symmetries)
 
     @cached_property
     def _valid_symmetries(self) -> np.ndarray:
@@ -106,7 +114,7 @@ class PoseAngleSymmetry:
     """Utility class for computing symmetry metrics from angle data."""
 
     @staticmethod
-    def compute(angle_data: 'PoseAngleData', symmetry_exponent: float = 1.0) -> PoseSymmetryData:
+    def from_angles(angle_data: 'PoseAngleData', symmetry_exponent: float = 1.0) -> PoseSymmetryData:
         """Calculate symmetry metrics from angle data.
 
         Args:

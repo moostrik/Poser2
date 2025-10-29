@@ -61,12 +61,12 @@ class Pose:
     @cached_property
     def angle_data(self) -> PoseAngleData:
         """Compute joint angles. Returns NaN values if point_data is None. Cached after first access."""
-        return PoseAngles.compute(self.point_data)
+        return PoseAngles.from_points(self.point_data)
 
     @cached_property
     def head_data(self) -> PoseHeadData:
         """Compute head orientation. Returns NaN values if point_data is None. Cached after first access."""
-        return PoseHead.compute(self.point_data)
+        return PoseHead.from_points(self.point_data)
 
     @cached_property
     def measurement_data(self) -> PoseMeasurementData:

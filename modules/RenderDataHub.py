@@ -15,10 +15,11 @@ from threading import Lock
 from collections.abc import Mapping
 
 from modules.pose.Pose import Pose, PoseDict
-from modules.pose.features.PoseAngles import AngleJoint
+from modules.pose.features.PoseAngles import AngleJoint, PoseAngleData
+from modules.pose.features.PoseAngleSymmetry import PoseSymmetryData
 from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
 from modules.pose.interpolation.PoseViewportInterpolator import PoseViewportInterpolator, PoseViewportInterpolatorSettings
-from modules.pose.interpolation.PoseAngleInterpolator import PoseAngleInterpolator, PoseAngleInterpolatorSettings, SymmetricJointType
+from modules.pose.interpolation.PoseAngleInterpolator import PoseAngleInterpolator, PoseAngleInterpolatorSettings
 from modules.Settings import Settings
 from modules.utils.OneEuroInterpolation import OneEuroSettings, OneEuroInterpolator
 from modules.utils.PointsAndRects import Rect
@@ -44,13 +45,13 @@ class RenderDataHub:
         )
 
         # Dictionaries to store smoothers for each tracklet ID
-        self._rect_smoothers: dict[int, PoseViewportInterpolator] = {}
+        self._viewport_smoothers: dict[int, PoseViewportInterpolator] = {}
         self._angle_smoothers: dict[int, PoseAngleInterpolator] = {}
 
         for i in range(self._num_players):
-            self._rect_smoothers[i] = PoseViewportInterpolator(self.rect_settings)
+            self._viewport_smoothers[i] = PoseViewportInterpolator(self.rect_settings)
             self._angle_smoothers[i] = PoseAngleInterpolator(self.angle_settings)
-        self._all_smoothers: list[Mapping[int, PoseInterpolationBase]] = [self._rect_smoothers, self._angle_smoothers]
+        self._all_smoothers: list[Mapping[int, PoseInterpolationBase]] = [self._viewport_smoothers, self._angle_smoothers]
 
         # Correlation smoothing (automatically managed)
         self._pose_correlation_smoothers: dict[tuple[int, int], OneEuroInterpolator] = {}
@@ -136,40 +137,34 @@ class RenderDataHub:
     def get_is_active(self, tracklet_id: int) -> bool:
         """Check if the smoother for the specified tracklet ID is active."""
         with self._lock:
-            return self._rect_smoothers[tracklet_id].is_active
+            return self._viewport_smoothers[tracklet_id].is_active
 
     # RECT
     def get_rect(self, tracklet_id: int) -> Rect:
         """Get smoothed rectangle for the specified tracklet ID."""
         with self._lock:
-            return self._rect_smoothers[tracklet_id].smoothed_rect
+            return self._viewport_smoothers[tracklet_id].smoothed_rect
 
     #  BODY JOINT ANGLES
-    def get_angle(self, tracklet_id: int, joint: AngleJoint) -> float:
+    def get_angles(self, tracklet_id: int) -> PoseAngleData:
         """Get smoothed angle for the specified tracklet ID and joint."""
         with self._lock:
-            return self._angle_smoothers[tracklet_id].get_angle(joint, symmetric=True)
+            return self._angle_smoothers[tracklet_id].angles.safe()
 
-    def get_velocity(self, tracklet_id: int, joint: AngleJoint) -> float:
+    def get_velocities(self, tracklet_id: int) -> PoseAngleData:
         """Get smoothed angle for the specified tracklet ID and joint."""
         with self._lock:
-            return self._angle_smoothers[tracklet_id].get_velocity(joint, symmetric=True)
+            return self._angle_smoothers[tracklet_id].velocities.safe()
 
-    def get_motion(self, tracklet_id: int, joint: AngleJoint) -> float:
+    def get_motions(self, tracklet_id: int) -> PoseAngleData:
         """Get smoothed angle change for the specified tracklet ID and joint."""
         with self._lock:
-            return self._angle_smoothers[tracklet_id].get_motion(joint)
+            return self._angle_smoothers[tracklet_id].motions.safe()
 
-    # BODY JOINT SYMMETRY
-    def get_symmetry(self, tracklet_id: int, type: SymmetricJointType) -> float:
+    def get_symmetries(self, tracklet_id: int) -> PoseSymmetryData:
         """Get the synchrony value for the specified symmetric joint type."""
         with self._lock:
-            return self._angle_smoothers[tracklet_id].get_symmetry(type)
-
-    def get_mean_symmetry(self, tracklet_id: int) -> float:
-        """Get the mean synchrony value across all symmetric joint types."""
-        with self._lock:
-            return self._angle_smoothers[tracklet_id].mean_symmetry
+            return self._angle_smoothers[tracklet_id].symmetries
 
     # TIME
     def get_cumulative_motion(self, tracklet_id: int) -> float:
@@ -180,7 +175,7 @@ class RenderDataHub:
     def get_age(self, tracklet_id: int) -> float:
         """Get the age in seconds since the tracklet was first detected."""
         with self._lock:
-            return self._rect_smoothers[tracklet_id].age
+            return self._viewport_smoothers[tracklet_id].age
 
     # CORRELATION
     def get_pose_correlation(self, id1: int, id2: int) -> float:

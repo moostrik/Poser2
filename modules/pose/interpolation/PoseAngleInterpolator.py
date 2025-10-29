@@ -1,8 +1,9 @@
 import numpy as np
 from dataclasses import dataclass, field
+from time import time
 
 from modules.pose.Pose import Pose
-from modules.pose.features.PoseAngles import AngleJoint, PoseAngleData, PoseAngles
+from modules.pose.features.PoseAngles import AngleJoint, PoseAngleData, ANGLE_NUM_JOINTS
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetry, PoseSymmetryData
 from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
 
@@ -45,7 +46,7 @@ class PoseAngleInterpolator(PoseInterpolationBase):
             self._motions[joint] = 0.0
             self._cumulative_motions[joint] = 0.0
 
-        self._symmetry_data: PoseSymmetryData | None = None
+        self._symmetry_data: PoseSymmetryData = PoseSymmetryData()
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def add_pose(self, pose: Pose) -> None:
@@ -62,16 +63,18 @@ class PoseAngleInterpolator(PoseInterpolationBase):
             return
 
         # Add angle data to smoothers (OneEuroInterpolator handles NaN values)
+        add_time: float = time()
         for joint in AngleJoint:
-            self._angle_smoothers[joint].add_sample(pose.angle_data.values[joint.value])
+            self._angle_smoothers[joint].add_sample(pose.angle_data.values[joint.value], add_time)
 
     def update(self) -> None:
         if not self._active:
             return
 
+        update_time: float = time()
         total_motion: float = 0.0
         for joint in AngleJoint:
-            self._angle_smoothers[joint].update()
+            self._angle_smoothers[joint].update(update_time)
             velocity: float | None = self._angle_smoothers[joint].smooth_velocity
 
             if velocity is None or np.isnan(velocity):
@@ -90,7 +93,7 @@ class PoseAngleInterpolator(PoseInterpolationBase):
         self._cumulative_total_motion += total_motion
 
         # Compute symmetry
-        self._symmetry_data = PoseAngleSymmetry.compute(self.angles, self.settings.symmetry_exponent)
+        self._symmetry_data = PoseAngleSymmetry.from_angles(self.angles, self.settings.symmetry_exponent)
 
     def reset(self) -> None:
         """Reset all smoothers and accumulated state"""
@@ -100,9 +103,10 @@ class PoseAngleInterpolator(PoseInterpolationBase):
             self._cumulative_motions[joint] = 0.0
         self._total_motion = 0.0
         self._cumulative_total_motion = 0.0
-        self._symmetry_data = None
+        self._symmetry_data = PoseSymmetryData()
 
-    # PROPERTIES
+    # ========== PROPERTIES ==========
+
     @property
     def is_active(self) -> bool:
         """Whether the interpolator is actively tracking a pose"""
@@ -111,30 +115,37 @@ class PoseAngleInterpolator(PoseInterpolationBase):
     @property
     def angles(self) -> PoseAngleData:
         """Current smoothed angles (radians)"""
-        values = {joint: self._angle_smoothers[joint].smooth_value for joint in AngleJoint}
-        return PoseAngles.from_values(values)
+        values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_value for joint in AngleJoint], dtype=np.float32)
+        scores: np.ndarray = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
+        return PoseAngleData(values=values, scores=scores)
 
     @property
     def velocities(self) -> PoseAngleData:
         """Current angular velocities (rad/s)"""
-        values = {joint: self._angle_smoothers[joint].smooth_velocity for joint in AngleJoint}
-        return PoseAngles.from_values(values)
+        values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_velocity for joint in AngleJoint], dtype=np.float32)
+        scores: np.ndarray = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
+        return PoseAngleData(values=values, scores=scores)
 
     @property
     def accelerations(self) -> PoseAngleData:
         """Current angular accelerations (rad/s²)"""
-        values = {joint: self._angle_smoothers[joint].smooth_acceleration for joint in AngleJoint}
-        return PoseAngles.from_values(values)
+        values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_acceleration for joint in AngleJoint], dtype=np.float32)
+        scores: np.ndarray = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
+        return PoseAngleData(values=values, scores=scores)
 
     @property
     def motions(self) -> PoseAngleData:
         """Current weighted motion values"""
-        return PoseAngles.from_values(self._motions)
+        values: np.ndarray = np.array([self._motions[joint] for joint in AngleJoint], dtype=np.float32)
+        scores: np.ndarray = np.ones(ANGLE_NUM_JOINTS, dtype=np.float32)
+        return PoseAngleData(values=values, scores=scores)
 
     @property
     def cumulative_motions(self) -> PoseAngleData:
         """Cumulative motion values since tracking started"""
-        return PoseAngles.from_values(self._cumulative_motions)
+        values: np.ndarray = np.array([self._cumulative_motions[joint] for joint in AngleJoint], dtype=np.float32)
+        scores: np.ndarray = np.ones(ANGLE_NUM_JOINTS, dtype=np.float32)
+        return PoseAngleData(values=values, scores=scores)
 
     @property
     def total_motion(self) -> float:
@@ -147,6 +158,6 @@ class PoseAngleInterpolator(PoseInterpolationBase):
         return self._cumulative_total_motion
 
     @property
-    def symmetry_data(self) -> PoseSymmetryData | None:
-        """Current pose symmetry metrics, or None if no data available"""
+    def symmetries(self) -> PoseSymmetryData:
+        """Current pose symmetry metrics"""
         return self._symmetry_data
