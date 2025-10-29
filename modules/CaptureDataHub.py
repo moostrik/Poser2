@@ -1,6 +1,47 @@
+"""
+Stores raw pose detection data at capture framerate.
+
+Manages data storage for all detected entities at the rate they're captured from
+cameras, enabling multiple consumers to access the same data independently.
+
+Counterpart to RenderDataHub:
+- CaptureDataHub: Stores raw pose data at capture rate (input FPS, e.g., 24 Hz)
+- RenderDataHub: Provides smoothed pose data at render rate (output FPS, e.g., 60 Hz)
+
+Key capabilities:
+1. Thread-safe data storage with mutex protection
+2. Per-consumer access tracking (new vs. already-accessed data)
+3. Stores multi-modal data: images, tracklets, poses, correlations
+4. Unique consumer key generation for independent data consumption
+
+Data flow:
+    Camera/Detector → CaptureDataHub.set_*() → CaptureDataHub.get_*() → Consumers
+                                              ↓
+                                       RenderDataHub (for smoothed output)
+
+Consumer pattern:
+    Each consumer gets a unique key to track which data they've already processed.
+    This enables multiple independent consumers (e.g., UI, file writer, network sender)
+    to consume the same data stream at their own pace.
+
+Example:
+    consumer_key = CaptureDataHub.get_unique_consumer_key()
+
+    # First call returns data
+    pose = hub.get_pose(tracklet_id, only_new_data=True, consumer_key=consumer_key)
+
+    # Second call returns None (already consumed by this consumer)
+    pose = hub.get_pose(tracklet_id, only_new_data=True, consumer_key=consumer_key)
+
+    # New data arrives
+    hub.set_poses(new_poses)
+
+    # Now returns new data again
+    pose = hub.get_pose(tracklet_id, only_new_data=True, consumer_key=consumer_key)
+"""
+
 import numpy as np
-from itertools import combinations
-from typing import Optional, Tuple, Dict, List
+from typing import Optional
 from threading import Lock
 from dataclasses import dataclass, field
 from typing import Optional, TypeVar, Generic
@@ -10,8 +51,6 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameTyp
 from modules.tracker.Tracklet import Tracklet, TrackletDict
 from modules.pose.Pose import Pose, PoseDict
 from modules.pose.PoseStream import PoseStreamData
-from modules.RenderDataHub import RenderDataHub
-from modules.pose.correlation.PairCorrelationStream import PairCorrelationStreamData
 from modules.pose.correlation.PairCorrelation import PairCorrelationBatch
 from modules.WS.WSOutput import WSOutput
 from modules.Settings import Settings
@@ -32,14 +71,14 @@ class CaptureDataHub:
         self.mutex: Lock = Lock()
 
         # Data storage
-        self.light_image: Dict[int, DataItem[WSOutput]] = {}
-        self.cam_image: Dict[int, DataItem[np.ndarray]] = {}
-        self.depth_tracklets: Dict[int, DataItem[List[DepthTracklet]]] = {}
-        self.tracklets: Dict[int, DataItem[Tracklet]] = {}
-        self.poses: Dict[int, DataItem[Pose]] = {}
-        self.pose_streams: Dict[int, DataItem[PoseStreamData]] = {}
-        self.pose_correlation: Dict[int, DataItem[PairCorrelationBatch]] = {}
-        self.motion_correlation: Dict[int, DataItem[PairCorrelationBatch]] = {}
+        self.light_image: dict[int, DataItem[WSOutput]] = {}
+        self.cam_image: dict[int, DataItem[np.ndarray]] = {}
+        self.depth_tracklets: dict[int, DataItem[list[DepthTracklet]]] = {}
+        self.tracklets: dict[int, DataItem[Tracklet]] = {}
+        self.poses: dict[int, DataItem[Pose]] = {}
+        self.pose_streams: dict[int, DataItem[PoseStreamData]] = {}
+        self.pose_correlation: dict[int, DataItem[PairCorrelationBatch]] = {}
+        self.motion_correlation: dict[int, DataItem[PairCorrelationBatch]] = {}
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -49,11 +88,11 @@ class CaptureDataHub:
         cls._consumer_counter += 1
         return f"C_{cls._consumer_counter}"
 
-    def _set_data_dict(self, data_dict: Dict[int, DataItem[T]], data_key: int, value: T) -> None:
+    def _set_data_dict(self, data_dict: dict[int, DataItem[T]], data_key: int, value: T) -> None:
         with self.mutex:
             data_dict[data_key] = DataItem(value)
 
-    def _get_data_dict(self, data_dict: Dict[int, DataItem[T]], data_key: int, only_new_data: bool, consumer_key: str) -> Optional[T]:
+    def _get_data_dict(self, data_dict: dict[int, DataItem[T]], data_key: int, only_new_data: bool, consumer_key: str) -> Optional[T]:
         with self.mutex:
             item: Optional[DataItem[T]] = data_dict.get(data_key)
             if not item:
@@ -83,7 +122,7 @@ class CaptureDataHub:
         self._set_data_dict(self.depth_tracklets, key, value)
 
     def get_depth_tracklets(self, key: int, only_new_data: bool, consumer_key: str) -> list[DepthTracklet]:
-        result: List[DepthTracklet] | None = self._get_data_dict(self.depth_tracklets, key, only_new_data, consumer_key)
+        result: list[DepthTracklet] | None = self._get_data_dict(self.depth_tracklets, key, only_new_data, consumer_key)
         return result if result is not None else []
 
     # Tracklet management
@@ -114,7 +153,7 @@ class CaptureDataHub:
     def get_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
         return self._get_data_dict(self.poses, id, only_new_data, consumer_key)
 
-    def get_poses_for_cam(self, cam_id: int) -> List[Pose]:
+    def get_poses_for_cam(self, cam_id: int) -> list[Pose]:
         with self.mutex:
             return [v.value for v in self.poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
 

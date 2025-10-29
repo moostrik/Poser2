@@ -70,7 +70,7 @@ class CentreCamLayer(LayerBase):
             self.cam_image.set_image(cam_image_np)
             self.cam_image.update()
 
-        smooth_pose_rect: Rect | None = self.smooth_data.get_rect(key)
+        smooth_pose_rect: Rect | None = self.smooth_data.get_viewport(key)
         if smooth_pose_rect is None:
             return
 

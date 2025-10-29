@@ -65,7 +65,7 @@ class CentrePoseRender(LayerBase):
         if not self.is_active:
             return
 
-        smooth_pose_rect: Rect | None = self.smooth_data.get_rect(key)
+        smooth_pose_rect: Rect | None = self.smooth_data.get_viewport(key)
         if smooth_pose_rect is None:
             return
 

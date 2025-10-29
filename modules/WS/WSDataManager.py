@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, fields, make_dataclass
 import numpy as np
 from time import time
 
-from modules.utils.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
+from modules.utils.depricated.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose, PosePointData, PoseAngleData, PoseMeasurementData
 from modules.pose.features.PoseAngles import AngleJoint, ANGLE_JOINT_NAMES

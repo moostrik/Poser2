@@ -130,10 +130,12 @@ class SetupColor(Setup):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig) -> None:
         super().__init__(pipeline, fps)
 
-        self.width, self.height = 1920, 1072 # for warping must be devisible by 16
+        # self.width, self.height = 1920, 1072 # for warping must be devisible by 16
+        self.width, self.height = 1280, 720 # for warping must be devisible by 16
+
         self.data_size = self.width * self.height * 3
 
-        self.resolution: dai.ColorCameraProperties.SensorResolution = dai.ColorCameraProperties.SensorResolution.THE_1080_P
+        self.resolution: dai.ColorCameraProperties.SensorResolution = dai.ColorCameraProperties.SensorResolution.THE_720_P
         self.color: dai.node.ColorCamera = pipeline.create(dai.node.ColorCamera)
         self.color.setResolution(self.resolution)
         self.color.setFps(self.fps)

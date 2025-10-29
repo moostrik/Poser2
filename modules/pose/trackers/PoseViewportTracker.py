@@ -5,29 +5,29 @@ from dataclasses import dataclass
 # Local imports
 from modules.pose.Pose import Pose
 from modules.pose.PoseTypes import PoseJoint
-from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
+from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.PointsAndRects import Rect
-from modules.utils.OneEuroInterpolation import OneEuroInterpolator, OneEuroSettings
+from modules.utils.SmoothedInterpolator import SmoothedInterpolator, OneEuroSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 @dataclass
-class PoseViewportInterpolatorSettings:
+class PoseViewportTrackerSettings:
     smooth_settings: OneEuroSettings
     center_dest_x: float = 0.5
     centre_dest_y: float = 0.2
     height_dest: float = 0.95
     dst_aspectratio: float = 9/16
 
-class PoseViewportInterpolator(PoseInterpolationBase):
-    def __init__(self, settings: PoseViewportInterpolatorSettings) -> None:
+class PoseViewportTracker(PoseTrackerBase):
+    def __init__(self, settings: PoseViewportTrackerSettings) -> None:
         self._active: bool = False
-        self._settings: PoseViewportInterpolatorSettings = settings
+        self._settings: PoseViewportTrackerSettings = settings
 
-        self._center_x_interpolator: OneEuroInterpolator = OneEuroInterpolator(self._settings.smooth_settings)
-        self._center_y_interpolator: OneEuroInterpolator = OneEuroInterpolator(self._settings.smooth_settings)
-        self._height_interpolator: OneEuroInterpolator = OneEuroInterpolator(self._settings.smooth_settings)
+        self._center_x_interpolator: SmoothedInterpolator = SmoothedInterpolator(self._settings.smooth_settings)
+        self._center_y_interpolator: SmoothedInterpolator = SmoothedInterpolator(self._settings.smooth_settings)
+        self._height_interpolator: SmoothedInterpolator = SmoothedInterpolator(self._settings.smooth_settings)
 
         self._smoothed_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
         self._age: float = 0.0

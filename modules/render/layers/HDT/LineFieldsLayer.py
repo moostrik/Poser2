@@ -123,11 +123,11 @@ class LF(LayerBase):
         # if self.cam_id != 1:
         #     return
 
-        self.smooth_data.OneEuro_settings.min_cutoff = 0.1
-        self.smooth_data.OneEuro_settings.beta = 0.3
+        self.smooth_data.one_euro_settings.min_cutoff = 0.1
+        self.smooth_data.one_euro_settings.beta = 1.0
 
-        self.smooth_data.rect_settings.centre_dest_y = 0.25
-        self.smooth_data.rect_settings.height_dest = 0.8
+        self.smooth_data.viewport_settings.centre_dest_y = 0.25
+        self.smooth_data.viewport_settings.height_dest = 0.8
 
         self.smooth_data.angle_settings.motion_threshold = 0.003
 
@@ -148,7 +148,7 @@ class LF(LayerBase):
         head: float     = self.smooth_data.get_angles(self.cam_id).get(AngleJoint.head)
         motion: float   = self.smooth_data.get_cumulative_motion(self.cam_id)
         age: float      = self.smooth_data.get_age(self.cam_id)
-        anchor: float   = 1.0 - self.smooth_data.rect_settings.centre_dest_y
+        anchor: float   = 1.0 - self.smooth_data.viewport_settings.centre_dest_y
         symmetry: float= self.smooth_data.get_symmetries(self.cam_id).geometric_mean
 
 

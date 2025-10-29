@@ -5,9 +5,9 @@ from time import time
 from modules.pose.Pose import Pose
 from modules.pose.features.PoseAngles import AngleJoint, PoseAngleData, ANGLE_NUM_JOINTS
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetry, PoseSymmetryData
-from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
+from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
 
-from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSettings
+from modules.utils.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 POSE_ANGLE_MOTION_WEIGHTS: dict[AngleJoint, float] = {
@@ -24,25 +24,25 @@ POSE_ANGLE_MOTION_WEIGHTS: dict[AngleJoint, float] = {
 }
 
 @dataclass
-class PoseAngleInterpolatorSettings:
+class PoseAngleTrackerSettings:
     smooth_settings: OneEuroSettings
     symmetry_exponent: float = 1.0
     motion_threshold: float = 0.002
     motion_weights: dict[AngleJoint, float] = field(default_factory=lambda: POSE_ANGLE_MOTION_WEIGHTS)
 
 
-class PoseAngleInterpolator(PoseInterpolationBase):
-    def __init__(self, settings: PoseAngleInterpolatorSettings) -> None:
-        self.settings: PoseAngleInterpolatorSettings = settings
+class PoseAngleTracker(PoseTrackerBase):
+    def __init__(self, settings: PoseAngleTrackerSettings) -> None:
+        self.settings: PoseAngleTrackerSettings = settings
         self._active: bool = False
-        self._angle_smoothers: dict[AngleJoint, AngleEuroInterpolator] = {}
+        self._angle_smoothers: dict[AngleJoint, SmoothedAngleInterpolator] = {}
         self._motions: dict[AngleJoint, float] = {}
         self._total_motion: float = 0.0
         self._cumulative_motions: dict[AngleJoint, float] = {}
         self._cumulative_total_motion: float = 0.0
 
         for joint in AngleJoint:
-            self._angle_smoothers[joint] = AngleEuroInterpolator(settings.smooth_settings)
+            self._angle_smoothers[joint] = SmoothedAngleInterpolator(settings.smooth_settings)
             self._motions[joint] = 0.0
             self._cumulative_motions[joint] = 0.0
 

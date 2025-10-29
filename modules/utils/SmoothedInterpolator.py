@@ -1,57 +1,44 @@
 """
 OneEuroInterpolation Module
 
-Provides interpolation classes based on the 1€ Filter algorithm for smoothing
-various types of motion data with low-latency Hermite interpolation between samples.
+Smooths noisy input signals and generates interpolated values between samples.
 
-The interpolators smooth incoming samples using a 1€ Filter, then interpolate
-between the two most recent samples using cubic Hermite splines for smooth
-animation with minimal latency.
+Combines two techniques:
+- 1€ Filter: Adaptive low-pass filter that reduces noise while tracking fast movements
+- Hermite interpolation: Generates smooth values between filtered samples
+
+Purpose: Convert low-framerate noisy input (e.g., 30 FPS pose detection) into
+smooth high-framerate output (e.g., 60 FPS animation) with minimal lag.
+
+How it works:
+1. add_sample() filters input with 1€ Filter and buffers result (input frame rate)
+2. update() interpolates between buffered samples based on elapsed time (output frame rate)
+3. Output is smooth, low-noise signal queryable at any framerate
 
 Classes:
-    OneEuroSettings: Configuration parameters for 1€ Filter
-    OneEuroInterpolator: Basic interpolator for numeric values
-    AngleEuroInterpolator: Specialized interpolator for angular data in [-π,π] range
+    OneEuroSettings: Filter configuration parameters
+    SmoothedInterpolator: Scalar value smoother/interpolator
+    SmoothedAngleInterpolator: Angular value smoother (handles ±π wraparound)
 
 Usage Example:
-    # Setup interpolator
     # IMPORTANT: Set frequency to INPUT rate, not output rate!
     settings = OneEuroSettings(frequency=30.0, min_cutoff=1.0, beta=0.0)
-    interp = OneEuroInterpolator(settings)
+    interp = SmoothedInterpolator(settings)
 
-     # Add samples at INPUT rate
-    def on_pose_detected(angle: float):
-        interp.add_sample(angle)
+    # Feed at input rate (30 Hz)
+    def on_pose_update(value):
+        interp.add_sample(value)
 
-    # Update/render at OUTPUT rate
-    def update_and_render():
-        interp.update()  # Update interpolation for current time
+    # Query at output rate (60 Hz)
+    def render_frame():
+        interp.update()
+        draw(interp.smooth_value)
 
-        if not math.isnan(interp.smooth_value):
-            draw_skeleton(interp.smooth_value)
-
-    # For angular data (handles ±π wrapping)
-    angle_interp = AngleEuroInterpolator(settings)
-    angle_interp.add_sample(math.pi / 4)
-    angle_interp.update()
-    angle = angle_interp.smooth_value  # Wrapped to [-π, π]
-
-Thread Safety:
-    Not thread-safe. External synchronization required for multi-threaded access.
-
-NaN Handling:
-    NaN samples are substituted with the last valid value. If no valid value
-    exists yet, NaN samples are skipped.
-
-Performance Tip:
-    For optimal performance when using multiple interpolators, get the
-    current time once per frame and pass it to all update() calls:
-
-    current_time = time()
-    for interp in interpolators:
-        interp.update(current_time)  # 60x faster than calling time() each time!
-
-    This also ensures perfect temporal synchronization across all interpolators.
+Notes:
+    - frequency parameter must match input rate, not output rate
+    - Not thread-safe
+    - NaN inputs use last valid value; output is NaN until first valid sample
+    - Pass current_time to update() when using multiple interpolators for efficiency
 """
 
 import math
@@ -69,7 +56,7 @@ class OneEuroSettings:
     Attributes:
         frequency: INPUT data frequency in Hz (default: 30.0)
                   This is the frequency at which add_sample() is called.
-                  Example: For 24 FPS pose detection, use frequency=24.0
+                  Example: For 30 FPS pose detection, use frequency=30.0
                           Then call update() at any desired rate (e.g., 60 FPS)
         min_cutoff: Minimum cutoff frequency for position smoothing (default: 1.0)
         beta: Speed coefficient - higher values reduce lag but increase jitter (default: 0.0)
@@ -124,7 +111,7 @@ class OneEuroSettings:
             callback()
 
 
-class OneEuroInterpolator:
+class SmoothedInterpolator:
     """Basic numeric value interpolator using 1€ Filter with Hermite interpolation.
 
     Smooths incoming samples using a 1€ Filter, then interpolates between the
@@ -351,7 +338,7 @@ class OneEuroInterpolator:
         return h00*p2 + h10*m2 + h01*p3 + h11*m3
 
 
-class AngleEuroInterpolator:
+class SmoothedAngleInterpolator:
     """Interpolator for angular data in [-π,π] range.
 
     Handles angular data by decomposing into sin/cos components, smoothing
@@ -374,8 +361,8 @@ class AngleEuroInterpolator:
             settings: OneEuroSettings configuration object (shared by both components)
         """
         # Use separate interpolators for sin and cos components
-        self._sin_interp = OneEuroInterpolator(settings)
-        self._cos_interp = OneEuroInterpolator(settings)
+        self._sin_interp = SmoothedInterpolator(settings)
+        self._cos_interp = SmoothedInterpolator(settings)
 
         # Initialize angular state as NaN
         self._smooth_value: float = math.nan

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-class PoseInterpolationBase(ABC):
+class PoseTrackerBase(ABC):
     @abstractmethod
     def add_pose(self, pose):
         """Add a new pose data point for processing."""

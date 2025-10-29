@@ -2,25 +2,24 @@ import numpy as np
 from dataclasses import dataclass
 
 from modules.pose.Pose import Pose
-from modules.pose.interpolation.PoseInterpolationBase import PoseInterpolationBase
-from modules.pose.interpolation.PoseAngleInterpolator import PoseAngleInterpolatorSettings
+from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
 
-from modules.utils.OneEuroInterpolation import AngleEuroInterpolator, OneEuroSettings
+from modules.utils.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 @dataclass
-class PoseHeadInterpolatorSettings:
+class PoseHeadTrackerSettings:
     smooth_settings: OneEuroSettings
     motion_threshold: float = 0.002
     motion_weight: float = 2.0 # based on PoseSmoothAngleSettings motion weights
 
 # CLASSES
-class PoseHeadInterpolator(PoseInterpolationBase):
-    def __init__(self, settings: PoseHeadInterpolatorSettings) -> None:
+class PoseHeadTracker(PoseTrackerBase):
+    def __init__(self, settings: PoseHeadTrackerSettings) -> None:
         self._active: bool = False
-        self.settings: PoseHeadInterpolatorSettings = settings
-        self._head_smoother: AngleEuroInterpolator = AngleEuroInterpolator(settings.smooth_settings)
+        self.settings: PoseHeadTrackerSettings = settings
+        self._head_smoother: SmoothedAngleInterpolator = SmoothedAngleInterpolator(settings.smooth_settings)
 
         self._angle: float = 0.0
         self._velocity: float = 0.0
