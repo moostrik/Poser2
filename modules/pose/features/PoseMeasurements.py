@@ -108,7 +108,7 @@ class PoseMeasurementFactory:
         if point_data is None or crop_rect is None:
             return PoseMeasurementData()
 
-        points: np.ndarray = point_data.points
+        points: np.ndarray = point_data.values
         crop_height: float = crop_rect.height
 
         estimates: dict[LimbType, float] = {}

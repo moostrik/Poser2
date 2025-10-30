@@ -42,7 +42,7 @@ class PoseHeadFactory:
         if point_data is None:
             return PoseHeadData()
 
-        points: np.ndarray = point_data.points
+        points: np.ndarray = point_data.values
         scores: np.ndarray = point_data.scores
 
         # Check if we have all necessary points (eyes and nose)

@@ -114,6 +114,93 @@ class PoseAngleData(PoseFeatureBase[AngleJoint]):
         similarity_values: np.ndarray = np.power(1.0 - np.abs(diff_data.values) / np.pi, exponent)
         return PoseAngleData(values=similarity_values, scores=diff_data.scores)
 
+    # ========== CIRCULAR STATISTICS ==========
+
+    @cached_property
+    def mean(self) -> float:
+        """Circular mean of valid angle values in radians, or NaN if none valid.
+
+        Uses circular statistics to properly handle angle wrapping.
+        For example, the mean of [-π, π] is correctly computed as ±π, not 0.
+        """
+        valid = self.values[self.valid_mask]
+        if valid.size == 0:
+            return np.nan
+
+        # Convert to unit circle coordinates
+        sin_mean = np.mean(np.sin(valid))
+        cos_mean = np.mean(np.cos(valid))
+
+        # Compute circular mean
+        return float(np.arctan2(sin_mean, cos_mean))
+
+    @cached_property
+    def std(self) -> float:
+        """Circular standard deviation of valid angle values, or NaN if none valid.
+
+        Measures angular dispersion. Returns values in [0, ~1.48] radians.
+        Higher values indicate more spread around the circle.
+        A value near 0 means angles are clustered, near 1.48 means uniformly distributed.
+        """
+        valid = self.values[self.valid_mask]
+        if valid.size == 0:
+            return np.nan
+
+        # Compute resultant length R
+        sin_mean = np.mean(np.sin(valid))
+        cos_mean = np.mean(np.cos(valid))
+        R = np.sqrt(sin_mean**2 + cos_mean**2)
+
+        # Circular standard deviation
+        # Returns NaN if R is too close to 0 (uniform distribution)
+        if R < 1e-10:
+            return np.nan
+
+        return float(np.sqrt(-2 * np.log(R)))
+
+    @cached_property
+    def median(self) -> float:
+        """Circular median approximation of valid angle values, or NaN if none valid.
+
+        Returns the angle with minimum circular distance to the circular mean.
+        This is an approximation; true circular median requires more complex algorithms.
+        """
+        if not self.any_valid:
+            return np.nan
+
+        valid = self.values[self.valid_mask]
+        circ_mean = self.mean
+
+        if np.isnan(circ_mean):
+            return np.nan
+
+        # Find angle with minimum circular distance to mean
+        # Use complex exponential to handle wrapping correctly
+        diffs = np.abs(np.angle(np.exp(1j * (valid - circ_mean))))
+        return float(valid[np.argmin(diffs)])
+
+    # Override to return NaN - these don't make sense for angles
+    @cached_property
+    def harmonic_mean(self) -> float:
+        """Not applicable for angular data. Always returns NaN.
+
+        Harmonic mean is mathematically undefined for angles in [-π, π].
+        Use circular_mean instead.
+        """
+        return np.nan
+
+    @cached_property
+    def geometric_mean(self) -> float:
+        """Not applicable for angular data. Always returns NaN.
+
+        Geometric mean is mathematically undefined for angles in [-π, π].
+        Use circular_mean instead.
+        """
+        return np.nan
+
+    # min_value and max_value inherited from base class
+    # They work but have limited meaning for circular data
+    # (e.g., min of [-π, π] doesn't mean they're "far apart")
 
 # ========== FACTORY ==========
 

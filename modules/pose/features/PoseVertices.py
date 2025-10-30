@@ -55,7 +55,7 @@ class PoseVertexFactory:
         for i, (p1, p2) in enumerate(POSE_VERTEX_LIST):
             for j, joint in enumerate((p1, p2)):
                 idx: int = i * 2 + j
-                vertices[idx] = point_data.points[joint]
+                vertices[idx] = point_data.values[joint]
                 colors[idx] = [*POSE_JOINT_COLORS[joint], (point_data.scores[joint] + POSE_COLOR_ALPHA_BASE) / (1.0 + POSE_COLOR_ALPHA_BASE)]
 
         vertex_data: PoseVertexData = PoseVertexData(vertices, colors)

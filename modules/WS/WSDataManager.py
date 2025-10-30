@@ -101,7 +101,7 @@ class WSData:
             pose_points: PosePointData | None = pose.point_data
             crop_rect: Rect | None = pose.crop_rect
             if pose_points is not None and crop_rect is not None:
-                nose_x = pose_points.points[PoseJoint.nose.value][0]
+                nose_x = pose_points.values[PoseJoint.nose.value][0]
                 nose_conf = pose_points.scores[PoseJoint.nose.value]
                 if nose_conf > 0.3:
                     # calculate nose offset from center of crop rect

@@ -104,9 +104,10 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
         pass
 
     @classmethod
-    def from_values(cls, values: np.ndarray) -> Self:
+    def from_values(cls, values: np.ndarray, scores: np.ndarray | None = None) -> Self:
         """Create feature data from values array, auto-generating scores, 1.0 for valid (non-NaN) values, 0.0 for NaN values."""
-        scores: np.ndarray = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
+        if scores is None:
+            scores = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
         return cls(values=values, scores=scores)
 
     @classmethod
@@ -149,7 +150,8 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
     @cached_property
     def valid_joints(self) -> list[JointEnum]:
         """List of joints with valid (non-zero score) values."""
-        return [self.joint_enum()(i) for i in range(len(self.values)) if self.scores[i] > 0.0]
+        joint_enum_type: type[JointEnum] = self.joint_enum()
+        return [joint_enum_type(i) for i in np.where(self.valid_mask)[0]]
 
     # ========== STATISTICS ==========
 
@@ -160,19 +162,29 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
 
     @cached_property
     def harmonic_mean(self) -> float:
-        """Harmonic mean of valid values, or NaN if none are valid."""
-        valid = self.values[self.valid_mask]
-        if valid.size == 0:
+        """Harmonic mean of valid positive values, or NaN if none exist.
+
+        Only meaningful for features with positive values (e.g., symmetry scores).
+        Returns NaN if no valid positive values exist.
+        """
+        valid: np.ndarray = self.values[self.valid_mask]
+        positive: np.ndarray = valid[valid > 1e-6]
+        if positive.size == 0:
             return np.nan
-        return float(valid.size / np.sum(1.0 / np.maximum(valid, 1e-10)))
+        return float(positive.size / np.sum(1.0 / positive))
 
     @cached_property
     def geometric_mean(self) -> float:
-        """Geometric mean of valid values, or NaN if none are valid."""
-        valid = self.values[self.valid_mask]
-        if valid.size == 0:
+        """Geometric mean of valid positive values, or NaN if none exist.
+
+        Only meaningful for features with positive values (e.g., symmetry scores).
+        Returns NaN if no valid positive values exist.
+        """
+        valid: np.ndarray = self.values[self.valid_mask]
+        positive: np.ndarray = valid[valid > 1e-6]
+        if positive.size == 0:
             return np.nan
-        return float(np.exp(np.mean(np.log(np.maximum(valid, 1e-10)))))
+        return float(np.exp(np.mean(np.log(positive))))
 
     @cached_property
     def min_value(self) -> float:
@@ -195,7 +207,14 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
         return float(np.nanmedian(self.values))
 
     def get_stat(self, statistic: FeatureStatistic) -> float:
-        """Get the value for a specific statistical metric, can be NaN."""
+        """Get the value for a specific statistical metric.
+
+        Returns NaN if the statistic is not applicable for this feature type.
+        For example, geometric_mean and harmonic_mean are only defined for
+        features with positive values. (and not for angles that can be negative).
+        """
+        if not hasattr(self, statistic.value):
+            return np.nan
         return getattr(self, statistic.value)
 
     # ========== ACCESS ==========

@@ -84,7 +84,7 @@ class Pose:
         if self.point_data is None or self.crop_rect is None:
             return None
 
-        pose_joints: np.ndarray = self.point_data.points
+        pose_joints: np.ndarray = self.point_data.values
         rect: Rect = self.crop_rect
 
         # Convert from normalized [0,1] to absolute pixel coordinates
