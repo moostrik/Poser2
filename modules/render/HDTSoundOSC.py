@@ -1,6 +1,6 @@
 import threading
 import time
-import traceback
+import math
 from typing import Dict, List, Optional, Set
 import numpy as np
 from pythonosc import udp_client
@@ -96,6 +96,8 @@ class HDTSoundOSC:
 
         for joint in AngleJoint:
             angle: float | None = self.smooth_data.get_angles(id).get(joint)
+            if angle is math.nan:
+                print(f"HDTSoundOSC: Warning - NaN angle for joint {joint.name} on tracklet {id}")
             angle_msg = OscMessageBuilder(address=f"/pose/{id}/angle/{joint.name}")
             angle_msg.add_arg(float(angle))
             bundle_builder.add_content(angle_msg.build()) # type: ignore

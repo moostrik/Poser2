@@ -86,7 +86,13 @@ class CorrelationStreamLayer(LayerBase):
             return
 
         pairs: list[tuple[int, int]] = stream_data.get_top_pairs(self.num_streams)
+        if pairs == []:
+            print("CorrelationStreamLayer.update: No valid pairs found.")
+            return
         pair_arrays: list[np.ndarray] = [stream_data.get_similarities(pair_id) for pair_id in pairs]
+        if pair_arrays == []:
+            print("CorrelationStreamLayer.update: No valid similarity arrays found.")
+            return
         image_np: np.ndarray = StreamCorrelation.r_stream_to_image(pair_arrays, self.num_streams)
         self.image.set_image(image_np)
         self.image.update()
