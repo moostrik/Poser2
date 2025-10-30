@@ -46,7 +46,22 @@ class PoseAngleTracker(PoseTrackerBase):
             self._motions[joint] = 0.0
             self._cumulative_motions[joint] = 0.0
 
+
+        self._angle_data: PoseAngleData = PoseAngleData()
+        self._velocity_data: PoseAngleData = PoseAngleData()
+        self._acceleration_data: PoseAngleData = PoseAngleData()
+        self._motion_data: PoseAngleData = PoseAngleData()
+        self._cumulative_motion_data: PoseAngleData = PoseAngleData()
+
         self._symmetry_data: PoseSymmetryData = PoseSymmetryData()
+
+        self._angles_dirty = False
+        self._velocities_dirty = False
+        self._accelerations_dirty = False
+        self._motions_dirty = False
+        self._cumulative_motions_dirty = False
+
+
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def add_pose(self, pose: Pose) -> None:
@@ -92,6 +107,12 @@ class PoseAngleTracker(PoseTrackerBase):
         self._total_motion = total_motion
         self._cumulative_total_motion += total_motion
 
+        self._angles_dirty = True
+        self._velocities_dirty = True
+        self._accelerations_dirty = True
+        self._motions_dirty = True
+        self._cumulative_motions_dirty = True
+
         # Compute symmetry
         self._symmetry_data = PoseAngleSymmetry.from_angles(self.angles, self.settings.symmetry_exponent)
 
@@ -115,37 +136,47 @@ class PoseAngleTracker(PoseTrackerBase):
     @property
     def angles(self) -> PoseAngleData:
         """Current smoothed angles (radians)"""
-        values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_value for joint in AngleJoint], dtype=np.float32)
-        scores: np.ndarray = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
-        return PoseAngleData(values=values, scores=scores)
+        if self._angles_dirty:
+            angle_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_value for joint in AngleJoint], dtype=np.float32)
+            self._angle_data = PoseAngleData.from_values(angle_values)
+            self._angles_dirty = False
+        return self._angle_data
 
     @property
     def velocities(self) -> PoseAngleData:
         """Current angular velocities (rad/s)"""
-        values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_velocity for joint in AngleJoint], dtype=np.float32)
-        scores: np.ndarray = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
-        return PoseAngleData(values=values, scores=scores)
+        if self._velocities_dirty:
+            velocity_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_velocity for joint in AngleJoint], dtype=np.float32)
+            self._velocity_data = PoseAngleData.from_values(velocity_values)
+            self._velocities_dirty = False
+        return self._velocity_data
 
     @property
     def accelerations(self) -> PoseAngleData:
         """Current angular accelerations (rad/s²)"""
-        values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_acceleration for joint in AngleJoint], dtype=np.float32)
-        scores: np.ndarray = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
-        return PoseAngleData(values=values, scores=scores)
+        if self._accelerations_dirty:
+            acceleration_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_acceleration for joint in AngleJoint], dtype=np.float32)
+            self._acceleration_data = PoseAngleData.from_values(acceleration_values)
+            self._accelerations_dirty = False
+        return self._acceleration_data
 
     @property
     def motions(self) -> PoseAngleData:
         """Current weighted motion values"""
-        values: np.ndarray = np.array([self._motions[joint] for joint in AngleJoint], dtype=np.float32)
-        scores: np.ndarray = np.ones(ANGLE_NUM_JOINTS, dtype=np.float32)
-        return PoseAngleData(values=values, scores=scores)
+        if self._motions_dirty:
+            motion_values: np.ndarray = np.array([self._motions[joint] for joint in AngleJoint], dtype=np.float32)
+            self._motion_data = PoseAngleData.from_values(motion_values)
+            self._motions_dirty = False
+        return self._motion_data
 
     @property
     def cumulative_motions(self) -> PoseAngleData:
         """Cumulative motion values since tracking started"""
-        values: np.ndarray = np.array([self._cumulative_motions[joint] for joint in AngleJoint], dtype=np.float32)
-        scores: np.ndarray = np.ones(ANGLE_NUM_JOINTS, dtype=np.float32)
-        return PoseAngleData(values=values, scores=scores)
+        if self._cumulative_motions_dirty:
+            cumulative_values: np.ndarray = np.array([self._cumulative_motions[joint] for joint in AngleJoint], dtype=np.float32)
+            self._cumulative_motion_data = PoseAngleData.from_values(cumulative_values)
+            self._cumulative_motions_dirty = False
+        return self._cumulative_motion_data
 
     @property
     def total_motion(self) -> float:

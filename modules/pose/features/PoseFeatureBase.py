@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, lru_cache
 from typing import Generic, TypeVar
 from enum import Enum, IntEnum
 import numpy as np
@@ -69,6 +69,12 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
                 f"Data integrity violation: NaN values must have 0.0 scores. "
                 f"Invalid joints: {', '.join(invalid_joints)}"
             )
+
+    @classmethod
+    def from_values(cls, values: np.ndarray) -> Self:
+        """Create feature data from values array, auto-generating scores, 1.0 for valid (non-NaN) values, 0.0 for NaN values."""
+        scores: np.ndarray = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
+        return cls(values=values, scores=scores)
 
     @property
     @abstractmethod
@@ -183,10 +189,9 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
         value = self.values[joint]
         return value if not np.isnan(value) else default
 
-    def get_score(self, joint: JointEnum | int, default: float = 0.0) -> float:
-        """Get score with default for missing/invalid joints."""
-        score = self.scores[joint]
-        return score if score > 0.0 else default
+    def get_score(self, joint: JointEnum | int) -> float:
+        """Get score for a joint (always between 0.0 and 1.0)."""
+        return self.scores[joint]
 
     def to_dict(self, include_invalid: bool = False) -> dict[str, float]:
         """Convert to dictionary.
@@ -211,8 +216,7 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
         Returns:
             New instance of same type with NaN values replaced
         """
-        safe_values: np.ndarray = self.values.copy()
-        safe_values[np.isnan(safe_values)] = default
+        safe_values: np.ndarray = np.nan_to_num(self.values, nan=default, copy=True)
 
         return self.__class__(
             values=safe_values,

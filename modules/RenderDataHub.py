@@ -147,17 +147,17 @@ class RenderDataHub:
     def get_angles(self, tracklet_id: int) -> PoseAngleData:
         """Get smoothed angle for the specified tracklet ID and joint."""
         with self._lock:
-            return self._angle_trackers[tracklet_id].angles.safe()
+            return self._angle_trackers[tracklet_id].angles
 
     def get_velocities(self, tracklet_id: int) -> PoseAngleData:
         """Get smoothed angle for the specified tracklet ID and joint."""
         with self._lock:
-            return self._angle_trackers[tracklet_id].velocities.safe()
+            return self._angle_trackers[tracklet_id].velocities
 
     def get_motions(self, tracklet_id: int) -> PoseAngleData:
         """Get smoothed angle change for the specified tracklet ID and joint."""
         with self._lock:
-            return self._angle_trackers[tracklet_id].motions.safe()
+            return self._angle_trackers[tracklet_id].motions
 
     def get_symmetries(self, tracklet_id: int) -> PoseSymmetryData:
         """Get the synchrony value for the specified symmetric joint type."""
