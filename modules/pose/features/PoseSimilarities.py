@@ -11,15 +11,13 @@ from modules.pose.features.PoseFeatureBase import PoseFeatureBase, FeatureStatis
 from modules.pose.features.PoseAngles import AngleJoint
 
 @dataclass(frozen=True)
-class PoseSimilarity(PoseFeatureBase[AngleJoint]):
+class PoseSimilarityData(PoseFeatureBase[AngleJoint]):
     """Similarity scores between two poses for all joints."""
 
-    pair_id: tuple[int, int] = field(default=(0, 0), kw_only=True)
-    values: np.ndarray = field(default_factory=lambda: np.full(len(AngleJoint), np.nan, dtype=np.float32))
-    scores: np.ndarray = field(default_factory=lambda: np.zeros(len(AngleJoint), dtype=np.float32))
+    pair_id: tuple[int, int]
 
-    @property
-    def joint_enum(self) -> type[AngleJoint]:
+    @classmethod
+    def joint_enum(cls) -> type[AngleJoint]:
         """Return the AngleJoint enum class."""
         return AngleJoint
 
@@ -61,13 +59,13 @@ class PoseSimilarityBatch:
 
     Simple container with O(1) lookup and iteration support.
     """
-    pair_correlations: list[PoseSimilarity ]
+    pair_correlations: list[PoseSimilarityData ]
     timestamp: pd.Timestamp = field(default_factory=pd.Timestamp.now)
-    _pair_lookup: dict[tuple[int, int], PoseSimilarity ] = field(init=False, repr=False, compare=False, default_factory=dict)
+    _pair_lookup: dict[tuple[int, int], PoseSimilarityData ] = field(init=False, repr=False, compare=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         """Build O(1) lookup index for pair access"""
-        lookup: dict[tuple[int, int], PoseSimilarity ] = {pc.pair_id: pc for pc in self.pair_correlations}
+        lookup: dict[tuple[int, int], PoseSimilarityData ] = {pc.pair_id: pc for pc in self.pair_correlations}
         object.__setattr__(self, '_pair_lookup', lookup)
 
     def __repr__(self) -> str:
@@ -82,7 +80,7 @@ class PoseSimilarityBatch:
         pair_id = (min(pair_id), max(pair_id))
         return pair_id in self._pair_lookup
 
-    def __iter__(self) -> Iterator[PoseSimilarity ]:
+    def __iter__(self) -> Iterator[PoseSimilarityData ]:
         """Support 'for pair in batch' syntax"""
         return iter(self.pair_correlations)
 
@@ -91,16 +89,17 @@ class PoseSimilarityBatch:
         """True if batch contains no pairs"""
         return len(self) == 0
 
-    def get_pair(self, pair_id: tuple[int, int]) -> Optional[PoseSimilarity ]:
+    def get_pair(self, pair_id: tuple[int, int]) -> Optional[PoseSimilarityData ]:
         """Get correlation for specific pair (O(1) lookup)."""
         pair_id = (min(pair_id), max(pair_id))
         return self._pair_lookup.get(pair_id)
 
-    def get_top_pairs(self, n: int = 5, min_valid_joints: int = 1, metric: FeatureStatistic = FeatureStatistic.MEAN) -> list[PoseSimilarity ]:
+    def get_top_pairs(self, n: int = 5, min_valid_joints: int = 1, metric: FeatureStatistic = FeatureStatistic.MEAN) -> list[PoseSimilarityData ]:
         """Get top N most similar pairs, sorted by metric (descending)."""
         if self.is_empty or n <= 0:
             return []
-        valid_pairs: list[PoseSimilarity ] = [pc for pc in self.pair_correlations if pc.valid_count >= min_valid_joints]
+        valid_pairs: list[PoseSimilarityData ] = [pc for pc in self.pair_correlations if pc.valid_count >= min_valid_joints]
         return sorted(valid_pairs, key=lambda pc: pc.get_stat(metric), reverse=True)[:n]
 
 PoseSimilarityBatchCallback = Callable[[PoseSimilarityBatch ], None]
+

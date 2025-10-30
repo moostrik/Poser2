@@ -48,40 +48,44 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
         """Base class validation - DO NOT OVERRIDE.
 
         Validates:
+        - Arrays are 1D with correct length for joint enum
         - NaN values must have 0.0 scores
-        - Arrays have same shape
         """
-        # Validate shapes match
-        if self.values.shape != self.scores.shape:
+        # Validate both arrays are 1D
+        if self.values.ndim != 1:
             raise ValueError(
-                f"values and scores must have same shape. "
-                f"Got values: {self.values.shape}, scores: {self.scores.shape}"
+                f"values array must be 1D, got shape {self.values.shape}"
+            )
+        if self.scores.ndim != 1:
+            raise ValueError(
+                f"scores array must be 1D, got shape {self.scores.shape}"
+            )
+
+        # Validate array length matches joint enum - cache the enum type
+        joint_enum_type: type[JointEnum] = self.__class__.joint_enum()
+        expected_length: int = len(joint_enum_type)
+        if len(self.values) != expected_length:
+            raise ValueError(
+                f"values array length ({len(self.values)}) must match joint enum length ({expected_length})"
+            )
+        if len(self.scores) != expected_length:
+            raise ValueError(
+                f"scores array length ({len(self.scores)}) must match joint enum length ({expected_length})"
             )
 
         # Validate: NaN values must have 0.0 scores
-        nan_mask: np.ndarray = np.isnan(self.values)
-        valid_mask: np.ndarray = self.scores > 0.0
+        nan_mask = np.isnan(self.values)
+        valid_mask = self.scores > 0.0
         invalid = nan_mask & valid_mask
 
         if np.any(invalid):
-            invalid_joints = [self.joint_enum(i).name for i in np.where(invalid)[0]]
+            invalid_joints = [joint_enum_type(i).name for i in np.where(invalid)[0]]
             raise ValueError(
                 f"Data integrity violation: NaN values must have 0.0 scores. "
                 f"Invalid joints: {', '.join(invalid_joints)}"
             )
 
-    @classmethod
-    def from_values(cls, values: np.ndarray) -> Self:
-        """Create feature data from values array, auto-generating scores, 1.0 for valid (non-NaN) values, 0.0 for NaN values."""
-        scores: np.ndarray = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
-        return cls(values=values, scores=scores)
-
-    @property
     @abstractmethod
-    def joint_enum(self) -> type[JointEnum]:
-        """The enum class used for joint indexing."""
-        pass
-
     def validate(self) -> None:
         """Custom validation logic for subclasses.
 
@@ -92,6 +96,26 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
             ValueError: If validation fails
         """
         pass  # Default: no additional validation
+
+    @classmethod
+    @abstractmethod
+    def joint_enum(cls) -> type[JointEnum]:
+        """Get the joint enum type for this class. Must be implemented by subclasses."""
+        pass
+
+    @classmethod
+    def from_values(cls, values: np.ndarray) -> Self:
+        """Create feature data from values array, auto-generating scores, 1.0 for valid (non-NaN) values, 0.0 for NaN values."""
+        scores: np.ndarray = np.where(~np.isnan(values), 1.0, 0.0).astype(np.float32)
+        return cls(values=values, scores=scores)
+
+    @classmethod
+    def create_empty(cls) -> Self:
+        """Create instance with all joints marked as invalid (NaN values, zero scores)."""
+        num_joints: int = len(cls.joint_enum())
+        values: np.ndarray = np.full(num_joints, np.nan, dtype=np.float32)
+        scores: np.ndarray = np.zeros(num_joints, dtype=np.float32)
+        return cls(values=values, scores=scores)
 
     def __repr__(self) -> str:
         """Readable string representation."""
@@ -125,7 +149,7 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
     @cached_property
     def valid_joints(self) -> list[JointEnum]:
         """List of joints with valid (non-zero score) values."""
-        return [self.joint_enum(i) for i in range(len(self.values)) if self.scores[i] > 0.0]
+        return [self.joint_enum()(i) for i in range(len(self.values)) if self.scores[i] > 0.0]
 
     # ========== STATISTICS ==========
 
@@ -203,22 +227,6 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
             Dictionary mapping joint names to values
         """
         if include_invalid:
-            return {self.joint_enum(i).name: float(v) for i, v in enumerate(self.values)}
+            return {self.joint_enum()(i).name: float(v) for i, v in enumerate(self.values)}
         else:
             return {joint.name: self.values[joint] for joint in self.valid_joints}
-
-    def safe(self: Self, default: float = 0.0) -> Self:
-        """Return copy with NaN replaced by default value.
-
-        Args:
-            default: Value to replace NaN with (default: 0.0)
-
-        Returns:
-            New instance of same type with NaN values replaced
-        """
-        safe_values: np.ndarray = np.nan_to_num(self.values, nan=default, copy=True)
-
-        return self.__class__(
-            values=safe_values,
-            scores=self.scores.copy()
-        )

@@ -10,7 +10,7 @@ from pandas import Timestamp
 from modules.pose.features.PosePoints import PosePointData
 from modules.pose.features.PoseVertices import PoseVertexData, PoseVertexFactory
 from modules.pose.features.PoseAngles import PoseAngleData, PoseAngleFactory
-from modules.pose.features.PoseHeadOrientation import PoseHeadData,PoseHeadFactory
+from modules.pose.features.depricated.PoseHeadOrientation import PoseHeadData,PoseHeadFactory
 from modules.pose.features.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
 
 from modules.tracker.Tracklet import Tracklet

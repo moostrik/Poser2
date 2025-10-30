@@ -10,7 +10,7 @@ from typing import Optional
 
 # Local application imports
 from modules.pose.Pose import PoseDict
-from modules.pose.features.PoseSimilarities import PoseSimilarity , PoseSimilarityBatch , PoseSimilarityBatchCallback
+from modules.pose.features.PoseSimilarities import PoseSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
 from modules.Settings import Settings
 
 from modules.pose.features.PoseAngles import PoseAngleData
@@ -97,7 +97,7 @@ class PoseSimilarityComputer:
             return PoseSimilarityBatch(pair_correlations=[])
 
         # Compute correlations for each pair
-        similarities: list[PoseSimilarity] = []
+        similarities: list[PoseSimilarityData] = []
         for (id1, angles_1), (id2, angles_2) in combinations(angle_data.items(), 2):
             # Compute similarity scores
             similarity_data: PoseAngleData = angles_1.similarity(angles_2, self.similarity_exponent)
@@ -107,7 +107,7 @@ class PoseSimilarityComputer:
                 # Normalize pair_id ordering
                 pair_id = (id1, id2) if id1 <= id2 else (id2, id1)
 
-                similarities.append(PoseSimilarity(
+                similarities.append(PoseSimilarityData(
                     pair_id=pair_id,
                     values=similarity_data.values,
                     scores=similarity_data.scores

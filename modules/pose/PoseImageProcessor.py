@@ -83,14 +83,15 @@ class PoseImageProcessor:
         if image_channels == 1:
             crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2RGB)
 
-        # Apply padding if the roi is outside the image bounds
-        left_padding: int = -min(0, x)
-        top_padding: int = -min(0, y)
-        right_padding: int = max(0, x + w - image_width)
-        bottom_padding: int = max(0, y + h - image_height)
+        needs_padding = (x < 0 or y < 0 or x + w > image_width or y + h > image_height)
 
-        if left_padding + right_padding + top_padding + bottom_padding > 0:
-            crop = cv2.copyMakeBorder(crop, top_padding, bottom_padding, left_padding, right_padding, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+        if needs_padding:
+            top = max(0, -y)
+            bottom = max(0, y + h - image_height)
+            left = max(0, -x)
+            right = max(0, x + w - image_width)
+            crop = cv2.copyMakeBorder(crop, top, bottom, left, right, cv2.BORDER_CONSTANT, value=[0, 0, 0])
 
-        # Resize the cutout to the desired size
-        return cv2.resize(crop, (output_width, output_height), interpolation=cv2.INTER_AREA)
+        interpolation = cv2.INTER_AREA if (output_width < w or output_height < h) else cv2.INTER_CUBIC
+
+        return cv2.resize(crop, (output_width, output_height), interpolation=interpolation)

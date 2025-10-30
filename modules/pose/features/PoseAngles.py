@@ -78,11 +78,8 @@ class PoseAngleData(PoseFeatureBase[AngleJoint]):
     Note: Right-side angles are mirrored in compute(), so symmetric poses have similar left/right values.
     """
 
-    values: np.ndarray = field(default_factory=lambda: np.full(ANGLE_NUM_JOINTS, np.nan, dtype=np.float32))
-    scores: np.ndarray = field(default_factory=lambda: np.zeros(ANGLE_NUM_JOINTS, dtype=np.float32))
-
-    @property
-    def joint_enum(self) -> type[AngleJoint]:
+    @classmethod
+    def joint_enum(cls) -> type[AngleJoint]:
         """Return the AngleJoint enum class."""
         return AngleJoint
 
@@ -119,6 +116,7 @@ class PoseAngleData(PoseFeatureBase[AngleJoint]):
 
 
 # ========== FACTORY ==========
+
 class PoseAngleFactory:
 
     @staticmethod
@@ -158,7 +156,7 @@ class PoseAngleFactory:
             PoseAngleData with computed angles and confidence scores
         """
         if point_data is None:
-            return PoseAngleData()
+            return PoseAngleData.create_empty()
 
         angle_values: np.ndarray = np.full(ANGLE_NUM_JOINTS, np.nan, dtype=np.float32)
         angle_scores: np.ndarray = np.zeros(ANGLE_NUM_JOINTS, dtype=np.float32)
