@@ -19,7 +19,7 @@ POSE_ANGLE_MOTION_WEIGHTS: dict[AngleJoint, float] = {
     AngleJoint.right_hip:        0.8,
     AngleJoint.left_knee:        1.2,
     AngleJoint.right_knee:       1.2,
-    AngleJoint.torso:            2.0,
+    # AngleJoint.torso:            2.0,
     AngleJoint.head:             2.0
 }
 

@@ -24,8 +24,12 @@ void main() {
     float value = texelFetch(values_buffer, joint_index).r;
     float score = texelFetch(scores_buffer, joint_index).r;
 
+    // float test = texelFetch(values_buffer, 0).r;
+
+    // fragColor = vec4(joint_index *joint_width, joint_width, joint_width, 1.0);
+
     // Check if value is valid (not NaN and has confidence)
-    if (isnan(value) || score <= 0.0) {
+    if (score <= 0.0) {
         fragColor = vec4(0.2, 0.2, 0.2, 1.0); // Gray for invalid joints
         return;
     }
@@ -33,6 +37,8 @@ void main() {
     // Normalize value to [0, 1]
     float normalized_value = (value - value_min) / (value_max - value_min);
     normalized_value = clamp(normalized_value, 0.0, 1.0);
+
+    // fragColor = vec4(normalized_value, normalized_value, normalized_value, 1.0);
 
     // Draw vertical bar from bottom up to normalized_value height
     if (texCoord.y <= normalized_value) {

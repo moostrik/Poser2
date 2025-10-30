@@ -53,7 +53,7 @@ class PoseFeatureLayer(LayerBase):
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
         if not PoseFeatureLayer.pose_feature_shader.allocated:
-            PoseFeatureLayer.pose_feature_shader.allocate(monitor_file=False)
+            PoseFeatureLayer.pose_feature_shader.allocate(monitor_file=True)
 
         key: int = self.cam_id
 
@@ -64,13 +64,13 @@ class PoseFeatureLayer(LayerBase):
             self.fbo.end()
             return
 
-        angles: PoseAngleData = self.data.get_angles(key)
+        angles: PoseAngleData = self.data.get_motions(key)
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         # Define value range based on feature type
-        value_range: tuple[float, float] = (-np.pi, np.pi)  # For angles in radians
+        value_range: tuple[float, float] = (0, .2)  # For angles in radians
 
         PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, angles, value_range)
 
@@ -97,7 +97,7 @@ class PoseFeatureLayer(LayerBase):
         for i in range(num_joints):
             string: str = joint_names[i]
             x: int = int((i + 0.1) * step)
-            y: int = self.fbo.height - 25
+            y: int = int(self.fbo.height * 0.5 - 12)
             clr: int = i % 2
 
             draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore

@@ -17,8 +17,8 @@ class AngleJoint(IntEnum):
     right_hip =      5
     left_knee =      6
     right_knee =     7
-    torso =          8  # Torso rotation (special calculation)
-    head =           9  # Head yaw (special calculation)
+    # torso =          8  # Torso rotation (special calculation)
+    head =           8  # Head yaw (special calculation)
 
 ANGLE_JOINT_NAMES: list[str] = [e.name for e in AngleJoint]
 ANGLE_NUM_JOINTS: int = len(AngleJoint)
@@ -262,9 +262,9 @@ class PoseAngleFactory:
             elif joint == AngleJoint.head:
                 # Special: head yaw
                 angle = PoseAngleFactory._calculate_head_yaw(points[0], points[1], points[2], points[3], rotate_by)
-            elif joint == AngleJoint.torso:
-                # Special: torso rotation
-                angle = PoseAngleFactory._calculate_torso_rotation(points[0], points[1], points[2], points[3], rotate_by)
+            # elif joint == AngleJoint.torso:
+            #     # Special: torso rotation
+            #     angle = PoseAngleFactory._calculate_torso_rotation(points[0], points[1], points[2], points[3], rotate_by)
             else:
                 continue
 
