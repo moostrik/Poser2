@@ -38,20 +38,20 @@ ANGLE_JOINT_KEYPOINTS: dict[AngleJoint, tuple[PoseJoint, ...]] = {
     AngleJoint.right_knee:     (PoseJoint.right_hip,      PoseJoint.right_knee,     PoseJoint.right_ankle),
     # Special 4-point measurements
     AngleJoint.head:           (PoseJoint.left_eye,       PoseJoint.right_eye,      PoseJoint.left_shoulder, PoseJoint.right_shoulder),
-    AngleJoint.torso:          (PoseJoint.left_shoulder,  PoseJoint.right_shoulder, PoseJoint.left_hip,      PoseJoint.right_hip),
+    # AngleJoint.torso:          (PoseJoint.left_shoulder,  PoseJoint.right_shoulder, PoseJoint.left_hip,      PoseJoint.right_hip),
 }
 
-ANGLE_JOINT_ROTATIONS: dict[AngleJoint, float] = {
-    AngleJoint.left_shoulder:  0.0,
-    AngleJoint.right_shoulder: 0.0,
-    AngleJoint.left_elbow:     np.pi,
-    AngleJoint.right_elbow:    np.pi,
-    AngleJoint.left_hip:       np.pi,
-    AngleJoint.right_hip:      np.pi,
-    AngleJoint.left_knee:      np.pi,
-    AngleJoint.right_knee:     np.pi,
-    AngleJoint.head:           0.0,
-    AngleJoint.torso:          0.0
+NEUTRAL_ROTATIONS: dict[AngleJoint, float] = {
+    AngleJoint.left_shoulder:   0.15 * np.pi,
+    AngleJoint.right_shoulder: -0.15 * np.pi,
+    AngleJoint.left_elbow:      0.9 * np.pi,
+    AngleJoint.right_elbow:    -0.9 * np.pi,
+    AngleJoint.left_hip:       -0.95 * np.pi,
+    AngleJoint.right_hip:       0.95 * np.pi,
+    AngleJoint.left_knee:       np.pi,
+    AngleJoint.right_knee:      np.pi,
+    AngleJoint.head:            0.0,
+    # AngleJoint.torso:           0.0
 }
 
 # Right-side joints that should be mirrored for symmetric representation
@@ -253,7 +253,7 @@ class PoseAngleFactory:
             # Extract points using .get() method (returns NaN array if invalid)
             points = [point_data.get(kp) for kp in keypoints]
 
-            rotate_by = ANGLE_JOINT_ROTATIONS[joint]
+            rotate_by = NEUTRAL_ROTATIONS[joint]
 
             # Compute angle based on number of keypoints
             if len(keypoints) == 3:
