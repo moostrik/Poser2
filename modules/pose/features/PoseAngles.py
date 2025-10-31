@@ -6,7 +6,7 @@ import numpy as np
 
 from modules.pose.PoseTypes import PoseJoint
 from modules.pose.features.PosePoints import PosePointData
-from modules.pose.features.PoseFeatureBase import PoseFeatureBase
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
 class AngleJoint(IntEnum):
     left_shoulder =  0
@@ -65,10 +65,10 @@ ANGLE_JOINT_SYMMETRIC_MIRROR: set[AngleJoint] = {
 
 
 @dataclass(frozen=True)
-class PoseAngleData(PoseFeatureBase[AngleJoint]):
+class PoseAngleData(PoseAngleFeatureBase[AngleJoint]):
     """Container for joint angle measurements with convenient access and statistics.
 
-    Stores angle values (in radians) and confidence scores for body joints.
+    Stores angle values (in radians, [-π, π]) and confidence scores for body joints.
     Provides dict-like access, iteration, and summary statistics over valid angles.
 
     Individual angles can be NaN to indicate missing/uncomputable joints.
@@ -78,21 +78,17 @@ class PoseAngleData(PoseFeatureBase[AngleJoint]):
     Note: Right-side angles are mirrored in compute(), so symmetric poses have similar left/right values.
     """
 
+    # ========== CLASS-LEVEL PROPERTIES ==========
+
     @classmethod
     def joint_enum(cls) -> type[AngleJoint]:
         """Return the AngleJoint enum class."""
         return AngleJoint
 
-    def validate(self) -> None:
-        """Validate that all non-NaN angles are in [-π, π] range."""
-        valid_values = self.values[~np.isnan(self.values)]
-        if valid_values.size > 0:
-            if np.any((valid_values < -np.pi) | (valid_values > np.pi)):
-                out_of_range = valid_values[(valid_values < -np.pi) | (valid_values > np.pi)]
-                raise ValueError(
-                    f"Angle values must be in range [-π, π]. "
-                    f"Found values outside range: {out_of_range}"
-                )
+    @classmethod
+    def default_range(cls) -> tuple[float, float]:
+        """Return the default range for angle joints."""
+        return (-np.pi, np.pi)
 
     # ========== ANGLE-SPECIFIC OPERATIONS =========
 
@@ -201,6 +197,7 @@ class PoseAngleData(PoseFeatureBase[AngleJoint]):
     # min_value and max_value inherited from base class
     # They work but have limited meaning for circular data
     # (e.g., min of [-π, π] doesn't mean they're "far apart")
+
 
 # ========== FACTORY ==========
 

@@ -20,7 +20,7 @@ class FeatureStatistic(Enum):
     MEDIAN = 'median'
 
 @dataclass(frozen=True)
-class PoseFeatureBase(ABC, Generic[JointEnum]):
+class PoseAngleFeatureBase(ABC, Generic[JointEnum]):
     """Abstract base class for per-joint pose features with confidence scores.
 
     Immutable container for per-joint measurements with confidence scores.
@@ -40,17 +40,6 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
         self.values.flags.writeable = False
         self.scores.flags.writeable = False
 
-        # Run all validations
-        self._validate_base()
-        self.validate()  # Hook for subclass validation
-
-    def _validate_base(self) -> None:
-        """Base class validation - DO NOT OVERRIDE.
-
-        Validates:
-        - Arrays are 1D with correct length for joint enum
-        - NaN values must have 0.0 scores
-        """
         # Validate both arrays are 1D
         if self.values.ndim != 1:
             raise ValueError(
@@ -73,6 +62,17 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
                 f"scores array length ({len(self.scores)}) must match joint enum length ({expected_length})"
             )
 
+        # Validate similarity values are in default range
+        valid_values = self.values[~np.isnan(self.values)]
+        if valid_values.size > 0:
+            min_range, max_range = self.__class__.default_range()
+            if np.any((valid_values < min_range) | (valid_values > max_range)):
+                out_of_range = valid_values[(valid_values < min_range) | (valid_values > max_range)]
+                raise ValueError(
+                    f"Values must be in range [{min_range}, {max_range}]. "
+                    f"Found values outside range: {out_of_range}"
+                )
+
         # Validate: NaN values must have 0.0 scores
         nan_mask = np.isnan(self.values)
         valid_mask = self.scores > 0.0
@@ -85,23 +85,21 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
                 f"Invalid joints: {', '.join(invalid_joints)}"
             )
 
-    @abstractmethod
-    def validate(self) -> None:
-        """Custom validation logic for subclasses.
-
-        Override this method to add subclass-specific validation.
-        Called automatically during __post_init__.
-
-        Raises:
-            ValueError: If validation fails
-        """
-        pass  # Default: no additional validation
+    # ========== ABSTRACT METHODS ==========
 
     @classmethod
     @abstractmethod
     def joint_enum(cls) -> type[JointEnum]:
         """Get the joint enum type for this class. Must be implemented by subclasses."""
         pass
+
+    @classmethod
+    @abstractmethod
+    def default_range(cls) -> tuple[float, float]:
+        """Get the default/expected range for this feature type."""
+        pass
+
+    # ========== CONSTRUCTORS ==========
 
     @classmethod
     def from_values(cls, values: np.ndarray, scores: np.ndarray | None = None) -> Self:
@@ -118,6 +116,8 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
         scores: np.ndarray = np.zeros(num_joints, dtype=np.float32)
         return cls(values=values, scores=scores)
 
+    # ========== REPRESENTATION ==========
+
     def __repr__(self) -> str:
         """Readable string representation."""
         if not self.any_valid:
@@ -125,7 +125,42 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
 
         mean_score = float(np.mean(self.scores[self.valid_mask]))
         return f"{self.__class__.__name__}({self.valid_count}/{len(self.values)}, score={mean_score:.2f})"
-        # ========== VALIDATION ==========
+
+    # ========== ACCESS ==========
+
+    def __len__(self) -> int:
+        """Return total number of joints (including invalid)."""
+        return len(self.values)
+
+    def __getitem__(self, joint: JointEnum | int) -> float:
+        """Get value for a joint (may be NaN)."""
+        return float(self.values[joint])
+
+    def get(self, joint: JointEnum | int, default: float = np.nan) -> float:
+        """Get value with default for NaN."""
+        value = self.values[joint]
+        return value if not np.isnan(value) else default
+
+    def get_score(self, joint: JointEnum | int) -> float:
+        """Get score for a joint (always between 0.0 and 1.0)."""
+        return self.scores[joint]
+
+    def to_dict(self, include_invalid: bool = False) -> dict[str, float]:
+        """Convert to dictionary.
+
+        Args:
+            include_invalid: If True, includes NaN values. If False, only valid joints.
+
+        Returns:
+            Dictionary mapping joint names to values
+        """
+        if include_invalid:
+            return {self.joint_enum()(i).name: float(v) for i, v in enumerate(self.values)}
+        else:
+            return {joint.name: self.values[joint] for joint in self.valid_joints}
+
+
+    # ========== VALIDATION ==========
 
     @cached_property
     def valid_mask(self) -> np.ndarray:
@@ -216,36 +251,3 @@ class PoseFeatureBase(ABC, Generic[JointEnum]):
         if not hasattr(self, statistic.value):
             return np.nan
         return getattr(self, statistic.value)
-
-    # ========== ACCESS ==========
-
-    def __len__(self) -> int:
-        """Return total number of joints (including invalid)."""
-        return len(self.values)
-
-    def __getitem__(self, joint: JointEnum | int) -> float:
-        """Get value for a joint (may be NaN)."""
-        return float(self.values[joint])
-
-    def get(self, joint: JointEnum | int, default: float = np.nan) -> float:
-        """Get value with default for NaN."""
-        value = self.values[joint]
-        return value if not np.isnan(value) else default
-
-    def get_score(self, joint: JointEnum | int) -> float:
-        """Get score for a joint (always between 0.0 and 1.0)."""
-        return self.scores[joint]
-
-    def to_dict(self, include_invalid: bool = False) -> dict[str, float]:
-        """Convert to dictionary.
-
-        Args:
-            include_invalid: If True, includes NaN values. If False, only valid joints.
-
-        Returns:
-            Dictionary mapping joint names to values
-        """
-        if include_invalid:
-            return {self.joint_enum()(i).name: float(v) for i, v in enumerate(self.values)}
-        else:
-            return {joint.name: self.values[joint] for joint in self.valid_joints}

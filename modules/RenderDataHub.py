@@ -22,22 +22,23 @@ from collections.abc import Mapping
 
 from modules.pose.Pose import PoseDict
 from modules.pose.features.PoseAngles import PoseAngleData
-from modules.pose.features.PoseAngleSymmetry import PoseSymmetryData
+from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
 from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
 from modules.pose.trackers.PoseViewportTracker import PoseViewportTracker, PoseViewportTrackerSettings
 from modules.pose.trackers.PoseAngleTracker import PoseAngleTracker, PoseAngleTrackerSettings
 from modules.Settings import Settings
 from modules.utils.SmoothedInterpolator import OneEuroSettings, SmoothedInterpolator
 from modules.utils.PointsAndRects import Rect
-from modules.pose.features.PoseSimilarities import PoseSimilarityBatch
+from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 class RenderDataHub:
     def __init__(self, settings: Settings) -> None:
         self._num_players: int = settings.num_players
+        fps: int = settings.camera_fps
 
-        self.one_euro_settings: OneEuroSettings = OneEuroSettings(25, 1.0, 0.1)
+        self.one_euro_settings: OneEuroSettings = OneEuroSettings(fps, 1.0, 0.1)
         self.viewport_settings: PoseViewportTrackerSettings = PoseViewportTrackerSettings(
             smooth_settings=self.one_euro_settings,
             center_dest_x=0.5,
@@ -159,7 +160,7 @@ class RenderDataHub:
         with self._lock:
             return self._angle_trackers[tracklet_id].motions
 
-    def get_symmetries(self, tracklet_id: int) -> PoseSymmetryData:
+    def get_symmetries(self, tracklet_id: int) -> PoseAngleSymmetryData:
         """Get the synchrony value for the specified symmetric joint type."""
         with self._lock:
             return self._angle_trackers[tracklet_id].symmetries

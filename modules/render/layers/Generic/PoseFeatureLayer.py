@@ -16,7 +16,7 @@ from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 
 from modules.pose.PoseTypes import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
-from modules.pose.features.PoseFeatureBase import PoseFeatureBase
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
 from modules.RenderDataHub import RenderDataHub
 from modules.render.meshes.PoseMeshes import PoseMeshes
@@ -77,7 +77,7 @@ class PoseFeatureLayer(LayerBase):
                 # Draw joint labels on top of bars
         self.draw_joint_labels(angles)
 
-    def draw_joint_labels(self, feature: PoseFeatureBase) -> None:
+    def draw_joint_labels(self, feature: PoseAngleFeatureBase) -> None:
         """Draw joint names at the bottom of each bar."""
         num_joints: int = len(feature)
         step: float = self.fbo.width / num_joints

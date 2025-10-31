@@ -4,7 +4,7 @@ from time import time
 
 from modules.pose.Pose import Pose
 from modules.pose.features.PoseAngles import AngleJoint, PoseAngleData
-from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryFactory, PoseSymmetryData
+from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryFactory, PoseAngleSymmetryData
 from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
@@ -52,7 +52,7 @@ class PoseAngleTracker(PoseTrackerBase):
         self._acceleration_data: PoseAngleData = PoseAngleData.create_empty()
         self._motion_data: PoseAngleData = PoseAngleData.create_empty()
         self._cumulative_motion_data: PoseAngleData = PoseAngleData.create_empty()
-        self._symmetry_data: PoseSymmetryData = PoseSymmetryData.create_empty()
+        self._symmetry_data: PoseAngleSymmetryData = PoseAngleSymmetryData.create_empty()
 
         self._angles_dirty = False
         self._velocities_dirty = False
@@ -128,7 +128,7 @@ class PoseAngleTracker(PoseTrackerBase):
         self._acceleration_data = PoseAngleData.create_empty()
         self._motion_data = PoseAngleData.create_empty()
         self._cumulative_motion_data = PoseAngleData.create_empty()
-        self._symmetry_data = PoseSymmetryData.create_empty()
+        self._symmetry_data = PoseAngleSymmetryData.create_empty()
 
         self._angles_dirty = False
         self._velocities_dirty = False
@@ -200,6 +200,6 @@ class PoseAngleTracker(PoseTrackerBase):
         return self._cumulative_total_motion
 
     @property
-    def symmetries(self) -> PoseSymmetryData:
+    def symmetries(self) -> PoseAngleSymmetryData:
         """Current pose symmetry metrics"""
         return self._symmetry_data

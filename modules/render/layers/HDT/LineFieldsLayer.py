@@ -25,7 +25,7 @@ from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
 from modules.gl.shaders.HDT_LineBlend import HDT_LineBlend
 from modules.RenderDataHub import RenderDataHub
-from modules.pose.features.PoseAngleSymmetry import PoseSymmetryData
+from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
 from modules.pose.features.PoseAngles import AngleJoint
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.utils.Smoothing import OneEuroFilterAngular

@@ -3,7 +3,7 @@ from modules.gl.Shader import Shader, draw_quad
 
 import numpy as np
 
-from modules.pose.features.PoseFeatureBase import PoseFeatureBase
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
 class PoseFeature(Shader):
     def __init__(self) -> None:
@@ -13,7 +13,7 @@ class PoseFeature(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, feature: PoseFeatureBase, value_range: tuple[float, float]) -> None:
+    def use(self, fbo: int, feature: PoseAngleFeatureBase, value_range: tuple[float, float]) -> None:
         super().use()
         if not self.allocated: return
         if not fbo: return

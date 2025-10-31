@@ -7,41 +7,40 @@ import pandas as pd
 from dataclasses import dataclass, field
 from typing import Callable, Iterator, Optional
 
-from modules.pose.features.PoseFeatureBase import PoseFeatureBase, FeatureStatistic
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase, FeatureStatistic
 from modules.pose.features.PoseAngles import AngleJoint
 
 @dataclass(frozen=True)
-class PoseSimilarityData(PoseFeatureBase[AngleJoint]):
+class PoseAngleSimilarityData(PoseAngleFeatureBase[AngleJoint]):
     """Similarity scores between two poses for all joints."""
 
     pair_id: tuple[int, int]
+
+    # ========== INSTANCE-LEVEL METHODS ==========
+
+    def __post_init__(self) -> None:
+        """Validate data integrity."""
+
+        if self.pair_id[0] == self.pair_id[1]:
+            raise ValueError(f"Cannot correlate pose with itself: {self.pair_id[0]}")
+        if self.pair_id[0] > self.pair_id[1]:
+            raise ValueError(f"pair_id must be ordered as (smaller, larger), got {self.pair_id}")
+
+        super().__post_init__()
+
+    # ========== CLASS-LEVEL PROPERTIES ==========
 
     @classmethod
     def joint_enum(cls) -> type[AngleJoint]:
         """Return the AngleJoint enum class."""
         return AngleJoint
 
-    def validate(self) -> None:
-        """Validate pair_id and similarity values.
+    @classmethod
+    def default_range(cls) -> tuple[float, float]:
+        """Return the default range for angle joints."""
+        return (-np.pi, np.pi)
 
-        Called automatically during construction.
-        """
-        # Validate pair_id ordering
-        if self.pair_id[0] == self.pair_id[1]:
-            raise ValueError(f"Cannot correlate pose with itself: {self.pair_id[0]}")
-        if self.pair_id[0] > self.pair_id[1]:
-            raise ValueError(f"pair_id must be ordered as (smaller, larger), got {self.pair_id}")
-
-        # Validate similarity values are in [0, 1] range
-        valid_values = self.values[~np.isnan(self.values)]
-        if valid_values.size > 0:
-            if np.any((valid_values < 0.0) | (valid_values > 1.0)):
-                out_of_range = valid_values[(valid_values < 0.0) | (valid_values > 1.0)]
-                raise ValueError(
-                    f"Similarity values must be in range [0, 1]. "
-                    f"Found values outside range: {out_of_range}"
-                )
-
+    # ========== PROPERTIES ==========
     @property
     def id_1(self) -> int:
         """First tracklet ID (always smaller)."""
@@ -59,13 +58,13 @@ class PoseSimilarityBatch:
 
     Simple container with O(1) lookup and iteration support.
     """
-    pair_correlations: list[PoseSimilarityData ]
+    pair_correlations: list[PoseAngleSimilarityData ]
     timestamp: pd.Timestamp = field(default_factory=pd.Timestamp.now)
-    _pair_lookup: dict[tuple[int, int], PoseSimilarityData ] = field(init=False, repr=False, compare=False, default_factory=dict)
+    _pair_lookup: dict[tuple[int, int], PoseAngleSimilarityData ] = field(init=False, repr=False, compare=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         """Build O(1) lookup index for pair access"""
-        lookup: dict[tuple[int, int], PoseSimilarityData ] = {pc.pair_id: pc for pc in self.pair_correlations}
+        lookup: dict[tuple[int, int], PoseAngleSimilarityData ] = {pc.pair_id: pc for pc in self.pair_correlations}
         object.__setattr__(self, '_pair_lookup', lookup)
 
     def __repr__(self) -> str:
@@ -80,7 +79,7 @@ class PoseSimilarityBatch:
         pair_id = (min(pair_id), max(pair_id))
         return pair_id in self._pair_lookup
 
-    def __iter__(self) -> Iterator[PoseSimilarityData ]:
+    def __iter__(self) -> Iterator[PoseAngleSimilarityData ]:
         """Support 'for pair in batch' syntax"""
         return iter(self.pair_correlations)
 
@@ -89,16 +88,16 @@ class PoseSimilarityBatch:
         """True if batch contains no pairs"""
         return len(self) == 0
 
-    def get_pair(self, pair_id: tuple[int, int]) -> Optional[PoseSimilarityData ]:
+    def get_pair(self, pair_id: tuple[int, int]) -> Optional[PoseAngleSimilarityData ]:
         """Get correlation for specific pair (O(1) lookup)."""
         pair_id = (min(pair_id), max(pair_id))
         return self._pair_lookup.get(pair_id)
 
-    def get_top_pairs(self, n: int = 5, min_valid_joints: int = 1, metric: FeatureStatistic = FeatureStatistic.MEAN) -> list[PoseSimilarityData ]:
+    def get_top_pairs(self, n: int = 5, min_valid_joints: int = 1, metric: FeatureStatistic = FeatureStatistic.MEAN) -> list[PoseAngleSimilarityData ]:
         """Get top N most similar pairs, sorted by metric (descending)."""
         if self.is_empty or n <= 0:
             return []
-        valid_pairs: list[PoseSimilarityData ] = [pc for pc in self.pair_correlations if pc.valid_count >= min_valid_joints]
+        valid_pairs: list[PoseAngleSimilarityData ] = [pc for pc in self.pair_correlations if pc.valid_count >= min_valid_joints]
         return sorted(valid_pairs, key=lambda pc: pc.get_stat(metric), reverse=True)[:n]
 
 PoseSimilarityBatchCallback = Callable[[PoseSimilarityBatch ], None]

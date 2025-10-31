@@ -3,7 +3,7 @@ import numpy as np
 from functools import cached_property
 from dataclasses import dataclass
 
-from modules.pose.features.PoseSimilarities import PoseSimilarityBatch, FeatureStatistic
+from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch, FeatureStatistic
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 

@@ -7,7 +7,7 @@ from enum import IntEnum
 from numpy._typing._array_like import NDArray
 
 from modules.pose.features.PoseAngles import PoseAngleData, AngleJoint
-from modules.pose.features.PoseFeatureBase import PoseFeatureBase
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
 class SymmetricJoint(IntEnum):
     shoulder = 0
@@ -27,7 +27,7 @@ SYMMETRIC_JOINT_PAIRS: dict[SymmetricJoint, tuple[AngleJoint, AngleJoint]] = {
 
 
 @dataclass(frozen=True)
-class PoseSymmetryData(PoseFeatureBase[SymmetricJoint]):
+class PoseAngleSymmetryData(PoseAngleFeatureBase[SymmetricJoint]):
     """Symmetry metrics for symmetric joint pairs.
 
     Measures how similar left/right joint angles are after mirroring. Multiple mean
@@ -37,23 +37,26 @@ class PoseSymmetryData(PoseFeatureBase[SymmetricJoint]):
     Scores represent confidence in the measurement.
     """
 
+    # ========== CLASS-LEVEL PROPERTIES ==========
+
     @classmethod
     def joint_enum(cls) -> type[SymmetricJoint]:
         """The enum class used for joint indexing."""
         return SymmetricJoint
 
-    def validate(self) -> None:
-        """Validate that all symmetry values are in [0, 1] range."""
-        valid_values = self.values[~np.isnan(self.values)]
-        if np.any((valid_values < 0.0) | (valid_values > 1.0)):
-            raise ValueError("Symmetry values must be in range [0, 1]")
+    @classmethod
+    def default_range(cls) -> tuple[float, float]:
+        """Return the default range for symmetry scores."""
+        return (0.0, 1.0)
 
+
+# ========== FACTORY ==========
 
 class PoseAngleSymmetryFactory:
     """Utility class for computing symmetry metrics from angle data."""
 
     @staticmethod
-    def from_dict(symmetries: dict[SymmetricJoint, float]) -> PoseSymmetryData:
+    def from_dict(symmetries: dict[SymmetricJoint, float]) -> PoseAngleSymmetryData:
         """Create symmetry data from dictionary of symmetry values.
 
         Args:
@@ -63,10 +66,10 @@ class PoseAngleSymmetryFactory:
             PoseSymmetryData instance
         """
         values: np.ndarray = np.array([symmetries.get(jt, np.nan) for jt in SymmetricJoint], dtype=np.float32)
-        return PoseSymmetryData.from_values(values)
+        return PoseAngleSymmetryData.from_values(values)
 
     @staticmethod
-    def from_angles(angle_data: PoseAngleData, symmetry_exponent: float = 1.0) -> PoseSymmetryData:
+    def from_angles(angle_data: PoseAngleData, symmetry_exponent: float = 1.0) -> PoseAngleSymmetryData:
         """Calculate symmetry metrics from angle data.
 
         Args:
@@ -97,4 +100,4 @@ class PoseAngleSymmetryFactory:
                 symmetry = (1.0 - normalized_diff) ** symmetry_exponent
                 values[joint_type] = float(max(0.0, min(1.0, symmetry)))
 
-        return PoseSymmetryData.from_values(values)
+        return PoseAngleSymmetryData.from_values(values)
