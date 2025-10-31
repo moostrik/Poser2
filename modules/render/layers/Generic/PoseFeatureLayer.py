@@ -29,7 +29,7 @@ from modules.gl.shaders.PoseFeature import PoseFeature
 class PoseFeatureLayer(LayerBase):
     pose_feature_shader = PoseFeature()
 
-    def __init__(self, data: RenderDataHub, pose_meshes: PoseMeshes, cam_id: int) -> None:
+    def __init__(self, data: RenderDataHub, cam_id: int) -> None:
         self.data: RenderDataHub = data
         self.fbo: Fbo = Fbo()
         self.cam_id: int = cam_id
@@ -64,15 +64,13 @@ class PoseFeatureLayer(LayerBase):
             self.fbo.end()
             return
 
-        angles: PoseAngleData = self.data.get_motions(key)
+        angles: PoseAngleData = self.data.get_angles(key)
+        range_scale: float = 1.0
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        # Define value range based on feature type
-        value_range: tuple[float, float] = (0, .2)  # For angles in radians
-
-        PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, angles, value_range)
+        PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, angles, range_scale)
 
                 # Draw joint labels on top of bars
         self.draw_joint_labels(angles)

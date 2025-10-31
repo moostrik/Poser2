@@ -42,7 +42,7 @@ class Settings():
         # CAMERA SETTINGS
         self.camera_list: list[str]             = None # type: ignore
         self.camera_num: int                    = None # type: ignore
-        self.camera_fps: int                    = None # type: ignore
+        self.camera_fps: float                  = None # type: ignore
         self.camera_square: bool                = None # type: ignore
         self.camera_color: bool                 = None # type: ignore
         self.camera_stereo: bool                = None # type: ignore

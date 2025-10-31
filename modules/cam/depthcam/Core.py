@@ -33,7 +33,7 @@ class Core(Thread):
 
         # FIXED SETTINGS
         self.model_path: str =          general_settings.path_model
-        self.fps: int =                 general_settings.camera_fps
+        self.fps: float =               general_settings.camera_fps
         self.square: bool =             general_settings.camera_square
         self.do_color: bool =           general_settings.camera_color
         self.do_stereo: bool =          general_settings.camera_stereo

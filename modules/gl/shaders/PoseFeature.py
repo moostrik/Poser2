@@ -13,7 +13,7 @@ class PoseFeature(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, feature: PoseAngleFeatureBase, value_range: tuple[float, float]) -> None:
+    def use(self, fbo: int, feature: PoseAngleFeatureBase, range_scale: float = 1.0) -> None:
         super().use()
         if not self.allocated: return
         if not fbo: return
@@ -21,6 +21,8 @@ class PoseFeature(Shader):
         # Flatten values and scores to pass to shader
         values: np.ndarray = np.nan_to_num(feature.values.astype(np.float32), nan=0.0)
         scores: np.ndarray = feature.scores.astype(np.float32)
+        min_range: float = feature.default_range()[0] * range_scale
+        max_range: float = feature.default_range()[1] * range_scale
 
         # Create buffer objects
         vbo_values = glGenBuffers(1)
@@ -47,8 +49,8 @@ class PoseFeature(Shader):
 
         # Pass uniforms to shader
         glUniform1i(glGetUniformLocation(s, "num_joints"), len(feature))
-        glUniform1f(glGetUniformLocation(s, "value_min"), value_range[0])
-        glUniform1f(glGetUniformLocation(s, "value_max"), value_range[1])
+        glUniform1f(glGetUniformLocation(s, "value_min"), min_range)
+        glUniform1f(glGetUniformLocation(s, "value_max"), max_range)
 
         # Bind texture units
         glActiveTexture(GL_TEXTURE0)

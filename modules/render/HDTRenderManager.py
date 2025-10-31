@@ -35,7 +35,7 @@ class HDTRenderManager(RenderBase):
         self.num_players: int =     settings.num_players
         self.num_cams: int =        settings.camera_num
         num_R_streams: int =   settings.render_R_num
-        R_stream_capacity: int = settings.camera_fps * 10  # 10 seconds buffer
+        R_stream_capacity: int = int(settings.camera_fps * 10)  # 10 seconds buffer
 
         # data
         self.render_data: RenderDataHub =   render_data_hub
@@ -64,7 +64,7 @@ class HDTRenderManager(RenderBase):
             self.centre_cam_layers[i] = CentreCamLayer(self.capture_data, self.render_data, i)
             self.centre_pose_layers[i] = CentrePoseRender(self.capture_data, self.render_data, self.pose_meshes, i)
             self.pose_overlays[i] = PoseStreamLayer(self.capture_data, self.pose_meshes, i)
-            self.pose_feature_layers[i] = PoseFeatureLayer(self.render_data, self.pose_meshes, i)
+            self.pose_feature_layers[i] = PoseFeatureLayer(self.render_data, i)
             self.line_field_layers[i] = LineFieldLayer(self.render_data, self.cam_fbos, i)
             self.cam_fbos[i] = self.centre_cam_layers[i].get_fbo()
             # self.cam_fbos[i] = self.camera_layers[i].fbo

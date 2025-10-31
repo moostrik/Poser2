@@ -36,7 +36,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class RenderDataHub:
     def __init__(self, settings: Settings) -> None:
         self._num_players: int = settings.num_players
-        fps: int = settings.camera_fps
+        fps: float = settings.camera_fps
 
         self.one_euro_settings: OneEuroSettings = OneEuroSettings(fps, 1.0, 0.1)
         self.viewport_settings: PoseViewportTrackerSettings = PoseViewportTrackerSettings(
