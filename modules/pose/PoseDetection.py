@@ -148,7 +148,7 @@ class PoseDetection(Thread):
         print("PoseDetection: Model warmup complete")
 
         while not self._shutdown_event.is_set():
-            self._notify_update_event.wait(timeout=1.0)
+            self._notify_update_event.wait()
 
             if self._shutdown_event.is_set():
                 break

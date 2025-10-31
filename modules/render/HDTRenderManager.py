@@ -151,7 +151,7 @@ class HDTRenderManager(RenderBase):
             self.centre_pose_layers[i].update()
             self.pose_overlays[i].update()
             self.pose_feature_layers[i].update()
-            self.line_field_layers[i].update()
+            # self.line_field_layers[i].update()
 
         # if (t5-t0) * 1000 > 10:
         #     print(f"t1 {(t1 - t0)*1000:4.0f} | t2 {(t2 - t1)*1000:4.0f} | t3 {(t3 - t2)*1000:4.0f} | t4 {(t4 - t3)*1000:4.0f} | t5 {(t5 - t4)*1000:4.0f} | total {(t5 - t0)*1000:4.0f} ms")

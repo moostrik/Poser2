@@ -32,13 +32,13 @@ class PoseFeature(Shader):
         tex_values = glGenTextures(1)
         tex_scores = glGenTextures(1)
 
-        # Setup values buffer
+        # # Setup values buffer
         glBindBuffer(GL_TEXTURE_BUFFER, vbo_values)
         glBufferData(GL_TEXTURE_BUFFER, values.nbytes, values, GL_STATIC_DRAW)
         glBindTexture(GL_TEXTURE_BUFFER, tex_values)
         glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, vbo_values)
 
-        # Setup scores buffer
+        # # Setup scores buffer
         glBindBuffer(GL_TEXTURE_BUFFER, vbo_scores)
         glBufferData(GL_TEXTURE_BUFFER, scores.nbytes, scores, GL_STATIC_DRAW)
         glBindTexture(GL_TEXTURE_BUFFER, tex_scores)
@@ -68,8 +68,11 @@ class PoseFeature(Shader):
         glUseProgram(0)
 
         # Cleanup
-        glBindBuffer(GL_TEXTURE_BUFFER, 0)
+        glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_BUFFER, 0)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_BUFFER, 0)
+        glBindBuffer(GL_TEXTURE_BUFFER, 0)
         glDeleteTextures(2, [tex_values, tex_scores])
         glDeleteBuffers(2, [vbo_values, vbo_scores])
 

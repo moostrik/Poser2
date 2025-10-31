@@ -64,16 +64,19 @@ class PoseFeatureLayer(LayerBase):
             self.fbo.end()
             return
 
-        angles: PoseAngleData = self.data.get_angles(key)
-        range_scale: float = 1.0
+
+        # values: PoseAngleData = self.data.get_angles(key)
+        # range_scale: float = 1.0
+        values: PoseAngleData = self.data.get_velocities(key)
+        range_scale: float = 0.0005
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, angles, range_scale)
+        PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, values, range_scale)
 
                 # Draw joint labels on top of bars
-        self.draw_joint_labels(angles)
+        # self.draw_joint_labels(values)
 
     def draw_joint_labels(self, feature: PoseAngleFeatureBase) -> None:
         """Draw joint names at the bottom of each bar."""

@@ -5,6 +5,8 @@ from typing import Optional
 import traceback
 from dataclasses import dataclass
 
+import time
+
 # Third-party imports
 import numpy as np
 from pandas import Timestamp
@@ -108,7 +110,7 @@ class PosePipeline(Thread):
         """Main pipeline loop - processes tracklets and submits to detector"""
         while not self._shutdown_event.is_set():
             # Wait for update signal
-            self._update_event.wait(timeout=1.0)
+            self._update_event.wait()
 
             # Check shutdown again after waking
             if self._shutdown_event.is_set():
@@ -128,6 +130,7 @@ class PosePipeline(Thread):
         tracklets: list[Tracklet] = list(self.get_tracklets().values())
 
         if not tracklets:
+            print("No tracklets to process")
             return
 
         self.batch_counter += 1
@@ -156,6 +159,8 @@ class PosePipeline(Thread):
         if self.pose_detector is not None and self.pose_detector.is_ready:
             pose_data_input = PoseDetectionInput(pending_request.batch_id, pending_request.crop_images)
             self.pose_detector.submit_batch(pose_data_input)
+        else:
+            print("PosePipeline: Pose detector not ready, skipping submission")
 
     def _notify_detection_callback(self, poses: PoseDetectionOutput) -> None:
 
