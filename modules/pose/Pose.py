@@ -33,15 +33,14 @@ class Pose:
     """
 
     tracklet: Tracklet       # Deprecated, but kept for backward compatibility
-    bounding_box: Rect       # Bounding Box, in normalized coordinates, can be outside [0,1]
     detection_image: np.ndarray # Cropped image corresponding to bounding_box (with padding)
     time_stamp: Timestamp    # Time when pose was captured -> should be Unix time in ms
     lost: bool               # Last frame, before being lost
 
+    bounding_box: Rect       # Bounding Box, in normalized coordinates, can be outside [0,1]
     point_data: PosePointData
     angle_data: PoseAngleData
-    pose_velocity_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
-    angle_velocity_data: PosePointData = field(default_factory=PosePointData.create_empty)
+    angle_delta_data: PosePointData = field(default_factory=PosePointData.create_empty)
 
     def __repr__(self) -> str:
         return (f"Pose(id={self.tracklet.id}, points={self.point_data.valid_count if self.point_data else 0}, age={self.age:.2f}s)")
