@@ -54,8 +54,8 @@ class PoseFeatureLayer(LayerBase):
             PoseFeatureLayer.pose_feature_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
+        # self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
         self.fbo2.draw(rect.x, rect.y, rect.width, rect.height)
-        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
@@ -79,38 +79,37 @@ class PoseFeatureLayer(LayerBase):
 
 
 
-        # values: PoseAngleData = self.data.get_angles(key)
+        values: PoseAngleData = self.data.get_angles(key)
         # range_scale: float = 1.0
-        values: PoseAngleData = self.data.get_velocities(key)
-        range_scale: float = 0.001
+        # values: PoseAngleData = self.data.get_velocities(key)
+        # range_scale: float = 0.001
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         if self.capture_data.get_is_active(key):
-            pose: Pose | None = self.capture_data.get_raw_pose(key, True, self.capture_key)
-            if pose is not None:
-                v_c: PoseAngleData = pose.angle_data
+            raw_pose: Pose | None = self.capture_data.get_raw_pose(key, True, self.capture_key)
+            if raw_pose is not None:
+                v_c: PoseAngleData = raw_pose.angle_data
                 if v_c is not None:
-                    PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, v_c, range_scale)
-                    PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, v_c)
-            pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
-            if pose is not None:
-                v_c: PoseAngleData = pose.angle_data
+                    PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, v_c, 1.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
+            smooth_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
+            if smooth_pose is not None:
+                v_c: PoseAngleData = smooth_pose.angle_data
                 if v_c is not None:
-                    PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, range_scale)
-                    PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c)
+                    PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, 1.0)
 
 
                 # Draw joint labels on top of bars
-        # self.draw_joint_labels(values)
+        self.draw_joint_labels(self.fbo2, values)
 
-    def draw_joint_labels(self, feature: PoseAngleFeatureBase) -> None:
+    @staticmethod
+    def draw_joint_labels(fbo: Fbo, feature: PoseAngleFeatureBase) -> None:
         """Draw joint names at the bottom of each bar."""
         num_joints: int = len(feature)
-        step: float = self.fbo.width / num_joints
+        step: float = fbo.width / num_joints
 
-        self.fbo.begin()
+        fbo.begin()
 
         # Get joint names from the feature's enum
         joint_enum_type = feature.__class__.joint_enum()
@@ -125,9 +124,9 @@ class PoseFeatureLayer(LayerBase):
         for i in range(num_joints):
             string: str = joint_names[i]
             x: int = int((i + 0.1) * step)
-            y: int = int(self.fbo.height * 0.5 - 12)
+            y: int = int(fbo.height * 0.5 - 12)
             clr: int = i % 2
 
             draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
 
-        self.fbo.end()
+        fbo.end()

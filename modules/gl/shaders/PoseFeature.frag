@@ -6,6 +6,10 @@ uniform float value_max;
 uniform samplerBuffer values_buffer;
 uniform samplerBuffer scores_buffer;
 
+// Add these uniforms for color control
+uniform vec3 color_low;
+uniform vec3 color_high;
+
 in vec2 texCoord;
 out vec4 fragColor;
 
@@ -24,10 +28,6 @@ void main() {
     float value = texelFetch(values_buffer, joint_index).r;
     float score = texelFetch(scores_buffer, joint_index).r;
 
-    // float test = texelFetch(values_buffer, 0).r;
-
-    // fragColor = vec4(joint_index *joint_width, joint_width, joint_width, 1.0);
-
     // Check if value is valid (not NaN and has confidence)
     if (score <= 0.0) {
         fragColor = vec4(0.2, 0.2, 0.2, 1.0); // Gray for invalid joints
@@ -38,12 +38,10 @@ void main() {
     float normalized_value = (value - value_min) / (value_max - value_min);
     normalized_value = clamp(normalized_value, 0.0, 1.0);
 
-    // fragColor = vec4(normalized_value, normalized_value, normalized_value, 1.0);
-
     // Draw vertical bar from bottom up to normalized_value height
     if (texCoord.y <= normalized_value) {
-        // Color based on value (green = low, yellow = mid, red = high)
-        vec3 color = mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), normalized_value);
+        // Color based on value (interpolate between color_low and color_high)
+        vec3 color = mix(color_low, color_high, normalized_value);
 
         // Dim color based on confidence score
         color *= score;

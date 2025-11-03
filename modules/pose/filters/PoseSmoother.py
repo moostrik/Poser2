@@ -11,9 +11,11 @@ from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS, An
 from modules.utils.Smoothing import OneEuroFilter, OneEuroFilterAngular
 from modules.Settings import Settings
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 @dataclass
-class OneEuroSettings:
+class PoseSmootherSettings:
     """Configuration parameters for the 1€ Filter.
 
     Attributes:
@@ -38,35 +40,8 @@ class OneEuroSettings:
         if self.d_cutoff < 0:
             raise ValueError(f"d_cutoff must be non-negative, got {self.d_cutoff}")
 
-        self._observers: list[Callable[[], None]] = []
-
-    def __setattr__(self, name: str, value: object) -> None:
-        """Notify observers when settings change."""
-        super().__setattr__(name, value)
-        if name != '_observers' and hasattr(self, '_observers') and len(self._observers) > 0:
-            self._notify()
-
-    def add_observer(self, callback: Callable[[], None]) -> None:
-        """Add observer callback to be notified of setting changes."""
-        self._observers.append(callback)
-
-    def remove_observer(self, callback: Callable[[], None]) -> None:
-        """Remove observer callback."""
-        if callback in self._observers:
-            self._observers.remove(callback)
-
-    def _notify(self) -> None:
-        """Notify all observers of setting changes."""
-        for callback in self._observers:
-            try:
-                callback()
-            except Exception as e:
-                print(f"OneEuroSettings: Error in observer callback: {str(e)}")
-                print_exc()
-
-
 @dataclass
-class TrackletSmoothingState:
+class PoseSmoothingState:
     """All smoothing state for one tracked person/tracklet.
 
     Encapsulates filters and validity tracking to ensure they stay synchronized.
@@ -77,7 +52,7 @@ class TrackletSmoothingState:
     prev_angle_valid: np.ndarray = field(default_factory=lambda: np.zeros(ANGLE_NUM_JOINTS, dtype=bool))
 
     @classmethod
-    def create(cls, settings: OneEuroSettings) -> 'TrackletSmoothingState':
+    def create(cls, settings: PoseSmootherSettings) -> 'PoseSmoothingState':
         """Create new tracklet state with all filters initialized from settings."""
         # Point filters (x, y for each joint)
         point_filters = [
@@ -99,8 +74,9 @@ class TrackletSmoothingState:
             prev_angle_valid=np.zeros(ANGLE_NUM_JOINTS, dtype=bool)
         )
 
-    def update_all_filters(self, settings: OneEuroSettings) -> None:
+    def update_all_filters(self, settings: PoseSmootherSettings) -> None:
         """Update all filter parameters from settings."""
+        print(f"PoseSmoothingState: Updating filter parameters {settings}")
         for x_filter, y_filter in self.point_filters:
             x_filter.setParameters(settings.frequency, settings.min_cutoff, settings.beta, settings.d_cutoff)
             y_filter.setParameters(settings.frequency, settings.min_cutoff, settings.beta, settings.d_cutoff)
@@ -113,7 +89,6 @@ class PoseSmoother:
     """Smooths pose data using OneEuroFilter, maintaining per-tracklet filter state.
 
     Note: Not thread-safe. Call add_poses() from a single thread only.
-    Settings can be modified from any thread and will be applied on the next add_poses() call.
 
     Features:
     - Resets filters when joints reappear after occlusion (prevents temporal artifacts)
@@ -122,23 +97,49 @@ class PoseSmoother:
     """
 
     def __init__(self, settings: Settings) -> None:
-        # Smoothing settings with observer pattern
-        self.settings = OneEuroSettings(
+        # Smoothing settings
+        self.settings: PoseSmootherSettings = PoseSmootherSettings(
             frequency=settings.camera_fps,
             min_cutoff=1.0,
             beta=0.025,
             d_cutoff=1.0
         )
-        self.settings.add_observer(self._on_settings_changed)
 
         # Per-tracklet smoothing state
-        self._tracklets: dict[int, TrackletSmoothingState] = {}
+        self._tracklets: dict[int, PoseSmoothingState] = {}
 
         # Callbacks
         self.pose_output_callbacks: set[PoseDictCallback] = set()
 
-    def _on_settings_changed(self) -> None:
-        """Called automatically when settings change - updates all active filters."""
+        self.hotreload = HotReloadMethods(self.__class__, True, True)
+        self.hotreload.add_file_changed_callback(self._on_hot_reload)
+        self._on_hot_reload()
+
+    def _on_hot_reload(self) -> None:
+        self._uds()
+
+    def _uds(self) -> None:
+        settings: PoseSmootherSettings = PoseSmootherSettings(
+            frequency=  24,
+            min_cutoff= 0.2,
+            beta =      0.2, #25,
+            d_cutoff =  1.0
+        )
+        self.update_settings(settings)
+
+    def update_settings(self, settings: PoseSmootherSettings) -> None:
+        """Update all filter settings from a new settings object.
+
+        Args:
+            settings: New OneEuroSettings to apply
+
+        Example:
+            new_settings = OneEuroSettings(frequency=60, beta=0.05)
+            smoother.update_settings(new_settings)
+        """
+        self.settings = settings
+
+        # Apply to all active filters
         for state in self._tracklets.values():
             state.update_all_filters(self.settings)
 
@@ -152,22 +153,25 @@ class PoseSmoother:
         - Computes velocity data from filter derivatives
         - Cleans up filters for lost tracklets
         """
+
+        # update settings for hotreload
+
         smoothed_poses: PoseDict = {}
 
         for pose_id, pose in poses.items():
-            tracklet_id = pose.tracklet.id
+            tracklet_id: int = pose.tracklet.id
 
             # Get or create tracklet state
             if tracklet_id not in self._tracklets:
-                self._tracklets[tracklet_id] = TrackletSmoothingState.create(self.settings)
+                self._tracklets[tracklet_id] = PoseSmoothingState.create(self.settings)
 
-            state = self._tracklets[tracklet_id]
-            timestamp = pose.time_stamp.timestamp()
+            state: PoseSmoothingState = self._tracklets[tracklet_id]
+            timestamp: float = pose.time_stamp.timestamp()
 
             # Smooth points with reset detection
-            smoothed_values = pose.point_data.values.copy()
+            smoothed_values: np.ndarray = pose.point_data.values.copy()
             smoothed_values.flags.writeable = True
-            point_velocities = np.full((POSE_NUM_JOINTS, 2), np.nan)
+            point_velocities: np.ndarray = np.full((POSE_NUM_JOINTS, 2), np.nan)
 
             for joint in PoseJoint:
                 is_valid = pose.point_data.valid_mask[joint]
@@ -191,9 +195,9 @@ class PoseSmoother:
                 state.prev_point_valid[joint] = is_valid
 
             # Smooth angles with reset detection
-            smoothed_angles = pose.angle_data.values.copy()
+            smoothed_angles: np.ndarray = pose.angle_data.values.copy()
             smoothed_angles.flags.writeable = True
-            angle_velocities = np.full(ANGLE_NUM_JOINTS, np.nan)
+            angle_velocities: np.ndarray = np.full(ANGLE_NUM_JOINTS, np.nan)
 
             for angle_joint in AngleJoint:
                 is_valid = pose.angle_data.valid_mask[angle_joint]
@@ -221,7 +225,7 @@ class PoseSmoother:
             velocity_point_data = PosePointData.create_empty()
             velocity_angle_data = PoseAngleData.create_empty()
 
-            smoothed_pose = replace(
+            smoothed_pose: Pose = replace(
                 pose,
                 point_data=smoothed_point_data,
                 angle_data=smoothed_angle_data,
@@ -236,6 +240,8 @@ class PoseSmoother:
                 del self._tracklets[tracklet_id]
 
         self._notify_pose_callbacks(smoothed_poses)
+
+
 
     # CALLBACK METHODS
     def add_pose_callback(self, callback: PoseDictCallback) -> None:
