@@ -64,7 +64,7 @@ class HDTRenderManager(RenderBase):
             self.centre_cam_layers[i] = CentreCamLayer(self.capture_data, self.render_data, i)
             self.centre_pose_layers[i] = CentrePoseRender(self.capture_data, self.render_data, self.pose_meshes, i)
             self.pose_overlays[i] = PoseStreamLayer(self.capture_data, self.pose_meshes, i)
-            self.pose_feature_layers[i] = PoseFeatureLayer(self.render_data, i)
+            self.pose_feature_layers[i] = PoseFeatureLayer(self.render_data, self.capture_data, i)
             self.line_field_layers[i] = LineFieldLayer(self.render_data, self.cam_fbos, i)
             self.cam_fbos[i] = self.centre_cam_layers[i].get_fbo()
             # self.cam_fbos[i] = self.camera_layers[i].fbo

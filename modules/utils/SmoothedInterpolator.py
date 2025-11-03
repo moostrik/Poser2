@@ -48,6 +48,8 @@ from collections import deque
 from time import time
 from typing import Callable
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 @dataclass
 class OneEuroSettings:
@@ -154,6 +156,8 @@ class SmoothedInterpolator:
         # Register for setting changes
         settings.add_observer(self._update_filter_from_settings)
 
+        self.hotreload = HotReloadMethods(self.__class__, True, True)
+
     def __del__(self) -> None:
         """Cleanup observer registration on deletion."""
         try:
@@ -218,56 +222,49 @@ class SmoothedInterpolator:
         self._last_time = timestamp if timestamp is not None else time()
 
     def update(self, current_time: float | None = None) -> None:
-        """Calculate interpolated value and derivatives for current time.
+        self._update(current_time)
 
-        Should be called every frame to get smooth interpolated values between
-        samples. Uses the time since the last sample to interpolate between
-        the two most recent buffered values.
-
-        Args:
-            current_time: Optional current timestamp in seconds. If None, uses time().
-                         Providing current_time improves performance and consistency
-                         when updating multiple interpolators in the same frame.
-        """
+    def _update(self, current_time: float | None = None) -> None:
+        """Calculate interpolated value and derivatives for current time."""
         if not self._buffer:
             return
 
-        # Use provided time or get current time
         if current_time is None:
             current_time = time()
 
-        # Calculate interpolation alpha based on time since last sample
         alpha: float = (current_time - self._last_time) / self._interval
 
         # Select interpolation method
         if alpha <= 0.0 or alpha >= 1.0:
-            # Time anomaly or sample overdue - use latest
             value: float = self._buffer[-1]
-        elif len(self._buffer) >= 4:
-            # Use cubic Hermite for smooth interpolation
-            value: float = self._hermite_interpolate_latest(alpha)
-        elif len(self._buffer) >= 2:
-            # Fall back to linear interpolation
-            value: float = self._linear_interpolate_latest(alpha)
+            velocity: float = (self._buffer[-1] - self._buffer[-2]) / self._interval if len(self._buffer) >= 2 else 0.0
+        # elif len(self._buffer) >= 4:
+        #     # Use Hermite interpolation for smooth position AND velocity
+        #     value: float = self._hermite_interpolate_latest(alpha)
+        #     velocity: float = self._hermite_velocity_latest(alpha)
+        elif len(self._buffer) >= 3:
+            # Fallback to linear if not enough samples
+            p1: float = self._buffer[-3]
+            p2: float = self._buffer[-2]
+            p3: float = self._buffer[-1]
+            value: float = p2 + alpha * (p3 - p2)
+
+            v2: float = (p2 - p1)  # Velocity at p2
+            v3: float = (p3 - p2)  # Velocity at p3
+            velocity: float = p1
         else:
-            # Only one sample available
             value = self._buffer[0]
+            velocity = 0.0
 
         # Initialize on first valid value
         if math.isnan(self._smooth_value):
             self._smooth_value = value
-            self._smooth_velocity = 0.0
-            self._smooth_acceleration = 0.0
+            self._smooth_velocity = velocity
             return
-
-        # Calculate derivatives
-        velocity: float = value - self._smooth_value
-        acceleration: float = velocity - self._smooth_velocity
 
         # Update state
         self._smooth_value = value
-        self._smooth_velocity = velocity
-        self._smooth_acceleration = acceleration
+        self._smooth_velocity = 0.1
 
     def reset(self, current_time: float | None = None) -> None:
         """Reset interpolator to initial state.
@@ -309,9 +306,7 @@ class SmoothedInterpolator:
         older samples (p0 and p1) to estimate tangents.
 
         Tangent at p2: Centered Catmull-Rom difference (p3 - p1) / 2
-        Tangent at p3: One-sided difference (p3 - p2) / 2, scaled to match
-
-        This minimizes latency while maintaining smoothness and preventing overshoot.
+        Tangent at p3: Centered Catmull-Rom difference (p3 - p2), assuming continuation
 
         Args:
             alpha: Interpolation factor [0, 1] where 0=p2, 1=p3
@@ -319,15 +314,19 @@ class SmoothedInterpolator:
         Returns:
             Smoothly interpolated value between p2 and p3
         """
-        # Direct indexing is faster than list conversion
         p0: float = self._buffer[-4]
         p1: float = self._buffer[-3]
         p2: float = self._buffer[-2]
         p3: float = self._buffer[-1]
 
-        # Tangents with consistent magnitude (prevents overshoot)
+        # Tangents using Catmull-Rom scheme
         m2: float = (p3 - p1) * 0.5  # Centered difference at p2
-        m3: float = (p3 - p2) * 0.5  # ✅ FIXED: Scaled one-sided difference at p3
+        m3: float = (p3 - p2) * 0.5  # Forward-looking: assume same velocity continues
+
+        # Alternative: Use centered difference assuming p3 velocity continues
+        m3: float = (p3 - p2) * 0.5 + (p3 - p2) * 0.5  # = (p3 - p2)
+        # Or match the velocity from p2->p3:
+        # m3: float = m2  # Copy tangent from p2 for maximum smoothness
 
         # Hermite basis functions
         h00: float = 2*alpha**3 - 3*alpha**2 + 1
@@ -336,6 +335,34 @@ class SmoothedInterpolator:
         h11: float = alpha**3 - alpha**2
 
         return h00*p2 + h10*m2 + h01*p3 + h11*m3
+
+    def _hermite_velocity_latest(self, alpha: float) -> float:
+        """Velocity (first derivative) of Hermite interpolation.
+
+        Args:
+            alpha: Interpolation factor [0, 1]
+
+        Returns:
+            Velocity at interpolation point (units per interval)
+        """
+        p0: float = self._buffer[-4]
+        p1: float = self._buffer[-3]
+        p2: float = self._buffer[-2]
+        p3: float = self._buffer[-1]
+
+        # Same tangents as position interpolation
+        m2: float = (p3 - p1) * 0.5
+        m3: float = (p3 - p2) * 0.5  # Must match the interpolation tangent
+        m3: float = (p3 - p2) * 0.5 + (p3 - p2) * 0.5  # = (p3 - p2)
+        # m3: float = m2
+
+        # Derivatives of Hermite basis functions
+        dh00: float = 6*alpha**2 - 6*alpha
+        dh10: float = 3*alpha**2 - 4*alpha + 1
+        dh01: float = -6*alpha**2 + 6*alpha
+        dh11: float = 3*alpha**2 - 2*alpha
+
+        return (dh00*p2 + dh10*m2 + dh01*p3 + dh11*m3) / self._interval
 
 
 class SmoothedAngleInterpolator:
@@ -368,6 +395,8 @@ class SmoothedAngleInterpolator:
         self._smooth_value: float = math.nan
         self._smooth_velocity: float = math.nan
         self._smooth_acceleration: float = math.nan
+
+        self.hotreload = HotReloadMethods(self.__class__, True, True)
 
     def __repr__(self) -> str:
         """Debug representation."""
@@ -433,6 +462,9 @@ class SmoothedAngleInterpolator:
                          Pass the same time when updating multiple interpolators
                          for better performance and temporal consistency.
         """
+        self._update(current_time)
+
+    def _update(self, current_time: float | None = None) -> None:
         # Update component interpolators with same timestamp
         self._sin_interp.update(current_time)
         self._cos_interp.update(current_time)
@@ -461,6 +493,8 @@ class SmoothedAngleInterpolator:
 
         # Calculate angular acceleration with wrapping
         acceleration: float = (velocity - self._smooth_velocity + math.pi) % (2 * math.pi) - math.pi
+
+        # print(f"AngleInterp Update: value={value:.3f}, vel={velocity:.3f}, acc={acceleration:.3f}")
 
         # Update state
         self._smooth_value = value

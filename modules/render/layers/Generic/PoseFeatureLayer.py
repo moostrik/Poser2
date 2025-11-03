@@ -19,6 +19,7 @@ from modules.pose.PoseTypes import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
 from modules.RenderDataHub import RenderDataHub
+from modules.CaptureDataHub import CaptureDataHub
 from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -29,9 +30,11 @@ from modules.gl.shaders.PoseFeature import PoseFeature
 class PoseFeatureLayer(LayerBase):
     pose_feature_shader = PoseFeature()
 
-    def __init__(self, data: RenderDataHub, cam_id: int) -> None:
+    def __init__(self, data: RenderDataHub, capture_data: CaptureDataHub, cam_id: int) -> None:
         self.data: RenderDataHub = data
+        self.capture_data: CaptureDataHub = capture_data
         self.fbo: Fbo = Fbo()
+        self.fbo2: Fbo = Fbo()
         self.cam_id: int = cam_id
         text_init()
 
@@ -39,15 +42,18 @@ class PoseFeatureLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
+        self.fbo2.allocate(width, height, internal_format)
         if not PoseFeatureLayer.pose_feature_shader.allocated:
             PoseFeatureLayer.pose_feature_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
+        self.fbo2.deallocate()
         if PoseFeatureLayer.pose_feature_shader.allocated:
             PoseFeatureLayer.pose_feature_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
+        self.fbo2.draw(rect.x, rect.y, rect.width, rect.height)
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
@@ -59,19 +65,31 @@ class PoseFeatureLayer(LayerBase):
 
         if self.data.get_is_active(key) is False:
             self.fbo.begin()
-            glClearColor(0.0, 0.0, 0.0, 1.0)
+            glClearColor(0.0, 0.0, 0.0, 0.0)
             glClear(GL_COLOR_BUFFER_BIT)
             self.fbo.end()
+            self.fbo2.begin()
+            glClearColor(0.0, 0.0, 0.0, 0.0)
+            glClear(GL_COLOR_BUFFER_BIT)
+            self.fbo2.end()
             return
+
+
+
 
 
         # values: PoseAngleData = self.data.get_angles(key)
         # range_scale: float = 1.0
         values: PoseAngleData = self.data.get_velocities(key)
-        range_scale: float = 0.0005
+        range_scale: float = 0.001
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        if self.capture_data.get_is_active(key):
+            v_c = self.capture_data.get_angles(key)
+            if v_c is not None:
+                PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c)
 
         PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, values, range_scale)
 

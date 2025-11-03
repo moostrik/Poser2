@@ -54,6 +54,7 @@ from modules.pose.PoseStream import PoseStreamData
 from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch
 from modules.WS.WSOutput import WSOutput
 from modules.Settings import Settings
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -177,3 +178,16 @@ class CaptureDataHub:
     def get_motion_correlation(self, only_new_data: bool, consumer_key: str) -> Optional[PoseSimilarityBatch ]:
         return self._get_data_dict(self.motion_correlation, 0, only_new_data, consumer_key)
 
+    def get_is_active(self, tracklet_id: int) -> bool:
+        with self.mutex:
+            tracklet_item: Optional[DataItem[Tracklet]] = self.tracklets.get(tracklet_id)
+            if not tracklet_item or not tracklet_item.value:
+                return False
+            return tracklet_item.value.is_being_tracked
+
+    def get_angles(self, tracklet_id: int) -> Optional[PoseAngleFeatureBase]:
+        with self.mutex:
+            pose_item: Optional[DataItem[Pose]] = self.poses.get(tracklet_id)
+            if not pose_item or not pose_item.value:
+                return None
+            return pose_item.value.angle_data
