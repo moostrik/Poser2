@@ -33,6 +33,7 @@ class PoseFeatureLayer(LayerBase):
     def __init__(self, data: RenderDataHub, capture_data: CaptureDataHub, cam_id: int) -> None:
         self.data: RenderDataHub = data
         self.capture_data: CaptureDataHub = capture_data
+        self.capture_key: str = capture_data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.fbo2: Fbo = Fbo()
         self.cam_id: int = cam_id
@@ -87,11 +88,19 @@ class PoseFeatureLayer(LayerBase):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         if self.capture_data.get_is_active(key):
-            v_c = self.capture_data.get_angles(key)
-            if v_c is not None:
-                PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c)
+            pose: Pose | None = self.capture_data.get_raw_pose(key, True, self.capture_key)
+            if pose is not None:
+                v_c: PoseAngleData = pose.angle_data
+                if v_c is not None:
+                    PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, v_c, range_scale)
+                    PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, v_c)
+            pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
+            if pose is not None:
+                v_c: PoseAngleData = pose.angle_data
+                if v_c is not None:
+                    PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, range_scale)
+                    PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c)
 
-        PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, values, range_scale)
 
                 # Draw joint labels on top of bars
         # self.draw_joint_labels(values)

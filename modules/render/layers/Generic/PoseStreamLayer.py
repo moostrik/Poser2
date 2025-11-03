@@ -57,7 +57,7 @@ class PoseStreamLayer(LayerBase):
 
     def update(self) -> None:
         key: int = self.cam_id
-        pose: Pose | None = self.data.get_pose(key, True, self.data_consumer_key)
+        pose: Pose | None = self.data.get_smooth_pose(key, True, self.data_consumer_key)
         if pose is None:
             return #??
         pose_mesh: Mesh = self.pose_meshes.meshes[pose.tracklet.id]

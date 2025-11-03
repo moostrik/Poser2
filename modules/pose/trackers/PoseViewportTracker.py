@@ -61,7 +61,7 @@ class PoseViewportTracker(PoseTrackerBase):
 
         self._age = pose.tracklet.age_in_seconds
 
-        pose_rect: Rect | None = pose.crop_rect
+        pose_rect: Rect | None = pose.bounding_box
         pose_points: np.ndarray | None = pose.point_data.values if pose.point_data is not None else None
         pose_height: float | None = pose.measurement_data.length_estimate if pose.measurement_data is not None else None
 

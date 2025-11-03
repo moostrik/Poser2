@@ -57,10 +57,10 @@ class PoseLayer(LayerBase):
 
     def update(self) -> None:
         key: int = self.cam_id
-        pose: Pose | None = self.data.get_pose(key, True, self.data_consumer_key)
+        pose: Pose | None = self.data.get_smooth_pose(key, True, self.data_consumer_key)
         if pose is None:
             return #??
-        pose_image_np: np.ndarray | None = pose.crop_image
+        pose_image_np: np.ndarray | None = pose.detection_image
         if pose_image_np is not None:
             self.image.set_image(pose_image_np)
             self.image.update()

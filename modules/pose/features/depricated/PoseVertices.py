@@ -45,9 +45,7 @@ class PoseVertexData:
 
 class PoseVertexFactory:
     @staticmethod
-    def compute_vertices(point_data: Optional[PosePointData]) -> Optional[PoseVertexData]:
-        if point_data is None:
-            return None
+    def compute_vertices(point_data: PosePointData) -> PoseVertexData:
 
         vertices: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 2), dtype=np.float32)
         colors: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 4), dtype=np.float32)
@@ -62,10 +60,8 @@ class PoseVertexFactory:
         return vertex_data
 
     @staticmethod
-    def compute_angled_vertices(point_data: Optional[PosePointData], angle_data: PoseAngleData) -> Optional[PoseVertexData]:
+    def compute_angled_vertices(point_data: PosePointData, angle_data: PoseAngleData) -> PoseVertexData:
 
-        if point_data is None:
-            return None
 
         vertex_data: Optional[PoseVertexData] = PoseVertexFactory.compute_vertices(point_data)
         if vertex_data is None:

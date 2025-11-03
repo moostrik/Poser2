@@ -1,16 +1,15 @@
 # Standard library imports
 import numpy as np
 from functools import cached_property
-from dataclasses import dataclass, field
-from typing import Optional, Callable
+from dataclasses import dataclass, field, MISSING
+from typing import Callable
 
 from pandas import Timestamp
 
 # Local application imports
 from modules.pose.features.PosePoints import PosePointData
-from modules.pose.features.PoseVertices import PoseVertexData, PoseVertexFactory
 from modules.pose.features.PoseAngles import PoseAngleData, PoseAngleFactory
-from modules.pose.features.depricated.PoseHeadOrientation import PoseHeadData,PoseHeadFactory
+from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData, PoseAngleSymmetryFactory
 from modules.pose.features.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
 
 from modules.tracker.Tracklet import Tracklet
@@ -33,24 +32,19 @@ class Pose:
     Only vertex_data and absolute_points return None when dependencies are unavailable.
     """
 
-    # Set at first stage of pipeline
-    tracklet: Tracklet = field(init=True)
-    crop_rect: Rect = field(init=True)
-    crop_image: np.ndarray = field(init=True)
-    time_stamp: Timestamp = field(init=True)
+    tracklet: Tracklet       # Deprecated, but kept for backward compatibility
+    bounding_box: Rect       # Bounding Box, in normalized coordinates, can be outside [0,1]
+    detection_image: np.ndarray # Cropped image corresponding to bounding_box (with padding)
+    time_stamp: Timestamp    # Time when pose was captured -> should be Unix time in ms
+    lost: bool               # Last frame, before being lost
 
-    # Set at second stage of pipeline
-    point_data: Optional[PosePointData] = field(default=None)
+    point_data: PosePointData
+    angle_data: PoseAngleData
+    pose_velocity_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
+    angle_velocity_data: PosePointData = field(default_factory=PosePointData.create_empty)
 
     def __repr__(self) -> str:
-        return (f"Pose(id={self.tracklet.id}, valid={self.has_data}, "
-                f"points={self.point_data.valid_count if self.point_data else 0}, "
-                f"age={self.age:.2f}s)")
-
-    @property
-    def has_data(self) -> bool:
-        """Check if pose has minimum required data for feature extraction"""
-        return self.point_data is not None
+        return (f"Pose(id={self.tracklet.id}, points={self.point_data.valid_count if self.point_data else 0}, age={self.age:.2f}s)")
 
     @property
     def age(self) -> float:
@@ -59,40 +53,26 @@ class Pose:
 
     # LAZY FEATURES
     @cached_property
-    def angle_data(self) -> PoseAngleData:
-        """Compute joint angles. Returns NaN values if point_data is None. Cached after first access."""
-        return PoseAngleFactory.from_points(self.point_data)
-
-    @cached_property
-    def head_data(self) -> PoseHeadData:
-        """Compute head orientation. Returns NaN values if point_data is None. Cached after first access."""
-        return PoseHeadFactory.from_points(self.point_data)
-
-    @cached_property
     def measurement_data(self) -> PoseMeasurementData:
         """Compute body measurements. Returns NaN values if point_data or crop_rect is None. Cached after first access."""
-        return PoseMeasurementFactory.compute(self.point_data, self.crop_rect)
+        return PoseMeasurementFactory.compute(self.point_data, self.bounding_box)
 
     @cached_property
-    def vertex_data(self) -> Optional[PoseVertexData]:
-        """Compute skeleton vertices for rendering. Returns None if dependencies are unavailable. Cached after first access."""
-        return PoseVertexFactory.compute_angled_vertices(self.point_data, self.angle_data)
+    def similarity_data(self) -> PoseAngleSymmetryData:
+        """Compute body measurements. Returns NaN values if point_data or crop_rect is None. Cached after first access."""
+        return PoseAngleSymmetryFactory.from_angles(self.angle_data)
 
-    @cached_property
-    def absolute_points(self) -> Optional[np.ndarray]:
-        """Convert normalized keypoints to absolute pixel coordinates. Returns None if point_data or crop_rect is None. Cached after first access."""
-        if self.point_data is None or self.crop_rect is None:
-            return None
+    # @cached_property
+    # def absolute_points(self) -> np.ndarray:
+    #     """Convert normalized keypoints to absolute pixel coordinates. Cached after first access."""
+    #     pose_joints: np.ndarray = self.point_data.values
+    #     rect: Rect = self.bounding_box
 
-        pose_joints: np.ndarray = self.point_data.values
-        rect: Rect = self.crop_rect
+    #     # Vectorized conversion from normalized [0,1] to absolute pixel coordinates
+    #     scale: np.ndarray = np.array([rect.width, rect.height])
+    #     offset: np.ndarray = np.array([rect.x, rect.y])
 
-        # Convert from normalized [0,1] to absolute pixel coordinates
-        real_pose_joints: np.ndarray = np.zeros_like(pose_joints)
-        real_pose_joints[:, 0] = pose_joints[:, 0] * rect.width + rect.x
-        real_pose_joints[:, 1] = pose_joints[:, 1] * rect.height + rect.y
-
-        return real_pose_joints
+    #     return pose_joints[:, :2] * scale + offset
 
 
 PoseCallback = Callable[[Pose], None]

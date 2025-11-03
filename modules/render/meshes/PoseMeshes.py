@@ -5,8 +5,9 @@ import numpy as np
 
 # Local application imports
 from modules.gl.Mesh import Mesh
-from modules.pose.Pose import Pose, PoseVertexData
-from modules.pose.features.PoseVertices import POSE_VERTEX_INDICES
+from modules.pose.Pose import Pose
+from modules.pose.features.depricated.PoseVertices import PoseVertexData, PoseVertexFactory
+from modules.pose.features.depricated.PoseVertices import POSE_VERTEX_INDICES
 from modules.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
@@ -36,10 +37,10 @@ class PoseMeshes(LayerBase):
 
     def update(self) -> None:
         for id in range(self.amount):
-            pose: Pose | None = self.data.get_pose(id, True, self.data_consumer_key)
+            pose: Pose | None = self.data.get_smooth_pose(id, True, self.data_consumer_key)
             pose_mesh: Mesh | None = self.meshes.get(id, None)
             if pose is not None and pose_mesh is not None:
-                vertex_data: PoseVertexData | None = pose.vertex_data
+                vertex_data: PoseVertexData = PoseVertexFactory.compute_angled_vertices(pose.point_data, pose.angle_data)
                 if vertex_data is not None:
                     pose_mesh.set_vertices(vertex_data.vertices)
                     pose_mesh.set_colors(vertex_data.colors)

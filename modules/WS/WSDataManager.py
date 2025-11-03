@@ -99,7 +99,7 @@ class WSData:
             world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
             nose_angle_offset: float | None = None
             pose_points: PosePointData | None = pose.point_data
-            crop_rect: Rect | None = pose.crop_rect
+            crop_rect: Rect | None = pose.bounding_box
             if pose_points is not None and crop_rect is not None:
                 nose_x = pose_points.values[PoseJoint.nose.value][0]
                 nose_conf = pose_points.scores[PoseJoint.nose.value]

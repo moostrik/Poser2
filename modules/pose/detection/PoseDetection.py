@@ -60,7 +60,7 @@ class PoseDetectionInput:
 @dataclass
 class PoseDetectionOutput:
     batch_id: int
-    point_data_list: list[PosePointData | None]
+    point_data_list: list[PosePointData]
     inference_time_ms: float = 0.0  # For monitoring
 
 PoseDetectionOutputCallback = Callable[[PoseDetectionOutput], None]
@@ -177,7 +177,7 @@ class PoseDetection(Thread):
 
             with torch.cuda.stream(stream):
                 data_samples: list[list[PoseDataSample]] = PoseDetection._infer_batch(model, pipeline, input_data.images)
-                point_data_list: list[PosePointData | None] = PoseDetection._extract_pose_point_data(data_samples, self.model_width, self.model_height, self.confidence_threshold)
+                point_data_list: list[PosePointData] = PoseDetection._extract_pose_point_data(data_samples, self.model_width, self.model_height, self.confidence_threshold)
                 stream.synchronize()
 
             inference_time_ms: float = (time.perf_counter() - batch_start) * 1000.0
@@ -297,9 +297,9 @@ class PoseDetection(Thread):
             return results_by_image
 
     @staticmethod
-    def _extract_pose_point_data(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> list[PosePointData | None]:
+    def _extract_pose_point_data(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> list[PosePointData]:
         """Process pose data samples and return only the first detected pose for each image."""
-        first_poses: list[PosePointData | None] = []
+        first_poses: list[PosePointData] = []
 
         for data_samples_for_image in data_samples:
             pose_found = False
@@ -317,13 +317,13 @@ class PoseDetection(Thread):
                 person_scores: np.ndarray = scores[0].copy()
 
                 # Create pose and add to result
-                pose = PosePointData(norm_keypoints, person_scores, confidence_threshold)
+                pose = PosePointData(norm_keypoints, person_scores)
                 first_poses.append(pose)
                 pose_found = True
                 break  # Stop after finding first pose
 
             # If no pose found for this image, add None
             if not pose_found:
-                first_poses.append(None)
+                first_poses.append(PosePointData.create_empty())
 
         return first_poses

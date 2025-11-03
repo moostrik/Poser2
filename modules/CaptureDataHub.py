@@ -76,7 +76,8 @@ class CaptureDataHub:
         self.cam_image: dict[int, DataItem[np.ndarray]] = {}
         self.depth_tracklets: dict[int, DataItem[list[DepthTracklet]]] = {}
         self.tracklets: dict[int, DataItem[Tracklet]] = {}
-        self.poses: dict[int, DataItem[Pose]] = {}
+        self.smooth_poses: dict[int, DataItem[Pose]] = {}
+        self.raw_poses: dict[int, DataItem[Pose]] = {}
         self.pose_streams: dict[int, DataItem[PoseStreamData]] = {}
         self.pose_correlation: dict[int, DataItem[PoseSimilarityBatch ]] = {}
         self.motion_correlation: dict[int, DataItem[PoseSimilarityBatch ]] = {}
@@ -147,16 +148,27 @@ class CaptureDataHub:
             return [v.value for v in self.tracklets.values() if v.value is not None and v.value.cam_id == cam_id and v.value.is_active]
 
     # Pose management
-    def set_poses(self, poses: PoseDict) -> None:
+    def set_raw_poses(self, poses: PoseDict) -> None:
         for pose in poses.values():
-            self._set_data_dict(self.poses, pose.tracklet.id, pose)
+            self._set_data_dict(self.raw_poses, pose.tracklet.id, pose)
 
-    def get_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
-        return self._get_data_dict(self.poses, id, only_new_data, consumer_key)
+    def get_raw_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
+        return self._get_data_dict(self.raw_poses, id, only_new_data, consumer_key)
 
-    def get_poses_for_cam(self, cam_id: int) -> list[Pose]:
+    def get_raw_poses_for_cam(self, cam_id: int) -> list[Pose]:
         with self.mutex:
-            return [v.value for v in self.poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
+            return [v.value for v in self.raw_poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
+
+    def set_smooth_poses(self, poses: PoseDict) -> None:
+        for pose in poses.values():
+            self._set_data_dict(self.smooth_poses, pose.tracklet.id, pose)
+
+    def get_smooth_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
+        return self._get_data_dict(self.smooth_poses, id, only_new_data, consumer_key)
+
+    def get_smooth_poses_for_cam(self, cam_id: int) -> list[Pose]:
+        with self.mutex:
+            return [v.value for v in self.smooth_poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
 
     # Pose window/stream management
     def set_pose_stream(self, value: PoseStreamData) -> None:
@@ -187,7 +199,7 @@ class CaptureDataHub:
 
     def get_angles(self, tracklet_id: int) -> Optional[PoseAngleFeatureBase]:
         with self.mutex:
-            pose_item: Optional[DataItem[Pose]] = self.poses.get(tracklet_id)
+            pose_item: Optional[DataItem[Pose]] = self.smooth_poses.get(tracklet_id)
             if not pose_item or not pose_item.value:
                 return None
             return pose_item.value.angle_data

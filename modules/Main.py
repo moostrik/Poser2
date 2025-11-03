@@ -12,8 +12,10 @@ from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
 from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
 from modules.RenderDataHub import RenderDataHub
-from modules.pose.PosePipeline import PosePipeline
+from modules.pose.detection.PoseDetectionPipeline import PosePipeline
 from modules.pose.PoseStream import PoseStreamManager
+from modules.pose.filters.PoseConfidenceFilter import PoseConfidenceFilter
+from modules.pose.filters.PoseSmoother import PoseSmoother
 from modules.render.WSRenderManager import WSRenderManager
 from modules.render.HDTRenderManager import HDTRenderManager
 from modules.Settings import Settings
@@ -60,6 +62,9 @@ class Main():
         self.pose_detection = PosePipeline(settings)
         self.pose_streamer = PoseStreamManager(settings)
 
+        self.pose_confidence_filter = PoseConfidenceFilter(settings)
+        self.pose_smoother = PoseSmoother(settings)
+
         self.pose_correlator: PoseSimilarityComputer = PoseSimilarityComputer(settings)
         self.motion_correlator: Optional[PoseStreamCorrelator] = PoseStreamCorrelator(settings)
 
@@ -96,9 +101,13 @@ class Main():
         self.pose_streamer.add_stream_callback(self.capture_data_hub.set_pose_stream)
         self.pose_streamer.start()
 
+        self.pose_smoother.add_pose_callback(self.capture_data_hub.set_smooth_poses)
+        self.pose_confidence_filter.add_pose_callback(self.capture_data_hub.set_raw_poses)
+        self.pose_confidence_filter.add_pose_callback(self.pose_smoother.add_poses)
+
         self.pose_detection.add_pose_callback(self.pose_streamer.add_poses)
         self.pose_detection.add_pose_callback(self.pose_correlator.add_poses)
-        self.pose_detection.add_pose_callback(self.capture_data_hub.set_poses)
+        self.pose_detection.add_pose_callback(self.pose_confidence_filter.add_poses)
         self.pose_detection.add_pose_callback(self.render_data_hub.add_poses)
         self.pose_detection.start()
 

@@ -50,7 +50,7 @@ class CentrePoseRender(LayerBase):
     def update(self) -> None:
         key: int = self.cam_id
 
-        pose: Pose | None = self.data.get_pose(key, only_new_data=True, consumer_key=self.data_consumer_key)
+        pose: Pose | None = self.data.get_smooth_pose(key, only_new_data=True, consumer_key=self.data_consumer_key)
         if pose is not None:
 
             if pose.tracklet.is_removed:
@@ -60,7 +60,7 @@ class CentrePoseRender(LayerBase):
 
             if pose.tracklet.is_being_tracked:
                 self.is_active = True
-                self.last_pose_rect = pose.crop_rect if pose.crop_rect is not None else Rect(0.0, 0.0, 1.0, 1.0)
+                self.last_pose_rect = pose.bounding_box if pose.bounding_box is not None else Rect(0.0, 0.0, 1.0, 1.0)
 
         if not self.is_active:
             return

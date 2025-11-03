@@ -73,7 +73,7 @@ class TrackerOnePerCamLayer(LayerBase):
         cam_image_roi: Rect = getattr(tracklet.metadata, "smooth_rect", Rect(0.0, 0.0, 1.0, 1.0))
         # print(draw_rect)
 
-        pose: Pose | None = self.data.get_pose(key, True, self.data_consumer_key)
+        pose: Pose | None = self.data.get_smooth_pose(key, True, self.data_consumer_key)
         cam_image_np: np.ndarray | None = self.data.get_cam_image(key, True, self.data_consumer_key)
 
         if cam_image_np is not None:

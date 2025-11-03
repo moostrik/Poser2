@@ -1,7 +1,5 @@
 # Standard library imports
-from queue import Empty
 from threading import Event, Lock, Thread
-from typing import Optional
 import traceback
 from dataclasses import dataclass
 
@@ -14,9 +12,9 @@ from pandas import Timestamp
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
 from modules.tracker.Tracklet import Tracklet, Rect, TrackletDict
-from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
-from modules.pose.PoseDetection import PoseDetection, PoseDetectionInput, PoseDetectionOutput, PoseDetectionOutputCallback, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
-from modules.pose.PoseImageProcessor import PoseImageProcessor
+from modules.pose.Pose import Pose, PoseDict, PoseDictCallback, PoseAngleFactory
+from modules.pose.detection.PoseDetection import PoseDetection, PoseDetectionInput, PoseDetectionOutput, PoseDetectionOutputCallback, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
+from modules.pose.detection.PoseImageProcessor import PoseImageProcessor
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -184,10 +182,12 @@ class PosePipeline(Thread):
         for i, tracklet in enumerate(pending_request.tracklets):
             pose = Pose(
                 tracklet=tracklet,
-                crop_rect = pending_request.crop_rects[i],
-                crop_image = pending_request.crop_images[i],
+                bounding_box = pending_request.crop_rects[i],
+                detection_image = pending_request.crop_images[i],
                 time_stamp = pending_request.time_stamp,
-                point_data = poses.point_data_list[i]
+                lost=tracklet.is_removed,
+                point_data = poses.point_data_list[i],
+                angle_data= PoseAngleFactory.from_points(poses.point_data_list[i])
             )
             pose_dict[tracklet.id] = pose
 
@@ -238,6 +238,5 @@ class PosePipeline(Thread):
                 try:
                     callback(poses)
                 except Exception as e:
-                    if self.verbose:
-                        print(f"PosePipeline: Error in pose output callback: {str(e)}")
-                        traceback.print_exc()
+                    print(f"PosePipeline: Error in pose output callback: {str(e)}")
+                    traceback.print_exc()

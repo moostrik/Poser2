@@ -47,7 +47,7 @@ class CamTrackPoseLayer(LayerBase):
 
         frame: np.ndarray | None = self.data.get_cam_image(self.cam_id, True, self.data_consumer_key)
         depth_tracklets: list[DepthTracklet] = self.data.get_depth_tracklets(self.cam_id, False, self.data_consumer_key)
-        poses: list[Pose] = self.data.get_poses_for_cam(self.cam_id)
+        poses: list[Pose] = self.data.get_smooth_poses_for_cam(self.cam_id)
         meshes: dict[int, Mesh] = self.pose_meshes.meshes
 
         if frame is not None:
@@ -70,7 +70,7 @@ class CamTrackPoseLayer(LayerBase):
     @staticmethod
     def draw_poses(poses: list[Pose], pose_meshes: dict[int, Mesh], x: float, y: float, width: float, height: float) -> None:
         for pose in poses:
-            roi: Rect | None = pose.crop_rect
+            roi: Rect | None = pose.bounding_box
             mesh: Mesh = pose_meshes[pose.tracklet.id]
             if roi is None or not mesh.isInitialized():
                 continue

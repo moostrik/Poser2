@@ -6,49 +6,20 @@ from modules.pose.PoseTypes import PoseJoint, POSE_NUM_JOINTS
 
 @dataclass(frozen=True)
 class PosePointData:
-    """Keypoint data with convenient access methods and summary statistics.
+    """Keypoint data with convenient access methods and summary statistics."""
 
-    Immutable container for 2D keypoint coordinates with confidence scores.
-    Similar structure to PoseFeatureBase but specialized for 2D spatial data.
-
-    Stores raw and filtered points/scores. Points/scores can be NaN/0.0
-    to indicate missing or low-confidence detections.
-    """
-    raw_values: np.ndarray = field(repr=False)  # shape (17, 2)
-    raw_scores: np.ndarray = field(repr=False)  # shape (17,)
-    score_threshold: float = field(default=0.5)
-
-    values: np.ndarray = field(init=False, repr=False)   # filtered points (NaN where score < threshold)
-    scores: np.ndarray = field(init=False, repr=False)   # normalized scores (0 where < threshold)
+    values: np.ndarray
+    scores: np.ndarray
 
     def __post_init__(self) -> None:
         """Initialize filtered data and freeze arrays for immutability."""
         # Validate shapes
-        if self.raw_values.shape != (POSE_NUM_JOINTS, 2):
-            raise ValueError(f"raw_values must have shape ({POSE_NUM_JOINTS}, 2), got {self.raw_values.shape}")
+        if self.values.shape != (POSE_NUM_JOINTS, 2):
+            raise ValueError(f"raw_values must have shape ({POSE_NUM_JOINTS}, 2), got {self.values.shape}")
 
-        if self.raw_scores.shape != (POSE_NUM_JOINTS,):
-            raise ValueError(f"raw_scores must have shape ({POSE_NUM_JOINTS},), got {self.raw_scores.shape}")
+        if self.scores.shape != (POSE_NUM_JOINTS,):
+            raise ValueError(f"raw_scores must have shape ({POSE_NUM_JOINTS},), got {self.scores.shape}")
 
-        # Clamp threshold to valid range
-        s_t: float = max(0.0, min(0.99, self.score_threshold))
-        object.__setattr__(self, 'score_threshold', s_t)
-
-        # Filter points based on threshold
-        filtered = self.raw_scores >= self.score_threshold
-        filtered_values: np.ndarray = np.where(filtered[:, np.newaxis], self.raw_values, np.nan)
-        object.__setattr__(self, 'values', filtered_values)  # ← Fixed: was 'points'
-
-        # Normalize scores based on threshold
-        normalized: np.ndarray = np.zeros_like(self.raw_scores, dtype=np.float32)  # ← Added dtype
-        above_threshold = self.raw_scores >= self.score_threshold
-        denominator: float = max(1.0 - self.score_threshold, 1e-6)
-        normalized[above_threshold] = (self.raw_scores[above_threshold] - self.score_threshold) / denominator
-        object.__setattr__(self, 'scores', normalized)
-
-        # Make arrays immutable
-        self.raw_values.flags.writeable = False
-        self.raw_scores.flags.writeable = False
         self.values.flags.writeable = False
         self.scores.flags.writeable = False
 
@@ -85,14 +56,14 @@ class PosePointData:
             has_nan = np.isnan(values).any(axis=1)
             scores = np.where(~has_nan, 1.0, 0.0).astype(np.float32)
 
-        return cls(raw_values=values, raw_scores=scores, score_threshold=score_threshold)
+        return cls(values=values, scores=scores)
 
     @classmethod
     def create_empty(cls) -> 'PosePointData':
         """Create instance with all joints marked as invalid (NaN values, zero scores)."""
-        raw_values = np.full((POSE_NUM_JOINTS, 2), np.nan, dtype=np.float32)
-        raw_scores = np.zeros(POSE_NUM_JOINTS, dtype=np.float32)
-        return cls(raw_values=raw_values, raw_scores=raw_scores, score_threshold=0.0)
+        values = np.full((POSE_NUM_JOINTS, 2), np.nan, dtype=np.float32)
+        scores = np.zeros(POSE_NUM_JOINTS, dtype=np.float32)
+        return cls(values=values, scores=scores)
 
     # ========== ACCESS ==========
 

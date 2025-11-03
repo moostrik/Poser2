@@ -17,6 +17,12 @@ class OneEuroFilter(_OneEuroFilter):
         """Current target value"""
         return self.__x.lastValue()
 
+    @property
+    def velocity(self) -> float:
+        """Current filtered velocity (rate of change)"""
+        return self.__dx.lastFilteredValue() if self.__dx.lastFilteredValue() is not None else 0.0
+
+
 class OneEuroFilterAngular():
 
     def __init__(self, freq:float, mincutoff:float=1.0, beta:float=0.0, dcutoff:float=1.0) -> None:
@@ -41,6 +47,28 @@ class OneEuroFilterAngular():
     @property
     def target(self) -> float:
         return self.__target
+
+    @property
+    def velocity(self) -> float:
+        """Current angular velocity in radians per second"""
+        # Get the velocities of the sin and cos components
+        sin_vel: float = self.__sin_interp.velocity
+        cos_vel: float = self.__cos_interp.velocity
+
+        # Get current filtered sin and cos values
+        sin_val: float = self.__sin_interp.value
+        cos_val: float = self.__cos_interp.value
+
+        # Angular velocity formula: dθ/dt = (sin*dcos/dt - cos*dsin/dt) / (sin² + cos²)
+        # The denominator normalizes for the magnitude
+        denominator: float = sin_val * sin_val + cos_val * cos_val
+
+        if denominator > 1e-10:  # Avoid division by zero
+            angular_velocity: float = (sin_val * cos_vel - cos_val * sin_vel) / denominator
+        else:
+            angular_velocity = 0.0
+
+        return angular_velocity
 
     def filter(self, x:float, timestamp: float | None = None) -> float:
         return self.__call__(x, timestamp)
