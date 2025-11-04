@@ -85,6 +85,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.camera_list =          camera_list
     settings.camera_num =           len(camera_list)
     settings.camera_fps =           args.fps
+    settings.camera_player_fps =    settings.camera_fps
     settings.camera_square =        False
     settings.camera_color =         True
     settings.camera_stereo =        False

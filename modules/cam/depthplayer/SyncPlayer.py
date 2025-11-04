@@ -56,7 +56,7 @@ class SyncPlayer(Thread):
         self.input_path: Path = Path(settings.path_video)
         self.num_cams: int = settings.camera_num
         self.types: list[FrameType] = settings.video_frame_types
-        self.fps: float = settings.camera_fps
+        self.fps: float = settings.camera_player_fps
 
         self.running: bool = False
         self.state_messages: Queue[Message] = Queue()
