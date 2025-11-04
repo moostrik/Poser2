@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 # Pose imports
-from .FeatureInterpolatorBase import FeatureInterpolatorBase
+from modules.pose.filters.interpolation.FeatureInterpolatorBase import FeatureInterpolatorBase
 
 # Local application imports
 from modules.utils.Interpolation import VectorPredictiveHermite

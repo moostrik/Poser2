@@ -5,8 +5,8 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from .PoseFilterBase import PoseFilterBase
-from ..Pose import Pose, PoseDict
+from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.Pose import Pose, PoseDict
 
 
 class PoseMotionTimeAccumulator(PoseFilterBase):

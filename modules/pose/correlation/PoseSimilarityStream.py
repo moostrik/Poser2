@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 
 # Pose imports
-from ..features.PoseAngleSimilarity import PoseSimilarityBatch, FeatureStatistic
+from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch, FeatureStatistic
 
 # Local application imports
 from modules.utils.HotReloadMethods import HotReloadMethods

@@ -17,7 +17,7 @@ import numpy as np
 import torch
 
 # Pose imports
-from ..features.PosePoints import PosePointData
+from modules.pose.features.PosePoints import PosePointData
 
 # Local application imports
 from modules.utils.HotReloadMethods import HotReloadMethods

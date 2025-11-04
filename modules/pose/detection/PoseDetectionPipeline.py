@@ -8,10 +8,10 @@ import traceback
 import numpy as np
 
 # Pose imports
-from ..detection.PoseDetection import PoseDetection, PoseDetectionInput, PoseDetectionOutput, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
-from ..detection.PoseImageProcessor import PoseImageProcessor
-from ..features.PoseAngles import PoseAngleFactory
-from ..Pose import Pose, PoseDict, PoseDictCallback
+from modules.pose.detection.PoseDetection import PoseDetection, PoseDetectionInput, PoseDetectionOutput, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
+from modules.pose.detection.PoseImageProcessor import PoseImageProcessor
+from modules.pose.features.PoseAngles import PoseAngleFactory
+from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType

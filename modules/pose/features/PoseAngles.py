@@ -8,8 +8,8 @@ from typing import Optional
 import numpy as np
 
 # Pose imports
-from ..features.PoseAngleFeatureBase import PoseAngleFeatureBase
-from ..features.PosePoints import PosePointData, PoseJoint
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
+from modules.pose.features.PosePoints import PosePointData, PoseJoint
 
 
 class AngleJoint(IntEnum):

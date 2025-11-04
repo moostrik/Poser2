@@ -8,9 +8,9 @@ from typing import Optional
 # Third-party imports
 
 # Pose imports
-from ..features.PoseAngles import PoseAngleData
-from ..features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
-from ..Pose import PoseDict
+from modules.pose.features.PoseAngles import PoseAngleData
+from modules.pose.features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
+from modules.pose.Pose import PoseDict
 
 # Local application imports
 from modules.Settings import Settings

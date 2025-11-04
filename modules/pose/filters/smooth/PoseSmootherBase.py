@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 # Pose imports
-from ..PoseFilterBase import PoseFilterBase
-from ...Pose import Pose, PoseDict
+from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.Pose import Pose, PoseDict
 
 # Local application imports
 from modules.Settings import Settings

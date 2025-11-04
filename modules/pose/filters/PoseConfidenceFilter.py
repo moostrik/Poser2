@@ -5,9 +5,9 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from .PoseFilterBase import PoseFilterBase
-from ..features.PosePoints import PosePointData
-from ..Pose import Pose, PoseDict
+from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.features.PosePoints import PosePointData
+from modules.pose.Pose import Pose, PoseDict
 
 # Local application imports
 from modules.Settings import Settings

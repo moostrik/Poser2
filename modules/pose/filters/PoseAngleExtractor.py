@@ -2,9 +2,9 @@
 from dataclasses import replace
 
 # Pose imports
-from .PoseFilterBase import PoseFilterBase
-from ..features.PoseAngles import PoseAngleData, PoseAngleFactory
-from ..Pose import Pose, PoseDict
+from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.features.PoseAngles import PoseAngleData, PoseAngleFactory
+from modules.pose.Pose import Pose, PoseDict
 
 
 class PoseAngleExtractor(PoseFilterBase):

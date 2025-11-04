@@ -4,7 +4,7 @@ from threading import Lock
 from traceback import print_exc
 
 # Pose imports
-from ..Pose import PoseDict, PoseDictCallback
+from modules.pose.Pose import PoseDict, PoseDictCallback
 
 
 class PoseFilterBase(ABC):

@@ -8,10 +8,10 @@ from typing import Callable
 import numpy as np
 
 # Pose imports
-from .features.PoseAngles import PoseAngleData
-from .features.PoseAngleSymmetry import PoseAngleSymmetryData, PoseAngleSymmetryFactory
-from .features.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
-from .features.PosePoints import PosePointData
+from modules.pose.features.PoseAngles import PoseAngleData
+from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData, PoseAngleSymmetryFactory
+from modules.pose.features.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
+from modules.pose.features.PosePoints import PosePointData
 
 # Local application imports
 from modules.tracker.Tracklet import Tracklet

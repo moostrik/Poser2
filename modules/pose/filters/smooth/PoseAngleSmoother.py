@@ -5,9 +5,9 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from ..smooth.PoseSmootherBase import PoseSmootherBase
-from ...features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS, AngleJoint
-from ...Pose import Pose
+from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS, AngleJoint
+from modules.pose.filters.smooth.PoseSmootherBase import PoseSmootherBase
+from modules.pose.Pose import Pose
 
 # Local application imports
 from modules.utils.Smoothing import OneEuroFilterAngular

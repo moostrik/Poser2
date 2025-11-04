@@ -7,7 +7,7 @@ from typing import Optional
 import numpy as np
 
 # Pose imports
-from ..features.PosePoints import PosePointData, PoseJoint
+from modules.pose.features.PosePoints import PosePointData, PoseJoint
 
 # Local application imports
 from modules.utils.PointsAndRects import Rect

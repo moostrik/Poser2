@@ -6,8 +6,8 @@ from enum import IntEnum
 import numpy as np
 
 # Pose imports
-from ..features.PoseAngles import PoseAngleData, AngleJoint
-from ..features.PoseAngleFeatureBase import PoseAngleFeatureBase
+from modules.pose.features.PoseAngles import PoseAngleData, AngleJoint
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
 
 class SymmetricJoint(IntEnum):

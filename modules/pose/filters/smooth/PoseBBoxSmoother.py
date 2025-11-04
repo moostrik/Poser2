@@ -2,8 +2,8 @@
 from dataclasses import replace
 
 # Pose imports
-from .PoseSmootherBase import PoseSmootherBase
-from ...Pose import Pose, Rect
+from modules.pose.filters.smooth.PoseSmootherBase import PoseSmootherBase
+from modules.pose.Pose import Pose, Rect
 
 # Local application imports
 from modules.utils.Smoothing import OneEuroFilter

@@ -15,8 +15,8 @@ from numba import njit
 import pandas as pd
 
 # Pose imports
-from ..features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
-from ..PoseStream import PoseStreamData, PoseStreamDataDict
+from modules.pose.features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
+from modules.pose.PoseStream import PoseStreamData, PoseStreamDataDict
 
 # Local application imports
 from modules.Settings import Settings

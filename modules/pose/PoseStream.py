@@ -12,8 +12,8 @@ from typing import Callable
 import pandas as pd
 import numpy as np
 
-from .Pose import Pose, PoseDict
-from .features.PoseAngles import PoseAngleData, ANGLE_JOINT_NAMES, ANGLE_NUM_JOINTS
+from modules.pose.Pose import Pose, PoseDict
+from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_JOINT_NAMES, ANGLE_NUM_JOINTS
 
 # Local application imports
 from modules.Settings import Settings

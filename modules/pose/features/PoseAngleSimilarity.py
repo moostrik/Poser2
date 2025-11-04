@@ -7,8 +7,8 @@ from typing import Callable, Iterator, Optional
 import numpy as np
 
 # Pose imports
-from ..features.PoseAngles import AngleJoint
-from ..features.PoseAngleFeatureBase import PoseAngleFeatureBase, FeatureStatistic
+from modules.pose.features.PoseAngles import AngleJoint
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase, FeatureStatistic
 
 @dataclass(frozen=True)
 class PoseAngleSimilarityData(PoseAngleFeatureBase[AngleJoint]):
