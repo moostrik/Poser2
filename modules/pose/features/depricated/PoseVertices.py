@@ -1,10 +1,14 @@
-import numpy as np
-from dataclasses import dataclass, field
+# Standard library imports
+from dataclasses import dataclass
 from typing import Optional
 
-from modules.pose.features.PosePoints import PosePointData, PoseJoint, POSE_JOINT_COLORS
-from modules.pose.features.PoseAngles import PoseAngleData, AngleJoint, ANGLE_JOINT_KEYPOINTS
-from modules.pose.features.PosePoints import POSE_COLOR_ALPHA_BASE, POSE_COLOR_LEFT_POSITIVE, POSE_COLOR_LEFT_NEGATIVE, POSE_COLOR_RIGHT_POSITIVE, POSE_COLOR_RIGHT_NEGATIVE
+# Third-party imports
+import numpy as np
+
+# Pose imports
+from ..PoseAngles import PoseAngleData, AngleJoint, ANGLE_JOINT_KEYPOINTS
+from ..PosePoints import PosePointData, PoseJoint, POSE_JOINT_COLORS
+from ..PosePoints import POSE_COLOR_ALPHA_BASE, POSE_COLOR_LEFT_POSITIVE, POSE_COLOR_LEFT_NEGATIVE, POSE_COLOR_RIGHT_POSITIVE, POSE_COLOR_RIGHT_NEGATIVE
 
 # DEFINITIONS
 POSE_VERTEX_LIST: list[list[PoseJoint]] = [

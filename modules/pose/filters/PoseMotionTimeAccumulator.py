@@ -1,8 +1,12 @@
+# Standard library imports
 from dataclasses import replace
+
+# Third-party imports
 import numpy as np
 
-from modules.pose.Pose import Pose, PoseDict
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+# Pose imports
+from .PoseFilterBase import PoseFilterBase
+from ..Pose import Pose, PoseDict
 
 
 class PoseMotionTimeAccumulator(PoseFilterBase):

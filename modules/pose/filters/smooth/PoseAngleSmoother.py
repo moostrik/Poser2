@@ -1,10 +1,15 @@
+# Standard library imports
 from dataclasses import replace
 
+# Third-party imports
 import numpy as np
 
-from modules.pose.Pose import Pose
-from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS, AngleJoint
-from modules.pose.filters.smooth.PoseSmootherBase import PoseSmootherBase
+# Pose imports
+from ..smooth.PoseSmootherBase import PoseSmootherBase
+from ...features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS, AngleJoint
+from ...Pose import Pose
+
+# Local application imports
 from modules.utils.Smoothing import OneEuroFilterAngular
 
 

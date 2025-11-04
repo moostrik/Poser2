@@ -1,9 +1,12 @@
-import math
-import numpy as np
+# Standard library imports
 from functools import cached_property
 from dataclasses import dataclass
+import numpy as np
 
-from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch, FeatureStatistic
+# Pose imports
+from ..features.PoseAngleSimilarity import PoseSimilarityBatch, FeatureStatistic
+
+# Local application imports
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 

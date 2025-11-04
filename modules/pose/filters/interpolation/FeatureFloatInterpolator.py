@@ -1,8 +1,11 @@
+# Standard library imports
 from dataclasses import dataclass
 
+# Pose imports
 from .FeatureInterpolatorBase import FeatureInterpolatorBase
+
+# Local application imports
 from modules.utils.Interpolation import ScalarPredictiveHermite
-from modules.Settings import Settings
 
 
 @dataclass

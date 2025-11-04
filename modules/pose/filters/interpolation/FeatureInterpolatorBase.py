@@ -1,6 +1,10 @@
+# Standard library imports
 from abc import abstractmethod
 from typing import Any, Generic, TypeVar
+
+# Local application imports
 from modules.Settings import Settings
+
 
 # Generic type for any feature (PoseAngles, PoseMeasurements, etc.)
 TFeature = TypeVar('TFeature')

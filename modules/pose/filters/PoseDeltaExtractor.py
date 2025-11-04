@@ -1,10 +1,10 @@
+# Standard library imports
 from dataclasses import replace
-import numpy as np
 
-from modules.pose.Pose import Pose, PoseDict
-from modules.pose.features.PosePoints import PosePointData
-from modules.pose.features.PoseAngles import PoseAngleData
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+# Pose imports
+from .PoseFilterBase import PoseFilterBase
+from ..features.PoseAngles import PoseAngleData
+from ..Pose import Pose, PoseDict
 
 
 class PoseDeltaExtractor(PoseFilterBase):

@@ -1,8 +1,11 @@
-import numpy as np
-from dataclasses import dataclass, field
+# Standard library imports
+from dataclasses import dataclass
+from enum import IntEnum
 from functools import cached_property
 
-from enum import IntEnum
+# Third-party imports
+import numpy as np
+
 
 # JOINTS
 class PoseJoint(IntEnum):

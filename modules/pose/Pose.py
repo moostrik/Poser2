@@ -1,16 +1,19 @@
 # Standard library imports
-import numpy as np
+from dataclasses import dataclass, field
 from functools import cached_property
-from dataclasses import dataclass, field, MISSING
-from typing import Callable
 import time
+from typing import Callable
+
+# Third-party imports
+import numpy as np
+
+# Pose imports
+from .features.PoseAngles import PoseAngleData
+from .features.PoseAngleSymmetry import PoseAngleSymmetryData, PoseAngleSymmetryFactory
+from .features.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
+from .features.PosePoints import PosePointData
 
 # Local application imports
-from modules.pose.features.PosePoints import PosePointData
-from modules.pose.features.PoseAngles import PoseAngleData, PoseAngleFactory
-from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData, PoseAngleSymmetryFactory
-from modules.pose.features.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
-
 from modules.tracker.Tracklet import Tracklet
 from modules.utils.PointsAndRects import Rect
 

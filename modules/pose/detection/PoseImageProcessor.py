@@ -1,5 +1,8 @@
+# Third-party imports
 import cv2
 import numpy as np
+
+# Local application imports
 from modules.tracker.Tracklet import Tracklet, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods

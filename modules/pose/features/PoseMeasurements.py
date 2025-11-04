@@ -1,13 +1,19 @@
-import numpy as np
-from dataclasses import dataclass, field
+# Standard library imports
+from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, TYPE_CHECKING
-from modules.pose.features.PosePoints import PoseJoint
+from typing import Optional
+
+# Third-party imports
+import numpy as np
+
+# Pose imports
+from ..features.PosePoints import PosePointData, PoseJoint
+
+# Local application imports
 from modules.utils.PointsAndRects import Rect
 
-from modules.pose.features.PosePoints import PosePointData
-
 from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 # DEFINITIONS
 class LimbType(Enum):

@@ -1,19 +1,22 @@
 # Standard library imports
-from threading import Event, Lock, Thread
-import traceback
 from dataclasses import dataclass
+from threading import Event, Lock, Thread
 import time
+import traceback
 
 # Third-party imports
 import numpy as np
 
+# Pose imports
+from ..detection.PoseDetection import PoseDetection, PoseDetectionInput, PoseDetectionOutput, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
+from ..detection.PoseImageProcessor import PoseImageProcessor
+from ..features.PoseAngles import PoseAngleFactory
+from ..Pose import Pose, PoseDict, PoseDictCallback
+
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
-from modules.tracker.Tracklet import Tracklet, Rect, TrackletDict
-from modules.pose.Pose import Pose, PoseDict, PoseDictCallback, PoseAngleFactory
-from modules.pose.detection.PoseDetection import PoseDetection, PoseDetectionInput, PoseDetectionOutput, PoseDetectionOutputCallback, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
-from modules.pose.detection.PoseImageProcessor import PoseImageProcessor
 from modules.Settings import Settings
+from modules.tracker.Tracklet import Tracklet, Rect, TrackletDict
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

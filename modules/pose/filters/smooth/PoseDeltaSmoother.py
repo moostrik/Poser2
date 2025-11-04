@@ -1,10 +1,13 @@
+# Standard library imports
 from dataclasses import replace
 
+# Third-party imports
 import numpy as np
 
-from modules.pose.Pose import Pose
-from modules.pose.features.PoseAngles import PoseAngleData, AngleJoint
-from modules.pose.filters.smooth.PoseAngleSmoother import PoseAngleSmoother
+# Pose imports
+from .PoseAngleSmoother import PoseAngleSmoother
+from ...features.PoseAngles import PoseAngleData, AngleJoint
+from ...Pose import Pose
 
 
 class PoseAngleDeltaSmoother(PoseAngleSmoother):

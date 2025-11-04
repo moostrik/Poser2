@@ -1,29 +1,29 @@
 # Standard library imports
+from dataclasses import dataclass
+from enum import IntEnum
 from queue import Queue, Empty
+from threading import Thread, Lock, Event
 import time
 import traceback
-from threading import Thread, Lock, Event
-from dataclasses import dataclass
 from typing import Callable
 
 # Third-party imports
 from mmengine.structures.instance_data import InstanceData
-import numpy as np
-import torch
-from enum import IntEnum
-
 from mmpose.apis import init_model
 from mmpose.structures import PoseDataSample
 from mmengine.dataset import Compose, pseudo_collate
 from mmengine.registry import init_default_scope
+import numpy as np
+import torch
+
+# Pose imports
+from ..features.PosePoints import PosePointData
 
 # Local application imports
-from modules.pose.features.PosePoints import PosePointData
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
-
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 # DEFINITIONS
 POSE_MODEL_WIDTH = 192

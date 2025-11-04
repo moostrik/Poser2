@@ -1,10 +1,15 @@
-import numpy as np
+# Standard library imports
 from dataclasses import dataclass
 
+# Third-party imports
+import numpy as np
+
+# Pose imports
 from .FeatureInterpolatorBase import FeatureInterpolatorBase
-from modules.utils.PointsAndRects import Rect
+
+# Local application imports
 from modules.utils.Interpolation import VectorPredictiveHermite
-from modules.Settings import Settings
+from modules.utils.PointsAndRects import Rect
 
 
 @dataclass

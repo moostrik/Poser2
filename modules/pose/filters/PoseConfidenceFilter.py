@@ -1,10 +1,15 @@
+# Standard library imports
 from dataclasses import replace
 
+# Third-party imports
 import numpy as np
 
-from modules.pose.Pose import Pose, PoseDict
-from modules.pose.features.PosePoints import PosePointData
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+# Pose imports
+from .PoseFilterBase import PoseFilterBase
+from ..features.PosePoints import PosePointData
+from ..Pose import Pose, PoseDict
+
+# Local application imports
 from modules.Settings import Settings
 
 

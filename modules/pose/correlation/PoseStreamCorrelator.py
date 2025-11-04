@@ -1,25 +1,24 @@
 # Standard library imports
-# from multiprocessing.synchronize import Event
-
-import signal
-import time
-import threading
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, replace
-from enum import Enum
 from itertools import combinations
+from typing import Optional
 from multiprocessing import cpu_count
-from typing import Optional, Callable
+import signal
+import threading
+import time
 
 # Third-party imports
 import numpy as np
 from numba import njit
 import pandas as pd
 
+# Pose imports
+from ..features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
+from ..PoseStream import PoseStreamData, PoseStreamDataDict
+
 # Local application imports
-from modules.pose.features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
-from modules.pose.PoseStream import PoseStreamData, PoseStreamDataDict
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods

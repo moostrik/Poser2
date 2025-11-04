@@ -1,11 +1,16 @@
-from functools import cached_property
-from dataclasses import dataclass, field
+# Standard library imports
+from dataclasses import dataclass
 from enum import IntEnum
+from functools import cached_property
 from typing import Optional
+
+# Third-party imports
 import numpy as np
 
-from modules.pose.features.PosePoints import PosePointData, PoseJoint
-from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
+# Pose imports
+from ..features.PoseAngleFeatureBase import PoseAngleFeatureBase
+from ..features.PosePoints import PosePointData, PoseJoint
+
 
 class AngleJoint(IntEnum):
     left_shoulder =  0

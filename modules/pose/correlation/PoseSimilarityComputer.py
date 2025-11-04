@@ -1,20 +1,22 @@
 # Standard library imports
-import time
-import threading
-from dataclasses import dataclass
 from itertools import combinations
+import threading
+import time
 import traceback
 from typing import Optional
 
 # Third-party imports
 
+# Pose imports
+from ..features.PoseAngles import PoseAngleData
+from ..features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
+from ..Pose import PoseDict
+
 # Local application imports
-from modules.pose.Pose import PoseDict
-from modules.pose.features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
 from modules.Settings import Settings
 
-from modules.pose.features.PoseAngles import PoseAngleData
 from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 class PoseSimilarityComputer:
     """Computes pairwise pose similarities in a background thread.

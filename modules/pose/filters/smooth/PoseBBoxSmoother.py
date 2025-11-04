@@ -1,7 +1,11 @@
+# Standard library imports
 from dataclasses import replace
 
-from modules.pose.Pose import Pose, Rect
-from modules.pose.filters.smooth.PoseSmootherBase import PoseSmootherBase
+# Pose imports
+from .PoseSmootherBase import PoseSmootherBase
+from ...Pose import Pose, Rect
+
+# Local application imports
 from modules.utils.Smoothing import OneEuroFilter
 
 

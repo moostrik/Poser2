@@ -1,13 +1,14 @@
-import numpy as np
-import math
-from functools import cached_property
-from dataclasses import dataclass, field
+# Standard library imports
+from dataclasses import dataclass
 from enum import IntEnum
 
-from numpy._typing._array_like import NDArray
+# Third-party imports
+import numpy as np
 
-from modules.pose.features.PoseAngles import PoseAngleData, AngleJoint
-from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
+# Pose imports
+from ..features.PoseAngles import PoseAngleData, AngleJoint
+from ..features.PoseAngleFeatureBase import PoseAngleFeatureBase
+
 
 class SymmetricJoint(IntEnum):
     shoulder = 0

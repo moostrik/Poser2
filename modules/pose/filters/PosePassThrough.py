@@ -1,5 +1,6 @@
-from modules.pose.Pose import PoseDict
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+# Pose imports
+from .PoseFilterBase import PoseFilterBase
+from ..Pose import PoseDict
 
 class PosePassThrough(PoseFilterBase):
     def add_poses(self, poses: PoseDict) -> None:

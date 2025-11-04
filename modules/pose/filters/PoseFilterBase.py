@@ -1,8 +1,10 @@
+# Standard library imports
 from abc import ABC, abstractmethod
 from threading import Lock
 from traceback import print_exc
 
-from modules.pose.Pose import PoseDict, PoseDictCallback
+# Pose imports
+from ..Pose import PoseDict, PoseDictCallback
 
 
 class PoseFilterBase(ABC):

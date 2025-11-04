@@ -1,14 +1,14 @@
-# 2DO
-# add lower and upper correlation
-# apply weights to different joints
-
-import numpy as np
+# Standard library imports
 from dataclasses import dataclass, field
-from typing import Callable, Iterator, Optional
 import time
+from typing import Callable, Iterator, Optional
 
-from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase, FeatureStatistic
-from modules.pose.features.PoseAngles import AngleJoint
+# Third-party imports
+import numpy as np
+
+# Pose imports
+from ..features.PoseAngles import AngleJoint
+from ..features.PoseAngleFeatureBase import PoseAngleFeatureBase, FeatureStatistic
 
 @dataclass(frozen=True)
 class PoseAngleSimilarityData(PoseAngleFeatureBase[AngleJoint]):

@@ -1,11 +1,14 @@
+# Standard library imports
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from modules.pose.Pose import Pose, PoseDict
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
-from modules.Settings import Settings
+# Pose imports
+from ..PoseFilterBase import PoseFilterBase
+from ...Pose import Pose, PoseDict
 
+# Local application imports
+from modules.Settings import Settings
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
 

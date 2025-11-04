@@ -1,10 +1,15 @@
-import numpy as np
+# Standard library imports
 from dataclasses import dataclass
 
+# Third-party imports
+import numpy as np
+
+# Pose imports
 from .FeatureInterpolatorBase import FeatureInterpolatorBase
-from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS
+from ...features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS
+
+# Local application imports
 from modules.utils.Interpolation import VectorPredictiveAngleHermite
-from modules.Settings import Settings
 
 
 @dataclass

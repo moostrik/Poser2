@@ -1,21 +1,21 @@
 # Standard library imports
-import traceback
-import signal
 from dataclasses import dataclass
 from multiprocessing import Process, Queue, Event
 from queue import Empty
+import signal
 from threading import Thread
-from time import sleep, time
-from typing import Optional, Callable, Set
+from time import sleep
+import traceback
+from typing import Callable
 
 # Third-party imports
 import pandas as pd
 import numpy as np
 
+from .Pose import Pose, PoseDict
+from .features.PoseAngles import PoseAngleData, ANGLE_JOINT_NAMES, ANGLE_NUM_JOINTS
+
 # Local application imports
-from modules.pose.Pose import Pose, PoseDict
-from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_JOINT_NAMES, ANGLE_NUM_JOINTS
-from modules.pose.features.PosePoints import PoseJoint, POSE_NUM_JOINTS
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -68,7 +68,7 @@ class PoseStreamManager:
             self.processors.append(PoseStreamProcessor(settings, self.result_queues[i]))
             self.result_threads.append(Thread(target=self._handle_results, args=(self.result_queues[i],), daemon=True))
 
-        self.output_callbacks: Set[PoseStreamDataCallback] = set()
+        self.output_callbacks: set[PoseStreamDataCallback] = set()
         self.running = False
 
         # Hot reload setup for restarting processor

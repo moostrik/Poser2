@@ -1,18 +1,20 @@
-from typing import Optional
-from threading import Lock
+# Standard library imports
 from dataclasses import dataclass, replace
+from threading import Lock
+from typing import Optional
 
-from ...Pose import Pose, PoseDict
-from ...features.PosePoints import PosePointData
-from ...features.PoseAngles import PoseAngleData
-from modules.utils.PointsAndRects import Rect
-
-from ..PoseFilterBase import PoseFilterBase
-from .FeaturePointInterpolator import FeaturePointInterpolator
+# Pose imports
 from .FeatureAngleInterpolator import FeatureAngleInterpolator
-from .FeatureRectInterpolator import FeatureRectInterpolator
 from .FeatureFloatInterpolator import FeatureFloatInterpolator
+from .FeaturePointInterpolator import FeaturePointInterpolator
+from .FeatureRectInterpolator import FeatureRectInterpolator
+from ..PoseFilterBase import PoseFilterBase
+from ...features.PoseAngles import PoseAngleData
+from ...features.PosePoints import PosePointData
+from ...Pose import Pose, PoseDict
 
+# Local application imports
+from modules.utils.PointsAndRects import Rect
 from modules.Settings import Settings
 
 
