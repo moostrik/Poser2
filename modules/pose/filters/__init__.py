@@ -9,6 +9,7 @@ from .smooth.PosePointSmoother import PosePointSmoother
 from .smooth.PoseAngleSmoother import PoseAngleSmoother
 from .smooth.PoseDeltaSmoother import PoseAngleDeltaSmoother
 from .smooth.PoseBBoxSmoother import PoseBBoxSmoother
+from .interpolation.PoseInterpolator import PoseInterpolator
 
 __all__: list[str] = [
     'PoseAngleExtractor',
@@ -20,4 +21,5 @@ __all__: list[str] = [
     'PoseAngleSmoother',
     'PoseAngleDeltaSmoother',
     'PoseBBoxSmoother',
+    'PoseInterpolator',
 ]

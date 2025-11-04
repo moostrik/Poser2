@@ -2,16 +2,16 @@ from typing import Optional
 from threading import Lock
 from dataclasses import dataclass, replace
 
-from modules.pose.Pose import Pose, PoseDict
-from modules.pose.features.PosePoints import PosePointData
-from modules.pose.features.PoseAngles import PoseAngleData
+from ...Pose import Pose, PoseDict
+from ...features.PosePoints import PosePointData
+from ...features.PoseAngles import PoseAngleData
 from modules.utils.PointsAndRects import Rect
 
 from ..PoseFilterBase import PoseFilterBase
-from .feature.FeaturePointInterpolator import FeaturePointInterpolator
-from .feature.FeatureAngleInterpolator import FeatureAngleInterpolator
-from .feature.FeatureRectInterpolator import FeatureRectInterpolator
-from .feature.FeatureFloatInterpolator import FeatureFloatInterpolator
+from .FeaturePointInterpolator import FeaturePointInterpolator
+from .FeatureAngleInterpolator import FeatureAngleInterpolator
+from .FeatureRectInterpolator import FeatureRectInterpolator
+from .FeatureFloatInterpolator import FeatureFloatInterpolator
 
 from modules.Settings import Settings
 
