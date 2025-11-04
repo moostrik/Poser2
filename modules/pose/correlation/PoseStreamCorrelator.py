@@ -236,13 +236,14 @@ class PoseStreamCorrelator():
     @staticmethod
     def _filter_streams_by_time(streams: PoseStreamDataDict, max_age_s: float = 2.0) -> PoseStreamDataDict:
         """Return only streams whose last timestamp is within max_age_s seconds from now."""
-        now: pd.Timestamp = pd.Timestamp.now()
+        now: float = time.time()  # Use float timestamp
         filtered: PoseStreamDataDict = {}
         for id, data in streams.items():
             if not data.angles.empty:
-                last_time = data.angles.index[-1]
-                # print(last_time, (now - last_time).total_seconds())
-                if (now - last_time).total_seconds() <= max_age_s:
+                last_time = data.angles.index[-1]  # This is a pd.Timestamp
+                # Convert pd.Timestamp to float for comparison
+                last_time_seconds = last_time.timestamp()
+                if (now - last_time_seconds) <= max_age_s:
                     filtered[id] = data
         return filtered
 
