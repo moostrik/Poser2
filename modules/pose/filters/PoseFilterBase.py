@@ -59,10 +59,11 @@ class PoseFilterBase(ABC):
         Args:
             poses: Processed pose dictionary to send to callbacks
         """
-        for callback in self.pose_output_callbacks:
-            try:
-                callback(poses)
-            except Exception as e:
-                # Log error but continue notifying other callbacks
-                print(f"{self.__class__.__name__}: Error in callback: {e}")
-                print_exc()
+        with self._callback_lock:
+            for callback in self.pose_output_callbacks:
+                try:
+                    callback(poses)
+                except Exception as e:
+                    # Log error but continue notifying other callbacks
+                    print(f"{self.__class__.__name__}: Error in callback: {e}")
+                    print_exc()
