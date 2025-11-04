@@ -225,7 +225,7 @@ class PosePipeline(Thread):
             self._update_event.set()
 
     # CALLBACK METHODS
-    def add_pose_callback(self, callback: PoseDictCallback) -> None:
+    def add_callback(self, callback: PoseDictCallback) -> None:
         """Register a callback to be invoked when pose detection completes"""
 
         with self.callback_lock:

@@ -90,12 +90,12 @@ class PoseFeatureLayer(LayerBase):
         if self.capture_data.get_is_active(key):
             raw_pose: Pose | None = self.capture_data.get_raw_pose(key, True, self.capture_key)
             if raw_pose is not None:
-                v_c: PoseAngleData = raw_pose.angle_delta_data
+                v_c: PoseAngleData = raw_pose.delta_data
                 if v_c is not None:
                     PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, v_c, range_scale, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
             smooth_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
             if smooth_pose is not None:
-                v_c: PoseAngleData = smooth_pose.angle_delta_data
+                v_c: PoseAngleData = smooth_pose.delta_data
                 if v_c is not None:
                     PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, range_scale)
 

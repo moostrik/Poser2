@@ -1,23 +1,23 @@
 """Pose filter modules for processing and enriching pose data."""
 
-from .PoseFilterBase import PoseFilterBase
-from .PoseAnglesFilter import PoseAnglesFilter
+from .PoseAngleExtractor import PoseAngleExtractor
+from .PoseDeltaExtractor import PoseDeltaExtractor
+from .PoseMotionTimeAccumulator import PoseMotionTimeAccumulator
 from .PoseConfidenceFilter import PoseConfidenceFilter
-from .PoseDeltaFilter import PoseDeltaFilter
-from .smooth.PoseSmoothFilterBase import PoseSmoothFilterBase
-from .smooth.PoseSmoothPointFilter import PoseSmoothPointFilter
-from .smooth.PoseSmoothAngleFilter import PoseSmoothAngleFilter
-from .smooth.PoseSmoothAngleDeltaFilter import PoseSmoothAngleDeltaFilter
-from .smooth.PoseSmoothBBoxFilter import PoseSmoothBBoxFilter
+from .PosePassThrough import PosePassThrough
+from .smooth.PosePointSmoother import PosePointSmoother
+from .smooth.PoseAngleSmoother import PoseAngleSmoother
+from .smooth.PoseAngleDeltaSmoother import PoseAngleDeltaSmoother
+from .smooth.PoseBBoxSmoother import PoseBBoxSmoother
 
-__all__ = [
-    'PoseFilterBase',
-    'PoseAnglesFilter',
+__all__: list[str] = [
+    'PoseAngleExtractor',
+    'PoseDeltaExtractor',
+    'PoseMotionTimeAccumulator',
     'PoseConfidenceFilter',
-    'PoseDeltaFilter',
-    'PoseSmoothFilterBase',
-    'PoseSmoothPointFilter',
-    'PoseSmoothAngleFilter',
-    'PoseSmoothAngleDeltaFilter',
-    'PoseSmoothBBoxFilter',
+    'PosePassThrough',
+    'PosePointSmoother',
+    'PoseAngleSmoother',
+    'PoseAngleDeltaSmoother',
+    'PoseBBoxSmoother',
 ]

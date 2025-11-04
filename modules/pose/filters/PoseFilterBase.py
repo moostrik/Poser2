@@ -38,7 +38,7 @@ class PoseFilterBase(ABC, Generic[TSettings]):
         """
         pass
 
-    def update_settings(self, settings: TSettings) -> None:
+    def _update_settings(self, settings: TSettings) -> None:
         """Update filter settings at runtime.
 
         Args:
@@ -49,7 +49,7 @@ class PoseFilterBase(ABC, Generic[TSettings]):
         """
         self.settings = settings
 
-    def add_pose_callback(self, callback: PoseDictCallback) -> None:
+    def add_callback(self, callback: PoseDictCallback) -> None:
         """Register a callback to receive processed poses.
 
         Args:
@@ -58,7 +58,7 @@ class PoseFilterBase(ABC, Generic[TSettings]):
         with self._callback_lock:
             self.pose_output_callbacks.add(callback)
 
-    def remove_pose_callback(self, callback: PoseDictCallback) -> None:
+    def remove_callback(self, callback: PoseDictCallback) -> None:
         """Unregister a callback.
 
         Args:

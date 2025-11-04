@@ -4,12 +4,11 @@ import numpy as np
 
 from modules.pose.Pose import Pose
 from modules.pose.features.PosePoints import PosePointData, POSE_NUM_JOINTS, PoseJoint
-from modules.pose.filters.smooth.PoseSmoothFilterBase import PoseSmoothFilterBase
+from modules.pose.filters.smooth.PoseSmootherBase import PoseSmootherBase
 from modules.utils.Smoothing import OneEuroFilter
-from modules.Settings import Settings
 
 
-class PoseSmoothPointFilter(PoseSmoothFilterBase):
+class PosePointSmoother(PoseSmootherBase):
     """Smooths pose keypoint positions using OneEuroFilter."""
 
     def _create_tracklet_state(self) -> tuple[list[tuple[OneEuroFilter, OneEuroFilter]], np.ndarray]:
@@ -25,7 +24,6 @@ class PoseSmoothPointFilter(PoseSmoothFilterBase):
     def _smooth_pose(self, pose: Pose, tracklet_id: int) -> Pose:
         """Smooth keypoint positions for one pose."""
         filters, prev_valid = self._tracklets[tracklet_id]
-        timestamp: float = pose.time_stamp.timestamp()
 
         # Smooth points
         smoothed_values: np.ndarray = pose.point_data.values.copy()
@@ -44,7 +42,7 @@ class PoseSmoothPointFilter(PoseSmoothFilterBase):
                     x_filter.reset()
                     y_filter.reset()
 
-                smoothed_values[joint] = [x_filter(x, timestamp), y_filter(y, timestamp)]
+                smoothed_values[joint] = [x_filter(x), y_filter(y)]
 
             prev_valid[joint] = is_valid
 

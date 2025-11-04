@@ -5,7 +5,7 @@ from modules.pose.features.PoseAngles import PoseAngleData, PoseAngleFactory
 from modules.pose.filters.PoseFilterBase import PoseFilterBase
 
 
-class PoseAnglesFilter(PoseFilterBase):
+class PoseAngleExtractor(PoseFilterBase):
     """Computes joint angles from pose keypoint data.
 
     Calculates:

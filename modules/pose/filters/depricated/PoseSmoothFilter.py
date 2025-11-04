@@ -87,9 +87,9 @@ class PosePointSmoother(PoseFilterBase[SmootherSettings]):
 
         self._notify_callbacks(smoothed_poses)
 
-    def update_settings(self, settings: SmootherSettings) -> None:
+    def _update_settings(self, settings: SmootherSettings) -> None:
         """Update filter parameters for all tracklets."""
-        super().update_settings(settings)
+        super()._update_settings(settings)
         for filters, _ in self._tracklets.values():
             for x_filter, y_filter in filters:
                 x_filter.setParameters(settings.frequency, settings.min_cutoff, settings.beta, settings.d_cutoff)
@@ -162,9 +162,9 @@ class PoseAngleSmoother(PoseFilterBase[SmootherSettings]):
 
         self._notify_callbacks(smoothed_poses)
 
-    def update_settings(self, settings: SmootherSettings) -> None:
+    def _update_settings(self, settings: SmootherSettings) -> None:
         """Update filter parameters for all tracklets."""
-        super().update_settings(settings)
+        super()._update_settings(settings)
         for filters, _ in self._tracklets.values():
             for angle_filter in filters:
                 angle_filter.setParameters(settings.frequency, settings.min_cutoff, settings.beta, settings.d_cutoff)
@@ -221,9 +221,9 @@ class PoseBBoxSmoother(PoseFilterBase[SmootherSettings]):
 
         self._notify_callbacks(smoothed_poses)
 
-    def update_settings(self, settings: SmootherSettings) -> None:
+    def _update_settings(self, settings: SmootherSettings) -> None:
         """Update filter parameters for all tracklets."""
-        super().update_settings(settings)
+        super()._update_settings(settings)
         for x_filter, y_filter, w_filter, h_filter in self._tracklets.values():
             x_filter.setParameters(settings.frequency, settings.min_cutoff, settings.beta, settings.d_cutoff)
             y_filter.setParameters(settings.frequency, settings.min_cutoff, settings.beta, settings.d_cutoff)

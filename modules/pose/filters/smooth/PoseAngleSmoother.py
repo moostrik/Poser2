@@ -4,12 +4,11 @@ import numpy as np
 
 from modules.pose.Pose import Pose
 from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS, AngleJoint
-from modules.pose.filters.smooth.PoseSmoothFilterBase import PoseSmoothFilterBase
+from modules.pose.filters.smooth.PoseSmootherBase import PoseSmootherBase
 from modules.utils.Smoothing import OneEuroFilterAngular
-from modules.Settings import Settings
 
 
-class PoseSmoothAngleFilter(PoseSmoothFilterBase):
+class PoseAngleSmoother(PoseSmootherBase):
     """Smooths pose joint angles using OneEuroFilterAngular."""
 
     def _create_tracklet_state(self) -> tuple[list[OneEuroFilterAngular], np.ndarray]:
@@ -24,7 +23,6 @@ class PoseSmoothAngleFilter(PoseSmoothFilterBase):
     def _smooth_pose(self, pose: Pose, tracklet_id: int) -> Pose:
         """Smooth joint angles for one pose."""
         filters, prev_valid = self._tracklets[tracklet_id]
-        timestamp: float = pose.time_stamp.timestamp()
 
         # Smooth angles
         smoothed_angles: np.ndarray = pose.angle_data.values.copy()
@@ -42,7 +40,7 @@ class PoseSmoothAngleFilter(PoseSmoothFilterBase):
                 if not was_valid and self.settings.reset_on_reappear:
                     angle_filter.reset()
 
-                smoothed_angles[angle_joint] = angle_filter(angle, timestamp)
+                smoothed_angles[angle_joint] = angle_filter(angle)
 
             prev_valid[angle_joint] = is_valid
 

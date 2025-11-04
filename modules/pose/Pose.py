@@ -39,9 +39,9 @@ class Pose:
 
     bounding_box: Rect       # Bounding Box, in normalized coordinates, can be outside [0,1]
     point_data: PosePointData
-    angle_data: PoseAngleData
-    point_delta_data: PosePointData = field(default_factory=PosePointData.create_empty)
-    angle_delta_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
+    angle_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
+    delta_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
+    motion_time: float =        0.0
 
     def __repr__(self) -> str:
         return (f"Pose(id={self.tracklet.id}, points={self.point_data.valid_count if self.point_data else 0}, age={self.age:.2f}s)")
