@@ -9,12 +9,11 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.RenderBase import RenderBase
 from modules.gl.WindowManager import WindowManager
 from modules.Settings import Settings
-from modules.RenderDataHub import RenderDataHub
 from modules.utils.PointsAndRects import Rect, Point2f
 
 from modules.gui.PyReallySimpleGui import Gui
 from modules.CaptureDataHub import CaptureDataHub
-from modules.RenderDataHub import RenderDataHub
+from modules.RenderDataHub_Old import RenderDataHub_Old
 from modules.render.HDTSoundOSC import HDTSoundOSC
 
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
@@ -31,14 +30,14 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class HDTRenderManager(RenderBase):
-    def __init__(self, gui: Gui, capture_data_hub: CaptureDataHub, render_data_hub: RenderDataHub, settings: Settings) -> None:
+    def __init__(self, gui: Gui, capture_data_hub: CaptureDataHub, render_data_hub: RenderDataHub_Old, settings: Settings) -> None:
         self.num_players: int =     settings.num_players
         self.num_cams: int =        settings.camera_num
         num_R_streams: int =   settings.render_R_num
         R_stream_capacity: int = int(settings.camera_fps * 10)  # 10 seconds buffer
 
         # data
-        self.render_data: RenderDataHub =   render_data_hub
+        self.render_data: RenderDataHub_Old =   render_data_hub
         self.capture_data: CaptureDataHub = capture_data_hub
         self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data, "localhost", 8000, 60.0)
 

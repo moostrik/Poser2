@@ -11,7 +11,7 @@ from modules.cam.FrameSyncBang import FrameSyncBang
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
 from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
-from modules.RenderDataHub import RenderDataHub
+from modules.RenderDataHub_Old import RenderDataHub_Old
 from modules.pose.detection.PoseDetectionPipeline import PosePipeline
 from modules.pose.PoseStream import PoseStreamManager
 import modules.pose.filters as pose_filters
@@ -30,7 +30,7 @@ class Main():
         self.settings: Settings = settings
 
         self.capture_data_hub = CaptureDataHub()
-        self.render_data_hub = RenderDataHub(settings)
+        self.render_data_hub = RenderDataHub_Old(settings)
 
         self.WS: Optional[WSPipeline] = None
         # self.render = WSRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, settings)

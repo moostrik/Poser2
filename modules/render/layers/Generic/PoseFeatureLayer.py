@@ -18,7 +18,7 @@ from modules.pose.Pose import Pose
 from modules.pose.features.PosePoints import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
-from modules.RenderDataHub import RenderDataHub
+from modules.RenderDataHub_Old import RenderDataHub_Old
 from modules.CaptureDataHub import CaptureDataHub
 from modules.render.meshes.PoseMeshes import PoseMeshes
 
@@ -30,8 +30,8 @@ from modules.gl.shaders.PoseFeature import PoseFeature
 class PoseFeatureLayer(LayerBase):
     pose_feature_shader = PoseFeature()
 
-    def __init__(self, data: RenderDataHub, capture_data: CaptureDataHub, cam_id: int) -> None:
-        self.data: RenderDataHub = data
+    def __init__(self, data: RenderDataHub_Old, capture_data: CaptureDataHub, cam_id: int) -> None:
+        self.data: RenderDataHub_Old = data
         self.capture_data: CaptureDataHub = capture_data
         self.capture_key: str = capture_data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()

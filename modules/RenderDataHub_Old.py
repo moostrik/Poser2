@@ -23,7 +23,6 @@ from collections.abc import Mapping
 from modules.pose.Pose import PoseDict
 from modules.pose.features.PoseAngles import PoseAngleData
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
-from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
 from modules.pose.trackers.PoseViewportTracker import PoseViewportTracker, PoseViewportTrackerSettings
 from modules.pose.trackers.PoseAngleTracker import PoseAngleTracker, PoseAngleTrackerSettings
 from modules.Settings import Settings
@@ -33,7 +32,7 @@ from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class RenderDataHub:
+class RenderDataHub_Old:
     def __init__(self, settings: Settings) -> None:
         self._num_players: int = settings.num_players
         fps: float = settings.camera_fps
