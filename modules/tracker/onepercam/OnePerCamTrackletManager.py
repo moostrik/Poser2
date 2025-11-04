@@ -2,8 +2,7 @@
 from dataclasses import replace
 from threading import Lock
 from typing import Optional
-
-from pandas import Timestamp
+import time
 
 # Local application imports
 from modules.tracker.Tracklet import Tracklet, TrackingStatus
@@ -74,7 +73,7 @@ class OnePerCamTrackletManager:
             if status == TrackingStatus.NEW:
                 status = TrackingStatus.TRACKED  # A replaced tracklet can not be NEW
 
-            last_active: Timestamp = new_tracklet.last_active
+            last_active: float = new_tracklet.last_active
             if new_tracklet.status == TrackingStatus.LOST:
                 last_active = old_tracklet.last_active
 

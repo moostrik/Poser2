@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from multiprocessing import Process, Queue, Event
 from queue import Empty
 from threading import Thread
-from time import sleep, perf_counter, time
+from time import sleep, time
 from typing import Optional, Callable, Set
 
 # Third-party imports
@@ -24,7 +24,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 @dataclass (frozen=True)
 class PoseStreamInput:
     id: int
-    time_stamp: pd.Timestamp
+    time_stamp: float  # Unix timestamp in seconds
     angles: PoseAngleData | None
     is_removed: bool
 
@@ -32,7 +32,7 @@ class PoseStreamInput:
     def from_pose(cls, pose: Pose) -> 'PoseStreamInput':
         return cls(
             id=pose.tracklet.id,
-            time_stamp=pose.tracklet.time_stamp,
+            time_stamp=pose.time_stamp,  # Now a float
             angles=pose.angle_data,
             is_removed=pose.tracklet.is_removed
         )
@@ -289,7 +289,11 @@ class PoseStreamProcessor(Process):
             empty = pd.DataFrame(columns=ANGLE_JOINT_NAMES, dtype=float)
             return empty, empty.copy()
 
-        timestamps: list[pd.Timestamp] = [pose.time_stamp for pose in poses if pose.angles is not None]
+        # Convert float timestamps to pd.Timestamp for DataFrame index
+        timestamps: list[pd.Timestamp] = [
+            pd.Timestamp(pose.time_stamp, unit='s')
+            for pose in poses if pose.angles is not None
+        ]
         angle_data: list[np.ndarray] = [pose.angles.values for pose in poses if pose.angles is not None]
         conf_data: list[np.ndarray] = [pose.angles.scores for pose in poses if pose.angles is not None]
 

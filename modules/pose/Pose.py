@@ -3,8 +3,7 @@ import numpy as np
 from functools import cached_property
 from dataclasses import dataclass, field, MISSING
 from typing import Callable
-
-from pandas import Timestamp
+import time
 
 # Local application imports
 from modules.pose.features.PosePoints import PosePointData
@@ -33,8 +32,8 @@ class Pose:
     """
 
     tracklet: Tracklet       # Deprecated, but kept for backward compatibility
-    crop_image: np.ndarray # Cropped image corresponding to bounding_box (with padding)
-    time_stamp: Timestamp    # Time when pose was captured -> should be Unix time in ms
+    crop_image: np.ndarray   # Cropped image corresponding to bounding_box (with padding)
+    time_stamp: float    # Time when pose was captured -> should be Unix time in ms
     lost: bool               # Last frame, before being lost
 
     bounding_box: Rect       # Bounding Box, in normalized coordinates, can be outside [0,1]
@@ -49,7 +48,7 @@ class Pose:
     @property
     def age(self) -> float:
         """Time in seconds since pose was captured"""
-        return (Timestamp.now() - self.time_stamp).total_seconds()
+        return time.time() - self.time_stamp
 
     # LAZY FEATURES
     @cached_property

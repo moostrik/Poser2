@@ -2,12 +2,10 @@
 from threading import Event, Lock, Thread
 import traceback
 from dataclasses import dataclass
-
 import time
 
 # Third-party imports
 import numpy as np
-from pandas import Timestamp
 
 # Local application imports
 from modules.cam.depthcam.Definitions import FrameType
@@ -22,7 +20,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 @dataclass
 class PendingPoseRequest:
     batch_id: int  # For debugging/logging
-    time_stamp: Timestamp
+    time_stamp: float
     tracklets: list[Tracklet]
     crop_rects: list[Rect]
     crop_images: list[np.ndarray]
@@ -133,7 +131,7 @@ class PosePipeline(Thread):
 
         self.batch_counter += 1
         batch_id: int = self.batch_counter
-        time_stamp: Timestamp = Timestamp.now()
+        time_stamp: float = time.time()
         pose_images: list[np.ndarray] = []
         pose_crop_rects: list[Rect] = []
 

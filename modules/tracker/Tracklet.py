@@ -6,9 +6,7 @@ import warnings
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Optional
-
-# Third-party imports
-from pandas import Timestamp
+import time
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as ExternalTracklet
@@ -34,9 +32,9 @@ class Tracklet:
     cam_id: int
     id: int =                   field(default=-1)
 
-    time_stamp: Timestamp =     field(default_factory=Timestamp.now)
-    created_at: Timestamp =     field(default_factory=Timestamp.now)
-    last_active: Timestamp =    field(default_factory=Timestamp.now)  # Last time person was actually detected (NEW/TRACKED)
+    time_stamp: float =         field(default_factory=time.time)
+    created_at: float =         field(default_factory=time.time)
+    last_active: float =        field(default_factory=time.time)  # Last time person was actually detected (NEW/TRACKED)
 
     status: TrackingStatus =    field(default=TrackingStatus.NEW)
     roi: Rect =                 field(default=Rect())
@@ -72,11 +70,11 @@ class Tracklet:
     @property
     def age_in_seconds(self) -> float:
         """Get how long this person has been tracked"""
-        return (self.last_active - self.created_at).total_seconds()
+        return self.last_active - self.created_at
 
     def is_expired(self, threshold: float) -> bool:
         """Check if person hasn't been updated recently"""
-        return (Timestamp.now() - self.last_active).total_seconds() > threshold
+        return (time.time() - self.last_active) > threshold
 
     @property
     def external_id(self) -> int:

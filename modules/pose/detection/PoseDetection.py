@@ -11,7 +11,6 @@ from mmengine.structures.instance_data import InstanceData
 import numpy as np
 import torch
 from enum import IntEnum
-from pandas import Timestamp
 
 from mmpose.apis import init_model
 from mmpose.structures import PoseDataSample
@@ -89,7 +88,7 @@ class PoseDetection(Thread):
         # Input queue
         self._input_lock: Lock = Lock()
         self._pending_input: PoseDetectionInput | None = None
-        self._input_timestamp: Timestamp = Timestamp.now()
+        self._input_timestamp: float = time.time()
         self._last_dropped_id: int = 0
 
         # Callbacks
@@ -204,9 +203,9 @@ class PoseDetection(Thread):
         with self._input_lock:
             if self._pending_input is not None:
                 old_input = self._pending_input
-                lag = int((Timestamp.now() - self._input_timestamp).total_seconds() * 1000)
+                lag = int((time.time() - self._input_timestamp) * 1000)
             self._pending_input = input_data
-            self._input_timestamp = Timestamp.now()
+            self._input_timestamp = time.time()
 
         if old_input is not None and self.verbose:
             print(f"Pose Detection: Dropped a batch {old_input.batch_id} after  {old_input.batch_id - self._last_dropped_id:4d}   samples, with a lag of {lag:3d} ms")

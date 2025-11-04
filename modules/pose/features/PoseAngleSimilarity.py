@@ -3,9 +3,9 @@
 # apply weights to different joints
 
 import numpy as np
-import pandas as pd
 from dataclasses import dataclass, field
 from typing import Callable, Iterator, Optional
+import time
 
 from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase, FeatureStatistic
 from modules.pose.features.PoseAngles import AngleJoint
@@ -59,7 +59,7 @@ class PoseSimilarityBatch:
     Simple container with O(1) lookup and iteration support.
     """
     pair_correlations: list[PoseAngleSimilarityData ]
-    timestamp: pd.Timestamp = field(default_factory=pd.Timestamp.now)
+    timestamp: float = field(default_factory=time.time)
     _pair_lookup: dict[tuple[int, int], PoseAngleSimilarityData ] = field(init=False, repr=False, compare=False, default_factory=dict)
 
     def __post_init__(self) -> None:
