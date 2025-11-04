@@ -4,7 +4,7 @@ import numpy as np
 
 from modules.pose.Pose import Pose
 from modules.pose.features.PosePoints import PosePointData, POSE_NUM_JOINTS
-from modules.pose.filters.interpolation.PoseInterpolatorBase import PoseInterpolaterBase
+from modules.pose.filters.interpolation.PoseInterpolatorBase import PoseInterpolatorBase
 from modules.utils.Interpolation import VectorPredictiveHermite
 
 
@@ -32,7 +32,7 @@ class TrackletState:
         )
 
 
-class PosePointInterpolater(PoseInterpolaterBase):
+class PosePointInterpolator(PoseInterpolatorBase):
     """Interpolates pose keypoint coordinates using cubic Hermite interpolation.
 
     Provides smooth interpolation of x,y coordinates for all pose keypoints,
@@ -51,24 +51,15 @@ class PosePointInterpolater(PoseInterpolaterBase):
     """
 
     def _create_tracklet_state(self) -> TrackletState:
-        """Create initial filter state for a new tracklet.
-
-        Returns:
-            TrackletState containing x and y interpolators
-        """
+        """Create initial filter state for a new tracklet. """
         return TrackletState(
-            input_rate=self.input_rate,
+            input_rate=self._input_rate,
             num_keypoints=POSE_NUM_JOINTS,
-            alpha_v=self.alpha_v
+            alpha_v=self._alpha_v
         )
 
     def _add_sample(self, pose: Pose, tracklet_id: int) -> None:
-        """Add input sample to tracklet's interpolators.
-
-        Args:
-            pose: Input pose to sample
-            tracklet_id: ID of the tracklet (for accessing filter state)
-        """
+        """Add input sample to tracklet's interpolators. """
         state: TrackletState = self._tracklets[tracklet_id]
 
         # Extract coordinates from PosePointData (includes NaN for invalid joints)
@@ -80,20 +71,8 @@ class PosePointInterpolater(PoseInterpolaterBase):
         state.y_interpolator.add_sample(y_coords)
 
     def _interpolate(self, pose: Pose, tracklet_id: int, current_time: float | None) -> Pose:
-        """Generate interpolated pose at current time.
+        """Generate interpolated pose at current time. """
 
-        Args:
-            pose: Last input pose (used as template for reconstruction)
-            tracklet_id: ID of the tracklet (for accessing filter state)
-            current_time: Optional explicit time for interpolation
-
-        Returns:
-            Pose with interpolated keypoint coordinates
-
-        Note:
-            Invalid keypoints (NaN values, zero scores) are passed through the
-            interpolators, which handle NaN gracefully element-wise.
-        """
         state: TrackletState = self._tracklets[tracklet_id]
 
         # Update interpolators to current time

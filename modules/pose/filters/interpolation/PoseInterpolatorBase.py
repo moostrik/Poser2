@@ -6,7 +6,7 @@ from modules.pose.filters.PoseFilterBase import PoseFilterBase
 from modules.Settings import Settings
 
 
-class PoseInterpolaterBase(PoseFilterBase):
+class PoseInterpolatorBase(PoseFilterBase):
     """Base class for pose data interpolation with separated input and output rates.
 
     Separates input sampling (at camera FPS) from output generation (at display/processing FPS):
@@ -32,8 +32,16 @@ class PoseInterpolaterBase(PoseFilterBase):
         # Store last input poses for reconstruction during update
         self._last_poses: PoseDict = {}
 
-        self.input_rate: float = settings.camera_fps
-        self.alpha_v: float = 0.45  # Default velocity smoothing factor
+        self._input_rate: float = settings.camera_fps
+        self._alpha_v: float = 0.45  # Default velocity smoothing factor
+
+    @property
+    def alpha_v(self) -> float:
+        return self._alpha_v
+    @alpha_v.setter
+    def alpha_v(self, value: float) -> None:
+        value = max(0.0, min(1.0, value))  # Clamp between 0.0 and 1.0
+        self._alpha_v = value
 
     def add_poses(self, poses: PoseDict) -> None:
         """Add input samples to interpolators (called at input rate).

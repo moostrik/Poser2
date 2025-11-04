@@ -1,14 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
 from threading import Lock
 from traceback import print_exc
 
 from modules.pose.Pose import PoseDict, PoseDictCallback
 
-TSettings = TypeVar('TSettings')
 
-
-class PoseFilterBase(ABC, Generic[TSettings]):
+class PoseFilterBase(ABC):
     """Abstract base class for pose pipeline filters.
 
     Filters receive pose data, process/enrich it, and emit results to registered callbacks.
@@ -37,17 +34,6 @@ class PoseFilterBase(ABC, Generic[TSettings]):
         2. Call _notify_callbacks() with results
         """
         pass
-
-    def _update_settings(self, settings: TSettings) -> None:
-        """Update filter settings at runtime.
-
-        Args:
-            settings: New settings to apply
-
-        Override this method if filter needs to propagate settings changes
-        to internal state (e.g., update filter parameters).
-        """
-        self.settings = settings
 
     def add_callback(self, callback: PoseDictCallback) -> None:
         """Register a callback to receive processed poses.
