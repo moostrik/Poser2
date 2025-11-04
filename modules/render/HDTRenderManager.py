@@ -4,18 +4,7 @@ from time import perf_counter
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
-# Local application imports
-from modules.gl.Fbo import Fbo, SwapFbo
-from modules.gl.RenderBase import RenderBase
-from modules.gl.WindowManager import WindowManager
-from modules.Settings import Settings
-from modules.utils.PointsAndRects import Rect, Point2f
-
-from modules.gui.PyReallySimpleGui import Gui
-from modules.CaptureDataHub import CaptureDataHub
-from modules.RenderDataHub_Old import RenderDataHub_Old
-from modules.render.HDTSoundOSC import HDTSoundOSC
-
+# Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.layers.Generic.CamTrackPoseLayer import CamTrackPoseLayer
 from modules.render.layers.Generic.PoseStreamLayer import PoseStreamLayer
@@ -26,20 +15,35 @@ from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
 from modules.render.layers.HDT.LineFieldsLayer import LF as LineFieldLayer
 from modules.render.meshes.PoseMeshes import PoseMeshes
 
+from modules.render.HDTSoundOSC import HDTSoundOSC
+
+# Local application imports
+from modules.gl.Fbo import Fbo, SwapFbo
+from modules.gl.RenderBase import RenderBase
+from modules.gl.WindowManager import WindowManager
+from modules.Settings import Settings
+from modules.utils.PointsAndRects import Rect, Point2f
+
+from modules.gui.PyReallySimpleGui import Gui
+from modules.CaptureDataHub import CaptureDataHub
+from modules.RenderDataHub import RenderDataHub
+from modules.RenderDataHub_Old import RenderDataHub_Old
+
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class HDTRenderManager(RenderBase):
-    def __init__(self, gui: Gui, capture_data_hub: CaptureDataHub, render_data_hub: RenderDataHub_Old, settings: Settings) -> None:
+    def __init__(self, gui: Gui, capture_data_hub: CaptureDataHub, render_data_hub: RenderDataHub, render_data_hub_old: RenderDataHub_Old, settings: Settings) -> None:
         self.num_players: int =     settings.num_players
         self.num_cams: int =        settings.camera_num
         num_R_streams: int =   settings.render_R_num
         R_stream_capacity: int = int(settings.camera_fps * 10)  # 10 seconds buffer
 
         # data
-        self.render_data: RenderDataHub_Old =   render_data_hub
         self.capture_data: CaptureDataHub = capture_data_hub
-        self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data, "localhost", 8000, 60.0)
+        self.render_data: RenderDataHub =   render_data_hub
+        self.render_data_old: RenderDataHub_Old = render_data_hub_old
+        self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data_old, "localhost", 8000, 60.0)
 
         # meshes
         self.pose_meshes =          PoseMeshes(self.capture_data, self.num_players)
@@ -60,11 +64,11 @@ class HDTRenderManager(RenderBase):
         # populate
         for i in range(self.num_cams):
             self.camera_layers[i] = CamTrackPoseLayer(self.capture_data, self.pose_meshes, i)
-            self.centre_cam_layers[i] = CentreCamLayer(self.capture_data, self.render_data, i)
-            self.centre_pose_layers[i] = CentrePoseRender(self.capture_data, self.render_data, self.pose_meshes, i)
+            self.centre_cam_layers[i] = CentreCamLayer(self.capture_data, self.render_data_old, i)
+            self.centre_pose_layers[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes, i)
             self.pose_overlays[i] = PoseStreamLayer(self.capture_data, self.pose_meshes, i)
-            self.pose_feature_layers[i] = PoseFeatureLayer(self.render_data, self.capture_data, i)
-            self.line_field_layers[i] = LineFieldLayer(self.render_data, self.cam_fbos, i)
+            self.pose_feature_layers[i] = PoseFeatureLayer(self.render_data_old, self.capture_data, i)
+            self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
             self.cam_fbos[i] = self.centre_cam_layers[i].get_fbo()
             # self.cam_fbos[i] = self.camera_layers[i].fbo
         # composition
@@ -139,6 +143,7 @@ class HDTRenderManager(RenderBase):
         glEnable(GL_BLEND)
 
         self.render_data.update()
+        self.render_data_old.update()
         self.pose_meshes.update()
 
         self.motion_corr_stream_layer.update()
@@ -192,7 +197,7 @@ class HDTRenderManager(RenderBase):
         # self.pose_overlays[camera_id].draw(Rect(0, 0, width, height))
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
 
-        if self.render_data.get_is_active(camera_id):
+        if self.render_data_old.get_is_active(camera_id):
             # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             # glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
             self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))

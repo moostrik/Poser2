@@ -156,23 +156,14 @@ class PoseInterpolator(PoseFilterBase):
         state.set_alpha_v(self._alpha_v)
         return state
 
-    def get_pose(self, pose_id: int) -> Optional[Pose]:
-        """Get interpolated pose by ID."""
+    def reset(self) -> None:
+        """Reset all interpolators and clear stored poses."""
         with self._lock:
-            return self._interpolated_poses.get(pose_id)
+            self._tracklet_states.clear()
+            self._interpolated_poses.clear()
 
     def get_poses(self) -> PoseDict:
         """Get all currently interpolated poses."""
         with self._lock:
             return self._interpolated_poses.copy()
-
-    def has_pose(self, pose_id: int) -> bool:
-        """Check if a pose exists in current interpolation."""
-        with self._lock:
-            return pose_id in self._interpolated_poses
-
-    def get_pose_ids(self) -> list[int]:
-        """Get list of all available pose IDs."""
-        with self._lock:
-            return list(self._interpolated_poses.keys())
 

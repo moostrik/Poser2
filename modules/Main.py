@@ -3,42 +3,43 @@ from math import ceil
 from typing import Optional
 
 # Local application imports
-from modules.CaptureDataHub import CaptureDataHub
+from modules.Settings import Settings
+from modules.gui.PyReallySimpleGui import Gui
+
 from modules.cam.DepthCam import DepthCam, DepthSimulator
 from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
 from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
 from modules.cam.FrameSyncBang import FrameSyncBang
-from modules.gui.PyReallySimpleGui import Gui
-from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
-from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
-from modules.RenderDataHub_Old import RenderDataHub_Old
-from modules.pose.detection.PoseDetectionPipeline import PosePipeline
-from modules.pose.PoseStream import PoseStreamManager
-import modules.pose.filters as pose_filters
-from modules.render.HDTRenderManager import HDTRenderManager
-from modules.Settings import Settings
+
 from modules.tracker.TrackerBase import TrackerType
 from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker
 from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
+
+from modules.pose.detection.PoseDetectionPipeline import PosePipeline
+import modules.pose.filters as pose_filters
+from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
+
+from modules.pose.PoseStream import PoseStreamManager
+from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
+
+from modules.CaptureDataHub import CaptureDataHub
+from modules.RenderDataHub import RenderDataHub
+from modules.RenderDataHub_Old import RenderDataHub_Old
+
+from modules.render.HDTRenderManager import HDTRenderManager
 from modules.WS.WSPipeline import WSPipeline
 
 
 class Main():
     def __init__(self, settings: Settings) -> None:
-        self.gui = Gui(settings)
 
         self.settings: Settings = settings
+        self.gui = Gui(settings)
 
-        self.capture_data_hub = CaptureDataHub()
-        self.render_data_hub = RenderDataHub_Old(settings)
+        self.is_running: bool = False
+        self.is_finished: bool = False
 
-        self.WS: Optional[WSPipeline] = None
-        # self.render = WSRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, settings)
-        if settings.art_type == Settings.ArtType.WS:
-            self.WS = WSPipeline(self.gui, settings)
-        if settings.art_type == Settings.ArtType.HDT:
-            self.render = HDTRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, settings)
-
+        # CAMERA
         self.cameras: list[DepthCam | DepthSimulator] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
@@ -51,14 +52,17 @@ class Main():
             for cam_id in settings.camera_list:
                 camera = DepthCam(self.gui, cam_id, settings)
                 self.cameras.append(camera)
+        self.frame_sync_bang = FrameSyncBang(settings, False, 'frame_sync')
 
+        # TRACKER
         if settings.tracker_type == TrackerType.PANORAMIC:
             self.tracker = PanoramicTracker(self.gui, settings)
         else:
             self.tracker = OnePerCamTracker(self.gui, settings)
+        self.tracklet_sync_bang = FrameSyncBang(settings, False, 'tracklet_sync')
 
+        # POSE
         self.pose_detection = PosePipeline(settings)
-        self.pose_streamer = PoseStreamManager(settings)
 
         self.pose_confidence_filter =   pose_filters.PoseConfidenceFilter(settings)
         self.pose_angle_extractor =     pose_filters.PoseAngleExtractor()
@@ -75,13 +79,22 @@ class Main():
         self.pose_smooth_node = pose_filters.PosePassThrough()
 
         self.pose_correlator: PoseSimilarityComputer = PoseSimilarityComputer(settings)
-        self.motion_correlator: Optional[PoseStreamCorrelator] = PoseStreamCorrelator(settings)
 
-        self.frame_sync_bang = FrameSyncBang(settings, False, 'frame_sync')
-        self.tracklet_sync_bang = FrameSyncBang(settings, False, 'tracklet_sync')
+        self.pose_streamer = PoseStreamManager(settings)
+        self.stream_correlator: Optional[PoseStreamCorrelator] = PoseStreamCorrelator(settings)
 
-        self.is_running: bool = False
-        self.is_finished: bool = False
+        # DATA
+        self.capture_data_hub = CaptureDataHub()
+        self.render_data_hub = RenderDataHub(settings)
+        self.render_data_hub_old = RenderDataHub_Old(settings)
+
+        # RENDER
+        self.WS: Optional[WSPipeline] = None
+        if settings.art_type == Settings.ArtType.WS:
+            self.WS = WSPipeline(self.gui, settings)
+            # self.render = WSRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, settings)
+        if settings.art_type == Settings.ArtType.HDT:
+            self.render = HDTRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, self.render_data_hub_old, settings)
 
     def start(self) -> None:
 
@@ -97,14 +110,14 @@ class Main():
             camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
             camera.start()
 
-        if self.motion_correlator:
-            self.motion_correlator.add_correlation_callback(self.capture_data_hub.set_motion_correlation)
-            self.motion_correlator.add_correlation_callback(self.render_data_hub.add_motion_correlation)
-            self.motion_correlator.start()
-            self.pose_streamer.add_stream_callback(self.motion_correlator.set_pose_stream)
+        if self.stream_correlator:
+            self.stream_correlator.add_correlation_callback(self.capture_data_hub.set_motion_correlation)
+            self.stream_correlator.add_correlation_callback(self.render_data_hub_old.add_motion_correlation)
+            self.stream_correlator.start()
+            self.pose_streamer.add_stream_callback(self.stream_correlator.set_pose_stream)
 
         self.pose_correlator.add_correlation_callback(self.capture_data_hub.set_pose_correlation)
-        self.pose_correlator.add_correlation_callback(self.render_data_hub.add_pose_correlation)
+        self.pose_correlator.add_correlation_callback(self.render_data_hub_old.add_pose_correlation)
         self.pose_correlator.start()
 
         self.pose_streamer.add_stream_callback(     self.capture_data_hub.set_pose_stream)
@@ -143,10 +156,11 @@ class Main():
         self.pose_raw_node.add_callback(    self.pose_correlator.add_poses)
         # SMOOTHED POSES
         self.pose_smooth_node.add_callback( self.capture_data_hub.set_smooth_poses) # SMOOTHED POSES
+        self.pose_smooth_node.add_callback( self.render_data_hub.add_poses)
 
 
         # DETECTION
-        self.pose_detection.add_callback(self.render_data_hub.add_poses)
+        self.pose_detection.add_callback(self.render_data_hub_old.add_poses)
         self.pose_detection.start()
 
         self.tracker.add_tracklet_callback(self.pose_detection.set_tracklets)
@@ -226,8 +240,8 @@ class Main():
             self.pose_detection.stop()
         if self.pose_streamer:
             self.pose_streamer.stop()
-        if self.motion_correlator:
-            self.motion_correlator.stop()
+        if self.stream_correlator:
+            self.stream_correlator.stop()
 
         # print('stop av')
         if self.WS:

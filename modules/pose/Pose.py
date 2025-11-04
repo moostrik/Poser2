@@ -60,7 +60,7 @@ class Pose:
         return PoseMeasurementFactory.compute(self.point_data, self.bounding_box)
 
     @cached_property
-    def similarity_data(self) -> PoseAngleSymmetryData:
+    def similarity_data(self) -> PoseAngleSymmetryData: # should this not be in PoseAngleData?
         """Compute body measurements. Returns NaN values if point_data or crop_rect is None. Cached after first access."""
         return PoseAngleSymmetryFactory.from_angles(self.angle_data)
 
