@@ -17,7 +17,7 @@ class PoseBBoxSmoother(PoseSmootherBase):
             OneEuroFilter(self.settings.frequency, self.settings.min_cutoff, self.settings.beta, self.settings.d_cutoff)
         )
 
-    def _smooth_pose(self, pose: Pose, tracklet_id: int) -> Pose:
+    def _smooth(self, pose: Pose, tracklet_id: int) -> Pose:
         """Smooth bounding box for one pose."""
         x_filter, y_filter, w_filter, h_filter = self._tracklets[tracklet_id]
 

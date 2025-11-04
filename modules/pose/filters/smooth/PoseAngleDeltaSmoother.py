@@ -14,7 +14,7 @@ class PoseAngleDeltaSmoother(PoseAngleSmoother):
     instead of angle_data.
     """
 
-    def _smooth_pose(self, pose: Pose, tracklet_id: int) -> Pose:
+    def _smooth(self, pose: Pose, tracklet_id: int) -> Pose:
         """Smooth angle deltas for one pose."""
         filters, prev_valid = self._tracklets[tracklet_id]
 

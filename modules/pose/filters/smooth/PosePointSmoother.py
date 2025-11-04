@@ -21,7 +21,7 @@ class PosePointSmoother(PoseSmootherBase):
         prev_valid = np.zeros(POSE_NUM_JOINTS, dtype=bool)
         return (filters, prev_valid)
 
-    def _smooth_pose(self, pose: Pose, tracklet_id: int) -> Pose:
+    def _smooth(self, pose: Pose, tracklet_id: int) -> Pose:
         """Smooth keypoint positions for one pose."""
         filters, prev_valid = self._tracklets[tracklet_id]
 

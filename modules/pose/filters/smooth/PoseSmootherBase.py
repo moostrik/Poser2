@@ -100,7 +100,7 @@ class PoseSmootherBase(PoseFilterBase):
                 self._tracklets[tracklet_id] = self._create_tracklet_state()
 
             # Smooth the pose data
-            smoothed_pose = self._smooth_pose(pose, tracklet_id)
+            smoothed_pose: Pose = self._smooth(pose, tracklet_id)
             smoothed_poses[pose_id] = smoothed_pose
 
             # Cleanup lost tracklets
@@ -119,7 +119,7 @@ class PoseSmootherBase(PoseFilterBase):
         pass
 
     @abstractmethod
-    def _smooth_pose(self, pose: Pose, tracklet_id: int) -> Pose:
+    def _smooth(self, pose: Pose, tracklet_id: int) -> Pose:
         """Apply smoothing to a single pose.
 
         Args:
