@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 from enum import IntEnum
 
-from modules.pose.PoseTypes import PoseJoint
+from modules.pose.PoseJoint import PoseJoint
 from modules.pose.features.PosePoints import PosePointData
 
 

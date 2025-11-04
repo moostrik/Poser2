@@ -2,7 +2,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from modules.pose.PoseTypes import PoseJoint, POSE_NUM_JOINTS
+from modules.pose.PoseJoint import PoseJoint, POSE_NUM_JOINTS
 
 @dataclass(frozen=True)
 class PosePointData:

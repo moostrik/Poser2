@@ -4,7 +4,7 @@ from enum import IntEnum
 from typing import Optional
 import numpy as np
 
-from modules.pose.PoseTypes import PoseJoint
+from modules.pose.PoseJoint import PoseJoint
 from modules.pose.features.PosePoints import PosePointData
 from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 

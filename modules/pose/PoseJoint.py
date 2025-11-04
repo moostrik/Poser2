@@ -24,11 +24,11 @@ POSE_NUM_JOINTS:  int = len(PoseJoint)
 
 # COLORS
 POSE_COLOR_ALPHA_BASE:      float = 0.2
-POSE_COLOR_CENTER:          tuple[float, float, float] = (0.8, 0.8, 0.8)   # Light Gray
-POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0)     # Orange
-POSE_COLOR_LEFT_POSITIVE:   tuple[float, float, float] = (1.0, 1.0, 0.0)  # Yellow
-POSE_COLOR_LEFT_NEGATIVE:   tuple[float, float, float] = (1.0, 0.0, 0.0)  # Red
-POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0)    # Cyan
+POSE_COLOR_CENTER:          tuple[float, float, float] = (0.8, 0.8, 0.8) # Light Gray
+POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange
+POSE_COLOR_LEFT_POSITIVE:   tuple[float, float, float] = (1.0, 1.0, 0.0) # Yellow
+POSE_COLOR_LEFT_NEGATIVE:   tuple[float, float, float] = (1.0, 0.0, 0.0) # Red
+POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0) # Cyan
 POSE_COLOR_RIGHT_POSITIVE:  tuple[float, float, float] = (0.0, 0.5, 1.0) # Light Blue
 POSE_COLOR_RIGHT_NEGATIVE:  tuple[float, float, float] = (0.0, 1.0, 0.5) # Light Green
 

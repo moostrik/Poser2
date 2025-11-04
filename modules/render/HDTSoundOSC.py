@@ -8,7 +8,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.Pose import Pose
-from modules.pose.PoseTypes import PoseJoint
+from modules.pose.PoseJoint import PoseJoint
 from modules.pose.features.PoseAngleSymmetry import SymmetricJoint
 from modules.RenderDataHub import RenderDataHub
 from modules.pose.features.PoseAngles import AngleJoint

@@ -7,7 +7,7 @@ from modules.utils.depricated.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroC
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose, PosePointData, PoseAngleData, PoseMeasurementData
 from modules.pose.features.PoseAngles import AngleJoint, ANGLE_JOINT_NAMES
-from modules.pose.PoseTypes import PoseJoint
+from modules.pose.PoseJoint import PoseJoint
 from modules.pose.PoseStream import PoseStreamData
 from modules.utils.PointsAndRects import Rect
 
