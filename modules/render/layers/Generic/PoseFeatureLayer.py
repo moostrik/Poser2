@@ -54,7 +54,7 @@ class PoseFeatureLayer(LayerBase):
             PoseFeatureLayer.pose_feature_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
-        # self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
         self.fbo2.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
@@ -82,7 +82,7 @@ class PoseFeatureLayer(LayerBase):
         values: PoseAngleData = self.data.get_angles(key)
         # range_scale: float = 1.0
         # values: PoseAngleData = self.data.get_velocities(key)
-        # range_scale: float = 0.001
+        range_scale: float = 1.0
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -90,14 +90,14 @@ class PoseFeatureLayer(LayerBase):
         if self.capture_data.get_is_active(key):
             raw_pose: Pose | None = self.capture_data.get_raw_pose(key, True, self.capture_key)
             if raw_pose is not None:
-                v_c: PoseAngleData = raw_pose.angle_data
+                v_c: PoseAngleData = raw_pose.angle_delta_data
                 if v_c is not None:
-                    PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, v_c, 1.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
+                    PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, v_c, range_scale, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
             smooth_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
             if smooth_pose is not None:
-                v_c: PoseAngleData = smooth_pose.angle_data
+                v_c: PoseAngleData = smooth_pose.angle_delta_data
                 if v_c is not None:
-                    PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, 1.0)
+                    PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, range_scale)
 
 
                 # Draw joint labels on top of bars

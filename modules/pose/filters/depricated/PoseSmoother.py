@@ -155,6 +155,16 @@ class PoseSmoother:
             smooth_bbox = True,
             reset_on_reappear = False
         )
+        settings: PoseSmootherSettings = PoseSmootherSettings(
+            frequency = 24,
+            min_cutoff= 0.2,
+            beta =      0.2,
+            d_cutoff =  1.0,
+            smooth_points = True,
+            smooth_angles = True,
+            smooth_bbox = True,
+            reset_on_reappear = False
+        )
         self.update_settings(settings)
 
     def update_settings(self, settings: PoseSmootherSettings) -> None:

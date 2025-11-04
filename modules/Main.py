@@ -14,9 +14,7 @@ from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
 from modules.RenderDataHub import RenderDataHub
 from modules.pose.detection.PoseDetectionPipeline import PosePipeline
 from modules.pose.PoseStream import PoseStreamManager
-from modules.pose.filters.PoseConfidenceFilter import PoseConfidenceFilter
-from modules.pose.filters.PoseSmoother import PoseSmoother
-from modules.render.WSRenderManager import WSRenderManager
+import modules.pose.filters as pose_filters
 from modules.render.HDTRenderManager import HDTRenderManager
 from modules.Settings import Settings
 from modules.tracker.TrackerBase import TrackerType
@@ -62,8 +60,13 @@ class Main():
         self.pose_detection = PosePipeline(settings)
         self.pose_streamer = PoseStreamManager(settings)
 
-        self.pose_confidence_filter = PoseConfidenceFilter(settings)
-        self.pose_smoother = PoseSmoother(settings)
+        self.pose_confidence_filter =   pose_filters.PoseConfidenceFilter(settings)
+        self.pose_smoother_points =     pose_filters.PoseSmoothPointFilter(settings)
+        self.pose_smoother_angles =     pose_filters.PoseSmoothAngleFilter(settings)
+        self.pose_smoother_bboxs =      pose_filters.PoseSmoothBBoxFilter(settings)
+        self.pose_smoother_deltas =     pose_filters.PoseSmoothAngleDeltaFilter(settings)
+        self.pose_delta_smooth =        pose_filters.PoseDeltaFilter()
+        self.pose_delta_raw =           pose_filters.PoseDeltaFilter()
 
         self.pose_correlator: PoseSimilarityComputer = PoseSimilarityComputer(settings)
         self.motion_correlator: Optional[PoseStreamCorrelator] = PoseStreamCorrelator(settings)
@@ -101,13 +104,18 @@ class Main():
         self.pose_streamer.add_stream_callback(self.capture_data_hub.set_pose_stream)
         self.pose_streamer.start()
 
-        self.pose_smoother.add_pose_callback(self.capture_data_hub.set_smooth_poses)
-        self.pose_confidence_filter.add_pose_callback(self.capture_data_hub.set_raw_poses)
-        self.pose_confidence_filter.add_pose_callback(self.pose_smoother.add_poses)
+        # FILTERS
+        self.pose_delta_smooth.add_pose_callback(self.capture_data_hub.set_smooth_poses)
+        self.pose_smoother_points.add_pose_callback(self.pose_delta_smooth.add_poses)
+        self.pose_delta_raw.add_pose_callback(self.capture_data_hub.set_raw_poses)
+        self.pose_confidence_filter.add_pose_callback(self.pose_delta_raw.add_poses)
+        self.pose_confidence_filter.add_pose_callback(self.pose_smoother_points.add_poses)
 
+        # DETECTION
         self.pose_detection.add_pose_callback(self.pose_streamer.add_poses)
         self.pose_detection.add_pose_callback(self.pose_correlator.add_poses)
         self.pose_detection.add_pose_callback(self.pose_confidence_filter.add_poses)
+
         self.pose_detection.add_pose_callback(self.render_data_hub.add_poses)
         self.pose_detection.start()
 

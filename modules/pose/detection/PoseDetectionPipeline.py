@@ -183,7 +183,7 @@ class PosePipeline(Thread):
             pose = Pose(
                 tracklet=tracklet,
                 bounding_box = pending_request.crop_rects[i],
-                detection_image = pending_request.crop_images[i],
+                crop_image = pending_request.crop_images[i],
                 time_stamp = pending_request.time_stamp,
                 lost=tracklet.is_removed,
                 point_data = poses.point_data_list[i],

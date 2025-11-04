@@ -40,7 +40,7 @@ class HDTRenderManager(RenderBase):
         # data
         self.render_data: RenderDataHub =   render_data_hub
         self.capture_data: CaptureDataHub = capture_data_hub
-        self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data, "10.0.0.65", 8000, 60.0)
+        self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data, "localhost", 8000, 60.0)
 
         # meshes
         self.pose_meshes =          PoseMeshes(self.capture_data, self.num_players)

@@ -160,3 +160,10 @@ class PosePointData:
             return {joint.name: (float(self.values[joint][0]), float(self.values[joint][1]))
                     for joint in self.valid_joints}
 
+    # ========== POINT-SPECIFIC OPERATIONS ==========
+
+    def subtract(self, other: 'PosePointData') -> 'PosePointData':
+        """Compute displacement vectors (deltas) between two point sets."""
+        delta_values: np.ndarray = self.values - other.values
+        min_scores: np.ndarray = np.minimum(self.scores, other.scores)
+        return PosePointData(values=delta_values, scores=min_scores)
