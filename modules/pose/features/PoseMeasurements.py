@@ -2,7 +2,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Optional, TYPE_CHECKING
-from modules.pose.PoseJoint import PoseJoint
+from modules.pose.features.PosePoints import PoseJoint
 from modules.utils.PointsAndRects import Rect
 
 from modules.pose.features.PosePoints import PosePointData

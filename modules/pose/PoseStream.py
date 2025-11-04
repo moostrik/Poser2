@@ -15,7 +15,7 @@ import numpy as np
 # Local application imports
 from modules.pose.Pose import Pose, PoseDict
 from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_JOINT_NAMES, ANGLE_NUM_JOINTS
-from modules.pose.PoseJoint import PoseJoint, POSE_NUM_JOINTS
+from modules.pose.features.PosePoints import PoseJoint, POSE_NUM_JOINTS
 from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods

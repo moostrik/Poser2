@@ -3,8 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 from enum import IntEnum
 
-from modules.pose.PoseJoint import PoseJoint
-from modules.pose.features.PosePoints import PosePointData
+from modules.pose.features.PosePoints import PosePointData, PoseJoint
 
 
 class PoseHeadOrientation(IntEnum):
