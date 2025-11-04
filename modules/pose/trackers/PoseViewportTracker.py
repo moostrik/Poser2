@@ -8,7 +8,7 @@ from modules.pose.features.PosePoints import PoseJoint
 from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.PointsAndRects import Rect
-from modules.utils.SmoothedInterpolator import SmoothedInterpolator, OneEuroSettings
+from modules.utils.depricated.SmoothedInterpolator import SmoothedInterpolator, OneEuroSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

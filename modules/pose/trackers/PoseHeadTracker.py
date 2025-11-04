@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from modules.pose.Pose import Pose
 from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
 
-from modules.utils.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
+from modules.utils.depricated.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

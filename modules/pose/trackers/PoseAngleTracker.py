@@ -7,7 +7,7 @@ from modules.pose.features.PoseAngles import AngleJoint, PoseAngleData
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryFactory, PoseAngleSymmetryData
 from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
 
-from modules.utils.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
+from modules.utils.depricated.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 POSE_ANGLE_MOTION_WEIGHTS: dict[AngleJoint, float] = {

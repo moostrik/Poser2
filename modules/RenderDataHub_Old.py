@@ -26,7 +26,7 @@ from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
 from modules.pose.trackers.PoseViewportTracker import PoseViewportTracker, PoseViewportTrackerSettings
 from modules.pose.trackers.PoseAngleTracker import PoseAngleTracker, PoseAngleTrackerSettings
 from modules.Settings import Settings
-from modules.utils.SmoothedInterpolator import OneEuroSettings, SmoothedInterpolator
+from modules.utils.depricated.SmoothedInterpolator import OneEuroSettings, SmoothedInterpolator
 from modules.utils.PointsAndRects import Rect
 from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch
 
