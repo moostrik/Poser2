@@ -46,7 +46,7 @@ class VectorAngle:
 
     def get_interpolated(self) -> np.ndarray:
         """Get the current interpolated angle values."""
-        return self.a_interpolated
+        return self.a_interpolated.copy()
 
     def add_sample(self, angles: np.ndarray, sample_time: float | None = None) -> None:
         """Add a new sample to the interpolator."""
@@ -68,6 +68,12 @@ class VectorAngle:
             self.last_update_time = sample_time
             self._initialized = True
             return
+
+        newly_valid = np.isnan(self.a_interpolated) & np.isfinite(angles)
+        if np.any(newly_valid):
+            self.a_interpolated[newly_valid] = angles[newly_valid]
+            self.v_curr[newly_valid] = 0.0
+            self.v_prev[newly_valid] = 0.0
 
         v_measured: np.ndarray = self._calculate_velocity(self.a_prev, self.a_curr, self.input_interval)
 
