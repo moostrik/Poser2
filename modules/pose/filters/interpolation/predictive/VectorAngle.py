@@ -12,6 +12,7 @@ from time import monotonic
 
 # Third-party imports
 import numpy as np
+import warnings
 
 # Local application imports
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -76,14 +77,11 @@ class VectorAngle:
             self.v_prev[newly_valid] = 0.0
 
         v_measured: np.ndarray = self._calculate_velocity(self.a_prev, self.a_curr, self.input_interval)
-
         acceleration: np.ndarray = self._calculate_velocity(self.v_prev, v_measured, self.input_interval)
         self.v_prev = v_measured
+
         self.a_target = self._predict_quadratic(self.a_curr, v_measured, acceleration, self.input_interval)
-
         # self.a_target = self._predict_linear(self.a_curr, v_measured, self.input_interval)
-        # self.a_target = self.a_curr
-
 
     def update(self, current_time: float | None = None) -> None:
         """Update the interpolated value for the current time."""
@@ -92,6 +90,10 @@ class VectorAngle:
 
         if current_time is None:
             current_time = monotonic()
+
+        if current_time < self.last_update_time:
+            warnings.warn("Interpolator received out-of-order time update.", RuntimeWarning)
+            current_time = self.last_update_time
 
         dt: float = current_time - self.last_update_time
         dt = min(dt, 0.1)  # Max 100ms step
@@ -106,8 +108,8 @@ class VectorAngle:
         self.a_interpolated = self.a_interpolated + delta_position
         self.a_interpolated = np.arctan2(np.sin(self.a_interpolated), np.cos(self.a_interpolated))
 
-        self.responsiveness = 0.2
-        self.damping = 0.97
+        # self.responsiveness = 0.2
+        # self.damping = 0.97
 
     @staticmethod
     def _calculate_velocity(p_prev: np.ndarray, p_curr: np.ndarray, interval: float) -> np.ndarray:
