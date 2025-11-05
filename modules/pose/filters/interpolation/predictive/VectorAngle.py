@@ -1,5 +1,14 @@
+"""
+Feel	responsiveness	friction	Result
+Snappy	0.4-0.6	        0.05-0.08	Quick response, slight overshoot
+Smooth	0.15-0.25	    0.02-0.04	Slower, fluid motion
+Tight	0.3-0.4	        0.03-0.05	Balanced, no lag
+Floaty	0.1-0.15	    0.01-0.02	Slow, dreamy motion
+"""
+
+
 # Standard library imports
-from time import time
+from time import monotonic
 
 # Third-party imports
 import numpy as np
@@ -28,6 +37,7 @@ class VectorAngle:
         self.a_target: np.ndarray = np.full(vector_size, np.nan)
         self.a_interpolated: np.ndarray = np.full(vector_size, np.nan)
 
+        self.v_prev: np.ndarray = np.zeros(vector_size)
         self.v_curr: np.ndarray = np.zeros(vector_size)
         self.v_target: np.ndarray = np.zeros(vector_size)
 
@@ -45,7 +55,7 @@ class VectorAngle:
             raise ValueError(f"Expected array of size {self.vector_size}, got {angles.shape[0]}")
 
         if sample_time is None:
-            sample_time = time()
+            sample_time = monotonic()
 
         # Shift samples
         self.a_prev = self.a_curr
@@ -60,9 +70,13 @@ class VectorAngle:
             return
 
         v_measured: np.ndarray = self._calculate_velocity(self.a_prev, self.a_curr, self.input_interval)
-        self.a_target = self._predict_linear(self.a_curr, v_measured, self.input_interval)
+
+        acceleration: np.ndarray = self._calculate_velocity(self.v_prev, v_measured, self.input_interval)
+        self.v_prev = v_measured
+        self.a_target = self._predict_quadratic(self.a_curr, v_measured, acceleration, self.input_interval)
+
+        # self.a_target = self._predict_linear(self.a_curr, v_measured, self.input_interval)
         # self.a_target = self.a_curr
-        self.v_target = self._calculate_velocity(self.a_interpolated, self.a_target, self.input_interval)
 
 
     def update(self, current_time: float | None = None) -> None:
@@ -71,11 +85,13 @@ class VectorAngle:
             return
 
         if current_time is None:
-            current_time = time()
+            current_time = monotonic()
 
         dt: float = current_time - self.last_update_time
+        dt = min(dt, 0.1)  # Max 100ms step
         self.last_update_time = current_time
 
+        self.v_target = self._calculate_velocity(self.a_interpolated, self.a_target, self.input_interval)
 
         velocity_correction = (self.v_target - self.v_curr) * self.responsiveness
         self.v_curr = (self.v_curr + velocity_correction) * self.damping
@@ -85,7 +101,7 @@ class VectorAngle:
         self.a_interpolated = np.arctan2(np.sin(self.a_interpolated), np.cos(self.a_interpolated))
 
         self.responsiveness = 0.2
-        self.damping = 1.0 # 0.97
+        self.damping = 0.97
 
     @staticmethod
     def _calculate_velocity(p_prev: np.ndarray, p_curr: np.ndarray, interval: float) -> np.ndarray:
@@ -102,4 +118,11 @@ class VectorAngle:
     def _predict_linear(p_curr: np.ndarray, v_curr: np.ndarray, interval: float) -> np.ndarray:
         """Predict next angle position based on current velocity."""
         p_pred_raw = p_curr + v_curr * interval
+        return np.arctan2(np.sin(p_pred_raw), np.cos(p_pred_raw))
+
+    @staticmethod
+    def _predict_quadratic(p_curr: np.ndarray, v_curr: np.ndarray, accel: np.ndarray, interval: float) -> np.ndarray:
+        """Predict next angle position using quadratic extrapolation (constant acceleration model)."""
+        # Formula: p(t) = p₀ + v₀*t + ½*a*t²
+        p_pred_raw = p_curr + v_curr * interval + 0.5 * accel * (interval ** 2)
         return np.arctan2(np.sin(p_pred_raw), np.cos(p_pred_raw))
