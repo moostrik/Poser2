@@ -17,6 +17,8 @@ from modules.pose.Pose import Pose, PoseDict
 from modules.utils.PointsAndRects import Rect
 from modules.Settings import Settings
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 @dataclass
 class PoseInterpolatorState:
@@ -62,6 +64,8 @@ class PoseInterpolator(PoseFilterBase):
 
         # Thread-safe storage for interpolated poses
         self._interpolated_poses: PoseDict = {}
+
+        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def alpha_v(self) -> float:
