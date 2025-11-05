@@ -129,7 +129,7 @@ class PosePipeline(Thread):
         tracklets: list[Tracklet] = list(self.get_tracklets().values())
 
         if not tracklets:
-            print("No tracklets to process")
+            # print("No tracklets to process")
             return
 
         self.batch_counter += 1

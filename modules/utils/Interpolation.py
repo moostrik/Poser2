@@ -1,8 +1,14 @@
-import math
+# Standard library imports
 from collections import deque
+import math
 from time import time
-import numpy as np
 import warnings
+
+# Third-party imports
+import numpy as np
+
+# Local application imports
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 MAX_EXTRAPOLATION = 1.1  # 10% overshoot for timing jitter
 
@@ -306,6 +312,11 @@ class VectorPredictiveHermite:
             self.buffer[-1], self.p_pred, self.v_curr, self.interval, s
         )
 
+
+        self.ud()
+    def ud(self) -> None:
+        pass
+
     def reset(self) -> None:
         """Reset the interpolator to its initial state."""
         self.buffer.clear()
@@ -503,6 +514,12 @@ class VectorPredictiveAngleHermite(VectorPredictiveHermite):
         the first valid sample pair. This allows independent recovery when elements
         transition from NaN to valid data.
     """
+    def __init__(self, input_rate: float, vector_size: int, alpha_v: float = 0.45) -> None:
+        super().__init__(input_rate, vector_size, alpha_v)
+        self._hot_reload = HotReloadMethods(self.__class__, True, True)
+
+    def ud(self) -> None:
+        self.alpha_v = 0.1
 
     @staticmethod
     def _calculate_velocity_and_prediction(p_prev: np.ndarray, p_curr: np.ndarray, v_prev: np.ndarray, alpha_v: float, interval: float) -> tuple[np.ndarray, np.ndarray]:

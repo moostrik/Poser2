@@ -5,7 +5,6 @@ import numpy as np
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules import CaptureDataHub
 from modules.gl.Fbo import Fbo
 from modules.gl.Mesh import Mesh
 from modules.gl.LayerBase import LayerBase, Rect
@@ -18,7 +17,7 @@ from modules.pose.Pose import Pose
 from modules.pose.features.PosePoints import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
-from modules.RenderDataHub_Old import RenderDataHub_Old
+from modules.RenderDataHub import RenderDataHub
 from modules.CaptureDataHub import CaptureDataHub
 from modules.render.meshes.PoseMeshes import PoseMeshes
 
@@ -30,8 +29,8 @@ from modules.gl.shaders.PoseFeature import PoseFeature
 class PoseFeatureLayer(LayerBase):
     pose_feature_shader = PoseFeature()
 
-    def __init__(self, data: RenderDataHub_Old, capture_data: CaptureDataHub, cam_id: int) -> None:
-        self.data: RenderDataHub_Old = data
+    def __init__(self, render_data: RenderDataHub, capture_data: CaptureDataHub, cam_id: int) -> None:
+        self.render_data: RenderDataHub = render_data
         self.capture_data: CaptureDataHub = capture_data
         self.capture_key: str = capture_data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
@@ -64,7 +63,7 @@ class PoseFeatureLayer(LayerBase):
 
         key: int = self.cam_id
 
-        if self.data.get_is_active(key) is False:
+        if self.render_data.get_is_active(key) is False:
             self.fbo.begin()
             glClearColor(0.0, 0.0, 0.0, 0.0)
             glClear(GL_COLOR_BUFFER_BIT)
@@ -76,10 +75,7 @@ class PoseFeatureLayer(LayerBase):
             return
 
 
-
-
-
-        values: PoseAngleData = self.data.get_angles(key)
+        values: PoseAngleData = self.render_data.get_angles(key)
         # range_scale: float = 1.0
         # values: PoseAngleData = self.data.get_velocities(key)
         range_scale: float = 1.0
@@ -88,14 +84,21 @@ class PoseFeatureLayer(LayerBase):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         if self.capture_data.get_is_active(key):
-            raw_pose: Pose | None = self.capture_data.get_raw_pose(key, True, self.capture_key)
+            raw_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
             if raw_pose is not None:
-                v_c: PoseAngleData = raw_pose.delta_data
+                v_c: PoseAngleData = raw_pose.angle_data
                 if v_c is not None:
                     PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, v_c, range_scale, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
-            smooth_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
+            # smooth_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
+            # if smooth_pose is not None:
+            #     v_c: PoseAngleData = smooth_pose.delta_data
+            #     if v_c is not None:
+            #         PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, range_scale)
+
+        if self.render_data.has_pose(key):
+            smooth_pose: Pose | None = self.render_data.get_pose(key)
             if smooth_pose is not None:
-                v_c: PoseAngleData = smooth_pose.delta_data
+                v_c: PoseAngleData = smooth_pose.angle_data
                 if v_c is not None:
                     PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, range_scale)
 
