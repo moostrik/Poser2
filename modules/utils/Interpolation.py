@@ -499,104 +499,213 @@ class ScalarPredictiveAngleHermite(ScalarPredictiveHermite):
         return math.atan2(math.sin(interpolated_raw), math.cos(interpolated_raw))
 
 
-class VectorPredictiveAngleHermite(VectorPredictiveHermite):
-    """Vectorized angle interpolator with proper angular wrapping.
 
-    Handles arrays of angles in radians [-π, π] with proper wrapping around discontinuities.
-    Uses the shortest angular distance for velocity calculations and interpolation.
+class VectorPredictiveAngleHermite:
+    """Vectorized angle interpolator with velocity steering and dead reckoning.
+
+    Uses dead reckoning with gentle velocity steering toward predicted positions.
+    Never resets position on new samples, instead smoothly adjusts velocity to
+    steer toward targets, eliminating discontinuities entirely.
 
     Attributes:
         interpolated_value: Current interpolated angles in radians [-π, π]. Contains NaN
             values until first sample arrives.
 
     Note:
-        Velocity is initialized to zero per element, resulting in a ramp-up effect on
-        the first valid sample pair. This allows independent recovery when elements
-        transition from NaN to valid data.
+        Velocity steering provides perfectly smooth motion at the cost of some latency.
+        The alpha_steer parameter controls how aggressively the interpolator corrects
+        course toward new predictions.
     """
-    def __init__(self, input_rate: float, vector_size: int, alpha_v: float = 0.45) -> None:
-        super().__init__(input_rate, vector_size, alpha_v)
+
+    def __init__(self, input_rate: float, vector_size: int, alpha_v: float = 0.45, alpha_steer: float = 0.3) -> None:
+        """Initialize the vectorized angle interpolator with velocity steering.
+
+        Args:
+            input_rate: Sampling rate of the input data (e.g., 23 Hz).
+            vector_size: Size of the input arrays (e.g., number of angles).
+            alpha_v: Smoothing factor for velocity calculation from samples (0.0 to 1.0, default: 0.45).
+                Higher values = more smoothing of measured velocity.
+            alpha_steer: Steering strength for velocity correction (0.0 to 1.0, default: 0.3).
+                Higher values = faster correction toward target but more responsive to noise.
+                Lower values = smoother but more latency.
+        """
+        self.input_rate: float = input_rate
+        self.alpha_v: float = alpha_v
+        self.alpha_steer: float = alpha_steer
+        self.interval: float = 1.0 / input_rate
+        self.vector_size: int = vector_size
+
+        # State variables - no buffer needed!
+        self.p_prev: np.ndarray = np.full(vector_size, np.nan)
+        self.p_curr: np.ndarray = np.full(vector_size, np.nan)
+        self.v_curr: np.ndarray = np.zeros(vector_size)
+        self.p_pred: np.ndarray = np.full(vector_size, np.nan)
+        self.target_velocity: np.ndarray = np.zeros(vector_size)  # ✅ NEW: Store target velocity
+        self.last_sample_time: float = 0.0
+        self.last_update_time: float = 0.0
+        self.interpolated_value: np.ndarray = np.full(vector_size, np.nan)
+        self._initialized = False
+
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
-    def ud(self) -> None:
-        self.alpha_v = 0.1
+    def add_sample(self, value: np.ndarray, sample_time: float | None = None) -> None:
+        """Add a new sample to the interpolator.
+
+        Args:
+            value: New input sample (NumPy array of angles in radians).
+            sample_time: Timestamp in seconds when the sample was captured.
+                If None, uses time() (not recommended for best accuracy).
+
+        Note:
+            Does NOT reset interpolated position. Calculates target velocity
+            that update() will gradually steer toward.
+
+        Raises:
+            ValueError: If value shape doesn't match vector_size.
+        """
+        if value.shape[0] != self.vector_size:
+            raise ValueError(f"Expected array of size {self.vector_size}, got {value.shape[0]}")
+
+        if sample_time is None:
+            sample_time = time()
+
+        # Shift samples
+        self.p_prev = self.p_curr
+        self.p_curr = value
+        self.last_sample_time = sample_time
+
+        # Initialize on first sample
+        if not self._initialized:
+            self.interpolated_value = value.copy()
+            self.last_update_time = sample_time
+            self._initialized = True
+            return
+
+        # Calculate measured velocity from samples (pure, no steering influence)
+        v_measured = self._calculate_velocity(self.p_prev, self.p_curr, self.interval)
+
+        # Predict based on MEASURED velocity (what the data says will happen)
+        self.p_pred = self._predict_next_angle(self.p_curr, v_measured, self.interval)
+
+        # Smooth the measured velocity
+        self.v_curr = self.alpha_v * self.v_curr + (1 - self.alpha_v) * v_measured
+
+        # ✅ Calculate and STORE target velocity (don't apply correction yet)
+        self.target_velocity = self._calculate_steering_velocity(
+            self.interpolated_value, self.p_pred, self.interval
+        )
+
+    def update(self, current_time: float | None = None) -> None:
+        """Update the interpolated value for the current time.
+
+        Uses dead reckoning: integrates current velocity from last update time.
+        Gradually steers velocity toward target calculated from last sample.
+
+        Args:
+            current_time: Optional timestamp in seconds. If None, uses time().
+        """
+        if not self._initialized:
+            return
+
+        if current_time is None:
+            current_time = time()
+
+        # Validate time ordering
+        if current_time < self.last_update_time:
+            warnings.warn("Interpolator received out-of-order time update.", RuntimeWarning)
+            current_time = self.last_update_time
+
+        # Calculate time delta since last update
+        dt: float = current_time - self.last_update_time
+        self.last_update_time = current_time
+
+        # ✅ Gradually steer velocity toward target (happens every frame, not just on sample)
+        velocity_correction = self.target_velocity - self.v_curr
+        self.v_curr = self.v_curr + self.alpha_steer * velocity_correction
+
+        # Dead reckoning: integrate velocity
+        delta_position = self.v_curr * dt
+        self.interpolated_value = self.interpolated_value + delta_position
+
+        # Wrap to [-π, π]
+        self.interpolated_value = np.arctan2(np.sin(self.interpolated_value), np.cos(self.interpolated_value))
+
+        self.alpha_v: float = 0.5
+        self.alpha_steer: float = 0.05
+
+    def reset(self) -> None:
+        """Reset the interpolator to its initial state."""
+        self.p_prev = np.full(self.vector_size, np.nan)
+        self.p_curr = np.full(self.vector_size, np.nan)
+        self.v_curr = np.zeros(self.vector_size)
+        self.p_pred = np.full(self.vector_size, np.nan)
+        self.target_velocity = np.zeros(self.vector_size)  # ✅ NEW: Reset target velocity
+        self.last_sample_time = 0.0
+        self.last_update_time = 0.0
+        self.interpolated_value = np.full(self.vector_size, np.nan)
+        self._initialized = False
 
     @staticmethod
-    def _calculate_velocity_and_prediction(p_prev: np.ndarray, p_curr: np.ndarray, v_prev: np.ndarray, alpha_v: float, interval: float) -> tuple[np.ndarray, np.ndarray]:
-        """Calculate smoothed angular velocities and predict next angles.
+    def _calculate_velocity(p_prev: np.ndarray, p_curr: np.ndarray, interval: float) -> np.ndarray:
+        """Calculate instantaneous angular velocity from two samples.
 
         Args:
             p_prev: Previous angles in radians [-π, π].
             p_curr: Current angles in radians [-π, π].
-            v_prev: Previous smoothed angular velocities in rad/s.
-            alpha_v: Smoothing factor for velocity.
-            interval: Input sampling interval in seconds.
+            interval: Time interval between samples in seconds.
 
         Returns:
-            Tuple containing (smoothed angular velocities, predicted next angles in [-π, π]).
+            Angular velocities in rad/s.
 
         Note:
-            Uses shortest angular distance per element. NaN values are treated as zero
-            velocity (stationary) element-wise.
+            Uses shortest angular distance per element. NaN values result in zero velocity.
         """
         # Calculate angular differences using shortest path
         delta = p_curr - p_prev
-        # Wrap to [-π, π]
-        delta: np.ndarray = np.arctan2(np.sin(delta), np.cos(delta))
+        delta = np.arctan2(np.sin(delta), np.cos(delta))
 
         # Instantaneous angular velocities
-        v_inst: np.ndarray = delta / interval
+        v_inst = delta / interval
 
         # Replace NaN with zero
-        v_inst = np.nan_to_num(v_inst, nan=0.0)
-
-        # Smoothed angular velocities
-        v_curr: np.ndarray = alpha_v * v_prev + (1 - alpha_v) * v_inst
-
-        # Predicted next angles
-        p_pred_raw = p_curr + v_curr * interval
-        # Wrap to [-π, π]
-        p_pred: np.ndarray = np.arctan2(np.sin(p_pred_raw), np.cos(p_pred_raw))
-
-        return v_curr, p_pred
+        return np.nan_to_num(v_inst, nan=0.0)
 
     @staticmethod
-    def _generate_interpolated_value(p_curr: np.ndarray, p_pred: np.ndarray, v_curr: np.ndarray, interval: float, s: float) -> np.ndarray:
-        """Generate interpolated angles with proper wrapping.
+    def _predict_next_angle(p_curr: np.ndarray, v_curr: np.ndarray, interval: float) -> np.ndarray:
+        """Predict next angle position based on current velocity.
 
         Args:
-            p_curr: Current angles in radians [-π, π] (at s=0).
-            p_pred: Predicted next angles in radians [-π, π] (at s=1).
-            v_curr: Current smoothed angular velocities in rad/s.
-            interval: Input sampling interval.
-            s: Normalized time (0 <= s <= MAX_EXTRAPOLATION).
+            p_curr: Current angles in radians [-π, π].
+            v_curr: Current angular velocities in rad/s.
+            interval: Prediction time interval in seconds.
 
         Returns:
-            Interpolated angles in radians [-π, π] at normalized time s.
+            Predicted angles in radians [-π, π].
+        """
+        p_pred_raw = p_curr + v_curr * interval
+        return np.arctan2(np.sin(p_pred_raw), np.cos(p_pred_raw))
+
+    @staticmethod
+    def _calculate_steering_velocity(p_current: np.ndarray, p_target: np.ndarray, interval: float) -> np.ndarray:
+        """Calculate required velocity to reach target from current position.
+
+        Args:
+            p_current: Current interpolated angles in radians [-π, π].
+            p_target: Target angles (predicted position) in radians [-π, π].
+            interval: Time interval to reach target in seconds.
+
+        Returns:
+            Required angular velocities in rad/s to reach target.
 
         Note:
-            Uses angular distance per element for interpolation to handle wrapping correctly.
+            Uses shortest angular distance. Returns zero for NaN targets.
         """
-        # Calculate shortest angular distance from p_curr to p_pred
-        delta = p_pred - p_curr
-        delta: np.ndarray = np.arctan2(np.sin(delta), np.cos(delta))
+        # Calculate angular distance to target (shortest path)
+        delta = p_target - p_current
+        delta = np.arctan2(np.sin(delta), np.cos(delta))
 
-        # Tangents for Hermite interpolation (angular)
-        m0: np.ndarray = v_curr * interval
-        m1: np.ndarray = v_curr * interval
+        # Required velocity to reach target in one interval
+        v_required = delta / interval
 
-        # Hermite basis functions (scalars)
-        h00: float = 2 * s**3 - 3 * s**2 + 1
-        h10: float = s**3 - 2 * s**2 + s
-        h01: float = -2 * s**3 + 3 * s**2
-        h11: float = s**3 - s**2
-
-        # Hermite interpolation in angular space:
-        # We interpolate the angular distance (delta) from p_curr, not absolute positions
-        # Standard Hermite: h00*p0 + h10*m0 + h01*p1 + h11*m1
-        # Angular version: h00*0 + h10*m0 + h01*delta + h11*m1
-        # (h00 term is zero because we start at p_curr and add interpolated delta)
-        interpolated_raw = p_curr + h10 * m0 + h01 * delta + h11 * m1
-
-        # Wrap result to [-π, π]
-        return np.arctan2(np.sin(interpolated_raw), np.cos(interpolated_raw))
+        # Handle NaN targets
+        return np.where(np.isnan(p_target), 0.0, v_required)
