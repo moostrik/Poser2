@@ -12,7 +12,7 @@ from modules.pose.features.PosePoints import PosePointData
 from modules.pose.Pose import Pose
 from modules.utils.PointsAndRects import Rect
 
-from modules.pose.filter.interpolation.InterpolatorConfig import InterpolatorConfig
+from modules.pose.filter.interpolation.PoseInterpolatorConfig import PoseInterpolatorConfig
 
 @dataclass
 class PoseInterpolatorState:
@@ -39,10 +39,10 @@ class PoseInterpolator(PoseFilterBase):
     (e.g., 60 FPS output vs 30 FPS input) to generate interpolated frames.
     """
 
-    def __init__(self, config: InterpolatorConfig) -> None:
+    def __init__(self, config: PoseInterpolatorConfig) -> None:
         """Initialize pose interpolator with feature interpolators."""
         super().__init__()
-        self._config: InterpolatorConfig = config
+        self._config: PoseInterpolatorConfig = config
         self._state: PoseInterpolatorState | None = None
 
     def process(self, pose: Pose) -> Pose:

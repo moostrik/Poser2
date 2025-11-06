@@ -3,7 +3,7 @@ from abc import abstractmethod
 from typing import Any, Generic, TypeVar
 
 # Local application imports
-from modules.pose.filter.interpolation.InterpolatorConfig import InterpolatorConfig
+from modules.pose.filter.interpolation.PoseInterpolatorConfig import PoseInterpolatorConfig
 
 
 # Generic type for any feature (PoseAngles, PoseMeasurements, etc.)
@@ -28,9 +28,9 @@ class FeatureInterpolatorBase(Generic[TFeature]):
     - Interpolation/update logic for generating output
     """
 
-    def __init__(self, config: InterpolatorConfig) -> None:
+    def __init__(self, config: PoseInterpolatorConfig) -> None:
         super().__init__()
-        self._config: InterpolatorConfig = config
+        self._config: PoseInterpolatorConfig = config
         # Initialize state immediately
         self._state: Any = self._create_state()
 

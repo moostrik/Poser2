@@ -1,7 +1,7 @@
 
 from modules.pose.filter.PoseFilterBase import PoseFilterConfigBase
 
-class InterpolatorConfig(PoseFilterConfigBase):
+class PoseInterpolatorConfig(PoseFilterConfigBase):
     """Configuration for pose interpolators with automatic change notification."""
 
     def __init__(self) -> None:

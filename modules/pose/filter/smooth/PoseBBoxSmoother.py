@@ -15,10 +15,10 @@ class PoseBBoxSmoother(PoseSmootherBase):
     def _create_state(self) -> tuple[OneEuroFilter, OneEuroFilter, OneEuroFilter, OneEuroFilter]:
         """Create filters for bounding box (x, y, width, height)."""
         return (
-            OneEuroFilter(self.settings.frequency, self.settings.min_cutoff, self.settings.beta, self.settings.d_cutoff),
-            OneEuroFilter(self.settings.frequency, self.settings.min_cutoff, self.settings.beta, self.settings.d_cutoff),
-            OneEuroFilter(self.settings.frequency, self.settings.min_cutoff, self.settings.beta, self.settings.d_cutoff),
-            OneEuroFilter(self.settings.frequency, self.settings.min_cutoff, self.settings.beta, self.settings.d_cutoff)
+            OneEuroFilter(self._config.frequency, self._config.min_cutoff, self._config.beta, self._config.d_cutoff),
+            OneEuroFilter(self._config.frequency, self._config.min_cutoff, self._config.beta, self._config.d_cutoff),
+            OneEuroFilter(self._config.frequency, self._config.min_cutoff, self._config.beta, self._config.d_cutoff),
+            OneEuroFilter(self._config.frequency, self._config.min_cutoff, self._config.beta, self._config.d_cutoff)
         )
 
     def _smooth(self, pose: Pose, state: tuple[OneEuroFilter, OneEuroFilter, OneEuroFilter, OneEuroFilter]) -> Pose:
@@ -34,8 +34,14 @@ class PoseBBoxSmoother(PoseSmootherBase):
         smoothed_bbox = Rect(smoothed_x, smoothed_y, smoothed_w, smoothed_h)
         return replace(pose, bounding_box=smoothed_bbox)
 
-    def _update_filters(self, state: tuple[OneEuroFilter, OneEuroFilter, OneEuroFilter, OneEuroFilter]) -> None:
-        """Update filter parameters for bounding box filters."""
-        x_filter, y_filter, w_filter, h_filter = state
-        for f in (x_filter, y_filter, w_filter, h_filter):
-            f.setParameters(self.settings.frequency, self.settings.min_cutoff, self.settings.beta, self.settings.d_cutoff)
+    def _on_config_changed(self) -> None:
+        """Update filter parameters when config changes."""
+        if self._state is not None:
+            x_filter, y_filter, w_filter, h_filter = self._state
+            for f in (x_filter, y_filter, w_filter, h_filter):
+                f.setParameters(
+                    self._config.frequency,
+                    self._config.min_cutoff,
+                    self._config.beta,
+                    self._config.d_cutoff
+                )

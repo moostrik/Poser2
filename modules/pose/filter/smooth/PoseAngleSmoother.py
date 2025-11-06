@@ -6,7 +6,7 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS, AngleJoint
-from modules.pose.filter.smooth.PoseSmootherBase import PoseSmootherBase
+from modules.pose.filter.smooth.PoseSmootherBase import PoseSmootherBase, PoseSmootherConfig
 from modules.pose.Pose import Pose
 from modules.utils.Smoothing import OneEuroFilterAngular
 
@@ -18,10 +18,10 @@ class PoseAngleSmoother(PoseSmootherBase):
         """Create angular filters for all joints and validity tracking."""
         filters = [
             OneEuroFilterAngular(
-                self.settings.frequency,
-                self.settings.min_cutoff,
-                self.settings.beta,
-                self.settings.d_cutoff
+                self._config.frequency,
+                self._config.min_cutoff,
+                self._config.beta,
+                self._config.d_cutoff
             )
             for _ in range(ANGLE_NUM_JOINTS)
         ]
@@ -43,7 +43,7 @@ class PoseAngleSmoother(PoseSmootherBase):
                 angle_filter = filters[angle_joint]
 
                 # Reset if angle reappeared
-                if not was_valid and self.settings.reset_on_reappear:
+                if not was_valid and self._config.reset_on_reappear:
                     angle_filter.reset()
 
                 smoothed_angles[angle_joint] = angle_filter(angle)
@@ -53,13 +53,14 @@ class PoseAngleSmoother(PoseSmootherBase):
         smoothed_angle_data = PoseAngleData(smoothed_angles, pose.angle_data.scores)
         return replace(pose, angle_data=smoothed_angle_data)
 
-    def _update_filters(self, state: tuple[list[OneEuroFilterAngular], np.ndarray]) -> None:
-        """Update filter parameters for all angle filters."""
-        filters, _ = state
-        for angle_filter in filters:
-            angle_filter.setParameters(
-                self.settings.frequency,
-                self.settings.min_cutoff,
-                self.settings.beta,
-                self.settings.d_cutoff
-            )
+    def _on_config_changed(self) -> None:
+        """Update filter parameters when config changes."""
+        if self._state is not None:
+            filters, _ = self._state
+            for angle_filter in filters:
+                angle_filter.setParameters(
+                    self._config.frequency,
+                    self._config.min_cutoff,
+                    self._config.beta,
+                    self._config.d_cutoff
+                )

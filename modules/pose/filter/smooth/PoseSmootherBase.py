@@ -4,56 +4,70 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 # Pose imports
-from modules.pose.filter.PoseFilterBase import PoseFilterBase
+from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
 from modules.pose.Pose import Pose
 
-# Local application imports
-from modules.gui.PyReallySimpleGui import Gui, eType as eT
-from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
 
+class PoseSmootherConfig(PoseFilterConfigBase):
+    """Configuration for OneEuroFilter-based smoothing with automatic change notification."""
 
-@dataclass
-class SmootherSettings:
-    """Configuration for OneEuroFilter-based smoothing."""
-    frequency: float = 30.0
-    min_cutoff: float = 1.0
-    beta: float = 0.025
-    d_cutoff: float = 1.0
-    reset_on_reappear: bool = False
+    def __init__(self,
+                 frequency: float = 30.0,
+                 min_cutoff: float = 1.0,
+                 beta: float = 0.025,
+                 d_cutoff: float = 1.0,
+                 reset_on_reappear: bool = False) -> None:
+        super().__init__()
+        self._frequency: float = frequency
+        self._min_cutoff: float = min_cutoff
+        self._beta: float = beta
+        self._d_cutoff: float = d_cutoff
+        self._reset_on_reappear: bool = reset_on_reappear
 
+    @property
+    def frequency(self) -> float:
+        return self._frequency
 
-class GuiSettings:
-    def __init__(self, settings: SmootherSettings, gui: Gui, name: str, on_change: Callable) -> None:
-        self.gui: Gui = gui
-        self.settings: SmootherSettings = settings
-        self.on_change: Callable = on_change
+    @frequency.setter
+    def frequency(self, value: float) -> None:
+        self._frequency = value
+        self._notify()
 
-        elm: list = []
-        elm.append([E(eT.TEXT, 'TIME     '),
-            E(eT.TEXT, 'minc'),
-            E(eT.SLDR, name + 'min_cutoff', self.set_min_cutoff,    1.0,    [0.0,2.0],  0.1),
-            E(eT.TEXT, 'beta'),
-            E(eT.SLDR, name + 'beta',       self.set_beta,          0.05,   [0.0,0.5],  0.01),
-            E(eT.TEXT, 'dc'),
-            E(eT.SLDR, name + 'd_cutoff',   self.set_d_cutoff,      1.0,    [0.0,2.0],  0.1)])
+    @property
+    def min_cutoff(self) -> float:
+        return self._min_cutoff
 
-        gui_height: int = len(elm) * ELEMHEIGHT + BASEHEIGHT
-        self.frame = Frame(name, elm, gui_height)
+    @min_cutoff.setter
+    def min_cutoff(self, value: float) -> None:
+        self._min_cutoff = value
+        self._notify()
 
-    def get_gui_frame(self):
-        return self.frame
+    @property
+    def beta(self) -> float:
+        return self._beta
 
-    def set_min_cutoff(self, value: float) -> None:
-        self.settings.min_cutoff = value
-        self.on_change()
+    @beta.setter
+    def beta(self, value: float) -> None:
+        self._beta = value
+        self._notify()
 
-    def set_beta(self, value: float) -> None:
-        self.settings.beta = value
-        self.on_change()
+    @property
+    def d_cutoff(self) -> float:
+        return self._d_cutoff
 
-    def set_d_cutoff(self, value: float) -> None:
-        self.settings.d_cutoff = value
-        self.on_change()
+    @d_cutoff.setter
+    def d_cutoff(self, value: float) -> None:
+        self._d_cutoff = value
+        self._notify()
+
+    @property
+    def reset_on_reappear(self) -> bool:
+        return self._reset_on_reappear
+
+    @reset_on_reappear.setter
+    def reset_on_reappear(self, value: bool) -> None:
+        self._reset_on_reappear = value
+        self._notify()
 
 
 class PoseSmootherBase(PoseFilterBase):
@@ -62,29 +76,17 @@ class PoseSmootherBase(PoseFilterBase):
 
     Handles:
     - Filter state management for a single pose
-    - Settings and GUI integration
+    - Config change notifications
 
     Subclasses implement:
     - Filter initialization for a new pose
     - Smoothing logic for specific data types (points, angles, bbox)
-    - Settings update propagation to filters
+    - Config change handling via _on_config_changed()
     """
 
-    def __init__(self, frequency: float, name: str, gui: Gui | None = None) -> None:
-        super().__init__()
-        self.settings = SmootherSettings(
-            frequency=frequency,
-            min_cutoff=2.0,
-            beta=0.05,
-            d_cutoff=1.0,
-            reset_on_reappear=False
-        )
-
-        self.name: str = name
-        self.gui_settings: GuiSettings | None = None
-        if gui is not None:
-            self.gui_settings = GuiSettings(self.settings, gui, name, self._update_settings)
-
+    def __init__(self, config: PoseSmootherConfig) -> None:
+        super().__init__(config)
+        self._config: PoseSmootherConfig = config
         # State for the current pose (managed by subclasses)
         self._state: Any = None
 
@@ -96,10 +98,6 @@ class PoseSmootherBase(PoseFilterBase):
 
         # Smooth the pose data
         smoothed_pose: Pose = self._smooth(pose, self._state)
-
-        # Cleanup state if pose is lost
-        if pose.lost:
-            self._state = None
 
         return smoothed_pose
 
@@ -113,21 +111,8 @@ class PoseSmootherBase(PoseFilterBase):
         """Apply smoothing to a single pose."""
         pass
 
-    @abstractmethod
-    def _update_filters(self, state: Any) -> None:
-        """Update filter parameters for the pose's filters."""
-        pass
-
-    def _update_settings(self) -> None:
-        """Update filter parameters for the current pose."""
-        if self._state is not None:
-            self._update_filters(self._state)
-
-    def get_gui_frame(self):
-        if self.gui_settings:
-            return self.gui_settings.get_gui_frame()
-        return Frame(self.name, [], 50)  # Empty frame if no GUI settings
-
     def reset(self) -> None:
         """Reset the filter's internal state."""
         self._state = None
+
+    # Note: Subclasses should override _on_config_changed() to update their state

@@ -9,7 +9,7 @@ from modules.pose.filter.interpolation._FeatureInterpolatorBase import FeatureIn
 from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS
 from modules.pose.filter.interpolation.predictive.VectorAngle import VectorAngle
 
-from modules.pose.filter.interpolation.InterpolatorConfig import InterpolatorConfig
+from modules.pose.filter.interpolation.PoseInterpolatorConfig import PoseInterpolatorConfig
 
 
 

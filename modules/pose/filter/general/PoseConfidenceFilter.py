@@ -5,9 +5,26 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filter.PoseFilterBase import PoseFilterBase
+from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
 from modules.pose.features.PosePoints import PosePointData
 from modules.pose.Pose import Pose
+
+class PoseConfidenceFilterConfig(PoseFilterConfigBase):
+    """Configuration for confidence filtering with automatic change notification."""
+
+    def __init__(self, confidence_threshold: float = 0.5) -> None:
+        super().__init__()
+        self._confidence_threshold: float = max(0.0, min(0.99, confidence_threshold))
+
+    @property
+    def confidence_threshold(self) -> float:
+        return self._confidence_threshold
+
+    @confidence_threshold.setter
+    def confidence_threshold(self, value: float) -> None:
+        self._confidence_threshold = max(0.0, min(0.99, value))
+        self._notify()
+
 
 class PoseConfidenceFilter(PoseFilterBase):
     """Filters pose keypoints based on confidence thresholds.
@@ -19,9 +36,9 @@ class PoseConfidenceFilter(PoseFilterBase):
     Note: Does NOT recompute angles - that should be done by PoseAngles filter downstream.
     """
 
-    def __init__(self, confidence_threshold: float) -> None:
+    def __init__(self, config: PoseConfidenceFilterConfig) -> None:
         super().__init__()
-        self.confidence_threshold: float = max(0.0, min(0.99, confidence_threshold))
+        self._config: PoseConfidenceFilterConfig = config
 
     def process(self, pose: Pose) -> Pose:
         """Process a single pose."""
@@ -32,13 +49,13 @@ class PoseConfidenceFilter(PoseFilterBase):
         scores: np.ndarray = pose.point_data.scores
 
         # Mask for keypoints meeting confidence threshold
-        filtered = scores >= self.confidence_threshold
+        filtered = scores >= self._config.confidence_threshold
 
         # Replace low-confidence keypoints with NaN
         filtered_values: np.ndarray = np.where(filtered[:, np.newaxis], values, np.nan)
 
         # Rescale remaining scores to [0, 1] range
-        rescaled_scores: np.ndarray = np.where(filtered, (scores - self.confidence_threshold) / (1 - self.confidence_threshold), 0.0)
+        rescaled_scores: np.ndarray = np.where(filtered, (scores - self._config.confidence_threshold) / (1 - self._config.confidence_threshold), 0.0)
 
         filtered_points = PosePointData(values=filtered_values, scores=rescaled_scores)
         filtered_pose: Pose = replace(pose, point_data=filtered_points)

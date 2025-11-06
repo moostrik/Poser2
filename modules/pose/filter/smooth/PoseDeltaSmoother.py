@@ -33,7 +33,7 @@ class PoseAngleDeltaSmoother(PoseAngleSmoother):
                 angle_filter = filters[angle_joint]
 
                 # Reset if delta reappeared
-                if not was_valid and self.settings.reset_on_reappear:
+                if not was_valid and self._config.reset_on_reappear:
                     angle_filter.reset()
 
                 smoothed_deltas[angle_joint] = angle_filter(delta)

@@ -10,9 +10,6 @@ from modules.pose.filter.smooth.PoseSmootherBase import PoseSmootherBase
 from modules.pose.Pose import Pose
 from modules.utils.Smoothing import OneEuroFilter
 
-# Local application imports
-from modules.utils.Smoothing import OneEuroFilter
-
 
 class PosePointSmoother(PoseSmootherBase):
     """Smooths pose keypoint positions using OneEuroFilter."""
@@ -21,8 +18,8 @@ class PosePointSmoother(PoseSmootherBase):
         """Create filters for all joints (x, y per joint) and validity tracking."""
         filters = [
             (
-                OneEuroFilter(self.settings.frequency, self.settings.min_cutoff, self.settings.beta, self.settings.d_cutoff),
-                OneEuroFilter(self.settings.frequency, self.settings.min_cutoff, self.settings.beta, self.settings.d_cutoff)
+                OneEuroFilter(self._config.frequency, self._config.min_cutoff, self._config.beta, self._config.d_cutoff),
+                OneEuroFilter(self._config.frequency, self._config.min_cutoff, self._config.beta, self._config.d_cutoff)
             )
             for _ in range(POSE_NUM_JOINTS)
         ]
@@ -44,7 +41,7 @@ class PosePointSmoother(PoseSmootherBase):
                 x_filter, y_filter = filters[joint]
 
                 # Reset if joint reappeared
-                if not was_valid and self.settings.reset_on_reappear:
+                if not was_valid and self._config.reset_on_reappear:
                     x_filter.reset()
                     y_filter.reset()
 
@@ -55,9 +52,20 @@ class PosePointSmoother(PoseSmootherBase):
         smoothed_point_data = PosePointData(smoothed_values, pose.point_data.scores)
         return replace(pose, point_data=smoothed_point_data)
 
-    def _update_filters(self, state: tuple[list[tuple[OneEuroFilter, OneEuroFilter]], np.ndarray]) -> None:
-        """Update filter parameters for all joint filters."""
-        filters, _ = state
-        for x_filter, y_filter in filters:
-            x_filter.setParameters(self.settings.frequency, self.settings.min_cutoff, self.settings.beta, self.settings.d_cutoff)
-            y_filter.setParameters(self.settings.frequency, self.settings.min_cutoff, self.settings.beta, self.settings.d_cutoff)
+    def _on_config_changed(self) -> None:
+        """Update filter parameters when config changes."""
+        if self._state is not None:
+            filters, _ = self._state
+            for x_filter, y_filter in filters:
+                x_filter.setParameters(
+                    self._config.frequency,
+                    self._config.min_cutoff,
+                    self._config.beta,
+                    self._config.d_cutoff
+                )
+                y_filter.setParameters(
+                    self._config.frequency,
+                    self._config.min_cutoff,
+                    self._config.beta,
+                    self._config.d_cutoff
+                )
