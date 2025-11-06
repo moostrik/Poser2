@@ -5,9 +5,11 @@ from dataclasses import dataclass
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.interpolation.FeatureInterpolatorBase import FeatureInterpolatorBase
+from modules.pose.filter.interpolation._FeatureInterpolatorBase import FeatureInterpolatorBase
 from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS
-from modules.pose.filters.interpolation.predictive.VectorAngle import VectorAngle
+from modules.pose.filter.interpolation.predictive.VectorAngle import VectorAngle
+
+from modules.pose.filter.interpolation.InterpolatorConfig import InterpolatorConfig
 
 
 
@@ -39,8 +41,10 @@ class FeatureAngleInterpolator(FeatureInterpolatorBase[PoseAngleData]):
         """Create initial filter state for interpolation."""
         return AngleFilterState(
             interpolator=VectorAngle(
-                input_rate=self._input_rate,
-                vector_size=ANGLE_NUM_JOINTS
+                input_frequency=self._config.frequency,
+                vector_size=ANGLE_NUM_JOINTS,
+                responsiveness=self._config.alpha_v,
+                friction=self._config.friction
             ),
             last_scores=np.zeros(ANGLE_NUM_JOINTS, dtype=np.float32)
         )
@@ -77,6 +81,8 @@ class FeatureAngleInterpolator(FeatureInterpolatorBase[PoseAngleData]):
 
         return PoseAngleData(values=interpolated_values, scores=interpolated_scores)
 
-    def _on_alpha_v_changed(self, value: float) -> None:
-        """Update interpolator when alpha_v changes."""
-        self._state.interpolator.alpha_v = value
+    def _on_config_changed(self) -> None:
+        """Update interpolator when config changes."""
+        self._state.interpolator.input_frequency = self._config.frequency
+        self._state.interpolator.responsiveness = self._config.alpha_v
+        self._state.interpolator.friction = self._config.friction

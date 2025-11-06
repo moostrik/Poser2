@@ -11,8 +11,8 @@ from modules.pose.features.PoseAngles import PoseAngleData
 from modules.pose.features.PosePoints import PosePointData
 from modules.pose.Pose import Pose
 from modules.utils.PointsAndRects import Rect
-from modules.Settings import Settings
 
+from modules.pose.filter.interpolation.InterpolatorConfig import InterpolatorConfig
 
 @dataclass
 class PoseInterpolatorState:
@@ -22,15 +22,7 @@ class PoseInterpolatorState:
     delta: FeatureAngleInterpolator
     b_box: FeatureRectInterpolator
     mtime: FeatureFloatInterpolator
-    pose_template: Pose  # Last known pose for metadata
-
-    def set_alpha_v(self, value: float) -> None:
-        """Set alpha_v for all interpolators in this state."""
-        self.point.alpha_v = value
-        self.angle.alpha_v = value
-        self.delta.alpha_v = value
-        self.b_box.alpha_v = value
-        self.mtime.alpha_v = value
+    pose_template: Pose
 
 
 class PoseInterpolator(PoseFilterBase):
@@ -47,25 +39,11 @@ class PoseInterpolator(PoseFilterBase):
     (e.g., 60 FPS output vs 30 FPS input) to generate interpolated frames.
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, config: InterpolatorConfig) -> None:
         """Initialize pose interpolator with feature interpolators."""
         super().__init__()
-        self._settings: Settings = settings
-        self._alpha_v: float = 0.45  # Default velocity smoothing factor
+        self._config: InterpolatorConfig = config
         self._state: PoseInterpolatorState | None = None
-
-    @property
-    def alpha_v(self) -> float:
-        """Get velocity smoothing factor."""
-        return self._alpha_v
-
-    @alpha_v.setter
-    def alpha_v(self, value: float) -> None:
-        """Set velocity smoothing factor for all interpolators."""
-        value = max(0.0, min(1.0, value))  # Clamp to [0, 1]
-        self._alpha_v = value
-        if self._state is not None:
-            self._state.set_alpha_v(value)
 
     def process(self, pose: Pose) -> Pose:
         """Add input sample to interpolators (called at input rate).
@@ -123,15 +101,13 @@ class PoseInterpolator(PoseFilterBase):
     def _create_state(self, pose: Pose) -> PoseInterpolatorState:
         """Create interpolator state for a new pose."""
         state = PoseInterpolatorState(
-            point=FeaturePointInterpolator(self._settings),
-            angle=FeatureAngleInterpolator(self._settings),
-            delta=FeatureAngleInterpolator(self._settings),
-            b_box=FeatureRectInterpolator(self._settings),
-            mtime=FeatureFloatInterpolator(self._settings),
+            point=FeaturePointInterpolator(self._config),
+            angle=FeatureAngleInterpolator(self._config),
+            delta=FeatureAngleInterpolator(self._config),
+            b_box=FeatureRectInterpolator(self._config),
+            mtime=FeatureFloatInterpolator(self._config),
             pose_template=pose
         )
-        # Apply current alpha_v to new state
-        state.set_alpha_v(self._alpha_v)
         return state
 
     def reset(self) -> None:

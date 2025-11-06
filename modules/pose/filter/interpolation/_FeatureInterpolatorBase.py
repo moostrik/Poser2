@@ -3,7 +3,7 @@ from abc import abstractmethod
 from typing import Any, Generic, TypeVar
 
 # Local application imports
-from modules.Settings import Settings
+from modules.pose.filter.interpolation.InterpolatorConfig import InterpolatorConfig
 
 
 # Generic type for any feature (PoseAngles, PoseMeasurements, etc.)
@@ -28,23 +28,14 @@ class FeatureInterpolatorBase(Generic[TFeature]):
     - Interpolation/update logic for generating output
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, config: InterpolatorConfig) -> None:
         super().__init__()
-        self._input_rate: float = settings.camera_fps
-        self._alpha_v: float = 0.45  # Default velocity smoothing factor
-
+        self._config: InterpolatorConfig = config
         # Initialize state immediately
         self._state: Any = self._create_state()
 
-    @property
-    def alpha_v(self) -> float:
-        return self._alpha_v
-
-    @alpha_v.setter
-    def alpha_v(self, value: float) -> None:
-        value = max(0.0, min(1.0, value))  # Clamp between 0.0 and 1.0
-        self._alpha_v = value
-        self._on_alpha_v_changed(value)
+        # Register for config change notifications
+        config.add_listener(self._on_config_changed)
 
     def add_feature(self, feature: TFeature) -> None:
         """Add feature sample to interpolator (called at input rate)."""
@@ -74,6 +65,6 @@ class FeatureInterpolatorBase(Generic[TFeature]):
         pass
 
     @abstractmethod
-    def _on_alpha_v_changed(self, value: float) -> None:
-        """Hook for subclasses to update state when alpha_v changes."""
-        pass
+    def _on_config_changed(self) -> None:
+        """Called when config changes. Override to apply new config values."""
+        pass  # Default: no action needed

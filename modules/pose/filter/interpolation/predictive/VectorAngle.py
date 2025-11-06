@@ -24,13 +24,13 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class VectorAngle:
 
-    def __init__(self, input_rate: float, vector_size: int, responsiveness: float = 0.2, friction: float = 0.03) -> None:
+    def __init__(self, input_frequency: float, vector_size: int, responsiveness: float = 0.2, friction: float = 0.03) -> None:
         """Initialize the vectorized angle interpolator with velocity steering."""
-        self.input_interval: float = 1.0 / input_rate
-        self.vector_size: int = vector_size
+        self._input_interval: float = 1.0 / input_frequency
+        self._vector_size: int = vector_size
 
-        self.responsiveness: float = responsiveness
-        self.inv_friction: float = 1.0 - friction
+        self._responsiveness: float = responsiveness
+        self._inv_friction: float = 1.0 - friction
 
         self._initialized = False
 
@@ -46,8 +46,38 @@ class VectorAngle:
         self.v_curr: np.ndarray = np.zeros(vector_size)
         self.v_target: np.ndarray = np.zeros(vector_size)
 
-
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
+
+    @property
+    def input_frequency(self) -> float:
+        """Get the input frequency."""
+        return 1.0 / self._input_interval
+    @input_frequency.setter
+    def input_frequency(self, value: float) -> None:
+        """Set the input frequency."""
+        if value <= 0.0:
+            raise ValueError("Frequency must be positive.")
+        self._input_interval = 1.0 / value
+
+    @property
+    def responsiveness(self) -> float:
+        """Get the current responsiveness."""
+        return self._responsiveness
+    @responsiveness.setter
+    def responsiveness(self, value: float) -> None:
+        """Set the responsiveness (0.0 to 1.0)."""
+        self._responsiveness = max(0.0, min(1.0, value))
+
+    @property
+    def friction(self) -> float:
+        """Get the current friction."""
+        return 1.0 - self._inv_friction
+    @friction.setter
+    def friction(self, value: float) -> None:
+        """Set the friction (0.0 to 1.0)."""
+        value = max(0.0, min(1.0, value))
+        self._inv_friction = 1.0 - value
+
 
     def get_interpolated(self) -> np.ndarray:
         """Get the current interpolated angle values."""
@@ -56,8 +86,8 @@ class VectorAngle:
     def add_sample(self, angles: np.ndarray, sample_time: float | None = None) -> None:
         """Add a new sample to the interpolator."""
 
-        if angles.shape[0] != self.vector_size:
-            raise ValueError(f"Expected array of size {self.vector_size}, got {angles.shape[0]}")
+        if angles.shape[0] != self._vector_size:
+            raise ValueError(f"Expected array of size {self._vector_size}, got {angles.shape[0]}")
 
         if sample_time is None:
             sample_time = monotonic()
@@ -80,11 +110,11 @@ class VectorAngle:
             self.v_curr[newly_valid] = 0.0
             self.v_prev[newly_valid] = 0.0
 
-        v_measured: np.ndarray = self._calculate_velocity(self.a_prev, self.a_curr, self.input_interval)
-        acceleration: np.ndarray = self._calculate_velocity(self.v_prev, v_measured, self.input_interval)
+        v_measured: np.ndarray = self._calculate_velocity(self.a_prev, self.a_curr, self._input_interval)
+        acceleration: np.ndarray = self._calculate_velocity(self.v_prev, v_measured, self._input_interval)
         self.v_prev = v_measured
 
-        self.a_target = self._predict_quadratic(self.a_curr, v_measured, acceleration, self.input_interval)
+        self.a_target = self._predict_quadratic(self.a_curr, v_measured, acceleration, self._input_interval)
         # self.a_target = self._predict_linear(self.a_curr, v_measured, self.input_interval)
 
     def update(self, current_time: float | None = None) -> None:
@@ -103,10 +133,10 @@ class VectorAngle:
         dt = min(dt, 0.1)  # Max 100ms step
         self.last_update_time = current_time
 
-        self.v_target = self._calculate_velocity(self.a_interpolated, self.a_target, self.input_interval)
+        self.v_target = self._calculate_velocity(self.a_interpolated, self.a_target, self._input_interval)
 
-        velocity_correction = (self.v_target - self.v_curr) * self.responsiveness
-        self.v_curr = (self.v_curr + velocity_correction) * self.inv_friction
+        velocity_correction = (self.v_target - self.v_curr) * self._responsiveness
+        self.v_curr = (self.v_curr + velocity_correction) * self._inv_friction
         delta_position = self.v_curr * dt
 
         self.a_interpolated = self.a_interpolated + delta_position

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.interpolation.FeatureInterpolatorBase import FeatureInterpolatorBase
+from modules.pose.filter.interpolation._FeatureInterpolatorBase import FeatureInterpolatorBase
 from modules.pose.features.PosePoints import PosePointData, POSE_NUM_JOINTS
 
 # Local application imports
@@ -41,14 +41,14 @@ class FeaturePointInterpolator(FeatureInterpolatorBase[PosePointData]):
         """Create initial filter state for interpolation."""
         return PointFilterState(
             interpolator_x=VectorPredictiveHermite(
-                input_rate=self._input_rate,
+                input_rate=self._config.frequency,
                 vector_size=POSE_NUM_JOINTS,
-                alpha_v=self._alpha_v
+                alpha_v=self._config.alpha_v
             ),
             interpolator_y=VectorPredictiveHermite(
-                input_rate=self._input_rate,
+                input_rate=self._config.frequency,
                 vector_size=POSE_NUM_JOINTS,
-                alpha_v=self._alpha_v
+                alpha_v=self._config.alpha_v
             ),
             last_scores=np.zeros(POSE_NUM_JOINTS, dtype=np.float32)
         )
