@@ -1,7 +1,6 @@
 # Standard library imports
 from abc import abstractmethod
-from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 # Pose imports
 from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
