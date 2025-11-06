@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 # Pose imports
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.filters.PoseBatchFilterBase import PoseBatchFilterBase
 from modules.pose.Pose import Pose, PoseDict
 
 # Local application imports
@@ -59,7 +59,7 @@ class GuiSettings:
 
 
 
-class PoseSmootherBase(PoseFilterBase):
+class PoseSmootherBase(PoseBatchFilterBase):
     """Base class for pose data smoothing using OneEuroFilter.
 
     Handles:

@@ -1,13 +1,15 @@
+
+
 # Standard library imports
 from dataclasses import replace
 
 # Pose imports
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.filters.PoseBatchFilterBase import PoseBatchFilterBase
 from modules.pose.features.PoseAngles import PoseAngleData
 from modules.pose.Pose import Pose, PoseDict
 
 
-class PoseDeltaExtractor(PoseFilterBase):
+class PoseDeltaExtractor(PoseBatchFilterBase):
     """Computes frame-to-frame changes (deltas) for pose data.
 
     Calculates:

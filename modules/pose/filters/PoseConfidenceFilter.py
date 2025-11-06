@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.filters.PoseBatchFilterBase import PoseBatchFilterBase
 from modules.pose.features.PosePoints import PosePointData
 from modules.pose.Pose import Pose, PoseDict
 
@@ -13,7 +13,7 @@ from modules.pose.Pose import Pose, PoseDict
 from modules.Settings import Settings
 
 
-class PoseConfidenceFilter(PoseFilterBase):
+class PoseConfidenceFilter(PoseBatchFilterBase):
     """Filters pose keypoints based on confidence thresholds.
 
     Removes low-confidence keypoints by:

@@ -5,11 +5,11 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.filters.PoseBatchFilterBase import PoseBatchFilterBase
 from modules.pose.Pose import Pose, PoseDict
 
 
-class PoseMotionTimeAccumulator(PoseFilterBase):
+class PoseMotionTimeAccumulator(PoseBatchFilterBase):
     """Takes the absolute value of all deltas and adds them to the movement_time field."""
 
 

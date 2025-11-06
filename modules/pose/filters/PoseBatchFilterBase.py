@@ -7,7 +7,7 @@ from traceback import print_exc
 from modules.pose.Pose import PoseDict, PoseDictCallback
 
 
-class PoseFilterBase(ABC):
+class PoseBatchFilterBase(ABC):
     """Abstract base class for pose pipeline filters.
 
     Filters receive pose data, process/enrich it, and emit results to registered callbacks.

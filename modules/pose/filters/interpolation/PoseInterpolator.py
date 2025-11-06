@@ -8,7 +8,7 @@ from modules.pose.filters.interpolation.FeatureAngleInterpolator import FeatureA
 from modules.pose.filters.interpolation.FeatureFloatInterpolator import FeatureFloatInterpolator
 from modules.pose.filters.interpolation.FeaturePointInterpolator import FeaturePointInterpolator
 from modules.pose.filters.interpolation.FeatureRectInterpolator import FeatureRectInterpolator
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.filters.PoseBatchFilterBase import PoseBatchFilterBase
 from modules.pose.features.PoseAngles import PoseAngleData
 from modules.pose.features.PosePoints import PosePointData
 from modules.pose.Pose import Pose, PoseDict
@@ -39,7 +39,7 @@ class PoseInterpolatorState:
         self.mtime.alpha_v = value
 
 
-class PoseInterpolator(PoseFilterBase):
+class PoseInterpolator(PoseBatchFilterBase):
     """Combines multiple pose feature interpolators for complete pose interpolation.
 
     Manages per-tracklet interpolators for all pose features:
