@@ -1,11 +1,14 @@
 # TODO
+# fix length calculation
+# external osc
+# monolithic shader / cleanup this class / better alpha
+# start and stop event (from external rec event)
+
+# nice to haves
 # pose snapshots
 # pose deviation form neutral (snapshot)
 # pose deviation form other (snapshots)
-# external osc events
-# monolithic shader / cleanup this class / better alpha
-# start and stop event (from external rec event)
-# fix length calculation
+# smoot filters numpy based
 # lut color system
 
 # Standard library imports

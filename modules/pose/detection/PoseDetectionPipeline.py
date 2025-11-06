@@ -28,7 +28,7 @@ class PendingPoseRequest:
     crop_rects: list[Rect]
     crop_images: list[np.ndarray]
 
-class PosePipeline(Thread):
+class PoseDetectionPipeline(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__()
 

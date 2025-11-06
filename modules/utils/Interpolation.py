@@ -517,7 +517,7 @@ class VectorPredictiveAngleHermite:
         course toward new predictions.
     """
 
-    def __init__(self, input_rate: float, vector_size: int, alpha_v: float = 0.45, alpha_steer: float = 0.3) -> None:
+    def __init__(self, input_rate: float, vector_size: int, alpha_v: float = 0.45, alpha_steer: float = 0.3, history_size: int = 4, v_nominal: float = 1.0) -> None:
         """Initialize the vectorized angle interpolator with velocity steering.
 
         Args:
@@ -528,19 +528,28 @@ class VectorPredictiveAngleHermite:
             alpha_steer: Steering strength for velocity correction (0.0 to 1.0, default: 0.3).
                 Higher values = faster correction toward target but more responsive to noise.
                 Lower values = smoother but more latency.
+            history_size: Number of recent samples to use for polynomial prediction (default: 4).
+                More samples = better acceleration detection, but more latency and noise sensitivity.
+            v_nominal: Nominal velocity threshold for full steering strength (rad/s, default: 1.0).
+                Velocities below this get reduced steering, velocities at or above get full steering.
         """
         self.input_rate: float = input_rate
         self.alpha_v: float = alpha_v
         self.alpha_steer: float = alpha_steer
         self.interval: float = 1.0 / input_rate
         self.vector_size: int = vector_size
+        self.history_size: int = history_size
+        self.v_nominal: float = v_nominal  # ✅ NEW: Nominal velocity threshold
 
-        # State variables - no buffer needed!
+        # State variables
+        self.history: deque[np.ndarray] = deque(maxlen=history_size)
+        self.history_times: deque[float] = deque(maxlen=history_size)
         self.p_prev: np.ndarray = np.full(vector_size, np.nan)
         self.p_curr: np.ndarray = np.full(vector_size, np.nan)
         self.v_curr: np.ndarray = np.zeros(vector_size)
         self.p_pred: np.ndarray = np.full(vector_size, np.nan)
-        self.target_velocity: np.ndarray = np.zeros(vector_size)  # ✅ NEW: Store target velocity
+        self.target_velocity: np.ndarray = np.zeros(vector_size)
+        self.velocity_scale: np.ndarray = np.ones(vector_size)  # ✅ NEW: Per-element steering scale
         self.last_sample_time: float = 0.0
         self.last_update_time: float = 0.0
         self.interpolated_value: np.ndarray = np.full(vector_size, np.nan)
@@ -563,11 +572,17 @@ class VectorPredictiveAngleHermite:
         Raises:
             ValueError: If value shape doesn't match vector_size.
         """
+
         if value.shape[0] != self.vector_size:
             raise ValueError(f"Expected array of size {self.vector_size}, got {value.shape[0]}")
 
         if sample_time is None:
             sample_time = time()
+            # print(sample_time)
+
+        # Add to history
+        self.history.append(value)
+        self.history_times.append(sample_time)
 
         # Shift samples
         self.p_prev = self.p_curr
@@ -584,16 +599,29 @@ class VectorPredictiveAngleHermite:
         # Calculate measured velocity from samples (pure, no steering influence)
         v_measured = self._calculate_velocity(self.p_prev, self.p_curr, self.interval)
 
-        # Predict based on MEASURED velocity (what the data says will happen)
-        self.p_pred = self._predict_next_angle(self.p_curr, v_measured, self.interval)
+        # ✅ NEW: Calculate velocity-based steering scale per element
+        # Low velocity → low scale (weak steering), high velocity → high scale (full steering)
+        v_magnitude = np.abs(v_measured)
+        self.velocity_scale = np.clip(v_magnitude / self.v_nominal, 0.0, 1.0)
+
+        # Predict using polynomial fitting if we have enough history
+        if len(self.history) >= 3:
+            self.p_pred = self._predict_polynomial(self.history, self.history_times, self.interval)
+        else:
+            # Fallback to linear prediction for first few samples
+            self.p_pred = self._predict_next_angle(self.p_curr, v_measured, self.interval)
 
         # Smooth the measured velocity
-        self.v_curr = self.alpha_v * self.v_curr + (1 - self.alpha_v) * v_measured
+        # self.v_curr = self.alpha_v * self.v_curr + (1 - self.alpha_v) * v_measured
+        self.v_curr = np.nan_to_num(self.alpha_v * self.v_curr + (1 - self.alpha_v) * v_measured, nan=0.0)
 
-        # ✅ Calculate and STORE target velocity (don't apply correction yet)
+        # Calculate and STORE target velocity (don't apply correction yet)
         self.target_velocity = self._calculate_steering_velocity(
             self.interpolated_value, self.p_pred, self.interval
         )
+
+        # print(self.target_velocity)
+
 
     def update(self, current_time: float | None = None) -> None:
         """Update the interpolated value for the current time.
@@ -619,9 +647,10 @@ class VectorPredictiveAngleHermite:
         dt: float = current_time - self.last_update_time
         self.last_update_time = current_time
 
-        # ✅ Gradually steer velocity toward target (happens every frame, not just on sample)
+        # ✅ Apply adaptive steering: weak when slow, strong when fast
         velocity_correction = self.target_velocity - self.v_curr
-        self.v_curr = self.v_curr + self.alpha_steer * velocity_correction
+        effective_alpha_steer = self.alpha_steer * self.velocity_scale  # Per-element modulation
+        self.v_curr = self.v_curr #+ effective_alpha_steer * velocity_correction
 
         # Dead reckoning: integrate velocity
         delta_position = self.v_curr * dt
@@ -630,16 +659,22 @@ class VectorPredictiveAngleHermite:
         # Wrap to [-π, π]
         self.interpolated_value = np.arctan2(np.sin(self.interpolated_value), np.cos(self.interpolated_value))
 
-        self.alpha_v: float = 0.5
+
+
+        self.alpha_v: float = 0.25
         self.alpha_steer: float = 0.05
+        self.v_nominal: float = 3.01
 
     def reset(self) -> None:
         """Reset the interpolator to its initial state."""
+        self.history.clear()
+        self.history_times.clear()
         self.p_prev = np.full(self.vector_size, np.nan)
         self.p_curr = np.full(self.vector_size, np.nan)
         self.v_curr = np.zeros(self.vector_size)
         self.p_pred = np.full(self.vector_size, np.nan)
-        self.target_velocity = np.zeros(self.vector_size)  # ✅ NEW: Reset target velocity
+        self.target_velocity = np.zeros(self.vector_size)
+        self.velocity_scale = np.ones(self.vector_size)  # ✅ NEW: Reset velocity scale
         self.last_sample_time = 0.0
         self.last_update_time = 0.0
         self.interpolated_value = np.full(self.vector_size, np.nan)
@@ -708,4 +743,59 @@ class VectorPredictiveAngleHermite:
         v_required = delta / interval
 
         # Handle NaN targets
-        return np.where(np.isnan(p_target), 0.0, v_required)
+        return np.where(np.isnan(v_required), 0.0, v_required)
+
+    @staticmethod
+    def _predict_polynomial(history: deque[np.ndarray], history_times: deque[float], interval: float) -> np.ndarray:
+        """Predict next angle using polynomial fitting through recent history.
+
+        Args:
+            history: Recent angle samples in radians [-π, π].
+            history_times: Timestamps for each history sample.
+            interval: Prediction time interval (one sample period ahead).
+
+        Returns:
+            Predicted angles in radians [-π, π].
+
+        Note:
+            Fits a quadratic polynomial through the last 3-4 samples and extrapolates.
+            Handles angular wrapping by unwrapping before fitting, then wrapping result.
+        """
+        n_samples = len(history)
+        if n_samples < 3:
+            # Not enough history, return NaN
+            return np.full(history[0].shape[0], np.nan)
+
+        # Convert to numpy array: shape (n_samples, vector_size)
+        angles = np.array(list(history))
+
+        # Normalize times to [0, 1, 2, ...] for numerical stability
+        times = np.array(list(history_times))
+        times = times - times[0]  # Start from zero
+
+        # Prediction time (one interval after last sample)
+        t_pred = times[-1] + interval
+
+        # Unwrap angles per element to avoid discontinuities during fitting
+        # This converts [-π, π] to continuous values
+        angles_unwrapped = np.unwrap(angles, axis=0)
+
+        # Fit polynomial per element (vectorized)
+        # Use quadratic (degree 2) for balance between smoothness and acceleration capture
+        predictions = np.zeros(angles.shape[1])
+
+        for i in range(angles.shape[1]):
+            # Handle NaN values: skip elements with any NaN in history
+            if np.any(np.isnan(angles_unwrapped[:, i])):
+                predictions[i] = np.nan
+                continue
+
+            # Fit polynomial: p(t) = a*t^2 + b*t + c
+            # Use fewer points if available (minimum 3 for quadratic)
+            coeffs = np.polyfit(times, angles_unwrapped[:, i], deg=min(2, n_samples - 1))
+
+            # Extrapolate to prediction time
+            predictions[i] = np.polyval(coeffs, t_pred)
+
+        # Wrap predictions back to [-π, π]
+        return np.arctan2(np.sin(predictions), np.cos(predictions))

@@ -15,7 +15,7 @@ from modules.tracker.TrackerBase import TrackerType
 from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker
 from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
-from modules.pose.detection.PoseDetectionPipeline import PosePipeline
+from modules.pose.detection.PoseDetectionPipeline import PoseDetectionPipeline
 import modules.pose.filters as pose_filters
 from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
 
