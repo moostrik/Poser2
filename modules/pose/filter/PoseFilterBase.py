@@ -33,20 +33,7 @@ class PoseFilterConfigBase:
 
 
 class PoseFilterBase(ABC):
-    """Abstract base class for pose filters.
-
-    Filters can optionally accept a config object that inherits from FilterConfigBase.
-    When config properties change, _on_config_changed() is called automatically.
-    """
-
-    def __init__(self, config: PoseFilterConfigBase | None = None) -> None:
-        self._callbacks: set[PoseCallback] = set()
-        self._callback_lock = Lock()
-        self._config: PoseFilterConfigBase | None = config
-
-        # Register for config change notifications
-        if config is not None:
-            config.add_listener(self._on_config_changed)
+    """Abstract base class for pose filters."""
 
     @abstractmethod
     def process(self, pose: Pose) -> Pose:
@@ -55,8 +42,4 @@ class PoseFilterBase(ABC):
 
     def reset(self) -> None:
         """Optional reset the filter's internal state."""
-        pass
-
-    def _on_config_changed(self) -> None:
-        """Called when config changes. Override to apply new config values."""
         pass

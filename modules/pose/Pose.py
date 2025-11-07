@@ -8,10 +8,8 @@ from typing import Callable
 import numpy as np
 
 # Pose imports
-from modules.pose.features.PoseAngles import PoseAngleData
-from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData, PoseAngleSymmetryFactory
+from modules.pose.features import PosePointData, PoseAngleData, PoseAngleSymmetryData
 from modules.pose.features.depricated.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
-from modules.pose.features.PosePoints import PosePointData
 
 # Local application imports
 from modules.tracker.Tracklet import Tracklet
@@ -43,6 +41,7 @@ class Pose:
     point_data: PosePointData
     angle_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
     delta_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
+    symmetry_data: PoseAngleSymmetryData = field(default_factory=PoseAngleSymmetryData.create_empty)
     motion_time: float =        0.0
 
     def __repr__(self) -> str:
@@ -58,11 +57,6 @@ class Pose:
     def measurement_data(self) -> PoseMeasurementData:
         """Compute body measurements. Returns NaN values if point_data or crop_rect is None. Cached after first access."""
         return PoseMeasurementFactory.compute(self.point_data, self.bounding_box)
-
-    @cached_property
-    def symmetry_data(self) -> PoseAngleSymmetryData: # should this not be in PoseAngleData?
-        """Compute body measurements. Returns NaN values if point_data or crop_rect is None. Cached after first access."""
-        return PoseAngleSymmetryFactory.from_angles(self.angle_data)
 
     @cached_property
     def camera_points(self) -> PosePointData:

@@ -4,11 +4,10 @@ from dataclasses import replace
 
 from modules.pose.Pose import Pose
 from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
-from modules.pose.features import PoseFeatureType, PoseFeatureData
-from modules.pose.features.PosePoints import PosePointData
+from modules.pose.features import PoseFeatureData
 
 
-class PoseNanValidatorConfig(PoseFilterConfigBase):
+class PoseValidatorConfig(PoseFilterConfigBase):
     """Configuration for PoseNanValidator."""
 
     def __init__(
@@ -17,7 +16,7 @@ class PoseNanValidatorConfig(PoseFilterConfigBase):
         validate_angles: bool = True,
         validate_delta: bool = True,
         validate_symmetry: bool = True,
-        fix: bool = False
+        fix: bool = True
     ) -> None:
         super().__init__()
         self.validate_points: bool = validate_points
@@ -35,9 +34,8 @@ class PoseNanValidator(PoseFilterBase):
     Optionally fixes inconsistencies by setting scores to 0 when values are NaN.
     """
 
-    def __init__(self, config: PoseNanValidatorConfig | None = None) -> None:
-        super().__init__(config or PoseNanValidatorConfig())
-        self._config: PoseNanValidatorConfig
+    def __init__(self, config: PoseValidatorConfig | None = None) -> None:
+        self._config: PoseValidatorConfig = config or PoseValidatorConfig()
 
     def process(self, pose: Pose) -> Pose:
         """Validate all enabled features and show warnings if inconsistencies are found."""
@@ -58,7 +56,9 @@ class PoseNanValidator(PoseFilterBase):
                 pose = replace(pose, delta_data=delta_data)
 
         if self._config.validate_symmetry:
-            self._validate_feature(pose.symmetry_data, "symmetry")
+            symmetry_data = self._validate_feature(pose.symmetry_data, "symmetry")
+            if symmetry_data is not pose.symmetry_data:
+                pose = replace(pose, symmetry_data=symmetry_data)
 
         return pose
 
@@ -72,12 +72,8 @@ class PoseNanValidator(PoseFilterBase):
 
         scores: np.ndarray = data.scores
 
-        # Find NaN values
-        has_nan: np.ndarray = np.isnan(values)
-
-        # For multi-dimensional data (like points), check if any dimension is NaN
-        if values.ndim > 1:
-            has_nan = np.any(has_nan, axis=1)
+        # Find NaN values - for 2D data (points), check if ANY dimension is NaN per row
+        has_nan: np.ndarray = np.any(np.isnan(values), axis=-1) if values.ndim > 1 else np.isnan(values)
 
         # Check if scores are non-zero when values are NaN
         inconsistent = has_nan & (scores > 0)

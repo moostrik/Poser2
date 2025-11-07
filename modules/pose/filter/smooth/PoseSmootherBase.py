@@ -39,8 +39,8 @@ class PoseSmootherBase(PoseFilterBase):
     """
 
     def __init__(self, config: PoseSmootherConfig) -> None:
-        super().__init__(config)
         self._config: PoseSmootherConfig = config
+        self._config.add_listener(self._on_config_changed)
         # State for the current pose (managed by subclasses)
         self._state: Any = None
 
@@ -69,4 +69,7 @@ class PoseSmootherBase(PoseFilterBase):
         """Reset the filter's internal state."""
         self._state = None
 
-    # Note: Subclasses should override _on_config_changed() to update their state
+    @abstractmethod
+    def _on_config_changed(self) -> None:
+        """Update filter parameters when config changes."""
+        pass

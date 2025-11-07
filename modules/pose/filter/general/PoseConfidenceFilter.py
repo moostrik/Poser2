@@ -28,7 +28,6 @@ class PoseConfidenceFilter(PoseFilterBase):
     """
 
     def __init__(self, config: PoseConfidenceFilterConfig) -> None:
-        super().__init__()
         self._config: PoseConfidenceFilterConfig = config
 
     def process(self, pose: Pose) -> Pose:

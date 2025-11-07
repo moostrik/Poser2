@@ -3,27 +3,9 @@ import warnings
 from dataclasses import replace
 
 from modules.pose.Pose import Pose
-from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
+from modules.pose.filter.PoseFilterBase import PoseFilterBase
+from modules.pose.filter.general.PoseNanValidator import PoseValidatorConfig
 from modules.pose.features import PoseFeatureType, POSE_FEATURE_RANGES, PoseFeatureData
-
-
-class PoseRangeValidatorConfig(PoseFilterConfigBase):
-    """Configuration for PoseRangeValidator."""
-
-    def __init__(
-        self,
-        validate_points: bool = True,
-        validate_angles: bool = True,
-        validate_delta: bool = True,
-        validate_symmetry: bool = True,
-        fix: bool = False
-    ) -> None:
-        super().__init__()
-        self.validate_points: bool = validate_points
-        self.validate_angles: bool = validate_angles
-        self.validate_delta: bool = validate_delta
-        self.validate_symmetry: bool = validate_symmetry
-        self.fix: bool = fix
 
 
 class PoseRangeValidator(PoseFilterBase):
@@ -34,9 +16,9 @@ class PoseRangeValidator(PoseFilterBase):
     Optionally fixes out-of-range values by clamping them to the valid range.
     """
 
-    def __init__(self, config: PoseRangeValidatorConfig | None = None) -> None:
-        super().__init__(config or PoseRangeValidatorConfig())
-        self._config: PoseRangeValidatorConfig
+    def __init__(self, config: PoseValidatorConfig | None = None) -> None:
+        super().__init__(config or PoseValidatorConfig())
+        self._config: PoseValidatorConfig
 
     def process(self, pose: Pose) -> Pose:
         """Validate all enabled features and show warnings if values are out of range."""
@@ -57,8 +39,9 @@ class PoseRangeValidator(PoseFilterBase):
                 pose = replace(pose, delta_data=delta_data)
 
         if self._config.validate_symmetry:
-            # Validate but don't modify (it's a cached_property)
-            self._validate_feature(pose.symmetry_data, PoseFeatureType.SYMMETRY, "symmetry")
+            symmetry_data = self._validate_feature(pose.symmetry_data, PoseFeatureType.SYMMETRY, "symmetry")
+            if symmetry_data is not pose.symmetry_data:
+                pose = replace(pose, symmetry_data=symmetry_data)
 
         return pose
 
