@@ -23,6 +23,7 @@ target in one input period" - which scales the response appropriately for the in
 
 # Standard library imports
 from time import monotonic
+from typing import Union
 
 # Third-party imports
 import numpy as np
@@ -32,9 +33,12 @@ import warnings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class AngleChaseInterpolator:
-    def __init__(self, vector_size: int, input_frequency: float = 30.0, responsiveness: float = 0.2, friction: float = 0.03) -> None:
-        """Initialize the vectorized angle interpolator with velocity steering.
+class VectorChaseInterpolator:
+    """Chase interpolator for arbitrary vector data (positions, coordinates, etc.)."""
+
+    def __init__(self, vector_size: int, input_frequency: float = 30.0, responsiveness: float = 0.2,
+                 friction: float = 0.03, clamp_range: tuple[float, float] | None = None) -> None:
+        """Initialize the vectorized chase interpolator with velocity steering.
 
         This interpolator is designed for a dual-frequency architecture:
         - set_target() is called at the input frequency (e.g., 30 FPS from pose detection)
@@ -53,13 +57,14 @@ class AngleChaseInterpolator:
         - Damping: Friction prevents oscillation
 
         Args:
-            vector_size: Number of angles to interpolate simultaneously
+            vector_size: Number of values to interpolate simultaneously
             input_frequency: Expected rate of set_target() calls in Hz. This sets the time
                            horizon for velocity calculation: "reach target in one input period"
             responsiveness: How quickly velocity converges to target velocity [0.0, 1.0].
                           Higher = faster response but less smooth (default: 0.2)
             friction: Velocity damping factor [0.0, 1.0]. Higher = more damping,
                      prevents overshoot (default: 0.03)
+            clamp_range: Optional (min, max) tuple to clamp interpolated values
 
         Raises:
             ValueError: If vector_size <= 0, input_frequency <= 0, or parameters out of range
@@ -72,19 +77,23 @@ class AngleChaseInterpolator:
             raise ValueError(f"responsiveness must be in [0.0, 1.0], got {responsiveness}")
         if not 0.0 <= friction <= 1.0:
             raise ValueError(f"friction must be in [0.0, 1.0], got {friction}")
+        if clamp_range is not None:
+            if len(clamp_range) != 2 or clamp_range[0] >= clamp_range[1]:
+                raise ValueError("clamp_range must be (min, max) with min < max")
 
         self._vector_size: int = vector_size
         self._input_interval: float = 1.0 / input_frequency
         self._responsiveness: float = responsiveness
         self._inv_friction: float = 1.0 - friction
+        self._clamp_range: tuple[float, float] | None = clamp_range
 
         self._last_update_time: float | None = None
 
-        self.a_target: np.ndarray = np.full(vector_size, np.nan)
-        self.a_interpolated: np.ndarray = np.full(vector_size, np.nan)
+        self._target: np.ndarray = np.full(vector_size, np.nan)
+        self._interpolated: np.ndarray = np.full(vector_size, np.nan)
 
-        self.v_curr: np.ndarray = np.zeros(vector_size)
-        self.v_target: np.ndarray = np.zeros(vector_size)
+        self._v_curr: np.ndarray = np.zeros(vector_size)
+        self._v_target: np.ndarray = np.zeros(vector_size)
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -92,11 +101,11 @@ class AngleChaseInterpolator:
         """Reset the interpolator's internal state."""
         self._last_update_time = None
 
-        self.a_target = np.full(self._vector_size, np.nan)
-        self.a_interpolated = np.full(self._vector_size, np.nan)
+        self._target = np.full(self._vector_size, np.nan)
+        self._interpolated = np.full(self._vector_size, np.nan)
 
-        self.v_curr = np.zeros(self._vector_size)
-        self.v_target = np.zeros(self._vector_size)
+        self._v_curr = np.zeros(self._vector_size)
+        self._v_target = np.zeros(self._vector_size)
 
     @property
     def input_frequency(self) -> float:
@@ -135,12 +144,25 @@ class AngleChaseInterpolator:
         self._inv_friction = 1.0 - value
 
     @property
-    def interpolated(self) -> np.ndarray:
-        """Get the current interpolated angle values."""
-        return self.a_interpolated.copy()
+    def clamp_range(self) -> tuple[float, float] | None:
+        """Get the clamping range."""
+        return self._clamp_range
 
-    def set_target(self, angles: np.ndarray) -> None:
-        """Set new target angles to interpolate towards.
+    @clamp_range.setter
+    def clamp_range(self, value: tuple[float, float] | None) -> None:
+        """Set the clamping range."""
+        if value is not None:
+            if len(value) != 2 or value[0] >= value[1]:
+                raise ValueError("clamp_range must be (min, max) with min < max")
+        self._clamp_range = value
+
+    @property
+    def value(self) -> np.ndarray:
+        """Get the interpolated values for the next frame."""
+        return self._interpolated.copy()
+
+    def set_target(self, values: np.ndarray) -> None:
+        """Set new target values to interpolate towards.
 
         This method should be called at the input frequency (e.g., when new pose data arrives).
         The interpolator will smoothly chase these targets using perpetual chase dynamics.
@@ -149,23 +171,18 @@ class AngleChaseInterpolator:
         It creates continuous smooth motion without hard stops. Each update() call recalculates
         velocity based on the current distance, creating automatic adaptive deceleration as
         the interpolated value approaches the target.
-
-        Args:
-            angles: Target angle values (shape must match vector_size)
-
-        Raises:
-            ValueError: If angles shape doesn't match vector_size
         """
-        if angles.shape[0] != self._vector_size:
-            raise ValueError(f"Expected array of size {self._vector_size}, got {angles.shape[0]}")
 
-        self.a_target = angles
+        if values.shape[0] != self._vector_size:
+            raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
+
+        self._target = values
 
         # Handle newly valid values (including first initialization)
-        newly_valid = np.isnan(self.a_interpolated) & np.isfinite(angles)
+        newly_valid = np.isnan(self._interpolated) & np.isfinite(values)
         if np.any(newly_valid):
-            self.a_interpolated[newly_valid] = angles[newly_valid]
-            self.v_curr[newly_valid] = 0.0
+            self._interpolated[newly_valid] = values[newly_valid]
+            self._v_curr[newly_valid] = 0.0
 
     def update(self, current_time: float | None = None) -> None:
         """Update the interpolated value for the current time.
@@ -190,11 +207,9 @@ class AngleChaseInterpolator:
         The magic: By recalculating v_target every frame based on current distance,
         the system naturally decelerates as it approaches the target. This creates
         smooth adaptive easing without explicit easing curves.
-
-        Args:
-            current_time: Optional timestamp in seconds (defaults to monotonic time)
         """
-        if np.all(np.isnan(self.a_target)):
+
+        if np.all(np.isnan(self._target)):
             return
 
         if current_time is None:
@@ -205,31 +220,85 @@ class AngleChaseInterpolator:
             self._last_update_time = current_time
             return
 
-        if current_time < self._last_update_time:
-            warnings.warn("Interpolator received out-of-order time update.", RuntimeWarning)
-            current_time = self._last_update_time
+        if current_time <= self._last_update_time:
+            if current_time < self._last_update_time:
+                warnings.warn("Interpolator received out-of-order time update.", RuntimeWarning)
+            return  # Skip update for non-positive dt
 
         dt: float = current_time - self._last_update_time
         self._last_update_time = current_time
 
         # Calculate target velocity (PID Proportional term)
-        self.v_target = self._calculate_velocity(self.a_interpolated, self.a_target, self._input_interval)
+        self._v_target = self._calculate_velocity(self._interpolated, self._target, self._input_interval)
 
         # Velocity steering (PID Derivative term)
-        velocity_correction = (self.v_target - self.v_curr) * self._responsiveness
-        self.v_curr = (self.v_curr + velocity_correction) * self._inv_friction
+        velocity_correction = (self._v_target - self._v_curr) * self._responsiveness
+        self._v_curr = (self._v_curr + velocity_correction) * self._inv_friction
 
         # Update position
-        delta_position = self.v_curr * dt
-        self.a_interpolated = self.a_interpolated + delta_position
-        self.a_interpolated = np.arctan2(np.sin(self.a_interpolated), np.cos(self.a_interpolated))
+        delta_position = self._v_curr * dt
+        self._interpolated = self._interpolated + delta_position
+
+        # Apply constraints (clamping or wrapping)
+        self._apply_constraints()
+
+    def _apply_constraints(self) -> None:
+        """Apply value constraints (clamping for vectors, overridden for angles)."""
+        if self._clamp_range is not None:
+            np.clip(self._interpolated, self._clamp_range[0], self._clamp_range[1], out=self._interpolated)
 
     @staticmethod
     def _calculate_velocity(p_prev: np.ndarray, p_curr: np.ndarray, interval: float) -> np.ndarray:
-        """Calculate target angular velocity from current position to target position."""
+        """Calculate target velocity from current position to target position."""
         delta = p_curr - p_prev
-        delta: np.ndarray = np.arctan2(np.sin(delta), np.cos(delta))
         v = delta / interval
-
-        # Replace NaN with zero
         return np.nan_to_num(v, nan=0.0)
+
+
+class AngleChaseInterpolator(VectorChaseInterpolator):
+    """Chase interpolator for angular/circular data with proper wrapping."""
+
+    def __init__(self, vector_size: int, input_frequency: float = 30.0, responsiveness: float = 0.2,
+                 friction: float = 0.03) -> None:
+        """Initialize the angle chase interpolator."""
+        super().__init__(vector_size, input_frequency, responsiveness, friction, clamp_range=None)
+
+    def _apply_constraints(self) -> None:
+        """Apply angular wrapping to [-π, π]."""
+        self._interpolated = np.arctan2(np.sin(self._interpolated), np.cos(self._interpolated))
+
+    @staticmethod
+    def _calculate_velocity(p_prev: np.ndarray, p_curr: np.ndarray, interval: float) -> np.ndarray:
+        """Calculate target angular velocity using shortest angular path."""
+        delta = p_curr - p_prev
+        delta = np.arctan2(np.sin(delta), np.cos(delta))
+        v = delta / interval
+        return np.nan_to_num(v, nan=0.0)
+
+
+class PointChaseInterpolator(VectorChaseInterpolator):
+    """Chase interpolator for 2D points with (x, y) coordinates."""
+
+    def __init__(self, num_points: int, input_frequency: float = 30.0, responsiveness: float = 0.2,
+                 friction: float = 0.03, clamp_range: tuple[float, float] | None = None) -> None:
+        """Initialize the point chase interpolator."""
+        super().__init__(num_points * 2, input_frequency, responsiveness, friction, clamp_range)
+        self._num_points: int = num_points
+
+    def set_target(self, points: np.ndarray) -> None:
+        """Set new target points."""
+        if points.shape != (self._num_points, 2):
+            raise ValueError(f"Expected shape ({self._num_points}, 2), got {points.shape}")
+        super().set_target(points.flatten())
+
+    @property
+    def value(self) -> np.ndarray:
+        """Get the current interpolated points."""
+        return self._interpolated.reshape(self._num_points, 2)
+
+
+ChaseInterpolator = Union[
+    VectorChaseInterpolator,
+    AngleChaseInterpolator,
+    PointChaseInterpolator,
+]

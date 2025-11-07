@@ -78,7 +78,7 @@ class VectorPredictor:
         self._clamp_range = value
 
     @property
-    def predicted(self) -> np.ndarray:
+    def value(self) -> np.ndarray:
         """Get the predicted values for the next frame."""
         return self.p_predicted.copy()
 
@@ -185,9 +185,9 @@ class PointPredictor(VectorPredictor):
         super().add_sample(points.flatten())
 
     @property
-    def predicted(self) -> np.ndarray:
+    def value(self) -> np.ndarray:
         """Get predicted points for the next frame."""
-        return super().predicted.reshape(self._num_points, 2)
+        return super().value.reshape(self._num_points, 2)
 
 Predictor = Union[
     VectorPredictor,

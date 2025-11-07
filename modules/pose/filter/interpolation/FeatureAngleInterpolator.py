@@ -7,7 +7,7 @@ import numpy as np
 # Pose imports
 from modules.pose.filter.interpolation._FeatureInterpolatorBase import FeatureInterpolatorBase
 from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS
-from modules.pose.filter.interpolation.predictive.VectorAngle import VectorAngle
+from modules.pose.filter.interpolation.predictive.VectorPredictiveChaseInterpolator import AnglePredictiveChaseInterpolator
 
 from modules.pose.filter.interpolation.PoseInterpolatorConfig import PoseInterpolatorConfig
 
@@ -17,7 +17,7 @@ from modules.pose.filter.interpolation.PoseInterpolatorConfig import PoseInterpo
 class AngleFilterState:
     """Per-joint state for angle interpolation."""
     # Interpolator for angular values with proper wrapping
-    interpolator: VectorAngle
+    interpolator: AnglePredictiveChaseInterpolator
 
     # Store last valid scores for reconstruction
     last_scores: np.ndarray  # shape: (ANGLE_NUM_JOINTS,)
@@ -40,7 +40,7 @@ class FeatureAngleInterpolator(FeatureInterpolatorBase[PoseAngleData]):
     def _create_state(self) -> AngleFilterState:
         """Create initial filter state for interpolation."""
         return AngleFilterState(
-            interpolator=VectorAngle(
+            interpolator=AnglePredictiveChaseInterpolator(
                 input_frequency=self._config.frequency,
                 vector_size=ANGLE_NUM_JOINTS,
                 responsiveness=self._config.responsiveness,

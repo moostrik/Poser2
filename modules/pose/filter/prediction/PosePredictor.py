@@ -7,18 +7,14 @@ import numpy as np
 # Pose imports
 from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.filter.prediction.VectorPredictors import Predictor, VectorPredictor, AnglePredictor, PointPredictor, PredictionMethod
+from modules.pose.filter.prediction.VectorPredictors import Predictor, AnglePredictor, PointPredictor, PredictionMethod
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POSE_NUM_JOINTS, POSE_POINTS_RANGE
 
 
 class PosePredictorConfig(PoseFilterConfigBase):
     """Configuration for pose prediction with automatic change notification."""
 
-    def __init__(
-        self,
-        frequency: float = 30.0,
-        method: PredictionMethod = PredictionMethod.QUADRATIC
-    ) -> None:
+    def __init__(self, frequency: float = 30.0, method: PredictionMethod = PredictionMethod.QUADRATIC) -> None:
         super().__init__()
         self.frequency: float = frequency
         self.method: PredictionMethod = method
@@ -61,15 +57,7 @@ class PosePredictorBase(PoseFilterBase):
 
     @abstractmethod
     def _create_predicted_data(self, original_data: PoseFeatureData, predicted_values: np.ndarray) -> PoseFeatureData:
-        """Create new feature data with predicted values.
-
-        Args:
-            original_data: Original feature data (for scores)
-            predicted_values: Predicted values from predictor
-
-        Returns:
-            New feature data with predicted values and adjusted scores
-        """
+        """Create new feature data with predicted values."""
         pass
 
     @abstractmethod
@@ -85,7 +73,7 @@ class PosePredictorBase(PoseFilterBase):
 
         # Add sample and get prediction
         self._predictor.add_sample(feature_data.values)
-        predicted_values: np.ndarray = self._predictor.predicted
+        predicted_values: np.ndarray = self._predictor.value
 
         # Create new feature data with predicted values
         predicted_data = self._create_predicted_data(feature_data, predicted_values)

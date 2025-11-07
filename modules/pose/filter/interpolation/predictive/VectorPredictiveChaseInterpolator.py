@@ -22,7 +22,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # monotmoc time from PoseInterpolator
 # make other predictions
 
-class VectorAngle:
+class AnglePredictiveChaseInterpolator:
 
     def __init__(self, input_frequency: float, vector_size: int, responsiveness: float = 0.2, friction: float = 0.03) -> None:
         """Initialize the vectorized angle interpolator with velocity steering."""
