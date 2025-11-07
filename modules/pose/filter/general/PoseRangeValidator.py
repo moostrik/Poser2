@@ -17,8 +17,7 @@ class PoseRangeValidator(PoseFilterBase):
     """
 
     def __init__(self, config: PoseValidatorConfig | None = None) -> None:
-        super().__init__(config or PoseValidatorConfig())
-        self._config: PoseValidatorConfig
+        self._config: PoseValidatorConfig = config or PoseValidatorConfig()
 
     def process(self, pose: Pose) -> Pose:
         """Validate all enabled features and show warnings if values are out of range."""
