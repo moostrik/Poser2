@@ -14,16 +14,7 @@ class PoseConfidenceFilterConfig(PoseFilterConfigBase):
 
     def __init__(self, confidence_threshold: float = 0.5) -> None:
         super().__init__()
-        self._confidence_threshold: float = max(0.0, min(0.99, confidence_threshold))
-
-    @property
-    def confidence_threshold(self) -> float:
-        return self._confidence_threshold
-
-    @confidence_threshold.setter
-    def confidence_threshold(self, value: float) -> None:
-        self._confidence_threshold = max(0.0, min(0.99, value))
-        self._notify()
+        self.confidence_threshold: float = max(0.0, min(0.99, confidence_threshold))
 
 
 class PoseConfidenceFilter(PoseFilterBase):

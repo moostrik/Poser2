@@ -87,7 +87,7 @@ class RenderDataHub:
         return self.get_pose(tracklet_id).delta_data
 
     def get_symmetries(self, tracklet_id: int) -> PoseAngleSymmetryData:
-        return self.get_pose(tracklet_id).similarity_data
+        return self.get_pose(tracklet_id).symmetry_data
 
     # TIME
     def get_cumulative_motion(self, tracklet_id: int) -> float: # for backward compatibility

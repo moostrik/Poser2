@@ -10,6 +10,13 @@ class PoseFilterConfigBase:
     def __init__(self) -> None:
         self._listeners: list[Callable[[], None]] = []
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Intercept attribute changes and notify listeners."""
+        super().__setattr__(name, value)
+        # Only notify after initialization is complete
+        if name != '_listeners' and hasattr(self, '_listeners'):
+            self._notify()
+
     def add_listener(self, callback: Callable[[], None]) -> None:
         """Register a callback to be notified of config changes."""
         self._listeners.append(callback)

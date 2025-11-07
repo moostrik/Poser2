@@ -16,6 +16,7 @@ class SymmetricJoint(IntEnum):
     hip = 2
     knee = 3
 
+SYMM_JOINT_NAMES: list[str] = [e.name for e in SymmetricJoint]
 SYMM_NUM_JOINTS: int = len(SymmetricJoint)
 
 # Source of truth for symmetric joint pairs

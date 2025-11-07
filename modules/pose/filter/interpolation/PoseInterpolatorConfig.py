@@ -6,33 +6,6 @@ class PoseInterpolatorConfig(PoseFilterConfigBase):
 
     def __init__(self) -> None:
         super().__init__()
-        self._frequency: float = 30.0
-        self._responsiveness: float = 0.2
-        self._friction: float = 0.03
-
-    @property
-    def frequency(self) -> float:
-        return self._frequency
-
-    @frequency.setter
-    def frequency(self, value: float) -> None:
-        self._frequency = value
-        self._notify()
-
-    @property
-    def responsiveness(self) -> float:
-        return self._responsiveness
-
-    @responsiveness.setter
-    def responsiveness(self, value: float) -> None:
-        self._responsiveness = value
-        self._notify()
-
-    @property
-    def friction(self) -> float:
-        return self._friction
-
-    @friction.setter
-    def friction(self, value: float) -> None:
-        self._friction = value
-        self._notify()
+        self.frequency: float = 30.0
+        self.responsiveness: float = 0.2
+        self.friction: float = 0.03
