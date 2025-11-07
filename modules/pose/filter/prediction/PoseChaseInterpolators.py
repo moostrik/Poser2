@@ -1,7 +1,15 @@
+"""Pose chase interpolation filters for smooth motion interpolation.
+
+Provides perpetual chase interpolation for angles, points, and deltas with
+proper handling of circular values and coordinate clamping. Uses dual-frequency
+architecture: process() at input rate, update() at render rate.
+"""
+
 # Standard library imports
 from abc import abstractmethod
 from dataclasses import replace
 from threading import Lock
+from typing import Union
 
 import numpy as np
 
@@ -218,3 +226,19 @@ class PoseDeltaChaseInterpolator(PoseChaseInterpolatorBase):
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
         return replace(pose, delta_data=new_data)
+
+
+# Type alias for any pose chase interpolator
+PoseChaseInterpolator = Union[
+    PoseAngleChaseInterpolator,
+    PosePointChaseInterpolator,
+    PoseDeltaChaseInterpolator,
+]
+
+__all__ = [
+    'PoseChaseInterpolatorConfig',
+    'PoseAngleChaseInterpolator',
+    'PosePointChaseInterpolator',
+    'PoseDeltaChaseInterpolator',
+    'PoseChaseInterpolator',
+]

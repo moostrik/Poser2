@@ -1,6 +1,13 @@
+"""Pose prediction filters for extrapolating future pose states.
+
+Provides prediction for angles, points, and deltas using linear or quadratic
+extrapolation with proper handling of circular values and coordinate clamping.
+"""
+
 # Standard library imports
 from abc import abstractmethod
 from dataclasses import replace
+from typing import Union
 
 import numpy as np
 
@@ -165,3 +172,19 @@ class PoseDeltaPredictor(PosePredictorBase):
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
         return replace(pose, delta_data=new_data)
+
+
+# Type alias for any pose predictor
+PosePredictor = Union[
+    PoseAnglePredictor,
+    PosePointPredictor,
+    PoseDeltaPredictor,
+]
+
+__all__ = [
+    'PosePredictorConfig',
+    'PoseAnglePredictor',
+    'PosePointPredictor',
+    'PoseDeltaPredictor',
+    'PosePredictor',
+]
