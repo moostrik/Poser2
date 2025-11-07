@@ -1,6 +1,8 @@
-from OneEuroFilter import OneEuroFilter as _OneEuroFilter
+
 
 import math
+
+from OneEuroFilter import OneEuroFilter as _OneEuroFilter
 
 class OneEuroFilter(_OneEuroFilter):
 
@@ -21,7 +23,6 @@ class OneEuroFilter(_OneEuroFilter):
     def velocity(self) -> float:
         """Current filtered velocity (rate of change)"""
         return self.__dx.lastFilteredValue() if self.__dx.lastFilteredValue() is not None else 0.0
-
 
 class OneEuroFilterAngular():
 

@@ -19,16 +19,16 @@ class VectorPredictor:
     def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the vectorized predictor."""
 
-        if input_frequency <= 0.0:
-            raise ValueError("Frequency must be positive.")
         if vector_size <= 0:
             raise ValueError("Vector size must be positive.")
+        if input_frequency <= 0.0:
+            raise ValueError("Frequency must be positive.")
         if clamp_range is not None:
             if len(clamp_range) != 2 or clamp_range[0] >= clamp_range[1]:
                 raise ValueError("clamp_range must be (min, max) with min < max")
 
-        self._input_interval: float = 1.0 / input_frequency
         self._vector_size: int = vector_size
+        self._input_interval: float = 1.0 / input_frequency
         self._method: PredictionMethod = method
         self._clamp_range: tuple[float, float] | None = clamp_range
 

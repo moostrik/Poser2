@@ -11,7 +11,7 @@ from modules.pose.Pose import Pose
 from modules.utils.Smoothing import OneEuroFilterAngular
 
 
-class PoseAngleDeltaSmoother(PoseAngleSmoother):
+class PoseDeltaSmoother(PoseAngleSmoother):
     """Smooths pose angle deltas using OneEuroFilterAngular.
 
     Reuses all logic from PoseAngleSmoother but operates on delta_data instead of angle_data.
