@@ -34,9 +34,9 @@ class FeatureRectInterpolator(FeatureInterpolatorBase[Rect]):
         """Create initial filter state for interpolation."""
         return RectFilterState(
             interpolator=VectorPredictiveHermite(
-                input_rate=self._config.frequency,
+                input_rate=self._input_rate,
                 vector_size=4,  # [x, y, width, height]
-                alpha_v=self._config.responsiveness
+                alpha_v=self._alpha_v
             )
         )
 

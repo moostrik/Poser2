@@ -26,6 +26,7 @@ SYMMETRIC_JOINT_PAIRS: dict[SymmetricJoint, tuple[AngleJoint, AngleJoint]] = {
     SymmetricJoint.knee: (AngleJoint.left_knee, AngleJoint.right_knee)
 }
 
+POSE_SIMILARITY_RANGE: tuple[float, float] = (0.0, 1.0)
 
 @dataclass(frozen=True)
 class PoseAngleSymmetryData(PoseAngleFeatureBase[SymmetricJoint]):
@@ -48,7 +49,7 @@ class PoseAngleSymmetryData(PoseAngleFeatureBase[SymmetricJoint]):
     @classmethod
     def default_range(cls) -> tuple[float, float]:
         """Return the default range for symmetry scores."""
-        return (0.0, 1.0)
+        return POSE_SIMILARITY_RANGE
 
 
 # ========== FACTORY ==========

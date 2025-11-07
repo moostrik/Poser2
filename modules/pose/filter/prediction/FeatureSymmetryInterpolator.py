@@ -40,9 +40,9 @@ class FeatureSymmetryInterpolator(FeatureInterpolatorBase[PoseAngleSymmetryData]
         """Create initial filter state for interpolation."""
         return SymmetryFilterState(
             interpolator=VectorPredictiveHermite(
-                input_rate=self._config.frequency,
+                input_rate=self._input_rate,
                 vector_size=SYMM_NUM_JOINTS,
-                alpha_v=self._config.responsiveness
+                alpha_v=self._alpha_v
             ),
             last_scores=np.zeros(SYMM_NUM_JOINTS, dtype=np.float32)
         )

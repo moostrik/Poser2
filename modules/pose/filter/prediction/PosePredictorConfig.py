@@ -1,0 +1,63 @@
+
+from modules.pose.filter.PoseFilterBase import PoseFilterConfigBase
+
+class PosePredictorConfig(PoseFilterConfigBase):
+    """Configuration for OneEuroFilter-based smoothing with automatic change notification."""
+
+    def __init__(self,
+                 frequency: float = 30.0,
+                 min_cutoff: float = 1.0,
+                 beta: float = 0.025,
+                 d_cutoff: float = 1.0,
+                 reset_on_reappear: bool = False) -> None:
+        super().__init__()
+        self._frequency: float = frequency
+        self._min_cutoff: float = min_cutoff
+        self._beta: float = beta
+        self._d_cutoff: float = d_cutoff
+        self._reset_on_reappear: bool = reset_on_reappear
+
+    @property
+    def frequency(self) -> float:
+        return self._frequency
+
+    @frequency.setter
+    def frequency(self, value: float) -> None:
+        self._frequency = value
+        self._notify()
+
+    @property
+    def min_cutoff(self) -> float:
+        return self._min_cutoff
+
+    @min_cutoff.setter
+    def min_cutoff(self, value: float) -> None:
+        self._min_cutoff = value
+        self._notify()
+
+    @property
+    def beta(self) -> float:
+        return self._beta
+
+    @beta.setter
+    def beta(self, value: float) -> None:
+        self._beta = value
+        self._notify()
+
+    @property
+    def d_cutoff(self) -> float:
+        return self._d_cutoff
+
+    @d_cutoff.setter
+    def d_cutoff(self, value: float) -> None:
+        self._d_cutoff = value
+        self._notify()
+
+    @property
+    def reset_on_reappear(self) -> bool:
+        return self._reset_on_reappear
+
+    @reset_on_reappear.setter
+    def reset_on_reappear(self, value: bool) -> None:
+        self._reset_on_reappear = value
+        self._notify()

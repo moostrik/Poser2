@@ -67,6 +67,7 @@ ANGLE_JOINT_SYMMETRIC_MIRROR: set[AngleJoint] = {
     AngleJoint.right_knee,
 }
 
+ANGLE_RANGE: tuple[float, float] = (-np.pi, np.pi)
 
 @dataclass(frozen=True)
 class PoseAngleData(PoseAngleFeatureBase[AngleJoint]):
@@ -92,7 +93,7 @@ class PoseAngleData(PoseAngleFeatureBase[AngleJoint]):
     @classmethod
     def default_range(cls) -> tuple[float, float]:
         """Return the default range for angle joints."""
-        return (-np.pi, np.pi)
+        return ANGLE_RANGE
 
     # ========== ANGLE-SPECIFIC OPERATIONS =========
 

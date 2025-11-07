@@ -7,7 +7,7 @@ class PoseInterpolatorConfig(PoseFilterConfigBase):
     def __init__(self) -> None:
         super().__init__()
         self._frequency: float = 30.0
-        self._alpha_v: float = 0.2
+        self._responsiveness: float = 0.2
         self._friction: float = 0.03
 
     @property
@@ -20,12 +20,12 @@ class PoseInterpolatorConfig(PoseFilterConfigBase):
         self._notify()
 
     @property
-    def alpha_v(self) -> float:
-        return self._alpha_v
+    def responsiveness(self) -> float:
+        return self._responsiveness
 
-    @alpha_v.setter
-    def alpha_v(self, value: float) -> None:
-        self._alpha_v = value
+    @responsiveness.setter
+    def responsiveness(self, value: float) -> None:
+        self._responsiveness = value
         self._notify()
 
     @property

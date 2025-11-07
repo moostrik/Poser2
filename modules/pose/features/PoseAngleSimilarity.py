@@ -10,6 +10,8 @@ import numpy as np
 from modules.pose.features.PoseAngles import AngleJoint
 from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase, FeatureStatistic
 
+POSE_SIMILARITY_RANGE: tuple[float, float] = (0, 1)
+
 @dataclass(frozen=True)
 class PoseAngleSimilarityData(PoseAngleFeatureBase[AngleJoint]):
     """Similarity scores between two poses for all joints."""
@@ -38,7 +40,7 @@ class PoseAngleSimilarityData(PoseAngleFeatureBase[AngleJoint]):
     @classmethod
     def default_range(cls) -> tuple[float, float]:
         """Return the default range for angle joints."""
-        return (-np.pi, np.pi)
+        return POSE_SIMILARITY_RANGE
 
     # ========== PROPERTIES ==========
     @property

@@ -36,8 +36,8 @@ class FeatureFloatInterpolator(FeatureInterpolatorBase[float]):
         """Create initial filter state for interpolation."""
         return FloatFilterState(
             interpolator=ScalarPredictiveHermite(
-                input_rate=self._config.frequency,
-                alpha_v=self._config.responsiveness
+                input_rate=self._input_rate,
+                alpha_v=self._alpha_v
             )
         )
 
