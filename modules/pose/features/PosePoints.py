@@ -66,6 +66,7 @@ POSE_JOINT_COLORS: dict[PoseJoint, tuple[float, float, float]] = {
     PoseJoint.right_ankle:      POSE_COLOR_RIGHT
 }
 
+POSE_POINTS_RANGE: tuple[float, float] = (0.0, 1.0)
 
 @dataclass(frozen=True)
 class PosePointData:
