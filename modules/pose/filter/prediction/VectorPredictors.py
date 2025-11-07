@@ -1,5 +1,6 @@
 # Standard library imports
 from enum import Enum
+from typing import Union
 
 # Third-party imports
 import numpy as np
@@ -11,7 +12,6 @@ class PredictionMethod(Enum):
     NONE = "none"
     LINEAR = "linear"
     QUADRATIC = "quadratic"
-
 
 class VectorPredictor:
     """Predictor for arbitrary vector data (positions, coordinates, etc.)."""
@@ -92,7 +92,7 @@ class VectorPredictor:
         self.p_prev = self.p_curr
         self.p_curr = values
 
-        newly_valid = np.isnan(self.p_prev) & np.isfinite(values)
+        newly_valid = np.isnan(self.p_prev) & np.isfinite(self.p_curr)
         if np.any(newly_valid):
             self.v_prev[newly_valid] = 0.0
 
@@ -112,6 +112,13 @@ class VectorPredictor:
 
         if self._clamp_range is not None:
             np.clip(self.p_predicted, self._clamp_range[0], self._clamp_range[1], out=self.p_predicted)
+
+    def reset(self) -> None:
+        """Reset the predictor's internal state (clear sample history)."""
+        self.p_prev = np.full(self._vector_size, np.nan)
+        self.p_curr = np.full(self._vector_size, np.nan)
+        self.p_predicted = np.full(self._vector_size, np.nan)
+        self.v_prev = np.zeros(self._vector_size)
 
     @staticmethod
     def _calculate_velocity(p_prev: np.ndarray, p_curr: np.ndarray, interval: float) -> np.ndarray:
@@ -181,3 +188,9 @@ class PointPredictor(VectorPredictor):
     def predicted(self) -> np.ndarray:
         """Get predicted points for the next frame."""
         return super().predicted.reshape(self._num_points, 2)
+
+Predictor = Union[
+    VectorPredictor,
+    AnglePredictor,
+    PointPredictor,
+]
