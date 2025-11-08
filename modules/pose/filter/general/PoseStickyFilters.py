@@ -217,7 +217,7 @@ class PoseStickyFilter(PoseFilterBase):
         self._delta_filter.reset()
 
 
-__all__ = [
+__all__: list[str] = [
     'PoseStickyFilterConfig',
     'PoseStickyFilterBase',
     'PoseAngleStickyFilter',
