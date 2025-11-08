@@ -73,6 +73,11 @@ POSE_FEATURE_DIMENSIONS: dict[PoseFeatureType, int] = {
     PoseFeatureType.SYMMETRY: 1,    # Single symmetry value
 }
 
+POSE_CLASS_TO_FEATURE_TYPE: dict[type, PoseFeatureType] = {
+    PosePointData: PoseFeatureType.POINTS,
+    PoseAngleData: PoseFeatureType.ANGLES,
+    PoseAngleSymmetryData: PoseFeatureType.SYMMETRY,
+}
 
 # Export all public symbols
 __all__: list[str] = [

@@ -10,13 +10,12 @@ from .extractor.PoseSymmetryExtractor import        PoseSymmetryExtractor
 from .extractor.PoseMotionTimeAccumulator import    PoseMotionTimeAccumulator
 
 from .general.PoseConfidenceFilter import           PoseConfidenceFilterConfig, PoseConfidenceFilter
-from .general.PoseNanValidator import               PoseNanValidator
-from .general.PoseRangeValidator import             PoseValidatorConfig, PoseRangeValidator
+from .general.PoseValidators import                 PoseValidatorConfig, PoseNanValidator, PoseRangeValidator, PoseScoreValidator, PoseValidator
 
-from .prediction.PoseChaseInterpolators import      PoseChaseInterpolatorConfig, PoseAngleChaseInterpolator, PoseDeltaChaseInterpolator, PosePointChaseInterpolator, PoseChaseInterpolator
-from .prediction.PoseStickyFilters import           PoseStickyFilterConfig, PoseAngleStickyFilter, PoseDeltaStickyFilter, PosePointStickyFilter, PoseStickyFilter
-from .prediction.PosePredictors import              PosePredictorConfig, PoseAnglePredictor, PoseDeltaPredictor, PosePointPredictor, PosePredictor
-from .prediction.PoseSmoothers import               PoseSmootherConfig, PoseAngleSmoother, PoseDeltaSmoother, PosePointSmoother, PoseSmoother
+from .general.PoseChaseInterpolators import         PoseChaseInterpolatorConfig, PoseAngleChaseInterpolator, PoseDeltaChaseInterpolator, PosePointChaseInterpolator, PoseChaseInterpolator
+from .general.PoseStickyFilters import              PoseStickyFilterConfig, PoseAngleStickyFilter, PoseDeltaStickyFilter, PosePointStickyFilter, PoseStickyFilter
+from .general.PosePredictors import                 PosePredictorConfig, PoseAnglePredictor, PoseDeltaPredictor, PosePointPredictor, PosePredictor
+from .general.PoseSmoothers import                  PoseSmootherConfig, PoseAngleSmoother, PoseDeltaSmoother, PosePointSmoother, PoseSmoother
 
 
 from .smooth.PoseSmootherBase import                PoseSmootherConfig as OldPoseSmootherConfig
@@ -43,6 +42,8 @@ __all__: list[str] = [
     'PoseValidatorConfig',
     'PoseNanValidator',
     'PoseRangeValidator',
+    'PoseScoreValidator',
+    'PoseValidator',
 
     'PoseChaseInterpolatorConfig',
     'PoseAngleChaseInterpolator',
