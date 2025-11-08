@@ -15,7 +15,7 @@ from .general.PoseChaseInterpolators import         PoseChaseInterpolatorConfig,
 from .general.PoseConfidenceFilters import          PoseConfidenceFilterConfig, PoseAngleConfidenceFilter, PoseDeltaConfidenceFilter, PosePointConfidenceFilter, PoseConfidenceFilter
 from .general.PosePredictors import                 PosePredictorConfig, PoseAnglePredictor, PoseDeltaPredictor, PosePointPredictor, PosePredictor
 from .general.PoseSmoothers import                  PoseSmootherConfig, PoseAngleSmoother, PoseDeltaSmoother, PosePointSmoother, PoseSmoother
-from .general.PoseStickyFilters import              PoseStickyFillerConfig, PoseAngleStickyFiller, PoseDeltaStickyFiller, PosePointStickyFiller, PoseStickyFiller
+from .general.PoseStickyFillers import              PoseStickyFillerConfig, PoseAngleStickyFiller, PoseDeltaStickyFiller, PosePointStickyFiller, PoseStickyFiller
 
 
 from .smooth.PoseSmootherBase import                PoseSmootherConfig as OldPoseSmootherConfig

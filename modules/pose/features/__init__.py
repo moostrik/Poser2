@@ -23,6 +23,7 @@ from modules.pose.features.PosePoints import (
 from modules.pose.features.PoseAngles import (
     PoseAngleData,
     AngleJoint,
+    PoseAngleFactory,
     ANGLE_JOINT_NAMES,
     ANGLE_NUM_JOINTS,
     ANGLE_RANGE
@@ -31,6 +32,7 @@ from modules.pose.features.PoseAngles import (
 from modules.pose.features.PoseAngleSymmetry import (
     PoseAngleSymmetryData,
     SymmetricJoint,
+    PoseAngleSymmetryFactory,
     SYMM_JOINT_NAMES,
     SYMM_NUM_JOINTS,
     POSE_SYMMETRY_RANGE
