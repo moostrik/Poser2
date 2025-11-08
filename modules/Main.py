@@ -17,9 +17,9 @@ from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
 from modules.pose.detection.PoseDetectionPipeline import PoseDetectionPipeline
 
-from modules.pose.filters.PoseFilterPipelineTracker import PoseFilterPipelineTracker
 from modules.pose import filters
-from modules.pose.filter.smooth.PoseSmootherGui import PoseSmootherGui
+from modules.pose.filters.PoseFilterPipelineTracker import PoseFilterPipelineTracker
+from modules.pose.filters.general.gui.PoseSmootherGui import PoseSmootherGui
 
 from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
 
@@ -78,7 +78,7 @@ class Main():
         )
 
 
-        self.point_smooth_config = filters.OldPoseSmootherConfig()
+        self.point_smooth_config = filters.PoseSmootherConfig()
         self.point_smooth_gui: PoseSmootherGui = PoseSmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
 
         self.pose_smooth_filters = PoseFilterPipelineTracker(

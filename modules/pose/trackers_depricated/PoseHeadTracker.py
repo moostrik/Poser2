@@ -2,7 +2,7 @@ import numpy as np
 from dataclasses import dataclass
 
 from modules.pose.Pose import Pose
-from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
+from modules.pose.trackers_depricated.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.depricated.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
 

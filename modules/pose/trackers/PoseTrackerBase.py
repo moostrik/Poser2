@@ -1,23 +1,104 @@
+"""Base class for pose filter trackers."""
+
 from abc import ABC, abstractmethod
+from threading import Lock
+from traceback import print_exc
+
+from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
+
 
 class PoseTrackerBase(ABC):
+    """Base class for tracking and filtering multiple poses.
+
+    Provides callback system and reset functionality. Subclasses implement
+    the specific filtering logic.
+    """
+
+    def __init__(self, num_poses: int):
+        """Initialize base tracker.
+
+        Args:
+            num_poses: Number of poses to track.
+        """
+        self.num_poses: int = num_poses
+        self._output_callbacks: set[PoseDictCallback] = set()
+        self._callback_lock = Lock()
+
+    def add_poses(self, poses: PoseDict) -> None:
+        """Process poses and emit callbacks.
+
+        Args:
+            poses: Dictionary of poses to process.
+        """
+        pending_poses: dict[int, Pose] = {}
+
+        for pose_id, pose in poses.items():
+            try:
+                current_pose: Pose = self._process_pose(pose_id, pose)
+                pending_poses[pose_id] = current_pose
+            except Exception as e:
+                print(f"{self.__class__.__name__}: Error processing pose {pose_id}: {e}")
+                print_exc()
+                pending_poses[pose_id] = pose
+
+            # Reset when pose is lost
+            if pose.lost:
+                self.reset_pose(pose_id)
+
+        self._emit_callbacks(pending_poses)
+
     @abstractmethod
-    def add_pose(self, pose):
-        """Add a new pose data point for processing."""
+    def _process_pose(self, pose_id: int, pose: Pose) -> Pose:
+        """Process a single pose through filters.
+
+        Args:
+            pose_id: ID of the pose.
+            pose: Pose to process.
+
+        Returns:
+            Processed pose.
+        """
         pass
 
     @abstractmethod
-    def update(self):
-        """Update the smoother's internal state."""
+    def reset(self) -> None:
+        """Reset all pose filters."""
         pass
 
     @abstractmethod
-    def reset(self):
-        """Reset the smoother to its initial state."""
+    def reset_pose(self, pose_id: int) -> None:
+        """Reset filter for a specific pose.
+
+        Args:
+            pose_id: ID of pose to reset.
+        """
         pass
 
-    @property
-    @abstractmethod
-    def is_active(self):
-        """Return whether the smoother is active."""
-        pass
+    # CALLBACKS
+    def _emit_callbacks(self, poses: dict[int, Pose]) -> None:
+        """Emit callbacks with processed poses."""
+        with self._callback_lock:
+            for callback in self._output_callbacks:
+                try:
+                    callback(poses)
+                except Exception as e:
+                    print(f"{self.__class__.__name__}: Error in callback: {e}")
+                    print_exc()
+
+    def add_callback(self, callback: PoseDictCallback) -> None:
+        """Register output callback.
+
+        Args:
+            callback: Function to call with processed poses.
+        """
+        with self._callback_lock:
+            self._output_callbacks.add(callback)
+
+    def remove_callback(self, callback: PoseDictCallback) -> None:
+        """Unregister output callback.
+
+        Args:
+            callback: Function to remove.
+        """
+        with self._callback_lock:
+            self._output_callbacks.discard(callback)

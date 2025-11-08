@@ -5,7 +5,7 @@ from dataclasses import dataclass
 # Local imports
 from modules.pose.Pose import Pose
 from modules.pose.features.PosePoints import PoseJoint
-from modules.pose.trackers.PoseTrackerBase import PoseTrackerBase
+from modules.pose.trackers_depricated.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.PointsAndRects import Rect
 from modules.utils.depricated.SmoothedInterpolator import SmoothedInterpolator, OneEuroSettings
