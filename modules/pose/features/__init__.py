@@ -80,28 +80,3 @@ POSE_CLASS_TO_FEATURE_TYPE: dict[type, PoseFeatureType] = {
     PoseAngleData: PoseFeatureType.ANGLES,
     PoseAngleSymmetryData: PoseFeatureType.SYMMETRY,
 }
-
-# Export all public symbols
-__all__: list[str] = [
-    # Feature classes
-    "PosePointData",
-    "PoseAngleData",
-    "PoseAngleSymmetryData",
-
-    # Enums
-    "PoseJoint",
-    "AngleJoint",
-    "SymmetricJoint",
-
-    # Constants
-    "POSE_JOINT_NAMES",
-    "POSE_NUM_JOINTS",
-    "ANGLE_JOINT_NAMES",
-    "ANGLE_NUM_JOINTS",
-    "SYMM_JOINT_NAMES",
-    "SYMM_NUM_JOINTS",
-
-    # Type aliases
-    "PoseFeatureData",
-    "PoseFeatureType"
-]
