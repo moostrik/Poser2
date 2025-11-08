@@ -26,7 +26,7 @@ Completely lock-free using fixed-size arrays:
 - Interpolators have internal locks for their own state
 - Pose cache is separate - written once per update(), read many times per frame
 """
-
+import time as time
 
 # Local application imports
 from modules.pose import features
@@ -47,29 +47,19 @@ class RenderDataHub:
             friction=0.03
         )
 
-        self._interpolators: list[PoseAngleChaseInterpolator | None] = [
-            PoseAngleChaseInterpolator(self.interpolator_config)
-            for _ in range(self._num_players)
-        ]
-
-        # Hub owns the cached poses for fast read access
+        # Lazy init - create on first add_poses()
+        self._interpolators: list[PoseAngleChaseInterpolator | None] = [None] * self._num_players
         self._cached_poses: list[Pose | None] = [None] * self._num_players
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def update(self) -> None:
         """Update all active interpolators and cache results. Completely lock-free."""
+        current_time: float = time.time()
         for i, interpolator in enumerate(self._interpolators):
             if interpolator is not None:
-                try:
-                    # Update interpolator (it has internal lock)
-                    pose: Pose = interpolator.update()
-                    # Cache result at hub level (atomic write)
-                    self._cached_poses[i] = pose
-
-                except RuntimeError:
-                    # Not ready yet, keep old cached pose
-                    pass
+                # sets cached pose to None if not ready yet
+                self._cached_poses[i] = interpolator.update(current_time)
 
     def reset(self) -> None:
         """Reset all interpolators and clear cache. Completely lock-free."""
@@ -77,45 +67,40 @@ class RenderDataHub:
             if interpolator is not None:
                 interpolator.reset()
 
-            # Clear cached pose (atomic write)
             self._cached_poses[i] = None
 
     def add_poses(self, poses: PoseDict) -> None:
         """Add new pose data points for processing. Completely lock-free."""
         for id, pose in poses.items():
             if id >= self._num_players:
-                continue  # Ignore out-of-range IDs
+                continue
 
             if pose.lost:
-                # Mark as lost (atomic writes)
                 self._interpolators[id] = None
                 self._cached_poses[id] = None
             else:
                 interpolator = self._interpolators[id]
                 if interpolator is None:
-                    # Lazy init (atomic write)
+                    # Create and initialize together
                     interpolator = PoseAngleChaseInterpolator(self.interpolator_config)
                     self._interpolators[id] = interpolator
-
-                # Process new input (interpolator has internal lock)
                 interpolator.process(pose)
 
     def is_active(self, pose_id: int) -> bool:
-        """Check if a pose exists. Completely lock-free."""
+        """Check if player has cached pose available."""
         if pose_id >= self._num_players:
             return False
         return self._cached_poses[pose_id] is not None
 
     def get_pose(self, pose_id: int) -> Pose:
-        """Get smoothed pose from cache. Completely lock-free.
+        """Get smoothed pose from cache.
 
-        This reads from the hub's cache, updated once per update() call.
-        Multiple callers can read the same pose without any locking overhead.
+        Raises KeyError if no pose available. Use is_active() to check first.
         """
         if pose_id >= self._num_players:
             raise KeyError(f"Pose ID {pose_id} out of range")
 
-        pose = self._cached_poses[pose_id]  # Atomic read
+        pose: Pose | None = self._cached_poses[pose_id]
         if pose is None:
             raise KeyError(f"No pose found for tracklet ID {pose_id}")
 

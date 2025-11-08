@@ -60,7 +60,6 @@ class PoseChaseInterpolatorBase(PoseFilterBase):
         self._config: PoseChaseInterpolatorConfig = config
         self._lock: Lock = Lock()
         self._last_pose: Pose | None = None
-        self._interpolated_pose: Pose | None = None
         self._interpolator: ChaseInterpolator
         self._initialize_interpolator()
         self._config.add_listener(self._on_config_changed)
@@ -101,13 +100,14 @@ class PoseChaseInterpolatorBase(PoseFilterBase):
 
         return pose
 
-    def update(self, current_time: float | None = None) -> Pose:
-        """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS)."""
+    def update(self, current_time: float | None = None) -> Pose | None:
+        """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS).
+        Returns None if process() has not been called yet."""
         # Lock only for reading _last_pose reference
         with self._lock:
             if self._last_pose is None:
-                raise RuntimeError("No pose has been processed yet. Call process() first.")
-            last_pose: Pose = self._last_pose  # Copy reference
+                return None
+            last_pose: Pose = self._last_pose
 
             self._interpolator.update(current_time)
             interpolated_values: np.ndarray = self._interpolator.value
@@ -116,17 +116,7 @@ class PoseChaseInterpolatorBase(PoseFilterBase):
         interpolated_data = self._create_interpolated_data(feature_data, interpolated_values)
         interpolated_pose: Pose = self._replace_feature_data(last_pose, interpolated_data)
 
-        with self._lock:
-            self._interpolated_pose = interpolated_pose
-
         return interpolated_pose
-
-    def get_interpolated_pose(self) -> Pose:
-        """Get a pose with the current interpolated values."""
-        with self._lock:
-            if self._interpolated_pose is None:
-                raise RuntimeError("No interpolated pose available. Call update() first.")
-            return self._interpolated_pose
 
     def reset(self) -> None:
         """Reset the interpolator's internal state."""
@@ -258,12 +248,19 @@ class PoseChaseInterpolator(PoseFilterBase):
         self._delta_interpolator.process(pose)
         return pose
 
-    def update(self, current_time: float | None = None) -> Pose:
-        """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS)."""
+    def update(self, current_time: float | None = None) -> Pose | None:
+        """Update and return interpolated pose, or None if not ready yet.
+
+        Returns None if process() has not been called yet.
+        """
+
         # Update all features (each caches internally)
-        angle_pose: Pose = self._angle_interpolator.update(current_time)
-        point_pose: Pose = self._point_interpolator.update(current_time)
-        delta_pose: Pose = self._delta_interpolator.update(current_time)
+        angle_pose: Pose | None = self._angle_interpolator.update(current_time)
+        point_pose: Pose | None = self._point_interpolator.update(current_time)
+        delta_pose: Pose | None = self._delta_interpolator.update(current_time)
+
+        if angle_pose is None or point_pose is None or delta_pose is None:
+            return None
 
         # Combine all interpolated features
         combined: Pose = replace(
@@ -276,16 +273,6 @@ class PoseChaseInterpolator(PoseFilterBase):
         self._cached_pose = combined
 
         return combined
-
-    def get_interpolated_pose(self) -> Pose:
-        """Get a pose with the current interpolated values.
-
-        Returns the cached result from the last update() call.
-        This is efficient for multiple callers per frame.
-        """
-        if self._cached_pose is None:
-            raise RuntimeError("No interpolated pose available. Call update() first.")
-        return self._cached_pose
 
     def reset(self) -> None:
         """Reset all interpolators' internal state."""
