@@ -13,7 +13,7 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 from modules.pose.features.PoseAngles import ANGLE_NUM_JOINTS, ANGLE_JOINT_NAMES
-from modules.pose.correlation.PoseStream import PoseStreamData
+from modules.pose.similarity.Stream import StreamData
 
 from modules.data.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
@@ -65,7 +65,7 @@ class PoseLayer(LayerBase):
             self.image.set_image(pose_image_np)
             self.image.update()
         pose_mesh: Mesh = self.pose_meshes.meshes[pose.tracklet.id]
-        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
+        pose_stream: StreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
             stream_image: np.ndarray = StreamPose.pose_stream_to_image(pose_stream)
             self.pose_stream_image.set_image(stream_image)

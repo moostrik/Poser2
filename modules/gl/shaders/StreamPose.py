@@ -2,7 +2,7 @@ from OpenGL.GL import * # type: ignore
 from OpenGL.GL.shaders import ShaderProgram # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
-from modules.pose.correlation.PoseStream import PoseStreamData
+from modules.pose.similarity.Stream import StreamData
 import numpy as np
 
 class StreamPose(Shader):
@@ -40,7 +40,7 @@ class StreamPose(Shader):
 
 
     @staticmethod
-    def pose_stream_to_image(pose_stream: PoseStreamData, confidence_ceil: bool = False) -> np.ndarray:
+    def pose_stream_to_image(pose_stream: StreamData, confidence_ceil: bool = False) -> np.ndarray:
 
         angles_raw: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0).astype(np.float32)
         confidences_raw: np.ndarray = pose_stream.confidences.to_numpy()

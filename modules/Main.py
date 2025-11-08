@@ -15,16 +15,16 @@ from modules.tracker.TrackerBase import TrackerType
 from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker
 from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
-from modules.pose.detection.PoseDetectionPipeline import PoseDetectionPipeline
+from modules.pose.detection.DetectionPipeline import DetectionPipeline
 
-from modules.pose import filter
-from modules.pose.filter.gui.PoseSmootherGui import PoseSmootherGui
-from modules.pose.tracker import PoseFilterPipelineTracker
+from modules.pose import filters
+from modules.pose.filters.gui.SmootherGui import SmootherGui
+from modules.pose.trackers import FilterPipelineTracker
 
-from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
+from modules.pose.similarity.SimilarityComputer import SimilarityComputer
 
-from modules.pose.correlation.PoseStream import PoseStreamManager
-from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
+from modules.pose.similarity.Stream import StreamManager
+from modules.pose.similarity.StreamSimilarityComputer import StreamCorrelator
 
 from modules.data.CaptureDataHub import CaptureDataHub
 from modules.data.RenderDataHub import RenderDataHub
@@ -66,36 +66,36 @@ class Main():
         self.tracklet_sync_bang = FrameSyncBang(settings, False, 'tracklet_sync')
 
         # POSE
-        self.pose_detection = PoseDetectionPipeline(settings)
+        self.pose_detection = DetectionPipeline(settings)
 
-        self.pose_raw_filters = PoseFilterPipelineTracker(
+        self.pose_raw_filters = FilterPipelineTracker(
             settings.num_players,
             [
-                lambda: filter.PoseConfidenceFilter(filter.PoseConfidenceFilterConfig(settings.pose_conf_threshold)),
-                filter.PoseAngleExtractor,
-                filter.PoseDeltaExtractor
+                lambda: filters.PoseConfidenceFilter(filters.ConfidenceFilterConfig(settings.pose_conf_threshold)),
+                filters.AngleExtractor,
+                filters.DeltaExtractor
             ]
         )
 
 
-        self.point_smooth_config = filter.PoseSmootherConfig()
-        self.point_smooth_gui: PoseSmootherGui = PoseSmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
+        self.point_smooth_config = filters.SmootherConfig()
+        self.point_smooth_gui: SmootherGui = SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
 
-        self.pose_smooth_filters = PoseFilterPipelineTracker(
+        self.pose_smooth_filters = FilterPipelineTracker(
             settings.num_players,
             [
-                lambda: filter.PosePointSmoother(self.point_smooth_config),
-                lambda: filter.PoseAngleSmoother(self.point_smooth_config),
-                filter.PoseDeltaExtractor,
-                filter.PoseMotionTimeAccumulator,
-                lambda: filter.PoseDeltaSmoother(self.point_smooth_config)
+                lambda: filters.PointSmoother(self.point_smooth_config),
+                lambda: filters.AngleSmoother(self.point_smooth_config),
+                filters.DeltaExtractor,
+                filters.MotionTimeAccumulator,
+                lambda: filters.DeltaSmoother(self.point_smooth_config)
             ]
         )
 
-        self.pose_correlator: PoseSimilarityComputer = PoseSimilarityComputer(settings)
+        self.pose_correlator: SimilarityComputer = SimilarityComputer(settings)
 
-        self.pose_streamer = PoseStreamManager(settings)
-        self.stream_correlator: Optional[PoseStreamCorrelator] = None #PoseStreamCorrelator(settings)
+        self.pose_streamer = StreamManager(settings)
+        self.stream_correlator: Optional[StreamCorrelator] = None #PoseStreamCorrelator(settings)
 
         # DATA
         self.capture_data_hub = CaptureDataHub()

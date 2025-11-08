@@ -9,7 +9,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.correlation.PoseSimilarityStream import PoseSimilarityStream, PoseSimilarityStreamData, PoseSimilarityBatch , FeatureStatistic
+from modules.pose.similarity.SimilarityStream import SimilarityStream, SimilarityStreamData, PoseSimilarityBatch , FeatureStatistic
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.data.CaptureDataHub import CaptureDataHub
 
@@ -28,7 +28,7 @@ class CorrelationStreamLayer(LayerBase):
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.num_streams: int = num_streams
-        self.correlation_stream: PoseSimilarityStream = PoseSimilarityStream(capacity)
+        self.correlation_stream: SimilarityStream = SimilarityStream(capacity)
         self.use_motion: bool = use_motion
 
         text_init()
@@ -74,7 +74,7 @@ class CorrelationStreamLayer(LayerBase):
             return
 
         self.correlation_stream.update(correlation_batch, FeatureStatistic.GEOMETRIC_MEAN)
-        stream_data: PoseSimilarityStreamData = self.correlation_stream.get_stream_data()
+        stream_data: SimilarityStreamData = self.correlation_stream.get_stream_data()
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         self.fbo.begin()

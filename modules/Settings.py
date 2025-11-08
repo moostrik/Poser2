@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 
 from modules.cam.depthcam.Definitions import FrameType, get_device_list
-from modules.pose.detection.PoseDetection import PoseModelType
+from modules.pose.detection.Detection import ModelType
 from modules.tracker.TrackerBase import TrackerType
 
 class Settings():
@@ -71,7 +71,7 @@ class Settings():
 
         # POSE DETCTION SETTINGS
         self.pose_crop_expansion: float         = None # type: ignore
-        self.pose_model_type: PoseModelType     = None # type: ignore
+        self.pose_model_type: ModelType     = None # type: ignore
         self.pose_model_warmups: int             = None # type: ignore
         self.pose_active: bool                  = None # type: ignore
         self.pose_stream_capacity: int          = None # type: ignore

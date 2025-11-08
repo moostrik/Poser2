@@ -9,7 +9,7 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features import PosePointData, PoseAngleData, PoseAngleSymmetryData
-from modules.pose.features.depricated.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
+from modules.pose.features.deprecated.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
 
 # Local application imports
 from modules.tracker.Tracklet import Tracklet

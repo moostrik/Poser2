@@ -50,7 +50,7 @@ from typing import Optional, TypeVar, Generic
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameType
 from modules.tracker.Tracklet import Tracklet, TrackletDict
 from modules.pose.Pose import Pose, PoseDict
-from modules.pose.correlation.PoseStream import PoseStreamData
+from modules.pose.similarity.Stream import StreamData
 from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch
 from modules.WS.WSOutput import WSOutput
 from modules.Settings import Settings
@@ -78,7 +78,7 @@ class CaptureDataHub:
         self.tracklets: dict[int, DataItem[Tracklet]] = {}
         self.smooth_poses: dict[int, DataItem[Pose]] = {}
         self.raw_poses: dict[int, DataItem[Pose]] = {}
-        self.pose_streams: dict[int, DataItem[PoseStreamData]] = {}
+        self.pose_streams: dict[int, DataItem[StreamData]] = {}
         self.pose_correlation: dict[int, DataItem[PoseSimilarityBatch ]] = {}
         self.motion_correlation: dict[int, DataItem[PoseSimilarityBatch ]] = {}
 
@@ -171,10 +171,10 @@ class CaptureDataHub:
             return [v.value for v in self.smooth_poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
 
     # Pose window/stream management
-    def set_pose_stream(self, value: PoseStreamData) -> None:
+    def set_pose_stream(self, value: StreamData) -> None:
         self._set_data_dict(self.pose_streams, value.id, value)
 
-    def get_pose_stream(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[PoseStreamData]:
+    def get_pose_stream(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[StreamData]:
         return self._get_data_dict(self.pose_streams, id, only_new_data, consumer_key)
 
     # Correlation window management

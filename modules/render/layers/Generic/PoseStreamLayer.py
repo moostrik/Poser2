@@ -17,7 +17,7 @@ from modules.pose.Pose import Pose
 
 from modules.pose.features.PosePoints import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.PoseAngles import ANGLE_NUM_JOINTS, ANGLE_JOINT_NAMES
-from modules.pose.correlation.PoseStream import PoseStreamData
+from modules.pose.similarity.Stream import StreamData
 
 from modules.data.CaptureDataHub import CaptureDataHub
 from modules.render.meshes.PoseMeshes import PoseMeshes
@@ -61,7 +61,7 @@ class PoseStreamLayer(LayerBase):
         if pose is None:
             return #??
         pose_mesh: Mesh = self.pose_meshes.meshes[pose.tracklet.id]
-        pose_stream: PoseStreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
+        pose_stream: StreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
             stream_image: np.ndarray = StreamPose.pose_stream_to_image(pose_stream)
             self.pose_stream_image.set_image(stream_image)

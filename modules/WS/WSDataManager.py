@@ -8,7 +8,7 @@ from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose, PosePointData, PoseAngleData, PoseMeasurementData
 from modules.pose.features.PoseAngles import AngleJoint, ANGLE_JOINT_NAMES
 from modules.pose.features.PosePoints import PoseJoint
-from modules.pose.correlation.PoseStream import PoseStreamData
+from modules.pose.similarity.Stream import StreamData
 from modules.utils.PointsAndRects import Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -118,7 +118,7 @@ class WSData:
         if pose.tracklet.is_removed:
             self.reset()
 
-    def add_stream(self, stream: PoseStreamData) -> None:
+    def add_stream(self, stream: StreamData) -> None:
         if not self.present:
             return
 

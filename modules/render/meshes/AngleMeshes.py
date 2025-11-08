@@ -5,7 +5,7 @@ import numpy as np
 
 # Local application imports
 from modules.gl.Mesh import Mesh
-from modules.pose.correlation.PoseStream import PoseStreamData
+from modules.pose.similarity.Stream import StreamData
 from modules.data.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
@@ -33,13 +33,13 @@ class AngleMeshes(LayerBase):
 
     def update(self) -> None:
         for id in range(self.amount):
-            pose: PoseStreamData | None = self.data.get_pose_stream(id, True, self.data_consumer_key)
+            pose: StreamData | None = self.data.get_pose_stream(id, True, self.data_consumer_key)
             mesh: Mesh | None = self.meshes.get(id, None)
             if pose is not None and mesh is not None:
                 AngleMeshes.update_angle_mesh(pose, mesh)
 
     @staticmethod
-    def update_angle_mesh(pose_stream: PoseStreamData, angle_mesh: Mesh) -> None:
+    def update_angle_mesh(pose_stream: StreamData, angle_mesh: Mesh) -> None:
         angles_np: np.ndarray = np.nan_to_num(pose_stream.angles.to_numpy(), nan=0.0)
         conf_np: np.ndarray = pose_stream.confidences.to_numpy()
         if angles_np.shape[0] != conf_np.shape[0] or angles_np.shape[1] != conf_np.shape[1]:
