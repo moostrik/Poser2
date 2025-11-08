@@ -3,7 +3,7 @@ from abc import abstractmethod
 from typing import Any
 
 # Pose imports
-from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
+from modules.pose.filters.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
 from modules.pose.Pose import Pose
 
 

@@ -6,7 +6,7 @@ from modules.pose.filter.interpolation.FeatureAngleInterpolator import FeatureAn
 from modules.pose.filter.interpolation.FeatureFloatInterpolator import FeatureFloatInterpolator
 from modules.pose.filter.interpolation.FeaturePointInterpolator import FeaturePointInterpolator
 from modules.pose.filter.interpolation.FeatureRectInterpolator import FeatureRectInterpolator
-from modules.pose.filter.PoseFilterBase import PoseFilterBase
+from modules.pose.filters.PoseFilterBase import PoseFilterBase
 from modules.pose.features.PoseAngles import PoseAngleData
 from modules.pose.features.PosePoints import PosePointData
 from modules.pose.Pose import Pose

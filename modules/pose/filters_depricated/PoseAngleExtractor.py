@@ -2,7 +2,7 @@
 from dataclasses import replace
 
 # Pose imports
-from modules.pose.filters.PoseBatchFilterBase import PoseBatchFilterBase
+from modules.pose.filters_depricated.PoseBatchFilterBase import PoseBatchFilterBase
 from modules.pose.features.PoseAngles import PoseAngleData, PoseAngleFactory
 from modules.pose.Pose import Pose, PoseDict
 

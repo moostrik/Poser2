@@ -2,7 +2,7 @@
 from dataclasses import replace
 
 # Pose imports
-from modules.pose.filters.smooth.PoseSmootherBase import PoseSmootherBase
+from modules.pose.filters_depricated.smooth.PoseSmootherBase import PoseSmootherBase
 from modules.pose.Pose import Pose, Rect
 
 # Local application imports

@@ -23,7 +23,7 @@ from threading import Lock
 # Local application imports
 from modules.pose.features.PoseAngles import PoseAngleData
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
-from modules.pose.filters import PoseInterpolator
+from modules.pose.filters_depricated import PoseInterpolator
 from modules.pose.Pose import Pose, PoseDict
 
 from modules.Settings import Settings

@@ -5,9 +5,9 @@ from dataclasses import dataclass
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.interpolation.FeatureInterpolatorBase import FeatureInterpolatorBase
+from modules.pose.filters_depricated.interpolation.FeatureInterpolatorBase import FeatureInterpolatorBase
 from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS
-from modules.pose.filters.interpolation.predictive.VectorAngle import VectorAngle
+from modules.pose.filters_depricated.interpolation.VectorAngle import VectorAngle
 
 
 

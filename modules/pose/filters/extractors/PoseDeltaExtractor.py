@@ -2,7 +2,7 @@
 from dataclasses import replace
 
 # Pose imports
-from modules.pose.filter.PoseFilterBase import PoseFilterBase
+from modules.pose.filters.PoseFilterBase import PoseFilterBase
 from modules.pose.features.PoseAngles import PoseAngleData
 from modules.pose.Pose import Pose
 

@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.PoseBatchFilterBase import PoseBatchFilterBase
+from modules.pose.filters_depricated.PoseBatchFilterBase import PoseBatchFilterBase
 from modules.pose.features.PosePoints import PosePointData
 from modules.pose.Pose import Pose, PoseDict
 

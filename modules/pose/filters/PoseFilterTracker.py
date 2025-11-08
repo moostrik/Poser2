@@ -9,7 +9,7 @@ from traceback import print_exc
 from typing import Callable
 
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
-from modules.pose.filter.PoseFilterBase import PoseFilterBase
+from modules.pose.filters.PoseFilterBase import PoseFilterBase
 
 
 class PoseFilterTracker:

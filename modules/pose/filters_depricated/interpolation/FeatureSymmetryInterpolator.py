@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.interpolation.FeatureInterpolatorBase import FeatureInterpolatorBase
+from modules.pose.filters_depricated.interpolation.FeatureInterpolatorBase import FeatureInterpolatorBase
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData, SYMM_NUM_JOINTS
 
 # Local application imports

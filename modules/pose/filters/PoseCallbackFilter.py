@@ -1,5 +1,5 @@
 from modules.pose.Pose import Pose, PoseCallback
-from modules.pose.filter.PoseFilterBase import PoseFilterBase
+from modules.pose.filters.PoseFilterBase import PoseFilterBase
 from threading import Lock
 
 

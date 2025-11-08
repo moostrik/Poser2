@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 
 # Pose imports
-from modules.pose.filters.interpolation.FeatureInterpolatorBase import FeatureInterpolatorBase
+from modules.pose.filters_depricated.interpolation.FeatureInterpolatorBase import FeatureInterpolatorBase
 
 # Local application imports
 from modules.utils.Interpolation import ScalarPredictiveHermite

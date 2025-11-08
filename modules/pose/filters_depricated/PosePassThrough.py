@@ -1,5 +1,5 @@
 # Pose imports
-from modules.pose.filters.PoseBatchFilterBase import PoseBatchFilterBase
+from modules.pose.filters_depricated.PoseBatchFilterBase import PoseBatchFilterBase
 from modules.pose.Pose import PoseDict
 
 class PosePassThrough(PoseBatchFilterBase):

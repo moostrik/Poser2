@@ -12,9 +12,9 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
+from modules.pose.filters.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.filter.general.VectorMath.VectorSmoothers import Smoother, AngleSmoother, PointSmoother
+from modules.pose.filters.general.algorithms.VectorSmoothers import Smoother, AngleSmoother, PointSmoother
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POSE_NUM_JOINTS, POSE_POINTS_RANGE
 
 

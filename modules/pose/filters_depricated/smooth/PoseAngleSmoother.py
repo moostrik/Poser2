@@ -6,7 +6,7 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_NUM_JOINTS, AngleJoint
-from modules.pose.filters.smooth.PoseSmootherBase import PoseSmootherBase
+from modules.pose.filters_depricated.smooth.PoseSmootherBase import PoseSmootherBase
 from modules.pose.Pose import Pose
 
 # Local application imports

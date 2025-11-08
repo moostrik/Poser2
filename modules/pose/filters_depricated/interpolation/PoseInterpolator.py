@@ -4,11 +4,11 @@ from threading import Lock
 from typing import Optional
 
 # Pose imports
-from modules.pose.filters.interpolation.FeatureAngleInterpolator import FeatureAngleInterpolator
-from modules.pose.filters.interpolation.FeatureFloatInterpolator import FeatureFloatInterpolator
-from modules.pose.filters.interpolation.FeaturePointInterpolator import FeaturePointInterpolator
-from modules.pose.filters.interpolation.FeatureRectInterpolator import FeatureRectInterpolator
-from modules.pose.filters.PoseBatchFilterBase import PoseBatchFilterBase
+from modules.pose.filters_depricated.interpolation.FeatureAngleInterpolator import FeatureAngleInterpolator
+from modules.pose.filters_depricated.interpolation.FeatureFloatInterpolator import FeatureFloatInterpolator
+from modules.pose.filters_depricated.interpolation.FeaturePointInterpolator import FeaturePointInterpolator
+from modules.pose.filters_depricated.interpolation.FeatureRectInterpolator import FeatureRectInterpolator
+from modules.pose.filters_depricated.PoseBatchFilterBase import PoseBatchFilterBase
 from modules.pose.features.PoseAngles import PoseAngleData
 from modules.pose.features.PosePoints import PosePointData
 from modules.pose.Pose import Pose, PoseDict

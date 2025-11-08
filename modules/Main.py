@@ -17,8 +17,8 @@ from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
 from modules.pose.detection.PoseDetectionPipeline import PoseDetectionPipeline
 
-from modules.pose.filter.PoseFilterPipelineTracker import PoseFilterPipelineTracker
-from modules.pose import filter
+from modules.pose.filters.PoseFilterPipelineTracker import PoseFilterPipelineTracker
+from modules.pose import filters
 from modules.pose.filter.smooth.PoseSmootherGui import PoseSmootherGui
 
 from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
@@ -71,25 +71,25 @@ class Main():
         self.pose_raw_filters = PoseFilterPipelineTracker(
             settings.num_players,
             [
-                lambda: filter.PoseConfidenceFilter(filter.PoseConfidenceFilterConfig(settings.pose_conf_threshold)),
-                filter.PoseAngleExtractor,
-                filter.PoseDeltaExtractor
+                lambda: filters.PoseConfidenceFilter(filters.PoseConfidenceFilterConfig(settings.pose_conf_threshold)),
+                filters.PoseAngleExtractor,
+                filters.PoseDeltaExtractor
             ]
         )
 
 
-        self.point_smooth_config = filter.OldPoseSmootherConfig()
+        self.point_smooth_config = filters.OldPoseSmootherConfig()
         self.point_smooth_gui: PoseSmootherGui = PoseSmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
 
         self.pose_smooth_filters = PoseFilterPipelineTracker(
             settings.num_players,
             [
-                lambda: filter.OldPosePointSmoother(self.point_smooth_config),
-                lambda: filter.OldPoseAngleSmoother(self.point_smooth_config),
-                lambda: filter.PoseBBoxSmoother(self.point_smooth_config),
-                filter.PoseDeltaExtractor,
-                filter.PoseMotionTimeAccumulator,
-                lambda: filter.OldPoseDeltaSmoother(self.point_smooth_config)
+                lambda: filters.OldPosePointSmoother(self.point_smooth_config),
+                lambda: filters.OldPoseAngleSmoother(self.point_smooth_config),
+                lambda: filters.PoseBBoxSmoother(self.point_smooth_config),
+                filters.PoseDeltaExtractor,
+                filters.PoseMotionTimeAccumulator,
+                lambda: filters.OldPoseDeltaSmoother(self.point_smooth_config)
             ]
         )
 

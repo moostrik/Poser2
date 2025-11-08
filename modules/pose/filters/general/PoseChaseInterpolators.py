@@ -13,9 +13,9 @@ from threading import Lock
 import numpy as np
 
 # Pose imports
-from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
+from modules.pose.filters.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.filter.general.VectorMath.VectorChaseInterpolators import ChaseInterpolator, AngleChaseInterpolator, PointChaseInterpolator
+from modules.pose.filters.general.algorithms.VectorChaseInterpolators import ChaseInterpolator, AngleChaseInterpolator, PointChaseInterpolator
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POSE_NUM_JOINTS, POSE_POINTS_RANGE
 
 

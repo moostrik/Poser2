@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.smooth.PoseAngleSmoother import PoseAngleSmoother
+from modules.pose.filters_depricated.smooth.PoseAngleSmoother import PoseAngleSmoother
 from modules.pose.features.PoseAngles import PoseAngleData, AngleJoint
 from modules.pose.Pose import Pose
 
