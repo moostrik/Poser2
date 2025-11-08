@@ -3,6 +3,16 @@
 Provides perpetual chase interpolation for angles, points, and deltas with
 proper handling of circular values and coordinate clamping. Uses dual-frequency
 architecture: process() at input rate, update() at render rate.
+
+Thread Safety:
+--------------
+Designed for multi-threaded operation:
+- Input thread: Calls process() at ~30 FPS
+- Render thread: Calls update() at 60+ FPS
+
+VectorChaseInterpolator classes are NOT thread-safe. PoseChaseInterpolatorBase
+serializes all access using a lock to prevent concurrent set_target() and update() calls
+and makes sure the last_pose always corresponds to interpolator's last set target.
 """
 
 # Standard library imports
@@ -48,10 +58,10 @@ class PoseChaseInterpolatorBase(PoseFilterBase):
 
     def __init__(self, config: PoseChaseInterpolatorConfig) -> None:
         self._config: PoseChaseInterpolatorConfig = config
-        self._interpolator: ChaseInterpolator
+        self._lock: Lock = Lock()
         self._last_pose: Pose | None = None
         self._interpolated_pose: Pose | None = None
-        self._pose_lock = Lock()  # Only for pose references
+        self._interpolator: ChaseInterpolator
         self._initialize_interpolator()
         self._config.add_listener(self._on_config_changed)
 
@@ -82,56 +92,55 @@ class PoseChaseInterpolatorBase(PoseFilterBase):
 
     def process(self, pose: Pose) -> Pose:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
-        with self._pose_lock:
-            self._last_pose = pose
-        # No lock needed for interpolator - it's thread-safe internally (numpy operations)
         feature_data = self._get_feature_data(pose)
-        self._interpolator.set_target(feature_data.values)
-        # return original pose unmodified
+
+        # Atomic block: update both together
+        with self._lock:
+            self._interpolator.set_target(feature_data.values)
+            self._last_pose = pose
+
         return pose
 
     def update(self, current_time: float | None = None) -> Pose:
         """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS)."""
         # Lock only for reading _last_pose reference
-        with self._pose_lock:
+        with self._lock:
             if self._last_pose is None:
                 raise RuntimeError("No pose has been processed yet. Call process() first.")
-            last_pose = self._last_pose  # Copy reference
+            last_pose: Pose = self._last_pose  # Copy reference
 
-        # No lock needed - interpolator update is safe
-        self._interpolator.update(current_time)
+            self._interpolator.update(current_time)
+            interpolated_values: np.ndarray = self._interpolator.value
 
         feature_data = self._get_feature_data(last_pose)
-        interpolated_values: np.ndarray = self._interpolator.value
         interpolated_data = self._create_interpolated_data(feature_data, interpolated_values)
         interpolated_pose: Pose = self._replace_feature_data(last_pose, interpolated_data)
 
-        # Lock only for writing _interpolated_pose reference
-        with self._pose_lock:
+        with self._lock:
             self._interpolated_pose = interpolated_pose
 
         return interpolated_pose
 
     def get_interpolated_pose(self) -> Pose:
         """Get a pose with the current interpolated values."""
-        with self._pose_lock:
+        with self._lock:
             if self._interpolated_pose is None:
                 raise RuntimeError("No interpolated pose available. Call update() first.")
             return self._interpolated_pose
 
     def reset(self) -> None:
         """Reset the interpolator's internal state."""
-        with self._pose_lock:
+        with self._lock:
             self._last_pose = None
             self._interpolated_pose = None
-        self._interpolator.reset()  # No lock needed - internal state
+            self._interpolator.reset()  # No lock needed - internal state
 
     def _on_config_changed(self) -> None:
         """Handle configuration changes by updating interpolator parameters."""
-        # No lock needed - config changes are rare and property setters are atomic
-        self._interpolator.input_frequency = self._config.input_frequency
-        self._interpolator.responsiveness = self._config.responsiveness
-        self._interpolator.friction = self._config.friction
+        with self._lock:
+            self._interpolator.input_frequency = self._config.input_frequency
+            self._interpolator.responsiveness = self._config.responsiveness
+            self._interpolator.friction = self._config.friction
 
 
 class PoseAngleChaseInterpolator(PoseChaseInterpolatorBase):
@@ -228,52 +237,60 @@ class PoseDeltaChaseInterpolator(PoseChaseInterpolatorBase):
 
 
 class PoseChaseInterpolator(PoseFilterBase):
-    """Chase interpolates all pose features (angles, points, and deltas).
-
-    Applies the same interpolation configuration to all features. For independent
-    control of each feature, use PoseAngleChaseInterpolator, PosePointChaseInterpolator,
-    and PoseDeltaChaseInterpolator separately.
-
-    Uses dual-frequency architecture:
-    - process() is called at input frequency (e.g., 30 FPS from pose detection)
-    - update() should be called at render frequency (e.g., 60+ FPS for display)
-    """
+    """Chase interpolates all pose features (angles, points, and deltas)."""
 
     def __init__(self, config: PoseChaseInterpolatorConfig) -> None:
         self._config: PoseChaseInterpolatorConfig = config
-        self._pose_lock = Lock()
+        self._cached_pose: Pose | None = None
 
-        # Create individual interpolators for each feature
         self._angle_interpolator = PoseAngleChaseInterpolator(config)
         self._point_interpolator = PosePointChaseInterpolator(config)
         self._delta_interpolator = PoseDeltaChaseInterpolator(config)
 
     @property
     def config(self) -> PoseChaseInterpolatorConfig:
-        """Access the interpolator's configuration."""
         return self._config
 
     def process(self, pose: Pose) -> Pose:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
-        pose = self._angle_interpolator.process(pose)
-        pose = self._point_interpolator.process(pose)
-        pose = self._delta_interpolator.process(pose)
+        self._angle_interpolator.process(pose)
+        self._point_interpolator.process(pose)
+        self._delta_interpolator.process(pose)
         return pose
 
     def update(self, current_time: float | None = None) -> Pose:
         """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS)."""
-        pose = self._angle_interpolator.update(current_time)
-        pose = self._point_interpolator.update(current_time)
-        pose = self._delta_interpolator.update(current_time)
-        return pose
+        # Update all features (each caches internally)
+        angle_pose: Pose = self._angle_interpolator.update(current_time)
+        point_pose: Pose = self._point_interpolator.update(current_time)
+        delta_pose: Pose = self._delta_interpolator.update(current_time)
+
+        # Combine all interpolated features
+        combined: Pose = replace(
+            angle_pose,
+            point_data=point_pose.point_data,
+            delta_data=delta_pose.delta_data
+        )
+
+        # Cache combined result
+        self._cached_pose = combined
+
+        return combined
 
     def get_interpolated_pose(self) -> Pose:
-        """Get a pose with the current interpolated values."""
-        # Just delegate to angle interpolator - all should have same pose
-        return self._angle_interpolator.get_interpolated_pose()
+        """Get a pose with the current interpolated values.
+
+        Returns the cached result from the last update() call.
+        This is efficient for multiple callers per frame.
+        """
+        if self._cached_pose is None:
+            raise RuntimeError("No interpolated pose available. Call update() first.")
+        return self._cached_pose
 
     def reset(self) -> None:
         """Reset all interpolators' internal state."""
         self._angle_interpolator.reset()
         self._point_interpolator.reset()
         self._delta_interpolator.reset()
+
+        self._cached_pose = None

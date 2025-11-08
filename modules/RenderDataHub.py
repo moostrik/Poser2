@@ -14,22 +14,28 @@ Key capabilities:
 3. Enables higher framerate output through interpolation
 4. Manages pose correlation analysis between tracklets
 
-Note: Interpolation introduces latency of approximately 1 input frame.
+Thread Safety:
+--------------
+Designed for multi-threaded operation:
+- Input thread: Calls add_poses() at ~30 FPS
+- Render thread: Calls update() and get_pose() at 60+ FPS
+
+Completely lock-free using fixed-size arrays:
+- Array sizes never change (no structural modifications)
+- Element assignment/reads are atomic (single reference operations)
+- Interpolators have internal locks for their own state
+- Pose cache is separate - written once per update(), read many times per frame
 """
 
-# Standard library imports
-from threading import Lock
 
 # Local application imports
-from modules.pose.features.PoseAngles import PoseAngleData
-from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
+from modules.pose import features
 from modules.pose.filters import PoseAngleChaseInterpolator, PoseChaseInterpolatorConfig
 from modules.pose.Pose import Pose, PoseDict
 
 from modules.Settings import Settings
-from modules.utils.PointsAndRects import Rect
-
 from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 class RenderDataHub:
     def __init__(self, settings: Settings) -> None:
@@ -41,67 +47,93 @@ class RenderDataHub:
             friction=0.03
         )
 
-        self.interpolators: dict[int, PoseAngleChaseInterpolator] = {
-            i: PoseAngleChaseInterpolator(self.interpolator_config) for i in range(self._num_players)
-        }
+        self._interpolators: list[PoseAngleChaseInterpolator | None] = [
+            PoseAngleChaseInterpolator(self.interpolator_config)
+            for _ in range(self._num_players)
+        ]
 
-        # Lock to ensure thread safety
-        self._lock = Lock()
+        # Hub owns the cached poses for fast read access
+        self._cached_poses: list[Pose | None] = [None] * self._num_players
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def update(self) -> None:
-        """Update all active trackers and smoothers."""
-        for interpolator in self.interpolators.values():
-            interpolator.update()
+        """Update all active interpolators and cache results. Completely lock-free."""
+        for i, interpolator in enumerate(self._interpolators):
+            if interpolator is not None:
+                try:
+                    # Update interpolator (it has internal lock)
+                    pose: Pose = interpolator.update()
+                    # Cache result at hub level (atomic write)
+                    self._cached_poses[i] = pose
+
+                except RuntimeError:
+                    # Not ready yet, keep old cached pose
+                    pass
 
     def reset(self) -> None:
-        """Reset all trackers and smoothers."""
-        for interpolator in self.interpolators.values():
-            interpolator.reset()
+        """Reset all interpolators and clear cache. Completely lock-free."""
+        for i, interpolator in enumerate(self._interpolators):
+            if interpolator is not None:
+                interpolator.reset()
+
+            # Clear cached pose (atomic write)
+            self._cached_poses[i] = None
 
     def add_poses(self, poses: PoseDict) -> None:
-        """ Add a new pose data point for processing."""
+        """Add new pose data points for processing. Completely lock-free."""
         for id, pose in poses.items():
-            if not id in self.interpolators:
-                self.interpolators[id] = PoseAngleChaseInterpolator(self.interpolator_config)
-            self.interpolators[id].process(pose)
+            if id >= self._num_players:
+                continue  # Ignore out-of-range IDs
+
             if pose.lost:
-                del self.interpolators[id]
+                # Mark as lost (atomic writes)
+                self._interpolators[id] = None
+                self._cached_poses[id] = None
+            else:
+                interpolator = self._interpolators[id]
+                if interpolator is None:
+                    # Lazy init (atomic write)
+                    interpolator = PoseAngleChaseInterpolator(self.interpolator_config)
+                    self._interpolators[id] = interpolator
 
+                # Process new input (interpolator has internal lock)
+                interpolator.process(pose)
 
-    # ACTIVE
-    def get_is_active(self, pose_id: int) -> bool: # for backward compatibility
-        return self.has_pose(pose_id)
-
-    def has_pose(self, pose_id: int) -> bool:
-        """Check if a pose exists for the specified tracklet ID."""
-        with self._lock:
-            return pose_id in self.interpolators
+    def is_active(self, pose_id: int) -> bool:
+        """Check if a pose exists. Completely lock-free."""
+        if pose_id >= self._num_players:
+            return False
+        return self._cached_poses[pose_id] is not None
 
     def get_pose(self, pose_id: int) -> Pose:
-        """Get smoothed pose for the specified tracklet ID."""
-        with self._lock:
-            if pose_id not in self.interpolators:
-                raise KeyError(f"No pose found for tracklet ID {pose_id}")
-        return self.interpolators[pose_id].get_interpolated_pose()
+        """Get smoothed pose from cache. Completely lock-free.
 
-    #  BODY JOINT ANGLES
-    def get_angles(self, tracklet_id: int) -> PoseAngleData:
+        This reads from the hub's cache, updated once per update() call.
+        Multiple callers can read the same pose without any locking overhead.
+        """
+        if pose_id >= self._num_players:
+            raise KeyError(f"Pose ID {pose_id} out of range")
+
+        pose = self._cached_poses[pose_id]  # Atomic read
+        if pose is None:
+            raise KeyError(f"No pose found for tracklet ID {pose_id}")
+
+        return pose
+
+   #  BODY JOINT ANGLES
+    def get_angles(self, tracklet_id: int) -> features.PoseAngleData:
         """Get angles for the specified tracklet ID"""
         return self.get_pose(tracklet_id).angle_data
 
-    def get_delta(self, tracklet_id: int) -> PoseAngleData:
+    def get_delta(self, tracklet_id: int) -> features.PoseAngleData:
         """Get delta for the specified tracklet ID"""
         return self.get_pose(tracklet_id).delta_data
 
-    def get_symmetries(self, tracklet_id: int) -> PoseAngleSymmetryData:
+    def get_symmetries(self, tracklet_id: int) -> features.PoseAngleSymmetryData:
         return self.get_pose(tracklet_id).symmetry_data
 
     # TIME
-    def get_cumulative_motion(self, tracklet_id: int) -> float: # for backward compatibility
-        return self.get_motion_time(tracklet_id)
-
     def get_motion_time(self, tracklet_id: int) -> float:
         """Get motion time for the specified tracklet ID."""
         return self.get_pose(tracklet_id).motion_time

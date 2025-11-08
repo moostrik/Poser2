@@ -63,7 +63,7 @@ class PoseFeatureLayer(LayerBase):
 
         key: int = self.cam_id
 
-        if self.render_data.get_is_active(key) is False:
+        if self.render_data.is_active(key) is False:
             self.fbo.begin()
             glClearColor(0.0, 0.0, 0.0, 0.0)
             glClear(GL_COLOR_BUFFER_BIT)

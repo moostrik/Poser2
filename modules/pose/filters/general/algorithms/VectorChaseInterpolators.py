@@ -18,6 +18,8 @@ Key insight: By recalculating velocity every frame based on current distance, th
 naturally decelerates as it approaches the target, creating adaptive easing without explicit
 curves. The input_interval parameter sets the time horizon - "how fast to move to reach the
 target in one input period" - which scales the response appropriately for the input frequency.
+
+Note: These classes are NOT thread-safe by design.
 """
 
 
