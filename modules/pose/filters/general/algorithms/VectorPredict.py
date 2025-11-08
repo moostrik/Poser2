@@ -5,9 +5,6 @@ from typing import Union
 # Third-party imports
 import numpy as np
 
-# Local application imports
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 class PredictionMethod(Enum):
     NONE = "none"
     LINEAR = "linear"
@@ -37,8 +34,6 @@ class VectorPredict:
         self.p_predicted: np.ndarray = np.full(vector_size, np.nan)
 
         self.v_prev: np.ndarray = np.zeros(vector_size)
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def input_frequency(self) -> float:

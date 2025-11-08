@@ -15,3 +15,5 @@ from .general.ConfidenceFilters import          ConfidenceFilterConfig, AngleCon
 from .general.Predictors import                 PredictorConfig, AnglePredictor, DeltaPredictor, PointPredictor, PosePredictor
 from .general.Smoothers import                  SmootherConfig, AngleSmoother, DeltaSmoother, PointSmoother, PoseSmoother
 from .general.StickyFillers import              StickyFillerConfig, AngleStickyFiller, DeltaStickyFiller, PointStickyFiller, PoseStickyFiller
+
+from .gui.SmootherGui import                    SmootherGui

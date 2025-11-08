@@ -5,9 +5,6 @@ from typing import Union
 import numpy as np
 from OneEuroFilter import OneEuroFilter
 
-# Local application imports
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 class VectorSmooth:
     """Smoother for arbitrary vector data (positions, coordinates, etc.)."""
@@ -42,8 +39,6 @@ class VectorSmooth:
         # Create OneEuroFilters for each vector component
         self._filters: list[OneEuroFilter] = []
         self._create_filters()
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def add_sample(self, values: np.ndarray) -> None:
         """Add a new sample and calculate smoothing.

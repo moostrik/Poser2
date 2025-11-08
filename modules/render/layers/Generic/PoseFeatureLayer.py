@@ -33,28 +33,39 @@ class PoseFeatureLayer(LayerBase):
         self.render_data: RenderDataHub = render_data
         self.capture_data: CaptureDataHub = capture_data
         self.capture_key: str = capture_data.get_unique_consumer_key()
-        self.fbo: Fbo = Fbo()
-        self.fbo2: Fbo = Fbo()
+        self.raw_fbo: Fbo = Fbo()
+        self.smooth_fbo: Fbo = Fbo()
+        self.render_fbo: Fbo = Fbo()
         self.cam_id: int = cam_id
+        self.draw_raw: bool = True
+        self.draw_smooth: bool = True
+        self.draw_render: bool = True
+
         text_init()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
-        self.fbo.allocate(width, height, internal_format)
-        self.fbo2.allocate(width, height, internal_format)
+        self.raw_fbo.allocate(width, height, internal_format)
+        self.smooth_fbo.allocate(width, height, internal_format)
+        self.render_fbo.allocate(width, height, internal_format)
         if not PoseFeatureLayer.pose_feature_shader.allocated:
             PoseFeatureLayer.pose_feature_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
-        self.fbo.deallocate()
-        self.fbo2.deallocate()
+        self.raw_fbo.deallocate()
+        self.smooth_fbo.deallocate()
+        self.render_fbo.deallocate()
         if PoseFeatureLayer.pose_feature_shader.allocated:
             PoseFeatureLayer.pose_feature_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
-        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        self.fbo2.draw(rect.x, rect.y, rect.width, rect.height)
+        if self.draw_raw:
+            self.raw_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        if self.draw_smooth:
+            self.smooth_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        if self.draw_render:
+            self.render_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
@@ -64,47 +75,40 @@ class PoseFeatureLayer(LayerBase):
         key: int = self.cam_id
 
         if self.render_data.is_active(key) is False:
-            self.fbo.begin()
-            glClearColor(0.0, 0.0, 0.0, 0.0)
-            glClear(GL_COLOR_BUFFER_BIT)
-            self.fbo.end()
-            self.fbo2.begin()
-            glClearColor(0.0, 0.0, 0.0, 0.0)
-            glClear(GL_COLOR_BUFFER_BIT)
-            self.fbo2.end()
+            self.raw_fbo.clear()
+            self.smooth_fbo.clear()
+            self.render_fbo.clear()
             return
 
 
-        values: PoseAngleData = self.render_data.get_angles(key)
-        # range_scale: float = 1.0
-        # values: PoseAngleData = self.data.get_velocities(key)
         range_scale: float = 1.0
 
-        LayerBase.setView(self.fbo.width, self.fbo.height)
+        LayerBase.setView(self.raw_fbo.width, self.raw_fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        raw_color = (0.0, 0.0, 0.0)
+        smooth_color = (0.0, 0.5, 0.0)
+        render_color = (0.5, 0.0, 0.0)
+        self.draw_raw = True
+        self.draw_smooth = True
+        self.draw_render = True
 
         if self.capture_data.get_is_active(key):
-            raw_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
+            raw_pose: Pose | None = self.capture_data.get_raw_pose(key, True, self.capture_key)
             if raw_pose is not None:
-                v_c: PoseAngleData = raw_pose.angle_data
-                if v_c is not None:
-                    PoseFeatureLayer.pose_feature_shader.use(self.fbo.fbo_id, v_c, range_scale, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
-            # smooth_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
-            # if smooth_pose is not None:
-            #     v_c: PoseAngleData = smooth_pose.delta_data
-            #     if v_c is not None:
-            #         PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, range_scale)
+                self.raw_fbo.clear()
+                data: PoseAngleData = raw_pose.angle_data
+                PoseFeatureLayer.pose_feature_shader.use(self.raw_fbo.fbo_id, data, range_scale, raw_color, raw_color)
+            smooth_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
+            if smooth_pose is not None:
+                self.smooth_fbo.clear()
+                data: PoseAngleData = smooth_pose.angle_data
+                PoseFeatureLayer.pose_feature_shader.use(self.smooth_fbo.fbo_id, data, range_scale, smooth_color, smooth_color)
 
         if self.render_data.is_active(key):
-            smooth_pose: Pose | None = self.render_data.get_pose(key)
-            if smooth_pose is not None:
-                v_c: PoseAngleData = smooth_pose.angle_data
-                if v_c is not None:
-                    PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, range_scale)
-
-
-                # Draw joint labels on top of bars
-        self.draw_joint_labels(self.fbo2, values)
+            render_pose: Pose = self.render_data.get_pose(key)
+            v_c: PoseAngleData = render_pose.angle_data
+            PoseFeatureLayer.pose_feature_shader.use(self.render_fbo.fbo_id, v_c, range_scale, render_color, render_color)
+            self.draw_joint_labels(self.render_fbo, render_pose.angle_data)
 
     @staticmethod
     def draw_joint_labels(fbo: Fbo, feature: PoseAngleFeatureBase) -> None:

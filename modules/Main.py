@@ -18,7 +18,7 @@ from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 from modules.pose.detection.DetectionPipeline import DetectionPipeline
 
 from modules.pose import filters
-from modules.pose.filters.gui.SmootherGui import SmootherGui
+from modules.pose.interpolators import ChaseInterpolatorConfig, InterpolationGui
 from modules.pose.trackers import FilterPipelineTracker
 
 from modules.pose.similarity.SimilarityComputer import SimilarityComputer
@@ -42,6 +42,11 @@ class Main():
 
         self.is_running: bool = False
         self.is_finished: bool = False
+
+        # DATA
+        self.capture_data_hub = CaptureDataHub()
+        self.render_data_hub = RenderDataHub(settings)
+        self.render_data_hub_old = RenderDataHub_Old(settings)
 
         # CAMERA
         self.cameras: list[DepthCam | DepthSimulator] = []
@@ -68,7 +73,7 @@ class Main():
         # POSE
         self.pose_detection = DetectionPipeline(settings)
 
-        self.pose_raw_filters = FilterPipelineTracker(
+        self.pose_raw_pipeline = FilterPipelineTracker(
             settings.num_players,
             [
                 lambda: filters.PoseConfidenceFilter(filters.ConfidenceFilterConfig(settings.pose_conf_threshold)),
@@ -77,30 +82,43 @@ class Main():
             ]
         )
 
-
         self.point_smooth_config = filters.SmootherConfig()
-        self.point_smooth_gui: SmootherGui = SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
+        self.angle_smooth_config = filters.SmootherConfig()
+        self.delta_smooth_config = filters.SmootherConfig()
+        self.point_smooth_gui: filters.SmootherGui = filters.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
+        self.angle_smooth_gui: filters.SmootherGui = filters.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
+        self.delta_smooth_gui: filters.SmootherGui = filters.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
 
-        self.pose_smooth_filters = FilterPipelineTracker(
+        self.pose_smooth_pipeline = FilterPipelineTracker(
             settings.num_players,
             [
                 lambda: filters.PointSmoother(self.point_smooth_config),
-                lambda: filters.AngleSmoother(self.point_smooth_config),
+                lambda: filters.AngleSmoother(self.angle_smooth_config),
                 filters.DeltaExtractor,
                 filters.MotionTimeAccumulator,
-                lambda: filters.DeltaSmoother(self.point_smooth_config)
+                lambda: filters.DeltaSmoother(self.delta_smooth_config),
             ]
         )
+
+        self.prediction_config = filters.PredictorConfig(frequency=settings.camera_fps)
+        self.pose_prediction_pipeline = FilterPipelineTracker(
+            settings.num_players,
+            [
+                lambda: filters.PointPredictor(self.prediction_config),
+                lambda: filters.AnglePredictor(self.prediction_config),
+                lambda: filters.DeltaPredictor(self.prediction_config),
+                # filters.PoseValidator
+            ]
+        )
+
+        self.interpolation_config: ChaseInterpolatorConfig = self.render_data_hub.interpolator_config
+        self.interpolation_gui: InterpolationGui = InterpolationGui(self.interpolation_config, self.gui, 'Interpolator')
+
 
         self.pose_correlator: SimilarityComputer = SimilarityComputer(settings)
 
         self.pose_streamer = StreamManager(settings)
         self.stream_correlator: Optional[StreamCorrelator] = None #PoseStreamCorrelator(settings)
-
-        # DATA
-        self.capture_data_hub = CaptureDataHub()
-        self.render_data_hub = RenderDataHub(settings)
-        self.render_data_hub_old = RenderDataHub_Old(settings)
 
         # RENDER
         self.WS: Optional[WSPipeline] = None
@@ -134,14 +152,15 @@ class Main():
         self.pose_correlator.add_correlation_callback(self.render_data_hub_old.add_pose_correlation)
         self.pose_correlator.start()
 
-        self.pose_streamer.add_stream_callback(     self.capture_data_hub.set_pose_stream)
+        self.pose_streamer.add_stream_callback(self.capture_data_hub.set_pose_stream)
         self.pose_streamer.start()
 
-        self.pose_detection.add_callback(self.pose_raw_filters.add_poses)
-        self.pose_raw_filters.add_callback(self.capture_data_hub.set_raw_poses)
-        self.pose_raw_filters.add_callback(self.pose_smooth_filters.add_poses)
-        self.pose_smooth_filters.add_callback(self.capture_data_hub.set_smooth_poses)
-        self.pose_smooth_filters.add_callback(self.render_data_hub.add_poses)
+        self.pose_detection.add_callback(self.pose_raw_pipeline.add_poses)
+        self.pose_raw_pipeline.add_callback(self.capture_data_hub.set_raw_poses)
+        self.pose_raw_pipeline.add_callback(self.pose_smooth_pipeline.add_poses)
+        self.pose_smooth_pipeline.add_callback(self.capture_data_hub.set_smooth_poses)
+        self.pose_smooth_pipeline.add_callback(self.pose_prediction_pipeline.add_poses)
+        self.pose_prediction_pipeline.add_callback(self.render_data_hub.add_poses)
 
         # DETECTION
         self.pose_detection.add_callback(self.render_data_hub_old.add_poses)
@@ -173,7 +192,8 @@ class Main():
         if self.WS:
             self.gui.addFrame([self.WS.gui.get_gui_frame(), self.WS.gui.get_gui_test_frame()])
 
-        self.gui.addFrame([self.point_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.angle_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.delta_smooth_gui.get_gui_frame(), self.interpolation_gui.get_gui_frame()])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])

@@ -51,7 +51,7 @@ class RenderDataHub:
         self._interpolators: list[AngleChaseInterpolator | None] = [None] * self._num_players
         self._cached_poses: list[Pose | None] = [None] * self._num_players
 
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
+        # self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def update(self) -> None:
         """Update all active interpolators and cache results. Completely lock-free."""
