@@ -97,6 +97,7 @@ class Main():
                 filters.DeltaExtractor,
                 filters.MotionTimeAccumulator,
                 lambda: filters.DeltaSmoother(self.delta_smooth_config),
+                filters.PoseValidator,
             ]
         )
 
@@ -108,7 +109,7 @@ class Main():
                 lambda: filters.PointPredictor(self.prediction_config),
                 lambda: filters.AnglePredictor(self.prediction_config),
                 lambda: filters.DeltaPredictor(self.prediction_config),
-                # filters.PoseValidator
+                filters.PoseValidator
             ]
         )
 

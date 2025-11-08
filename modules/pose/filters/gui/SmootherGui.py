@@ -12,9 +12,9 @@ class SmootherGui:
         elm: list = []
         elm.append([E(eT.TEXT, 'SMOOTH   '),
             E(eT.TEXT, 'minc'),
-            E(eT.SLDR, name + 'min_cutoff', self.set_min_cutoff,    1.0,    [0.01,2.0], 0.01),
+            E(eT.SLDR, name + 'min_cutoff', self.set_min_cutoff,    1.0,    [0.01,10.0], 0.01),
             E(eT.TEXT, 'beta'),
-            E(eT.SLDR, name + 'beta',       self.set_beta,          0.05,   [0.0,0.5],  0.01),
+            E(eT.SLDR, name + 'beta',       self.set_beta,          0.05,   [0.0,1.0],  0.01),
             E(eT.TEXT, 'dc'),
             E(eT.SLDR, name + 'd_cutoff',   self.set_d_cutoff,      1.0,    [0.0,2.0],  0.1)])
 

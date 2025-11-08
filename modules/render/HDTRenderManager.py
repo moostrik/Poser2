@@ -52,7 +52,7 @@ class HDTRenderManager(RenderBase):
         self.camera_layers:             dict[int, CamTrackPoseLayer] = {}
         self.centre_cam_layers:         dict[int, CentreCamLayer] = {}
         self.centre_pose_layers:        dict[int, CentrePoseRender] = {}
-        # self.centre_pose_layers_fast:   dict[int, CentrePoseRender] = {}
+        self.centre_pose_layers_fast:   dict[int, CentrePoseRender] = {}
         self.pose_overlays:             dict[int, PoseStreamLayer] = {}
         self.pose_feature_layers:       dict[int, PoseFeatureLayer] = {}
         self.line_field_layers:         dict[int, LineFieldLayer] = {}
@@ -67,7 +67,7 @@ class HDTRenderManager(RenderBase):
             self.camera_layers[i] = CamTrackPoseLayer(self.capture_data, self.pose_meshes, i)
             self.centre_cam_layers[i] = CentreCamLayer(self.capture_data, self.render_data_old, i)
             self.centre_pose_layers[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes, i)
-            # self.centre_pose_layers_fast[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes_fast, i)
+            self.centre_pose_layers_fast[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes_fast, i)
             self.pose_overlays[i] = PoseStreamLayer(self.capture_data, self.pose_meshes, i)
             self.pose_feature_layers[i] = PoseFeatureLayer(self.render_data, self.capture_data, i)
             self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
@@ -102,7 +102,7 @@ class HDTRenderManager(RenderBase):
         for i in range(self.num_cams):
             self.centre_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.centre_pose_layers[i].allocate(1080, 1920, GL_RGBA32F)
-            # self.centre_pose_layers_fast[i].allocate(1080, 1920, GL_RGBA32F)
+            self.centre_pose_layers_fast[i].allocate(1080, 1920, GL_RGBA32F)
             self.pose_feature_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
 
@@ -134,7 +134,7 @@ class HDTRenderManager(RenderBase):
             layer.deallocate()
         for layer in self.centre_pose_layers.values():
             layer.deallocate()
-        # for layer in self.centre_pose_layers_fast.values():
+        for layer in self.centre_pose_layers_fast.values():
             layer.deallocate()
         for layer in self.pose_overlays.values():
             layer.deallocate()
@@ -161,7 +161,7 @@ class HDTRenderManager(RenderBase):
             self.camera_layers[i].update()
             self.centre_cam_layers[i].update()
             self.centre_pose_layers[i].update()
-            # self.centre_pose_layers_fast[i].update()
+            self.centre_pose_layers_fast[i].update()
             self.pose_overlays[i].update()
             self.pose_feature_layers[i].update()
             # self.line_field_layers[i].update()
@@ -209,7 +209,7 @@ class HDTRenderManager(RenderBase):
         if self.render_data_old.get_is_active(camera_id):
             # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             # glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
-            self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))
-            # self.centre_pose_layers_fast[camera_id].draw(Rect(0, 0, width, height))
+            # self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))
+            self.centre_pose_layers_fast[camera_id].draw(Rect(0, 0, width, height))
         glBlendFunc(GL_ONE, GL_ONE)
 

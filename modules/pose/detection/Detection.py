@@ -307,6 +307,7 @@ class Detection(Thread):
                 pred_instances: InstanceData = data_sample.pred_instances
                 keypoints: np.ndarray = pred_instances.get('keypoints', np.full((0, 17, 2), np.nan, dtype=np.float32))
                 scores: np.ndarray = pred_instances.get('keypoint_scores', np.zeros((0, 17), dtype=np.float32))
+                scores = np.clip(scores, 0.0, 1.0)
 
                 if keypoints.shape[0] == 0:
                     continue  # No pose detected

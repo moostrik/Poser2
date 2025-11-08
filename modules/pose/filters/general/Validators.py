@@ -1,6 +1,5 @@
 """Pose validators for data integrity checks."""
 
-import warnings
 from abc import abstractmethod
 from dataclasses import replace
 
@@ -49,29 +48,29 @@ class ValidatorBase(FilterBase):
         """Validate all enabled features."""
 
         if self._config.validate_points:
-            point_data = self._validate_feature_data(pose.point_data, "points")
+            point_data = self._validate_feature_data(pose.tracklet.id, pose.point_data, "points")
             if point_data is not pose.point_data:
                 pose = replace(pose, point_data=point_data)
 
         if self._config.validate_angles:
-            angle_data = self._validate_feature_data(pose.angle_data, "angles")
+            angle_data = self._validate_feature_data(pose.tracklet.id, pose.angle_data, "angles")
             if angle_data is not pose.angle_data:
                 pose = replace(pose, angle_data=angle_data)
 
         if self._config.validate_delta:
-            delta_data = self._validate_feature_data(pose.delta_data, "delta")
+            delta_data = self._validate_feature_data(pose.tracklet.id, pose.delta_data, "delta")
             if delta_data is not pose.delta_data:
                 pose = replace(pose, delta_data=delta_data)
 
         if self._config.validate_symmetry:
-            symmetry_data = self._validate_feature_data(pose.symmetry_data, "symmetry")
+            symmetry_data = self._validate_feature_data(pose.tracklet.id, pose.symmetry_data, "symmetry")
             if symmetry_data is not pose.symmetry_data:
                 pose = replace(pose, symmetry_data=symmetry_data)
 
         return pose
 
     @abstractmethod
-    def _validate_feature_data(self, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
+    def _validate_feature_data(self, pose_id: int, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
         """Validate a single feature's data.
 
         Args:
@@ -92,7 +91,7 @@ class NanValidator(ValidatorBase):
     Optionally fixes inconsistencies by setting scores to 0 when values are NaN.
     """
 
-    def _validate_feature_data(self, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
+    def _validate_feature_data(self, pose_id: int, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
         """Validate that scores are 0 when values are NaN."""
         values: np.ndarray = data.values
 
@@ -111,10 +110,8 @@ class NanValidator(ValidatorBase):
         if np.any(inconsistent):
             num_inconsistent = int(np.sum(inconsistent))
             total_values: int = len(scores) if scores.ndim == 1 else scores.size
-            warnings.warn(
-                f"Feature '{feature_name}' has {num_inconsistent}/{total_values} values with NaN but non-zero scores",
-                UserWarning
-            )
+            print(f"Feature '{feature_name}' of pose {pose_id} has {num_inconsistent}/{total_values} values with NaN but non-zero scores")
+
 
             # Fix inconsistencies if enabled
             if self._config.fix:
@@ -133,7 +130,7 @@ class RangeValidator(ValidatorBase):
     Optionally fixes out-of-range values by clamping them to the valid range.
     """
 
-    def _validate_feature_data(self, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
+    def _validate_feature_data(self, pose_id: int, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
         """Validate feature values are within expected range."""
         # Get feature type from data's class type using reverse lookup
         data_type = type(data)
@@ -160,10 +157,15 @@ class RangeValidator(ValidatorBase):
             total_count = values.size  # Number of values
 
         if np.any(out_of_range):
-            warnings.warn(
-                f"Feature '{feature_name}' has {num_invalid}/{total_count} "
-                f"{'joints' if values.ndim > 1 else 'values'} out of range [{min_val}, {max_val}]",
-                UserWarning
+
+            out_of_range_values = values[out_of_range_elements]
+            actual_min: float = max(np.nanmin(out_of_range_values), min_val)
+            actual_max: float = min(np.nanmax(out_of_range_values), max_val)
+
+            print(
+                f"Feature '{feature_name}' of pose {pose_id} has {num_invalid}/{total_count} "
+                f"{'joints' if values.ndim > 1 else 'values'} out of range [{min_val}, {max_val}]"
+                f"Actual range: [{actual_min:.3f}, {actual_max:.3f}]"
             )
 
             # Fix out-of-range values if enabled
@@ -180,17 +182,22 @@ class RangeValidator(ValidatorBase):
 class ScoreValidator(ValidatorBase):
     """Validates that confidence scores are in [0.0, 1.0]."""
 
-    def _validate_feature_data(self, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
+    def _validate_feature_data(self, pose_id: int, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
         if not hasattr(data, 'scores'):
             return data
 
         invalid = (data.scores < 0.0) | (data.scores > 1.0)
         if np.any(invalid):
             num_invalid = int(np.sum(invalid))
-            warnings.warn(
-                f"Feature '{feature_name}' has {num_invalid}/{len(data.scores)} scores outside [0.0, 1.0]",
-                UserWarning
+            invalid_scores = data.scores[invalid]
+            actual_min: float = max(np.min(invalid_scores), 0.0)
+            actual_max = min(np.max(invalid_scores), 1.0)
+
+            print(
+                f"Feature '{feature_name}' of pose {pose_id} has {num_invalid}/{len(data.scores)} "
+                f"scores outside [0.0, 1.0]. Actual range: [{actual_min:.3f}, {actual_max:.3f}]"
             )
+
             if self._config.fix:
                 fixed_scores = np.clip(data.scores, 0.0, 1.0)
                 return type(data)(values=data.values, scores=fixed_scores)
