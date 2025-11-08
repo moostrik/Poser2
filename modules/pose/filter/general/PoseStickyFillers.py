@@ -17,7 +17,7 @@ from modules.pose.Pose import Pose
 from modules.pose.features import PoseFeatureData, PoseAngleData, PosePointData
 
 
-class PoseStickyFilterConfig(PoseFilterConfigBase):
+class PoseStickyFillerConfig(PoseFilterConfigBase):
     """Configuration for pose hold filter with automatic change notification."""
 
     def __init__(self, init_to_zero: bool = False, hold_scores: bool = False) -> None:
@@ -33,7 +33,7 @@ class PoseStickyFilterConfig(PoseFilterConfigBase):
         self.hold_scores: bool = hold_scores
 
 
-class PoseStickyFilterBase(PoseFilterBase):
+class PoseStickyFillerBase(PoseFilterBase):
     """Base class for pose hold filters.
 
     Replaces NaN values with the last valid value for each feature element.
@@ -45,12 +45,12 @@ class PoseStickyFilterBase(PoseFilterBase):
     - How to create empty feature data (_create_empty_feature_data)
     """
 
-    def __init__(self, config: PoseStickyFilterConfig) -> None:
-        self._config: PoseStickyFilterConfig = config
+    def __init__(self, config: PoseStickyFillerConfig) -> None:
+        self._config: PoseStickyFillerConfig = config
         self._last_valid: PoseFeatureData = self._initialize_last_valid()
 
     @property
-    def config(self) -> PoseStickyFilterConfig:
+    def config(self) -> PoseStickyFillerConfig:
         """Access the filter's configuration."""
         return self._config
 
@@ -133,7 +133,7 @@ class PoseStickyFilterBase(PoseFilterBase):
         self._last_valid = self._initialize_last_valid()
 
 
-class PoseAngleStickyFilter(PoseStickyFilterBase):
+class PoseAngleStickyFiller(PoseStickyFillerBase):
     """Holds last valid angle values when angles become NaN.
 
     Maintains continuity of joint angles when pose detection temporarily fails.
@@ -149,7 +149,7 @@ class PoseAngleStickyFilter(PoseStickyFilterBase):
         return PoseAngleData.create_empty()
 
 
-class PosePointStickyFilter(PoseStickyFilterBase):
+class PosePointStickyFiller(PoseStickyFillerBase):
     """Holds last valid point coordinates when points become NaN.
 
     Maintains continuity of keypoint positions when pose detection temporarily fails.
@@ -166,7 +166,7 @@ class PosePointStickyFilter(PoseStickyFilterBase):
         return PosePointData.create_empty()
 
 
-class PoseDeltaStickyFilter(PoseStickyFilterBase):
+class PoseDeltaStickyFiller(PoseStickyFillerBase):
     """Holds last valid delta values when deltas become NaN.
 
     Maintains continuity of angle changes when pose detection temporarily fails.
@@ -182,7 +182,7 @@ class PoseDeltaStickyFilter(PoseStickyFilterBase):
         return PoseAngleData.create_empty()
 
 
-class PoseStickyFilter(PoseFilterBase):
+class PoseStickyFiller(PoseFilterBase):
     """Holds last valid values for all pose features (angles, points, and deltas).
 
     Applies the same hold configuration to all features. For independent
@@ -190,16 +190,16 @@ class PoseStickyFilter(PoseFilterBase):
     PoseDeltaHoldFilter separately.
     """
 
-    def __init__(self, config: PoseStickyFilterConfig) -> None:
-        self._config: PoseStickyFilterConfig = config
+    def __init__(self, config: PoseStickyFillerConfig) -> None:
+        self._config: PoseStickyFillerConfig = config
 
         # Create individual hold filters for each feature
-        self._angle_filter = PoseAngleStickyFilter(config)
-        self._point_filter = PosePointStickyFilter(config)
-        self._delta_filter = PoseDeltaStickyFilter(config)
+        self._angle_filter = PoseAngleStickyFiller(config)
+        self._point_filter = PosePointStickyFiller(config)
+        self._delta_filter = PoseDeltaStickyFiller(config)
 
     @property
-    def config(self) -> PoseStickyFilterConfig:
+    def config(self) -> PoseStickyFillerConfig:
         """Access the filter's configuration."""
         return self._config
 
@@ -218,10 +218,10 @@ class PoseStickyFilter(PoseFilterBase):
 
 
 __all__: list[str] = [
-    'PoseStickyFilterConfig',
-    'PoseStickyFilterBase',
-    'PoseAngleStickyFilter',
-    'PosePointStickyFilter',
-    'PoseDeltaStickyFilter',
-    'PoseStickyFilter',
+    'PoseStickyFillerConfig',
+    'PoseStickyFillerBase',
+    'PoseAngleStickyFiller',
+    'PosePointStickyFiller',
+    'PoseDeltaStickyFiller',
+    'PoseStickyFiller',
 ]

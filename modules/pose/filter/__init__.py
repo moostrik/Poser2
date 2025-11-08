@@ -9,13 +9,13 @@ from .extractor.PoseDeltaExtractor import           PoseDeltaExtractor
 from .extractor.PoseSymmetryExtractor import        PoseSymmetryExtractor
 from .extractor.PoseMotionTimeAccumulator import    PoseMotionTimeAccumulator
 
-from .general.PoseConfidenceFilter import           PoseConfidenceFilterConfig, PoseConfidenceFilter
 from .general.PoseValidators import                 PoseValidatorConfig, PoseNanValidator, PoseRangeValidator, PoseScoreValidator, PoseValidator
 
 from .general.PoseChaseInterpolators import         PoseChaseInterpolatorConfig, PoseAngleChaseInterpolator, PoseDeltaChaseInterpolator, PosePointChaseInterpolator, PoseChaseInterpolator
-from .general.PoseStickyFilters import              PoseStickyFilterConfig, PoseAngleStickyFilter, PoseDeltaStickyFilter, PosePointStickyFilter, PoseStickyFilter
+from .general.PoseConfidenceFilters import          PoseConfidenceFilterConfig, PoseAngleConfidenceFilter, PoseDeltaConfidenceFilter, PosePointConfidenceFilter, PoseConfidenceFilter
 from .general.PosePredictors import                 PosePredictorConfig, PoseAnglePredictor, PoseDeltaPredictor, PosePointPredictor, PosePredictor
 from .general.PoseSmoothers import                  PoseSmootherConfig, PoseAngleSmoother, PoseDeltaSmoother, PosePointSmoother, PoseSmoother
+from .general.PoseStickyFilters import              PoseStickyFillerConfig, PoseAngleStickyFiller, PoseDeltaStickyFiller, PosePointStickyFiller, PoseStickyFiller
 
 
 from .smooth.PoseSmootherBase import                PoseSmootherConfig as OldPoseSmootherConfig
@@ -36,9 +36,6 @@ __all__: list[str] = [
     'PoseSymmetryExtractor',
     'PoseMotionTimeAccumulator',
 
-    'PoseConfidenceFilter',
-    'PoseConfidenceFilterConfig',
-
     'PoseValidatorConfig',
     'PoseNanValidator',
     'PoseRangeValidator',
@@ -51,11 +48,11 @@ __all__: list[str] = [
     'PosePointChaseInterpolator',
     'PoseChaseInterpolator',
 
-    'PoseStickyFilterConfig',
-    'PoseAngleStickyFilter',
-    'PoseDeltaStickyFilter',
-    'PosePointStickyFilter',
-    'PoseStickyFilter',
+    'PoseConfidenceFilterConfig',
+    'PoseAngleConfidenceFilter',
+    'PosePointConfidenceFilter',
+    'PoseDeltaConfidenceFilter',
+    'PoseConfidenceFilter',
 
     'PosePredictorConfig',
     'PoseAnglePredictor',
@@ -68,6 +65,12 @@ __all__: list[str] = [
     'PosePointSmoother',
     'PoseDeltaSmoother',
     'PoseSmoother',
+
+    'PoseStickyFillerConfig',
+    'PoseAngleStickyFiller',
+    'PoseDeltaStickyFiller',
+    'PosePointStickyFiller',
+    'PoseStickyFiller',
 
     # Old implementations (deprecated, aliased to avoid breaking changes)
     'OldPoseSmootherConfig',
