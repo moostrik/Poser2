@@ -18,7 +18,7 @@ from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from modules.render.meshes.PoseMeshes import PoseMeshes
+from modules.render.meshes.PoseMeshesCapture import PoseMeshesCapture
 
 from modules.gl.Mesh import Mesh
 

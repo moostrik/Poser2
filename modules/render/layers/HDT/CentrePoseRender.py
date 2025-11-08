@@ -18,12 +18,12 @@ from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from modules.render.meshes.PoseMeshes import PoseMeshes
+from modules.render.meshes import PoseMesh
 
 from modules.gl.Mesh import Mesh
 
 class CentrePoseRender(LayerBase):
-    def __init__(self, data: CaptureDataHub, smooth_data: RenderDataHub_Old, pose_meshes: PoseMeshes, cam_id: int) -> None:
+    def __init__(self, data: CaptureDataHub, smooth_data: RenderDataHub_Old, pose_meshes: PoseMesh, cam_id: int) -> None:
         self.data: CaptureDataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.smooth_data: RenderDataHub_Old = smooth_data
@@ -32,7 +32,7 @@ class CentrePoseRender(LayerBase):
 
         self.is_active: bool = False
 
-        self.pose_meshes: PoseMeshes = pose_meshes
+        self.pose_meshes: PoseMesh = pose_meshes
         self.last_pose_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
         text_init()

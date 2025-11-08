@@ -19,7 +19,7 @@ from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
 from modules.data.RenderDataHub import RenderDataHub
 from modules.data.CaptureDataHub import CaptureDataHub
-from modules.render.meshes.PoseMeshes import PoseMeshes
+from modules.render.meshes.PoseMeshesCapture import PoseMeshesCapture
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -81,15 +81,15 @@ class PoseFeatureLayer(LayerBase):
             return
 
 
-        range_scale: float = .3
+        range_scale: float = 1.0
 
         LayerBase.setView(self.raw_fbo.width, self.raw_fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         raw_color = (0.0, 0.0, 0.0)
         smooth_color = (0.0, 0.5, 0.5)
         render_color = (0.5, 0.0, 0.0)
-        self.draw_raw = False
-        self.draw_smooth = True
+        self.draw_raw = True
+        self.draw_smooth = False
         self.draw_render = True
 
         if self.capture_data.get_is_active(key):

@@ -30,7 +30,7 @@ import time as time
 
 # Local application imports
 from modules.pose import features
-from modules.pose.interpolators import AngleChaseInterpolator, ChaseInterpolatorConfig
+from modules.pose.interpolators import PoseChaseInterpolator, ChaseInterpolatorConfig
 from modules.pose.Pose import Pose, PoseDict
 
 from modules.Settings import Settings
@@ -48,7 +48,7 @@ class RenderDataHub:
         )
 
         # Lazy init - create on first add_poses()
-        self._interpolators: list[AngleChaseInterpolator | None] = [None] * self._num_players
+        self._interpolators: list[PoseChaseInterpolator | None] = [None] * self._num_players
         self._cached_poses: list[Pose | None] = [None] * self._num_players
 
         # self._hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -82,7 +82,7 @@ class RenderDataHub:
                 interpolator = self._interpolators[id]
                 if interpolator is None:
                     # Create and initialize together
-                    interpolator = AngleChaseInterpolator(self.interpolator_config)
+                    interpolator = PoseChaseInterpolator(self.interpolator_config)
                     self._interpolators[id] = interpolator
                 interpolator.process(pose)
 

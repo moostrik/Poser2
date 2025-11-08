@@ -13,8 +13,7 @@ from modules.render.layers.Generic.PoseFeatureLayer import PoseFeatureLayer
 from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
 from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
 from modules.render.layers.HDT.LineFieldsLayer import LF as LineFieldLayer
-from modules.render.meshes.PoseMeshes import PoseMeshes
-
+from modules.render.meshes import PoseMeshesCapture, PoseMeshesRender, PoseMesh
 from modules.render.HDTSoundOSC import HDTSoundOSC
 
 # Local application imports
@@ -46,15 +45,17 @@ class HDTRenderManager(RenderBase):
         self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data_old, "localhost", 8000, 60.0)
 
         # meshes
-        self.pose_meshes =          PoseMeshes(self.capture_data, self.num_players)
+        self.pose_meshes =          PoseMeshesCapture(self.capture_data, self.num_players)
+        self.pose_meshes_fast =     PoseMeshesRender(self.render_data, self.num_players)
 
         # layers
-        self.camera_layers:         dict[int, CamTrackPoseLayer] = {}
-        self.centre_cam_layers:     dict[int, CentreCamLayer] = {}
-        self.centre_pose_layers:    dict[int, CentrePoseRender] = {}
-        self.pose_overlays:         dict[int, PoseStreamLayer] = {}
-        self.pose_feature_layers:   dict[int, PoseFeatureLayer] = {}
-        self.line_field_layers:     dict[int, LineFieldLayer] = {}
+        self.camera_layers:             dict[int, CamTrackPoseLayer] = {}
+        self.centre_cam_layers:         dict[int, CentreCamLayer] = {}
+        self.centre_pose_layers:        dict[int, CentrePoseRender] = {}
+        # self.centre_pose_layers_fast:   dict[int, CentrePoseRender] = {}
+        self.pose_overlays:             dict[int, PoseStreamLayer] = {}
+        self.pose_feature_layers:       dict[int, PoseFeatureLayer] = {}
+        self.line_field_layers:         dict[int, LineFieldLayer] = {}
         self.pose_corr_stream_layer =   CorrelationStreamLayer(self.capture_data, num_R_streams, R_stream_capacity, use_motion=False)
         self.motion_corr_stream_layer = CorrelationStreamLayer(self.capture_data, num_R_streams, R_stream_capacity, use_motion=True)
 
@@ -66,6 +67,7 @@ class HDTRenderManager(RenderBase):
             self.camera_layers[i] = CamTrackPoseLayer(self.capture_data, self.pose_meshes, i)
             self.centre_cam_layers[i] = CentreCamLayer(self.capture_data, self.render_data_old, i)
             self.centre_pose_layers[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes, i)
+            # self.centre_pose_layers_fast[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes_fast, i)
             self.pose_overlays[i] = PoseStreamLayer(self.capture_data, self.pose_meshes, i)
             self.pose_feature_layers[i] = PoseFeatureLayer(self.render_data, self.capture_data, i)
             self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
@@ -100,10 +102,12 @@ class HDTRenderManager(RenderBase):
         for i in range(self.num_cams):
             self.centre_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.centre_pose_layers[i].allocate(1080, 1920, GL_RGBA32F)
+            # self.centre_pose_layers_fast[i].allocate(1080, 1920, GL_RGBA32F)
             self.pose_feature_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
 
         self.pose_meshes.allocate()
+        self.pose_meshes_fast.allocate()
 
         self.allocate_window_renders()
         self.sound_osc.start()
@@ -121,6 +125,7 @@ class HDTRenderManager(RenderBase):
 
     def deallocate(self) -> None:
         self.pose_meshes.deallocate()
+        self.pose_meshes_fast.deallocate()
         self.motion_corr_stream_layer.deallocate()
         self.pose_corr_stream_layer.deallocate()
         for layer in self.camera_layers.values():
@@ -128,6 +133,8 @@ class HDTRenderManager(RenderBase):
         for layer in self.centre_cam_layers.values():
             layer.deallocate()
         for layer in self.centre_pose_layers.values():
+            layer.deallocate()
+        # for layer in self.centre_pose_layers_fast.values():
             layer.deallocate()
         for layer in self.pose_overlays.values():
             layer.deallocate()
@@ -145,6 +152,7 @@ class HDTRenderManager(RenderBase):
         self.render_data.update()
         self.render_data_old.update()
         self.pose_meshes.update()
+        self.pose_meshes_fast.update()
 
         self.motion_corr_stream_layer.update()
         self.pose_corr_stream_layer.update()
@@ -153,6 +161,7 @@ class HDTRenderManager(RenderBase):
             self.camera_layers[i].update()
             self.centre_cam_layers[i].update()
             self.centre_pose_layers[i].update()
+            # self.centre_pose_layers_fast[i].update()
             self.pose_overlays[i].update()
             self.pose_feature_layers[i].update()
             # self.line_field_layers[i].update()
@@ -201,5 +210,6 @@ class HDTRenderManager(RenderBase):
             # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             # glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
             self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))
+            # self.centre_pose_layers_fast[camera_id].draw(Rect(0, 0, width, height))
         glBlendFunc(GL_ONE, GL_ONE)
 

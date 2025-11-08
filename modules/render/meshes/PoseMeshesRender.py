@@ -8,14 +8,13 @@ from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose
 from modules.pose.features.deprecated.PoseVertices import PoseVertexData, PoseVertexFactory
 from modules.pose.features.deprecated.PoseVertices import POSE_VERTEX_INDICES
-from modules.data.CaptureDataHub import CaptureDataHub
+from modules.data import RenderDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
-class PoseMeshes(LayerBase):
+class PoseMeshesRender(LayerBase):
     """Methods for updating meshes based on pose data."""
-    def __init__(self, data: CaptureDataHub, amount: int) -> None:
-        self.data: CaptureDataHub = data
-        self.data_consumer_key: str = data.get_unique_consumer_key()
+    def __init__(self, data: RenderDataHub, amount: int) -> None:
+        self.data: RenderDataHub = data
         self.amount: int = amount
         self.meshes: dict[int, Mesh] = {}
 
@@ -37,9 +36,11 @@ class PoseMeshes(LayerBase):
 
     def update(self) -> None:
         for id in range(self.amount):
-            pose: Pose | None = self.data.get_smooth_pose(id, True, self.data_consumer_key)
-            pose_mesh: Mesh | None = self.meshes.get(id, None)
-            if pose is not None and pose_mesh is not None:
+            if not self.data.is_active(id):
+                continue
+            pose: Pose = self.data.get_pose(id)
+            pose_mesh: Mesh | None = self.meshes.get(id)
+            if pose_mesh is not None:
                 vertex_data: PoseVertexData = PoseVertexFactory.compute_angled_vertices(pose.point_data, pose.angle_data)
                 if vertex_data is not None:
                     pose_mesh.set_vertices(vertex_data.vertices)

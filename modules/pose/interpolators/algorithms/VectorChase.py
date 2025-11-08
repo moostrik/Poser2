@@ -291,7 +291,7 @@ class PointChase(VectorChase):
         """Set new target points."""
         if points.shape != (self._num_points, 2):
             raise ValueError(f"Expected shape ({self._num_points}, 2), got {points.shape}")
-        super().set_target(points.flatten())
+        super().set_target(points.copy().flatten())
 
     @property
     def value(self) -> np.ndarray:

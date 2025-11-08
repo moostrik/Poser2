@@ -14,7 +14,7 @@ from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
 from modules.data.CaptureDataHub import CaptureDataHub
 from modules.pose.Pose import Pose
-from modules.render.meshes.PoseMeshes import PoseMeshes
+from modules.render.meshes.PoseMeshesCapture import PoseMeshesCapture
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -23,10 +23,10 @@ from modules.gl.shaders.Exposure import Exposure
 
 class TrackerOnePerCamLayer(LayerBase):
     exposure_shader = Exposure()
-    def __init__(self, data: CaptureDataHub, pose_meshes: PoseMeshes, cam_id: int) -> None:
+    def __init__(self, data: CaptureDataHub, pose_meshes: PoseMeshesCapture, cam_id: int) -> None:
         self.data: CaptureDataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
-        self.pose_meshes: PoseMeshes = pose_meshes
+        self.pose_meshes: PoseMeshesCapture = pose_meshes
         self.cam_id: int = cam_id
         self.cam_fbo: Fbo = Fbo()
         self.exp_fbo: Fbo = Fbo()
