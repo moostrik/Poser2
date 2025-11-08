@@ -1,14 +1,14 @@
 # Standard library imports
-from enum import Enum
+from enum import IntEnum
 from typing import Union
 
 # Third-party imports
 import numpy as np
 
-class PredictionMethod(Enum):
-    NONE = "none"
-    LINEAR = "linear"
-    QUADRATIC = "quadratic"
+class PredictionMethod(IntEnum):
+    NONE = 0
+    LINEAR = 1
+    QUADRATIC = 2
 
 class VectorPredict:
     """Predictor for arbitrary vector data (positions, coordinates, etc.)."""

@@ -17,3 +17,4 @@ from .general.Smoothers import                  SmootherConfig, AngleSmoother, D
 from .general.StickyFillers import              StickyFillerConfig, AngleStickyFiller, DeltaStickyFiller, PointStickyFiller, PoseStickyFiller
 
 from .gui.SmootherGui import                    SmootherGui
+from .gui.PredictionGui import                  PredictionGui

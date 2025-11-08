@@ -81,14 +81,14 @@ class PoseFeatureLayer(LayerBase):
             return
 
 
-        range_scale: float = 1.0
+        range_scale: float = .3
 
         LayerBase.setView(self.raw_fbo.width, self.raw_fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         raw_color = (0.0, 0.0, 0.0)
-        smooth_color = (0.0, 0.5, 0.0)
+        smooth_color = (0.0, 0.5, 0.5)
         render_color = (0.5, 0.0, 0.0)
-        self.draw_raw = True
+        self.draw_raw = False
         self.draw_smooth = True
         self.draw_render = True
 

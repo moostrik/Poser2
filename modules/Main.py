@@ -101,6 +101,7 @@ class Main():
         )
 
         self.prediction_config = filters.PredictorConfig(frequency=settings.camera_fps)
+        self.prediction_gui: filters.PredictionGui = filters.PredictionGui(self.prediction_config, self.gui, 'Predictor')
         self.pose_prediction_pipeline = FilterPipelineTracker(
             settings.num_players,
             [
@@ -193,7 +194,7 @@ class Main():
             self.gui.addFrame([self.WS.gui.get_gui_frame(), self.WS.gui.get_gui_test_frame()])
 
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.angle_smooth_gui.get_gui_frame()])
-        self.gui.addFrame([self.delta_smooth_gui.get_gui_frame(), self.interpolation_gui.get_gui_frame()])
+        self.gui.addFrame([self.prediction_gui.get_gui_frame(), self.interpolation_gui.get_gui_frame()])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])

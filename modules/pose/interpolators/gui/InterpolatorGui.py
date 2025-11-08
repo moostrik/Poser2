@@ -12,9 +12,9 @@ class InterpolationGui:
 
         elm: list = []
         elm.append([E(eT.TEXT, 'SMOOTH   '),
-            E(eT.TEXT, 'rpsn'),
+            E(eT.TEXT, 'response'),
             E(eT.SLDR, name + 'responsiveness',     self.set_responsiveness,    0.2,   [0.01, 1.0],  0.01),
-            E(eT.TEXT, 'frtn'),
+            E(eT.TEXT, 'friction'),
             E(eT.SLDR, name + 'friction',           self.set_friction,          0.03,  [0.01, .99],  0.01)])
 
         gui_height: int = len(elm) * ELEMHEIGHT + BASEHEIGHT
