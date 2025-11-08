@@ -1,7 +1,7 @@
 """Single-pose filter pipeline for chaining multiple filters."""
 
 from modules.pose.Pose import Pose
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.filter.PoseFilterBase import PoseFilterBase
 
 
 class PoseFilterPipeline(PoseFilterBase):

@@ -11,7 +11,7 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
+from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.features import PoseFeatureData
 

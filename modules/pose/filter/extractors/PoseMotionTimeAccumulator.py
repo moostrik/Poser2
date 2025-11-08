@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.filter.PoseFilterBase import PoseFilterBase
 from modules.pose.Pose import Pose
 
 

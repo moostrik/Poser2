@@ -1,6 +1,6 @@
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
-from modules.pose.filter.smooth.PoseSmootherBase import PoseSmootherConfig
+from modules.pose.filter.general.PoseSmoothers import PoseSmootherConfig
 
 
 

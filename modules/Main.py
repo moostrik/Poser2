@@ -17,8 +17,8 @@ from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
 from modules.pose.detection.PoseDetectionPipeline import PoseDetectionPipeline
 
-from modules.pose import filters
-from modules.pose.filters.general.gui.PoseSmootherGui import PoseSmootherGui
+from modules.pose import filter
+from modules.pose.filter.gui.PoseSmootherGui import PoseSmootherGui
 from modules.pose.tracker import PoseFilterPipelineTracker
 
 from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
@@ -71,24 +71,24 @@ class Main():
         self.pose_raw_filters = PoseFilterPipelineTracker(
             settings.num_players,
             [
-                lambda: filters.PoseConfidenceFilter(filters.PoseConfidenceFilterConfig(settings.pose_conf_threshold)),
-                filters.PoseAngleExtractor,
-                filters.PoseDeltaExtractor
+                lambda: filter.PoseConfidenceFilter(filter.PoseConfidenceFilterConfig(settings.pose_conf_threshold)),
+                filter.PoseAngleExtractor,
+                filter.PoseDeltaExtractor
             ]
         )
 
 
-        self.point_smooth_config = filters.PoseSmootherConfig()
+        self.point_smooth_config = filter.PoseSmootherConfig()
         self.point_smooth_gui: PoseSmootherGui = PoseSmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
 
         self.pose_smooth_filters = PoseFilterPipelineTracker(
             settings.num_players,
             [
-                lambda: filters.PosePointSmoother(self.point_smooth_config),
-                lambda: filters.PoseAngleSmoother(self.point_smooth_config),
-                filters.PoseDeltaExtractor,
-                filters.PoseMotionTimeAccumulator,
-                lambda: filters.PoseDeltaSmoother(self.point_smooth_config)
+                lambda: filter.PosePointSmoother(self.point_smooth_config),
+                lambda: filter.PoseAngleSmoother(self.point_smooth_config),
+                filter.PoseDeltaExtractor,
+                filter.PoseMotionTimeAccumulator,
+                lambda: filter.PoseDeltaSmoother(self.point_smooth_config)
             ]
         )
 

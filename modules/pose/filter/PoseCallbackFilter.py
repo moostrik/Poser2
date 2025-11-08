@@ -1,7 +1,7 @@
 
 
 from modules.pose.Pose import Pose
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.filter.PoseFilterBase import PoseFilterBase
 from modules.pose.callback import PoseCallbackMixin
 
 

@@ -30,7 +30,7 @@ import time as time
 
 # Local application imports
 from modules.pose import features
-from modules.pose.filters import PoseAngleChaseInterpolator, PoseChaseInterpolatorConfig
+from modules.pose.interpolator import PoseAngleChaseInterpolator, PoseChaseInterpolatorConfig
 from modules.pose.Pose import Pose, PoseDict
 
 from modules.Settings import Settings

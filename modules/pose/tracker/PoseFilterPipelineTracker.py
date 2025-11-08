@@ -4,7 +4,7 @@ from typing import Callable
 
 from .PoseTrackerBase import PoseTrackerBase
 from modules.pose.Pose import Pose
-from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.filter.PoseFilterBase import PoseFilterBase
 
 
 class PoseFilterPipelineTracker(PoseTrackerBase):

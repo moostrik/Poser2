@@ -95,7 +95,7 @@ class PoseFeatureLayer(LayerBase):
             #     if v_c is not None:
             #         PoseFeatureLayer.pose_feature_shader.use(self.fbo2.fbo_id, v_c, range_scale)
 
-        if self.render_data.has_pose(key):
+        if self.render_data.is_active(key):
             smooth_pose: Pose | None = self.render_data.get_pose(key)
             if smooth_pose is not None:
                 v_c: PoseAngleData = smooth_pose.angle_data
