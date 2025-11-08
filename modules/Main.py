@@ -23,12 +23,12 @@ from modules.pose.tracker import PoseFilterPipelineTracker
 
 from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
 
-from modules.pose.PoseStream import PoseStreamManager
+from modules.pose.correlation.PoseStream import PoseStreamManager
 from modules.pose.correlation.PoseStreamCorrelator import PoseStreamCorrelator
 
-from modules.CaptureDataHub import CaptureDataHub
-from modules.RenderDataHub import RenderDataHub
-from modules.RenderDataHub_Old import RenderDataHub_Old
+from modules.data.CaptureDataHub import CaptureDataHub
+from modules.data.RenderDataHub import RenderDataHub
+from modules.data.depricated.RenderDataHub import RenderDataHub_Old
 
 from modules.render.HDTRenderManager import HDTRenderManager
 from modules.WS.WSPipeline import WSPipeline

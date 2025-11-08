@@ -2,7 +2,7 @@ from OpenGL.GL import * # type: ignore
 from OpenGL.GL.shaders import ShaderProgram # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
-from modules.pose.PoseStream import PoseStreamData
+from modules.pose.correlation.PoseStream import PoseStreamData
 import numpy as np
 
 class StreamPose(Shader):

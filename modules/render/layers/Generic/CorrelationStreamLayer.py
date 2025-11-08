@@ -11,7 +11,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.correlation.PoseSimilarityStream import PoseSimilarityStream, PoseSimilarityStreamData, PoseSimilarityBatch , FeatureStatistic
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.CaptureDataHub import CaptureDataHub
+from modules.data.CaptureDataHub import CaptureDataHub
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

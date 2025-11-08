@@ -13,9 +13,9 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 from modules.pose.features.PoseAngles import ANGLE_NUM_JOINTS, ANGLE_JOINT_NAMES
-from modules.pose.PoseStream import PoseStreamData
+from modules.pose.correlation.PoseStream import PoseStreamData
 
-from modules.CaptureDataHub import CaptureDataHub
+from modules.data.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes

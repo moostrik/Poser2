@@ -5,7 +5,7 @@ from time import time
 from modules.pose.Pose import Pose
 from modules.pose.features.PoseAngles import AngleJoint, PoseAngleData
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryFactory, PoseAngleSymmetryData
-from modules.pose.trackers_depricated.PoseTrackerBase import PoseTrackerBase
+from modules.data.depricated.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.depricated.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
 from modules.utils.HotReloadMethods import HotReloadMethods

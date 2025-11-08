@@ -10,7 +10,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.WS.WSOutput import WSOutput
 from modules.pose.correlation.PoseSimilarityStream import PoseSimilarityStreamData
-from modules.CaptureDataHub import CaptureDataHub
+from modules.data.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.gl.shaders.WS_Angles import WS_Angles

@@ -17,8 +17,8 @@ from modules.pose.Pose import Pose
 from modules.pose.features.PosePoints import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
-from modules.RenderDataHub import RenderDataHub
-from modules.CaptureDataHub import CaptureDataHub
+from modules.data.RenderDataHub import RenderDataHub
+from modules.data.CaptureDataHub import CaptureDataHub
 from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.utils.HotReloadMethods import HotReloadMethods

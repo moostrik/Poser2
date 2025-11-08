@@ -12,7 +12,7 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
-from modules.CaptureDataHub import CaptureDataHub
+from modules.data.CaptureDataHub import CaptureDataHub
 from modules.pose.Pose import Pose
 from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.gl.LayerBase import LayerBase, Rect

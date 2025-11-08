@@ -16,7 +16,7 @@ import pandas as pd
 
 # Pose imports
 from modules.pose.features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
-from modules.pose.PoseStream import PoseStreamData, PoseStreamDataDict
+from modules.pose.correlation.PoseStream import PoseStreamData, PoseStreamDataDict
 
 # Local application imports
 from modules.Settings import Settings

@@ -12,7 +12,7 @@ from modules.gl.Image import Image
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.CaptureDataHub import CaptureDataHub
+from modules.data.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.gl.shaders.HD_Sync import HD_Sync

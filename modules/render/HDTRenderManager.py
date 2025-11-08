@@ -25,9 +25,9 @@ from modules.Settings import Settings
 from modules.utils.PointsAndRects import Rect, Point2f
 
 from modules.gui.PyReallySimpleGui import Gui
-from modules.CaptureDataHub import CaptureDataHub
-from modules.RenderDataHub import RenderDataHub
-from modules.RenderDataHub_Old import RenderDataHub_Old
+from modules.data.CaptureDataHub import CaptureDataHub
+from modules.data.RenderDataHub import RenderDataHub
+from modules.data.depricated.RenderDataHub import RenderDataHub_Old
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

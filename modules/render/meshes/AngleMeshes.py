@@ -5,8 +5,8 @@ import numpy as np
 
 # Local application imports
 from modules.gl.Mesh import Mesh
-from modules.pose.PoseStream import PoseStreamData
-from modules.CaptureDataHub import CaptureDataHub
+from modules.pose.correlation.PoseStream import PoseStreamData
+from modules.data.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
 class AngleMeshes(LayerBase):

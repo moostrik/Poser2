@@ -50,7 +50,7 @@ from typing import Optional, TypeVar, Generic
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameType
 from modules.tracker.Tracklet import Tracklet, TrackletDict
 from modules.pose.Pose import Pose, PoseDict
-from modules.pose.PoseStream import PoseStreamData
+from modules.pose.correlation.PoseStream import PoseStreamData
 from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch
 from modules.WS.WSOutput import WSOutput
 from modules.Settings import Settings

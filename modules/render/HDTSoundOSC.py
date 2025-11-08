@@ -10,7 +10,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 from modules.pose.Pose import Pose
 from modules.pose.features.PosePoints import PoseJoint
 from modules.pose.features.PoseAngleSymmetry import SymmetricJoint
-from modules.RenderDataHub_Old import RenderDataHub_Old
+from modules.data.depricated.RenderDataHub import RenderDataHub_Old
 from modules.pose.features.PoseAngles import AngleJoint
 
 from modules.utils.HotReloadMethods import HotReloadMethods

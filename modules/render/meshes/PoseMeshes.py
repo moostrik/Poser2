@@ -8,7 +8,7 @@ from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose
 from modules.pose.features.depricated.PoseVertices import PoseVertexData, PoseVertexFactory
 from modules.pose.features.depricated.PoseVertices import POSE_VERTEX_INDICES
-from modules.CaptureDataHub import CaptureDataHub
+from modules.data.CaptureDataHub import CaptureDataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
 class PoseMeshes(LayerBase):

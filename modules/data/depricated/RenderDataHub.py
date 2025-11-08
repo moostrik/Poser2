@@ -23,8 +23,8 @@ from collections.abc import Mapping
 from modules.pose.Pose import PoseDict
 from modules.pose.features.PoseAngles import PoseAngleData
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
-from modules.pose.trackers_depricated.PoseViewportTracker import PoseViewportTracker, PoseViewportTrackerSettings
-from modules.pose.trackers_depricated.PoseAngleTracker import PoseAngleTracker, PoseAngleTrackerSettings
+from modules.data.depricated.PoseViewportTracker import PoseViewportTracker, PoseViewportTrackerSettings
+from modules.data.depricated.PoseAngleTracker import PoseAngleTracker, PoseAngleTrackerSettings
 from modules.Settings import Settings
 from modules.utils.depricated.SmoothedInterpolator import OneEuroSettings, SmoothedInterpolator
 from modules.utils.PointsAndRects import Rect
