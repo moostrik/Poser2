@@ -5,7 +5,7 @@ from time import time
 import warnings
 
 from modules.pose.Pose import Pose, PoseDict
-from modules.pose.callbacks import PoseDictCallbackMixin
+from modules.pose.callback import PoseDictCallbackMixin
 
 
 class PosePresenceTracker(PoseDictCallbackMixin):

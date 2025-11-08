@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 from modules.pose.Pose import Pose, PoseDict
-from modules.pose.callbacks import PoseDictCallbackMixin
+from modules.pose.callback import PoseDictCallbackMixin
 
 
 class PoseTrackerBase(PoseDictCallbackMixin, ABC):

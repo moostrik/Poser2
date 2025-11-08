@@ -3,8 +3,6 @@
 from .PoseFilterBase import                         PoseFilterBase
 from .PoseCallbackFilter import                     PoseCallbackFilter
 from .PoseFilterPipeline import                     PoseFilterPipeline
-from ..trackers.PoseFilterTracker import                      PoseFilterTracker
-from ..trackers.PoseFilterPipelineTracker import              PoseFilterPipelineTracker
 
 from .extractors.PoseAngleExtractor import          PoseAngleExtractor
 from .extractors.PoseDeltaExtractor import          PoseDeltaExtractor

@@ -1,9 +1,8 @@
 
 
-from modules.pose.Pose import Pose, PoseCallback
+from modules.pose.Pose import Pose
 from modules.pose.filters.PoseFilterBase import PoseFilterBase
-from modules.pose.callbacks import PoseCallbackMixin
-from threading import Lock
+from modules.pose.callback import PoseCallbackMixin
 
 
 class PoseCallbackFilter(PoseCallbackMixin):
@@ -11,12 +10,10 @@ class PoseCallbackFilter(PoseCallbackMixin):
     Wraps a PoseFilterBase and provides callback registration for push-based filters.
 
     Compatible with:
-    - PoseSmoother, PoseAngleSmoother, PosePointSmoother, PoseDeltaSmoother
-    - PosePredictor, PoseAnglePredictor, PosePointPredictor, PoseDeltaPredictor
-    - Other filters that process synchronously
+    - All filters derived from PoseFilterBase that operate in a push-based manner.
 
     NOT compatible with:
-    - PoseChaseInterpolator and its variants (use pull-based architecture instead)
+    - PoseChaseInterpolator (uses pull-based architecture)
 
     Usage:
         filter = PoseSmoother(config)

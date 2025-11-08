@@ -4,7 +4,7 @@ from threading import Lock
 from traceback import print_exc
 
 from modules.pose.Pose import Pose, PoseDict
-from modules.pose.callbacks.types import PoseCallback, PoseDictCallback
+from modules.pose.callback.types import PoseCallback, PoseDictCallback
 
 
 class PoseCallbackMixin:
