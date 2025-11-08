@@ -14,7 +14,7 @@ from .general.PoseNanValidator import               PoseNanValidator
 from .general.PoseRangeValidator import             PoseValidatorConfig, PoseRangeValidator
 
 from .prediction.PoseChaseInterpolators import      PoseChaseInterpolatorConfig, PoseAngleChaseInterpolator, PoseDeltaChaseInterpolator, PosePointChaseInterpolator, PoseChaseInterpolator
-from .prediction.PoseHoldFilters import             PoseHoldFilterConfig, PoseAngleHoldFilter, PoseDeltaHoldFilter, PosePointHoldFilter, PoseHoldFilter
+from .prediction.PoseStickyFilters import           PoseStickyFilterConfig, PoseAngleStickyFilter, PoseDeltaStickyFilter, PosePointStickyFilter, PoseStickyFilter
 from .prediction.PosePredictors import              PosePredictorConfig, PoseAnglePredictor, PoseDeltaPredictor, PosePointPredictor, PosePredictor
 from .prediction.PoseSmoothers import               PoseSmootherConfig, PoseAngleSmoother, PoseDeltaSmoother, PosePointSmoother, PoseSmoother
 
@@ -50,11 +50,11 @@ __all__: list[str] = [
     'PosePointChaseInterpolator',
     'PoseChaseInterpolator',
 
-    'PoseHoldFilterConfig',
-    'PoseAngleHoldFilter',
-    'PoseDeltaHoldFilter',
-    'PosePointHoldFilter',
-    'PoseHoldFilter',
+    'PoseStickyFilterConfig',
+    'PoseAngleStickyFilter',
+    'PoseDeltaStickyFilter',
+    'PosePointStickyFilter',
+    'PoseStickyFilter',
 
     'PosePredictorConfig',
     'PoseAnglePredictor',

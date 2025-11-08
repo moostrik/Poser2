@@ -78,18 +78,18 @@ class Main():
         )
 
 
-        self.point_smooth_config = filter.PoseSmootherConfig()
+        self.point_smooth_config = filter.OldPoseSmootherConfig()
         self.point_smooth_gui: PoseSmootherGui = PoseSmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
 
         self.pose_smooth_filters = PoseBatchFilterPipeline(
             settings.num_players,
             [
-                lambda: filter.PosePointSmoother(self.point_smooth_config),
-                lambda: filter.PoseAngleSmoother(self.point_smooth_config),
+                lambda: filter.OldPosePointSmoother(self.point_smooth_config),
+                lambda: filter.OldPoseAngleSmoother(self.point_smooth_config),
                 lambda: filter.PoseBBoxSmoother(self.point_smooth_config),
                 filter.PoseDeltaExtractor,
                 filter.PoseMotionTimeAccumulator,
-                lambda: filter.PoseAngleDeltaSmoother(self.point_smooth_config)
+                lambda: filter.OldPoseDeltaSmoother(self.point_smooth_config)
             ]
         )
 
