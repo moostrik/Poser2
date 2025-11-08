@@ -1,3 +1,9 @@
+"""Tracks and filters multiple poses independently.
+
+Maintains separate filter instances for each pose ID, automatically
+resetting filters when poses are lost.
+"""
+
 from threading import Lock
 from traceback import print_exc
 from typing import Callable
@@ -5,10 +11,12 @@ from typing import Callable
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 from modules.pose.filter.PoseFilterBase import PoseFilterBase
 
-class PoseBatchFilter:
-    """Processes batches of poses using a single filter instance per pose ID.
 
-    Each pose_id gets its own PoseFilterBase instance.
+class PoseFilterTracker:
+    """Tracks multiple poses, maintaining a separate filter for each.
+
+    Each pose_id gets its own PoseFilterBase instance which maintains
+    independent state. Filters are automatically reset when their pose is lost.
     """
 
     def __init__(self, num_poses: int, filter_factory: Callable[[], PoseFilterBase]) -> None:
@@ -22,29 +30,33 @@ class PoseBatchFilter:
         }
 
     def add_poses(self, poses: PoseDict) -> None:
-        """Process incoming pose batch through single filters."""
+        """Process poses through their individual filters."""
         pending_poses: dict[int, Pose] = {}
-        for pose_id, pose in poses.items():
 
+        for pose_id, pose in poses.items():
             filter_instance: PoseFilterBase = self._filters[pose_id]
+
             try:
                 current_pose: Pose = filter_instance.process(pose)
                 pending_poses[pose_id] = current_pose
             except Exception as e:
-                print(f"PoseBatchFilter: Error processing pose {pose_id}: {e}")
+                print(f"PoseFilterTracker: Error processing pose {pose_id}: {e}")
                 print_exc()
                 pending_poses[pose_id] = pose
 
+            # Reset filter when pose is lost
             if pose.lost:
                 self.reset_pose(pose_id)
 
         self._emit_callbacks(pending_poses)
 
     def reset(self) -> None:
+        """Reset all pose filters."""
         for filter_instance in self._filters.values():
             filter_instance.reset()
 
     def reset_pose(self, pose_id: int) -> None:
+        """Reset filter for a specific pose."""
         self._filters[pose_id].reset()
 
     # CALLBACKS
@@ -54,7 +66,7 @@ class PoseBatchFilter:
                 try:
                     callback(poses)
                 except Exception as e:
-                    print(f"PoseBatchFilter: Error in callback: {e}")
+                    print(f"PoseFilterTracker: Error in callback: {e}")
                     print_exc()
 
     def add_callback(self, callback: PoseDictCallback) -> None:

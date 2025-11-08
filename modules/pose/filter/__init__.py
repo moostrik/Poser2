@@ -1,8 +1,8 @@
 """Pose filter modules for processing and enriching pose data."""
 
 from .PoseCallbackFilter import                     PoseCallbackFilter
-from .PoseBatchFilter import                        PoseBatchFilter
-from .PoseBatchFilterPipeline import                PoseBatchFilterPipeline
+from .PoseBatchFilter import                        PoseFilterTracker
+from .PoseBatchFilterPipeline import                PoseFilterPipelineTracker
 
 from .extractor.PoseAngleExtractor import           PoseAngleExtractor
 from .extractor.PoseDeltaExtractor import           PoseDeltaExtractor
@@ -29,7 +29,7 @@ from .interpolation.PoseInterpolatorConfig import   PoseInterpolatorConfig
 __all__: list[str] = [
     'PoseCallbackFilter',
     'PoseBatchFilter',
-    'PoseBatchFilterPipeline',
+    'PoseFilterPipelineTracker',
 
     'PoseAngleExtractor',
     'PoseDeltaExtractor',

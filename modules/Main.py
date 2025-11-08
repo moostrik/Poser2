@@ -17,7 +17,7 @@ from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
 from modules.pose.detection.PoseDetectionPipeline import PoseDetectionPipeline
 
-from modules.pose.filter.PoseBatchFilterPipeline import PoseBatchFilterPipeline
+from modules.pose.filter.PoseBatchFilterPipeline import PoseFilterPipelineTracker
 from modules.pose import filter
 from modules.pose.filter.smooth.PoseSmootherGui import PoseSmootherGui
 
@@ -68,7 +68,7 @@ class Main():
         # POSE
         self.pose_detection = PoseDetectionPipeline(settings)
 
-        self.pose_raw_filters = PoseBatchFilterPipeline(
+        self.pose_raw_filters = PoseFilterPipelineTracker(
             settings.num_players,
             [
                 lambda: filter.PoseConfidenceFilter(filter.PoseConfidenceFilterConfig(settings.pose_conf_threshold)),
@@ -81,7 +81,7 @@ class Main():
         self.point_smooth_config = filter.OldPoseSmootherConfig()
         self.point_smooth_gui: PoseSmootherGui = PoseSmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
 
-        self.pose_smooth_filters = PoseBatchFilterPipeline(
+        self.pose_smooth_filters = PoseFilterPipelineTracker(
             settings.num_players,
             [
                 lambda: filter.OldPosePointSmoother(self.point_smooth_config),

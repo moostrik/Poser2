@@ -1,66 +1,71 @@
-# Standard library imports
+"""Tracks and processes multiple poses through filter pipelines.
+
+Maintains separate filter pipelines for each pose ID, automatically
+resetting pipelines when poses are lost.
+"""
+
 from threading import Lock
 from traceback import print_exc
 from typing import Callable
 
-# Pose imports
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 from modules.pose.filter.PoseFilterBase import PoseFilterBase
 
-from modules.Settings import Settings
 
+class PoseFilterPipelineTracker:
+    """Tracks multiple poses, maintaining a separate filter pipeline for each.
 
-class PoseBatchFilterPipeline:
-    """Manages pose processing through filter chains.
-
-    Maintains a fixed number of filter chains (one per pose ID).
-    Each chain processes poses sequentially through multiple filters.
+    Each pose_id gets its own chain of filters which maintains independent state.
+    Pipelines are automatically reset when their pose is lost.
     """
 
-    def __init__(self, num_poses: int, filters: list[Callable[[], PoseFilterBase]]) -> None:
-        if not filters:
-            raise ValueError("PosePipeline: filter_factories must not be empty.")
+    def __init__(self, num_poses: int, filter_factories: list[Callable[[], PoseFilterBase]]) -> None:
+        if not filter_factories:
+            raise ValueError("PoseFilterPipelineTracker: filter_factories must not be empty.")
 
         self.num_poses: int = num_poses
         self._output_callbacks: set[PoseDictCallback] = set()
         self._callback_lock = Lock()
 
-        # Create fixed dict of filter chains (one per pose ID)
-        self._filter_chains: dict[int, list[PoseFilterBase]] = {}
+        # Create one filter pipeline per pose ID
+        self._filter_pipelines: dict[int, list[PoseFilterBase]] = {}
         for pose_id in range(self.num_poses):
-            chain: list[PoseFilterBase] = [filter() for filter in filters]
-            self._filter_chains[pose_id] = chain
+            pipeline: list[PoseFilterBase] = [factory() for factory in filter_factories]
+            self._filter_pipelines[pose_id] = pipeline
 
     def add_poses(self, poses: PoseDict) -> None:
-        """Process incoming pose batch through filter chains."""
+        """Process poses through their individual filter pipelines."""
         pending_poses: dict[int, Pose] = {}
-        for pose_id, pose in poses.items():
 
-            chain: list[PoseFilterBase] = self._filter_chains[pose_id]
+        for pose_id, pose in poses.items():
+            pipeline: list[PoseFilterBase] = self._filter_pipelines[pose_id]
 
             try:
                 current_pose: Pose = pose
-                for filter_instance in chain:
+                for filter_instance in pipeline:
                     current_pose = filter_instance.process(current_pose)
                 pending_poses[pose_id] = current_pose
             except Exception as e:
-                print(f"PosePipeline: Error processing pose {pose_id}: {e}")
+                print(f"PoseFilterPipelineTracker: Error processing pose {pose_id}: {e}")
                 print_exc()
                 pending_poses[pose_id] = pose
 
+            # Reset pipeline when pose is lost
             if pose.lost:
                 self.reset_pose(pose_id)
 
         self._emit_callbacks(pending_poses)
 
     def reset(self) -> None:
-        for chain in self._filter_chains.values():
-            for filter_instance in chain:
+        """Reset all pose filter pipelines."""
+        for pipeline in self._filter_pipelines.values():
+            for filter_instance in pipeline:
                 filter_instance.reset()
 
     def reset_pose(self, pose_id: int) -> None:
-        chain: list[PoseFilterBase] = self._filter_chains[pose_id]
-        for filter_instance in chain:
+        """Reset filter pipeline for a specific pose."""
+        pipeline: list[PoseFilterBase] = self._filter_pipelines[pose_id]
+        for filter_instance in pipeline:
             filter_instance.reset()
 
     # CALLBACKS
@@ -70,7 +75,7 @@ class PoseBatchFilterPipeline:
                 try:
                     callback(poses)
                 except Exception as e:
-                    print(f"PosePipeline: Error in callback: {e}")
+                    print(f"PoseFilterPipelineTracker: Error in callback: {e}")
                     print_exc()
 
     def add_callback(self, callback: PoseDictCallback) -> None:
