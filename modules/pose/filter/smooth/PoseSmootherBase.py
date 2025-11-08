@@ -38,8 +38,8 @@ class PoseSmootherBase(PoseFilterBase):
     - Config change handling via _on_config_changed()
     """
 
-    def __init__(self, config: PoseSmootherConfig) -> None:
-        self._config: PoseSmootherConfig = config
+    def __init__(self, config: PoseSmootherConfig | None) -> None:
+        self._config: PoseSmootherConfig = config or PoseSmootherConfig()
         self._config.add_listener(self._on_config_changed)
         # State for the current pose (managed by subclasses)
         self._state: Any = None

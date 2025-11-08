@@ -23,7 +23,7 @@ from threading import Lock
 # Local application imports
 from modules.pose.features.PoseAngles import PoseAngleData
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
-from modules.pose.filters_depricated import PoseInterpolator
+from modules.pose.filters import PoseAngleChaseInterpolator, PoseChaseInterpolatorConfig
 from modules.pose.Pose import Pose, PoseDict
 
 from modules.Settings import Settings
@@ -35,8 +35,15 @@ class RenderDataHub:
     def __init__(self, settings: Settings) -> None:
         self._num_players: int = settings.num_players
 
-        self.interpolator = PoseInterpolator(settings)
-        self.poses: PoseDict = {}
+        self.interpolator_config: PoseChaseInterpolatorConfig = PoseChaseInterpolatorConfig(
+            input_frequency=settings.camera_fps,
+            responsiveness=0.2,
+            friction=0.03
+        )
+
+        self.interpolators: dict[int, PoseAngleChaseInterpolator] = {
+            i: PoseAngleChaseInterpolator(self.interpolator_config) for i in range(self._num_players)
+        }
 
         # Lock to ensure thread safety
         self._lock = Lock()
@@ -45,37 +52,39 @@ class RenderDataHub:
 
     def update(self) -> None:
         """Update all active trackers and smoothers."""
-        self.interpolator.update()
-        with self._lock:
-            self.poses = self.interpolator.get_poses()
+        for interpolator in self.interpolators.values():
+            interpolator.update()
 
     def reset(self) -> None:
         """Reset all trackers and smoothers."""
-        self.interpolator.reset()
+        for interpolator in self.interpolators.values():
+            interpolator.reset()
 
     def add_poses(self, poses: PoseDict) -> None:
         """ Add a new pose data point for processing."""
-        self.interpolator.add_poses(poses)
+        for id, pose in poses.items():
+            if not id in self.interpolators:
+                self.interpolators[id] = PoseAngleChaseInterpolator(self.interpolator_config)
+            self.interpolators[id].process(pose)
+            if pose.lost:
+                del self.interpolators[id]
+
 
     # ACTIVE
-    def get_is_active(self, tracklet_id: int) -> bool: # for backward compatibility
-        return self.has_pose(tracklet_id)
+    def get_is_active(self, pose_id: int) -> bool: # for backward compatibility
+        return self.has_pose(pose_id)
 
-    def has_pose(self, tracklet_id: int) -> bool:
+    def has_pose(self, pose_id: int) -> bool:
         """Check if a pose exists for the specified tracklet ID."""
         with self._lock:
-            pose: Pose | None = self.poses.get(tracklet_id)
-            if pose is None:
-                return False
-        return True
+            return pose_id in self.interpolators
 
-    def get_pose(self, tracklet_id: int) -> Pose:
+    def get_pose(self, pose_id: int) -> Pose:
         """Get smoothed pose for the specified tracklet ID."""
         with self._lock:
-            pose: Pose | None = self.poses.get(tracklet_id)
-            if pose is None:
-                raise KeyError(f"No pose found for tracklet ID {tracklet_id}")
-        return pose
+            if pose_id not in self.interpolators:
+                raise KeyError(f"No pose found for tracklet ID {pose_id}")
+        return self.interpolators[pose_id].get_interpolated_pose()
 
     #  BODY JOINT ANGLES
     def get_angles(self, tracklet_id: int) -> PoseAngleData:

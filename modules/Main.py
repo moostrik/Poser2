@@ -84,19 +84,18 @@ class Main():
         self.pose_smooth_filters = PoseFilterPipelineTracker(
             settings.num_players,
             [
-                lambda: filters.OldPosePointSmoother(self.point_smooth_config),
-                lambda: filters.OldPoseAngleSmoother(self.point_smooth_config),
-                lambda: filters.PoseBBoxSmoother(self.point_smooth_config),
+                lambda: filters.PosePointSmoother(self.point_smooth_config),
+                lambda: filters.PoseAngleSmoother(self.point_smooth_config),
                 filters.PoseDeltaExtractor,
                 filters.PoseMotionTimeAccumulator,
-                lambda: filters.OldPoseDeltaSmoother(self.point_smooth_config)
+                lambda: filters.PoseDeltaSmoother(self.point_smooth_config)
             ]
         )
 
         self.pose_correlator: PoseSimilarityComputer = PoseSimilarityComputer(settings)
 
         self.pose_streamer = PoseStreamManager(settings)
-        self.stream_correlator: Optional[PoseStreamCorrelator] = PoseStreamCorrelator(settings)
+        self.stream_correlator: Optional[PoseStreamCorrelator] = None #PoseStreamCorrelator(settings)
 
         # DATA
         self.capture_data_hub = CaptureDataHub()

@@ -19,10 +19,10 @@ from .general.PoseStickyFillers import              PoseStickyFillerConfig, Pose
 
 
 # Old implementations (deprecated, aliased to avoid breaking changes)
-from ..filter.smooth.PoseSmootherBase import                PoseSmootherConfig as OldPoseSmootherConfig
-from ..filter.smooth.PosePointSmoother import               PosePointSmoother as OldPosePointSmoother
-from ..filter.smooth.PoseAngleSmoother import               PoseAngleSmoother as OldPoseAngleSmoother
-from ..filter.smooth.PoseDeltaSmoother import               PoseDeltaSmoother as OldPoseDeltaSmoother
-from ..filter.smooth.PoseBBoxSmoother import                PoseBBoxSmoother
-from ..filter.interpolation.PoseInterpolatorConfig import   PoseInterpolatorConfig
-from ..filter.interpolation.PoseInterpolator import         PoseInterpolator
+# from ..filter.smooth.PoseSmootherBase import                PoseSmootherConfig as OldPoseSmootherConfig
+# from ..filter.smooth.PosePointSmoother import               PosePointSmoother as OldPosePointSmoother
+# from ..filter.smooth.PoseAngleSmoother import               PoseAngleSmoother as OldPoseAngleSmoother
+# from ..filter.smooth.PoseDeltaSmoother import               PoseDeltaSmoother as OldPoseDeltaSmoother
+# from ..filter.smooth.PoseBBoxSmoother import                PoseBBoxSmoother
+# from ..filter.interpolation.PoseInterpolatorConfig import   PoseInterpolatorConfig
+# from ..filter.interpolation.PoseInterpolator import         PoseInterpolator
