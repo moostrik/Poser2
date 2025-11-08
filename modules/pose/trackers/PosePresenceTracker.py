@@ -1,128 +1,75 @@
-"""Tracks pose presence and detects unexpected disappearances."""
+"""Tracker for monitoring pose presence and detecting unexpected losses."""
+
 from dataclasses import replace
-from typing import Callable
+from time import time
 import warnings
 
-from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
+from modules.pose.Pose import Pose, PoseDict
+from modules.pose.callbacks import PoseDictCallbackMixin
 
 
-class PosePresenceTracker:
-    """Tracks which poses are present and warns when they disappear unexpectedly.
+class PosePresenceTracker(PoseDictCallbackMixin):
+    """Monitors pose presence and warns about unexpected pose losses.
 
-    Monitors PoseDict across frames and detects when pose IDs disappear
-    without being properly marked as lost first. Can optionally broadcast
-    fixed poses with lost=True.
+    Monitors which poses are present in each frame and warns if a pose
+    disappears without being marked as lost. Optionally broadcasts lost
+    poses with the current frame.
+
+    This is a standalone monitor, not a filter-based tracker.
     """
 
-    def __init__(self, warn: bool = True, fix: bool = False):
+    def __init__(self, num_poses: int, warn: bool = True, fix: bool = False) -> None:
         """Initialize presence tracker.
 
         Args:
-            warn: Whether to issue warnings when poses disappear unexpectedly.
-            fix: Whether to broadcast last known pose with lost=True when pose disappears unexpectedly.
+            num_poses: Number of poses to track.
+            warn: If True, issue warnings when poses disappear unexpectedly.
+            fix: If True, broadcast missing poses with lost=True and current timestamp.
         """
-        self._warn = warn
-        self._fix = fix
-        self._active_pose_ids: set[int] = set()
-        self._lost_pose_ids: set[int] = set()
-        self._last_poses: dict[int, Pose] = {}  # Store last known pose for each ID
-        self._fix_callbacks: list[PoseDictCallback] = []
+        super().__init__()  # Initialize mixin
+        self.num_poses: int = num_poses
+        self._warn: bool = warn
+        self._fix: bool = fix
+        self._previous_poses: dict[int, Pose] = {}
 
-    def check(self, poses: PoseDict) -> set[int]:
-        """Check for unexpectedly disappeared poses and return their IDs.
+    def add_poses(self, poses: PoseDict) -> None:
+        """Process poses and check for unexpected losses.
 
         Args:
             poses: Current pose dictionary.
-
-        Returns:
-            Set of pose IDs that disappeared unexpectedly (without being marked lost first).
         """
-        current_ids = set(poses.keys())
+        current_pose_ids: set[int] = set(poses.keys())
+        all_pose_ids: set[int] = set(range(self.num_poses))
 
-        # Store current poses for future reference
-        for pose_id, pose in poses.items():
-            self._last_poses[pose_id] = pose
+        # Find poses that should be present but aren't
+        missing_pose_ids: set[int] = all_pose_ids - current_pose_ids
 
-        # Update which poses are currently marked as lost
-        currently_lost = {pose_id for pose_id, pose in poses.items() if pose.lost}
+        for pose_id in missing_pose_ids:
+            # Only process poses we've seen before
+            if pose_id in self._previous_poses:
+                previous_pose: Pose = self._previous_poses[pose_id]
 
-        # Find poses that disappeared
-        disappeared_ids = self._active_pose_ids - current_ids
+                # Warn if pose disappeared without being marked lost
+                if self._warn and not previous_pose.lost:
+                    warnings.warn(
+                        f"Pose {pose_id} disappeared without being marked as lost",
+                        RuntimeWarning,
+                        stacklevel=2
+                    )
 
-        # Filter out expected disappearances (poses that were marked lost)
-        unexpected_disappeared = disappeared_ids - self._lost_pose_ids
+                # Fix: Add the lost pose with current timestamp
+                if self._fix:
+                    # Use current timestamp since this is a synthetic pose being emitted now
+                    # This prevents duplicate timestamps and maintains temporal ordering
+                    lost_pose: Pose = replace(previous_pose, lost=True, time_stamp=time())
+                    poses[pose_id] = lost_pose
 
-        # Warn about unexpected disappearances
-        if self._warn and unexpected_disappeared:
-            for pose_id in unexpected_disappeared:
-                warnings.warn(
-                    f"Pose {pose_id} disappeared from dict without being marked lost",
-                    RuntimeWarning,
-                    stacklevel=2
-                )
+        # Update previous poses (store current state for next frame)
+        self._previous_poses = poses.copy()
 
-        # Fix unexpected disappearances by broadcasting last pose with lost=True
-        if self._fix and unexpected_disappeared:
-            fixed_poses: dict[int, Pose] = {}
-            for pose_id in unexpected_disappeared:
-                if pose_id in self._last_poses:
-                    # Create copy of last pose with lost=True
-                    last_pose = self._last_poses[pose_id]
-                    fixed_pose = replace(last_pose, lost=True)
-                    fixed_poses[pose_id] = fixed_pose
-
-            # Broadcast fixed poses
-            if fixed_poses:
-                self._emit_fix_callbacks(fixed_poses)
-
-        # Update tracking
-        self._active_pose_ids = current_ids
-        self._lost_pose_ids = currently_lost
-
-        return unexpected_disappeared
+        # Emit to callbacks
+        self._notify_callbacks(poses)
 
     def reset(self) -> None:
-        """Reset tracking state."""
-        self._active_pose_ids.clear()
-        self._lost_pose_ids.clear()
-        self._last_poses.clear()
-
-    # CALLBACKS
-    def add_fix_callback(self, callback: PoseDictCallback) -> None:
-        """Register callback for fixed poses (unexpectedly disappeared poses with lost=True).
-
-        Args:
-            callback: Function that receives dict of fixed poses.
-        """
-        self._fix_callbacks.append(callback)
-
-    def remove_fix_callback(self, callback: PoseDictCallback) -> None:
-        """Unregister a fix callback.
-
-        Args:
-            callback: Function to remove.
-        """
-        if callback in self._fix_callbacks:
-            self._fix_callbacks.remove(callback)
-
-    def _emit_fix_callbacks(self, fixed_poses: dict[int, Pose]) -> None:
-        """Emit callbacks with fixed poses."""
-        for callback in self._fix_callbacks:
-            try:
-                callback(fixed_poses)
-            except Exception as e:
-                warnings.warn(
-                    f"PosePresenceTracker: Error in fix callback: {e}",
-                    RuntimeWarning,
-                    stacklevel=2
-                )
-
-    @property
-    def active_pose_ids(self) -> set[int]:
-        """Get set of currently active pose IDs."""
-        return self._active_pose_ids.copy()
-
-    @property
-    def lost_pose_ids(self) -> set[int]:
-        """Get set of pose IDs currently marked as lost."""
-        return self._lost_pose_ids.copy()
+        """Reset all tracked poses."""
+        self._previous_poses.clear()

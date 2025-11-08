@@ -1,9 +1,12 @@
+
+
 from modules.pose.Pose import Pose, PoseCallback
 from modules.pose.filters.PoseFilterBase import PoseFilterBase
+from modules.pose.callbacks import PoseCallbackMixin
 from threading import Lock
 
 
-class PoseCallbackFilter:
+class PoseCallbackFilter(PoseCallbackMixin):
     """
     Wraps a PoseFilterBase and provides callback registration for push-based filters.
 
@@ -24,12 +27,10 @@ class PoseCallbackFilter:
 
     def __init__(self, filter_instance: PoseFilterBase) -> None:
         self._filter: PoseFilterBase = filter_instance
-        self._callbacks: set[PoseCallback] = set()
-        self._callback_lock = Lock()
 
     def add_pose(self, pose: Pose) -> None:
         """Process a pose and notify all registered callbacks."""
-        processed_pose = self._filter.process(pose)
+        processed_pose: Pose = self._filter.process(pose)
         self._notify_callbacks(processed_pose)
 
         if pose.lost:
@@ -38,17 +39,3 @@ class PoseCallbackFilter:
     def reset(self) -> None:
         """Reset the filter's internal state."""
         self._filter.reset()
-
-    # CALLBACKS
-    def _notify_callbacks(self, pose: Pose) -> None:
-        with self._callback_lock:
-            for callback in self._callbacks:
-                callback(pose)
-
-    def add_callback(self, callback: PoseCallback) -> None:
-        with self._callback_lock:
-            self._callbacks.add(callback)
-
-    def remove_callback(self, callback: PoseCallback) -> None:
-        with self._callback_lock:
-            self._callbacks.discard(callback)

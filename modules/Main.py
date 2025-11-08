@@ -18,8 +18,8 @@ from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 from modules.pose.detection.PoseDetectionPipeline import PoseDetectionPipeline
 
 from modules.pose import filters
-from modules.pose.filters.PoseFilterPipelineTracker import PoseFilterPipelineTracker
 from modules.pose.filters.general.gui.PoseSmootherGui import PoseSmootherGui
+from modules.pose.trackers import PoseFilterPipelineTracker
 
 from modules.pose.correlation.PoseSimilarityComputer import PoseSimilarityComputer
 

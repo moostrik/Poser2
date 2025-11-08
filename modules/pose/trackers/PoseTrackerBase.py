@@ -1,13 +1,12 @@
 """Base class for pose filter trackers."""
 
 from abc import ABC, abstractmethod
-from threading import Lock
-from traceback import print_exc
 
-from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
+from modules.pose.Pose import Pose, PoseDict
+from modules.pose.callbacks import PoseDictCallbackMixin
 
 
-class PoseTrackerBase(ABC):
+class PoseTrackerBase(PoseDictCallbackMixin, ABC):
     """Base class for tracking and filtering multiple poses.
 
     Provides callback system and reset functionality. Subclasses implement
@@ -20,9 +19,8 @@ class PoseTrackerBase(ABC):
         Args:
             num_poses: Number of poses to track.
         """
+        super().__init__()  # Initialize mixin
         self.num_poses: int = num_poses
-        self._output_callbacks: set[PoseDictCallback] = set()
-        self._callback_lock = Lock()
 
     def add_poses(self, poses: PoseDict) -> None:
         """Process poses and emit callbacks.
@@ -38,6 +36,7 @@ class PoseTrackerBase(ABC):
                 pending_poses[pose_id] = current_pose
             except Exception as e:
                 print(f"{self.__class__.__name__}: Error processing pose {pose_id}: {e}")
+                from traceback import print_exc
                 print_exc()
                 pending_poses[pose_id] = pose
 
@@ -45,7 +44,7 @@ class PoseTrackerBase(ABC):
             if pose.lost:
                 self.reset_pose(pose_id)
 
-        self._emit_callbacks(pending_poses)
+        self._notify_callbacks(pending_poses)
 
     @abstractmethod
     def _process_pose(self, pose_id: int, pose: Pose) -> Pose:
@@ -73,32 +72,3 @@ class PoseTrackerBase(ABC):
             pose_id: ID of pose to reset.
         """
         pass
-
-    # CALLBACKS
-    def _emit_callbacks(self, poses: dict[int, Pose]) -> None:
-        """Emit callbacks with processed poses."""
-        with self._callback_lock:
-            for callback in self._output_callbacks:
-                try:
-                    callback(poses)
-                except Exception as e:
-                    print(f"{self.__class__.__name__}: Error in callback: {e}")
-                    print_exc()
-
-    def add_callback(self, callback: PoseDictCallback) -> None:
-        """Register output callback.
-
-        Args:
-            callback: Function to call with processed poses.
-        """
-        with self._callback_lock:
-            self._output_callbacks.add(callback)
-
-    def remove_callback(self, callback: PoseDictCallback) -> None:
-        """Unregister output callback.
-
-        Args:
-            callback: Function to remove.
-        """
-        with self._callback_lock:
-            self._output_callbacks.discard(callback)
