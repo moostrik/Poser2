@@ -7,7 +7,6 @@ of circular values and coordinate clamping.
 # Standard library imports
 from abc import abstractmethod
 from dataclasses import replace
-from typing import Union
 
 # Third-party imports
 import numpy as np
@@ -15,7 +14,7 @@ import numpy as np
 # Pose imports
 from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.filter.prediction.VectorSmoothers import Smoother, AngleSmoother, PointSmoother
+from modules.pose.filter.prediction.VectorMath.VectorSmoothers import Smoother, AngleSmoother, PointSmoother
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POSE_NUM_JOINTS, POSE_POINTS_RANGE
 
 
@@ -177,11 +176,46 @@ class PoseDeltaSmoother(PoseSmootherBase):
         return replace(pose, delta_data=new_data)
 
 
+class PoseSmoother(PoseFilterBase):
+    """Smooths all pose features (angles, points, and deltas) using OneEuroFilter.
+
+    Applies the same smoothing configuration to all features. For independent
+    control of each feature, use PoseAngleSmoother, PosePointSmoother, and
+    PoseDeltaSmoother separately.
+    """
+
+    def __init__(self, config: PoseSmootherConfig) -> None:
+        self._config: PoseSmootherConfig = config
+
+        # Create individual smoothers for each feature
+        self._angle_smoother = PoseAngleSmoother(config)
+        self._point_smoother = PosePointSmoother(config)
+        self._delta_smoother = PoseDeltaSmoother(config)
+
+    @property
+    def config(self) -> PoseSmootherConfig:
+        """Access the smoother's configuration."""
+        return self._config
+
+    def process(self, pose: Pose) -> Pose:
+        """Smooth all features in the pose."""
+        pose = self._angle_smoother.process(pose)
+        pose = self._point_smoother.process(pose)
+        pose = self._delta_smoother.process(pose)
+        return pose
+
+    def reset(self) -> None:
+        """Reset all smoothers' internal state."""
+        self._angle_smoother.reset()
+        self._point_smoother.reset()
+        self._delta_smoother.reset()
+
+
 __all__: list[str] = [
     'PoseSmootherConfig',
+    'PoseSmootherBase',
     'PoseAngleSmoother',
     'PosePointSmoother',
     'PoseDeltaSmoother',
+    'PoseSmoother',
 ]
-
-PoseSmoother = Union[PoseAngleSmoother, PosePointSmoother, PoseDeltaSmoother]

@@ -7,14 +7,13 @@ extrapolation with proper handling of circular values and coordinate clamping.
 # Standard library imports
 from abc import abstractmethod
 from dataclasses import replace
-from typing import Union
 
 import numpy as np
 
 # Pose imports
 from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.filter.prediction.VectorPredictors import Predictor, AnglePredictor, PointPredictor, PredictionMethod
+from modules.pose.filter.prediction.VectorMath.VectorPredictors import Predictor, AnglePredictor, PointPredictor, PredictionMethod
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POSE_NUM_JOINTS, POSE_POINTS_RANGE
 
 
@@ -174,15 +173,44 @@ class PoseDeltaPredictor(PosePredictorBase):
         return replace(pose, delta_data=new_data)
 
 
-# Type alias for any pose predictor
-PosePredictor = Union[
-    PoseAnglePredictor,
-    PosePointPredictor,
-    PoseDeltaPredictor,
-]
+class PosePredictor(PoseFilterBase):
+    """Predicts all pose features (angles, points, and deltas) for the next frame.
 
-__all__ = [
+    Applies the same prediction configuration to all features. For independent
+    control of each feature, use PoseAnglePredictor, PosePointPredictor, and
+    PoseDeltaPredictor separately.
+    """
+
+    def __init__(self, config: PosePredictorConfig) -> None:
+        self._config: PosePredictorConfig = config
+
+        # Create individual predictors for each feature
+        self._angle_predictor = PoseAnglePredictor(config)
+        self._point_predictor = PosePointPredictor(config)
+        self._delta_predictor = PoseDeltaPredictor(config)
+
+    @property
+    def config(self) -> PosePredictorConfig:
+        """Access the predictor's configuration."""
+        return self._config
+
+    def process(self, pose: Pose) -> Pose:
+        """Predict all features in the pose."""
+        pose = self._angle_predictor.process(pose)
+        pose = self._point_predictor.process(pose)
+        pose = self._delta_predictor.process(pose)
+        return pose
+
+    def reset(self) -> None:
+        """Reset all predictors' internal state."""
+        self._angle_predictor.reset()
+        self._point_predictor.reset()
+        self._delta_predictor.reset()
+
+
+__all__: list[str] = [
     'PosePredictorConfig',
+    'PosePredictorBase',
     'PoseAnglePredictor',
     'PosePointPredictor',
     'PoseDeltaPredictor',

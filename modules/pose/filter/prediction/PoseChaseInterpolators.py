@@ -9,14 +9,13 @@ architecture: process() at input rate, update() at render rate.
 from abc import abstractmethod
 from dataclasses import replace
 from threading import Lock
-from typing import Union
 
 import numpy as np
 
 # Pose imports
 from modules.pose.filter.PoseFilterBase import PoseFilterBase, PoseFilterConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.filter.prediction.VectorChaseInterpolators import ChaseInterpolator, AngleChaseInterpolator, PointChaseInterpolator
+from modules.pose.filter.prediction.VectorMath.VectorChaseInterpolators import ChaseInterpolator, AngleChaseInterpolator, PointChaseInterpolator
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POSE_NUM_JOINTS, POSE_POINTS_RANGE
 
 
@@ -228,15 +227,61 @@ class PoseDeltaChaseInterpolator(PoseChaseInterpolatorBase):
         return replace(pose, delta_data=new_data)
 
 
-# Type alias for any pose chase interpolator
-PoseChaseInterpolator = Union[
-    PoseAngleChaseInterpolator,
-    PosePointChaseInterpolator,
-    PoseDeltaChaseInterpolator,
-]
+class PoseChaseInterpolator(PoseFilterBase):
+    """Chase interpolates all pose features (angles, points, and deltas).
+
+    Applies the same interpolation configuration to all features. For independent
+    control of each feature, use PoseAngleChaseInterpolator, PosePointChaseInterpolator,
+    and PoseDeltaChaseInterpolator separately.
+
+    Uses dual-frequency architecture:
+    - process() is called at input frequency (e.g., 30 FPS from pose detection)
+    - update() should be called at render frequency (e.g., 60+ FPS for display)
+    """
+
+    def __init__(self, config: PoseChaseInterpolatorConfig) -> None:
+        self._config: PoseChaseInterpolatorConfig = config
+        self._pose_lock = Lock()
+
+        # Create individual interpolators for each feature
+        self._angle_interpolator = PoseAngleChaseInterpolator(config)
+        self._point_interpolator = PosePointChaseInterpolator(config)
+        self._delta_interpolator = PoseDeltaChaseInterpolator(config)
+
+    @property
+    def config(self) -> PoseChaseInterpolatorConfig:
+        """Access the interpolator's configuration."""
+        return self._config
+
+    def process(self, pose: Pose) -> Pose:
+        """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
+        pose = self._angle_interpolator.process(pose)
+        pose = self._point_interpolator.process(pose)
+        pose = self._delta_interpolator.process(pose)
+        return pose
+
+    def update(self, current_time: float | None = None) -> Pose:
+        """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS)."""
+        pose = self._angle_interpolator.update(current_time)
+        pose = self._point_interpolator.update(current_time)
+        pose = self._delta_interpolator.update(current_time)
+        return pose
+
+    def get_interpolated_pose(self) -> Pose:
+        """Get a pose with the current interpolated values."""
+        # Just delegate to angle interpolator - all should have same pose
+        return self._angle_interpolator.get_interpolated_pose()
+
+    def reset(self) -> None:
+        """Reset all interpolators' internal state."""
+        self._angle_interpolator.reset()
+        self._point_interpolator.reset()
+        self._delta_interpolator.reset()
+
 
 __all__ = [
     'PoseChaseInterpolatorConfig',
+    'PoseChaseInterpolatorBase',
     'PoseAngleChaseInterpolator',
     'PosePointChaseInterpolator',
     'PoseDeltaChaseInterpolator',
