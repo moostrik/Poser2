@@ -168,7 +168,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
 # ========== BATCH COLLECTION ==========
 
 @dataclass(frozen=True)
-class SimilarityFeatureBatch:
+class SimilarityBatch:
     """Collection of all similarity features for multiple pose pairs in a frame.
 
     Simple container with O(1) lookup and iteration support.
@@ -316,7 +316,7 @@ class SimilarityFeatureBatch:
 
 
 # Type alias for batch callbacks
-SimilarityBatchCallback = Callable[[SimilarityFeatureBatch], None]
+SimilarityBatchCallback = Callable[[SimilarityBatch], None]
 
 
 

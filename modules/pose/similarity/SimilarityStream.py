@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 
 # Pose imports
-from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch, FeatureStatistic
+from modules.pose.features import SimilarityBatch, AggregationMethod
 
 # Local application imports
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -71,8 +71,8 @@ class SimilarityStream:
         self._snapshot_dirty: bool = True
         self.hot_reload = HotReloadMethods(self.__class__, True, True)
 
-    def update(self, batch: PoseSimilarityBatch ,
-               statistic: FeatureStatistic = FeatureStatistic.GEOMETRIC_MEAN) -> None:
+    def update(self, batch: SimilarityBatch ,
+               statistic: AggregationMethod = AggregationMethod.GEOMETRIC_MEAN) -> None:
         """Update stream with new correlation batch.
 
         Args:
@@ -82,11 +82,11 @@ class SimilarityStream:
         current_pairs: set[tuple[int, int]] = set()
 
         # Process new correlations
-        for pair_corr in batch.pair_correlations:
+        for pair_corr in batch.similarities:
             pair_id: tuple[int, int] = (min(pair_corr.pair_id), max(pair_corr.pair_id))
             current_pairs.add(pair_id)
 
-            similarity: float = pair_corr.get_stat(statistic)
+            similarity: float = pair_corr.similarity(statistic)
 
             if pair_id in self._pair_history:
                 similarities, write_idx = self._pair_history[pair_id]

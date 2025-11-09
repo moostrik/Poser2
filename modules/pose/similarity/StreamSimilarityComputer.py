@@ -15,7 +15,7 @@ from numba import njit
 import pandas as pd
 
 # Pose imports
-from modules.pose.features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
+from modules.pose.features import SimilarityFeature , SimilarityBatch , SimilarityBatchCallback
 from modules.pose.similarity.Stream import StreamData, StreamDataDict
 
 # Local application imports
@@ -132,7 +132,7 @@ class StreamCorrelator():
 
         # CALLBACKS
         self._callback_lock = threading.Lock()
-        self._callbacks: set[PoseSimilarityBatchCallback] = set()
+        self._callbacks: set[SimilarityBatchCallback] = set()
 
         # HOT RELOADER
         self.hot_reloader = HotReloadMethods(self.__class__, False, False)
@@ -143,12 +143,12 @@ class StreamCorrelator():
             self._input_pose_streams[data.id] = data
         return
 
-    def add_correlation_callback(self, callback: PoseSimilarityBatchCallback) -> None:
+    def add_correlation_callback(self, callback: SimilarityBatchCallback) -> None:
         """ Register a callback to receive the last correlation batch. """
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def _notify_callbacks(self, batch: PoseSimilarityBatch ) -> None:
+    def _notify_callbacks(self, batch: SimilarityBatch ) -> None:
         """ Call all registered callbacks with the current batch. """
         with self._callback_lock:
             for callback in self._callbacks:
@@ -184,7 +184,7 @@ class StreamCorrelator():
                 try:
                     for pair in angle_pairs:
                         try:
-                            future: Future[PoseAngleSimilarityData  | None] = self._process_pool.submit(
+                            future: Future[SimilarityFeature  | None] = self._process_pool.submit(
                                 self._analyse_pair, pair, self.maximum_nan_ratio, self.dtw_band, self.similarity_exponent
                             )
                             future_to_pair[future] = pair
@@ -197,12 +197,12 @@ class StreamCorrelator():
                     self._stop_event.set()
                     break
 
-                correlations: list[PoseAngleSimilarityData ] = []
+                correlations: list[SimilarityFeature ] = []
                 try:
                     for future in as_completed(future_to_pair):
                         pair: AnglePair = future_to_pair[future]
                         try:
-                            correlation: Optional[PoseAngleSimilarityData ] = future.result()
+                            correlation: Optional[SimilarityFeature ] = future.result()
                             if correlation:
                                 correlations.append(correlation)
                         except Exception as e:
@@ -212,7 +212,7 @@ class StreamCorrelator():
                     self._stop_event.set()
                     break
 
-                batch = PoseSimilarityBatch (pair_correlations=correlations)
+                batch = SimilarityBatch(similarities=correlations)
                 self._notify_callbacks(batch)
 
             elapsed: float = time.perf_counter() - loop_start
@@ -433,7 +433,7 @@ class StreamCorrelator():
         return pairs
 
     @staticmethod
-    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int, similarity_exponent: float) -> Optional[PoseAngleSimilarityData]:
+    def _analyse_pair(pair: AnglePair, maximum_nan_ratio: float, dtw_band: int, similarity_exponent: float) -> Optional[SimilarityFeature]:
         """Analyse a single pair of angle sequences for all joints and compute their similarity.
 
         Args:
@@ -493,7 +493,7 @@ class StreamCorrelator():
             scores = np.where(np.isnan(values), 0.0, 1.0).astype(np.float32)
 
             pair_id = (pair.id_1, pair.id_2) if pair.id_1 <= pair.id_2 else (pair.id_2, pair.id_1)
-            return PoseAngleSimilarityData(
+            return SimilarityFeature(
                 pair_id=pair_id,
                 values=values,
                 scores=scores

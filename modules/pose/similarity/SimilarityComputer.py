@@ -8,8 +8,7 @@ from typing import Optional
 # Third-party imports
 
 # Pose imports
-from modules.pose.features.AngleFeature import AngleFeature
-from modules.pose.features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
+from modules.pose.features import AngleFeature, SimilarityFeature , SimilarityBatch , SimilarityBatchCallback
 from modules.pose.similarity.AngleSimilarity import AngleSimilarity
 from modules.pose.Pose import PoseDict
 
@@ -39,9 +38,9 @@ class SimilarityComputer:
 
         # OUTPUT AND CALLBACKS
         self._output_lock = threading.Lock()
-        self._output_data: Optional[PoseSimilarityBatch ] = None
+        self._output_data: Optional[SimilarityBatch ] = None
         self._callback_lock = threading.Lock()
-        self._callbacks: set[PoseSimilarityBatchCallback] = set()
+        self._callbacks: set[SimilarityBatchCallback] = set()
 
         # HOT RELOADER
         self.hot_reloader = HotReloadMethods(self.__class__)
@@ -73,7 +72,7 @@ class SimilarityComputer:
                     poses: PoseDict = self._input_poses
 
                 # Process correlations
-                batch: PoseSimilarityBatch  = self._evaluate_pose_similarity(poses)
+                batch: SimilarityBatch  = self._evaluate_pose_similarity(poses)
 
                 # Store and notify
                 with self._output_lock:
@@ -87,7 +86,7 @@ class SimilarityComputer:
                 print(f"PoseCorrelator: Processing error: {e}")
                 traceback.print_exc()
 
-    def _evaluate_pose_similarity(self, poses: PoseDict) -> PoseSimilarityBatch :
+    def _evaluate_pose_similarity(self, poses: PoseDict) -> SimilarityBatch :
         """Process all pose pairs and compute their correlations."""
         # Extract angle data from actively tracked poses
         angle_data: dict[int, AngleFeature] = {
@@ -97,10 +96,10 @@ class SimilarityComputer:
         }
 
         if len(angle_data) < 2:
-            return PoseSimilarityBatch(pair_correlations=[])
+            return SimilarityBatch(similarities=[])
 
         # Compute correlations for each pair
-        similarities: list[PoseAngleSimilarityData] = []
+        similarities: list[SimilarityFeature] = []
         for (id1, angles_1), (id2, angles_2) in combinations(angle_data.items(), 2):
             # Compute similarity scores
             similarity_data: AngleFeature = AngleSimilarity.compute_similarity(angles_1, angles_2, self.similarity_exponent)
@@ -110,13 +109,13 @@ class SimilarityComputer:
                 # Normalize pair_id ordering
                 pair_id = (id1, id2) if id1 <= id2 else (id2, id1)
 
-                similarities.append(PoseAngleSimilarityData(
+                similarities.append(SimilarityFeature(
                     pair_id=pair_id,
                     values=similarity_data.values,
                     scores=similarity_data.scores
                 ))
 
-        return PoseSimilarityBatch(pair_correlations=similarities)
+        return SimilarityBatch(similarities=similarities)
 
     def add_poses(self, poses: PoseDict) -> None:
         """Update input poses and trigger correlation processing.
@@ -128,12 +127,12 @@ class SimilarityComputer:
             self._input_poses = poses
             self._update_event.set()
 
-    def get_output_data(self) -> Optional[PoseSimilarityBatch ]:
+    def get_output_data(self) -> Optional[SimilarityBatch ]:
         """Get the latest computed correlation batch."""
         with self._output_lock:
             return self._output_data
 
-    def add_correlation_callback(self, callback: PoseSimilarityBatchCallback) -> None:
+    def add_correlation_callback(self, callback: SimilarityBatchCallback) -> None:
         """Register a callback to receive correlation batch updates.
 
         Args:
@@ -142,7 +141,7 @@ class SimilarityComputer:
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def _notify_callbacks(self, batch: PoseSimilarityBatch ) -> None:
+    def _notify_callbacks(self, batch: SimilarityBatch ) -> None:
         """Call all registered callbacks with the current batch."""
         with self._callback_lock:
             for callback in self._callbacks:

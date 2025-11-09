@@ -16,6 +16,11 @@ from modules.pose.features.base.BaseFeature import (
     NORMALIZED_RANGE,
 )
 
+from modules.pose.features.base.NormalizedScalarFeature import (
+    AggregationMethod,
+)
+
+
 # Import all feature classes
 from modules.pose.features.Point2DFeature import (
     Point2DFeature,
@@ -36,6 +41,12 @@ from modules.pose.features.AngleFeature import (
 from modules.pose.features.factories.AngleFactory import (
     AngleFactory,
     ANGLE_KEYPOINTS,
+)
+
+from modules.pose.features.SimilarityFeature import (
+    SimilarityFeature,
+    SimilarityBatch,
+    SimilarityBatchCallback,
 )
 
 from modules.pose.features.SymmetryFeature import (

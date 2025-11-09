@@ -9,7 +9,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.similarity.SimilarityStream import SimilarityStream, SimilarityStreamData, PoseSimilarityBatch , FeatureStatistic
+from modules.pose.similarity.SimilarityStream import SimilarityStream, SimilarityStreamData, SimilarityBatch , AggregationMethod
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.data.CaptureDataHub import CaptureDataHub
 
@@ -66,14 +66,14 @@ class CorrelationStreamLayer(LayerBase):
             CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=True)
 
         if self.use_motion:
-            correlation_batch: PoseSimilarityBatch  | None = self.data.get_motion_correlation(True, self.data_consumer_key)
+            correlation_batch: SimilarityBatch  | None = self.data.get_motion_correlation(True, self.data_consumer_key)
         else:
-            correlation_batch: PoseSimilarityBatch  | None = self.data.get_pose_correlation(True, self.data_consumer_key)
+            correlation_batch: SimilarityBatch  | None = self.data.get_pose_correlation(True, self.data_consumer_key)
 
         if correlation_batch is None:
             return
 
-        self.correlation_stream.update(correlation_batch, FeatureStatistic.GEOMETRIC_MEAN)
+        self.correlation_stream.update(correlation_batch, AggregationMethod.GEOMETRIC_MEAN)
         stream_data: SimilarityStreamData = self.correlation_stream.get_stream_data()
 
         LayerBase.setView(self.fbo.width, self.fbo.height)

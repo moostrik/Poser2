@@ -21,14 +21,12 @@ from threading import Lock
 from collections.abc import Mapping
 
 from modules.pose.Pose import PoseDict
-from modules.pose.features.AngleFeature import AngleFeature
-from modules.pose.features.SymmetryFeature import SymmetryFeature
+from modules.pose.features import AngleFeature, SymmetryFeature, SimilarityBatch
 from modules.data.depricated.PoseViewportTracker import PoseViewportTracker, PoseViewportTrackerSettings
 from modules.data.depricated.PoseAngleTracker import PoseAngleTracker, PoseAngleTrackerSettings
 from modules.Settings import Settings
 from modules.utils.depricated.SmoothedInterpolator import OneEuroSettings, SmoothedInterpolator
 from modules.utils.PointsAndRects import Rect
-from modules.pose.features.PoseAngleSimilarity import PoseSimilarityBatch
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -102,7 +100,7 @@ class RenderDataHub_Old:
                 self._viewport_trackers[tracklet_id].add_pose(pose)
                 self._angle_trackers[tracklet_id].add_pose(pose)
 
-    def _add_correlation(self, batch: PoseSimilarityBatch , smoothers: dict[tuple[int, int], SmoothedInterpolator]
+    def _add_correlation(self, batch: SimilarityBatch , smoothers: dict[tuple[int, int], SmoothedInterpolator]
     ) -> None:
         """Helper to add correlation data and manage smoother lifecycle."""
         batch_pair_ids: set[tuple[int, int]] = {pair.pair_id for pair in batch}
@@ -114,9 +112,9 @@ class RenderDataHub_Old:
         for pair in batch:
             if pair.pair_id not in smoothers:
                 smoothers[pair.pair_id] = SmoothedInterpolator(self.one_euro_settings)
-            smoothers[pair.pair_id].add_sample(pair.geometric_mean)
+            smoothers[pair.pair_id].add_sample(pair.geometric_mean())
 
-    def add_pose_correlation(self, batch: PoseSimilarityBatch ) -> None:
+    def add_pose_correlation(self, batch: SimilarityBatch ) -> None:
         """Add new pose correlation and manage smoothers.
            Smoothers for pairs not in batch are automatically removed.
         """
@@ -124,7 +122,7 @@ class RenderDataHub_Old:
         with self._lock:
             self._add_correlation(batch, self._pose_correlation_smoothers)
 
-    def add_motion_correlation(self, batch: PoseSimilarityBatch ) -> None:
+    def add_motion_correlation(self, batch: SimilarityBatch ) -> None:
         """Add new motion correlation and manage smoothers.
            Smoothers for pairs not in batch are automatically removed.
         """
