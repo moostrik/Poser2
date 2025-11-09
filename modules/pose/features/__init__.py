@@ -16,7 +16,7 @@ from modules.pose.features.Point2DFeature import (
     PointLandmark,
     POINT_LANDMARK_NAMES,
     POINT_NUM_LANDMARKS,
-    POINT_COORD_RANGE
+    POINT2D_COORD_RANGE
 )
 
 from modules.pose.features.PoseAngles import (
@@ -61,7 +61,7 @@ POSE_FEATURE_CLASSES: dict[PoseFeatureType, type] = {
 }
 
 POSE_FEATURE_RANGES: dict[PoseFeatureType, tuple[float, float]] = {
-    PoseFeatureType.POINTS: POINT_COORD_RANGE,
+    PoseFeatureType.POINTS: POINT2D_COORD_RANGE,
     PoseFeatureType.ANGLES: ANGLE_RANGE,
     PoseFeatureType.DELTA: ANGLE_RANGE,
     PoseFeatureType.SYMMETRY: POSE_SYMMETRY_RANGE,

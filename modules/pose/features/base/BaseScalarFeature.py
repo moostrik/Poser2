@@ -1,10 +1,11 @@
 from abc import abstractmethod
-from functools import cached_property
 from typing import Optional
+from unittest import result
 
 import numpy as np
 from typing_extensions import Self
 
+from modules.gl.Utils import fill
 from modules.pose.features.base.BaseFeature import BaseFeature, FeatureEnum
 
 
@@ -26,7 +27,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
     """
 
     def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
-        """Initialize feature vector with values and scores.
+        """Initialize scalar feature with values and scores.
 
         PERFORMANCE NOTE: No validation performed. Caller must ensure:
         - Both arrays are 1D
@@ -76,7 +77,22 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         """Define valid range for scalar values. Must be implemented by subclasses."""
         pass
 
-    # ========== PROPERTIES (BaseFeature interface) ==========
+    # ========== BASEFEATURE ==========
+
+    def __len__(self) -> int:
+        """Number of joints in this feature."""
+        return len(self.joint_enum())
+
+    # ========== RAW DATA ACCESS ==========
+
+    def __getitem__(self, key: FeatureEnum | int) -> float:
+        """Support indexing by joint enum or integer."""
+        return float(self.values[key])
+
+    @property
+    def values(self) -> np.ndarray:
+        """Feature values array (read-only, n_joints)."""
+        return self._values
 
     @property
     def scores(self) -> np.ndarray:
@@ -93,58 +109,51 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         """Number of valid (non-NaN) values."""
         return self._valid_count
 
-    # ========== ADDITIONAL PROPERTIES ==========
-
-    @property
-    def values(self) -> np.ndarray:
-        """Feature values array (read-only, n_joints)."""
-        return self._values
-
-    @property
-    def any_valid(self) -> bool:
-        """True if at least one valid value is available."""
-        return self.valid_count > 0
-
-    @cached_property
-    def valid_joints(self) -> list[FeatureEnum]:
-        """List of joints with valid values (computed once, cached)."""
-        joint_enum_type: type[FeatureEnum] = self.joint_enum()
-        return [joint_enum_type(i) for i in np.where(self.valid_mask)[0]]
-
     # ========== ACCESS ==========
 
-    def __getitem__(self, key: FeatureEnum | int) -> float:
-        """Support indexing by joint enum or integer."""
-        return float(self.values[key])
-
-    def get(self, joint: FeatureEnum | int, default: float = np.nan) -> float:
-        """Get value with default for NaN."""
+    def get(self, joint: FeatureEnum | int, fill: float = np.nan) -> float:
+        """Get raw value for a joint (may be NaN), with fill for NaN."""
         value = self._values[joint]
-        return float(value) if not np.isnan(value) else default
+        return float(value) if not np.isnan(value) else fill
+
+    def get_value(self, joint: FeatureEnum | int, fill: float = np.nan) -> float:
+        """Alias for get() to emphasize value retrieval."""
+        return self.get(joint, fill)
+
+    def get_values(self, joints: list[FeatureEnum | int], fill: float = np.nan) -> list[float]:
+        """Get values for multiple joints with fill for NaN."""
+        values = self._values[list(joints)]
+
+        # Fast path: no NaN replacement needed
+        if np.isnan(fill):
+            return values.tolist()
+
+        # Vectorized NaN replacement
+        valid_mask = self._valid_mask[list(joints)]
+        result = np.where(valid_mask, values, fill)
+        return result.tolist()
 
     def get_score(self, joint: FeatureEnum | int) -> float:
         """Get score for a joint (always between 0.0 and 1.0)."""
         return float(self._scores[joint])
 
-    def to_dict(self, include_invalid: bool = False) -> dict[FeatureEnum, float]:
-        """Convert to dictionary mapping joint enums to values."""
-        joint_enum_type = self.joint_enum()
-        if include_invalid:
-            return {joint_enum_type(i): self._values[i] for i in range(len(self._values))}
-        else:
-            return {joint: self._values[joint] for joint in self.valid_joints}
+    def get_scores(self, joints: list[FeatureEnum | int]) -> list[float]:
+        """Get confidence scores for multiple joints."""
+        return [float(self._scores[joint]) for joint in joints]
+
+    def get_valid(self, joint: FeatureEnum | int) -> bool:
+        """Check if the value for a joint is valid (not NaN)."""
+        return self._valid_mask[joint]
+
+    def are_valid(self, joints: list[FeatureEnum | int]) -> bool:
+        """Check if ALL specified joints are valid (batch validation)."""
+        return bool(np.all(self._valid_mask[list(joints)]))
 
     # ========== REPRESENTATION ==========
 
     def __repr__(self) -> str:
         """String representation showing type and validity stats."""
-        min_val, max_val = self.default_range()
-
-        min_str = "-inf" if np.isneginf(min_val) else ("inf" if np.isposinf(min_val) else f"{min_val}")
-        max_str = "inf" if np.isposinf(max_val) else ("-inf" if np.isneginf(max_val) else f"{max_val}")
-        range_str = f", range=({min_str}, {max_str})"
-
-        return f"{self.__class__.__name__}(valid={self.valid_count}/{len(self.values)}{range_str})"
+        return f"{self.__class__.__name__}(valid={self.valid_count}/{len(self)})"
 
     # ========== CONSTRUCTORS ==========
 
@@ -172,13 +181,23 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
             raise ValueError(f"Invalid {cls.__name__}: {error}")
         return instance
 
-    # ========== VALIDATION (BaseFeature interface) ==========
+    # ========= VALIDATION ==========
 
     def validate(self, check_ranges: bool = True) -> tuple[bool, Optional[str]]:
         """Validate array properties (use for debugging/testing).
 
         Checks all invariants that should hold for a valid ScalarFeature.
         Returns all validation errors at once for better debugging experience.
+
+        Checks:
+        - values array is 1D
+        - values length matches n_joints
+        - scores array is 1D
+        - scores length matches n_joints
+        - NaN values must have score 0.0
+        - Scores are in [0.0, 1.0] (if check_ranges=True)
+        - Values are within default_range() (if check_ranges=True)
+            * Infinite bounds (±inf) are automatically skipped during validation
 
         Args:
             check_ranges: Whether to validate score/value ranges (slower)
@@ -199,22 +218,20 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         if errors:
             return (False, "; ".join(errors))
 
-        # Check enum length match
+        # Check shape match
         length = len(self.joint_enum())
+
         if len(self._values) != length:
             errors.append(f"values length {len(self._values)} != {self.joint_enum().__name__} length {length}")
+
         if len(self._scores) != length:
             errors.append(f"scores length {len(self._scores)} != {self.joint_enum().__name__} length {length}")
-
-        # Check arrays match each other
-        if len(self._values) != len(self._scores):
-            errors.append(f"Length mismatch: values={len(self._values)} vs scores={len(self._scores)}")
 
         # Early return for length errors (can't continue validation)
         if errors:
             return (False, "; ".join(errors))
 
-        # Check NaN/score consistency
+        # Check NaN/score consistency: NaN values MUST have score 0.0
         invalid_mask = ~self._valid_mask
         invalid_indices = np.where(invalid_mask)[0]
         if len(invalid_indices) > 0:
@@ -241,13 +258,13 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
             if not np.isneginf(min_val):
                 below_min = valid_values < min_val
                 if np.any(below_min):
-                    errors.append(f"values below minimum {min_val}: min={valid_values[below_min].min():.2f}")
+                    errors.append(f"Values below minimum {min_val}: min={valid_values[below_min].min():.2f}")
 
             # Check upper bound (only if not +inf)
             if not np.isposinf(max_val):
                 above_max = valid_values > max_val
                 if np.any(above_max):
-                    errors.append(f"values above maximum {max_val}: max={valid_values[above_max].max():.2f}")
+                    errors.append(f"Values above maximum {max_val}: max={valid_values[above_max].max():.2f}")
 
         # Return result
         if errors:

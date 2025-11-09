@@ -1,5 +1,4 @@
 from abc import abstractmethod
-from functools import cached_property
 from typing import Optional
 
 import numpy as np
@@ -23,9 +22,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
     Subclasses must implement:
     - joint_enum(): Define the joint structure (which IntEnum to use)
     - dimensions(): Number of dimensions per vector (2 for 2D, 3 for 3D)
-    - default_range(): Define valid value range per dimension
-        * Returns array of shape (n_dims, 2) with [[min, max], ...] for each dimension
-        * Use np.inf for unbounded dimensions: np.array([[-np.inf, np.inf], ...])
+    - default_range(): Define valid value range for ALL dimensions
     """
 
     def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
@@ -80,18 +77,26 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
 
     @classmethod
     @abstractmethod
-    def default_range(cls) -> np.ndarray:
-        """Define valid value ranges per dimension. Must be implemented by subclasses.
-
-        Note:
-            - Shape must be (dimensions(), 2)
-            - Each row is [min, max] for that dimension
-            - Use np.inf for unbounded dimensions
-            - Infinite ranges skip validation checks (automatic optimization)
-        """
+    def default_range(cls) -> tuple[float, float]:
+        """Define valid value range. Must be implemented by subclasses."""
         pass
 
-    # ========== PROPERTIES (BaseFeature interface) ==========
+    # ========== BASEFEATURE ==========
+
+    def __len__(self) -> int:
+        """Number of joints in this feature."""
+        return len(self.joint_enum())
+
+    # ========== RAW DATA ACCESS ==========
+
+    def __getitem__(self, key: FeatureEnum | int) -> np.ndarray:
+        """Get vector for a joint."""
+        return self._values[key]
+
+    @property
+    def values(self) -> np.ndarray:
+        """Vector values array (read-only, shape: n_joints × n_dims)."""
+        return self._values
 
     @property
     def scores(self) -> np.ndarray:
@@ -108,99 +113,29 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         """Number of valid (non-NaN) values."""
         return self._valid_count
 
-    # ========== ADDITIONAL PROPERTIES ==========
-
-    @property
-    def values(self) -> np.ndarray:
-        """Vector values array (read-only, shape: n_joints × n_dims)."""
-        return self._values
-
-    @property
-    def any_valid(self) -> bool:
-        """True if at least one valid vector is available."""
-        return self.valid_count > 0
-
-    @cached_property
-    def valid_joints(self) -> list[FeatureEnum]:
-        """List of joints with valid values (computed once, cached)."""
-        joint_enum_type: type[FeatureEnum] = self.joint_enum()
-        return [joint_enum_type(i) for i in np.where(self.valid_mask)[0]]
-
-    # ========== ACCESS ==========
-
-    def __getitem__(self, key: FeatureEnum | int) -> np.ndarray:
-        """Get vector for a joint."""
-        return self._values[key]
-
-    def get_component(self, joint: FeatureEnum | int, dim: int) -> float:
-        """Get specific component of a vector.
-
-        Args:
-            joint: Joint enum member or index
-            dim: Dimension index (0 for first, 1 for second, etc.)
-
-        Returns:
-            Component value (may be NaN)
-        """
-        return float(self._values[joint, dim])
-
-    def get(self, joint: FeatureEnum | int, default: float = np.nan) -> np.ndarray:
-        """Get vector with NaN components replaced by default value.
-
-        Args:
-            joint: Joint enum member or index
-            default: Value to replace NaN components with. If np.nan (default),
-                     returns vector unchanged (including NaN components).
-
-        Returns:
-            Vector with NaN components optionally replaced.
-            If default is np.nan or vector has no NaNs, returns original (no copy).
-            Otherwise returns a copy with NaNs replaced.
-
-        Examples:
-            >>> # Get vector as-is (including NaNs)
-            >>> vector = feature.get(BodyJoint.SHOULDER)
-
-            >>> # Replace NaNs with 0.0
-            >>> vector = feature.get(BodyJoint.SHOULDER, default=0.0)
-            >>> # [100.5, NaN, 200.3] → [100.5, 0.0, 200.3]
-        """
-        vector = self._values[joint]
-
-        # Fast path: return original if no replacement needed
-        if np.isnan(default) or not np.any(np.isnan(vector)):
-            return vector
-
-        # Slow path: copy and replace NaNs
-        vector = vector.copy()
-        nan_mask = np.isnan(vector)
-        vector[nan_mask] = default
-        return vector
+    # ========== FRIENDLY ACCESS ==========
 
     def get_score(self, joint: FeatureEnum | int) -> float:
-        """Get score for a joint (always between 0.0 and 1.0)."""
+        """Get confidence score for a single joint (Python float)."""
         return float(self._scores[joint])
 
-    def to_dict(self, include_invalid: bool = False) -> dict[FeatureEnum, np.ndarray]:
-        """Convert to dictionary mapping joint enums to values.
+    def get_scores(self, joints: list[FeatureEnum | int]) -> list[float]:
+        """Get confidence scores for multiple joints (Python list)."""
+        return [float(self._scores[joint]) for joint in joints]
 
-        Args:
-            include_invalid: If True, include values with NaN components
+    def get_valid(self, joint: FeatureEnum | int) -> bool:
+        """Check if the value for a joint is valid (not NaN)."""
+        return self._valid_mask[joint]
 
-        Returns:
-            Dictionary of joint → vector array mappings
-        """
-        joint_enum_type = self.joint_enum()
-        if include_invalid:
-            return {joint_enum_type(i): self._values[i] for i in range(len(self._values))}
-        else:
-            return {joint: self._values[joint] for joint in self.valid_joints}
+    def are_valid(self, joints: list[FeatureEnum | int]) -> bool:
+        """Check if ALL specified joints are valid (batch validation)."""
+        return bool(np.all(self._valid_mask[list(joints)]))
 
     # ========== REPRESENTATION ==========
 
     def __repr__(self) -> str:
         """String representation showing type, validity stats, and dimensions."""
-        return f"{self.__class__.__name__}(valid={self.valid_count}/{len(self._values)}, dims={self.dimensions()})"
+        return f"{self.__class__.__name__}(valid={self.valid_count}/{len(self)}, dims={self.dimensions()})"
 
     # ========== CONSTRUCTORS ==========
 
@@ -234,34 +169,14 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
 
     @classmethod
     def create_validated(cls, values: np.ndarray, scores: np.ndarray) -> Self:
-        """Create with full validation (use for untrusted input).
-
-        Performs complete validation including:
-        - Structural checks (dimensions, lengths)
-        - NaN/score consistency
-        - Score range validation
-        - Component range validation per dimension
-
-        Args:
-            values: Vector values array
-            scores: Confidence scores array
-
-        Returns:
-            New validated feature instance
-
-        Raises:
-            ValueError: If any validation check fails
-
-        Note: For performance-critical code, use cls(values, scores) directly
-              and validate explicitly if needed.
-        """
+        """Create with full validation (use for untrusted input)."""
         instance = cls(values=values, scores=scores)
         is_valid, error = instance.validate(check_ranges=True)
         if not is_valid:
             raise ValueError(f"Invalid {cls.__name__}: {error}")
         return instance
 
-    # ========== VALIDATION (BaseFeature interface) ==========
+    # ========= VALIDATION ==========
 
     def validate(self, check_ranges: bool = True) -> tuple[bool, Optional[str]]:
         """Validate array properties (use for debugging/testing).
@@ -276,7 +191,8 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         - scores length matches n_joints
         - Vectors with any NaN component must have score 0.0
         - Scores are in [0.0, 1.0] (if check_ranges=True)
-        - Components are within default_range() per dimension (if check_ranges=True)
+        - ALL components are within default_range() (if check_ranges=True)
+            * Same range applies to all dimensions (x, y, z, ...)
             * Infinite bounds (±inf) are automatically skipped during validation
 
         Args:
@@ -332,27 +248,22 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
             if np.any((valid_scores < 0.0) | (valid_scores > 1.0)):
                 errors.append(f"Scores outside [0.0, 1.0]: min={valid_scores.min():.3f}, max={valid_scores.max():.3f}")
 
-            # Validate component ranges per dimension
-            range_limits = self.default_range()
-            valid_values = self._values[self._valid_mask]  # Shape: (n_valid, n_dims)
+            # Validate component ranges (same range for ALL dimensions)
+            min_val, max_val = self.default_range()  # Single tuple applies to all dimensions
+            valid_values = self._values[self._valid_mask]  # Shape: (n_valid, n_dims), all components
 
-            dim_names = ['x', 'y', 'z', 'w']
-            for dim in range(n_dims):
-                min_val, max_val = range_limits[dim]
-                dim_values = valid_values[:, dim]
-                dim_name = dim_names[dim] if dim < len(dim_names) else f"dim{dim}"
+            # Check ALL components against the same range
+            # Check lower bound (only if not -inf)
+            if not np.isneginf(min_val):
+                below_min = valid_values < min_val
+                if np.any(below_min):
+                    errors.append(f"Components below minimum {min_val}: min={valid_values[below_min].min():.2f}")
 
-                # Check lower bound (only if not -inf)
-                if not np.isneginf(min_val):
-                    below_min = dim_values < min_val
-                    if np.any(below_min):
-                        errors.append(f"{dim_name} below minimum {min_val}: min={dim_values[below_min].min():.2f}")
-
-                # Check upper bound (only if not +inf)
-                if not np.isposinf(max_val):
-                    above_max = dim_values > max_val
-                    if np.any(above_max):
-                        errors.append(f"{dim_name} above maximum {max_val}: max={dim_values[above_max].max():.2f}")
+            # Check upper bound (only if not +inf)
+            if not np.isposinf(max_val):
+                above_max = valid_values > max_val
+                if np.any(above_max):
+                    errors.append(f"Components above maximum {max_val}: max={valid_values[above_max].max():.2f}")
 
         # Return result
         if errors:
