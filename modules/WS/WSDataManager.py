@@ -5,9 +5,9 @@ from time import time
 
 from modules.utils.depricated.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
-from modules.pose.Pose import Pose, PosePointData, PoseAngleData, PoseMeasurementData
+from modules.pose.Pose import Pose, Point2DFeature, PoseAngleData, PoseMeasurementData
 from modules.pose.features.PoseAngles import AngleJoint, ANGLE_JOINT_NAMES
-from modules.pose.features.PosePoints import PoseJoint
+from modules.pose.features.Point2DFeature import PointLandmark
 from modules.pose.similarity.Stream import StreamData
 from modules.utils.PointsAndRects import Rect
 
@@ -98,11 +98,11 @@ class WSData:
 
             world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
             nose_angle_offset: float | None = None
-            pose_points: PosePointData | None = pose.point_data
+            pose_points: Point2DFeature | None = pose.point_data
             crop_rect: Rect | None = pose.bounding_box
             if pose_points is not None and crop_rect is not None:
-                nose_x = pose_points.values[PoseJoint.nose.value][0]
-                nose_conf = pose_points.scores[PoseJoint.nose.value]
+                nose_x = pose_points.values[PointLandmark.nose.value][0]
+                nose_conf = pose_points.scores[PointLandmark.nose.value]
                 if nose_conf > 0.3:
                     # calculate nose offset from center of crop rect
                     nose_offset_x: float = nose_x - 0.5

@@ -17,7 +17,7 @@ import numpy as np
 import torch
 
 # Pose imports
-from modules.pose.features.PosePoints import PosePointData
+from modules.pose.features.Point2DFeature import Point2DFeature
 
 # Local application imports
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -59,7 +59,7 @@ class DetectionInput:
 @dataclass
 class DetectionOutput:
     batch_id: int
-    point_data_list: list[PosePointData]
+    point_data_list: list[Point2DFeature]
     inference_time_ms: float = 0.0  # For monitoring
 
 PoseDetectionOutputCallback = Callable[[DetectionOutput], None]
@@ -176,7 +176,7 @@ class Detection(Thread):
 
             with torch.cuda.stream(stream):
                 data_samples: list[list[PoseDataSample]] = Detection._infer_batch(model, pipeline, input_data.images)
-                point_data_list: list[PosePointData] = Detection._extract_pose_point_data(data_samples, self.model_width, self.model_height, self.confidence_threshold)
+                point_data_list: list[Point2DFeature] = Detection._extract_pose_point_data(data_samples, self.model_width, self.model_height, self.confidence_threshold)
                 stream.synchronize()
 
             inference_time_ms: float = (time.perf_counter() - batch_start) * 1000.0
@@ -296,9 +296,9 @@ class Detection(Thread):
             return results_by_image
 
     @staticmethod
-    def _extract_pose_point_data(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> list[PosePointData]:
+    def _extract_pose_point_data(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> list[Point2DFeature]:
         """Process pose data samples and return only the first detected pose for each image."""
-        first_poses: list[PosePointData] = []
+        first_poses: list[Point2DFeature] = []
 
         for data_samples_for_image in data_samples:
             pose_found = False
@@ -317,13 +317,13 @@ class Detection(Thread):
                 person_scores: np.ndarray = scores[0].copy()
 
                 # Create pose and add to result
-                pose = PosePointData(norm_keypoints, person_scores)
+                pose = Point2DFeature(norm_keypoints, person_scores)
                 first_poses.append(pose)
                 pose_found = True
                 break  # Stop after finding first pose
 
             # If no pose found for this image, add None
             if not pose_found:
-                first_poses.append(PosePointData.create_empty())
+                first_poses.append(Point2DFeature.create_empty())
 
         return first_poses

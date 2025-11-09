@@ -10,7 +10,7 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.Pose import Pose
-from modules.pose.features.PosePoints import PoseJoint
+from modules.pose.features.Point2DFeature import PointLandmark
 from modules.data.depricated.RenderDataHub import RenderDataHub_Old
 
 from modules.data.CaptureDataHub import CaptureDataHub

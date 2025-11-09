@@ -15,7 +15,7 @@ from modules.gl.Texture import Texture
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 
-from modules.pose.features.PosePoints import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
+from modules.pose.features.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.PoseAngles import ANGLE_NUM_JOINTS, ANGLE_JOINT_NAMES
 from modules.pose.similarity.Stream import StreamData
 

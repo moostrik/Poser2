@@ -6,7 +6,7 @@ from typing_extensions import Self
 from modules.pose.features.base.BaseVectorFeature import BaseVectorFeature
 
 
-class PoseJoint(IntEnum):
+class PointLandmark(IntEnum):
     """Enumeration of body joints for pose estimation."""
     nose =          0
     left_eye =      1
@@ -28,12 +28,12 @@ class PoseJoint(IntEnum):
 
 
 # Constants
-POSE_JOINT_NAMES: list[str] = [e.name for e in PoseJoint]
-POSE_NUM_JOINTS: int = len(PoseJoint)
-POSE_POINTS_RANGE: tuple[float, float] = (0.0, 1.0)
+POINT_LANDMARK_NAMES: list[str] = [e.name for e in PointLandmark]
+POINT_NUM_LANDMARKS: int = len(PointLandmark)
+POINT_COORD_RANGE: tuple[float, float] = (0.0, 1.0)
 
 
-class Point2DFeature(BaseVectorFeature[PoseJoint]):
+class Point2DFeature(BaseVectorFeature[PointLandmark]):
     """2D point coordinates for body joints (normalized [0, 1] range).
 
     Represents 2D keypoint positions for pose estimation, where:
@@ -46,9 +46,9 @@ class Point2DFeature(BaseVectorFeature[PoseJoint]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def joint_enum(cls) -> type[PoseJoint]:
+    def joint_enum(cls) -> type[PointLandmark]:
         """Returns PoseJoint enum."""
-        return PoseJoint
+        return PointLandmark
 
     @classmethod
     def dimensions(cls) -> int:
@@ -65,7 +65,7 @@ class Point2DFeature(BaseVectorFeature[PoseJoint]):
                 - Row 1: y range [0.0, 1.0]
         """
         # Use the constant to build the array
-        min_val, max_val = POSE_POINTS_RANGE
+        min_val, max_val = POINT_COORD_RANGE
         return np.array([
             [min_val, max_val],  # x range
             [min_val, max_val],  # y range
@@ -73,21 +73,21 @@ class Point2DFeature(BaseVectorFeature[PoseJoint]):
 
     # ========== CONVENIENCE ACCESSORS ==========
 
-    def get_x(self, joint: PoseJoint | int, fill: float = np.nan) -> float:
+    def get_x(self, joint: PointLandmark | int, fill: float = np.nan) -> float:
         """Get x coordinate (optionally replacing NaN with fill value)."""
-        x = float(self._vectors[joint, 0])
+        x = float(self._values[joint, 0])
         if not np.isnan(fill) and np.isnan(x):
             return fill
         return x
 
-    def get_y(self, joint: PoseJoint | int, fill: float = np.nan) -> float:
+    def get_y(self, joint: PointLandmark | int, fill: float = np.nan) -> float:
         """Get y coordinate (optionally replacing NaN with fill value)."""
-        y = float(self._vectors[joint, 1])
+        y = float(self._values[joint, 1])
         if not np.isnan(fill) and np.isnan(y):
             return fill
         return y
 
-    def get(self, joint: PoseJoint | int, fill: float = np.nan) -> tuple[float, float]:
+    def get(self, joint: PointLandmark | int, fill: float = np.nan) -> tuple[float, float]:
         """Get (x, y) tuple (optionally replacing NaN with fill value)."""
         x = self.get_x(joint, fill=fill)
         y = self.get_y(joint, fill=fill)
@@ -113,8 +113,8 @@ class Point2DFeature(BaseVectorFeature[PoseJoint]):
             >>> feature = Point2DFeature.from_xy_arrays(x, y)
         """
         # Stack into (n_joints, 2) shape
-        vectors = np.column_stack([x, y]).astype(np.float32)
-        return cls.from_vectors(vectors, scores)
+        values = np.column_stack([x, y]).astype(np.float32)
+        return cls.from_values(values, scores)
 
     @classmethod
     def from_flat_array(cls, flat: np.ndarray, scores: np.ndarray | None = None) -> Self:
@@ -134,8 +134,8 @@ class Point2DFeature(BaseVectorFeature[PoseJoint]):
         """
         # Reshape to (n_joints, 2)
         n_joints = len(cls.joint_enum())
-        vectors = flat.reshape(n_joints, 2).astype(np.float32)
-        return cls.from_vectors(vectors, scores)
+        values = flat.reshape(n_joints, 2).astype(np.float32)
+        return cls.from_values(values, scores)
 
     # ========== UTILITY METHODS ==========
 
@@ -149,7 +149,7 @@ class Point2DFeature(BaseVectorFeature[PoseJoint]):
             >>> feature = Point2DFeature(...)
             >>> flat = feature.to_flat_array()  # Shape: (34,)
         """
-        return self._vectors.flatten()
+        return self._values.flatten()
 
     def get_xy_arrays(self) -> tuple[np.ndarray, np.ndarray]:
         """Get separate x and y coordinate arrays.
@@ -162,9 +162,9 @@ class Point2DFeature(BaseVectorFeature[PoseJoint]):
             >>> x.shape  # (17,)
             >>> y.shape  # (17,)
         """
-        return self._vectors[:, 0], self._vectors[:, 1]
+        return self._values[:, 0], self._values[:, 1]
 
-    def distance_to(self, other: 'Point2DFeature', joint: PoseJoint | int) -> float:
+    def distance_to(self, other: 'Point2DFeature', joint: PointLandmark | int) -> float:
         """Calculate Euclidean distance between joint positions in two features.
 
         Args:
@@ -177,8 +177,8 @@ class Point2DFeature(BaseVectorFeature[PoseJoint]):
         Examples:
             >>> dist = feature1.distance_to(feature2, PoseJoint.nose)
         """
-        p1 = self._vectors[joint]
-        p2 = other._vectors[joint]
+        p1 = self._values[joint]
+        p2 = other._values[joint]
 
         # Return NaN if either point is invalid
         if np.any(np.isnan(p1)) or np.any(np.isnan(p2)):

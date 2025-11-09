@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 # Local imports
 from modules.pose.Pose import Pose
-from modules.pose.features.PosePoints import PoseJoint
+from modules.pose.features.Point2DFeature import PointLandmark
 from modules.data.depricated.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.PointsAndRects import Rect
@@ -76,8 +76,8 @@ class PoseViewportTracker(PoseTrackerBase):
             self._height_interpolator.add_sample(np.nan)
             return
 
-        left_eye: np.ndarray = pose_points[PoseJoint.left_eye.value]
-        right_eye: np.ndarray = pose_points[PoseJoint.right_eye.value]
+        left_eye: np.ndarray = pose_points[PointLandmark.left_eye.value]
+        right_eye: np.ndarray = pose_points[PointLandmark.right_eye.value]
         eye_midpoint: np.ndarray = (left_eye + right_eye) / 2
 
         centre_x: float = eye_midpoint[0] * pose_rect.width + pose_rect.x

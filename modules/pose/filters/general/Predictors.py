@@ -14,7 +14,7 @@ import numpy as np
 from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.filters.general.algorithms.VectorPredict import Predict, AnglePredict, PointPredict, PredictionMethod
-from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POSE_NUM_JOINTS, POSE_POINTS_RANGE
+from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POINT_NUM_LANDMARKS, POINT_COORD_RANGE
 
 
 class PredictorConfig(FilterConfigBase):
@@ -129,7 +129,7 @@ class PointPredictor(PredictorBase):
     """
 
     def _initialize_predictor(self) -> None:
-        self._predictor = PointPredict(num_points=POSE_NUM_JOINTS, input_frequency=self._config.frequency, method=self._config.method, clamp_range=POSE_POINTS_RANGE)
+        self._predictor = PointPredict(num_points=POINT_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method, clamp_range=POINT_COORD_RANGE)
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
         return pose.point_data

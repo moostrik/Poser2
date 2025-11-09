@@ -5,10 +5,10 @@ from typing import Optional
 
 from typing_extensions import Self
 
-from modules.pose.features.experimental.PoseVectorFeatureBase import PoseVectorFeatureBase, PoseEnum
+from modules.pose.features.base.VectorFeature import PoseVectorFeatureBase, VectorEnum
 
 
-class PoseAngleFeature(PoseVectorFeatureBase[PoseEnum], ABC):
+class PoseAngleFeature(PoseVectorFeatureBase[VectorEnum], ABC):
     """Base class for angle-based pose features.
 
     Extends PoseFeatureBase with angle-specific functionality:
@@ -25,7 +25,7 @@ class PoseAngleFeature(PoseVectorFeatureBase[PoseEnum], ABC):
         """Angles must be in range [-π, π]."""
         return (-np.pi, np.pi)
 
-    def angular_distance(self, other: 'PoseAngleFeature', joint: PoseEnum | int) -> float:
+    def angular_distance(self, other: 'PoseAngleFeature', joint: VectorEnum | int) -> float:
         """Calculate angular distance between two angles at a joint. """
         angle1 = self._values[joint]
         angle2 = other._values[joint]

@@ -14,7 +14,7 @@ import numpy as np
 # Pose imports
 from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.features import PoseFeatureData, PoseAngleData, PosePointData
+from modules.pose.features import PoseFeatureData, PoseAngleData, Point2DFeature
 
 
 class StickyFillerConfig(FilterConfigBase):
@@ -163,7 +163,7 @@ class PointStickyFiller(StickyFillerBase):
         return replace(pose, point_data=new_data)
 
     def _create_empty_feature_data(self) -> PoseFeatureData:
-        return PosePointData.create_empty()
+        return Point2DFeature.create_empty()
 
 
 class DeltaStickyFiller(StickyFillerBase):

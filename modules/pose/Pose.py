@@ -8,7 +8,7 @@ from typing import Callable
 import numpy as np
 
 # Pose imports
-from modules.pose.features import PosePointData, PoseAngleData, PoseAngleSymmetryData
+from modules.pose.features import Point2DFeature, PoseAngleData, PoseAngleSymmetryData
 from modules.pose.features.deprecated.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
 
 # Local application imports
@@ -38,7 +38,7 @@ class Pose:
     lost: bool               # Last frame, before being lost
 
     bounding_box: Rect       # Bounding Box, in normalized coordinates, can be outside [0,1]
-    point_data: PosePointData
+    point_data: Point2DFeature
     angle_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
     delta_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
     symmetry_data: PoseAngleSymmetryData = field(default_factory=PoseAngleSymmetryData.create_empty)
@@ -59,7 +59,7 @@ class Pose:
         return PoseMeasurementFactory.compute(self.point_data, self.bounding_box)
 
     @cached_property
-    def camera_points(self) -> PosePointData:
+    def camera_points(self) -> Point2DFeature:
         """Convert normalized keypoints to camera image coordinates. Cached after first access."""
         pose_joints: np.ndarray = self.point_data.values
         rect: Rect = self.bounding_box
@@ -71,7 +71,7 @@ class Pose:
         camera_values = pose_joints[:, :2] * scale + offset
 
         # Preserve scores from original point_data
-        return PosePointData(values=camera_values, scores=self.point_data.scores)
+        return Point2DFeature(values=camera_values, scores=self.point_data.scores)
 
 
 PoseCallback = Callable[[Pose], None]

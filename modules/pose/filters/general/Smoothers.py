@@ -15,7 +15,7 @@ import numpy as np
 from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.filters.general.algorithms.VectorSmooth import Smooth, AngleSmooth, PointSmooth
-from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POSE_NUM_JOINTS, POSE_POINTS_RANGE
+from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POINT_NUM_LANDMARKS, POINT_COORD_RANGE
 
 
 class SmootherConfig(FilterConfigBase):
@@ -139,12 +139,12 @@ class PointSmoother(SmootherBase):
 
     def _initialize_smoother(self) -> None:
         self._smoother = PointSmooth(
-            num_points=POSE_NUM_JOINTS,
+            num_points=POINT_NUM_LANDMARKS,
             frequency=self._config.frequency,
             min_cutoff=self._config.min_cutoff,
             beta=self._config.beta,
             d_cutoff=self._config.d_cutoff,
-            clamp_range=POSE_POINTS_RANGE
+            clamp_range=POINT_COORD_RANGE
         )
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 from enum import IntEnum
 
-from modules.pose.features.PosePoints import PosePointData, PoseJoint
+from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
 
 
 class PoseHeadOrientation(IntEnum):
@@ -33,7 +33,7 @@ class PoseHeadData:
 
 class PoseHeadFactory:
     @staticmethod
-    def from_points(point_data: Optional['PosePointData']) -> PoseHeadData:
+    def from_points(point_data: Optional['Point2DFeature']) -> PoseHeadData:
         """
         Calculate head orientation data from point data.
         Returns HeadPoseData with calculated angles or default values if calculation not possible.
@@ -45,9 +45,9 @@ class PoseHeadFactory:
         scores: np.ndarray = point_data.scores
 
         # Check if we have all necessary points (eyes and nose)
-        left_eye = points[PoseJoint.left_eye.value]
-        right_eye = points[PoseJoint.right_eye.value]
-        nose = points[PoseJoint.nose.value]
+        left_eye = points[PointLandmark.left_eye.value]
+        right_eye = points[PointLandmark.right_eye.value]
+        nose = points[PointLandmark.nose.value]
 
         if (np.isnan(left_eye).any() or
             np.isnan(right_eye).any() or
@@ -55,9 +55,9 @@ class PoseHeadFactory:
             return PoseHeadData()  # NaN values if points are missing
 
         # Get scores for the points
-        left_eye_score = scores[PoseJoint.left_eye.value]
-        right_eye_score = scores[PoseJoint.right_eye.value]
-        nose_score = scores[PoseJoint.nose.value]
+        left_eye_score = scores[PointLandmark.left_eye.value]
+        right_eye_score = scores[PointLandmark.right_eye.value]
+        nose_score = scores[PointLandmark.nose.value]
 
         # Calculate eye midpoint
         eye_midpoint = (left_eye + right_eye) / 2

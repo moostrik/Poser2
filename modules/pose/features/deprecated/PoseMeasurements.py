@@ -7,7 +7,7 @@ from typing import Optional
 import numpy as np
 
 # Pose imports
-from modules.pose.features.PosePoints import PosePointData, PoseJoint
+from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
 
 # Local application imports
 from modules.utils.PointsAndRects import Rect
@@ -37,37 +37,37 @@ ANATOMICAL_PROPORTIONS: dict[str, float] = {
 
 LIMB_CONFIG: dict[LimbType, dict] = {
     LimbType.left_arm: {
-        "joints": (PoseJoint.left_shoulder, PoseJoint.left_elbow, PoseJoint.left_wrist),
+        "joints": (PointLandmark.left_shoulder, PointLandmark.left_elbow, PointLandmark.left_wrist),
         "proportion": ANATOMICAL_PROPORTIONS["arm"],
         "calc_type": LimbCalculationType.SEGMENT_CHAIN,
         "fallback": False
     },
     LimbType.right_arm: {
-        "joints": (PoseJoint.right_shoulder, PoseJoint.right_elbow, PoseJoint.right_wrist),
+        "joints": (PointLandmark.right_shoulder, PointLandmark.right_elbow, PointLandmark.right_wrist),
         "proportion": ANATOMICAL_PROPORTIONS["arm"],
         "calc_type": LimbCalculationType.SEGMENT_CHAIN,
         "fallback": False
     },
     LimbType.left_leg: {
-        "joints": (PoseJoint.left_hip, PoseJoint.left_knee, PoseJoint.left_ankle),
+        "joints": (PointLandmark.left_hip, PointLandmark.left_knee, PointLandmark.left_ankle),
         "proportion": ANATOMICAL_PROPORTIONS["leg"],
         "calc_type": LimbCalculationType.SEGMENT_CHAIN,
         "fallback": False
     },
     LimbType.right_leg: {
-        "joints": (PoseJoint.right_hip, PoseJoint.right_knee, PoseJoint.right_ankle),
+        "joints": (PointLandmark.right_hip, PointLandmark.right_knee, PointLandmark.right_ankle),
         "proportion": ANATOMICAL_PROPORTIONS["leg"],
         "calc_type": LimbCalculationType.SEGMENT_CHAIN,
         "fallback": False
     },
     LimbType.spine: {
-        "joints": (PoseJoint.nose, PoseJoint.left_hip, PoseJoint.right_hip),
+        "joints": (PointLandmark.nose, PointLandmark.left_hip, PointLandmark.right_hip),
         "proportion": ANATOMICAL_PROPORTIONS["spine"],
         "calc_type": LimbCalculationType.MIDPOINT_TO_POINT,
         "fallback": False
     },
     LimbType.head: {
-        "joints": (PoseJoint.left_ear, PoseJoint.nose, PoseJoint.right_ear),
+        "joints": (PointLandmark.left_ear, PointLandmark.nose, PointLandmark.right_ear),
         "proportion": ANATOMICAL_PROPORTIONS["head"],
         "calc_type": LimbCalculationType.SEGMENT_CHAIN,
         "fallback": True  # Head is a fallback estimate
@@ -107,7 +107,7 @@ class PoseMeasurementFactory:
         return None
 
     @staticmethod
-    def compute(point_data: Optional['PosePointData'], crop_rect: Optional[Rect]) -> PoseMeasurementData:
+    def compute(point_data: Optional['Point2DFeature'], crop_rect: Optional[Rect]) -> PoseMeasurementData:
         if PoseMeasurementFactory.hotreload is None:
             PoseMeasurementFactory.hotreload = HotReloadMethods(PoseMeasurementFactory)
 

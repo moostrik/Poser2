@@ -9,7 +9,7 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
-from modules.pose.features.PosePoints import PosePointData, PoseJoint
+from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
 
 
 class AngleJoint(IntEnum):
@@ -30,18 +30,18 @@ ANGLE_NUM_JOINTS: int = len(AngleJoint)
 # Keypoint requirements for each angle measurement
 # Triplets (3 points) use standard angle calculation
 # Quads (4 points) require special calculation functions
-ANGLE_JOINT_KEYPOINTS: dict[AngleJoint, tuple[PoseJoint, ...]] = {
+ANGLE_JOINT_KEYPOINTS: dict[AngleJoint, tuple[PointLandmark, ...]] = {
     # Standard 3-point angles
-    AngleJoint.left_shoulder:  (PoseJoint.left_hip,       PoseJoint.left_shoulder,  PoseJoint.left_elbow),
-    AngleJoint.right_shoulder: (PoseJoint.right_hip,      PoseJoint.right_shoulder, PoseJoint.right_elbow),
-    AngleJoint.left_elbow:     (PoseJoint.left_shoulder,  PoseJoint.left_elbow,     PoseJoint.left_wrist),
-    AngleJoint.right_elbow:    (PoseJoint.right_shoulder, PoseJoint.right_elbow,    PoseJoint.right_wrist),
-    AngleJoint.left_hip:       (PoseJoint.left_shoulder,  PoseJoint.left_hip,       PoseJoint.left_knee),
-    AngleJoint.right_hip:      (PoseJoint.right_shoulder, PoseJoint.right_hip,      PoseJoint.right_knee),
-    AngleJoint.left_knee:      (PoseJoint.left_hip,       PoseJoint.left_knee,      PoseJoint.left_ankle),
-    AngleJoint.right_knee:     (PoseJoint.right_hip,      PoseJoint.right_knee,     PoseJoint.right_ankle),
+    AngleJoint.left_shoulder:  (PointLandmark.left_hip,       PointLandmark.left_shoulder,  PointLandmark.left_elbow),
+    AngleJoint.right_shoulder: (PointLandmark.right_hip,      PointLandmark.right_shoulder, PointLandmark.right_elbow),
+    AngleJoint.left_elbow:     (PointLandmark.left_shoulder,  PointLandmark.left_elbow,     PointLandmark.left_wrist),
+    AngleJoint.right_elbow:    (PointLandmark.right_shoulder, PointLandmark.right_elbow,    PointLandmark.right_wrist),
+    AngleJoint.left_hip:       (PointLandmark.left_shoulder,  PointLandmark.left_hip,       PointLandmark.left_knee),
+    AngleJoint.right_hip:      (PointLandmark.right_shoulder, PointLandmark.right_hip,      PointLandmark.right_knee),
+    AngleJoint.left_knee:      (PointLandmark.left_hip,       PointLandmark.left_knee,      PointLandmark.left_ankle),
+    AngleJoint.right_knee:     (PointLandmark.right_hip,      PointLandmark.right_knee,     PointLandmark.right_ankle),
     # Special 4-point measurements
-    AngleJoint.head:           (PoseJoint.left_eye,       PoseJoint.right_eye,      PoseJoint.left_shoulder, PoseJoint.right_shoulder),
+    AngleJoint.head:           (PointLandmark.left_eye,       PointLandmark.right_eye,      PointLandmark.left_shoulder, PointLandmark.right_shoulder),
     # AngleJoint.torso:          (PoseJoint.left_shoulder,  PoseJoint.right_shoulder, PoseJoint.left_hip,      PoseJoint.right_hip),
 }
 
@@ -232,7 +232,7 @@ class PoseAngleFactory:
         return PoseAngleData(values=values, scores=scores)
 
     @staticmethod
-    def from_points(point_data: Optional[PosePointData]) -> PoseAngleData:
+    def from_points(point_data: Optional[Point2DFeature]) -> PoseAngleData:
         """Create angle measurements from keypoint data.
 
         Computes joint angles from 2D keypoint positions, applies rotation offsets,
@@ -253,7 +253,7 @@ class PoseAngleFactory:
         # Compute all angle measurements
         for joint, keypoints in ANGLE_JOINT_KEYPOINTS.items():
             # Extract points using .get() method (returns NaN array if invalid)
-            points = [point_data.get(kp) for kp in keypoints]
+            points = [point_data[kp] for kp in keypoints]
 
             rotate_by = NEUTRAL_ROTATIONS[joint]
 

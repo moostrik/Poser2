@@ -7,38 +7,78 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features.PoseAngles import PoseAngleData, AngleJoint, ANGLE_JOINT_KEYPOINTS
-from modules.pose.features.PosePoints import PosePointData, PoseJoint, POSE_JOINT_COLORS
-from modules.pose.features.PosePoints import POSE_COLOR_ALPHA_BASE, POSE_COLOR_LEFT_POSITIVE, POSE_COLOR_LEFT_NEGATIVE, POSE_COLOR_RIGHT_POSITIVE, POSE_COLOR_RIGHT_NEGATIVE
+from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
+
+# COLORS
+POSE_COLOR_ALPHA_BASE:      float = 0.2
+POSE_COLOR_CENTER:          tuple[float, float, float] = (0.8, 0.8, 0.8) # Light Gray
+POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange
+POSE_COLOR_LEFT_POSITIVE:   tuple[float, float, float] = (1.0, 1.0, 0.0) # Yellow
+POSE_COLOR_LEFT_NEGATIVE:   tuple[float, float, float] = (1.0, 0.0, 0.0) # Red
+POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0) # Cyan
+POSE_COLOR_RIGHT_POSITIVE:  tuple[float, float, float] = (0.0, 0.5, 1.0) # Light Blue
+POSE_COLOR_RIGHT_NEGATIVE:  tuple[float, float, float] = (0.0, 1.0, 0.5) # Light Green
+
+
+# Define color for each joint
+POSE_JOINT_COLORS: dict[PointLandmark, tuple[float, float, float]] = {
+    # Central point
+    PointLandmark.nose: POSE_COLOR_CENTER,
+
+    # Left side points - orange
+    PointLandmark.left_eye:         POSE_COLOR_LEFT,
+    PointLandmark.left_ear:         POSE_COLOR_LEFT,
+    PointLandmark.left_shoulder:    POSE_COLOR_LEFT,
+    PointLandmark.left_elbow:       POSE_COLOR_LEFT,
+    PointLandmark.left_wrist:       POSE_COLOR_LEFT,
+    PointLandmark.left_hip:         POSE_COLOR_LEFT,
+    PointLandmark.left_knee:        POSE_COLOR_LEFT,
+    PointLandmark.left_ankle:       POSE_COLOR_LEFT,
+
+    # Right side points - cyan
+    PointLandmark.right_eye:        POSE_COLOR_RIGHT,
+    PointLandmark.right_ear:        POSE_COLOR_RIGHT,
+    PointLandmark.right_shoulder:   POSE_COLOR_RIGHT,
+    PointLandmark.right_elbow:      POSE_COLOR_RIGHT,
+    PointLandmark.right_wrist:      POSE_COLOR_RIGHT,
+    PointLandmark.right_hip:        POSE_COLOR_RIGHT,
+    PointLandmark.right_knee:       POSE_COLOR_RIGHT,
+    PointLandmark.right_ankle:      POSE_COLOR_RIGHT
+}
+
+
+
+
 
 # DEFINITIONS
-POSE_VERTEX_LIST: list[list[PoseJoint]] = [
-    [PoseJoint.nose,            PoseJoint.left_eye],
-    [PoseJoint.nose,            PoseJoint.right_eye],
-    [PoseJoint.left_eye,        PoseJoint.left_ear],
-    [PoseJoint.right_eye,       PoseJoint.right_ear],
-    [PoseJoint.left_shoulder,   PoseJoint.right_shoulder],
-    [PoseJoint.left_shoulder,   PoseJoint.left_elbow],
-    [PoseJoint.right_shoulder,  PoseJoint.right_elbow],
-    [PoseJoint.left_elbow,      PoseJoint.left_wrist],
-    [PoseJoint.right_elbow,     PoseJoint.right_wrist],
-    [PoseJoint.left_shoulder,   PoseJoint.left_hip],
-    [PoseJoint.right_shoulder,  PoseJoint.right_hip],
-    [PoseJoint.left_hip,        PoseJoint.left_knee],
-    [PoseJoint.right_hip,       PoseJoint.right_knee],
-    [PoseJoint.left_knee,       PoseJoint.left_ankle],
-    [PoseJoint.right_knee,      PoseJoint.right_ankle]
+POSE_VERTEX_LIST: list[list[PointLandmark]] = [
+    [PointLandmark.nose,            PointLandmark.left_eye],
+    [PointLandmark.nose,            PointLandmark.right_eye],
+    [PointLandmark.left_eye,        PointLandmark.left_ear],
+    [PointLandmark.right_eye,       PointLandmark.right_ear],
+    [PointLandmark.left_shoulder,   PointLandmark.right_shoulder],
+    [PointLandmark.left_shoulder,   PointLandmark.left_elbow],
+    [PointLandmark.right_shoulder,  PointLandmark.right_elbow],
+    [PointLandmark.left_elbow,      PointLandmark.left_wrist],
+    [PointLandmark.right_elbow,     PointLandmark.right_wrist],
+    [PointLandmark.left_shoulder,   PointLandmark.left_hip],
+    [PointLandmark.right_shoulder,  PointLandmark.right_hip],
+    [PointLandmark.left_hip,        PointLandmark.left_knee],
+    [PointLandmark.right_hip,       PointLandmark.right_knee],
+    [PointLandmark.left_knee,       PointLandmark.left_ankle],
+    [PointLandmark.right_knee,      PointLandmark.right_ankle]
 ]
 POSE_VERTEX_ARRAY: np.ndarray = np.array([kp.value for pose in POSE_VERTEX_LIST for kp in pose], dtype=np.int32)
 POSE_VERTEX_INDICES: np.ndarray = np.arange(len(POSE_VERTEX_ARRAY), dtype=np.int32)
 
-POSE_JOINT_TO_ANGLE_IDX: dict[PoseJoint, int] = {}
+POSE_JOINT_TO_ANGLE_IDX: dict[PointLandmark, int] = {}
 for angle_joint, keypoints in ANGLE_JOINT_KEYPOINTS.items():
     if len(keypoints) == 3:
         # For triplets, map the middle point (vertex) to this angle
         POSE_JOINT_TO_ANGLE_IDX[keypoints[1]] = angle_joint.value
     elif angle_joint == AngleJoint.head:
         # For head, map nose and eyes to head angle
-        POSE_JOINT_TO_ANGLE_IDX[PoseJoint.nose] = angle_joint.value
+        POSE_JOINT_TO_ANGLE_IDX[PointLandmark.nose] = angle_joint.value
 
 # CLASSES
 @dataclass(frozen=True)
@@ -48,7 +88,7 @@ class PoseVertexData:
 
 class PoseVertexFactory:
     @staticmethod
-    def compute_vertices(point_data: PosePointData) -> PoseVertexData:
+    def compute_vertices(point_data: Point2DFeature) -> PoseVertexData:
 
         vertices: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 2), dtype=np.float32)
         colors: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 4), dtype=np.float32)
@@ -63,7 +103,7 @@ class PoseVertexFactory:
         return vertex_data
 
     @staticmethod
-    def compute_angled_vertices(point_data: PosePointData, angle_data: PoseAngleData) -> PoseVertexData:
+    def compute_angled_vertices(point_data: Point2DFeature, angle_data: PoseAngleData) -> PoseVertexData:
 
 
         vertex_data: Optional[PoseVertexData] = PoseVertexFactory.compute_vertices(point_data)
