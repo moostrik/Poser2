@@ -34,7 +34,7 @@ class Pose:
 
     tracklet: Tracklet       # Deprecated, but kept for backward compatibility
     crop_image: np.ndarray   # Cropped image corresponding to bounding_box (with padding)
-    time_stamp: float    # Time when pose was captured -> should be Unix time in ms
+    time_stamp: float        # Time when pose was captured
     lost: bool               # Last frame, before being lost
 
     bounding_box: Rect       # Bounding Box, in normalized coordinates, can be outside [0,1]
