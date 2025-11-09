@@ -115,7 +115,7 @@ class RenderDataHub:
         """Get delta for the specified tracklet ID"""
         return self.get_pose(tracklet_id).delta_data
 
-    def get_symmetries(self, tracklet_id: int) -> features.PoseAngleSymmetryData:
+    def get_symmetries(self, tracklet_id: int) -> features.SymmetryFeature:
         return self.get_pose(tracklet_id).symmetry_data
 
     # TIME

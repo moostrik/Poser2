@@ -9,7 +9,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.Pose import Pose
 from modules.pose.features.Point2DFeature import PointLandmark
-from modules.pose.features.PoseAngleSymmetry import SymmetricJoint
+from modules.pose.features.SymmetryFeature import SymmetricJoint
 from modules.data.depricated.RenderDataHub import RenderDataHub_Old
 from modules.pose.features.AngleFeature import AngleLandmark
 
@@ -108,7 +108,7 @@ class HDTSoundOSC:
             velocity_msg.add_arg(float(velocity))
             bundle_builder.add_content(velocity_msg.build()) # type: ignore
 
-        mean_symmetry: float = self.smooth_data.get_symmetries(id).geometric_mean
+        mean_symmetry: float = self.smooth_data.get_symmetries(id).geometric_mean()
         symmetry_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/mean")
         symmetry_msg.add_arg(float(mean_symmetry))
         bundle_builder.add_content(symmetry_msg.build()) # type: ignore

@@ -28,7 +28,7 @@ from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
 from modules.gl.shaders.HDT_LineBlend import HDT_LineBlend
 from modules.data.depricated.RenderDataHub import RenderDataHub_Old
-from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
+from modules.pose.features.SymmetryFeature import SymmetryFeature
 from modules.pose.features.AngleFeature import AngleLandmark
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.utils.Smoothing import OneEuroFilterAngular
@@ -153,7 +153,7 @@ class LF(LayerBase):
         motion: float =     self.smooth_data.get_cumulative_motion(self.cam_id)
         age: float =        self.smooth_data.get_age(self.cam_id)
         anchor: float =     1.0 - self.smooth_data.viewport_settings.centre_dest_y
-        symmetry: float =   self.smooth_data.get_symmetries(self.cam_id).geometric_mean
+        symmetry: float =   self.smooth_data.get_symmetries(self.cam_id).geometric_mean()
 
 
 

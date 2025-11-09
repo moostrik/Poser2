@@ -8,7 +8,7 @@ from typing import Callable
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Point2DFeature, AngleFeature, PoseAngleSymmetryData
+from modules.pose.features import Point2DFeature, AngleFeature, SymmetryFeature
 from modules.pose.features.deprecated.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
 
 # Local application imports
@@ -41,7 +41,7 @@ class Pose:
     point_data: Point2DFeature
     angle_data: AngleFeature = field(default_factory=AngleFeature.create_empty)
     delta_data: AngleFeature = field(default_factory=AngleFeature.create_empty)
-    symmetry_data: PoseAngleSymmetryData = field(default_factory=PoseAngleSymmetryData.create_empty)
+    symmetry_data: SymmetryFeature = field(default_factory=SymmetryFeature.create_empty)
     motion_time: float =        0.0
 
     def __repr__(self) -> str:

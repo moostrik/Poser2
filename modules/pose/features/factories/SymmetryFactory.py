@@ -1,0 +1,49 @@
+import numpy as np
+
+from modules.pose.features.AngleFeature import AngleFeature, AngleLandmark
+from modules.pose.features.SymmetryFeature import SymmetryFeature, SymmetricJoint
+
+# Maps each symmetric joint type to its left/right AngleLandmark pair
+_SYMMETRY_PAIRS: dict[SymmetricJoint, tuple[AngleLandmark, AngleLandmark]] = {
+    SymmetricJoint.shoulder: (AngleLandmark.left_shoulder, AngleLandmark.right_shoulder),
+    SymmetricJoint.elbow: (AngleLandmark.left_elbow, AngleLandmark.right_elbow),
+    SymmetricJoint.hip: (AngleLandmark.left_hip, AngleLandmark.right_hip),
+    SymmetricJoint.knee: (AngleLandmark.left_knee, AngleLandmark.right_knee),
+}
+
+class SymmetryFactory:
+    """Utility class for computing symmetry metrics from angle data."""
+
+    @staticmethod
+    def from_angles(angle_data: AngleFeature, symmetry_exponent: float = 1.0) -> SymmetryFeature:
+        """Calculate symmetry metrics from angle data.
+
+        Args:
+            angle_data: Angle measurements (angles should already be mirrored)
+            symmetry_exponent: Exponent to emphasize symmetry differences (e.g., 2.0 for quadratic).
+                              Higher values penalize asymmetries more severely.
+
+        Returns:
+            SymmetryFeature with individual joint pair scores and aggregate metrics
+        """
+        values: np.ndarray = np.empty(len(SymmetricJoint), dtype=np.float32)
+
+        for joint_type in SymmetricJoint:
+            left_joint, right_joint = _SYMMETRY_PAIRS[joint_type]
+            left_angle = angle_data.values[left_joint]
+            right_angle = angle_data.values[right_joint]
+
+            if np.isnan(left_angle) or np.isnan(right_angle):
+                values[joint_type] = np.nan
+            else:
+                # After mirroring, symmetric poses have similar angles
+                angle_diff = abs(left_angle - right_angle)
+                if angle_diff > np.pi:
+                    angle_diff = 2 * np.pi - angle_diff
+
+                # Normalize to [0, 1] and apply exponent for emphasis
+                normalized_diff = angle_diff / np.pi
+                symmetry = (1.0 - normalized_diff) ** symmetry_exponent
+                values[joint_type] = float(max(0.0, min(1.0, symmetry)))
+
+        return SymmetryFeature.from_values(values)

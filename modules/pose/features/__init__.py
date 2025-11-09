@@ -10,13 +10,19 @@ This module provides classes for computing and analyzing pose features:
 from enum import Enum
 from typing import Union
 
+
+from modules.pose.features.base.BaseFeature import (
+    BaseFeature,
+    NORMALIZED_RANGE,
+)
+
 # Import all feature classes
 from modules.pose.features.Point2DFeature import (
     Point2DFeature,
     PointLandmark,
     POINT_LANDMARK_NAMES,
     POINT_NUM_LANDMARKS,
-    POINT2D_COORD_RANGE
+    POINT2D_COORD_RANGE,
 )
 
 from modules.pose.features.AngleFeature import (
@@ -24,21 +30,23 @@ from modules.pose.features.AngleFeature import (
     AngleLandmark,
     ANGLE_LANDMARK_NAMES,
     ANGLE_NUM_LANDMARKS,
-    ANGLE_RANGE
+    ANGLE_RANGE,
 )
 
 from modules.pose.features.factories.AngleFactory import (
     AngleFactory,
-    ANGLE_KEYPOINTS
+    ANGLE_KEYPOINTS,
 )
 
-from modules.pose.features.PoseAngleSymmetry import (
-    PoseAngleSymmetryData,
+from modules.pose.features.SymmetryFeature import (
+    SymmetryFeature,
     SymmetricJoint,
-    PoseAngleSymmetryFactory,
     SYMM_JOINT_NAMES,
     SYMM_NUM_JOINTS,
-    POSE_SYMMETRY_RANGE
+)
+
+from modules.pose.features.factories.SymmetryFactory import (
+    SymmetryFactory,
 )
 
 # Feature type enum for dynamic dispatch
@@ -54,21 +62,21 @@ class PoseFeatureType(Enum):
 PoseFeatureData = Union[
     Point2DFeature,
     AngleFeature,
-    PoseAngleSymmetryData,
+    SymmetryFeature,
 ]
 
 POSE_FEATURE_CLASSES: dict[PoseFeatureType, type] = {
     PoseFeatureType.POINTS: Point2DFeature,
     PoseFeatureType.ANGLES: AngleFeature,
     PoseFeatureType.DELTA: AngleFeature,
-    PoseFeatureType.SYMMETRY: PoseAngleSymmetryData,
+    PoseFeatureType.SYMMETRY: SymmetryFeature,
 }
 
 POSE_FEATURE_RANGES: dict[PoseFeatureType, tuple[float, float]] = {
     PoseFeatureType.POINTS: POINT2D_COORD_RANGE,
     PoseFeatureType.ANGLES: ANGLE_RANGE,
     PoseFeatureType.DELTA: ANGLE_RANGE,
-    PoseFeatureType.SYMMETRY: POSE_SYMMETRY_RANGE,
+    PoseFeatureType.SYMMETRY: NORMALIZED_RANGE,
 }
 
 POSE_FEATURE_DIMENSIONS: dict[PoseFeatureType, int] = {
@@ -81,5 +89,5 @@ POSE_FEATURE_DIMENSIONS: dict[PoseFeatureType, int] = {
 POSE_CLASS_TO_FEATURE_TYPE: dict[type, PoseFeatureType] = {
     Point2DFeature: PoseFeatureType.POINTS,
     AngleFeature: PoseFeatureType.ANGLES,
-    PoseAngleSymmetryData: PoseFeatureType.SYMMETRY,
+    SymmetryFeature: PoseFeatureType.SYMMETRY,
 }

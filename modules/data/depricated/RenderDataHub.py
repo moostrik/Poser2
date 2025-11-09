@@ -22,7 +22,7 @@ from collections.abc import Mapping
 
 from modules.pose.Pose import PoseDict
 from modules.pose.features.AngleFeature import AngleFeature
-from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
+from modules.pose.features.SymmetryFeature import SymmetryFeature
 from modules.data.depricated.PoseViewportTracker import PoseViewportTracker, PoseViewportTrackerSettings
 from modules.data.depricated.PoseAngleTracker import PoseAngleTracker, PoseAngleTrackerSettings
 from modules.Settings import Settings
@@ -159,7 +159,7 @@ class RenderDataHub_Old:
         with self._lock:
             return self._angle_trackers[tracklet_id].motions
 
-    def get_symmetries(self, tracklet_id: int) -> PoseAngleSymmetryData:
+    def get_symmetries(self, tracklet_id: int) -> SymmetryFeature:
         """Get the synchrony value for the specified symmetric joint type."""
         with self._lock:
             return self._angle_trackers[tracklet_id].symmetries

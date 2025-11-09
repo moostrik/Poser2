@@ -3,8 +3,7 @@ from dataclasses import dataclass, field
 from time import time
 
 from modules.pose.Pose import Pose
-from modules.pose.features.AngleFeature import AngleLandmark, AngleFeature
-from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryFactory, PoseAngleSymmetryData
+from modules.pose.features import AngleLandmark, AngleFeature, SymmetryFeature, SymmetryFactory
 from modules.data.depricated.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.depricated.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
@@ -52,7 +51,7 @@ class PoseAngleTracker(PoseTrackerBase):
         self._acceleration_data: AngleFeature = AngleFeature.create_empty()
         self._motion_data: AngleFeature = AngleFeature.create_empty()
         self._cumulative_motion_data: AngleFeature = AngleFeature.create_empty()
-        self._symmetry_data: PoseAngleSymmetryData = PoseAngleSymmetryData.create_empty()
+        self._symmetry_data: SymmetryFeature = SymmetryFeature.create_empty()
 
         self._angles_dirty = False
         self._velocities_dirty = False
@@ -112,7 +111,7 @@ class PoseAngleTracker(PoseTrackerBase):
         self._cumulative_motions_dirty = True
 
         # Compute symmetry
-        self._symmetry_data = PoseAngleSymmetryFactory.from_angles(self.angles, self.settings.symmetry_exponent)
+        self._symmetry_data = SymmetryFactory.from_angles(self.angles, self.settings.symmetry_exponent)
 
     def reset(self) -> None:
         """Reset all smoothers and accumulated state"""
@@ -128,7 +127,7 @@ class PoseAngleTracker(PoseTrackerBase):
         self._acceleration_data = AngleFeature.create_empty()
         self._motion_data = AngleFeature.create_empty()
         self._cumulative_motion_data = AngleFeature.create_empty()
-        self._symmetry_data = PoseAngleSymmetryData.create_empty()
+        self._symmetry_data = SymmetryFeature.create_empty()
 
         self._angles_dirty = False
         self._velocities_dirty = False
@@ -200,6 +199,6 @@ class PoseAngleTracker(PoseTrackerBase):
         return self._cumulative_total_motion
 
     @property
-    def symmetries(self) -> PoseAngleSymmetryData:
+    def symmetries(self) -> SymmetryFeature:
         """Current pose symmetry metrics"""
         return self._symmetry_data

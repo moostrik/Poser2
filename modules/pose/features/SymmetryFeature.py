@@ -1,7 +1,5 @@
 from enum import IntEnum
 
-import numpy as np
-
 from modules.pose.features.base.BaseFeature import NORMALIZED_RANGE
 from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod
 from modules.pose.features.AngleFeature import AngleLandmark
@@ -140,9 +138,9 @@ Batch Operations:
   • feature.are_valid(joints) -> bool                Check if ALL valid
 
 Factory Methods:
-  • SymmetryFeature.create_empty() -> SymmetryFeature     All NaN scores
-  • SymmetryFeature.from_values(values, scores)           Create with validation
-  • SymmetryFeature.create_validated(values, scores)      Create with strict checks
+  • feature.create_empty() -> feature             All NaN scores
+  • feature.from_values(values, scores)           Create with validation
+  • feature.create_validated(values, scores)      Create with strict checks
 
 Inherited from NormalizedScalarFeature (statistical aggregation):
 ------------------------------------------------------------------
@@ -150,27 +148,27 @@ Statistical Methods:
   • feature.mean(min_confidence=0.0) -> float
       Confidence-weighted arithmetic mean
       Use for: General purpose, balanced averaging
-  
+
   • feature.geometric_mean(min_confidence=0.0) -> float
       Confidence-weighted geometric mean (penalizes low values)
       Use for: When most joints should be symmetric
-  
+
   • feature.harmonic_mean(min_confidence=0.0) -> float
       Confidence-weighted harmonic mean (heavily penalizes low values)
       Use for: When ALL joints must be symmetric (strict)
-  
+
   • feature.aggregate(method, min_confidence=0.0) -> float
       General aggregation with method selection
-  
+
   • feature.min_value(min_confidence=0.0) -> float
       Minimum symmetry score (least symmetric joint pair)
-  
+
   • feature.max_value(min_confidence=0.0) -> float
       Maximum symmetry score (most symmetric joint pair)
-  
+
   • feature.median(min_confidence=0.0) -> float
       Median symmetry score
-  
+
   • feature.std(min_confidence=0.0) -> float
       Standard deviation of symmetry scores
 
