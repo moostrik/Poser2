@@ -3,7 +3,7 @@ from dataclasses import replace
 
 # Pose imports
 from modules.pose.filters.FilterBase import FilterBase
-from modules.pose.features.PoseAngles import PoseAngleData
+from modules.pose.features.AngleFeature import AngleFeature
 from modules.pose.Pose import Pose
 
 
@@ -23,7 +23,7 @@ class DeltaExtractor(FilterBase):
     def process(self, pose: Pose) -> Pose:
         # Compute deltas (or empty if no previous pose)
         if self._prev_pose is None:
-            delta_data: PoseAngleData = PoseAngleData.create_empty()
+            delta_data: AngleFeature = AngleFeature.create_empty()
         else:
             delta_data = pose.angle_data.subtract(self._prev_pose.angle_data)
 

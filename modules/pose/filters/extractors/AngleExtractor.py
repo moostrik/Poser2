@@ -3,7 +3,7 @@ from dataclasses import replace
 
 # Pose imports
 from modules.pose.filters.FilterBase import FilterBase
-from modules.pose.features.PoseAngles import PoseAngleData, PoseAngleFactory
+from modules.pose.features import AngleFeature, AngleFactory
 from modules.pose.Pose import Pose
 
 
@@ -20,5 +20,5 @@ class AngleExtractor(FilterBase):
 
     def process(self, pose: Pose) -> Pose:
         """Compute angles for all poses and emit enriched results."""
-        angle_data: PoseAngleData = PoseAngleFactory.from_points(pose.camera_points)
+        angle_data: AngleFeature = AngleFactory.from_points(pose.camera_points)
         return replace(pose, angle_data=angle_data)

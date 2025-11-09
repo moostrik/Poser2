@@ -107,11 +107,11 @@ class RenderDataHub:
         return pose
 
    #  BODY JOINT ANGLES
-    def get_angles(self, tracklet_id: int) -> features.PoseAngleData:
+    def get_angles(self, tracklet_id: int) -> features.AngleFeature:
         """Get angles for the specified tracklet ID"""
         return self.get_pose(tracklet_id).angle_data
 
-    def get_delta(self, tracklet_id: int) -> features.PoseAngleData:
+    def get_delta(self, tracklet_id: int) -> features.AngleFeature:
         """Get delta for the specified tracklet ID"""
         return self.get_pose(tracklet_id).delta_data
 

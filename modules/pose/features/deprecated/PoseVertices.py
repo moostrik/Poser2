@@ -6,7 +6,7 @@ from typing import Optional
 import numpy as np
 
 # Pose imports
-from modules.pose.features.PoseAngles import PoseAngleData, AngleJoint, ANGLE_JOINT_KEYPOINTS
+from modules.pose.features import AngleFeature, AngleLandmark, ANGLE_KEYPOINTS
 from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
 
 # COLORS
@@ -72,11 +72,11 @@ POSE_VERTEX_ARRAY: np.ndarray = np.array([kp.value for pose in POSE_VERTEX_LIST 
 POSE_VERTEX_INDICES: np.ndarray = np.arange(len(POSE_VERTEX_ARRAY), dtype=np.int32)
 
 POSE_JOINT_TO_ANGLE_IDX: dict[PointLandmark, int] = {}
-for angle_joint, keypoints in ANGLE_JOINT_KEYPOINTS.items():
+for angle_joint, keypoints in ANGLE_KEYPOINTS.items():
     if len(keypoints) == 3:
         # For triplets, map the middle point (vertex) to this angle
         POSE_JOINT_TO_ANGLE_IDX[keypoints[1]] = angle_joint.value
-    elif angle_joint == AngleJoint.head:
+    elif angle_joint == AngleLandmark.head:
         # For head, map nose and eyes to head angle
         POSE_JOINT_TO_ANGLE_IDX[PointLandmark.nose] = angle_joint.value
 
@@ -103,14 +103,14 @@ class PoseVertexFactory:
         return vertex_data
 
     @staticmethod
-    def compute_angled_vertices(point_data: Point2DFeature, angle_data: PoseAngleData) -> PoseVertexData:
+    def compute_angled_vertices(point_data: Point2DFeature, angle_data: AngleFeature) -> PoseVertexData:
 
 
         vertex_data: Optional[PoseVertexData] = PoseVertexFactory.compute_vertices(point_data)
         if vertex_data is None:
             return None
 
-        if not angle_data.any_valid:
+        if angle_data.valid_count == 0:
             return vertex_data
 
         colors: np.ndarray = vertex_data.colors

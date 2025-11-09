@@ -10,7 +10,7 @@ import numpy as np
 # Pose imports
 from modules.pose.detection.Detection import Detection, DetectionInput, DetectionOutput, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
 from modules.pose.detection.ImageProcessor import ImageProcessor
-from modules.pose.features.PoseAngles import PoseAngleFactory
+from modules.pose.features import AngleFactory
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 
 # Local application imports
@@ -188,7 +188,7 @@ class DetectionPipeline(Thread):
                 time_stamp = pending_request.time_stamp,
                 lost=tracklet.is_removed,
                 point_data = poses.point_data_list[i],
-                angle_data= PoseAngleFactory.from_points(poses.point_data_list[i])
+                angle_data= AngleFactory.from_points(poses.point_data_list[i])
             )
             pose_dict[tracklet.id] = pose
 

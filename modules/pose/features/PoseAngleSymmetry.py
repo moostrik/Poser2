@@ -6,7 +6,7 @@ from enum import IntEnum
 import numpy as np
 
 # Pose imports
-from modules.pose.features.PoseAngles import PoseAngleData, AngleJoint
+from modules.pose.features.AngleFeature import AngleFeature, AngleLandmark
 from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
 
@@ -20,11 +20,11 @@ SYMM_JOINT_NAMES: list[str] = [e.name for e in SymmetricJoint]
 SYMM_NUM_JOINTS: int = len(SymmetricJoint)
 
 # Source of truth for symmetric joint pairs
-SYMMETRIC_JOINT_PAIRS: dict[SymmetricJoint, tuple[AngleJoint, AngleJoint]] = {
-    SymmetricJoint.shoulder: (AngleJoint.left_shoulder, AngleJoint.right_shoulder),
-    SymmetricJoint.elbow: (AngleJoint.left_elbow, AngleJoint.right_elbow),
-    SymmetricJoint.hip: (AngleJoint.left_hip, AngleJoint.right_hip),
-    SymmetricJoint.knee: (AngleJoint.left_knee, AngleJoint.right_knee)
+SYMMETRIC_JOINT_PAIRS: dict[SymmetricJoint, tuple[AngleLandmark, AngleLandmark]] = {
+    SymmetricJoint.shoulder: (AngleLandmark.left_shoulder, AngleLandmark.right_shoulder),
+    SymmetricJoint.elbow: (AngleLandmark.left_elbow, AngleLandmark.right_elbow),
+    SymmetricJoint.hip: (AngleLandmark.left_hip, AngleLandmark.right_hip),
+    SymmetricJoint.knee: (AngleLandmark.left_knee, AngleLandmark.right_knee)
 }
 
 POSE_SYMMETRY_RANGE: tuple[float, float] = (0.0, 1.0)
@@ -72,7 +72,7 @@ class PoseAngleSymmetryFactory:
         return PoseAngleSymmetryData.from_values(values)
 
     @staticmethod
-    def from_angles(angle_data: PoseAngleData, symmetry_exponent: float = 1.0) -> PoseAngleSymmetryData:
+    def from_angles(angle_data: AngleFeature, symmetry_exponent: float = 1.0) -> PoseAngleSymmetryData:
         """Calculate symmetry metrics from angle data.
 
         Args:

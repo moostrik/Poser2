@@ -8,8 +8,9 @@ from typing import Optional
 # Third-party imports
 
 # Pose imports
-from modules.pose.features.PoseAngles import PoseAngleData
+from modules.pose.features.AngleFeature import AngleFeature
 from modules.pose.features.PoseAngleSimilarity import PoseAngleSimilarityData , PoseSimilarityBatch , PoseSimilarityBatchCallback
+from modules.pose.similarity.AngleSimilarity import AngleSimilarity
 from modules.pose.Pose import PoseDict
 
 # Local application imports
@@ -89,7 +90,7 @@ class SimilarityComputer:
     def _evaluate_pose_similarity(self, poses: PoseDict) -> PoseSimilarityBatch :
         """Process all pose pairs and compute their correlations."""
         # Extract angle data from actively tracked poses
-        angle_data: dict[int, PoseAngleData] = {
+        angle_data: dict[int, AngleFeature] = {
             tracklet_id: pose.angle_data
             for tracklet_id, pose in poses.items()
             if pose.tracklet.is_being_tracked
@@ -102,10 +103,10 @@ class SimilarityComputer:
         similarities: list[PoseAngleSimilarityData] = []
         for (id1, angles_1), (id2, angles_2) in combinations(angle_data.items(), 2):
             # Compute similarity scores
-            similarity_data: PoseAngleData = angles_1.similarity(angles_2, self.similarity_exponent)
+            similarity_data: AngleFeature = AngleSimilarity.compute_similarity(angles_1, angles_2, self.similarity_exponent)
 
             # Only include pairs with at least one valid joint
-            if similarity_data.any_valid:
+            if similarity_data.valid_count > 0:
                 # Normalize pair_id ordering
                 pair_id = (id1, id2) if id1 <= id2 else (id2, id1)
 

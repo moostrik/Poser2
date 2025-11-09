@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 
 from modules.pose.Pose import Pose, PoseDict
-from modules.pose.features.PoseAngles import PoseAngleData, ANGLE_JOINT_NAMES, ANGLE_NUM_JOINTS
+from modules.pose.features.AngleFeature import AngleFeature, ANGLE_LANDMARK_NAMES, ANGLE_NUM_LANDMARKS
 
 # Local application imports
 from modules.Settings import Settings
@@ -25,7 +25,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class StreamInput:
     id: int
     time_stamp: float  # Unix timestamp in seconds
-    angles: PoseAngleData | None
+    angles: AngleFeature | None
     is_removed: bool
 
     @classmethod
@@ -49,7 +49,7 @@ class StreamData:
 
     def get_last_angles(self) -> list[float]:
         if self.angles.empty:
-            return [0.0] * ANGLE_NUM_JOINTS
+            return [0.0] * ANGLE_NUM_LANDMARKS
         return self.angles.iloc[-1].tolist()
 
 StreamDataCallback = Callable[[StreamData], None]
@@ -191,7 +191,7 @@ class StreamProcessor(Process):
         self.resample_interval: str = f"{int(1.0 / settings.camera_fps * 1000)}ms"
 
         # Initialize buffers (will be recreated in child process)
-        self.empty_df: pd.DataFrame = pd.DataFrame(columns=ANGLE_JOINT_NAMES, dtype=float)
+        self.empty_df: pd.DataFrame = pd.DataFrame(columns=ANGLE_LANDMARK_NAMES, dtype=float)
         self.angle_df: pd.DataFrame = self.empty_df.copy()
         self.score_df: pd.DataFrame = self.empty_df.copy()
 
@@ -286,7 +286,7 @@ class StreamProcessor(Process):
         """
 
         if not poses or all(pose.angles is None for pose in poses):
-            empty = pd.DataFrame(columns=ANGLE_JOINT_NAMES, dtype=float)
+            empty = pd.DataFrame(columns=ANGLE_LANDMARK_NAMES, dtype=float)
             return empty, empty.copy()
 
         # Convert float timestamps to pd.Timestamp for DataFrame index
@@ -297,8 +297,8 @@ class StreamProcessor(Process):
         angle_data: list[np.ndarray] = [pose.angles.values for pose in poses if pose.angles is not None]
         conf_data: list[np.ndarray] = [pose.angles.scores for pose in poses if pose.angles is not None]
 
-        angles_df = pd.DataFrame(angle_data, index=timestamps, columns=ANGLE_JOINT_NAMES, dtype=float)
-        conf_df = pd.DataFrame(conf_data, index=timestamps, columns=ANGLE_JOINT_NAMES, dtype=float)
+        angles_df = pd.DataFrame(angle_data, index=timestamps, columns=ANGLE_LANDMARK_NAMES, dtype=float)
+        conf_df = pd.DataFrame(conf_data, index=timestamps, columns=ANGLE_LANDMARK_NAMES, dtype=float)
 
         return angles_df, conf_df
 

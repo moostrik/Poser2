@@ -3,8 +3,8 @@ import numpy as np
 from modules.pose.features.AngleFeature import AngleFeature, AngleLandmark
 from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
 
-
-ANGLE_JOINT_KEYPOINTS: dict[AngleLandmark, tuple[PointLandmark, ...]] = {
+"""Maps angle joints to the point landmarks needed to compute them"""
+ANGLE_KEYPOINTS: dict[AngleLandmark, tuple[PointLandmark, ...]] = {
     # Standard 3-point angles
     AngleLandmark.left_shoulder:  (PointLandmark.left_hip,       PointLandmark.left_shoulder,  PointLandmark.left_elbow),
     AngleLandmark.right_shoulder: (PointLandmark.right_hip,      PointLandmark.right_shoulder, PointLandmark.right_elbow),
@@ -16,10 +16,10 @@ ANGLE_JOINT_KEYPOINTS: dict[AngleLandmark, tuple[PointLandmark, ...]] = {
     AngleLandmark.right_knee:     (PointLandmark.right_hip,      PointLandmark.right_knee,     PointLandmark.right_ankle),
     # Special 4-point measurements
     AngleLandmark.head:           (PointLandmark.left_eye,       PointLandmark.right_eye,      PointLandmark.left_shoulder, PointLandmark.right_shoulder),
-    # AngleJoint.torso:          (PoseJoint.left_shoulder,  PoseJoint.right_shoulder, PoseJoint.left_hip,      PoseJoint.right_hip),
 }
 
-NEUTRAL_ROTATIONS: dict[AngleLandmark, float] = {
+"""Rotation offsets to normalize angles to neutral body position"""
+_ANGLE_OFFSET: dict[AngleLandmark, float] = {
     AngleLandmark.left_shoulder:   0.15 * np.pi,
     AngleLandmark.right_shoulder: -0.15 * np.pi,
     AngleLandmark.left_elbow:      0.9 * np.pi,
@@ -29,12 +29,10 @@ NEUTRAL_ROTATIONS: dict[AngleLandmark, float] = {
     AngleLandmark.left_knee:       np.pi,
     AngleLandmark.right_knee:      np.pi,
     AngleLandmark.head:            0.0,
-    # AngleJoint.torso:           0.0
 }
 
-# Right-side joints that should be mirrored for symmetric representation
-# When mirrored, symmetric poses (e.g., arms both at 45°) have similar values for left/right
-ANGLE_JOINT_SYMMETRIC_MIRROR: set[AngleLandmark] = {
+"""Right-side angles that get negated for left-right symmetry"""
+_ANGLE_MIRRORED: set[AngleLandmark] = {
     AngleLandmark.right_shoulder,
     AngleLandmark.right_elbow,
     AngleLandmark.right_hip,
@@ -63,14 +61,14 @@ class AngleFactory:
         angle_scores = np.zeros(len(AngleLandmark), dtype=np.float32)
 
         # Compute all angle measurements
-        for joint, keypoints in ANGLE_JOINT_KEYPOINTS.items():
+        for joint, keypoints in ANGLE_KEYPOINTS.items():
             # ✅ NEW: Use are_valid() - cleaner batch validation
             if not point_data.are_valid(list(keypoints)):
                 continue  # Skip if any required keypoint is invalid
 
             # Extract points (guaranteed valid - no NaN)
             points = [point_data[kp] for kp in keypoints]
-            rotate_by = NEUTRAL_ROTATIONS[joint]
+            rotate_by = _ANGLE_OFFSET[joint]
 
             # Compute angle based on number of keypoints (no NaN checks needed)
             if len(keypoints) == 3:
@@ -81,7 +79,7 @@ class AngleFactory:
                 continue
 
             # Mirror right-side angles for symmetric representation
-            if joint in ANGLE_JOINT_SYMMETRIC_MIRROR:
+            if joint in _ANGLE_MIRRORED:
                 angle = -angle
 
             angle_values[joint] = angle

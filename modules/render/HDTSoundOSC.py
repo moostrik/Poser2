@@ -11,7 +11,7 @@ from modules.pose.Pose import Pose
 from modules.pose.features.Point2DFeature import PointLandmark
 from modules.pose.features.PoseAngleSymmetry import SymmetricJoint
 from modules.data.depricated.RenderDataHub import RenderDataHub_Old
-from modules.pose.features.PoseAngles import AngleJoint
+from modules.pose.features.AngleFeature import AngleLandmark
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -94,7 +94,7 @@ class HDTSoundOSC:
         change_msg.add_arg(float(motion))
         bundle_builder.add_content(change_msg.build()) # type: ignore
 
-        for joint in AngleJoint:
+        for joint in AngleLandmark:
             angle: float | None = self.smooth_data.get_angles(id).get(joint)
             if angle is math.nan:
                 print(f"HDTSoundOSC: Warning - NaN angle for joint {joint.name} on tracklet {id}")
@@ -102,7 +102,7 @@ class HDTSoundOSC:
             angle_msg.add_arg(float(angle))
             bundle_builder.add_content(angle_msg.build()) # type: ignore
 
-        for joint in AngleJoint:
+        for joint in AngleLandmark:
             velocity: float | None = self.smooth_data.get_velocities(id).get(joint)
             velocity_msg = OscMessageBuilder(address=f"/pose/{id}/delta/{joint.name}")
             velocity_msg.add_arg(float(velocity))

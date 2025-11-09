@@ -10,12 +10,12 @@ from modules.gl.Mesh import Mesh
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.features.PoseAngles import PoseAngleData
+from modules.pose.features.AngleFeature import AngleFeature
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 
 from modules.pose.features.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
-from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
+from modules.pose.features import AngleFeature
 
 from modules.data.RenderDataHub import RenderDataHub
 from modules.data.CaptureDataHub import CaptureDataHub
@@ -96,22 +96,22 @@ class PoseFeatureLayer(LayerBase):
             raw_pose: Pose | None = self.capture_data.get_raw_pose(key, True, self.capture_key)
             if raw_pose is not None:
                 self.raw_fbo.clear()
-                data: PoseAngleData = raw_pose.angle_data
+                data: AngleFeature = raw_pose.angle_data
                 PoseFeatureLayer.pose_feature_shader.use(self.raw_fbo.fbo_id, data, range_scale, raw_color, raw_color)
             smooth_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
             if smooth_pose is not None:
                 self.smooth_fbo.clear()
-                data: PoseAngleData = smooth_pose.angle_data
+                data: AngleFeature = smooth_pose.angle_data
                 PoseFeatureLayer.pose_feature_shader.use(self.smooth_fbo.fbo_id, data, range_scale, smooth_color, smooth_color)
 
         if self.render_data.is_active(key):
             render_pose: Pose = self.render_data.get_pose(key)
-            v_c: PoseAngleData = render_pose.angle_data
+            v_c: AngleFeature = render_pose.angle_data
             PoseFeatureLayer.pose_feature_shader.use(self.render_fbo.fbo_id, v_c, range_scale, render_color, render_color)
             self.draw_joint_labels(self.render_fbo, render_pose.angle_data)
 
     @staticmethod
-    def draw_joint_labels(fbo: Fbo, feature: PoseAngleFeatureBase) -> None:
+    def draw_joint_labels(fbo: Fbo, feature: AngleFeature) -> None:
         """Draw joint names at the bottom of each bar."""
         num_joints: int = len(feature)
         step: float = fbo.width / num_joints

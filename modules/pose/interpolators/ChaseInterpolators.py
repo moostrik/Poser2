@@ -26,7 +26,7 @@ import numpy as np
 from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.interpolators.algorithms.VectorChase import Chase, VectorChase, AngleChase, PointChase
-from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
+from modules.pose.features import PoseFeatureData, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
 
 
 class ChaseInterpolatorConfig(FilterConfigBase):
@@ -142,7 +142,7 @@ class AngleChaseInterpolator(ChaseInterpolatorBase):
 
     def _initialize_interpolator(self) -> None:
         self._interpolator = AngleChase(
-            vector_size=ANGLE_NUM_JOINTS,
+            vector_size=ANGLE_NUM_LANDMARKS,
             input_frequency=self._config.input_frequency,
             responsiveness=self._config.responsiveness,
             friction=self._config.friction
@@ -204,7 +204,7 @@ class DeltaChaseInterpolator(ChaseInterpolatorBase):
 
     def _initialize_interpolator(self) -> None:
         self._interpolator = AngleChase(
-            vector_size=ANGLE_NUM_JOINTS,
+            vector_size=ANGLE_NUM_LANDMARKS,
             input_frequency=self._config.input_frequency,
             responsiveness=self._config.responsiveness,
             friction=self._config.friction

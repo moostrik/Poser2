@@ -7,13 +7,13 @@ from typing import Callable, Iterator, Optional
 import numpy as np
 
 # Pose imports
-from modules.pose.features.PoseAngles import AngleJoint
+from modules.pose.features.AngleFeature import AngleLandmark
 from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase, FeatureStatistic
 
 POSE_SIMILARITY_RANGE: tuple[float, float] = (0, 1)
 
 @dataclass(frozen=True)
-class PoseAngleSimilarityData(PoseAngleFeatureBase[AngleJoint]):
+class PoseAngleSimilarityData(PoseAngleFeatureBase[AngleLandmark]):
     """Similarity scores between two poses for all joints."""
 
     pair_id: tuple[int, int]
@@ -33,9 +33,9 @@ class PoseAngleSimilarityData(PoseAngleFeatureBase[AngleJoint]):
     # ========== CLASS-LEVEL PROPERTIES ==========
 
     @classmethod
-    def joint_enum(cls) -> type[AngleJoint]:
+    def joint_enum(cls) -> type[AngleLandmark]:
         """Return the AngleJoint enum class."""
-        return AngleJoint
+        return AngleLandmark
 
     @classmethod
     def default_range(cls) -> tuple[float, float]:

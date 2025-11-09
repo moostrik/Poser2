@@ -19,13 +19,17 @@ from modules.pose.features.Point2DFeature import (
     POINT2D_COORD_RANGE
 )
 
-from modules.pose.features.PoseAngles import (
-    PoseAngleData,
-    AngleJoint,
-    PoseAngleFactory,
-    ANGLE_JOINT_NAMES,
-    ANGLE_NUM_JOINTS,
+from modules.pose.features.AngleFeature import (
+    AngleFeature,
+    AngleLandmark,
+    ANGLE_LANDMARK_NAMES,
+    ANGLE_NUM_LANDMARKS,
     ANGLE_RANGE
+)
+
+from modules.pose.features.factories.AngleFactory import (
+    AngleFactory,
+    ANGLE_KEYPOINTS
 )
 
 from modules.pose.features.PoseAngleSymmetry import (
@@ -49,14 +53,14 @@ class PoseFeatureType(Enum):
 # Type alias for any feature data
 PoseFeatureData = Union[
     Point2DFeature,
-    PoseAngleData,
+    AngleFeature,
     PoseAngleSymmetryData,
 ]
 
 POSE_FEATURE_CLASSES: dict[PoseFeatureType, type] = {
     PoseFeatureType.POINTS: Point2DFeature,
-    PoseFeatureType.ANGLES: PoseAngleData,
-    PoseFeatureType.DELTA: PoseAngleData,
+    PoseFeatureType.ANGLES: AngleFeature,
+    PoseFeatureType.DELTA: AngleFeature,
     PoseFeatureType.SYMMETRY: PoseAngleSymmetryData,
 }
 
@@ -76,6 +80,6 @@ POSE_FEATURE_DIMENSIONS: dict[PoseFeatureType, int] = {
 
 POSE_CLASS_TO_FEATURE_TYPE: dict[type, PoseFeatureType] = {
     Point2DFeature: PoseFeatureType.POINTS,
-    PoseAngleData: PoseFeatureType.ANGLES,
+    AngleFeature: PoseFeatureType.ANGLES,
     PoseAngleSymmetryData: PoseFeatureType.SYMMETRY,
 }

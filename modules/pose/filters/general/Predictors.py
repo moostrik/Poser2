@@ -14,7 +14,7 @@ import numpy as np
 from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.filters.general.algorithms.VectorPredict import Predict, AnglePredict, PointPredict, PredictionMethod
-from modules.pose.features import PoseFeatureData, ANGLE_NUM_JOINTS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
+from modules.pose.features import PoseFeatureData, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
 
 
 class PredictorConfig(FilterConfigBase):
@@ -104,7 +104,7 @@ class AnglePredictor(PredictorBase):
     """
 
     def _initialize_predictor(self) -> None:
-        self._predictor = AnglePredict(vector_size=ANGLE_NUM_JOINTS, input_frequency=self._config.frequency, method=self._config.method)
+        self._predictor = AnglePredict(vector_size=ANGLE_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method)
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
         return pose.angle_data
@@ -155,7 +155,7 @@ class DeltaPredictor(PredictorBase):
     """
 
     def _initialize_predictor(self) -> None:
-        self._predictor = AnglePredict(vector_size=ANGLE_NUM_JOINTS, input_frequency=self._config.frequency, method=self._config.method)
+        self._predictor = AnglePredict(vector_size=ANGLE_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method)
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
         return pose.delta_data

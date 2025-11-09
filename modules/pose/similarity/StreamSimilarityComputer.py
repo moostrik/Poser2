@@ -445,10 +445,10 @@ class StreamCorrelator():
         Returns:
             PoseSimilarity with per-joint similarity scores, or None if no valid joints
         """
-        from modules.pose.features.PoseAngles import AngleJoint
+        from modules.pose.features.AngleFeature import AngleLandmark
 
         # Initialize arrays for all joints
-        num_joints = len(AngleJoint)
+        num_joints = len(AngleLandmark)
         values = np.full(num_joints, np.nan, dtype=np.float32)
 
         angles_columns: pd.Index[str] = pair.angles_1.select_dtypes(include=[np.number]).columns
@@ -459,7 +459,7 @@ class StreamCorrelator():
 
             # Map column name to joint enum
             try:
-                joint = AngleJoint[column]
+                joint = AngleLandmark[column]
             except KeyError:
                 continue
 

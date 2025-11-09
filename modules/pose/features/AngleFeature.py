@@ -53,6 +53,23 @@ class AngleFeature(BaseScalarFeature[AngleLandmark]):
         """Returns angle range in radians [-π, π]."""
         return ANGLE_RANGE
 
+    # ========== RAW ANGLE-SPECIFIC OPERATIONS =========
+
+    def subtract(self, other: 'AngleFeature') -> 'AngleFeature':
+        """Compute angular differences with proper wrapping (batch operation).
+
+        Calculates the shortest angular distance between corresponding angles
+        in two AngleFeature instances.
+
+        The confidence score for each delta is the minimum of the two source
+        confidences (conservative approach).
+        """
+        diff: np.ndarray = self.values - other.values
+        # Wrap angles to [-π, π] range (shortest angular distance)
+        wrapped_diff: np.ndarray = np.arctan2(np.sin(diff), np.cos(diff))
+        min_scores: np.ndarray = np.minimum(self.scores, other.scores)
+        return AngleFeature(values=wrapped_diff, scores=min_scores)
+
     # ========== CONVENIENCE ACCESSORS ==========
 
     def get_degree(self, landmark: AngleLandmark | int, fill: float = np.nan) -> float:
@@ -67,24 +84,6 @@ class AngleFeature(BaseScalarFeature[AngleLandmark]):
     def to_degrees(self) -> np.ndarray:
         """Convert all angles to degrees."""
         return np.degrees(self._values)
-
-    # ========== UTILITY METHODS ==========
-
-    def angle_difference(self, other: 'AngleFeature', landmark: AngleLandmark | int) -> float:
-        """Calculate angular difference between two features at a landmark."""
-        angle1 = self._values[landmark]
-        angle2 = other._values[landmark]
-
-        # Return NaN if either angle is invalid
-        if np.isnan(angle1) or np.isnan(angle2):
-            return np.nan
-
-        # Compute shortest angular distance
-        diff = angle2 - angle1
-        # Wrap to [-π, π]
-        diff = np.arctan2(np.sin(diff), np.cos(diff))
-
-        return float(diff)
 
 
 

@@ -12,7 +12,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
-from modules.pose.features.PoseAngles import ANGLE_NUM_JOINTS, ANGLE_JOINT_NAMES
+from modules.pose.features.AngleFeature import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.pose.similarity.Stream import StreamData
 
 from modules.data.CaptureDataHub import CaptureDataHub
@@ -103,7 +103,7 @@ class PoseLayer(LayerBase):
         shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, 1.5 / fbo.height)
 
 
-        angle_num: int = ANGLE_NUM_JOINTS
+        angle_num: int = ANGLE_NUM_LANDMARKS
         step: float = fbo.height / angle_num
         fbo.begin()
 
@@ -111,7 +111,7 @@ class PoseLayer(LayerBase):
         colors: list[tuple[float, float, float, float]] = [(1.0, 0.5, 0.0, 1.0), (0.0, 0.8, 1.0, 1.0)]
 
         for i in range(angle_num):
-            string: str = ANGLE_JOINT_NAMES[i]
+            string: str = ANGLE_LANDMARK_NAMES[i]
             x: int = 10
             y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
             clr: int = i % 2

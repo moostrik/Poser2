@@ -3,24 +3,24 @@ from dataclasses import dataclass, field
 from time import time
 
 from modules.pose.Pose import Pose
-from modules.pose.features.PoseAngles import AngleJoint, PoseAngleData
+from modules.pose.features.AngleFeature import AngleLandmark, AngleFeature
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryFactory, PoseAngleSymmetryData
 from modules.data.depricated.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.depricated.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-POSE_ANGLE_MOTION_WEIGHTS: dict[AngleJoint, float] = {
-    AngleJoint.left_elbow:       0.5,
-    AngleJoint.right_elbow:      0.5,
-    AngleJoint.left_shoulder:    0.6,
-    AngleJoint.right_shoulder:   0.6,
-    AngleJoint.left_hip:         0.8,
-    AngleJoint.right_hip:        0.8,
-    AngleJoint.left_knee:        1.2,
-    AngleJoint.right_knee:       1.2,
+POSE_ANGLE_MOTION_WEIGHTS: dict[AngleLandmark, float] = {
+    AngleLandmark.left_elbow:       0.5,
+    AngleLandmark.right_elbow:      0.5,
+    AngleLandmark.left_shoulder:    0.6,
+    AngleLandmark.right_shoulder:   0.6,
+    AngleLandmark.left_hip:         0.8,
+    AngleLandmark.right_hip:        0.8,
+    AngleLandmark.left_knee:        1.2,
+    AngleLandmark.right_knee:       1.2,
     # AngleJoint.torso:            2.0,
-    AngleJoint.head:             2.0
+    AngleLandmark.head:             2.0
 }
 
 @dataclass
@@ -28,30 +28,30 @@ class PoseAngleTrackerSettings:
     smooth_settings: OneEuroSettings
     symmetry_exponent: float = 1.0
     motion_threshold: float = 0.002
-    motion_weights: dict[AngleJoint, float] = field(default_factory=lambda: POSE_ANGLE_MOTION_WEIGHTS)
+    motion_weights: dict[AngleLandmark, float] = field(default_factory=lambda: POSE_ANGLE_MOTION_WEIGHTS)
 
 
 class PoseAngleTracker(PoseTrackerBase):
     def __init__(self, settings: PoseAngleTrackerSettings) -> None:
         self.settings: PoseAngleTrackerSettings = settings
         self._active: bool = False
-        self._angle_smoothers: dict[AngleJoint, SmoothedAngleInterpolator] = {}
-        self._motions: dict[AngleJoint, float] = {}
+        self._angle_smoothers: dict[AngleLandmark, SmoothedAngleInterpolator] = {}
+        self._motions: dict[AngleLandmark, float] = {}
         self._total_motion: float = 0.0
-        self._cumulative_motions: dict[AngleJoint, float] = {}
+        self._cumulative_motions: dict[AngleLandmark, float] = {}
         self._cumulative_total_motion: float = 0.0
 
-        for joint in AngleJoint:
+        for joint in AngleLandmark:
             self._angle_smoothers[joint] = SmoothedAngleInterpolator(settings.smooth_settings)
             self._motions[joint] = 0.0
             self._cumulative_motions[joint] = 0.0
 
 
-        self._angle_data: PoseAngleData = PoseAngleData.create_empty()
-        self._velocity_data: PoseAngleData = PoseAngleData.create_empty()
-        self._acceleration_data: PoseAngleData = PoseAngleData.create_empty()
-        self._motion_data: PoseAngleData = PoseAngleData.create_empty()
-        self._cumulative_motion_data: PoseAngleData = PoseAngleData.create_empty()
+        self._angle_data: AngleFeature = AngleFeature.create_empty()
+        self._velocity_data: AngleFeature = AngleFeature.create_empty()
+        self._acceleration_data: AngleFeature = AngleFeature.create_empty()
+        self._motion_data: AngleFeature = AngleFeature.create_empty()
+        self._cumulative_motion_data: AngleFeature = AngleFeature.create_empty()
         self._symmetry_data: PoseAngleSymmetryData = PoseAngleSymmetryData.create_empty()
 
         self._angles_dirty = False
@@ -77,7 +77,7 @@ class PoseAngleTracker(PoseTrackerBase):
 
         # Add angle data to smoothers (OneEuroInterpolator handles NaN values)
         add_time: float = time()
-        for joint in AngleJoint:
+        for joint in AngleLandmark:
             self._angle_smoothers[joint].add_sample(pose.angle_data.values[joint.value], add_time)
 
     def update(self) -> None:
@@ -86,7 +86,7 @@ class PoseAngleTracker(PoseTrackerBase):
 
         update_time: float = time()
         total_motion: float = 0.0
-        for joint in AngleJoint:
+        for joint in AngleLandmark:
             self._angle_smoothers[joint].update(update_time)
             velocity: float | None = self._angle_smoothers[joint].smooth_velocity
 
@@ -116,18 +116,18 @@ class PoseAngleTracker(PoseTrackerBase):
 
     def reset(self) -> None:
         """Reset all smoothers and accumulated state"""
-        for joint in AngleJoint:
+        for joint in AngleLandmark:
             self._angle_smoothers[joint].reset()
             self._motions[joint] = 0.0
             self._cumulative_motions[joint] = 0.0
         self._total_motion = 0.0
         self._cumulative_total_motion = 0.0
 
-        self._angle_data = PoseAngleData.create_empty()
-        self._velocity_data = PoseAngleData.create_empty()
-        self._acceleration_data = PoseAngleData.create_empty()
-        self._motion_data = PoseAngleData.create_empty()
-        self._cumulative_motion_data = PoseAngleData.create_empty()
+        self._angle_data = AngleFeature.create_empty()
+        self._velocity_data = AngleFeature.create_empty()
+        self._acceleration_data = AngleFeature.create_empty()
+        self._motion_data = AngleFeature.create_empty()
+        self._cumulative_motion_data = AngleFeature.create_empty()
         self._symmetry_data = PoseAngleSymmetryData.create_empty()
 
         self._angles_dirty = False
@@ -145,47 +145,47 @@ class PoseAngleTracker(PoseTrackerBase):
         return self._active
 
     @property
-    def angles(self) -> PoseAngleData:
+    def angles(self) -> AngleFeature:
         """Current smoothed angles (radians)"""
         if self._angles_dirty:
-            angle_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_value for joint in AngleJoint], dtype=np.float32)
-            self._angle_data = PoseAngleData.from_values(angle_values)
+            angle_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_value for joint in AngleLandmark], dtype=np.float32)
+            self._angle_data = AngleFeature.from_values(angle_values)
             self._angles_dirty = False
         return self._angle_data
 
     @property
-    def velocities(self) -> PoseAngleData:
+    def velocities(self) -> AngleFeature:
         """Current angular velocities (rad/s)"""
         if self._velocities_dirty:
-            velocity_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_velocity for joint in AngleJoint], dtype=np.float32)
-            self._velocity_data = PoseAngleData.from_values(velocity_values)
+            velocity_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_velocity for joint in AngleLandmark], dtype=np.float32)
+            self._velocity_data = AngleFeature.from_values(velocity_values)
             self._velocities_dirty = False
         return self._velocity_data
 
     @property
-    def accelerations(self) -> PoseAngleData:
+    def accelerations(self) -> AngleFeature:
         """Current angular accelerations (rad/s²)"""
         if self._accelerations_dirty:
-            acceleration_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_acceleration for joint in AngleJoint], dtype=np.float32)
-            self._acceleration_data = PoseAngleData.from_values(acceleration_values)
+            acceleration_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_acceleration for joint in AngleLandmark], dtype=np.float32)
+            self._acceleration_data = AngleFeature.from_values(acceleration_values)
             self._accelerations_dirty = False
         return self._acceleration_data
 
     @property
-    def motions(self) -> PoseAngleData:
+    def motions(self) -> AngleFeature:
         """Current weighted motion values"""
         if self._motions_dirty:
-            motion_values: np.ndarray = np.array([self._motions[joint] for joint in AngleJoint], dtype=np.float32)
-            self._motion_data = PoseAngleData.from_values(motion_values)
+            motion_values: np.ndarray = np.array([self._motions[joint] for joint in AngleLandmark], dtype=np.float32)
+            self._motion_data = AngleFeature.from_values(motion_values)
             self._motions_dirty = False
         return self._motion_data
 
     @property
-    def cumulative_motions(self) -> PoseAngleData:
+    def cumulative_motions(self) -> AngleFeature:
         """Cumulative motion values since tracking started"""
         if self._cumulative_motions_dirty:
-            cumulative_values: np.ndarray = np.array([self._cumulative_motions[joint] for joint in AngleJoint], dtype=np.float32)
-            self._cumulative_motion_data = PoseAngleData.from_values(cumulative_values)
+            cumulative_values: np.ndarray = np.array([self._cumulative_motions[joint] for joint in AngleLandmark], dtype=np.float32)
+            self._cumulative_motion_data = AngleFeature.from_values(cumulative_values)
             self._cumulative_motions_dirty = False
         return self._cumulative_motion_data
 

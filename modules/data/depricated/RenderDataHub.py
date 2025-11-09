@@ -21,7 +21,7 @@ from threading import Lock
 from collections.abc import Mapping
 
 from modules.pose.Pose import PoseDict
-from modules.pose.features.PoseAngles import PoseAngleData
+from modules.pose.features.AngleFeature import AngleFeature
 from modules.pose.features.PoseAngleSymmetry import PoseAngleSymmetryData
 from modules.data.depricated.PoseViewportTracker import PoseViewportTracker, PoseViewportTrackerSettings
 from modules.data.depricated.PoseAngleTracker import PoseAngleTracker, PoseAngleTrackerSettings
@@ -144,17 +144,17 @@ class RenderDataHub_Old:
             return self._viewport_trackers[tracklet_id].smoothed_rect
 
     #  BODY JOINT ANGLES
-    def get_angles(self, tracklet_id: int) -> PoseAngleData:
+    def get_angles(self, tracklet_id: int) -> AngleFeature:
         """Get smoothed angle for the specified tracklet ID and joint."""
         with self._lock:
             return self._angle_trackers[tracklet_id].angles
 
-    def get_velocities(self, tracklet_id: int) -> PoseAngleData:
+    def get_velocities(self, tracklet_id: int) -> AngleFeature:
         """Get smoothed angle for the specified tracklet ID and joint."""
         with self._lock:
             return self._angle_trackers[tracklet_id].velocities
 
-    def get_motions(self, tracklet_id: int) -> PoseAngleData:
+    def get_motions(self, tracklet_id: int) -> AngleFeature:
         """Get smoothed angle change for the specified tracklet ID and joint."""
         with self._lock:
             return self._angle_trackers[tracklet_id].motions

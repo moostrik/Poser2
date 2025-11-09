@@ -8,7 +8,7 @@ from typing import Callable
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Point2DFeature, PoseAngleData, PoseAngleSymmetryData
+from modules.pose.features import Point2DFeature, AngleFeature, PoseAngleSymmetryData
 from modules.pose.features.deprecated.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
 
 # Local application imports
@@ -39,8 +39,8 @@ class Pose:
 
     bounding_box: Rect       # Bounding Box, in normalized coordinates, can be outside [0,1]
     point_data: Point2DFeature
-    angle_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
-    delta_data: PoseAngleData = field(default_factory=PoseAngleData.create_empty)
+    angle_data: AngleFeature = field(default_factory=AngleFeature.create_empty)
+    delta_data: AngleFeature = field(default_factory=AngleFeature.create_empty)
     symmetry_data: PoseAngleSymmetryData = field(default_factory=PoseAngleSymmetryData.create_empty)
     motion_time: float =        0.0
 
