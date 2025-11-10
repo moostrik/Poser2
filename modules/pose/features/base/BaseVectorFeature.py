@@ -95,49 +95,6 @@ Abstract Methods (must implement in subclasses):
       Optional convenience constants: NORMALIZED_RANGE, POSITIVE_RANGE, UNBOUNDED_RANGE,
                                       PI_RANGE, TWO_PI_RANGE, SYMMETRIC_PI_RANGE
 
-Common Usage Patterns:
-----------------------
-# Direct access (raw - fastest):
-vector = feature[MyEnum.element]  # Returns np.ndarray (n_dims,), may contain NaN
-
-# Access individual components:
-x, y = feature[MyEnum.element]  # Unpack 2D vector
-x, y, z = feature[MyEnum.element]  # Unpack 3D vector
-
-# Check validity before access:
-if feature.get_valid(MyEnum.element):
-    vector = feature[MyEnum.element]
-    confidence = feature.get_score(MyEnum.element)
-    x, y = vector  # Safe to unpack
-
-# Batch processing (numpy-native):
-valid_vectors = feature.values[feature.valid_mask]  # Shape: (n_valid, n_dims)
-all_scores = feature.scores
-
-# Batch validation and extraction:
-elements = [MyEnum.elem1, MyEnum.elem2, MyEnum.elem3]
-if feature.are_valid(elements):
-    scores = feature.get_scores(elements)
-
-# Create empty feature (2D example):
-class MyFeature(BaseVectorFeature):
-    @classmethod
-    def dimensions(cls):
-        return 2  # 2D vectors
-
-feature = MyFeature.create_empty()
-
-# Create with auto-generated scores (1.0 for valid, 0.0 if any NaN):
-values = np.array([[1.0, 2.0], [3.0, np.nan], [5.0, 6.0]])  # Second vector invalid
-feature = MyFeature.from_values(values)
-# Scores will be: [1.0, 0.0, 1.0]
-
-# Create with validation (for untrusted input):
-try:
-    feature = MyFeature.create_validated(values, scores)
-except ValueError as e:
-    print(f"Invalid data: {e}")
-
 Notes:
 ------
 - All vectors have the same number of dimensions (2D, 3D, etc.)

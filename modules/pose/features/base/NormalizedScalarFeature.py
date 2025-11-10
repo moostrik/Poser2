@@ -145,40 +145,6 @@ Aggregation Methods (Enum):
   • AggregationMethod.MEDIAN            Median value
   • AggregationMethod.STD               Standard deviation
 
-Common Usage Patterns:
-----------------------
-# Simple mean (all valid values):
-avg = feature.mean()
-
-# High-confidence mean only:
-avg = feature.mean(min_confidence=0.7)
-
-# Geometric mean (penalizes low values):
-geom = feature.geometric_mean(min_confidence=0.5)
-
-# Using aggregate with different methods:
-mean_val = feature.aggregate(AggregationMethod.MEAN)
-geom_val = feature.aggregate(AggregationMethod.GEOMETRIC_MEAN)
-harm_val = feature.aggregate(AggregationMethod.HARMONIC_MEAN)
-
-# Compare different statistics:
-for method in AggregationMethod:
-    value = feature.aggregate(method, min_confidence=0.6)
-    print(f"{method.value}: {value:.3f}")
-
-# Access individual elements (inherited from BaseScalarFeature):
-value = feature[MyEnum.element]
-if feature.get_valid(MyEnum.element):
-    confidence = feature.get_score(MyEnum.element)
-
-# Batch processing (numpy-native):
-valid_values = feature.values[feature.valid_mask]
-all_scores = feature.scores
-
-# Create with auto-generated scores (1.0 for valid, 0.0 for NaN):
-values = np.array([0.9, 0.8, np.nan, 0.7])
-feature = MyFeature.from_values(values)
-
 Statistical Comparison:
 -----------------------
 Given values: [0.9, 0.9, 0.9, 0.2]

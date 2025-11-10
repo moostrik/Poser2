@@ -95,42 +95,6 @@ Abstract Methods (must implement in subclasses):
       Optional convenience constants: NORMALIZED_RANGE, POSITIVE_RANGE, UNBOUNDED_RANGE,
                                       PI_RANGE, TWO_PI_RANGE, SYMMETRIC_PI_RANGE
 
-Common Usage Patterns:
-----------------------
-# Direct access (raw - fastest):
-value = feature[MyEnum.element]  # Returns float, may be NaN
-
-# Python-friendly access (with NaN handling):
-value = feature.get(MyEnum.element, fill=0.0)  # Returns 0.0 if NaN
-
-# Check validity before access:
-if feature.get_valid(MyEnum.element):
-    value = feature[MyEnum.element]
-    confidence = feature.get_score(MyEnum.element)
-
-# Batch processing (numpy-native):
-valid_values = feature.values[feature.valid_mask]
-all_scores = feature.scores
-
-# Batch validation and extraction:
-elements = [MyEnum.elem1, MyEnum.elem2, MyEnum.elem3]
-if feature.are_valid(elements):
-    values = feature.get_values(elements)
-    scores = feature.get_scores(elements)
-
-# Create empty feature:
-feature = MyFeature.create_empty()
-
-# Create with auto-generated scores (1.0 for valid, 0.0 for NaN):
-values = np.array([1.0, 2.0, np.nan, 4.0])
-feature = MyFeature.from_values(values)
-
-# Create with validation (for untrusted input):
-try:
-    feature = MyFeature.create_validated(values, scores)
-except ValueError as e:
-    print(f"Invalid data: {e}")
-
 Notes:
 ------
 - All values are single floats (scalar per element)

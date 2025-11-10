@@ -1,3 +1,141 @@
+"""
+=============================================================================
+ANGLEFEATURE API REFERENCE
+=============================================================================
+
+Concrete implementation of BaseScalarFeature for body landmark angles.
+
+Use for: pose articulation analysis, angle tracking, pose comparison.
+
+Summary of BaseFeature Design Philosophy:
+==========================================
+
+Immutability & Ownership:
+  • Features are IMMUTABLE - arrays set to read-only after construction
+  • Constructor takes OWNERSHIP - caller must not modify arrays after passing
+  • Modifications create new features (functional style)
+
+Data Access (two patterns):
+  Raw (numpy):     feature.values, feature.scores, feature[element]
+  Python-friendly: feature.get(element, fill), feature.get_score(element)
+
+NaN Semantics:
+  • Invalid data = NaN with score 0.0 (enforced)
+  • Use get(element, fill=0.0) for automatic NaN handling
+
+Cached Properties:
+  • Subclasses may add @cached_property (safe due to immutability)
+
+Construction:
+  • AngleFeature(values, scores)           → Direct (fast, no validation)
+  • AngleFeature.create_empty()            → All NaN values, zero scores
+  • AngleFeature.from_values(values, ...)  → Auto-generate scores if None
+  • AngleFeature.create_validated(...)     → Full validation, raises on error
+
+Validation:
+  • Asserts in constructors (removed with -O flag for production)
+  • validate() method for debugging/testing/untrusted input
+  • Fast by default, validate only when needed
+
+Performance:
+  Fast:     Property access, indexing, cached properties, array ops
+  Moderate: get(), get_score() (Python conversion)
+  Slow:     get_values(), get_scores() (iteration), validate()
+
+Inherited from BaseScalarFeature:
+==================================
+
+Structure:
+----------
+Each element has:
+  • A scalar angle value (float) in radians [-π, π] - may be NaN for invalid/missing data
+  • A confidence score [0.0, 1.0]
+
+Storage:
+  • values: np.ndarray, shape (n_elements,), dtype float32, range [-π, π]
+  • scores: np.ndarray, shape (n_elements,), dtype float32
+
+Properties:
+-----------
+  • values: np.ndarray                             All angle values (n_elements,)
+  • scores: np.ndarray                             All confidence scores (n_elements,)
+  • valid_mask: np.ndarray                         Boolean validity mask (n_elements,)
+  • valid_count: int                               Number of valid angles
+  • len(feature): int                              Total number of elements (9)
+
+Single Value Access:
+--------------------
+  • feature[element] -> float                      Get angle in radians (supports enum or int)
+  • feature.get(element, fill=np.nan) -> float     Get angle with NaN handling
+  • feature.get_value(element, fill) -> float      Alias for get()
+  • feature.get_score(element) -> float            Get confidence score
+  • feature.get_valid(element) -> bool             Check if angle is valid
+
+Batch Operations:
+-----------------
+  • feature.get_values(elements, fill) -> list[float]  Get multiple angles
+  • feature.get_scores(elements) -> list[float]        Get multiple scores
+  • feature.are_valid(elements) -> bool                Check if ALL valid
+
+Factory Methods:
+----------------
+  • AngleFeature.create_empty() -> AngleFeature          All NaN angles, zero scores
+  • AngleFeature.from_values(values, scores?) -> AngleFeature  Auto-generate scores if None
+  • AngleFeature.create_validated(values, scores) -> AngleFeature  Full validation
+
+Validation:
+-----------
+  • feature.validate(check_ranges=True) -> tuple[bool, str|None]
+      Returns (is_valid, error_message)
+
+Implemented Methods (from BaseScalarFeature):
+----------------------------------------------
+  • feature_enum() -> type[AngleLandmark]          Returns AngleLandmark enum
+  • default_range() -> tuple[float, float]         Returns SYMMETRIC_PI_RANGE (-π, π)
+
+AngleFeature-Specific:
+======================
+
+Angle Math:
+-----------
+  • feature.subtract(other) -> AngleFeature
+      Compute angular differences with proper wrapping
+      Returns shortest angular distance between corresponding angles
+      Confidence is minimum of the two source confidences (conservative)
+
+Degree Conversion:
+------------------
+  • feature.get_degree(element, fill=np.nan) -> float
+      Get angle in degrees (optionally replacing NaN with fill value)
+
+  • feature.to_degrees() -> np.ndarray
+      Convert all angles to degrees (returns numpy array)
+
+AngleLandmark Enum:
+-------------------
+  • left_shoulder (0)    - Shoulder angle
+  • right_shoulder (1)   - Shoulder angle
+  • left_elbow (2)       - Elbow angle
+  • right_elbow (3)      - Elbow angle
+  • left_hip (4)         - Hip angle
+  • right_hip (5)        - Hip angle
+  • left_knee (6)        - Knee angle
+  • right_knee (7)       - Knee angle
+  • head (8)             - Head yaw angle (special calculation)
+
+Notes:
+------
+- Angles are in radians [-π, π] (±180 degrees)
+- Right-side angles are mirrored for symmetric representation
+- Head yaw is computed from eye/shoulder positions (special case)
+- Invalid/uncomputable angles are NaN with score 0.0
+- Use get_degree() for degree conversion (more convenient than manual conversion)
+- Use subtract() instead of direct subtraction to handle angle wrapping and scores
+- Arrays are read-only after construction (immutable)
+- Use validate() for debugging, not in production loops
+- Constructor takes ownership - caller must not modify arrays after passing
+=============================================================================
+"""
 from enum import IntEnum
 
 import numpy as np
@@ -32,7 +170,7 @@ ANGLE_RANGE: tuple[float, float] = SYMMETRIC_PI_RANGE # for backward compatibili
 
 
 class AngleFeature(BaseScalarFeature[AngleLandmark]):
-    """Joint angles for body landmarks (radians, range [-π, π]).
+    """Angles for body landmarks (radians, range [-π, π]).
 
     Represents angles at articulation points for pose analysis:
     - Each landmark has a single angle value in radians
@@ -84,121 +222,4 @@ class AngleFeature(BaseScalarFeature[AngleLandmark]):
     def to_degrees(self) -> np.ndarray:
         """Convert all angles to degrees."""
         return np.degrees(self._values)
-
-
-
-"""
-=============================================================================
-ANGLEFEATURE QUICK API REFERENCE
-=============================================================================
-
-Design Philosophy (from BaseFeature):
--------------------------------------
-Raw Access (numpy-native):
-  • feature.values      → Full array, shape (n_joints,) for angles
-  • feature.scores      → Full scores (n_joints,)
-  • feature[joint]      → Single value (float, radians) - supports enum or int
-  Use for: Numpy operations, batch processing, performance
-
-Python-Friendly Access:
-  • feature.get(joint, fill)    → Python float with NaN handling
-  • feature.get_score(joint)    → Python float
-  • feature.get_scores(joints)  → Python list
-  Use for: Logic, conditionals, unpacking, defaults
-
-Inherited from BaseScalarFeature (single value per joint):
-----------------------------------------------------------
-Properties:
-  • values: np.ndarray                             All angle values (radians)
-  • scores: np.ndarray                             All confidence scores
-  • valid_mask: np.ndarray                         Boolean validity mask
-  • valid_count: int                               Number of valid angles
-  • len(feature): int                              Total number of joints (9)
-
-Single Value Access:
-  • feature[joint] -> float                        Get angle in radians (supports enum or int)
-  • feature.get(joint, fill=0.0) -> float          Get angle with NaN fill
-  • feature.get_value(joint, fill) -> float        Alias for get()
-  • feature.get_score(joint) -> float              Get confidence score
-  • feature.get_valid(joint) -> bool               Check if angle is valid
-
-Batch Operations:
-  • feature.get_values(joints, fill) -> list[float]  Get multiple angles
-  • feature.get_scores(joints) -> list[float]        Get multiple scores
-  • feature.are_valid(joints) -> bool                Check if ALL valid
-
-Factory Methods:
-  • AngleFeature.create_empty() -> AngleFeature      All NaN angles
-  • AngleFeature.from_values(values, scores)         Create with validation
-  • AngleFeature.create_validated(values, scores)    Create with strict checks
-
-AngleFeature-Specific Methods:
--------------------------------
-Degree Conversion:
-  • feature.get_degree(joint, fill=np.nan) -> float  Get angle in degrees
-  • feature.to_degrees() -> np.ndarray               All angles in degrees
-
-Angle Math:
-  • feature.subtract(other) -> AngleFeature          Angular difference with wrapping [-π, π]
-      Computes shortest angular distance between corresponding angles in two poses.
-      Confidence is minimum of the two source confidences (conservative).
-
-Common Usage Patterns:
-----------------------
-# Get angle in degrees:
-angle_deg = angles.get_degree(AngleLandmark.left_elbow)
-
-# Direct access via bracket notation:
-angle_rad = angles[AngleLandmark.left_elbow]  # Returns float in radians
-
-# Check if angle computation was successful:
-if angles.get_valid(AngleLandmark.left_knee):
-    angle = angles[AngleLandmark.left_knee]
-    confidence = angles.get_score(AngleLandmark.left_knee)
-
-# Process only valid angles:
-for joint in AngleLandmark:
-    if angles.get_valid(joint):
-        print(f"{joint.name}: {angles.get_degree(joint):.1f}°")
-
-# Compare angles between two poses (proper angular wrapping):
-angle_delta = pose1_angles.subtract(pose2_angles)
-left_elbow_diff = angle_delta[AngleLandmark.left_elbow]
-
-# Convert all to degrees for display:
-all_degrees = angles.to_degrees()
-
-# Batch processing (numpy-native):
-valid_angles = angles.values[angles.valid_mask]  # Only valid angles
-all_scores = angles.scores  # Raw numpy array
-
-# Batch validation and extraction:
-joints = [AngleLandmark.left_elbow, AngleLandmark.left_knee, AngleLandmark.left_hip]
-if angles.are_valid(joints):
-    values = angles.get_values(joints)
-    scores = angles.get_scores(joints)
-
-AngleLandmark Enum Values:
---------------------------
-  • left_shoulder (0)    - Shoulder joint angle
-  • right_shoulder (1)   - Shoulder joint angle
-  • left_elbow (2)       - Elbow joint angle
-  • right_elbow (3)      - Elbow joint angle
-  • left_hip (4)         - Hip joint angle
-  • right_hip (5)        - Hip joint angle
-  • left_knee (6)        - Knee joint angle
-  • right_knee (7)       - Knee joint angle
-  • head (8)             - Head yaw angle
-
-Notes:
-------
-- Angles are in radians [-π, π] (use get_degree() for degrees)
-- Right-side angles are mirrored for symmetric representation
-- Head yaw is computed from eye/shoulder positions (special case)
-- Invalid angles are NaN (check with get_valid() before use)
-- Confidence scores indicate reliability of angle computation
-- Use subtract() instead of direct subtraction to handle angle wrapping
-=============================================================================
-"""
-
 
