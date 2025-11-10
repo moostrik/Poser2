@@ -8,7 +8,7 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features.AngleFeature import AngleLandmark
-from modules.pose.features.deprecated.PoseAngleFeatureBase import PoseAngleFeatureBase, FeatureStatistic
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase, FeatureStatistic
 
 POSE_SIMILARITY_RANGE: tuple[float, float] = (0, 1)
 

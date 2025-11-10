@@ -7,7 +7,7 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features.AngleFeature import AngleFeature, AngleLandmark
-from modules.pose.features.deprecated.PoseAngleFeatureBase import PoseAngleFeatureBase
+from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
 
 
 class SymmetricJoint(IntEnum):
