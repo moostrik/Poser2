@@ -210,9 +210,9 @@ class AngleFeature(BaseScalarFeature[AngleLandmark]):
 
     # ========== CONVENIENCE ACCESSORS ==========
 
-    def get_degree(self, landmark: AngleLandmark | int, fill: float = np.nan) -> float:
+    def get_degree(self, element: AngleLandmark | int, fill: float = np.nan) -> float:
         """Get angle in degrees (optionally replacing NaN with fill value)."""
-        angle_rad = self._values[landmark]
+        angle_rad = self._values[element]
 
         if np.isnan(angle_rad):
             return fill
