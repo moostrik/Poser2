@@ -8,7 +8,7 @@ from typing import Optional
 import numpy as np
 
 # Pose imports
-from modules.pose.features.PoseAngleFeatureBase import PoseAngleFeatureBase
+from modules.pose.features.deprecated.PoseAngleFeatureBase import PoseAngleFeatureBase
 from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
 
 
