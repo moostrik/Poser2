@@ -1,4 +1,268 @@
-from enum import IntEnum
+"""
+=============================================================================
+SIMILARITYFEATURE API REFERENCE
+=============================================================================
+
+Concrete implementation of NormalizedScalarFeature for pose-to-pose similarity.
+
+Use for: pose matching, pose tracking, quality assessment, pose comparison.
+
+Summary of BaseFeature Design Philosophy:
+==========================================
+
+Immutability & Ownership:
+  • Features are IMMUTABLE - arrays set to read-only after construction
+  • Constructor takes OWNERSHIP - caller must not modify arrays after passing
+  • Modifications create new features (functional style)
+
+Data Access (two patterns):
+  Raw (numpy):     feature.values, feature.scores, feature[element]
+  Python-friendly: feature.get(element, fill), feature.get_score(element)
+
+NaN Semantics:
+  • Invalid data = NaN with score 0.0 (enforced)
+  • Use get(element, fill=0.0) for automatic NaN handling
+
+Cached Properties:
+  • Subclasses may add @cached_property (safe due to immutability)
+
+Construction:
+  • SimilarityFeature(values, scores, pair_id)     → Direct (fast, no validation)
+  • SimilarityFeature.create_empty()               → All NaN values, zero scores
+  • SimilarityFeature.from_values(values, ...)     → Auto-generate scores if None
+  • SimilarityFeature.create_validated(...)        → Full validation, raises on error
+
+Validation:
+  • Asserts in constructors (removed with -O flag for production)
+  • validate() method for debugging/testing/untrusted input
+  • Fast by default, validate only when needed
+
+Performance:
+  Fast:     Property access, indexing, cached properties, array ops
+  Moderate: get(), get_score() (Python conversion)
+  Slow:     get_values(), get_scores() (iteration), validate()
+
+Inherited from BaseScalarFeature:
+==================================
+
+Structure:
+----------
+Each element has:
+  • A scalar similarity value (float) in [0.0, 1.0] - may be NaN for invalid/missing data
+  • A confidence score [0.0, 1.0]
+
+Storage:
+  • values: np.ndarray, shape (n_elements,), dtype float32, range [0.0, 1.0]
+  • scores: np.ndarray, shape (n_elements,), dtype float32
+
+Properties:
+-----------
+  • values: np.ndarray                             All similarity values (n_elements,)
+  • scores: np.ndarray                             All confidence scores (n_elements,)
+  • valid_mask: np.ndarray                         Boolean validity mask (n_elements,)
+  • valid_count: int                               Number of valid values
+  • len(feature): int                              Total number of elements (9)
+
+Single Value Access:
+--------------------
+  • feature[element] -> float                      Get similarity (supports enum or int)
+  • feature.get(element, fill=np.nan) -> float     Get similarity with NaN handling
+  • feature.get_value(element, fill) -> float      Alias for get()
+  • feature.get_score(element) -> float            Get confidence score
+  • feature.get_valid(element) -> bool             Check if similarity is valid
+
+Batch Operations:
+-----------------
+  • feature.get_values(elements, fill) -> list[float]  Get multiple similarities
+  • feature.get_scores(elements) -> list[float]        Get multiple scores
+  • feature.are_valid(elements) -> bool                Check if ALL valid
+
+Factory Methods:
+----------------
+  • SimilarityFeature.create_empty() -> SimilarityFeature          All NaN values, zero scores
+  • SimilarityFeature.from_values(values, scores?) -> SimilarityFeature  Auto-generate scores if None
+  • SimilarityFeature.create_validated(values, scores) -> SimilarityFeature  Full validation
+
+Validation:
+-----------
+  • feature.validate(check_ranges=True) -> tuple[bool, str|None]
+      Returns (is_valid, error_message)
+
+Implemented Methods (from NormalizedScalarFeature):
+----------------------------------------------------
+Structure:
+  • feature_enum() -> type[AngleLandmark]          Returns AngleLandmark enum (IMPLEMENTED)
+
+Implemented Methods (do not override):
+---------------------------------------
+  • default_range() -> tuple[float, float]         Always returns (0.0, 1.0)
+                                                   (Already implemented in NormalizedScalarFeature)
+
+Inherited from NormalizedScalarFeature:
+========================================
+
+Statistical Aggregation:
+------------------------
+All methods support:
+  • Confidence-weighted computation
+  • Filtering by minimum confidence threshold
+  • Return NaN if no values meet criteria
+
+Core Methods:
+  • feature.aggregate(method, min_confidence=0.0) -> float
+      General aggregation with method selection
+
+  • feature.mean(min_confidence=0.0) -> float
+      Confidence-weighted arithmetic mean
+      Best for: General purpose averaging
+
+  • feature.geometric_mean(min_confidence=0.0) -> float
+      Confidence-weighted geometric mean (penalizes low values)
+      Best for: When most elements should be similar
+
+  • feature.harmonic_mean(min_confidence=0.0) -> float
+      Confidence-weighted harmonic mean (heavily penalizes low values)
+      Best for: When ALL elements must be similar (strict matching)
+
+  • feature.min_value(min_confidence=0.0) -> float
+      Minimum similarity value (worst matching element)
+
+  • feature.max_value(min_confidence=0.0) -> float
+      Maximum similarity value (best matching element)
+
+  • feature.median(min_confidence=0.0) -> float
+      Median similarity value
+
+  • feature.std(min_confidence=0.0) -> float
+      Confidence-weighted standard deviation
+
+Aggregation Methods (Enum):
+----------------------------
+  • AggregationMethod.MEAN              Arithmetic mean (balanced)
+  • AggregationMethod.GEOMETRIC_MEAN    Geometric mean (penalizes dissimilar)
+  • AggregationMethod.HARMONIC_MEAN     Harmonic mean (very strict)
+  • AggregationMethod.MIN               Minimum value
+  • AggregationMethod.MAX               Maximum value
+  • AggregationMethod.MEDIAN            Median value
+  • AggregationMethod.STD               Standard deviation
+
+SimilarityFeature-Specific:
+============================
+
+Pair Tracking:
+--------------
+  • feature.pair_id -> tuple[int, int]             Tuple (id_1, id_2) identifying the two poses
+                                                   Always ordered as (smaller, larger)
+  • feature.id_1 -> int                            First pose ID (always smaller)
+  • feature.id_2 -> int                            Second pose ID (always larger)
+
+Similarity Methods:
+-------------------
+  • feature.similarity(method=MEAN, min_confidence=0.0) -> float
+      Compute overall similarity score using specified aggregation method
+      Convenience wrapper for aggregate() with similarity-specific naming
+
+  • feature.matches_pose(threshold=0.8, method=GEOMETRIC_MEAN, min_confidence=0.0) -> bool
+      Check if poses match based on overall similarity threshold
+      Returns True if similarity >= threshold, False otherwise
+
+AngleLandmark Enum (used for similarity elements):
+---------------------------------------------------
+  • left_shoulder (0)    - Shoulder angle similarity
+  • right_shoulder (1)   - Shoulder angle similarity
+  • left_elbow (2)       - Elbow angle similarity
+  • right_elbow (3)      - Elbow angle similarity
+  • left_hip (4)         - Hip angle similarity
+  • right_hip (5)        - Hip angle similarity
+  • left_knee (6)        - Knee angle similarity
+  • right_knee (7)       - Knee angle similarity
+  • head (8)             - Head angle similarity
+
+Statistical Comparison for Similarity:
+---------------------------------------
+Given similarity values: [0.9, 0.9, 0.9, 0.3]
+(3 matching elements, 1 non-matching)
+
+• Mean:          0.75  → "75% similar overall"
+• Geometric:     0.69  → "69% similar (penalizes mismatch)"
+• Harmonic:      0.51  → "51% similar (very strict)"
+
+Use case guidance:
+- Mean:      General similarity assessment (balanced)
+- Geometric: Prefer matching poses, some tolerance for variation
+- Harmonic:  Require all elements to match (strict pose verification)
+
+Comparison with SymmetryFeature:
+--------------------------------
+SimilarityFeature:
+  • Compares two different poses (inter-pose comparison)
+  • Has pair_id tracking which poses are compared
+  • Used for pose matching, tracking, quality assessment
+
+SymmetryFeature:
+  • Compares left/right within one pose (intra-pose comparison)
+  • No pair_id (single pose analysis)
+  • Used for symmetry checking, pose quality
+
+Both use same statistical methods and interpretation.
+
+Notes:
+------
+- Similarity values are in range [0.0, 1.0]
+  * 1.0 = perfect similarity (angles identical)
+  * 0.0 = maximum dissimilarity (angles π radians apart)
+- Invalid values are NaN with score 0.0
+- Geometric/harmonic means replace zeros with 1e-5 (numerical stability)
+- Zero values have semantic meaning (complete mismatch) and penalize scores
+- Methods return NaN if no values meet min_confidence criteria
+- Confidence weighting improves reliability of aggregates
+- Arrays are read-only after construction (immutable)
+- Use validate() for debugging, not in production loops
+- pair_id validation uses asserts (removed with -O flag for production)
+- pair_id must be tuple of two different integers, always ordered (smaller, larger)
+- Cannot compare a pose with itself (enforced by assert in development)
+
+=============================================================================
+
+SIMILARITYBATCH API REFERENCE
+=============================================================================
+
+Collection of all similarity features for multiple pose pairs in a frame.
+
+Structure:
+----------
+  • similarities: list[SimilarityFeature]          List of all pair comparisons
+  • timestamp: float                               When this batch was created
+  • len(batch): int                                Number of pairs in batch
+  • batch.is_empty: bool                           True if no pairs
+
+Lookup & Iteration:
+-------------------
+  • batch.get_pair(pair_id) -> SimilarityFeature | None
+      O(1) lookup for specific pair
+      pair_id normalized to (min, max) automatically
+
+  • (pair_id) in batch -> bool
+      Check if pair exists in batch
+
+  • for similarity in batch:
+      Iterate all pairs
+
+Top Matches:
+------------
+  • batch.get_top_pairs(n=5, min_valid_elements=1, method=MEAN, min_confidence=0.0) -> list[SimilarityFeature]
+      Get top N most similar pairs, sorted by similarity (descending)
+
+Notes:
+------
+- Immutable dataclass (frozen=True)
+- O(1) pair lookup via internal dict
+- pair_id automatically normalized to (min, max) for lookups
+- Top pairs filtering supports minimum valid element count and confidence thresholds
+- Empty batch check with is_empty property
+=============================================================================
+"""
+
 import time
 from dataclasses import dataclass, field
 from typing import Iterator, Optional, Callable
@@ -10,7 +274,7 @@ from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarF
 from modules.pose.features.AngleFeature import AngleLandmark
 
 
-# Reuse AngleLandmark enum for similarity (same joints as angles)
+# Reuse AngleLandmark enum for similarity (same landmarks as angles)
 # No need to define a new enum since similarity is measured per angle landmark
 
 # Constants
@@ -20,8 +284,8 @@ SIMILARITY_RANGE: tuple[float, float] = NORMALIZED_RANGE
 class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
     """Similarity scores between two poses for all angle landmarks (range [0, 1]).
 
-    Measures how similar corresponding joint angles are between two poses.
-    Values are similarity scores [0, 1] per joint:
+    Measures how similar corresponding angle landmarks are between two poses.
+    Values are similarity scores [0, 1] per landmark:
     - 1.0 = perfect similarity (angles identical)
     - 0.0 = maximum dissimilarity (angles maximally different, e.g., π radians apart)
 
@@ -48,18 +312,13 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
         """Initialize SimilarityFeature with pair tracking.
 
         Args:
-            values: Similarity scores [0, 1] for each joint
+            values: Similarity scores [0, 1] for each element
             scores: Confidence scores for each similarity measurement
             pair_id: Tuple of (pose_id_1, pose_id_2) being compared
-
-        Raises:
-            ValueError: If pair_id is invalid (same ID or not ordered)
         """
-        # Validate pair_id -> this should assert not raise an error
-        if pair_id[0] == pair_id[1]:
-            raise ValueError(f"Cannot compare pose with itself: {pair_id[0]}")
-        if pair_id[0] > pair_id[1]:
-            raise ValueError(f"pair_id must be ordered as (smaller, larger), got {pair_id}")
+        # Validate pair_id (asserts for development, removed with -O)
+        assert pair_id[0] != pair_id[1], f"Cannot compare pose with itself: {pair_id[0]}"
+        assert pair_id[0] < pair_id[1], f"pair_id must be ordered as (smaller, larger), got {pair_id}"
 
         super().__init__(values, scores)
         self._pair_id = pair_id
@@ -75,17 +334,17 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
 
     @property
     def pair_id(self) -> tuple[int, int]:
-        """ID pair of the two poses being compared (always ordered)."""
+        """Tuple (id_1, id_2) identifying the two poses being compared (always ordered as smaller, larger)."""
         return self._pair_id
 
     @property
     def id_1(self) -> int:
-        """First pose ID (always smaller)."""
+        """First pose ID (always the smaller ID)."""
         return self._pair_id[0]
 
     @property
     def id_2(self) -> int:
-        """Second pose ID (always larger)."""
+        """Second pose ID (always the larger ID)."""
         return self._pair_id[1]
 
     # ========== SIMILARITY-SPECIFIC CONVENIENCE METHODS ==========
@@ -96,16 +355,16 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
 
         Args:
             method: Statistical aggregation method (default: MEAN)
-            min_confidence: Minimum confidence to include joint (default: 0.0)
+            min_confidence: Minimum confidence to include element (default: 0.0)
 
         Returns:
-            Overall similarity score [0, 1], or NaN if no joints meet criteria
+            Overall similarity score [0, 1], or NaN if no elements meet criteria
 
         Examples:
             >>> # Mean similarity (default, balanced)
             >>> overall = similarity.similarity()
             >>>
-            >>> # Geometric mean (penalizes dissimilar joints more)
+            >>> # Geometric mean (penalizes dissimilar landmarks more)
             >>> overall = similarity.similarity(AggregationMethod.GEOMETRIC_MEAN)
             >>>
             >>> # Harmonic mean (very strict - heavily penalizes any dissimilarity)
@@ -117,7 +376,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
             ...     min_confidence=0.7
             ... )
             >>>
-            >>> # For strict pose matching (all joints must match):
+            >>> # For strict pose matching (all landmarks must match):
             >>> overall = similarity.similarity(
             ...     AggregationMethod.HARMONIC_MEAN,
             ...     min_confidence=0.6
@@ -133,7 +392,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
         Args:
             threshold: Minimum similarity to consider poses matching (default: 0.8)
             method: Aggregation method (default: GEOMETRIC_MEAN for balanced strictness)
-            min_confidence: Minimum confidence to include joint (default: 0.0)
+            min_confidence: Minimum confidence to include element (default: 0.0)
 
         Returns:
             True if overall similarity >= threshold, False otherwise
@@ -264,7 +523,7 @@ class SimilarityBatch:
     def get_top_pairs(
         self,
         n: int = 5,
-        min_valid_joints: int = 1,
+        min_valid_landmarks: int = 1,
         method: AggregationMethod = AggregationMethod.MEAN,
         min_confidence: float = 0.0
     ) -> list[SimilarityFeature]:
@@ -272,7 +531,7 @@ class SimilarityBatch:
 
         Args:
             n: Number of top pairs to return (default: 5)
-            min_valid_joints: Minimum valid joints required (default: 1)
+            min_valid_landmarks: Minimum valid elements required (default: 1)
             method: Aggregation method for sorting (default: MEAN)
             min_confidence: Minimum confidence for aggregation (default: 0.0)
 
@@ -288,7 +547,7 @@ class SimilarityBatch:
             >>> # Get top pairs with strict criteria
             >>> top = batch.get_top_pairs(
             ...     n=3,
-            ...     min_valid_joints=10,
+            ...     min_valid_landmarks=10,
             ...     method=AggregationMethod.GEOMETRIC_MEAN,
             ...     min_confidence=0.7
             ... )
@@ -296,10 +555,10 @@ class SimilarityBatch:
         if self.is_empty or n <= 0:
             return []
 
-        # Filter by minimum valid joints
+        # Filter by minimum valid landmarks
         valid_pairs = [
             sim for sim in self.similarities
-            if sim.valid_count >= min_valid_joints
+            if sim.valid_count >= min_valid_landmarks
         ]
 
         # Compute scores and filter out NaN
@@ -317,188 +576,3 @@ class SimilarityBatch:
 
 # Type alias for batch callbacks
 SimilarityBatchCallback = Callable[[SimilarityBatch], None]
-
-
-
-"""
-=============================================================================
-SIMILARITYFEATURE QUICK API REFERENCE
-=============================================================================
-
-Design Philosophy (from BaseFeature):
--------------------------------------
-Raw Access (numpy-native):
-  • feature.values      → Full array, shape (n_joints,) for similarity scores
-  • feature.scores      → Full confidence scores (n_joints,)
-  • feature[joint]      → Single value (float, [0, 1])
-  Use for: Numpy operations, batch processing, performance
-
-Python-Friendly Access:
-  • feature.get(joint, fill)    → Python float with NaN handling
-  • feature.get_score(joint)    → Python float
-  • feature.get_scores(joints)  → Python list
-  Use for: Logic, conditionals, unpacking, defaults
-
-Pair Tracking:
---------------
-  • feature.pair_id      → (id_1, id_2) tuple identifying the two poses
-  • feature.id_1         → First pose ID (always smaller)
-  • feature.id_2         → Second pose ID (always larger)
-
-Inherited from BaseScalarFeature (single value per joint):
-----------------------------------------------------------
-Properties:
-  • values: np.ndarray                             All similarity scores [0, 1]
-  • scores: np.ndarray                             All confidence scores
-  • valid_mask: np.ndarray                         Boolean validity mask
-  • valid_count: int                               Number of valid similarity scores
-  • len(feature): int                              Total number of joints (17)
-
-Single Value Access:
-  • feature[joint] -> float                        Get similarity score [0, 1]
-  • feature.get(joint, fill=0.0) -> float          Get score with NaN fill
-  • feature.get_value(joint, fill) -> float        Alias for get()
-  • feature.get_score(joint) -> float              Get confidence score
-  • feature.get_valid(joint) -> bool               Check if score is valid
-
-Batch Operations:
-  • feature.get_values(joints, fill) -> list[float]  Get multiple scores
-  • feature.get_scores(joints) -> list[float]        Get multiple confidences
-  • feature.are_valid(joints) -> bool                Check if ALL valid
-
-Factory Methods:
-  • feature.create_empty() -> feature             All NaN scores
-  • feature.from_values(values, scores)           Create with validation
-  • feature.create_validated(values, scores)      Create with strict checks
-
-Inherited from NormalizedScalarFeature (statistical aggregation):
-------------------------------------------------------------------
-Statistical Methods:
-  • feature.mean(min_confidence=0.0) -> float
-      Confidence-weighted arithmetic mean
-      Use for: General purpose, balanced averaging
-
-  • feature.geometric_mean(min_confidence=0.0) -> float
-      Confidence-weighted geometric mean (penalizes low values)
-      Use for: When most joints should match
-
-  • feature.harmonic_mean(min_confidence=0.0) -> float
-      Confidence-weighted harmonic mean (heavily penalizes low values)
-      Use for: When ALL joints must match (strict)
-
-  • feature.aggregate(method, min_confidence=0.0) -> float
-      General aggregation with method selection
-
-  • feature.min_value(min_confidence=0.0) -> float
-      Minimum similarity score (worst matching joint)
-
-  • feature.max_value(min_confidence=0.0) -> float
-      Maximum similarity score (best matching joint)
-
-  • feature.median(min_confidence=0.0) -> float
-      Median similarity score
-
-  • feature.std(min_confidence=0.0) -> float
-      Standard deviation of similarity scores
-
-SimilarityFeature-Specific Methods:
------------------------------------------
-  • feature.similarity(method=MEAN, min_confidence=0.0) -> float
-      Convenience wrapper for aggregate() with similarity-specific naming
-      Recommended method names for similarity:
-      - AggregationMethod.MEAN: Balanced overall similarity
-      - AggregationMethod.GEOMETRIC_MEAN: Penalize dissimilar joints
-      - AggregationMethod.HARMONIC_MEAN: Strict matching requirement
-
-  • feature.matches_pose(threshold=0.8, method=GEOMETRIC_MEAN, min_confidence=0.0) -> bool
-      Quick check if poses match above threshold
-      Returns True if similarity >= threshold
-
-Common Usage Patterns:
-----------------------
-# Create similarity feature for pose pair (5, 8):
-similarity = SimilarityFeature(values, scores, pair_id=(5, 8))
-
-# Check which poses are being compared:
-print(f"Comparing poses {similarity.id_1} and {similarity.id_2}")
-
-# Individual joint similarity:
-shoulder_sim = similarity[AngleLandmark.left_shoulder]
-if shoulder_sim > 0.9:
-    print("Left shoulder matches well!")
-
-# Overall similarity (mean - balanced):
-overall = similarity.similarity()
-print(f"Poses {similarity.pair_id} are {overall*100:.1f}% similar")
-
-# Geometric mean (penalizes dissimilarity):
-overall = similarity.similarity(AggregationMethod.GEOMETRIC_MEAN)
-if overall > 0.80:
-    print(f"Good overall match for pair {similarity.pair_id}")
-
-# Quick pose matching check:
-if similarity.matches_pose(threshold=0.8):
-    print(f"Poses {similarity.pair_id} match!")
-
-# Batch processing multiple pairs:
-similarities = [
-    SimilarityFeature(vals1, scores1, (1, 2)),
-    SimilarityFeature(vals2, scores2, (1, 3)),
-    SimilarityFeature(vals3, scores3, (2, 3)),
-]
-
-# Find best matching pair:
-best = max(similarities, key=lambda s: s.similarity())
-print(f"Best match: poses {best.pair_id} ({best.similarity():.2f})")
-
-Statistical Comparison for Similarity:
----------------------------------------
-Given similarity scores: [0.9, 0.9, 0.9, 0.3]
-(3 matching joints, 1 non-matching)
-
-• Mean:          0.75  → "75% similar overall"
-• Geometric:     0.69  → "69% similar (penalizes mismatch)"
-• Harmonic:      0.51  → "51% similar (very strict)"
-
-Use case guidance:
-- Mean:      General similarity assessment (balanced)
-- Geometric: Prefer matching poses, some tolerance for variation
-- Harmonic:  Require all joints to match (strict pose verification)
-
-Comparison with SymmetryFeature:
---------------------------------
-- SimilarityFeature: Compares two different poses (inter-pose)
-  * Has pair_id tracking which poses are compared
-  * Used for pose matching, tracking, quality assessment
-
-- SymmetryFeature: Compares left/right within one pose (intra-pose)
-  * No pair_id (single pose analysis)
-  * Used for symmetry checking, pose quality
-
-Both use same statistical methods and interpretation
-
-Validation:
------------
-• pair_id must be tuple of two different integers
-• pair_id is always ordered (smaller, larger)
-• Cannot compare a pose with itself
-• Example valid: (5, 8), (1, 100)
-• Example invalid: (5, 5), (8, 5)
-
-Notes:
-------
-- Similarity scores are in range [0.0, 1.0]
-  * 1.0 = perfect similarity (angles identical)
-  * 0.0 = maximum dissimilarity (angles π radians apart)
-- Invalid scores are NaN (check with get_valid() before use)
-- Confidence scores indicate reliability of the similarity measurement
-  (minimum confidence of the two angles being compared)
-- Zero similarity (complete mismatch) is replaced with TINY (1e-5) in
-  geometric/harmonic means to preserve semantic meaning (penalizes score
-  rather than being filtered out)
-- All statistics support min_confidence filtering to ignore uncertain
-  measurements
-- Use geometric_mean for balanced strictness in most cases
-- Use harmonic_mean for strict pose verification (e.g., exercise form checking)
-=============================================================================
-"""

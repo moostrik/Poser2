@@ -51,9 +51,9 @@ from modules.pose.features.SimilarityFeature import (
 
 from modules.pose.features.SymmetryFeature import (
     SymmetryFeature,
-    SymmetricJoint,
-    SYMM_JOINT_NAMES,
-    SYMM_NUM_JOINTS,
+    SymmetryRegion,
+    SYMMETRY_REGION_NAMES,
+    SYMMETRY_NUM_REGIONS,
 )
 
 from modules.pose.features.factories.SymmetryFactory import (

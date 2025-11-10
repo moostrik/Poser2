@@ -5,7 +5,31 @@ ANGLEFEATURE API REFERENCE
 
 Concrete implementation of BaseScalarFeature for body landmark angles.
 
-Use for: pose articulation analysis, angle tracking, pose comparison.
+**IMPORTANT: Angles are normalized and mirrored for consistent pose comparison.**
+
+Coordinate System Design:
+-------------------------
+AngleFeature uses a normalized coordinate system where:
+
+1. **Normalization (Rotation Offsets)**:
+   - All angles are rotated relative to a neutral standing position
+   - Example: Elbow at 0° = neutral position (slightly bent), not raw geometric angle
+   - Applied via rotation offsets per landmark (see AngleFactory._ANGLE_OFFSET)
+   - Each landmark has a specific offset to define its "neutral" state
+
+2. **Mirroring (Right-Side Negation)**:
+   - Right-side angles are negated for symmetric representation
+   - Enables direct left/right comparison (e.g., left_elbow vs right_elbow)
+   - Applied to: right_shoulder, right_elbow, right_hip, right_knee
+
+This coordinate system is established at construction (AngleFactory.from_points())
+and enables:
+  • Direct symmetry comparison (SymmetryFeature)
+  • Symmetric pose visualization
+  • Pose matching across mirror poses
+  • Intuitive angle interpretation (0° = neutral position)
+
+Use for: pose articulation analysis, angle tracking, pose comparison, symmetry assessment.
 
 Summary of BaseFeature Design Philosophy:
 ==========================================
