@@ -119,7 +119,7 @@ class PoseFeatureLayer(LayerBase):
         fbo.begin()
 
         # Get joint names from the feature's enum
-        joint_enum_type = feature.__class__.joint_enum()
+        joint_enum_type = feature.__class__.feature_enum()
         joint_names: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
 
         # Alternate colors for readability

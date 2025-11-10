@@ -55,7 +55,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
         Raises:
             ValueError: If pair_id is invalid (same ID or not ordered)
         """
-        # Validate pair_id
+        # Validate pair_id -> this should assert not raise an error
         if pair_id[0] == pair_id[1]:
             raise ValueError(f"Cannot compare pose with itself: {pair_id[0]}")
         if pair_id[0] > pair_id[1]:
@@ -67,7 +67,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def joint_enum(cls) -> type[AngleLandmark]:
+    def feature_enum(cls) -> type[AngleLandmark]:
         """Returns AngleLandmark enum."""
         return AngleLandmark
 

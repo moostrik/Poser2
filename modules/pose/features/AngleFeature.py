@@ -44,7 +44,7 @@ class AngleFeature(BaseScalarFeature[AngleLandmark]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def joint_enum(cls) -> type[AngleLandmark]:
+    def feature_enum(cls) -> type[AngleLandmark]:
         """Returns AngleLandmark enum."""
         return AngleLandmark
 
@@ -97,7 +97,7 @@ Design Philosophy (from BaseFeature):
 Raw Access (numpy-native):
   • feature.values      → Full array, shape (n_joints,) for angles
   • feature.scores      → Full scores (n_joints,)
-  • feature[joint]      → Single value (float, radians)
+  • feature[joint]      → Single value (float, radians) - supports enum or int
   Use for: Numpy operations, batch processing, performance
 
 Python-Friendly Access:
@@ -116,7 +116,7 @@ Properties:
   • len(feature): int                              Total number of joints (9)
 
 Single Value Access:
-  • feature[joint] -> float                        Get angle in radians
+  • feature[joint] -> float                        Get angle in radians (supports enum or int)
   • feature.get(joint, fill=0.0) -> float          Get angle with NaN fill
   • feature.get_value(joint, fill) -> float        Alias for get()
   • feature.get_score(joint) -> float              Get confidence score
@@ -139,12 +139,17 @@ Degree Conversion:
   • feature.to_degrees() -> np.ndarray               All angles in degrees
 
 Angle Math:
-  • feature.angle_difference(other, joint) -> float  Angular distance [-π, π]
+  • feature.subtract(other) -> AngleFeature          Angular difference with wrapping [-π, π]
+      Computes shortest angular distance between corresponding angles in two poses.
+      Confidence is minimum of the two source confidences (conservative).
 
 Common Usage Patterns:
 ----------------------
 # Get angle in degrees:
 angle_deg = angles.get_degree(AngleLandmark.left_elbow)
+
+# Direct access via bracket notation:
+angle_rad = angles[AngleLandmark.left_elbow]  # Returns float in radians
 
 # Check if angle computation was successful:
 if angles.get_valid(AngleLandmark.left_knee):
@@ -156,8 +161,9 @@ for joint in AngleLandmark:
     if angles.get_valid(joint):
         print(f"{joint.name}: {angles.get_degree(joint):.1f}°")
 
-# Compare angles between two poses:
-diff = pose1.angle_difference(pose2, AngleLandmark.left_elbow)
+# Compare angles between two poses (proper angular wrapping):
+angle_delta = pose1_angles.subtract(pose2_angles)
+left_elbow_diff = angle_delta[AngleLandmark.left_elbow]
 
 # Convert all to degrees for display:
 all_degrees = angles.to_degrees()
@@ -191,6 +197,7 @@ Notes:
 - Head yaw is computed from eye/shoulder positions (special case)
 - Invalid angles are NaN (check with get_valid() before use)
 - Confidence scores indicate reliability of angle computation
+- Use subtract() instead of direct subtraction to handle angle wrapping
 =============================================================================
 """
 

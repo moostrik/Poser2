@@ -55,7 +55,7 @@ class SymmetryFeature(NormalizedScalarFeature[SymmetricJoint]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def joint_enum(cls) -> type[SymmetricJoint]:
+    def feature_enum(cls) -> type[SymmetricJoint]:
         """Returns SymmetricJoint enum."""
         return SymmetricJoint
 

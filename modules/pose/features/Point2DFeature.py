@@ -47,7 +47,7 @@ class Point2DFeature(BaseVectorFeature[PointLandmark]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def joint_enum(cls) -> type[PointLandmark]:
+    def feature_enum(cls) -> type[PointLandmark]:
         """Returns PointLandmark enum."""
         return PointLandmark
 
@@ -125,7 +125,7 @@ class Point2DFeature(BaseVectorFeature[PointLandmark]):
             >>> feature = Point2DFeature.from_flat_array(flat)
         """
         # Reshape to (n_joints, 2)
-        n_joints = len(cls.joint_enum())
+        n_joints = len(cls.feature_enum())
         values = flat.reshape(n_joints, 2).astype(np.float32)
         return cls.from_values(values, scores)
 

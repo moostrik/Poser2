@@ -1,3 +1,151 @@
+"""
+=============================================================================
+BASEFEATURE API REFERENCE
+=============================================================================
+
+Base interface for all pose features. Defines common structure, data access
+patterns, and design philosophy shared across all feature types.
+
+Design Philosophy:
+==================
+
+Immutability & Ownership:
+-------------------------
+• Features are IMMUTABLE after construction
+• Arrays are set to read-only (writeable=False)
+• Constructor takes OWNERSHIP of arrays - caller must not modify
+• Create new features for modifications (functional style)
+• Enables safe caching of computed properties
+
+Raw Access (numpy-native):
+--------------------------
+• feature.values      → Full array (shape varies by type), read-only
+• feature.scores      → Full scores (n_elements,), read-only
+• feature[element]    → Single value (type varies by subclass)
+
+Use for: Numpy operations, batch processing, performance-critical code
+Performance: O(1) array access, no Python type conversion
+
+Python-Friendly Access:
+-----------------------
+• feature.get(element, fill)     → Python types with NaN handling
+• feature.get_score(element)     → Python float [0.0, 1.0]
+• feature.get_scores(elements)   → Python list
+
+Use for: Logic, conditionals, unpacking, defaults, user-facing code
+Performance: Slightly slower due to type conversion
+
+NaN Semantics:
+--------------
+• Invalid/missing data is represented as NaN (np.nan)
+• NaN values MUST have score 0.0 (enforced by validation)
+• Use valid_mask to check validity before accessing
+• Use get(element, fill=0.0) to handle NaN automatically
+
+Cached Properties:
+------------------
+• Subclasses may provide cached computed properties
+• Safe because features are immutable
+• Use @cached_property from functools
+• First access computes and caches, subsequent O(1) lookup
+
+Construction Patterns:
+----------------------
+• MyFeature(values, scores)              → Direct (fast, no validation)
+• MyFeature.create_empty()               → All NaN values, zero scores
+• MyFeature.from_values(values, scores?) → Auto-generate scores if None
+• MyFeature.create_validated(values, scores) → Full validation, raises on error
+
+Validation Strategy (Asserts vs Validate):
+------------------------------------------
+Development (assertions):
+• Constructors use assert statements for structural checks
+• assert values.ndim == 1, "values must be 1D"
+• assert len(values) == length, "length mismatch"
+• Assertions are removed with Python -O flag for production
+
+Testing/Debugging (validate method):
+• Use validate() for comprehensive checking
+• Returns all errors at once (better debugging)
+• Includes optional range validation (check_ranges=True)
+• Use in tests, development, and untrusted input
+
+Production:
+• Run with python -O to remove assertions (faster)
+• Skip validate() calls unless validating external input
+• Use create_validated() for untrusted data only
+
+Philosophy:
+• Fast by default (no validation overhead in production)
+• Asserts catch programmer errors during development
+• validate() catches data errors from external sources
+• Use asserts for "should never happen" conditions
+• Use validate() for "might happen with bad input" conditions
+
+Performance Contracts:
+----------------------
+Fast (O(1) or O(n)):
+• Property access: values, scores, valid_mask, valid_count
+• Indexing: feature[element]
+• Cached properties (after first access)
+• Array operations: feature.values[mask]
+
+Moderate (Python conversion):
+• get(element, fill), get_score(element)
+
+Slower (iteration or allocation):
+• get_values(elements), get_scores(elements)
+• validate() with check_ranges=True
+
+Guidance:
+• Use raw access in tight loops or vectorized operations
+• Use python-friendly access for clarity and safety
+• Cache results of get_values() if accessing multiple times
+• Avoid repeated validate() calls in production code
+
+Validation Philosophy:
+----------------------
+• Construction is fast by default (no validation)
+• Use validate() for debugging and testing
+• Use create_validated() for untrusted input
+• Validation returns all errors at once (better debugging)
+• Optional range checking (disabled for infinite bounds)
+
+Abstract Methods (must implement in subclasses):
+-------------------------------------------------
+Structure:
+  • feature_enum() -> type[IntEnum]        Feature element enum
+  • default_range() -> tuple[float, float] Valid value range
+  • __len__() -> int                       Number of elements
+
+Data Access:
+  • values: np.ndarray                     Raw values array
+  • scores: np.ndarray                     Confidence scores
+  • valid_mask: np.ndarray                 Boolean validity mask
+  • valid_count: int                       Count of valid elements
+
+Element Access:
+  • get_score(element) -> float            Single confidence score
+  • get_scores(elements) -> list[float]    Multiple scores
+
+Utilities:
+  • validate(check_ranges) -> tuple[bool, str|None]  Validation
+  • __repr__() -> str                      String representation
+
+Range Constants:
+----------------
+Convenience constants for common ranges (optional, can be used in default_range()):
+
+• NORMALIZED_RANGE = (0.0, 1.0)           For normalized values (probabilities, ratios)
+• POSITIVE_RANGE = (0.0, np.inf)          For non-negative values (distances, heights)
+• UNBOUNDED_RANGE = (-np.inf, np.inf)     For any real value (coordinates, differences)
+• PI_RANGE = (0.0, np.pi)                 For angles [0, π]
+• TWO_PI_RANGE = (0.0, 2*np.pi)           For angles [0, 2π]
+• SYMMETRIC_PI_RANGE = (-np.pi, np.pi)    For angles [-π, π]
+
+Infinite bounds (±np.inf) disable range validation for that bound.
+=============================================================================
+"""
 from abc import ABC, abstractmethod
 from enum import IntEnum
 from typing import Generic, TypeVar
@@ -17,59 +165,37 @@ FeatureEnum = TypeVar('FeatureEnum', bound=IntEnum)
 class BaseFeature(ABC, Generic[FeatureEnum]):
     """Base interface for pose features.
 
-    All pose features share:
-    - Structure definition (joint enum)
-    - Raw data arrays (values, scores)
-    - Validity tracking
-    - Common constructor pattern
+    All pose features share structure definition, raw data arrays,
+    validity tracking, and common constructor patterns.
 
-    This enables polymorphic code that works with any feature type.
-
-    Design Philosophy:
-    ==================
-
-    Raw Access (numpy-native):
-    --------------------------
-    feature.values      → Full array (shape varies by type)
-    feature.scores      → Full scores (n_joints,)
-    feature[joint]      → Single value (type varies by subclass)
-
-    Use for: Numpy operations, batch processing, performance
-
-    Python-Friendly Access:
-    -----------------------
-    feature.get(joint, fill)    → Python types (varies by subclass)
-    feature.get_score(joint)    → Python float
-    feature.get_scores(joints)  → Python list
-
-    Use for: Logic, conditionals, unpacking, defaults
+    See module docstring for full API reference and design philosophy.
     """
 
     # ========== STRUCTURE ==========
 
     @classmethod
     @abstractmethod
-    def joint_enum(cls) -> type[FeatureEnum]:
-        """Joint enum defining the structure (source of truth for length).
+    def feature_enum(cls) -> type[FeatureEnum]:
+        """Feature enum defining the structure (source of truth for length).
 
         Returns:
-            IntEnum subclass defining joints for this feature type.
+            IntEnum subclass defining elements for this feature type.
         """
         pass
 
     @classmethod
     @abstractmethod
     def default_range(cls) -> tuple[float, float]:
-        """Define valid value range. Must be implemented by subclasses."""
+        """Define valid value range for this feature type.
+
+        Returns:
+            (min_value, max_value) tuple. Use module constants.
+        """
         pass
 
     @abstractmethod
     def __len__(self) -> int:
-        """Number of joints in this feature.
-
-        Returns:
-            Number of joints (typically len(joint_enum())).
-        """
+        """Number of elements in this feature."""
         pass
 
     # ========== RAW DATA ACCESS ==========
@@ -77,31 +203,13 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
     @property
     @abstractmethod
     def values(self) -> np.ndarray:
-        """Feature values array (read-only).
-
-        Shape varies by feature type:
-        - VectorFeature: (n_joints, n_dims)
-        - ScalarFeature: (n_joints,)
-
-        Use for raw numpy operations. For Python-friendly access,
-        use get() methods defined by subclasses.
-
-        Returns:
-            Numpy array with feature values (NaN for invalid joints).
-        """
+        """Feature values array (read-only, shape varies by type)."""
         pass
 
     @property
     @abstractmethod
     def scores(self) -> np.ndarray:
-        """Confidence scores array (read-only, n_joints).
-
-        Raw numpy array for batch operations.
-        For single values, use get_score() for Python float conversion.
-
-        Returns:
-            Array of confidence scores [0.0, 1.0] for each joint.
-        """
+        """Confidence scores array (read-only, n_elements)."""
         pass
 
     # ========== VALIDITY ==========
@@ -109,50 +217,25 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
     @property
     @abstractmethod
     def valid_mask(self) -> np.ndarray:
-        """Boolean mask of valid joints (n_joints,).
-
-        Returns:
-            Boolean array where True = valid data, False = invalid/NaN.
-        """
+        """Boolean mask of valid elements (n_elements)."""
         pass
 
     @property
     @abstractmethod
     def valid_count(self) -> int:
-        """Number of joints with valid data.
-
-        Returns:
-            Count of True values in valid_mask.
-        """
+        """Number of elements with valid data."""
         pass
 
-    # ========== SCORE ACCESS (Python-friendly) ==========
+    # ========== SCORE ACCESS ==========
 
     @abstractmethod
-    def get_score(self, joint: FeatureEnum | int) -> float:
-        """Get confidence score for a single joint (Python float).
-
-        Args:
-            joint: Joint enum member or index
-
-        Returns:
-            Confidence score [0.0, 1.0] as Python float.
-        """
+    def get_score(self, element: FeatureEnum | int) -> float:
+        """Get confidence score for a single element (Python float)."""
         pass
 
     @abstractmethod
-    def get_scores(self, joints: list[FeatureEnum | int]) -> list[float]:
-        """Get confidence scores for multiple joints (Python list).
-
-        Args:
-            joints: List of joint enum members or indices
-
-        Returns:
-            List of confidence scores as Python floats.
-
-        Note:
-            For raw numpy access, use feature.scores[joints].
-        """
+    def get_scores(self, elements: list[FeatureEnum | int]) -> list[float]:
+        """Get confidence scores for multiple elements (Python list)."""
         pass
 
     # ========== VALIDATION ==========
@@ -173,32 +256,5 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
 
     @abstractmethod
     def __repr__(self) -> str:
-        """String representation for debugging.
-
-        Returns:
-            Human-readable string describing this feature.
-        """
+        """String representation for debugging."""
         pass
-
-    # ========== CONSTRUCTION ==========
-    # Note: While all features use __init__(values, scores), we don't
-    # mark it as @abstractmethod because Python doesn't enforce
-    # constructor signatures in subclasses. The pattern is documented here:
-    #
-    # Standard constructor pattern:
-    #     def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
-    #         """Initialize with raw values and confidence scores."""
-    #         ...
-    #
-    # Standard factory methods:
-    #     @classmethod
-    #     def create_empty(cls) -> Self:
-    #         """Create empty instance with all NaN values."""
-    #
-    #     @classmethod
-    #     def from_values(cls, values: np.ndarray, scores: Optional[np.ndarray] = None) -> Self:
-    #         """Create from values, generating default scores if needed."""
-    #
-    #     @classmethod
-    #     def create_validated(cls, values: np.ndarray, scores: np.ndarray) -> Self:
-    #         """Create with full validation."""

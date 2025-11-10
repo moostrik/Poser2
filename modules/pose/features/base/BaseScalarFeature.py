@@ -1,29 +1,159 @@
+"""
+=============================================================================
+BASESCALARFEATURE API REFERENCE
+=============================================================================
+
+Base class for scalar features (single value per element).
+
+Use for: angles, distances, normalized values, unbounded scalars, etc.
+
+Summary of BaseFeature Design Philosophy:
+==========================================
+
+Immutability & Ownership:
+  • Features are IMMUTABLE - arrays set to read-only after construction
+  • Constructor takes OWNERSHIP - caller must not modify arrays after passing
+  • Modifications create new features (functional style)
+
+Data Access (two patterns):
+  Raw (numpy):     feature.values, feature.scores, feature[element]
+  Python-friendly: feature.get(element, fill), feature.get_score(element)
+
+NaN Semantics:
+  • Invalid data = NaN with score 0.0 (enforced)
+  • Use get(element, fill=0.0) for automatic NaN handling
+
+Cached Properties:
+  • Subclasses may add @cached_property (safe due to immutability)
+
+Construction:
+  • MyFeature(values, scores)           → Direct (fast, no validation)
+  • MyFeature.create_empty()            → All NaN values, zero scores
+  • MyFeature.from_values(values, ...)  → Auto-generate scores if None
+  • MyFeature.create_validated(...)     → Full validation, raises on error
+
+Validation:
+  • Asserts in constructors (removed with -O flag for production)
+  • validate() method for debugging/testing/untrusted input
+  • Fast by default, validate only when needed
+
+Performance:
+  Fast:     Property access, indexing, cached properties, array ops
+  Moderate: get(), get_score() (Python conversion)
+  Slow:     get_values(), get_scores() (iteration), validate()
+
+BaseScalarFeature-Specific:
+============================
+
+Structure:
+----------
+Each element has:
+  • A scalar value (float) - may be NaN for invalid/missing data
+  • A confidence score [0.0, 1.0]
+
+Storage:
+  • values: np.ndarray, shape (n_elements,), dtype float32
+  • scores: np.ndarray, shape (n_elements,), dtype float32
+
+Properties:
+-----------
+  • values: np.ndarray                             All scalar values (n_elements,)
+  • scores: np.ndarray                             All confidence scores (n_elements,)
+  • valid_mask: np.ndarray                         Boolean validity mask (n_elements,)
+  • valid_count: int                               Number of valid values
+  • len(feature): int                              Total number of elements
+
+Single Value Access:
+--------------------
+  • feature[element] -> float                      Get value (supports enum or int)
+  • feature.get(element, fill=np.nan) -> float     Get value with NaN handling
+  • feature.get_value(element, fill) -> float      Alias for get()
+  • feature.get_score(element) -> float            Get confidence score
+  • feature.get_valid(element) -> bool             Check if value is valid
+
+Batch Operations:
+-----------------
+  • feature.get_values(elements, fill) -> list[float]  Get multiple values
+  • feature.get_scores(elements) -> list[float]        Get multiple scores
+  • feature.are_valid(elements) -> bool                Check if ALL valid
+
+Factory Methods:
+----------------
+  • MyFeature.create_empty() -> MyFeature          All NaN values, zero scores
+  • MyFeature.from_values(values, scores?) -> MyFeature  Auto-generate scores if None
+  • MyFeature.create_validated(values, scores) -> MyFeature  Full validation
+
+Validation:
+-----------
+  • feature.validate(check_ranges=True) -> tuple[bool, str|None]
+      Returns (is_valid, error_message)
+
+Abstract Methods (must implement in subclasses):
+-------------------------------------------------
+  • feature_enum() -> type[IntEnum]                Feature element enum
+  • default_range() -> tuple[float, float]         Valid value range
+      Optional convenience constants: NORMALIZED_RANGE, POSITIVE_RANGE, UNBOUNDED_RANGE,
+                                      PI_RANGE, TWO_PI_RANGE, SYMMETRIC_PI_RANGE
+
+Common Usage Patterns:
+----------------------
+# Direct access (raw - fastest):
+value = feature[MyEnum.element]  # Returns float, may be NaN
+
+# Python-friendly access (with NaN handling):
+value = feature.get(MyEnum.element, fill=0.0)  # Returns 0.0 if NaN
+
+# Check validity before access:
+if feature.get_valid(MyEnum.element):
+    value = feature[MyEnum.element]
+    confidence = feature.get_score(MyEnum.element)
+
+# Batch processing (numpy-native):
+valid_values = feature.values[feature.valid_mask]
+all_scores = feature.scores
+
+# Batch validation and extraction:
+elements = [MyEnum.elem1, MyEnum.elem2, MyEnum.elem3]
+if feature.are_valid(elements):
+    values = feature.get_values(elements)
+    scores = feature.get_scores(elements)
+
+# Create empty feature:
+feature = MyFeature.create_empty()
+
+# Create with auto-generated scores (1.0 for valid, 0.0 for NaN):
+values = np.array([1.0, 2.0, np.nan, 4.0])
+feature = MyFeature.from_values(values)
+
+# Create with validation (for untrusted input):
+try:
+    feature = MyFeature.create_validated(values, scores)
+except ValueError as e:
+    print(f"Invalid data: {e}")
+
+Notes:
+------
+- All values are single floats (scalar per element)
+- Invalid values are NaN with score 0.0
+- Arrays are read-only after construction (immutable)
+- Use validate() for debugging, not in production loops
+- Constructor takes ownership - caller must not modify arrays after passing
+=============================================================================
+"""
 from abc import abstractmethod
 from typing import Optional
-from unittest import result
 
 import numpy as np
 from typing_extensions import Self
 
-from modules.gl.Utils import fill
 from modules.pose.features.base.BaseFeature import BaseFeature, FeatureEnum
 
 
 class BaseScalarFeature(BaseFeature[FeatureEnum]):
-    """Base class for scalar features (1D value per joint).
+    """Base class for scalar features (1D value per element).
 
-    Use for: angles, distances, normalized values, unbounded scalars, etc.
-
-    Each joint has:
-    - A scalar value (float)
-    - A confidence score (0.0 to 1.0)
-
-    Values can be NaN to indicate missing/invalid data.
-
-    Subclasses must implement:
-    - joint_enum(): Define the joint structure (which IntEnum to use)
-    - default_range(): Define valid value range, or (±inf, ±inf) for unbounded
-        * construct with (-np.inf, np.inf) for example
+    See module docstring for full API reference.
+    Inherits design philosophy from BaseFeature.
     """
 
     def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
@@ -31,7 +161,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
 
         PERFORMANCE NOTE: No validation performed. Caller must ensure:
         - Both arrays are 1D
-        - Arrays match joint_enum() length
+        - Arrays match feature_enum() length
         - Scores are in range [0.0, 1.0]
 
         Use create_validated() for untrusted input or validate() to check.
@@ -39,11 +169,11 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         Note: Takes ownership of arrays - caller must not modify after passing.
 
         Args:
-            values: Feature values array (1D, float32), length = len(joint_enum())
-            scores: Confidence scores (1D, float32, range [0.0, 1.0]), length = len(joint_enum())
+            values: Feature values array (1D, float32), length = len(feature_enum())
+            scores: Confidence scores (1D, float32, range [0.0, 1.0]), length = len(feature_enum())
         """
         # Get the length from the enum (the source of truth)
-        length = len(self.joint_enum())
+        length = len(self.feature_enum())
 
         # Optional: Keep assertions for development (removed with -O flag)
         assert values.ndim == 1, f"values must be 1D, got {values.ndim}D"
@@ -67,8 +197,8 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
 
     @classmethod
     @abstractmethod
-    def joint_enum(cls) -> type[FeatureEnum]:
-        """Get the joint enum type for this class. Must be implemented by subclasses."""
+    def feature_enum(cls) -> type[FeatureEnum]:
+        """Get the feature enum type for this class. Must be implemented by subclasses."""
         pass
 
     @classmethod
@@ -80,28 +210,28 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
     # ========== BASEFEATURE ==========
 
     def __len__(self) -> int:
-        """Number of joints in this feature."""
-        return len(self.joint_enum())
+        """Number of features in this feature."""
+        return len(self.feature_enum())
 
     # ========== RAW DATA ACCESS ==========
 
-    def __getitem__(self, key: FeatureEnum | int) -> float:
-        """Support indexing by joint enum or integer."""
-        return float(self.values[key])
+    def __getitem__(self, element: FeatureEnum | int) -> float:
+        """Support indexing by feature enum or integer."""
+        return float(self.values[element])
 
     @property
     def values(self) -> np.ndarray:
-        """Feature values array (read-only, n_joints)."""
+        """Feature values array (read-only, n_elements)."""
         return self._values
 
     @property
     def scores(self) -> np.ndarray:
-        """Confidence scores array (read-only, n_joints)."""
+        """Confidence scores array (read-only, n_elements)."""
         return self._scores
 
     @property
     def valid_mask(self) -> np.ndarray:
-        """Boolean mask indicating valid (non-NaN) values (n_joints)."""
+        """Boolean mask indicating valid (non-NaN) values (n_elements)."""
         return self._valid_mask
 
     @property
@@ -111,43 +241,43 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
 
     # ========== ACCESS ==========
 
-    def get(self, joint: FeatureEnum | int, fill: float = np.nan) -> float:
-        """Get raw value for a joint (may be NaN), with fill for NaN."""
-        value = self._values[joint]
+    def get(self, element: FeatureEnum | int, fill: float = np.nan) -> float:
+        """Get raw value for an element (may be NaN), with fill for NaN."""
+        value = self._values[element]
         return float(value) if not np.isnan(value) else fill
 
-    def get_value(self, joint: FeatureEnum | int, fill: float = np.nan) -> float:
+    def get_value(self, element: FeatureEnum | int, fill: float = np.nan) -> float:
         """Alias for get() to emphasize value retrieval."""
-        return self.get(joint, fill)
+        return self.get(element, fill)
 
-    def get_values(self, joints: list[FeatureEnum | int], fill: float = np.nan) -> list[float]:
-        """Get values for multiple joints with fill for NaN."""
-        values = self._values[list(joints)]
+    def get_values(self, elements: list[FeatureEnum | int], fill: float = np.nan) -> list[float]:
+        """Get values for multiple elements with fill for NaN."""
+        values = self._values[list(elements)]
 
         # Fast path: no NaN replacement needed
         if np.isnan(fill):
             return values.tolist()
 
         # Vectorized NaN replacement
-        valid_mask = self._valid_mask[list(joints)]
+        valid_mask = self._valid_mask[list(elements)]
         result = np.where(valid_mask, values, fill)
         return result.tolist()
 
-    def get_score(self, joint: FeatureEnum | int) -> float:
-        """Get score for a joint (always between 0.0 and 1.0)."""
-        return float(self._scores[joint])
+    def get_score(self, element: FeatureEnum | int) -> float:
+        """Get score for an element (always between 0.0 and 1.0)."""
+        return float(self._scores[element])
 
-    def get_scores(self, joints: list[FeatureEnum | int]) -> list[float]:
-        """Get confidence scores for multiple joints."""
-        return [float(self._scores[joint]) for joint in joints]
+    def get_scores(self, elements: list[FeatureEnum | int]) -> list[float]:
+        """Get confidence scores for multiple elements."""
+        return [float(self._scores[element]) for element in elements]
 
-    def get_valid(self, joint: FeatureEnum | int) -> bool:
-        """Check if the value for a joint is valid (not NaN)."""
-        return self._valid_mask[joint]
+    def get_valid(self, element: FeatureEnum | int) -> bool:
+        """Check if the value for an element is valid (not NaN)."""
+        return self._valid_mask[element]
 
-    def are_valid(self, joints: list[FeatureEnum | int]) -> bool:
-        """Check if ALL specified joints are valid (batch validation)."""
-        return bool(np.all(self._valid_mask[list(joints)]))
+    def are_valid(self, elements: list[FeatureEnum | int]) -> bool:
+        """Check if ALL specified elements are valid (batch validation)."""
+        return bool(np.all(self._valid_mask[list(elements)]))
 
     # ========== REPRESENTATION ==========
 
@@ -160,7 +290,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
     @classmethod
     def create_empty(cls) -> Self:
         """Create an empty instance with all NaN values and zero scores."""
-        length = len(cls.joint_enum())
+        length = len(cls.feature_enum())
         values = np.full(length, np.nan, dtype=np.float32)
         scores = np.zeros(length, dtype=np.float32)
         return cls(values=values, scores=scores)
@@ -191,9 +321,9 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
 
         Checks:
         - values array is 1D
-        - values length matches n_joints
+        - values length matches n_elements
         - scores array is 1D
-        - scores length matches n_joints
+        - scores length matches n_elements
         - NaN values must have score 0.0
         - Scores are in [0.0, 1.0] (if check_ranges=True)
         - Values are within default_range() (if check_ranges=True)
@@ -219,13 +349,13 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
             return (False, "; ".join(errors))
 
         # Check shape match
-        length = len(self.joint_enum())
+        length = len(self.feature_enum())
 
         if len(self._values) != length:
-            errors.append(f"values length {len(self._values)} != {self.joint_enum().__name__} length {length}")
+            errors.append(f"values length {len(self._values)} != {self.feature_enum().__name__} length {length}")
 
         if len(self._scores) != length:
-            errors.append(f"scores length {len(self._scores)} != {self.joint_enum().__name__} length {length}")
+            errors.append(f"scores length {len(self._scores)} != {self.feature_enum().__name__} length {length}")
 
         # Early return for length errors (can't continue validation)
         if errors:
@@ -238,10 +368,10 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
             bad_scores = self._scores[invalid_mask] != 0.0
             if np.any(bad_scores):
                 bad_indices = invalid_indices[bad_scores]
-                joint_enum = self.joint_enum()
-                bad_joints = [joint_enum(i).name for i in bad_indices[:3]]
+                feature_enum = self.feature_enum()
+                bad_elements = [feature_enum(i).name for i in bad_indices[:3]]
                 more = f" and {len(bad_indices) - 3} more" if len(bad_indices) > 3 else ""
-                errors.append(f"NaN values must have score 0.0, but found non-zero scores at: {', '.join(bad_joints)}{more}")
+                errors.append(f"NaN values must have score 0.0, but found non-zero scores at: {', '.join(bad_elements)}{more}")
 
         # Range checks (expensive, only if requested)
         if check_ranges and self._valid_count > 0:

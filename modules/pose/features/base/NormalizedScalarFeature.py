@@ -49,7 +49,7 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
 
     @classmethod
     @abstractmethod
-    def joint_enum(cls) -> type[FeatureEnum]:
+    def feature_enum(cls) -> type[FeatureEnum]:
         """Returns the enum type for joints in this feature."""
         pass
 

@@ -1,3 +1,155 @@
+"""
+=============================================================================
+BASEVECTORFEATURE API REFERENCE
+=============================================================================
+
+Base class for vector features (multi-dimensional values per element).
+
+Use for: 2D/3D positions, direction vectors, velocity vectors, etc.
+
+Summary of BaseFeature Design Philosophy:
+==========================================
+
+Immutability & Ownership:
+  • Features are IMMUTABLE - arrays set to read-only after construction
+  • Constructor takes OWNERSHIP - caller must not modify arrays after passing
+  • Modifications create new features (functional style)
+
+Data Access (two patterns):
+  Raw (numpy):     feature.values, feature.scores, feature[element]
+  Python-friendly: feature.get(element, fill), feature.get_score(element)
+
+NaN Semantics:
+  • Invalid data = NaN with score 0.0 (enforced)
+  • Use get(element, fill=0.0) for automatic NaN handling
+
+Cached Properties:
+  • Subclasses may add @cached_property (safe due to immutability)
+
+Construction:
+  • MyFeature(values, scores)           → Direct (fast, no validation)
+  • MyFeature.create_empty()            → All NaN values, zero scores
+  • MyFeature.from_values(values, ...)  → Auto-generate scores if None
+  • MyFeature.create_validated(...)     → Full validation, raises on error
+
+Validation:
+  • Asserts in constructors (removed with -O flag for production)
+  • validate() method for debugging/testing/untrusted input
+  • Fast by default, validate only when needed
+
+Performance:
+  Fast:     Property access, indexing, cached properties, array ops
+  Moderate: get(), get_score() (Python conversion)
+  Slow:     get_values(), get_scores() (iteration), validate()
+
+BaseVectorFeature-Specific:
+============================
+
+Structure:
+----------
+Each element has:
+  • A vector with n dimensions (e.g., x, y for 2D; x, y, z for 3D)
+  • A confidence score [0.0, 1.0]
+  • A vector is INVALID if ANY component is NaN
+
+Storage:
+  • values: np.ndarray, shape (n_elements, n_dims), dtype float32
+  • scores: np.ndarray, shape (n_elements,), dtype float32
+
+Properties:
+-----------
+  • values: np.ndarray                             All vectors (n_elements, n_dims)
+  • scores: np.ndarray                             All confidence scores (n_elements,)
+  • valid_mask: np.ndarray                         Boolean validity mask (n_elements,)
+  • valid_count: int                               Number of valid vectors
+  • len(feature): int                              Total number of elements
+
+Single Vector Access:
+---------------------
+  • feature[element] -> np.ndarray                 Get vector (supports enum or int)
+                                                   Returns (n_dims,) array, may contain NaN
+  • feature.get_score(element) -> float            Get confidence score
+  • feature.get_valid(element) -> bool             Check if vector is valid
+
+Batch Operations:
+-----------------
+  • feature.get_scores(elements) -> list[float]    Get multiple scores
+  • feature.are_valid(elements) -> bool            Check if ALL valid
+
+Factory Methods:
+----------------
+  • MyFeature.create_empty() -> MyFeature          All NaN vectors, zero scores
+  • MyFeature.from_values(values, scores?) -> MyFeature  Auto-generate scores if None
+  • MyFeature.create_validated(values, scores) -> MyFeature  Full validation
+
+Validation:
+-----------
+  • feature.validate(check_ranges=True) -> tuple[bool, str|None]
+      Returns (is_valid, error_message)
+
+Abstract Methods (must implement in subclasses):
+-------------------------------------------------
+  • feature_enum() -> type[IntEnum]                Feature element enum
+  • dimensions() -> int                            Number of dimensions (2 for 2D, 3 for 3D)
+  • default_range() -> tuple[float, float]         Valid value range (applies to ALL dimensions)
+      Optional convenience constants: NORMALIZED_RANGE, POSITIVE_RANGE, UNBOUNDED_RANGE,
+                                      PI_RANGE, TWO_PI_RANGE, SYMMETRIC_PI_RANGE
+
+Common Usage Patterns:
+----------------------
+# Direct access (raw - fastest):
+vector = feature[MyEnum.element]  # Returns np.ndarray (n_dims,), may contain NaN
+
+# Access individual components:
+x, y = feature[MyEnum.element]  # Unpack 2D vector
+x, y, z = feature[MyEnum.element]  # Unpack 3D vector
+
+# Check validity before access:
+if feature.get_valid(MyEnum.element):
+    vector = feature[MyEnum.element]
+    confidence = feature.get_score(MyEnum.element)
+    x, y = vector  # Safe to unpack
+
+# Batch processing (numpy-native):
+valid_vectors = feature.values[feature.valid_mask]  # Shape: (n_valid, n_dims)
+all_scores = feature.scores
+
+# Batch validation and extraction:
+elements = [MyEnum.elem1, MyEnum.elem2, MyEnum.elem3]
+if feature.are_valid(elements):
+    scores = feature.get_scores(elements)
+
+# Create empty feature (2D example):
+class MyFeature(BaseVectorFeature):
+    @classmethod
+    def dimensions(cls):
+        return 2  # 2D vectors
+
+feature = MyFeature.create_empty()
+
+# Create with auto-generated scores (1.0 for valid, 0.0 if any NaN):
+values = np.array([[1.0, 2.0], [3.0, np.nan], [5.0, 6.0]])  # Second vector invalid
+feature = MyFeature.from_values(values)
+# Scores will be: [1.0, 0.0, 1.0]
+
+# Create with validation (for untrusted input):
+try:
+    feature = MyFeature.create_validated(values, scores)
+except ValueError as e:
+    print(f"Invalid data: {e}")
+
+Notes:
+------
+- All vectors have the same number of dimensions (2D, 3D, etc.)
+- A vector is INVALID if ANY component is NaN (entire vector marked invalid)
+- Invalid vectors must have score 0.0
+- default_range() applies to ALL dimensions (x, y, z all use same range)
+- Arrays are read-only after construction (immutable)
+- Use validate() for debugging, not in production loops
+- Constructor takes ownership - caller must not modify arrays after passing
+=============================================================================
+"""
+
 from abc import abstractmethod
 from typing import Optional
 
@@ -8,11 +160,11 @@ from modules.pose.features.base.BaseFeature import BaseFeature, FeatureEnum
 
 
 class BaseVectorFeature(BaseFeature[FeatureEnum]):
-    """Base class for vector features (multi-dimensional values per joint).
+    """Base class for vector features (multi-dimensional values per element).
 
     Use for: 2D/3D keypoints, direction vectors, velocity vectors, etc.
 
-    Each joint has:
+    Each element has:
     - A vector with n dimensions (e.g., x, y for 2D points)
     - A confidence score (0.0 to 1.0)
 
@@ -20,7 +172,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
     A vector is considered invalid if ANY of its components is NaN.
 
     Subclasses must implement:
-    - joint_enum(): Define the joint structure (which IntEnum to use)
+    - feature_enum(): Define the element structure (which IntEnum to use)
     - dimensions(): Number of dimensions per vector (2 for 2D, 3 for 3D)
     - default_range(): Define valid value range for ALL dimensions
     """
@@ -29,8 +181,8 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         """Initialize vector feature with multi-dimensional values and scores.
 
         PERFORMANCE NOTE: No validation performed. Caller must ensure:
-        - values is 2D with shape (n_joints, n_dims)
-        - scores is 1D with length n_joints
+        - values is 2D with shape (n_elements, n_dims)
+        - scores is 1D with length n_elements
         - Dimensions match dimensions()
         - Scores are in range [0.0, 1.0]
 
@@ -39,7 +191,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         Note: Takes ownership of arrays - caller must not modify after passing.
         """
         # Get expected dimensions from the enum and subclass
-        length = len(self.joint_enum())
+        length = len(self.feature_enum())
         n_dims = self.dimensions()
 
         # Optional: Keep assertions for development (removed with -O flag)
@@ -65,8 +217,8 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
 
     @classmethod
     @abstractmethod
-    def joint_enum(cls) -> type[FeatureEnum]:
-        """Get the joint enum type for this class. Must be implemented by subclasses."""
+    def feature_enum(cls) -> type[FeatureEnum]:
+        """Get the feature enum type for this class. Must be implemented by subclasses."""
         pass
 
     @classmethod
@@ -84,28 +236,28 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
     # ========== BASEFEATURE ==========
 
     def __len__(self) -> int:
-        """Number of joints in this feature."""
-        return len(self.joint_enum())
+        """Number of elements in this feature."""
+        return len(self.feature_enum())
 
     # ========== RAW DATA ACCESS ==========
 
-    def __getitem__(self, key: FeatureEnum | int) -> np.ndarray:
-        """Get vector for a joint."""
-        return self._values[key]
+    def __getitem__(self, element: FeatureEnum | int) -> np.ndarray:
+        """Get vector for a element."""
+        return self._values[element]
 
     @property
     def values(self) -> np.ndarray:
-        """Vector values array (read-only, shape: n_joints × n_dims)."""
+        """Vector values array (read-only, shape: n_elements × n_dims)."""
         return self._values
 
     @property
     def scores(self) -> np.ndarray:
-        """Confidence scores array (read-only, n_joints)."""
+        """Confidence scores array (read-only, n_elements)."""
         return self._scores
 
     @property
     def valid_mask(self) -> np.ndarray:
-        """Boolean mask indicating valid (non-NaN) values (n_joints)."""
+        """Boolean mask indicating valid (non-NaN) values (n_elements)."""
         return self._valid_mask
 
     @property
@@ -115,21 +267,21 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
 
     # ========== FRIENDLY ACCESS ==========
 
-    def get_score(self, joint: FeatureEnum | int) -> float:
-        """Get confidence score for a single joint (Python float)."""
-        return float(self._scores[joint])
+    def get_score(self, element: FeatureEnum | int) -> float:
+        """Get confidence score for a single element (Python float)."""
+        return float(self._scores[element])
 
-    def get_scores(self, joints: list[FeatureEnum | int]) -> list[float]:
-        """Get confidence scores for multiple joints (Python list)."""
-        return [float(self._scores[joint]) for joint in joints]
+    def get_scores(self, elements: list[FeatureEnum | int]) -> list[float]:
+        """Get confidence scores for multiple elements (Python list)."""
+        return [float(self._scores[element]) for element in elements]
 
-    def get_valid(self, joint: FeatureEnum | int) -> bool:
-        """Check if the value for a joint is valid (not NaN)."""
-        return self._valid_mask[joint]
+    def get_valid(self, element: FeatureEnum | int) -> bool:
+        """Check if the value for a element is valid (not NaN)."""
+        return self._valid_mask[element]
 
-    def are_valid(self, joints: list[FeatureEnum | int]) -> bool:
-        """Check if ALL specified joints are valid (batch validation)."""
-        return bool(np.all(self._valid_mask[list(joints)]))
+    def are_valid(self, elements: list[FeatureEnum | int]) -> bool:
+        """Check if ALL specified elements are valid (batch validation)."""
+        return bool(np.all(self._valid_mask[list(elements)]))
 
     # ========== REPRESENTATION ==========
 
@@ -142,7 +294,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
     @classmethod
     def create_empty(cls) -> Self:
         """Create an empty instance with all NaN values and zero scores."""
-        length = len(cls.joint_enum())
+        length = len(cls.feature_enum())
         n_dims = cls.dimensions()
         values = np.full((length, n_dims), np.nan, dtype=np.float32)
         scores = np.zeros(length, dtype=np.float32)
@@ -153,7 +305,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         """Create instance from values, generating default scores if needed.
 
         Args:
-            values: Value array (shape: n_joints × n_dims)
+            values: Value array (shape: n_elements × n_dims)
             scores: Optional scores array. If None, generates scores:
                     - 1.0 for valid values (all components non-NaN)
                     - 0.0 for invalid values (any component is NaN)
@@ -186,9 +338,9 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
 
         Checks:
         - values array is 2D
-        - values shape matches (n_joints, n_dims)
+        - values shape matches (n_elements, n_dims)
         - scores array is 1D
-        - scores length matches n_joints
+        - scores length matches n_elements
         - Vectors with any NaN component must have score 0.0
         - Scores are in [0.0, 1.0] (if check_ranges=True)
         - ALL components are within default_range() (if check_ranges=True)
@@ -215,7 +367,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
             return (False, "; ".join(errors))
 
         # Check shape match
-        length = len(self.joint_enum())
+        length = len(self.feature_enum())
         n_dims = self.dimensions()
         expected_shape = (length, n_dims)
 
@@ -223,7 +375,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
             errors.append(f"values shape {self._values.shape} != expected {expected_shape}")
 
         if len(self._scores) != length:
-            errors.append(f"scores length {len(self._scores)} != {self.joint_enum().__name__} length {length}")
+            errors.append(f"scores length {len(self._scores)} != {self.feature_enum().__name__} length {length}")
 
         # Early return for length errors (can't continue validation)
         if errors:
@@ -236,10 +388,10 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
             bad_scores = self._scores[invalid_mask] != 0.0
             if np.any(bad_scores):
                 bad_indices = invalid_indices[bad_scores]
-                joint_enum = self.joint_enum()
-                bad_joints = [joint_enum(i).name for i in bad_indices[:3]]
+                feature_enum = self.feature_enum()
+                bad_elements = [feature_enum(i).name for i in bad_indices[:3]]
                 more = f" and {len(bad_indices) - 3} more" if len(bad_indices) > 3 else ""
-                errors.append(f"Invalid values must have score 0.0, but found non-zero scores at: {', '.join(bad_joints)}{more}")
+                errors.append(f"Invalid values must have score 0.0, but found non-zero scores at: {', '.join(bad_elements)}{more}")
 
         # Range checks (expensive, only if requested)
         if check_ranges and self._valid_count > 0:
