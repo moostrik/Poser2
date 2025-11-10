@@ -1,3 +1,211 @@
+"""
+=============================================================================
+NORMALIZEDSCALARFEATURE API REFERENCE
+=============================================================================
+
+Extends BaseScalarFeature with statistical aggregation for normalized [0, 1] features.
+
+Use for: similarity scores, symmetry scores, confidence metrics, normalized ratios.
+
+Summary of BaseFeature Design Philosophy:
+==========================================
+
+Immutability & Ownership:
+  • Features are IMMUTABLE - arrays set to read-only after construction
+  • Constructor takes OWNERSHIP - caller must not modify arrays after passing
+  • Modifications create new features (functional style)
+
+Data Access (two patterns):
+  Raw (numpy):     feature.values, feature.scores, feature[element]
+  Python-friendly: feature.get(element, fill), feature.get_score(element)
+
+NaN Semantics:
+  • Invalid data = NaN with score 0.0 (enforced)
+  • Use get(element, fill=0.0) for automatic NaN handling
+
+Cached Properties:
+  • Subclasses may add @cached_property (safe due to immutability)
+
+Construction:
+  • MyFeature(values, scores)           → Direct (fast, no validation)
+  • MyFeature.create_empty()            → All NaN values, zero scores
+  • MyFeature.from_values(values, ...)  → Auto-generate scores if None
+  • MyFeature.create_validated(...)     → Full validation, raises on error
+
+Validation:
+  • Asserts in constructors (removed with -O flag for production)
+  • validate() method for debugging/testing/untrusted input
+  • Fast by default, validate only when needed
+
+Performance:
+  Fast:     Property access, indexing, cached properties, array ops
+  Moderate: get(), get_score() (Python conversion)
+  Slow:     get_values(), get_scores() (iteration), validate()
+
+Inherited from BaseScalarFeature:
+==================================
+
+Structure:
+----------
+Each element has:
+  • A scalar value (float) in [0.0, 1.0] - may be NaN for invalid/missing data
+  • A confidence score [0.0, 1.0]
+
+Storage:
+  • values: np.ndarray, shape (n_elements,), dtype float32, range [0.0, 1.0]
+  • scores: np.ndarray, shape (n_elements,), dtype float32
+
+Properties:
+-----------
+  • values: np.ndarray                             All scalar values (n_elements,)
+  • scores: np.ndarray                             All confidence scores (n_elements,)
+  • valid_mask: np.ndarray                         Boolean validity mask (n_elements,)
+  • valid_count: int                               Number of valid values
+  • len(feature): int                              Total number of elements
+
+Single Value Access:
+--------------------
+  • feature[element] -> float                      Get value (supports enum or int)
+  • feature.get(element, fill=np.nan) -> float     Get value with NaN handling
+  • feature.get_value(element, fill) -> float      Alias for get()
+  • feature.get_score(element) -> float            Get confidence score
+  • feature.get_valid(element) -> bool             Check if value is valid
+
+Batch Operations:
+-----------------
+  • feature.get_values(elements, fill) -> list[float]  Get multiple values
+  • feature.get_scores(elements) -> list[float]        Get multiple scores
+  • feature.are_valid(elements) -> bool                Check if ALL valid
+
+Factory Methods:
+----------------
+  • MyFeature.create_empty() -> MyFeature          All NaN values, zero scores
+  • MyFeature.from_values(values, scores?) -> MyFeature  Auto-generate scores if None
+  • MyFeature.create_validated(values, scores) -> MyFeature  Full validation
+
+Validation:
+-----------
+  • feature.validate(check_ranges=True) -> tuple[bool, str|None]
+      Returns (is_valid, error_message)
+
+Abstract Methods (must implement in subclasses):
+-------------------------------------------------
+  • feature_enum() -> type[IntEnum]                Feature element enum
+
+Implemented Methods (do not override):
+---------------------------------------
+  • default_range() -> tuple[float, float]         Always returns (0.0, 1.0)
+
+
+NormalizedScalarFeature-Specific:
+==================================
+
+Statistical Aggregation:
+------------------------
+All methods support:
+  • Confidence-weighted computation
+  • Filtering by minimum confidence threshold
+  • Return NaN if no values meet criteria
+
+Core Methods:
+  • feature.aggregate(method, min_confidence=0.0) -> float
+      General aggregation with method selection
+
+  • feature.mean(min_confidence=0.0) -> float
+      Confidence-weighted arithmetic mean
+      Best for: General purpose averaging
+
+  • feature.geometric_mean(min_confidence=0.0) -> float
+      Confidence-weighted geometric mean (penalizes low values)
+      Best for: When all values should be high (similarity matching)
+
+  • feature.harmonic_mean(min_confidence=0.0) -> float
+      Confidence-weighted harmonic mean (heavily penalizes low values)
+      Best for: When all values must be high (strict matching)
+
+  • feature.min_value(min_confidence=0.0) -> float
+      Minimum value meeting confidence threshold
+
+  • feature.max_value(min_confidence=0.0) -> float
+      Maximum value meeting confidence threshold
+
+  • feature.median(min_confidence=0.0) -> float
+      Median value meeting confidence threshold
+
+  • feature.std(min_confidence=0.0) -> float
+      Confidence-weighted standard deviation
+
+Aggregation Methods (Enum):
+----------------------------
+  • AggregationMethod.MEAN              Arithmetic mean (balanced)
+  • AggregationMethod.GEOMETRIC_MEAN    Geometric mean (penalizes low)
+  • AggregationMethod.HARMONIC_MEAN     Harmonic mean (very strict)
+  • AggregationMethod.MIN               Minimum value
+  • AggregationMethod.MAX               Maximum value
+  • AggregationMethod.MEDIAN            Median value
+  • AggregationMethod.STD               Standard deviation
+
+Common Usage Patterns:
+----------------------
+# Simple mean (all valid values):
+avg = feature.mean()
+
+# High-confidence mean only:
+avg = feature.mean(min_confidence=0.7)
+
+# Geometric mean (penalizes low values):
+geom = feature.geometric_mean(min_confidence=0.5)
+
+# Using aggregate with different methods:
+mean_val = feature.aggregate(AggregationMethod.MEAN)
+geom_val = feature.aggregate(AggregationMethod.GEOMETRIC_MEAN)
+harm_val = feature.aggregate(AggregationMethod.HARMONIC_MEAN)
+
+# Compare different statistics:
+for method in AggregationMethod:
+    value = feature.aggregate(method, min_confidence=0.6)
+    print(f"{method.value}: {value:.3f}")
+
+# Access individual elements (inherited from BaseScalarFeature):
+value = feature[MyEnum.element]
+if feature.get_valid(MyEnum.element):
+    confidence = feature.get_score(MyEnum.element)
+
+# Batch processing (numpy-native):
+valid_values = feature.values[feature.valid_mask]
+all_scores = feature.scores
+
+# Create with auto-generated scores (1.0 for valid, 0.0 for NaN):
+values = np.array([0.9, 0.8, np.nan, 0.7])
+feature = MyFeature.from_values(values)
+
+Statistical Comparison:
+-----------------------
+Given values: [0.9, 0.9, 0.9, 0.2]
+
+• Mean:          0.725  (balanced average)
+• Geometric:     0.621  (penalizes the 0.2)
+• Harmonic:      0.375  (heavily penalizes the 0.2)
+
+Use case guidance:
+- Mean:      General purpose, balanced
+- Geometric: Need most values high, some tolerance for outliers
+- Harmonic:  Need ALL values high, very strict
+
+Notes:
+------
+- All values must be in [0.0, 1.0] range
+- Invalid values are NaN with score 0.0
+- Geometric/harmonic means replace zeros with 1e-5 (numerical stability)
+- Zero values have semantic meaning (failure) and penalize scores
+- Methods return NaN if no values meet min_confidence criteria
+- Confidence weighting improves reliability of aggregates
+- Arrays are read-only after construction (immutable)
+- Use validate() for debugging, not in production loops
+- Only use for normalized features (not angles or unbounded values!)
+=============================================================================
+"""
+
 from abc import abstractmethod
 from enum import Enum
 
@@ -21,6 +229,8 @@ class AggregationMethod(Enum):
     STD = 'std'
 
 
+_TINY: float = 1e-5  # Tiny value to replace zeros in geometric/harmonic means
+
 class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
     """Base class for normalized scalar features with statistical aggregation.
 
@@ -33,7 +243,7 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
     - Filtering by minimum confidence threshold
 
     Subclasses must implement:
-    - joint_enum(): Define the joint structure (which IntEnum to use)
+    - feature_enum(): Define the element structure (which IntEnum to use)
     - default_range(): Must return (0.0, 1.0) for normalized features
 
     Design rationale:
@@ -43,14 +253,12 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
     - Can filter out low-confidence measurements
     """
 
-    TINY: float = 1e-5  # Tiny value to replace zeros in geometric/harmonic means
-
     # ========== ABSTRACT METHODS ==========
 
     @classmethod
     @abstractmethod
     def feature_enum(cls) -> type[FeatureEnum]:
-        """Returns the enum type for joints in this feature."""
+        """Returns the enum type for elements in this feature."""
         pass
 
     @classmethod
@@ -101,7 +309,7 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
 
         elif method == AggregationMethod.GEOMETRIC_MEAN:
             # Replace zeros with TINY (don't filter - zero has meaning!)
-            safe_values = np.where(confident_values > self.TINY, confident_values, self.TINY)
+            safe_values = np.where(confident_values > _TINY, confident_values, _TINY)
 
             # Geometric mean in log space for numerical stability
             weighted_log_mean = np.average(np.log(safe_values), weights=confident_scores)
@@ -109,7 +317,7 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
 
         elif method == AggregationMethod.HARMONIC_MEAN:
             # Replace zeros with TINY (don't filter - zero has meaning!)
-            safe_values = np.where(confident_values > self.TINY, confident_values, self.TINY)
+            safe_values = np.where(confident_values > _TINY, confident_values, _TINY)
 
             # Weighted harmonic mean: sum(w) / sum(w/x)
             return float(np.sum(confident_scores) / np.sum(confident_scores / safe_values))
@@ -166,7 +374,7 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
         """Confidence-weighted geometric mean of valid positive values.
 
         Geometric mean penalizes low values more than arithmetic mean.
-        Useful for similarity/symmetry where all joints should score well.
+        Useful for similarity/symmetry where all elements should score well.
 
         Args:
             min_confidence: Minimum confidence to include value (default: 0.0)
@@ -178,7 +386,7 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
             >>> # Stricter than mean - penalizes low scores
             >>> geom = feature.geometric_mean()
             >>>
-            >>> # If any joint has low similarity, overall score drops significantly
+            >>> # If any element has low similarity, overall score drops significantly
             >>> # E.g., values [0.9, 0.9, 0.2] -> geom ≈ 0.52 vs mean = 0.67
         """
         return self.aggregate(AggregationMethod.GEOMETRIC_MEAN, min_confidence)
@@ -187,7 +395,7 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
         """Confidence-weighted harmonic mean of valid positive values.
 
         Harmonic mean heavily penalizes low values - most conservative metric.
-        Useful when all joints must score well for overall success.
+        Useful when all elements must score well for overall success.
 
         Args:
             min_confidence: Minimum confidence to include value (default: 0.0)
@@ -200,7 +408,7 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
             >>> harm = feature.harmonic_mean()
             >>>
             >>> # E.g., values [0.9, 0.9, 0.2] -> harm ≈ 0.32 vs mean = 0.67
-            >>> # Use when all joints must match well
+            >>> # Use when all elements must match well
         """
         return self.aggregate(AggregationMethod.HARMONIC_MEAN, min_confidence)
 
@@ -247,126 +455,3 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
             Weighted standard deviation, or NaN if fewer than 2 values meet criteria
         """
         return self.aggregate(AggregationMethod.STD, min_confidence)
-
-
-
-"""
-=============================================================================
-NORMALIZEDSCALARFEATURE QUICK API REFERENCE
-=============================================================================
-
-Design Philosophy:
-------------------
-NormalizedScalarFeature extends BaseScalarFeature to add statistical
-aggregation for features with values in [0.0, 1.0] range where statistics
-are meaningful (similarity scores, symmetry scores, confidence metrics).
-
-Key Differences from BaseScalarFeature:
-- ✅ Has statistics methods (mean, geometric_mean, harmonic_mean, etc.)
-- ✅ All statistics are confidence-weighted
-- ✅ Can filter by minimum confidence threshold
-- ✅ Only for normalized [0, 1] values
-
-Inherited from BaseScalarFeature:
-----------------------------------
-Properties:
-  • values: np.ndarray                             All feature values [0, 1]
-  • scores: np.ndarray                             All confidence scores
-  • valid_mask: np.ndarray                         Boolean validity mask
-  • valid_count: int                               Number of valid values
-  • len(feature): int                              Total number of joints
-
-Single Value Access:
-  • feature[joint] -> float                        Get value [0, 1]
-  • feature.get(joint, fill=0.0) -> float          Get value with NaN fill
-  • feature.get_value(joint, fill) -> float        Alias for get()
-  • feature.get_score(joint) -> float              Get confidence score
-  • feature.get_valid(joint) -> bool               Check if value is valid
-
-Batch Operations:
-  • feature.get_values(joints, fill) -> list[float]  Get multiple values
-  • feature.get_scores(joints) -> list[float]        Get multiple confidences
-  • feature.are_valid(joints) -> bool                Check if ALL valid
-
-NormalizedScalarFeature-Specific:
-----------------------------------
-Statistical Aggregation:
-  • feature.aggregate(method, min_confidence) -> float
-      General-purpose aggregation with method selection
-
-  • feature.mean(min_confidence=0.0) -> float
-      Confidence-weighted arithmetic mean
-      Best for: General purpose averaging
-
-  • feature.geometric_mean(min_confidence=0.0) -> float
-      Confidence-weighted geometric mean (penalizes low values)
-      Best for: When all values should be high (similarity matching)
-
-  • feature.harmonic_mean(min_confidence=0.0) -> float
-      Confidence-weighted harmonic mean (heavily penalizes low values)
-      Best for: When all values must be high (strict matching)
-
-  • feature.min_value(min_confidence=0.0) -> float
-      Minimum value meeting confidence threshold
-
-  • feature.max_value(min_confidence=0.0) -> float
-      Maximum value meeting confidence threshold
-
-  • feature.median(min_confidence=0.0) -> float
-      Median value meeting confidence threshold
-
-  • feature.std(min_confidence=0.0) -> float
-      Confidence-weighted standard deviation
-
-Aggregation Methods (Enum):
-  • AggregationMethod.MEAN              - Arithmetic mean (balanced)
-  • AggregationMethod.GEOMETRIC_MEAN    - Geometric mean (penalizes low)
-  • AggregationMethod.HARMONIC_MEAN     - Harmonic mean (very strict)
-  • AggregationMethod.MIN               - Minimum value
-  • AggregationMethod.MAX               - Maximum value
-  • AggregationMethod.MEDIAN            - Median value
-  • AggregationMethod.STD               - Standard deviation
-
-Common Usage Patterns:
-----------------------
-# Simple mean (all values):
-avg = feature.mean()
-
-# High-confidence mean only:
-avg = feature.mean(min_confidence=0.7)
-
-# Geometric mean (penalizes outliers):
-geom = feature.geometric_mean(min_confidence=0.5)
-
-# Using aggregate with different methods:
-mean_val = feature.aggregate(AggregationMethod.MEAN)
-geom_val = feature.aggregate(AggregationMethod.GEOMETRIC_MEAN)
-harm_val = feature.aggregate(AggregationMethod.HARMONIC_MEAN)
-
-# Compare different statistics:
-for method in AggregationMethod:
-    value = feature.aggregate(method, min_confidence=0.6)
-    print(f"{method.value}: {value:.3f}")
-
-Statistical Comparison:
------------------------
-Given values: [0.9, 0.9, 0.9, 0.2]
-
-• Mean:          0.725  (balanced average)
-• Geometric:     0.621  (penalizes the 0.2)
-• Harmonic:      0.375  (heavily penalizes the 0.2)
-
-Use case guidance:
-- Mean:      General purpose, balanced
-- Geometric: Need most values high, some tolerance
-- Harmonic:  Need ALL values high, very strict
-
-Notes:
-------
-- All methods support min_confidence filtering
-- Geometric/harmonic means skip values ≤ 1e-6 (numerical stability)
-- Methods return NaN if no values meet criteria
-- Confidence weighting improves reliability of aggregates
-- Only use for normalized [0, 1] features (not angles!)
-=============================================================================
-"""
