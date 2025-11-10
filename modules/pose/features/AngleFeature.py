@@ -53,8 +53,6 @@ Cached Properties:
 Construction:
   • AngleFeature(values, scores)           → Direct (fast, no validation)
   • AngleFeature.create_empty()            → All NaN values, zero scores
-  • AngleFeature.from_values(values, ...)  → Auto-generate scores if None
-  • AngleFeature.create_validated(...)     → Full validation, raises on error
 
 Validation:
   • Asserts in constructors (removed with -O flag for production)
@@ -104,8 +102,6 @@ Batch Operations:
 Factory Methods:
 ----------------
   • AngleFeature.create_empty() -> AngleFeature          All NaN angles, zero scores
-  • AngleFeature.from_values(values, scores?) -> AngleFeature  Auto-generate scores if None
-  • AngleFeature.create_validated(values, scores) -> AngleFeature  Full validation
 
 Validation:
 -----------

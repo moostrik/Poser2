@@ -29,8 +29,6 @@ Cached Properties:
 Construction:
   • MyFeature(values, scores)           → Direct (fast, no validation)
   • MyFeature.create_empty()            → All NaN values, zero scores
-  • MyFeature.from_values(values, ...)  → Auto-generate scores if None
-  • MyFeature.create_validated(...)     → Full validation, raises on error
 
 Validation:
   • Asserts in constructors (removed with -O flag for production)
@@ -79,8 +77,6 @@ Batch Operations:
 Factory Methods:
 ----------------
   • MyFeature.create_empty() -> MyFeature          All NaN vectors, zero scores
-  • MyFeature.from_values(values, scores?) -> MyFeature  Auto-generate scores if None
-  • MyFeature.create_validated(values, scores) -> MyFeature  Full validation
 
 Validation:
 -----------
@@ -256,34 +252,6 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         values = np.full((length, n_dims), np.nan, dtype=np.float32)
         scores = np.zeros(length, dtype=np.float32)
         return cls(values=values, scores=scores)
-
-    @classmethod
-    def from_values(cls, values: np.ndarray, scores: Optional[np.ndarray] = None) -> Self:
-        """Create instance from values, generating default scores if needed.
-
-        Args:
-            values: Value array (shape: n_elements × n_dims)
-            scores: Optional scores array. If None, generates scores:
-                    - 1.0 for valid values (all components non-NaN)
-                    - 0.0 for invalid values (any component is NaN)
-
-        Returns:
-            New feature instance
-        """
-        if scores is None:
-            # Valid if ALL components are non-NaN
-            has_nan = np.any(np.isnan(values), axis=1)
-            scores = np.where(has_nan, 0.0, 1.0).astype(np.float32)
-        return cls(values=values, scores=scores)
-
-    @classmethod
-    def create_validated(cls, values: np.ndarray, scores: np.ndarray) -> Self:
-        """Create with full validation (use for untrusted input)."""
-        instance = cls(values=values, scores=scores)
-        is_valid, error = instance.validate(check_ranges=True)
-        if not is_valid:
-            raise ValueError(f"Invalid {cls.__name__}: {error}")
-        return instance
 
     # ========= VALIDATION ==========
 

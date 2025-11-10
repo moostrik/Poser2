@@ -29,8 +29,6 @@ Cached Properties:
 Construction:
   • SymmetryFeature(values, scores)           → Direct (fast, no validation)
   • SymmetryFeature.create_empty()            → All NaN values, zero scores
-  • SymmetryFeature.from_values(values, ...)  → Auto-generate scores if None
-  • SymmetryFeature.create_validated(...)     → Full validation, raises on error
 
 Validation:
   • Asserts in constructors (removed with -O flag for production)
@@ -80,8 +78,6 @@ Batch Operations:
 Factory Methods:
 ----------------
   • SymmetryFeature.create_empty() -> SymmetryFeature          All NaN values, zero scores
-  • SymmetryFeature.from_values(values, scores?) -> SymmetryFeature  Auto-generate scores if None
-  • SymmetryFeature.create_validated(values, scores) -> SymmetryFeature  Full validation
 
 Validation:
 -----------
@@ -214,7 +210,7 @@ from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarF
 from modules.pose.features.AngleFeature import AngleLandmark
 
 
-class SymmetryRegion(IntEnum):
+class SymmetryElement(IntEnum):
     """Symmetric landmark pairs for body symmetry measurement.
 
     Each value represents a pair of left/right landmarks that should
@@ -227,25 +223,25 @@ class SymmetryRegion(IntEnum):
 
 
 # Constants
-SYMMETRY_REGION_NAMES: list[str] = [e.name for e in SymmetryRegion]
-SYMMETRY_NUM_REGIONS: int = len(SymmetryRegion)  # for backward compatibility
+SYMMETRY_ELEMENT_NAMES: list[str] = [e.name for e in SymmetryElement]
+SYMMETRY_NUM_ELEMENTS: int = len(SymmetryElement)  # for backward compatibility
 
 # Maps each symmetric landmark type to its left/right AngleLandmark pair
-_SYMMETRY_PAIRS: dict[SymmetryRegion, tuple[AngleLandmark, AngleLandmark]] = {
-    SymmetryRegion.shoulder: (AngleLandmark.left_shoulder, AngleLandmark.right_shoulder),
-    SymmetryRegion.elbow: (AngleLandmark.left_elbow, AngleLandmark.right_elbow),
-    SymmetryRegion.hip: (AngleLandmark.left_hip, AngleLandmark.right_hip),
-    SymmetryRegion.knee: (AngleLandmark.left_knee, AngleLandmark.right_knee),
+_SYMMETRY_PAIRS: dict[SymmetryElement, tuple[AngleLandmark, AngleLandmark]] = {
+    SymmetryElement.shoulder: (AngleLandmark.left_shoulder, AngleLandmark.right_shoulder),
+    SymmetryElement.elbow: (AngleLandmark.left_elbow, AngleLandmark.right_elbow),
+    SymmetryElement.hip: (AngleLandmark.left_hip, AngleLandmark.right_hip),
+    SymmetryElement.knee: (AngleLandmark.left_knee, AngleLandmark.right_knee),
 }
 
 SYMMETRY_RANGE: tuple[float, float] = NORMALIZED_RANGE
 
 
-class SymmetryFeature(NormalizedScalarFeature[SymmetryRegion]):
+class SymmetryFeature(NormalizedScalarFeature[SymmetryElement]):
     """Symmetry scores for left/right landmark pairs (range [0, 1]).
 
     Measures how similar left/right landmark angles are after mirroring.
-    
+
     Values:
     - 1.0 = perfect symmetry (left/right angles identical after mirroring)
     - 0.0 = maximum asymmetry (left/right angles completely different)
@@ -265,9 +261,9 @@ class SymmetryFeature(NormalizedScalarFeature[SymmetryRegion]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def feature_enum(cls) -> type[SymmetryRegion]:
+    def feature_enum(cls) -> type[SymmetryElement]:
         """Returns SymmetricRegion enum."""
-        return SymmetryRegion
+        return SymmetryElement
 
     # ========== SYMMETRY-SPECIFIC CONVENIENCE METHODS ==========
 

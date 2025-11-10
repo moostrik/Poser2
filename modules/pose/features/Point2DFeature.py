@@ -29,8 +29,6 @@ Cached Properties:
 Construction:
   • Point2DFeature(values, scores)           → Direct (fast, no validation)
   • Point2DFeature.create_empty()            → All NaN values, zero scores
-  • Point2DFeature.from_values(values, ...)  → Auto-generate scores if None
-  • Point2DFeature.create_validated(...)     → Full validation, raises on error
 
 Validation:
   • Asserts in constructors (removed with -O flag for production)
@@ -79,8 +77,6 @@ Batch Operations:
 Factory Methods:
 ----------------
   • Point2DFeature.create_empty() -> Point2DFeature          All NaN vectors, zero scores
-  • Point2DFeature.from_values(values, scores?) -> Point2DFeature  Auto-generate scores if None
-  • Point2DFeature.create_validated(values, scores) -> Point2DFeature  Full validation
 
 Validation:
 -----------
@@ -249,12 +245,10 @@ class Point2DFeature(BaseVectorFeature[PointLandmark]):
         y = self.get_y(element, fill=fill)
         return (x, y)
 
-
-
     # ========== SPECIALIZED CONSTRUCTORS ==========
 
     @classmethod
-    def from_xy_arrays(cls, x: np.ndarray, y: np.ndarray, scores: np.ndarray | None = None) -> Self:
+    def from_xy_arrays(cls, x: np.ndarray, y: np.ndarray, scores: np.ndarray) -> Self:
         """Create from separate x and y coordinate arrays.
 
         Args:
@@ -272,10 +266,10 @@ class Point2DFeature(BaseVectorFeature[PointLandmark]):
         """
         # Stack into (n_elements, 2) shape
         values = np.column_stack([x, y]).astype(np.float32)
-        return cls.from_values(values, scores)
+        return cls(values, scores)
 
     @classmethod
-    def from_flat_array(cls, flat: np.ndarray, scores: np.ndarray | None = None) -> Self:
+    def from_flat_array(cls, flat: np.ndarray, scores: np.ndarray) -> Self:
         """Create from flat array [x0, y0, x1, y1, x2, y2, ...].
 
         Args:
@@ -293,7 +287,7 @@ class Point2DFeature(BaseVectorFeature[PointLandmark]):
         # Reshape to (n_elements, 2)
         n_elements = len(cls.feature_enum())
         values = flat.reshape(n_elements, 2).astype(np.float32)
-        return cls.from_values(values, scores)
+        return cls(values, scores)
 
     # ========== UTILITY METHODS ==========
 

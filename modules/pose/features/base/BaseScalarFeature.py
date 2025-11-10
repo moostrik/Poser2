@@ -27,13 +27,11 @@ Cached Properties:
   • Subclasses may add @cached_property (safe due to immutability)
 
 Construction:
-  • MyFeature(values, scores)           → Direct (fast, no validation)
+  • MyFeature(values, scores)           → Direct (minimal assertions)
   • MyFeature.create_empty()            → All NaN values, zero scores
-  • MyFeature.from_values(values, ...)  → Auto-generate scores if None
-  • MyFeature.create_validated(...)     → Full validation, raises on error
 
 Validation:
-  • Asserts in constructors (removed with -O flag for production)
+  • Minimal assertions in constructors (removed with -O flag for production)
   • validate() method for debugging/testing/untrusted input
   • Fast by default, validate only when needed
 
@@ -80,8 +78,6 @@ Batch Operations:
 Factory Methods:
 ----------------
   • MyFeature.create_empty() -> MyFeature          All NaN values, zero scores
-  • MyFeature.from_values(values, scores?) -> MyFeature  Auto-generate scores if None
-  • MyFeature.create_validated(values, scores) -> MyFeature  Full validation
 
 Validation:
 -----------
@@ -249,31 +245,22 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         """String representation showing type and validity stats."""
         return f"{self.__class__.__name__}(valid={self.valid_count}/{len(self)})"
 
-    # ========== CONSTRUCTORS ==========
+    # ========== FACTORY METHODS ==========
 
     @classmethod
     def create_empty(cls) -> Self:
-        """Create an empty instance with all NaN values and zero scores."""
-        length = len(cls.feature_enum())
-        values = np.full(length, np.nan, dtype=np.float32)
-        scores = np.zeros(length, dtype=np.float32)
+        """Create empty feature with all NaN values and zero scores.
+        """
+        values = np.full(len(cls.feature_enum()), np.nan, dtype=np.float32)
+        scores = np.zeros(len(cls.feature_enum()), dtype=np.float32)
         return cls(values=values, scores=scores)
 
-    @classmethod
+    @classmethod # KEEP FOR NOW FOR BACKWARDS COMPATIBILITY
     def from_values(cls, values: np.ndarray, scores: Optional[np.ndarray] = None) -> Self:
         """Create instance from values, generating default scores if needed."""
         if scores is None:
             scores = np.where(np.isnan(values), 0.0, 1.0).astype(np.float32)
         return cls(values=values, scores=scores)
-
-    @classmethod
-    def create_validated(cls, values: np.ndarray, scores: np.ndarray) -> Self:
-        """Create with full validation (use for untrusted input)."""
-        instance = cls(values=values, scores=scores)
-        is_valid, error = instance.validate(True)
-        if not is_valid:
-            raise ValueError(f"Invalid {cls.__name__}: {error}")
-        return instance
 
     # ========= VALIDATION ==========
 

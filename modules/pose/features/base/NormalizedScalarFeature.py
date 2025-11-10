@@ -29,8 +29,6 @@ Cached Properties:
 Construction:
   • MyFeature(values, scores)           → Direct (fast, no validation)
   • MyFeature.create_empty()            → All NaN values, zero scores
-  • MyFeature.from_values(values, ...)  → Auto-generate scores if None
-  • MyFeature.create_validated(...)     → Full validation, raises on error
 
 Validation:
   • Asserts in constructors (removed with -O flag for production)
@@ -80,8 +78,6 @@ Batch Operations:
 Factory Methods:
 ----------------
   • MyFeature.create_empty() -> MyFeature          All NaN values, zero scores
-  • MyFeature.from_values(values, scores?) -> MyFeature  Auto-generate scores if None
-  • MyFeature.create_validated(values, scores) -> MyFeature  Full validation
 
 Validation:
 -----------

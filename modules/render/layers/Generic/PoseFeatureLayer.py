@@ -88,7 +88,7 @@ class PoseFeatureLayer(LayerBase):
         raw_color = (0.0, 0.0, 0.0)
         smooth_color = (0.0, 0.5, 0.5)
         render_color = (0.5, 0.0, 0.0)
-        self.draw_raw = True
+        self.draw_raw = False
         self.draw_smooth = False
         self.draw_render = True
 

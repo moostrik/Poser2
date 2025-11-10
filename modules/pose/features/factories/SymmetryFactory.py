@@ -1,14 +1,14 @@
 import numpy as np
 
 from modules.pose.features.AngleFeature import AngleFeature, AngleLandmark
-from modules.pose.features.SymmetryFeature import SymmetryFeature, SymmetryRegion
+from modules.pose.features.SymmetryFeature import SymmetryFeature, SymmetryElement
 
 # Maps each symmetric joint type to its left/right AngleLandmark pair
-_SYMMETRY_PAIRS: dict[SymmetryRegion, tuple[AngleLandmark, AngleLandmark]] = {
-    SymmetryRegion.shoulder: (AngleLandmark.left_shoulder, AngleLandmark.right_shoulder),
-    SymmetryRegion.elbow: (AngleLandmark.left_elbow, AngleLandmark.right_elbow),
-    SymmetryRegion.hip: (AngleLandmark.left_hip, AngleLandmark.right_hip),
-    SymmetryRegion.knee: (AngleLandmark.left_knee, AngleLandmark.right_knee),
+_SYMMETRY_PAIRS: dict[SymmetryElement, tuple[AngleLandmark, AngleLandmark]] = {
+    SymmetryElement.shoulder: (AngleLandmark.left_shoulder, AngleLandmark.right_shoulder),
+    SymmetryElement.elbow: (AngleLandmark.left_elbow, AngleLandmark.right_elbow),
+    SymmetryElement.hip: (AngleLandmark.left_hip, AngleLandmark.right_hip),
+    SymmetryElement.knee: (AngleLandmark.left_knee, AngleLandmark.right_knee),
 }
 
 class SymmetryFactory:
@@ -26,9 +26,9 @@ class SymmetryFactory:
         Returns:
             SymmetryFeature with individual joint pair scores and aggregate metrics
         """
-        values: np.ndarray = np.empty(len(SymmetryRegion), dtype=np.float32)
+        values: np.ndarray = np.empty(len(SymmetryElement), dtype=np.float32)
 
-        for joint_type in SymmetryRegion:
+        for joint_type in SymmetryElement:
             left_joint, right_joint = _SYMMETRY_PAIRS[joint_type]
             left_angle = angle_data.values[left_joint]
             right_angle = angle_data.values[right_joint]

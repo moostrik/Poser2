@@ -29,8 +29,6 @@ Cached Properties:
 Construction:
   • SimilarityFeature(values, scores, pair_id)     → Direct (fast, no validation)
   • SimilarityFeature.create_empty()               → All NaN values, zero scores
-  • SimilarityFeature.from_values(values, ...)     → Auto-generate scores if None
-  • SimilarityFeature.create_validated(...)        → Full validation, raises on error
 
 Validation:
   • Asserts in constructors (removed with -O flag for production)
@@ -80,8 +78,6 @@ Batch Operations:
 Factory Methods:
 ----------------
   • SimilarityFeature.create_empty() -> SimilarityFeature          All NaN values, zero scores
-  • SimilarityFeature.from_values(values, scores?) -> SimilarityFeature  Auto-generate scores if None
-  • SimilarityFeature.create_validated(values, scores) -> SimilarityFeature  Full validation
 
 Validation:
 -----------
@@ -329,6 +325,71 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
     def feature_enum(cls) -> type[AngleLandmark]:
         """Returns AngleLandmark enum."""
         return AngleLandmark
+
+    # ========== OVERWRITTEN FACTORY METHOD ==========
+
+    @classmethod
+    def create_empty(cls, pair_id: tuple[int, int]) -> 'SimilarityFeature':
+        """Create empty SimilarityFeature with all NaN values and zero scores.
+
+        Args:
+            pair_id: Tuple of (pose_id_1, pose_id_2) being compared
+                    Will be normalized to (smaller, larger)
+
+        Returns:
+            SimilarityFeature with all NaN values and zero scores
+        """
+        # Normalize to (smaller, larger)
+        pair_id = (min(pair_id), max(pair_id))
+        values = np.full(len(cls.feature_enum()), np.nan, dtype=np.float32)
+        scores = np.zeros(len(cls.feature_enum()), dtype=np.float32)
+        # Call base class factory method with pair_id as kwarg
+        return cls(values, scores, pair_id=pair_id)
+
+
+    # ========== EXTENDED VALIDATION ==========
+
+    def validate(self, check_ranges: bool = True) -> tuple[bool, str | None]:
+        """Validate SimilarityFeature data and pair_id.
+
+        Args:
+            check_ranges: Whether to check value ranges (default: True)
+
+        Returns:
+            (is_valid, error_message) tuple
+            - is_valid: True if all checks pass
+            - error_message: None if valid, error description if invalid
+        """
+        # Call parent validation first
+        is_valid, error = super().validate(check_ranges)
+        if not is_valid:
+            return (is_valid, error)
+
+        # Validate pair_id
+        errors = []
+
+        # Check pair_id is tuple of two ints
+        if not isinstance(self._pair_id, tuple) or len(self._pair_id) != 2:
+            errors.append(f"pair_id must be tuple of 2 ints, got {type(self._pair_id)}")
+        else:
+            id_1, id_2 = self._pair_id
+
+            # Check both are integers
+            if not isinstance(id_1, int) or not isinstance(id_2, int):
+                errors.append(f"pair_id elements must be ints, got ({type(id_1).__name__}, {type(id_2).__name__})")
+
+            # Check not comparing pose with itself
+            if id_1 == id_2:
+                errors.append(f"Cannot compare pose with itself: pair_id={self._pair_id}")
+
+            # Check ordering (smaller, larger)
+            if id_1 >= id_2:
+                errors.append(f"pair_id must be ordered (smaller, larger), got {self._pair_id}")
+
+        if errors:
+            return (False, "; ".join(errors))
+
+        return (True, None)
 
     # ========== PAIR TRACKING PROPERTIES ==========
 

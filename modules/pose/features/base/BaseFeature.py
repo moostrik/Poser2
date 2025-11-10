@@ -51,10 +51,8 @@ Cached Properties:
 
 Construction Patterns:
 ----------------------
-• MyFeature(values, scores)              → Direct (fast, no validation)
+• MyFeature(values, scores)              → Direct (minimal assertions)
 • MyFeature.create_empty()               → All NaN values, zero scores
-• MyFeature.from_values(values, scores?) → Auto-generate scores if None
-• MyFeature.create_validated(values, scores) → Full validation, raises on error
 
 Validation Strategy (Asserts vs Validate):
 ------------------------------------------
@@ -73,7 +71,6 @@ Testing/Debugging (validate method):
 Production:
 • Run with python -O to remove assertions (faster)
 • Skip validate() calls unless validating external input
-• Use create_validated() for untrusted data only
 
 Philosophy:
 • Fast by default (no validation overhead in production)
@@ -105,9 +102,9 @@ Guidance:
 
 Validation Philosophy:
 ----------------------
-• Construction is fast by default (no validation)
+• Construction is fast by default (minimal assertions)
+• Assertions removed with -O flag for production performance
 • Use validate() for debugging and testing
-• Use create_validated() for untrusted input
 • Validation returns all errors at once (better debugging)
 • Optional range checking (disabled for infinite bounds)
 
