@@ -41,7 +41,7 @@ class PoseMeshesRender(LayerBase):
             pose: Pose = self.data.get_pose(id)
             pose_mesh: Mesh | None = self.meshes.get(id)
             if pose_mesh is not None:
-                vertex_data: PoseVertexData = PoseVertexFactory.compute_angled_vertices(pose.point_data, pose.angle_data)
+                vertex_data: PoseVertexData = PoseVertexFactory.compute_angled_vertices(pose.points, pose.angles)
                 if vertex_data is not None:
                     pose_mesh.set_vertices(vertex_data.vertices)
                     pose_mesh.set_colors(vertex_data.colors)

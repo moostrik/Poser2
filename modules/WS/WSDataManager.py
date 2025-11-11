@@ -84,11 +84,11 @@ class WSData:
                 self.start_age = time()
             self.present = True
 
-            angle_data: AngleFeature | None = pose.angle_data
-            if angle_data is not None:
+            angles: AngleFeature | None = pose.angles
+            if angles is not None:
                 for i, name in enumerate(ANGLE_LANDMARK_NAMES):
-                    angle: float = angle_data.values[i]
-                    score: float = angle_data.scores[i]
+                    angle: float = angles.values[i]
+                    score: float = angles.scores[i]
                     if score > 0.0 and not np.isnan(angle):
                         setattr(self, name, angle)
 
@@ -98,8 +98,8 @@ class WSData:
 
             world_angle: float = getattr(tracklet.metadata, "world_angle", 0.0)
             nose_angle_offset: float | None = None
-            pose_points: Point2DFeature | None = pose.point_data
-            crop_rect: Rect | None = pose.bounding_box
+            pose_points: Point2DFeature | None = pose.points
+            crop_rect: Rect | None = pose.bbox
             if pose_points is not None and crop_rect is not None:
                 nose_x = pose_points.values[PointLandmark.nose.value][0]
                 nose_conf = pose_points.scores[PointLandmark.nose.value]

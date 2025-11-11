@@ -247,13 +247,19 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
 
     # ========== FACTORY METHODS ==========
 
+    _empty_instance: Optional[Self] = None  # Class-level cache for the empty instance
+
     @classmethod
     def create_empty(cls) -> Self:
         """Create empty feature with all NaN values and zero scores.
+
+        Uses a class-level cache to ensure the empty instance is created only once per class.
         """
-        values = np.full(len(cls.feature_enum()), np.nan, dtype=np.float32)
-        scores = np.zeros(len(cls.feature_enum()), dtype=np.float32)
-        return cls(values=values, scores=scores)
+        if cls._empty_instance is None:
+            values = np.full(len(cls.feature_enum()), np.nan, dtype=np.float32)
+            scores = np.zeros(len(cls.feature_enum()), dtype=np.float32)
+            cls._empty_instance = cls(values=values, scores=scores)
+        return cls._empty_instance
 
     @classmethod # KEEP FOR NOW FOR BACKWARDS COMPATIBILITY
     def from_values(cls, values: np.ndarray, scores: Optional[np.ndarray] = None) -> Self:
@@ -351,4 +357,3 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         if errors:
             return (False, "; ".join(errors))
         return (True, None)
-

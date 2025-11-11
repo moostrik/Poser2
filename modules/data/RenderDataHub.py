@@ -109,14 +109,14 @@ class RenderDataHub:
    #  BODY JOINT ANGLES
     def get_angles(self, tracklet_id: int) -> features.AngleFeature:
         """Get angles for the specified tracklet ID"""
-        return self.get_pose(tracklet_id).angle_data
+        return self.get_pose(tracklet_id).angles
 
     def get_delta(self, tracklet_id: int) -> features.AngleFeature:
         """Get delta for the specified tracklet ID"""
-        return self.get_pose(tracklet_id).delta_data
+        return self.get_pose(tracklet_id).deltas
 
     def get_symmetries(self, tracklet_id: int) -> features.SymmetryFeature:
-        return self.get_pose(tracklet_id).symmetry_data
+        return self.get_pose(tracklet_id).symmetry
 
     # TIME
     def get_motion_time(self, tracklet_id: int) -> float:

@@ -12,5 +12,5 @@ class SymmetryExtractor(FilterNode):
 
     def process(self, pose: Pose) -> Pose:
         """Compute angles for all poses and emit enriched results."""
-        symmetry_data: SymmetryFeature = SymmetryFactory.from_angles(pose.angle_data)
+        symmetry_data: SymmetryFeature = SymmetryFactory.from_angles(pose.angles)
         return replace(pose, symmetry_data=symmetry_data)

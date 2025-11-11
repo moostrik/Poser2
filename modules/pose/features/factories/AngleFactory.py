@@ -42,51 +42,51 @@ _ANGLE_MIRRORED: set[AngleLandmark] = {
 class AngleFactory:
 
     @staticmethod
-    def from_points(point_data: Point2DFeature) -> AngleFeature:
+    def from_points(points: Point2DFeature) -> AngleFeature:
         """Create angle measurements from keypoint data.
 
         Computes joint angles from 2D keypoint positions, applies rotation offsets,
         and mirrors right-side angles for symmetric representation.
 
         Args:
-            point_data: Keypoint data
+            points: Keypoint data
 
         Returns:
             AngleFeature with computed angles and confidence scores
         """
-        if point_data.valid_count == 0:
+        if points.valid_count == 0:
             return AngleFeature.create_empty()
 
         angle_values = np.full(len(AngleLandmark), np.nan, dtype=np.float32)
         angle_scores = np.zeros(len(AngleLandmark), dtype=np.float32)
 
         # Compute all angle measurements
-        for joint, keypoints in ANGLE_KEYPOINTS.items():
+        for landmark, keypoints in ANGLE_KEYPOINTS.items():
             # ✅ NEW: Use are_valid() - cleaner batch validation
-            if not point_data.are_valid(list(keypoints)):
+            if not points.are_valid(list(keypoints)):
                 continue  # Skip if any required keypoint is invalid
 
             # Extract points (guaranteed valid - no NaN)
-            points = [point_data[kp] for kp in keypoints]
-            rotate_by = _ANGLE_OFFSET[joint]
+            P = [points[kp] for kp in keypoints]
+            rotate_by = _ANGLE_OFFSET[landmark]
 
             # Compute angle based on number of keypoints (no NaN checks needed)
             if len(keypoints) == 3:
-                angle = AngleFactory._calculate_angle(points[0], points[1], points[2], rotate_by)
-            elif joint == AngleLandmark.head:
-                angle = AngleFactory._calculate_head_yaw(points[0], points[1], points[2], points[3], rotate_by)
+                angle = AngleFactory._calculate_angle(P[0], P[1], P[2], rotate_by)
+            elif landmark == AngleLandmark.head:
+                angle = AngleFactory._calculate_head_yaw(P[0], P[1], P[2], P[3], rotate_by)
             else:
                 continue
 
             # Mirror right-side angles for symmetric representation
-            if joint in _ANGLE_MIRRORED:
+            if landmark in _ANGLE_MIRRORED:
                 angle = -angle
 
-            angle_values[joint] = angle
+            angle_values[landmark] = angle
 
             # ✅ Batch score retrieval
-            scores = point_data.get_scores(list(keypoints))
-            angle_scores[joint] = min(scores)
+            scores = points.get_scores(list(keypoints))
+            angle_scores[landmark] = min(scores)
 
         return AngleFeature(values=angle_values, scores=angle_scores)
 

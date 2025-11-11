@@ -107,7 +107,7 @@ class AnglePredictor(PredictorBase):
         self._predictor = AnglePredict(vector_size=ANGLE_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method)
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
-        return pose.angle_data
+        return pose.angles
 
     def _create_predicted_data(self, original_data: PoseFeatureData, predicted_values: np.ndarray) -> PoseFeatureData:
         """Create angle data with predicted values and adjusted scores.
@@ -119,7 +119,7 @@ class AnglePredictor(PredictorBase):
         return type(original_data)(values=predicted_values, scores=interpolated_scores)
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
-        return replace(pose, angle_data=new_data)
+        return replace(pose, angles=new_data)
 
 
 class PointPredictor(PredictorBase):
@@ -132,7 +132,7 @@ class PointPredictor(PredictorBase):
         self._predictor = PointPredict(num_points=POINT_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method, clamp_range=POINT2D_COORD_RANGE)
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
-        return pose.point_data
+        return pose.points
 
     def _create_predicted_data(self, original_data: PoseFeatureData, predicted_values: np.ndarray) -> PoseFeatureData:
         """Create point data with predicted values and adjusted scores.
@@ -145,7 +145,7 @@ class PointPredictor(PredictorBase):
         return type(original_data)(values=predicted_values, scores=interpolated_scores)
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
-        return replace(pose, point_data=new_data)
+        return replace(pose, points=new_data)
 
 
 class DeltaPredictor(PredictorBase):
@@ -158,7 +158,7 @@ class DeltaPredictor(PredictorBase):
         self._predictor = AnglePredict(vector_size=ANGLE_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method)
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
-        return pose.delta_data
+        return pose.deltas
 
     def _create_predicted_data(self, original_data: PoseFeatureData, predicted_values: np.ndarray) -> PoseFeatureData:
         """Create delta data with predicted values and adjusted scores.
@@ -170,7 +170,7 @@ class DeltaPredictor(PredictorBase):
         return type(original_data)(values=predicted_values, scores=interpolated_scores)
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
-        return replace(pose, delta_data=new_data)
+        return replace(pose, deltas=new_data)
 
 
 class PosePredictor(FilterNode):

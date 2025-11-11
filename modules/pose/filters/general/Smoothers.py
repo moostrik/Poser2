@@ -125,10 +125,10 @@ class AngleSmoother(SmootherBase):
         )
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
-        return pose.angle_data
+        return pose.angles
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
-        return replace(pose, angle_data=new_data)
+        return replace(pose, angles=new_data)
 
 
 class PointSmoother(SmootherBase):
@@ -148,10 +148,10 @@ class PointSmoother(SmootherBase):
         )
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
-        return pose.point_data
+        return pose.points
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
-        return replace(pose, point_data=new_data)
+        return replace(pose, points=new_data)
 
 
 class DeltaSmoother(SmootherBase):
@@ -170,10 +170,10 @@ class DeltaSmoother(SmootherBase):
         )
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
-        return pose.delta_data
+        return pose.deltas
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
-        return replace(pose, delta_data=new_data)
+        return replace(pose, deltas=new_data)
 
 
 class PoseSmoother(FilterNode):

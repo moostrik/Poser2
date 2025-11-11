@@ -46,7 +46,7 @@ class PoseAngleTracker(PoseTrackerBase):
             self._cumulative_motions[joint] = 0.0
 
 
-        self._angle_data: AngleFeature = AngleFeature.create_empty()
+        self._angles: AngleFeature = AngleFeature.create_empty()
         self._velocity_data: AngleFeature = AngleFeature.create_empty()
         self._acceleration_data: AngleFeature = AngleFeature.create_empty()
         self._motion_data: AngleFeature = AngleFeature.create_empty()
@@ -77,7 +77,7 @@ class PoseAngleTracker(PoseTrackerBase):
         # Add angle data to smoothers (OneEuroInterpolator handles NaN values)
         add_time: float = time()
         for joint in AngleLandmark:
-            self._angle_smoothers[joint].add_sample(pose.angle_data.values[joint.value], add_time)
+            self._angle_smoothers[joint].add_sample(pose.angles.values[joint.value], add_time)
 
     def update(self) -> None:
         if not self._active:
@@ -122,7 +122,7 @@ class PoseAngleTracker(PoseTrackerBase):
         self._total_motion = 0.0
         self._cumulative_total_motion = 0.0
 
-        self._angle_data = AngleFeature.create_empty()
+        self._angles = AngleFeature.create_empty()
         self._velocity_data = AngleFeature.create_empty()
         self._acceleration_data = AngleFeature.create_empty()
         self._motion_data = AngleFeature.create_empty()
@@ -148,9 +148,9 @@ class PoseAngleTracker(PoseTrackerBase):
         """Current smoothed angles (radians)"""
         if self._angles_dirty:
             angle_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_value for joint in AngleLandmark], dtype=np.float32)
-            self._angle_data = AngleFeature.from_values(angle_values)
+            self._angles = AngleFeature.from_values(angle_values)
             self._angles_dirty = False
-        return self._angle_data
+        return self._angles
 
     @property
     def velocities(self) -> AngleFeature:

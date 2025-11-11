@@ -23,7 +23,7 @@ from threading import Lock
 import numpy as np
 
 # Pose imports
-from modules.pose.Nodes import FilterNode, NodeConfigBase
+from modules.pose.Nodes import InterpolatorNode, NodeConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.interpolators.algorithms.VectorChase import Chase, VectorChase, AngleChase, PointChase
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
@@ -39,7 +39,7 @@ class ChaseInterpolatorConfig(NodeConfigBase):
         self.friction: float = friction
 
 
-class ChaseInterpolatorBase(FilterNode):
+class ChaseInterpolatorBase(InterpolatorNode):
     """Base class for pose chase interpolators.
 
     Handles common interpolation logic using perpetual chase dynamics.
@@ -89,7 +89,7 @@ class ChaseInterpolatorBase(FilterNode):
         """Create new pose with replaced feature data."""
         pass
 
-    def process(self, pose: Pose) -> Pose:
+    def process(self, pose: Pose) -> None:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
         feature_data = self._get_feature_data(pose)
 
@@ -97,8 +97,6 @@ class ChaseInterpolatorBase(FilterNode):
         with self._lock:
             self._interpolator.set_target(feature_data.values)
             self._last_pose = pose
-
-        return pose
 
     def update(self, current_time: float | None = None) -> Pose | None:
         """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS).
@@ -149,7 +147,7 @@ class AngleChaseInterpolator(ChaseInterpolatorBase):
         )
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
-        return pose.angle_data
+        return pose.angles
 
     def _create_interpolated_data(self, original_data: PoseFeatureData, interpolated_values: np.ndarray) -> PoseFeatureData:
         """Create angle data with interpolated values and adjusted scores.
@@ -161,7 +159,7 @@ class AngleChaseInterpolator(ChaseInterpolatorBase):
         return type(original_data)(values=interpolated_values, scores=interpolated_scores)
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
-        return replace(pose, angle_data=new_data)
+        return replace(pose, angles=new_data)
 
 
 class PointChaseInterpolator(ChaseInterpolatorBase):
@@ -180,7 +178,7 @@ class PointChaseInterpolator(ChaseInterpolatorBase):
         )
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
-        return pose.point_data
+        return pose.points
 
     def _create_interpolated_data(self, original_data: PoseFeatureData, interpolated_values: np.ndarray) -> PoseFeatureData:
         """Create point data with interpolated values and adjusted scores.
@@ -193,7 +191,7 @@ class PointChaseInterpolator(ChaseInterpolatorBase):
         return type(original_data)(values=interpolated_values, scores=interpolated_scores)
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
-        return replace(pose, point_data=new_data)
+        return replace(pose, points=new_data)
 
 
 class DeltaChaseInterpolator(ChaseInterpolatorBase):
@@ -211,7 +209,7 @@ class DeltaChaseInterpolator(ChaseInterpolatorBase):
         )
 
     def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
-        return pose.delta_data
+        return pose.deltas
 
     def _create_interpolated_data(self, original_data: PoseFeatureData, interpolated_values: np.ndarray) -> PoseFeatureData:
         """Create delta data with interpolated values and adjusted scores.
@@ -223,10 +221,10 @@ class DeltaChaseInterpolator(ChaseInterpolatorBase):
         return type(original_data)(values=interpolated_values, scores=interpolated_scores)
 
     def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
-        return replace(pose, delta_data=new_data)
+        return replace(pose, deltas=new_data)
 
 
-class PoseChaseInterpolator(FilterNode):
+class PoseChaseInterpolator(InterpolatorNode):
     """Chase interpolates all pose features (angles, points, and deltas)."""
 
     def __init__(self, config: ChaseInterpolatorConfig) -> None:
@@ -241,12 +239,11 @@ class PoseChaseInterpolator(FilterNode):
     def config(self) -> ChaseInterpolatorConfig:
         return self._config
 
-    def process(self, pose: Pose) -> Pose:
+    def process(self, pose: Pose) -> None:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
         self._angle_interpolator.process(pose)
         self._point_interpolator.process(pose)
         self._delta_interpolator.process(pose)
-        return pose
 
     def update(self, current_time: float | None = None) -> Pose | None:
         """Update and return interpolated pose, or None if not ready yet.
@@ -265,8 +262,8 @@ class PoseChaseInterpolator(FilterNode):
         # Combine all interpolated features
         combined: Pose = replace(
             angle_pose,
-            point_data=point_pose.point_data,
-            delta_data=delta_pose.delta_data
+            points=point_pose.points,
+            deltas=delta_pose.deltas
         )
 
         # Cache combined result

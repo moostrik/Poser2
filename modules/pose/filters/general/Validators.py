@@ -48,23 +48,23 @@ class ValidatorBase(FilterNode):
         """Validate all enabled features."""
 
         if self._config.validate_points:
-            point_data = self._validate_feature_data(pose.tracklet.id, pose.point_data, "points")
-            if point_data is not pose.point_data:
-                pose = replace(pose, point_data=point_data)
+            points = self._validate_feature_data(pose.tracklet.id, pose.points, "points")
+            if points is not pose.points:
+                pose = replace(pose, points=points)
 
         if self._config.validate_angles:
-            angle_data = self._validate_feature_data(pose.tracklet.id, pose.angle_data, "angles")
-            if angle_data is not pose.angle_data:
-                pose = replace(pose, angle_data=angle_data)
+            angles = self._validate_feature_data(pose.tracklet.id, pose.angles, "angles")
+            if angles is not pose.angles:
+                pose = replace(pose, angles=angles)
 
         if self._config.validate_delta:
-            delta_data = self._validate_feature_data(pose.tracklet.id, pose.delta_data, "delta")
-            if delta_data is not pose.delta_data:
-                pose = replace(pose, delta_data=delta_data)
+            deltas = self._validate_feature_data(pose.tracklet.id, pose.deltas, "delta")
+            if deltas is not pose.deltas:
+                pose = replace(pose, deltas=deltas)
 
         if self._config.validate_symmetry:
-            symmetry_data = self._validate_feature_data(pose.tracklet.id, pose.symmetry_data, "symmetry")
-            if symmetry_data is not pose.symmetry_data:
+            symmetry_data = self._validate_feature_data(pose.tracklet.id, pose.symmetry, "symmetry")
+            if symmetry_data is not pose.symmetry:
                 pose = replace(pose, symmetry_data=symmetry_data)
 
         return pose

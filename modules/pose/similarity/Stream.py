@@ -33,7 +33,7 @@ class StreamInput:
         return cls(
             id=pose.tracklet.id,
             time_stamp=pose.time_stamp,  # Now a float
-            angles=pose.angle_data,
+            angles=pose.angles,
             is_removed=pose.tracklet.is_removed
         )
 
@@ -294,10 +294,10 @@ class StreamProcessor(Process):
             pd.Timestamp(pose.time_stamp, unit='s')
             for pose in poses if pose.angles is not None
         ]
-        angle_data: list[np.ndarray] = [pose.angles.values for pose in poses if pose.angles is not None]
+        angles: list[np.ndarray] = [pose.angles.values for pose in poses if pose.angles is not None]
         conf_data: list[np.ndarray] = [pose.angles.scores for pose in poses if pose.angles is not None]
 
-        angles_df = pd.DataFrame(angle_data, index=timestamps, columns=ANGLE_LANDMARK_NAMES, dtype=float)
+        angles_df = pd.DataFrame(angles, index=timestamps, columns=ANGLE_LANDMARK_NAMES, dtype=float)
         conf_df = pd.DataFrame(conf_data, index=timestamps, columns=ANGLE_LANDMARK_NAMES, dtype=float)
 
         return angles_df, conf_df

@@ -200,4 +200,4 @@ class CaptureDataHub:
             pose_item: Optional[DataItem[Pose]] = self.smooth_poses.get(tracklet_id)
             if not pose_item or not pose_item.value:
                 return None
-            return pose_item.value.angle_data
+            return pose_item.value.angles

@@ -10,7 +10,7 @@ import numpy as np
 # Pose imports
 from modules.pose.detection.Detection import Detection, DetectionInput, DetectionOutput, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
 from modules.pose.detection.ImageProcessor import ImageProcessor
-from modules.pose.features import AngleFactory
+from modules.pose.features import AngleFactory, BBoxFeature
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 
 # Local application imports
@@ -183,13 +183,13 @@ class DetectionPipeline(Thread):
         for i, tracklet in enumerate(pending_request.tracklets):
             pose = Pose(
                 tracklet=tracklet,
-                bounding_box = pending_request.crop_rects[i],
-                crop_image = pending_request.crop_images[i],
+                bbox = BBoxFeature.from_rect(pending_request.crop_rects[i]),
                 time_stamp = pending_request.time_stamp,
                 lost=tracklet.is_removed,
-                point_data = poses.point_data_list[i],
-                angle_data= AngleFactory.from_points(poses.point_data_list[i])
+                points = poses.points_list[i],
+                angles= AngleFactory.from_points(poses.points_list[i])
             )
+            object.__setattr__(pose, "crop_image", pending_request.crop_images[i])
             pose_dict[tracklet.id] = pose
 
         self._notify_pose_callbacks(pose_dict)

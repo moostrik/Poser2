@@ -59,7 +59,7 @@ class DetectionInput:
 @dataclass
 class DetectionOutput:
     batch_id: int
-    point_data_list: list[Point2DFeature]
+    points_list: list[Point2DFeature]
     inference_time_ms: float = 0.0  # For monitoring
 
 PoseDetectionOutputCallback = Callable[[DetectionOutput], None]
@@ -176,7 +176,7 @@ class Detection(Thread):
 
             with torch.cuda.stream(stream):
                 data_samples: list[list[PoseDataSample]] = Detection._infer_batch(model, pipeline, input_data.images)
-                point_data_list: list[Point2DFeature] = Detection._extract_pose_point_data(data_samples, self.model_width, self.model_height, self.confidence_threshold)
+                points_list: list[Point2DFeature] = Detection._extract_pose_points(data_samples, self.model_width, self.model_height, self.confidence_threshold)
                 stream.synchronize()
 
             inference_time_ms: float = (time.perf_counter() - batch_start) * 1000.0
@@ -184,7 +184,7 @@ class Detection(Thread):
             # print(f"Pose Detection: Processed batch {input_data.batch_id} with {len(input_data.images)} images in   {inference_time_ms:.0f}   ms")
 
             # Create output
-            output = DetectionOutput(input_data.batch_id, point_data_list, inference_time_ms)
+            output = DetectionOutput(input_data.batch_id, points_list, inference_time_ms)
 
             # Queue for callbacks
             try:
@@ -296,7 +296,7 @@ class Detection(Thread):
             return results_by_image
 
     @staticmethod
-    def _extract_pose_point_data(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> list[Point2DFeature]:
+    def _extract_pose_points(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> list[Point2DFeature]:
         """Process pose data samples and return only the first detected pose for each image."""
         first_poses: list[Point2DFeature] = []
 

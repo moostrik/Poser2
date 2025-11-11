@@ -23,9 +23,9 @@ class DeltaExtractor(FilterNode):
     def process(self, pose: Pose) -> Pose:
         # Compute deltas (or empty if no previous pose)
         if self._prev_pose is None:
-            delta_data: AngleFeature = AngleFeature.create_empty()
+            deltas: AngleFeature = AngleFeature.create_empty()
         else:
-            delta_data = pose.angle_data.subtract(self._prev_pose.angle_data)
+            deltas = pose.angles.subtract(self._prev_pose.angles)
 
         # Update state for next frame
         self._prev_pose = pose
@@ -33,7 +33,7 @@ class DeltaExtractor(FilterNode):
         # Create enriched pose
         enriched_pose: Pose = replace(
             pose,
-            delta_data=delta_data
+            deltas=deltas
         )
 
         # Cleanup if pose is lost

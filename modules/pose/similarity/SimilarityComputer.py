@@ -89,18 +89,18 @@ class SimilarityComputer:
     def _evaluate_pose_similarity(self, poses: PoseDict) -> SimilarityBatch :
         """Process all pose pairs and compute their correlations."""
         # Extract angle data from actively tracked poses
-        angle_data: dict[int, AngleFeature] = {
-            tracklet_id: pose.angle_data
+        angles: dict[int, AngleFeature] = {
+            tracklet_id: pose.angles
             for tracklet_id, pose in poses.items()
             if pose.tracklet.is_being_tracked
         }
 
-        if len(angle_data) < 2:
+        if len(angles) < 2:
             return SimilarityBatch(similarities=[])
 
         # Compute correlations for each pair
         similarities: list[SimilarityFeature] = []
-        for (id1, angles_1), (id2, angles_2) in combinations(angle_data.items(), 2):
+        for (id1, angles_1), (id2, angles_2) in combinations(angles.items(), 2):
             # Compute similarity scores
             similarity_data: AngleFeature = AngleSimilarity.compute_similarity(angles_1, angles_2, self.similarity_exponent)
 

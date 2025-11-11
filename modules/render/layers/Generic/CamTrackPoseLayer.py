@@ -70,7 +70,7 @@ class CamTrackPoseLayer(LayerBase):
     @staticmethod
     def draw_poses(poses: list[Pose], pose_meshes: dict[int, Mesh], x: float, y: float, width: float, height: float) -> None:
         for pose in poses:
-            roi: Rect | None = pose.bounding_box
+            roi: Rect | None = pose.bbox.to_rect()
             mesh: Mesh = pose_meshes[pose.tracklet.id]
             if roi is None or not mesh.isInitialized():
                 continue

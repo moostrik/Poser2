@@ -244,14 +244,20 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
 
     # ========== CONSTRUCTORS ==========
 
+    _empty_instance: Optional[Self] = None  # Class-level cache for the empty instance
+
     @classmethod
     def create_empty(cls) -> Self:
         """Create an empty instance with all NaN values and zero scores."""
-        length = len(cls.feature_enum())
-        n_dims = cls.dimensions()
-        values = np.full((length, n_dims), np.nan, dtype=np.float32)
-        scores = np.zeros(length, dtype=np.float32)
-        return cls(values=values, scores=scores)
+
+        if cls._empty_instance is None:
+            length = len(cls.feature_enum())
+            n_dims = cls.dimensions()
+            values = np.full((length, n_dims), np.nan, dtype=np.float32)
+            scores = np.zeros(length, dtype=np.float32)
+            cls._empty_instance = cls(values=values, scores=scores)
+
+        return cls._empty_instance
 
     # ========= VALIDATION ==========
 

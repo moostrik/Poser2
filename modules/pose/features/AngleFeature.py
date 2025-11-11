@@ -242,4 +242,3 @@ class AngleFeature(BaseScalarFeature[AngleLandmark]):
     def to_degrees(self) -> np.ndarray:
         """Convert all angles to degrees."""
         return np.degrees(self._values)
-

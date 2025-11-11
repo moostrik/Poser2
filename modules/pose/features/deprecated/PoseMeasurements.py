@@ -107,14 +107,14 @@ class PoseMeasurementFactory:
         return None
 
     @staticmethod
-    def compute(point_data: Optional['Point2DFeature'], crop_rect: Optional[Rect]) -> PoseMeasurementData:
+    def compute(points: Optional['Point2DFeature'], crop_rect: Optional[Rect]) -> PoseMeasurementData:
         if PoseMeasurementFactory.hotreload is None:
             PoseMeasurementFactory.hotreload = HotReloadMethods(PoseMeasurementFactory)
 
-        if point_data is None or crop_rect is None:
+        if points is None or crop_rect is None:
             return PoseMeasurementData()
 
-        points: np.ndarray = point_data.values
+        points: np.ndarray = points.values
         crop_height: float = crop_rect.height
 
         estimates: dict[LimbType, float] = {}

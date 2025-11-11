@@ -8,7 +8,7 @@ from typing import Callable
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Point2DFeature, AngleFeature, SymmetryFeature
+from modules.pose.features import Point2DFeature, AngleFeature, SymmetryFeature, BBoxFeature
 from modules.pose.features.deprecated.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
 
 # Local application imports
@@ -18,34 +18,23 @@ from modules.utils.PointsAndRects import Rect
 
 @dataclass(frozen=True)
 class Pose:
-    """Immutable pose data structure with lazy feature computation.
+    """Immutable pose data structure"""
 
-    Designed for multi-stage pipeline:
-    1. Input: tracklet, time_stamp, crop_rect and crop_image added
-    2. Keypoint detection: point_data added
-    3. Feature extraction: computed on-demand via cached properties
+    tracklet: Tracklet                              # Deprecated, but kept for backward compatibility
+    crop_image: np.ndarray =    field(init=False)   # Deprecated Cropped image corresponding to bounding_box (with padding)
 
-    All computed features return valid objects even when input data is missing,
-    using NaN values to indicate unavailable data. This allows for consistent
-    API without null checks, with validity determined by NaN presence.
+    time_stamp: float =         field(default_factory=time.time)
+    lost: bool =                field(default=False)
 
-    Only vertex_data and absolute_points return None when dependencies are unavailable.
-    """
-
-    tracklet: Tracklet       # Deprecated, but kept for backward compatibility
-    crop_image: np.ndarray   # Cropped image corresponding to bounding_box (with padding)
-    time_stamp: float        # Time when pose was captured
-    lost: bool               # Last frame, before being lost
-
-    bounding_box: Rect       # Bounding Box, in normalized coordinates, can be outside [0,1]
-    point_data: Point2DFeature
-    angle_data: AngleFeature = field(default_factory=AngleFeature.create_empty)
-    delta_data: AngleFeature = field(default_factory=AngleFeature.create_empty)
-    symmetry_data: SymmetryFeature = field(default_factory=SymmetryFeature.create_empty)
-    motion_time: float =        0.0
+    bbox: BBoxFeature =         field(default_factory=BBoxFeature.create_empty)
+    points: Point2DFeature =    field(default_factory=Point2DFeature.create_empty)
+    angles: AngleFeature =      field(default_factory=AngleFeature.create_empty)
+    deltas: AngleFeature =      field(default_factory=AngleFeature.create_empty)
+    symmetry: SymmetryFeature = field(default_factory=SymmetryFeature.create_empty)
+    motion_time: float =        field(default=0.0)
 
     def __repr__(self) -> str:
-        return (f"Pose(id={self.tracklet.id}, points={self.point_data.valid_count if self.point_data else 0}, age={self.age:.2f}s)")
+        return (f"Pose(id={self.tracklet.id}, points={self.points.valid_count if self.points else 0}, age={self.age:.2f}s)")
 
     @property
     def age(self) -> float:
@@ -55,14 +44,12 @@ class Pose:
     # LAZY FEATURES
     @cached_property
     def measurement_data(self) -> PoseMeasurementData:
-        """Compute body measurements. Returns NaN values if point_data or crop_rect is None. Cached after first access."""
-        return PoseMeasurementFactory.compute(self.point_data, self.bounding_box)
+        return PoseMeasurementFactory.compute(self.points, self.bbox.to_rect())
 
     @cached_property
     def camera_points(self) -> Point2DFeature:
-        """Convert normalized keypoints to camera image coordinates. Cached after first access."""
-        pose_joints: np.ndarray = self.point_data.values
-        rect: Rect = self.bounding_box
+        pose_joints: np.ndarray = self.points.values
+        rect: Rect = self.bbox.to_rect()
 
         # Vectorized conversion from normalized [0,1] to camera pixel coordinates
         scale: np.ndarray = np.array([rect.width, rect.height])
@@ -70,8 +57,7 @@ class Pose:
 
         camera_values = pose_joints[:, :2] * scale + offset
 
-        # Preserve scores from original point_data
-        return Point2DFeature(values=camera_values, scores=self.point_data.scores)
+        return Point2DFeature(values=camera_values, scores=self.points.scores)
 
 
 PoseCallback = Callable[[Pose], None]

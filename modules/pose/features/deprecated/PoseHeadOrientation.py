@@ -33,16 +33,16 @@ class PoseHeadData:
 
 class PoseHeadFactory:
     @staticmethod
-    def from_points(point_data: Optional['Point2DFeature']) -> PoseHeadData:
+    def from_points(points: Optional['Point2DFeature']) -> PoseHeadData:
         """
         Calculate head orientation data from point data.
         Returns HeadPoseData with calculated angles or default values if calculation not possible.
         """
-        if point_data is None:
+        if points is None:
             return PoseHeadData()
 
-        points: np.ndarray = point_data.values
-        scores: np.ndarray = point_data.scores
+        points: np.ndarray = points.values
+        scores: np.ndarray = points.scores
 
         # Check if we have all necessary points (eyes and nose)
         left_eye = points[PointLandmark.left_eye.value]

@@ -15,11 +15,11 @@ class SymmetryFactory:
     """Utility class for computing symmetry metrics from angle data."""
 
     @staticmethod
-    def from_angles(angle_data: AngleFeature, symmetry_exponent: float = 1.0) -> SymmetryFeature:
+    def from_angles(angles: AngleFeature, symmetry_exponent: float = 1.0) -> SymmetryFeature:
         """Calculate symmetry metrics from angle data.
 
         Args:
-            angle_data: Angle measurements (angles should already be mirrored)
+            angles: Angle measurements (angles should already be mirrored)
             symmetry_exponent: Exponent to emphasize symmetry differences (e.g., 2.0 for quadratic).
                               Higher values penalize asymmetries more severely.
 
@@ -30,8 +30,8 @@ class SymmetryFactory:
 
         for joint_type in SymmetryElement:
             left_joint, right_joint = _SYMMETRY_PAIRS[joint_type]
-            left_angle = angle_data.values[left_joint]
-            right_angle = angle_data.values[right_joint]
+            left_angle = angles.values[left_joint]
+            right_angle = angles.values[right_joint]
 
             if np.isnan(left_angle) or np.isnan(right_angle):
                 values[joint_type] = np.nan

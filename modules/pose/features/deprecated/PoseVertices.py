@@ -88,7 +88,7 @@ class PoseVertexData:
 
 class PoseVertexFactory:
     @staticmethod
-    def compute_vertices(point_data: Point2DFeature) -> PoseVertexData:
+    def compute_vertices(points: Point2DFeature) -> PoseVertexData:
 
         vertices: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 2), dtype=np.float32)
         colors: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 4), dtype=np.float32)
@@ -96,21 +96,21 @@ class PoseVertexFactory:
         for i, (p1, p2) in enumerate(POSE_VERTEX_LIST):
             for j, joint in enumerate((p1, p2)):
                 idx: int = i * 2 + j
-                vertices[idx] = point_data.values[joint]
-                colors[idx] = [*POSE_JOINT_COLORS[joint], (point_data.scores[joint] + POSE_COLOR_ALPHA_BASE) / (1.0 + POSE_COLOR_ALPHA_BASE)]
+                vertices[idx] = points.values[joint]
+                colors[idx] = [*POSE_JOINT_COLORS[joint], (points.scores[joint] + POSE_COLOR_ALPHA_BASE) / (1.0 + POSE_COLOR_ALPHA_BASE)]
 
         vertex_data: PoseVertexData = PoseVertexData(vertices, colors)
         return vertex_data
 
     @staticmethod
-    def compute_angled_vertices(point_data: Point2DFeature, angle_data: AngleFeature) -> PoseVertexData:
+    def compute_angled_vertices(points: Point2DFeature, angles: AngleFeature) -> PoseVertexData:
 
 
-        vertex_data: Optional[PoseVertexData] = PoseVertexFactory.compute_vertices(point_data)
+        vertex_data: Optional[PoseVertexData] = PoseVertexFactory.compute_vertices(points)
         if vertex_data is None:
             return None
 
-        if angle_data.valid_count == 0:
+        if angles.valid_count == 0:
             return vertex_data
 
         colors: np.ndarray = vertex_data.colors
@@ -119,7 +119,7 @@ class PoseVertexFactory:
             for joint_pos, joint in enumerate((p1, p2)):
                 idx: int | None = POSE_JOINT_TO_ANGLE_IDX.get(joint)
                 if idx is not None:
-                    angle: float = angle_data.values[idx]
+                    angle: float = angles.values[idx]
                     if not np.isnan(angle):
                         if joint.value % 2 == 1:  # Left side
                             colors[i*2 + joint_pos][0:3] = POSE_COLOR_LEFT_POSITIVE if angle >= 0 else POSE_COLOR_LEFT_NEGATIVE

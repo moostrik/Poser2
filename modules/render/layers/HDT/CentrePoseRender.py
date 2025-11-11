@@ -60,7 +60,7 @@ class CentrePoseRender(LayerBase):
 
             if pose.tracklet.is_being_tracked:
                 self.is_active = True
-                self.last_pose_rect = pose.bounding_box if pose.bounding_box is not None else Rect(0.0, 0.0, 1.0, 1.0)
+                self.last_pose_rect = pose.bbox if pose.bbox is not None else Rect(0.0, 0.0, 1.0, 1.0)
 
         if not self.is_active:
             return

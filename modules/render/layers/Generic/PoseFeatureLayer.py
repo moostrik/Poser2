@@ -96,19 +96,19 @@ class PoseFeatureLayer(LayerBase):
             raw_pose: Pose | None = self.capture_data.get_raw_pose(key, True, self.capture_key)
             if raw_pose is not None:
                 self.raw_fbo.clear()
-                data: AngleFeature = raw_pose.angle_data
+                data: AngleFeature = raw_pose.angles
                 PoseFeatureLayer.pose_feature_shader.use(self.raw_fbo.fbo_id, data, range_scale, raw_color, raw_color)
             smooth_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
             if smooth_pose is not None:
                 self.smooth_fbo.clear()
-                data: AngleFeature = smooth_pose.angle_data
+                data: AngleFeature = smooth_pose.angles
                 PoseFeatureLayer.pose_feature_shader.use(self.smooth_fbo.fbo_id, data, range_scale, smooth_color, smooth_color)
 
         if self.render_data.is_active(key):
             render_pose: Pose = self.render_data.get_pose(key)
-            v_c: AngleFeature = render_pose.angle_data
+            v_c: AngleFeature = render_pose.angles
             PoseFeatureLayer.pose_feature_shader.use(self.render_fbo.fbo_id, v_c, range_scale, render_color, render_color)
-            self.draw_joint_labels(self.render_fbo, render_pose.angle_data)
+            self.draw_joint_labels(self.render_fbo, render_pose.angles)
 
     @staticmethod
     def draw_joint_labels(fbo: Fbo, feature: AngleFeature) -> None:
