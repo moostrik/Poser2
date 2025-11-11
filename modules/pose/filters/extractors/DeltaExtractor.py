@@ -2,12 +2,12 @@
 from dataclasses import replace
 
 # Pose imports
-from modules.pose.filters.FilterBase import FilterBase
+from modules.pose.Nodes import FilterNode
 from modules.pose.features.AngleFeature import AngleFeature
 from modules.pose.Pose import Pose
 
 
-class DeltaExtractor(FilterBase):
+class DeltaExtractor(FilterNode):
     """Computes frame-to-frame changes (deltas) for a single pose.
 
     Calculates:

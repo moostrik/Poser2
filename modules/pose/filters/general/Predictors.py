@@ -11,13 +11,13 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
+from modules.pose.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.filters.general.algorithms.VectorPredict import Predict, AnglePredict, PointPredict, PredictionMethod
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
 
 
-class PredictorConfig(FilterConfigBase):
+class PredictorConfig(NodeConfigBase):
     """Configuration for pose prediction with automatic change notification."""
 
     def __init__(self, frequency: float = 30.0, method: PredictionMethod = PredictionMethod.QUADRATIC) -> None:
@@ -26,7 +26,7 @@ class PredictorConfig(FilterConfigBase):
         self.method: PredictionMethod = method
 
 
-class PredictorBase(FilterBase):
+class PredictorBase(FilterNode):
     """Base class for pose predictors.
 
     Handles common prediction logic. Subclasses only need to specify:
@@ -173,7 +173,7 @@ class DeltaPredictor(PredictorBase):
         return replace(pose, delta_data=new_data)
 
 
-class PosePredictor(FilterBase):
+class PosePredictor(FilterNode):
     """Predicts all pose features (angles, points, and deltas) for the next frame.
 
     Applies the same prediction configuration to all features. For independent

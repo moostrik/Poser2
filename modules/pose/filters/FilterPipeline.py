@@ -1,17 +1,17 @@
 """Single-pose filter pipeline for chaining multiple filters."""
 
 from modules.pose.Pose import Pose
-from modules.pose.filters.FilterBase import FilterBase
+from modules.pose.Nodes import FilterNode
 
 
-class FilterPipeline(FilterBase):
+class FilterPipeline(FilterNode):
     """Chains multiple filters into a sequential pipeline for a single pose.
 
     Processes a pose through a series of filters in order, where each filter's
     output becomes the next filter's input.
     """
 
-    def __init__(self, filters: list[FilterBase]) -> None:
+    def __init__(self, filters: list[FilterNode]) -> None:
         """Initialize pipeline with a list of filters.
 
         Args:
@@ -31,7 +31,7 @@ class FilterPipeline(FilterBase):
         if not filters:
             raise ValueError("PoseFilterPipeline: filters list must not be empty.")
 
-        self._filters: list[FilterBase] = filters
+        self._filters: list[FilterNode] = filters
 
     def process(self, pose: Pose) -> Pose:
         """Process pose through all filters in sequence."""

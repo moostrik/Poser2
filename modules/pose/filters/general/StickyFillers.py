@@ -12,12 +12,12 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
+from modules.pose.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.features import PoseFeatureData, AngleFeature, Point2DFeature
 
 
-class StickyFillerConfig(FilterConfigBase):
+class StickyFillerConfig(NodeConfigBase):
     """Configuration for pose hold filter with automatic change notification."""
 
     def __init__(self, init_to_zero: bool = False, hold_scores: bool = False) -> None:
@@ -33,7 +33,7 @@ class StickyFillerConfig(FilterConfigBase):
         self.hold_scores: bool = hold_scores
 
 
-class StickyFillerBase(FilterBase):
+class StickyFillerBase(FilterNode):
     """Base class for pose hold filters.
 
     Replaces NaN values with the last valid value for each feature element.
@@ -182,7 +182,7 @@ class DeltaStickyFiller(StickyFillerBase):
         return AngleFeature.create_empty()
 
 
-class PoseStickyFiller(FilterBase):
+class PoseStickyFiller(FilterNode):
     """Holds last valid values for all pose features (angles, points, and deltas).
 
     Applies the same hold configuration to all features. For independent

@@ -1,6 +1,6 @@
 """Pose filter modules for processing and enriching pose data."""
 
-from .FilterBase import                         FilterBase
+# from ..Nodes import                         FilterNode
 from .CallbackFilter import                     CallbackFilter
 from .FilterPipeline import                     FilterPipeline
 

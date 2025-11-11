@@ -2,12 +2,12 @@
 from dataclasses import replace
 
 # Pose imports
-from modules.pose.filters.FilterBase import FilterBase
+from modules.pose.Nodes import FilterNode
 from modules.pose.features import SymmetryFeature, SymmetryFactory
 from modules.pose.Pose import Pose
 
 
-class SymmetryExtractor(FilterBase):
+class SymmetryExtractor(FilterNode):
     """Computes joint angles from pose keypoint data."""
 
     def process(self, pose: Pose) -> Pose:

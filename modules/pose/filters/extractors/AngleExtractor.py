@@ -2,12 +2,12 @@
 from dataclasses import replace
 
 # Pose imports
-from modules.pose.filters.FilterBase import FilterBase
+from modules.pose.Nodes import FilterNode
 from modules.pose.features import AngleFeature, AngleFactory
 from modules.pose.Pose import Pose
 
 
-class AngleExtractor(FilterBase):
+class AngleExtractor(FilterNode):
     """Computes joint angles from pose keypoint data.
 
     Calculates:

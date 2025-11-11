@@ -11,12 +11,12 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
+from modules.pose.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.features import PoseFeatureData
 
 
-class ConfidenceFilterConfig(FilterConfigBase):
+class ConfidenceFilterConfig(NodeConfigBase):
     """Configuration for confidence filtering with automatic change notification."""
 
     def __init__(self, confidence_threshold: float = 0.5, rescale_scores: bool = True) -> None:
@@ -33,7 +33,7 @@ class ConfidenceFilterConfig(FilterConfigBase):
         self.rescale_scores: bool = rescale_scores
 
 
-class ConfidenceFilterBase(FilterBase):
+class ConfidenceFilterBase(FilterNode):
     """Base class for pose confidence filters.
 
     Filters low-confidence values by:
@@ -148,7 +148,7 @@ class DeltaConfidenceFilter(ConfidenceFilterBase):
         return replace(pose, delta_data=new_data)
 
 
-class PoseConfidenceFilter(FilterBase):
+class PoseConfidenceFilter(FilterNode):
     """Filters all pose features (angles, points, and deltas) based on confidence.
 
     Applies the same confidence threshold to all features. For independent

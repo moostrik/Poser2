@@ -4,7 +4,7 @@ from typing import Callable
 
 from .TrackerBase import TrackerBase
 from modules.pose.Pose import Pose
-from modules.pose.filters.FilterBase import FilterBase
+from modules.pose.Nodes import FilterNode
 
 
 class FilterPipelineTracker(TrackerBase):
@@ -14,7 +14,7 @@ class FilterPipelineTracker(TrackerBase):
     Pipelines are automatically reset when their pose is lost.
     """
 
-    def __init__(self, num_poses: int, filter_factories: list[Callable[[], FilterBase]]) -> None:
+    def __init__(self, num_poses: int, filter_factories: list[Callable[[], FilterNode]]) -> None:
         """Initialize tracker with filter pipeline per pose.
 
         Args:
@@ -27,14 +27,14 @@ class FilterPipelineTracker(TrackerBase):
         super().__init__(num_poses)
 
         # Create one filter pipeline per pose ID
-        self._filter_pipelines: dict[int, list[FilterBase]] = {}
+        self._filter_pipelines: dict[int, list[FilterNode]] = {}
         for pose_id in range(self.num_poses):
-            pipeline: list[FilterBase] = [factory() for factory in filter_factories]
+            pipeline: list[FilterNode] = [factory() for factory in filter_factories]
             self._filter_pipelines[pose_id] = pipeline
 
     def _process_pose(self, pose_id: int, pose: Pose) -> Pose:
         """Process pose through its filter pipeline."""
-        pipeline: list[FilterBase] = self._filter_pipelines[pose_id]
+        pipeline: list[FilterNode] = self._filter_pipelines[pose_id]
 
         current_pose: Pose = pose
         for filter_instance in pipeline:
@@ -50,6 +50,6 @@ class FilterPipelineTracker(TrackerBase):
 
     def reset_pose(self, pose_id: int) -> None:
         """Reset filter pipeline for a specific pose."""
-        pipeline: list[FilterBase] = self._filter_pipelines[pose_id]
+        pipeline: list[FilterNode] = self._filter_pipelines[pose_id]
         for filter_instance in pipeline:
             filter_instance.reset()

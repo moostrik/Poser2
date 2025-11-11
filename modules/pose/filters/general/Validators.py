@@ -6,11 +6,11 @@ from dataclasses import replace
 import numpy as np
 
 from modules.pose.Pose import Pose
-from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
+from modules.pose.Nodes import FilterNode, NodeConfigBase
 from modules.pose.features import POSE_FEATURE_RANGES, POSE_CLASS_TO_FEATURE_TYPE, PoseFeatureData
 
 
-class ValidatorConfig(FilterConfigBase):
+class ValidatorConfig(NodeConfigBase):
     """Configuration for pose validators."""
 
     def __init__(
@@ -29,7 +29,7 @@ class ValidatorConfig(FilterConfigBase):
         self.fix: bool = fix
 
 
-class ValidatorBase(FilterBase):
+class ValidatorBase(FilterNode):
     """Base class for pose validators.
 
     Provides common validation pattern for all feature types.
@@ -204,7 +204,7 @@ class ScoreValidator(ValidatorBase):
         return data
 
 
-class PoseValidator(FilterBase):
+class PoseValidator(FilterNode):
     """Validates all pose features (points, angles, delta, symmetry) for data integrity.
 
     Combines NaN, range, and score validation. For independent control of each

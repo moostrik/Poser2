@@ -23,13 +23,13 @@ from threading import Lock
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
+from modules.pose.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.interpolators.algorithms.VectorChase import Chase, VectorChase, AngleChase, PointChase
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
 
 
-class ChaseInterpolatorConfig(FilterConfigBase):
+class ChaseInterpolatorConfig(NodeConfigBase):
     """Configuration for pose chase interpolation with automatic change notification."""
 
     def __init__(self, input_frequency: float = 30.0, responsiveness: float = 0.2, friction: float = 0.03) -> None:
@@ -39,7 +39,7 @@ class ChaseInterpolatorConfig(FilterConfigBase):
         self.friction: float = friction
 
 
-class ChaseInterpolatorBase(FilterBase):
+class ChaseInterpolatorBase(FilterNode):
     """Base class for pose chase interpolators.
 
     Handles common interpolation logic using perpetual chase dynamics.
@@ -226,7 +226,7 @@ class DeltaChaseInterpolator(ChaseInterpolatorBase):
         return replace(pose, delta_data=new_data)
 
 
-class PoseChaseInterpolator(FilterBase):
+class PoseChaseInterpolator(FilterNode):
     """Chase interpolates all pose features (angles, points, and deltas)."""
 
     def __init__(self, config: ChaseInterpolatorConfig) -> None:

@@ -3,7 +3,7 @@
 from typing import Callable
 
 from modules.pose.Pose import Pose
-from modules.pose.filters.FilterBase import FilterBase
+from modules.pose.Nodes import FilterNode
 from .TrackerBase import TrackerBase
 
 
@@ -14,7 +14,7 @@ class FilterTracker(TrackerBase):
     independent state. Filters are automatically reset when their pose is lost.
     """
 
-    def __init__(self, num_poses: int, filter_factory: Callable[[], FilterBase]) -> None:
+    def __init__(self, num_poses: int, filter_factory: Callable[[], FilterNode]) -> None:
         """Initialize tracker with single filter per pose.
 
         Args:
@@ -24,7 +24,7 @@ class FilterTracker(TrackerBase):
         super().__init__(num_poses)
 
         # Create one filter instance per pose ID
-        self._filters: dict[int, FilterBase] = {
+        self._filters: dict[int, FilterNode] = {
             pose_id: filter_factory() for pose_id in range(num_poses)
         }
 

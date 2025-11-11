@@ -1,7 +1,7 @@
 
 
 from modules.pose.Pose import Pose
-from modules.pose.filters.FilterBase import FilterBase
+from modules.pose.Nodes import FilterNode
 from modules.pose.callback import PoseCallbackMixin
 
 
@@ -22,8 +22,8 @@ class CallbackFilter(PoseCallbackMixin):
         callback_filter.add_pose(pose)  # Triggers callback immediately
     """
 
-    def __init__(self, filter_instance: FilterBase) -> None:
-        self._filter: FilterBase = filter_instance
+    def __init__(self, filter_instance: FilterNode) -> None:
+        self._filter: FilterNode = filter_instance
 
     def add_pose(self, pose: Pose) -> None:
         """Process a pose and notify all registered callbacks."""

@@ -12,13 +12,13 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.filters.FilterBase import FilterBase, FilterConfigBase
+from modules.pose.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.filters.general.algorithms.VectorSmooth import Smooth, AngleSmooth, PointSmooth
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
 
 
-class SmootherConfig(FilterConfigBase):
+class SmootherConfig(NodeConfigBase):
     """Configuration for pose smoothing with automatic change notification."""
 
     def __init__(self, frequency: float = 30.0, min_cutoff: float = 1.0, beta: float = 0.025, d_cutoff: float = 1.0) -> None:
@@ -29,7 +29,7 @@ class SmootherConfig(FilterConfigBase):
         self.d_cutoff: float = d_cutoff
 
 
-class SmootherBase(FilterBase):
+class SmootherBase(FilterNode):
     """Base class for pose smoothers.
 
     Handles common smoothing logic. Subclasses only need to specify:
@@ -176,7 +176,7 @@ class DeltaSmoother(SmootherBase):
         return replace(pose, delta_data=new_data)
 
 
-class PoseSmoother(FilterBase):
+class PoseSmoother(FilterNode):
     """Smooths all pose features (angles, points, and deltas) using OneEuroFilter.
 
     Applies the same smoothing configuration to all features. For independent
