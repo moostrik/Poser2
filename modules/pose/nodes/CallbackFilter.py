@@ -1,7 +1,7 @@
 
 
 from modules.pose.Pose import Pose
-from modules.pose.Nodes import FilterNode
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.callback import PoseCallbackMixin
 
 

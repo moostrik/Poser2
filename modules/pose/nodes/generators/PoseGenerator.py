@@ -1,6 +1,6 @@
 import time
 
-from modules.pose.Nodes import GeneratorNode
+from modules.pose.nodes.Nodes import GeneratorNode
 from modules.pose.Pose import Pose
 from modules.pose.features import BBoxFeature
 from modules.tracker.Tracklet import Tracklet

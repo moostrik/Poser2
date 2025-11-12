@@ -4,3 +4,4 @@ from .TrackerBase import            TrackerBase
 from .FilterTracker import          FilterTracker
 from .FilterPipelineTracker import  FilterPipelineTracker
 from .PresenceTracker import        PresenceTracker
+from .Point2DExtractor import       Point2DExtractor

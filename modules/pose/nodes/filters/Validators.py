@@ -6,7 +6,7 @@ from dataclasses import replace
 import numpy as np
 
 from modules.pose.Pose import Pose
-from modules.pose.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.features import POSE_FEATURE_RANGES, POSE_CLASS_TO_FEATURE_TYPE, PoseFeatureData
 
 

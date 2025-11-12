@@ -17,9 +17,9 @@ from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
 from modules.pose.detection.DetectionPipeline import DetectionPipeline
 
-from modules.pose import filters
-from modules.pose.interpolators import ChaseInterpolatorConfig, InterpolationGui
-from modules.pose.trackers import FilterPipelineTracker
+from modules.pose import nodes
+from modules.pose.nodes import ChaseInterpolatorConfig, InterpolatorGui
+from modules.pose.batch import FilterPipelineTracker
 
 from modules.pose.similarity.SimilarityComputer import SimilarityComputer
 
@@ -76,45 +76,45 @@ class Main():
         self.pose_raw_pipeline = FilterPipelineTracker(
             settings.num_players,
             [
-                lambda: filters.PoseConfidenceFilter(filters.ConfidenceFilterConfig(settings.pose_conf_threshold)),
-                filters.AngleExtractor,
-                filters.DeltaExtractor
+                lambda: nodes.PoseConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose_conf_threshold)),
+                nodes.AngleExtractor,
+                nodes.DeltaExtractor
             ]
         )
 
-        self.point_smooth_config = filters.SmootherConfig()
-        self.angle_smooth_config = filters.SmootherConfig()
-        self.delta_smooth_config = filters.SmootherConfig()
-        self.point_smooth_gui: filters.SmootherGui = filters.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
-        self.angle_smooth_gui: filters.SmootherGui = filters.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
-        self.delta_smooth_gui: filters.SmootherGui = filters.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
+        self.point_smooth_config = nodes.SmootherConfig()
+        self.angle_smooth_config = nodes.SmootherConfig()
+        self.delta_smooth_config = nodes.SmootherConfig()
+        self.point_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
+        self.angle_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
+        self.delta_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
 
         self.pose_smooth_pipeline = FilterPipelineTracker(
             settings.num_players,
             [
-                lambda: filters.PointSmoother(self.point_smooth_config),
-                lambda: filters.AngleSmoother(self.angle_smooth_config),
-                filters.DeltaExtractor,
-                filters.MotionTimeAccumulator,
-                lambda: filters.DeltaSmoother(self.delta_smooth_config),
+                lambda: nodes.PointSmoother(self.point_smooth_config),
+                lambda: nodes.AngleSmoother(self.angle_smooth_config),
+                nodes.DeltaExtractor,
+                nodes.MotionTimeAccumulator,
+                lambda: nodes.DeltaSmoother(self.delta_smooth_config),
                 # filters.PoseValidator,
             ]
         )
 
-        self.prediction_config = filters.PredictorConfig(frequency=settings.camera_fps)
-        self.prediction_gui: filters.PredictionGui = filters.PredictionGui(self.prediction_config, self.gui, 'Predictor')
+        self.prediction_config = nodes.PredictorConfig(frequency=settings.camera_fps)
+        self.prediction_gui: nodes.PredictionGui = nodes.PredictionGui(self.prediction_config, self.gui, 'Predictor')
         self.pose_prediction_pipeline = FilterPipelineTracker(
             settings.num_players,
             [
-                lambda: filters.PointPredictor(self.prediction_config),
-                lambda: filters.AnglePredictor(self.prediction_config),
-                lambda: filters.DeltaPredictor(self.prediction_config),
+                lambda: nodes.PointPredictor(self.prediction_config),
+                lambda: nodes.AnglePredictor(self.prediction_config),
+                lambda: nodes.DeltaPredictor(self.prediction_config),
                 # filters.PoseValidator
             ]
         )
 
         self.interpolation_config: ChaseInterpolatorConfig = self.render_data_hub.interpolator_config
-        self.interpolation_gui: InterpolationGui = InterpolationGui(self.interpolation_config, self.gui, 'Interpolator')
+        self.interpolation_gui: InterpolatorGui = InterpolatorGui(self.interpolation_config, self.gui, 'Interpolator')
 
 
         self.pose_correlator: SimilarityComputer = SimilarityComputer(settings)

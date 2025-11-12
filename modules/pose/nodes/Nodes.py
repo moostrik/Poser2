@@ -52,7 +52,7 @@ class InterpolatorNode(NodeBase):
     """Base class for interpolator nodes that smooth/blend poses."""
 
     @abstractmethod
-    def process(self, pose: Pose) -> None:
+    def submit(self, pose: Pose) -> None: # should be submit
         """Set interpolation target from input pose. Called at input frequency (~30 FPS)."""
         pass
 
@@ -76,18 +76,4 @@ class GeneratorNode(NodeBase):
 
     def reset(self) -> None:
         """Optional reset the generator's internal state."""
-        pass
-
-
-class BatchExtractorNode(NodeBase):
-    """Base class for batch extractors (e.g., GPU-based) that process multiple poses at once."""
-
-    @abstractmethod
-    def add(self, pose: Pose) -> None:
-        """Add a pose to the batch queue."""
-        pass
-
-    @abstractmethod
-    def extract_batch(self) -> PoseDict:
-        """Process all queued poses and return enriched poses keyed by tracklet ID."""
         pass

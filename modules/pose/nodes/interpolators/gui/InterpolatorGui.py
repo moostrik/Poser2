@@ -1,10 +1,10 @@
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
-from modules.pose.interpolators import ChaseInterpolatorConfig
+from modules.pose.nodes.interpolators.ChaseInterpolators import ChaseInterpolatorConfig
 
 
 
-class InterpolationGui:
+class InterpolatorGui:
     def __init__(self, config: ChaseInterpolatorConfig, gui: Gui, name: str) -> None:
         self.gui: Gui = gui
         self.config: ChaseInterpolatorConfig = config

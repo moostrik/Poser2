@@ -11,9 +11,9 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.filters.general.algorithms.VectorPredict import Predict, AnglePredict, PointPredict, PredictionMethod
+from modules.pose.nodes.filters.algorithms.VectorPredict import Predict, AnglePredict, PointPredict, PredictionMethod
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
 
 

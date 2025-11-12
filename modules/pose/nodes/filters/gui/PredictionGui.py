@@ -1,6 +1,6 @@
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
-from modules.pose.filters.general.Predictors import PredictorConfig, PredictionMethod
+from modules.pose.nodes.filters.Predictors import PredictorConfig, PredictionMethod
 
 
 

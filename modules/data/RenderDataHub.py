@@ -30,7 +30,7 @@ import time as time
 
 # Local application imports
 from modules.pose import features
-from modules.pose.interpolators import PoseChaseInterpolator, ChaseInterpolatorConfig
+from modules.pose.nodes import PoseChaseInterpolator, ChaseInterpolatorConfig
 from modules.pose.Pose import Pose, PoseDict
 
 from modules.Settings import Settings
@@ -84,7 +84,7 @@ class RenderDataHub:
                     # Create and initialize together
                     interpolator = PoseChaseInterpolator(self.interpolator_config)
                     self._interpolators[id] = interpolator
-                interpolator.process(pose)
+                interpolator.submit(pose)
 
     def is_active(self, pose_id: int) -> bool:
         """Check if player has cached pose available."""

@@ -2,7 +2,7 @@
 from dataclasses import replace
 
 # Pose imports
-from modules.pose.Nodes import FilterNode
+from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features.AngleFeature import AngleFeature
 from modules.pose.Pose import Pose
 

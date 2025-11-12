@@ -23,9 +23,9 @@ from threading import Lock
 import numpy as np
 
 # Pose imports
-from modules.pose.Nodes import InterpolatorNode, NodeConfigBase
+from modules.pose.nodes.Nodes import InterpolatorNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.interpolators.algorithms.VectorChase import Chase, VectorChase, AngleChase, PointChase
+from modules.pose.nodes.interpolators.algorithms.VectorChase import Chase, VectorChase, AngleChase, PointChase
 from modules.pose.features import PoseFeatureData, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
 
 
@@ -89,7 +89,7 @@ class ChaseInterpolatorBase(InterpolatorNode):
         """Create new pose with replaced feature data."""
         pass
 
-    def process(self, pose: Pose) -> None:
+    def submit(self, pose: Pose) -> None:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
         feature_data = self._get_feature_data(pose)
 
@@ -239,11 +239,11 @@ class PoseChaseInterpolator(InterpolatorNode):
     def config(self) -> ChaseInterpolatorConfig:
         return self._config
 
-    def process(self, pose: Pose) -> None:
+    def submit(self, pose: Pose) -> None:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
-        self._angle_interpolator.process(pose)
-        self._point_interpolator.process(pose)
-        self._delta_interpolator.process(pose)
+        self._angle_interpolator.submit(pose)
+        self._point_interpolator.submit(pose)
+        self._delta_interpolator.submit(pose)
 
     def update(self, current_time: float | None = None) -> Pose | None:
         """Update and return interpolated pose, or None if not ready yet.

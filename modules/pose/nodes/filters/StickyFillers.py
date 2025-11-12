@@ -12,7 +12,7 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.Nodes import FilterNode, NodeConfigBase
+from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.features import PoseFeatureData, AngleFeature, Point2DFeature
 
