@@ -183,6 +183,7 @@ class DetectionPipeline(Thread):
         for i, tracklet in enumerate(pending_request.tracklets):
             pose = Pose(
                 track_id=tracklet.id,
+                cam_id=tracklet.cam_id,
                 tracklet=tracklet,
                 bbox = BBoxFeature.from_rect(pending_request.crop_rects[i]),
                 time_stamp = pending_request.time_stamp,

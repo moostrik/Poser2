@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable
-from modules.pose.Pose import Pose, PoseDict
+from typing import Any, Callable, Generic, TypeVar
+from modules.pose.Pose import Pose
 
 
 class NodeConfigBase:
@@ -66,12 +66,24 @@ class InterpolatorNode(NodeBase):
         pass
 
 
-class GeneratorNode(NodeBase):
+TInput = TypeVar('TInput')
+
+class GeneratorNode(NodeBase, Generic[TInput]):
     """Base class for generator nodes that create poses."""
 
     @abstractmethod
-    def generate(self) -> Pose:
+    def set(self, input_data: TInput) -> None:
+        """Set the input data for pose generation."""
+        pass
+
+    @abstractmethod
+    def generate(self, time_stamp: float | None = None) -> Pose:
         """Generate a new pose."""
+        pass
+
+    @abstractmethod
+    def is_ready(self) -> bool:
+        """Check if the generator is ready to produce a pose."""
         pass
 
     def reset(self) -> None:

@@ -20,6 +20,7 @@ from modules.utils.PointsAndRects import Rect
 class Pose:
     """Immutable pose data structure"""
     track_id: int
+    cam_id: int
 
     tracklet: Tracklet                              # Deprecated, but kept for backward compatibility
     crop_image: np.ndarray =    field(init=False)   # Deprecated Cropped image corresponding to bounding_box (with padding)

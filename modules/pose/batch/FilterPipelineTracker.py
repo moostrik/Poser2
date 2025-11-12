@@ -2,12 +2,12 @@
 
 from typing import Callable
 
-from .TrackerBase import TrackerBase
+from .FilterTrackerBase import FilterTrackerBase
 from modules.pose.Pose import Pose
 from modules.pose.nodes.Nodes import FilterNode
 
 
-class FilterPipelineTracker(TrackerBase):
+class FilterPipelineTracker(FilterTrackerBase):
     """Tracks multiple poses, maintaining a separate filter pipeline for each.
 
     Each pose_id gets its own chain of filters which maintains independent state.

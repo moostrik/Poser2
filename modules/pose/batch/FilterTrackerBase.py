@@ -6,7 +6,7 @@ from modules.pose.Pose import Pose, PoseDict
 from modules.pose.callback import PoseDictCallbackMixin
 
 
-class TrackerBase(PoseDictCallbackMixin, ABC):
+class FilterTrackerBase(PoseDictCallbackMixin, ABC):
     """Base class for tracking and filtering multiple poses.
 
     Provides callback system and reset functionality. Subclasses implement

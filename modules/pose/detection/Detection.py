@@ -44,26 +44,37 @@ POSE_MODEL_FILE_NAMES: list[tuple[str, str]] = [
 
 @dataclass
 class DetectionInput:
+    """Batch of images for pose detection. Images must be 192x256 (HxW)."""
     batch_id: int
     images: list[np.ndarray]
 
     def __post_init__(self) -> None:
-        # check if images have right shape
+        """Validate image dimensions (debug builds only)."""
         for i, img in enumerate(self.images):
-            if img.shape[:2] != (POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH):
-                raise ValueError(f"Image {i} has incorrect shape: {img.shape}")
+            assert img.shape[:2] == (POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH), \
+                f"Image {i} has incorrect shape {img.shape}, expected (256, 192)"
 
 @dataclass
 class DetectionOutput:
+    """Results from pose detection. processed=False indicates batch was dropped."""
     batch_id: int
     point_batch: list[np.ndarray] = field(default_factory=list)   # List of (num_keypoints, 2) arrays, normalized [0, 1]
     score_batch: list[np.ndarray] = field(default_factory=list)   # List of (num_keypoints,) arrays, confidence scores [0, 1]
-    processed: bool = True          # Flag indicating this batch was dropped before processing
+    processed: bool = True          # False if batch was dropped before processing
     inference_time_ms: float = 0.0  # For monitoring
 
 PoseDetectionOutputCallback = Callable[[DetectionOutput], None]
 
 class Detection(Thread):
+    """Asynchronous GPU pose detection using RTMPose.
+
+    Uses a single-slot queue: only the most recent submitted batch waits to be processed.
+    Older pending batches are dropped. Batches already processing on GPU cannot be cancelled.
+
+    All results (success and dropped) are delivered via callbacks in notification order,
+    which may differ from batch_id order due to async processing.
+    """
+
     def __init__(self, path: str, model_type: ModelType, num_warmups: int, confidence_threshold: float = 0.3, verbose: bool = False) -> None:
         super().__init__()
 
@@ -161,7 +172,10 @@ class Detection(Thread):
                 traceback.print_exc()
 
     def submit_batch(self, input_batch: DetectionInput) -> None:
-        """Submit new batch for detection processing."""
+        """Submit batch for processing. Replaces any pending (not yet started) batch.
+
+        Dropped batches trigger callbacks with processed=False.
+        """
         if self._shutdown_event.is_set():
             return
 
@@ -193,10 +207,7 @@ class Detection(Thread):
         self._notify_update_event.set()
 
     def _retrieve_pending_batch(self) -> DetectionInput | None:
-        """Atomically retrieve and clear the pending batch.
-
-        Once retrieved, the batch is committed to processing and cannot be cancelled.
-        The pending slot becomes empty, allowing new batches to be queued.
+        """Atomically get and clear pending batch. Once retrieved, batch cannot be cancelled.
 
         Returns:
             The pending batch if one exists, None otherwise
@@ -245,7 +256,7 @@ class Detection(Thread):
 
     # CALLBACK
     def _callback_worker_loop(self) -> None:
-        """Worker thread that processes callbacks without blocking the main thread"""
+        """Dispatch queued results to registered callbacks. Runs on separate thread."""
         while not self._shutdown_event.is_set():
             try:
                 if self._callback_queue.qsize() > 1:
@@ -271,13 +282,14 @@ class Detection(Thread):
                 continue
 
     def register_callback(self, callback: PoseDetectionOutputCallback) -> None:
+        """Register callback to receive detection results (both success and dropped batches)."""
         with self._callback_lock:
             self._callbacks.add(callback)
 
     # STATIC METHODS
     @staticmethod
     def _model_warmup(model: torch.nn.Module, pipeline: Compose, num_imgs: int) -> None:
-        """Pre-warm the model with dummy inputs to initialize CUDA kernels and memory"""
+        """Initialize CUDA kernels with dummy batches of increasing sizes."""
         if num_imgs <= 0:
             return
         if num_imgs > 8:
@@ -294,6 +306,7 @@ class Detection(Thread):
 
     @staticmethod
     def _infer_batch(model: torch.nn.Module, pipeline: Compose, imgs: list[np.ndarray]) -> list[list[PoseDataSample]]:
+        """Run pose detection inference on batch of images."""
         if not imgs:
             return []
 
@@ -331,7 +344,7 @@ class Detection(Thread):
 
     @staticmethod
     def _extract_pose_points(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> tuple[list[np.ndarray], list[np.ndarray]]:
-        """Process pose data samples and return keypoints, scores, and metadata."""
+        """Extract normalized keypoints and scores from inference results. Returns first person per image."""
         keypoints_list: list[np.ndarray] = []
         scores_list: list[np.ndarray] = []
 

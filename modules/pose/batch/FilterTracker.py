@@ -4,10 +4,10 @@ from typing import Callable
 
 from modules.pose.Pose import Pose
 from modules.pose.nodes.Nodes import FilterNode
-from .TrackerBase import TrackerBase
+from .FilterTrackerBase import FilterTrackerBase
 
 
-class FilterTracker(TrackerBase):
+class FilterTracker(FilterTrackerBase):
     """Tracks multiple poses, maintaining a separate filter for each.
 
     Each pose_id gets its own PoseFilterBase instance which maintains

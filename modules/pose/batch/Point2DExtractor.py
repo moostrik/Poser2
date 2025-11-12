@@ -11,26 +11,19 @@ import numpy as np
 class Point2DExtractor(PoseDictCallbackMixin):
     """GPU-based batch extractor for 2D pose points using RTMPose detection.
 
-    Processes entire PoseDict batches through GPU inference asynchronously.
-    Results are broadcast via callbacks when ready.
+    Batches are processed asynchronously on GPU. Under load, pending batches may
+    be dropped by the Detection queue to maintain real-time performance. Dropped
+    batches do not emit callbacks - only successfully processed batches are broadcast.
 
-    Inherits callback system from PoseDictCallbackMixin for broadcasting results.
+    This design prioritizes low latency over data completeness, making it suitable
+    for real-time visualization where recent data is more valuable than old data.
     """
 
-    def __init__(self, detection: Detection, emit_dropped: bool = False):
-        """Initialize Point2D extractor.
-        
-        Args:
-            detection: Detection instance for GPU inference
-            emit_dropped: If True, broadcast dropped batches with empty Point2DFeatures
-        """
+    def __init__(self, detection: Detection):
         super().__init__()
         self._detection = detection
-        self._emit_dropped = emit_dropped
         self._lock = Lock()
         self._batch_counter: int = 0
-
-        # Track which poses correspond to which batch
         self._waiting_batches: dict[int, tuple[PoseDict, list[int]]] = {}
 
         self._detection.register_callback(self._on_detection_result)
@@ -45,13 +38,8 @@ class Point2DExtractor(PoseDictCallbackMixin):
         if not self._detection.is_ready or not poses:
             return
 
-        # Prepare batch
-        with self._lock:
-            self._batch_counter += 1
-            batch_id = self._batch_counter
-
-        tracklet_ids = []
-        image_list = []
+        tracklet_ids: list[int] = []
+        image_list: list[np.ndarray] = []
 
         for tracklet_id in poses.keys():
             if tracklet_id in images:
@@ -61,55 +49,42 @@ class Point2DExtractor(PoseDictCallbackMixin):
         if not image_list:
             return
 
-        # Store original poses for later
         with self._lock:
+            self._batch_counter += 1
+            batch_id: int = self._batch_counter
             self._waiting_batches[batch_id] = (poses, tracklet_ids)
 
-        # Submit and return immediately
         self._detection.submit_batch(DetectionInput(batch_id=batch_id, images=image_list))
 
     def _on_detection_result(self, output: DetectionOutput) -> None:
-        """Callback from Detection thread when results are ready or dropped."""
+        """Callback from Detection thread when results are ready or dropped.
+
+        Only successful batches (processed=True) emit callbacks. Dropped batches
+        are silently ignored to prioritize real-time performance over completeness.
+        """
         with self._lock:
-            batch_data = self._waiting_batches.pop(output.batch_id, None)
+            batch_data: tuple[PoseDict, list[int]] | None = self._waiting_batches.pop(output.batch_id, None)
 
         if not batch_data:
+            print(f"Point2DExtractor Warning: No waiting batch for batch_id {output.batch_id} (possible reset during processing)")
             return
 
         original_poses, tracklet_ids = batch_data
+        result_poses: PoseDict = {}
 
-        # If batch was dropped, optionally emit with empty points
-        if not output.processed:
-            if self._emit_dropped:
-                dropped_poses: PoseDict = {}
-                for tracklet_id in tracklet_ids:
-                    if tracklet_id in original_poses:
-                        # Create pose with empty Point2DFeature
-                        dropped_poses[tracklet_id] = replace(
-                            original_poses[tracklet_id],
-                            points=Point2DFeature.create_empty()
-                        )
-                
-                if dropped_poses:
-                    self._notify_callbacks(dropped_poses)
-            
-            return
+        if output.processed:
+            for idx, tracklet_id in enumerate(tracklet_ids):
+                if idx < len(output.point_batch) and tracklet_id in original_poses:
+                    point_feature = Point2DFeature(
+                        values=output.point_batch[idx],
+                        scores=output.score_batch[idx]
+                    )
+                    result_poses[tracklet_id] = replace(original_poses[tracklet_id], points=point_feature)
 
-        # Process successful results
-        updated_poses: PoseDict = {}
-
-        for idx, tracklet_id in enumerate(tracklet_ids):
-            if idx < len(output.point_batch) and tracklet_id in original_poses:
-                point_feature = Point2DFeature(
-                    values=output.point_batch[idx].astype(np.float32),
-                    scores=output.score_batch[idx].astype(np.float32)
-                )
-                updated_poses[tracklet_id] = replace(original_poses[tracklet_id], points=point_feature)
-
-        # Broadcast results
-        if updated_poses:
-            self._notify_callbacks(updated_poses)
+            self._notify_callbacks(result_poses)
 
     def reset(self) -> None:
+        """Clear all pending and buffered data."""
         with self._lock:
             self._waiting_batches.clear()
+            self._batch_counter = 0
