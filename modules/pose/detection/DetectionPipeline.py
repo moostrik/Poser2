@@ -10,7 +10,7 @@ import numpy as np
 # Pose imports
 from modules.pose.detection.Detection import Detection, DetectionInput, DetectionOutput, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
 from modules.pose.detection.ImageProcessor import ImageProcessor
-from modules.pose.features import AngleFactory, BBoxFeature
+from modules.pose.features import AngleFactory, BBoxFeature, Point2DFeature
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 
 # Local application imports
@@ -161,13 +161,13 @@ class DetectionPipeline(Thread):
         else:
             print("PosePipeline: Pose detector not ready, skipping submission")
 
-    def _notify_detection_callback(self, poses: DetectionOutput) -> None:
+    def _notify_detection_callback(self, batch_detection: DetectionOutput) -> None:
 
         """Handle completed pose detection results"""
         with self._pending_lock:
-            pending_request: PendingRequest | None = self._pending_requests.pop(poses.batch_id, None)
+            pending_request: PendingRequest | None = self._pending_requests.pop(batch_detection.batch_id, None)
             # delete andy pending request with a lower batch id to avoid memory leak
-            obsolete_keys: list[int] = [key for key in self._pending_requests if key < poses.batch_id]
+            obsolete_keys: list[int] = [key for key in self._pending_requests if key < batch_detection.batch_id]
             # if self.verbose and obsolete_keys:
             #     print(f"PosePipeline: Cleaning up {len(obsolete_keys)} obsolete pending requests: {obsolete_keys}")
             for key in obsolete_keys:
@@ -175,20 +175,21 @@ class DetectionPipeline(Thread):
 
         if pending_request is None:
             if self.verbose:
-                print(f"PosePipeline: No pending request found for batch ID {poses.batch_id}")
+                print(f"PosePipeline: No pending request found for batch ID {batch_detection.batch_id}")
             return
 
         pose_dict: PoseDict = {}
 
         for i, tracklet in enumerate(pending_request.tracklets):
             pose = Pose(
+                track_id=tracklet.id,
                 tracklet=tracklet,
                 bbox = BBoxFeature.from_rect(pending_request.crop_rects[i]),
                 time_stamp = pending_request.time_stamp,
                 lost=tracklet.is_removed,
-                points = poses.points_list[i],
-                angles= AngleFactory.from_points(poses.points_list[i])
+                points = Point2DFeature(batch_detection.point_batch[i], scores=batch_detection.score_batch[i])
             )
+
             object.__setattr__(pose, "crop_image", pending_request.crop_images[i])
             pose_dict[tracklet.id] = pose
 

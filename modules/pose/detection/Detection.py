@@ -1,5 +1,5 @@
 # Standard library imports
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
@@ -15,9 +15,6 @@ from mmengine.dataset import Compose, pseudo_collate
 from mmengine.registry import init_default_scope
 import numpy as np
 import torch
-
-# Pose imports
-from modules.pose.features.Point2DFeature import Point2DFeature
 
 # Local application imports
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -59,7 +56,9 @@ class DetectionInput:
 @dataclass
 class DetectionOutput:
     batch_id: int
-    points_list: list[Point2DFeature]
+    point_batch: list[np.ndarray] = field(default_factory=list)   # List of (num_keypoints, 2) arrays, normalized [0, 1]
+    score_batch: list[np.ndarray] = field(default_factory=list)   # List of (num_keypoints,) arrays, confidence scores [0, 1]
+    processed: bool = True          # Flag indicating this batch was dropped before processing
     inference_time_ms: float = 0.0  # For monitoring
 
 PoseDetectionOutputCallback = Callable[[DetectionOutput], None]
@@ -87,11 +86,11 @@ class Detection(Thread):
 
         # Input queue
         self._input_lock: Lock = Lock()
-        self._pending_input: DetectionInput | None = None
+        self._pending_batch: DetectionInput | None = None
         self._input_timestamp: float = time.time()
-        self._last_dropped_id: int = 0
 
         # Callbacks
+        self._callback_lock: Lock = Lock()
         self._callbacks: set[PoseDetectionOutputCallback] = set()
         self._callback_queue: Queue[DetectionOutput | None] = Queue(maxsize=2)
         self._callback_thread: Thread = Thread(target=self._callback_worker_loop, daemon=True)
@@ -161,57 +160,88 @@ class Detection(Thread):
                 print(f"Pose Detection Error: {str(e)}")
                 traceback.print_exc()
 
+    def submit_batch(self, input_batch: DetectionInput) -> None:
+        """Submit new batch for detection processing."""
+        if self._shutdown_event.is_set():
+            return
+
+        dropped_batch: DetectionInput | None = None
+
+        with self._input_lock:
+            if self._pending_batch is not None:
+                dropped_batch = self._pending_batch
+                if self.verbose:
+                    lag = int((time.time() - self._input_timestamp) * 1000)
+                    print(f"Pose Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
+
+            self._pending_batch = input_batch
+            self._input_timestamp = time.time()
+
+        # Notify about dropped batch
+        if dropped_batch is not None:
+            dropped_output = DetectionOutput(
+                batch_id=dropped_batch.batch_id,
+                processed=False  # Mark as not processed
+            )
+            try:
+                self._callback_queue.put_nowait(dropped_output)
+            except:
+                if self.verbose:
+                    print("Pose Detection Warning: Callback queue full, not critical for dropped notifications")
+                pass  # Queue full, not critical for dropped notifications
+
+        self._notify_update_event.set()
+
+    def _retrieve_pending_batch(self) -> DetectionInput | None:
+        """Atomically retrieve and clear the pending batch.
+
+        Once retrieved, the batch is committed to processing and cannot be cancelled.
+        The pending slot becomes empty, allowing new batches to be queued.
+
+        Returns:
+            The pending batch if one exists, None otherwise
+        """
+        with self._input_lock:
+            batch = self._pending_batch
+            self._pending_batch = None  # Clear slot - batch is now committed
+            return batch
+
     def _process_pending_batch(self, model: torch.nn.Module, pipeline: Compose, stream: torch.cuda.Stream) -> None:
         # Get pending input
-        with self._input_lock:
-            input_data: DetectionInput | None = self._pending_input
-            self._pending_input = None
+        batch: DetectionInput | None = self._retrieve_pending_batch()
 
-        if input_data is None:
+        if batch is None:
+            if self.verbose:
+                print("Pose Detection Warning: No pending batch to process, this should not happen")
             return
 
         # Run inference
-        if input_data.images:
+        if batch.images:
             batch_start = time.perf_counter()
 
             with torch.cuda.stream(stream):
-                data_samples: list[list[PoseDataSample]] = Detection._infer_batch(model, pipeline, input_data.images)
-                points_list: list[Point2DFeature] = Detection._extract_pose_points(data_samples, self.model_width, self.model_height, self.confidence_threshold)
+                data_samples: list[list[PoseDataSample]] = Detection._infer_batch(model, pipeline, batch.images)
+                point_list, score_list = Detection._extract_pose_points(data_samples, self.model_width, self.model_height, self.confidence_threshold)
                 stream.synchronize()
 
             inference_time_ms: float = (time.perf_counter() - batch_start) * 1000.0
 
             # print(f"Pose Detection: Processed batch {input_data.batch_id} with {len(input_data.images)} images in   {inference_time_ms:.0f}   ms")
 
-            # Create output
-            output = DetectionOutput(input_data.batch_id, points_list, inference_time_ms)
+            # Create output (processed=True by default)
+            output = DetectionOutput(
+                batch_id=batch.batch_id,
+                point_batch=point_list,
+                score_batch=score_list,
+                processed=True,
+                inference_time_ms=inference_time_ms
+            )
 
             # Queue for callbacks
             try:
                 self._callback_queue.put_nowait(output)
             except Exception:
                 print("Pose Detection Warning: Callback queue full, dropping inference results")
-
-    def submit_batch(self, input_data: DetectionInput) -> None:
-        """Submit new batch for detection processing."""
-        if self._shutdown_event.is_set():
-            return
-
-        old_input: DetectionInput | None = None
-        lag: float = 0.0
-
-        with self._input_lock:
-            if self._pending_input is not None:
-                old_input = self._pending_input
-                lag = int((time.time() - self._input_timestamp) * 1000)
-            self._pending_input = input_data
-            self._input_timestamp = time.time()
-
-        if old_input is not None and self.verbose:
-            print(f"Pose Detection: Dropped a batch {old_input.batch_id} after  {old_input.batch_id - self._last_dropped_id:4d}   samples, with a lag of {lag:3d} ms")
-            self._last_dropped_id = old_input.batch_id
-
-        self._notify_update_event.set()
 
     # CALLBACK
     def _callback_worker_loop(self) -> None:
@@ -226,7 +256,10 @@ class Detection(Thread):
                 if output is None:
                     break
 
-                for callback in self._callbacks:
+                with self._callback_lock:
+                    callbacks = list(self._callbacks)
+
+                for callback in callbacks:
                     try:
                         callback(output)
                     except Exception as e:
@@ -238,7 +271,8 @@ class Detection(Thread):
                 continue
 
     def register_callback(self, callback: PoseDetectionOutputCallback) -> None:
-        self._callbacks.add(callback)
+        with self._callback_lock:
+            self._callbacks.add(callback)
 
     # STATIC METHODS
     @staticmethod
@@ -296,9 +330,10 @@ class Detection(Thread):
             return results_by_image
 
     @staticmethod
-    def _extract_pose_points(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> list[Point2DFeature]:
-        """Process pose data samples and return only the first detected pose for each image."""
-        first_poses: list[Point2DFeature] = []
+    def _extract_pose_points(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> tuple[list[np.ndarray], list[np.ndarray]]:
+        """Process pose data samples and return keypoints, scores, and metadata."""
+        keypoints_list: list[np.ndarray] = []
+        scores_list: list[np.ndarray] = []
 
         for data_samples_for_image in data_samples:
             pose_found = False
@@ -316,14 +351,15 @@ class Detection(Thread):
                 norm_keypoints: np.ndarray = keypoints[0].copy() / np.array([model_width, model_height])
                 person_scores: np.ndarray = scores[0].copy()
 
-                # Create pose and add to result
-                pose = Point2DFeature(norm_keypoints, person_scores)
-                first_poses.append(pose)
+                # Append to lists
+                keypoints_list.append(norm_keypoints)
+                scores_list.append(person_scores)
                 pose_found = True
                 break  # Stop after finding first pose
 
-            # If no pose found for this image, add None
+            # If no pose found for this image, add empty placeholders
             if not pose_found:
-                first_poses.append(Point2DFeature.create_empty())
+                keypoints_list.append(np.full((17, 2), np.nan, dtype=np.float32))
+                scores_list.append(np.zeros(17, dtype=np.float32))
 
-        return first_poses
+        return keypoints_list, scores_list
