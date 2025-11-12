@@ -1,4 +1,4 @@
-"""Tracker for monitoring pose presence and detecting unexpected losses."""
+"""Monitor for pose presence and lifecycle validation."""
 
 from dataclasses import replace
 from time import time
@@ -8,18 +8,18 @@ from modules.pose.Pose import Pose, PoseDict
 from modules.pose.callback import PoseDictCallbackMixin
 
 
-class PresenceTracker(PoseDictCallbackMixin):
-    """Monitors pose presence and warns about unexpected pose losses.
+class PresenceMonitor(PoseDictCallbackMixin):
+    """Monitors pose presence and validates lifecycle transitions.
 
-    Monitors which poses are present in each frame and warns if a pose
-    disappears without being marked as lost. Optionally broadcasts lost
-    poses with the current frame.
+    Tracks which poses are present/absent across frames and validates
+    pose lifecycle (warns if poses disappear without being marked lost).
 
-    This is a standalone monitor, not a filter-based tracker.
+    Unlike node-based trackers (FilterTracker, GeneratorTracker), this is
+    a stateful monitor that observes pose streams rather than transforming them.
     """
 
     def __init__(self, num_poses: int, warn: bool = True, fix: bool = False) -> None:
-        """Initialize presence tracker.
+        """Initialize presence monitor.
 
         Args:
             num_poses: Number of poses to track.
@@ -68,7 +68,7 @@ class PresenceTracker(PoseDictCallbackMixin):
         self._previous_poses = poses.copy()
 
         # Emit to callbacks
-        self._notify_callbacks(poses)
+        self._notify_pose_dict_callbacks(poses)
 
     def reset(self) -> None:
         """Reset all tracked poses."""

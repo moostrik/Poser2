@@ -81,7 +81,7 @@ class Point2DExtractor(PoseDictCallbackMixin):
                     )
                     result_poses[tracklet_id] = replace(original_poses[tracklet_id], points=point_feature)
 
-            self._notify_callbacks(result_poses)
+            self._notify_pose_dict_callbacks(result_poses)
 
     def reset(self) -> None:
         """Clear all pending and buffered data."""

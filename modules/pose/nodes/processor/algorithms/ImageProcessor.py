@@ -3,10 +3,11 @@ import cv2
 import numpy as np
 
 # Local application imports
-from modules.tracker.Tracklet import Tracklet, Rect
+from modules.pose.features import BBoxFeature
+from modules.utils.PointsAndRects import Rect
 
-from modules.utils.HotReloadMethods import HotReloadMethods
 
+# make undependent of BBoxFeature? and rect , then it is a proper algorithm utility
 
 class ImageProcessor:
     """Handles image cropping and processing for pose detection"""
@@ -17,17 +18,11 @@ class ImageProcessor:
         self.output_height: int = output_height
         self.aspect_ratio: float = output_width / output_height
 
-        hot_reloader = HotReloadMethods(self.__class__)
+    def process_pose_image(self, bbox: BBoxFeature, image: np.ndarray) -> np.ndarray:
 
-    def process_pose_image(self, tracklet: Tracklet, image: np.ndarray) -> tuple[np.ndarray, Rect]:
-        """
-        Process and return the pose image and crop rectangle for a pose.
-        Returns tuple of (cropped_image, crop_rect).
-        """
-        h, w = image.shape[:2]
-        roi: Rect = self.get_crop_rect(w, h, tracklet.roi, self.aspect_ratio, self.crop_expansion)
-        cropped_image: np.ndarray = self.get_cropped_image(image, roi, self.output_width, self.output_height)
-        return cropped_image, roi
+        roi: Rect = bbox.to_rect()
+
+        return self.get_cropped_image(image, roi, self.output_width, self.output_height)
 
     @staticmethod
     def get_crop_rect(image_width: int, image_height: int, roi: Rect, aspect_ratio: float, expansion: float = 0.0) -> Rect:

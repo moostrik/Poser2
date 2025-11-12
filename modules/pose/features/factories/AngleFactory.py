@@ -55,7 +55,7 @@ class AngleFactory:
             AngleFeature with computed angles and confidence scores
         """
         if points.valid_count == 0:
-            return AngleFeature.create_empty()
+            return AngleFeature.create_dummy()
 
         angle_values = np.full(len(AngleLandmark), np.nan, dtype=np.float32)
         angle_scores = np.zeros(len(AngleLandmark), dtype=np.float32)

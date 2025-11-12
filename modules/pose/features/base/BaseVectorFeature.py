@@ -247,7 +247,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
     _empty_instance: Optional[Self] = None  # Class-level cache for the empty instance
 
     @classmethod
-    def create_empty(cls) -> Self:
+    def create_dummy(cls) -> Self:
         """Create an empty instance with all NaN values and zero scores."""
 
         if cls._empty_instance is None:

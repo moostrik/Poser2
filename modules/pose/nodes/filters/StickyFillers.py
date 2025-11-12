@@ -146,7 +146,7 @@ class AngleStickyFiller(StickyFillerBase):
         return replace(pose, angles=new_data)
 
     def _create_empty_feature_data(self) -> PoseFeatureData:
-        return AngleFeature.create_empty()
+        return AngleFeature.create_dummy()
 
 
 class PointStickyFiller(StickyFillerBase):
@@ -163,7 +163,7 @@ class PointStickyFiller(StickyFillerBase):
         return replace(pose, points=new_data)
 
     def _create_empty_feature_data(self) -> PoseFeatureData:
-        return Point2DFeature.create_empty()
+        return Point2DFeature.create_dummy()
 
 
 class DeltaStickyFiller(StickyFillerBase):
@@ -179,7 +179,7 @@ class DeltaStickyFiller(StickyFillerBase):
         return replace(pose, deltas=new_data)
 
     def _create_empty_feature_data(self) -> PoseFeatureData:
-        return AngleFeature.create_empty()
+        return AngleFeature.create_dummy()
 
 
 class PoseStickyFiller(FilterNode):

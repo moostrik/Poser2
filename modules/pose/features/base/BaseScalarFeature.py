@@ -250,7 +250,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
     _empty_instance: Optional[Self] = None  # Class-level cache for the empty instance
 
     @classmethod
-    def create_empty(cls) -> Self:
+    def create_dummy(cls) -> Self:
         """Create empty feature with all NaN values and zero scores.
 
         Uses a class-level cache to ensure the empty instance is created only once per class.

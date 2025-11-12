@@ -23,7 +23,7 @@ class DeltaExtractor(FilterNode):
     def process(self, pose: Pose) -> Pose:
         # Compute deltas (or empty if no previous pose)
         if self._prev_pose is None:
-            deltas: AngleFeature = AngleFeature.create_empty()
+            deltas: AngleFeature = AngleFeature.create_dummy()
         else:
             deltas = pose.angles.subtract(self._prev_pose.angles)
 

@@ -9,7 +9,7 @@ import numpy as np
 
 # Pose imports
 from modules.pose.detection.Detection import Detection, DetectionInput, DetectionOutput, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
-from modules.pose.detection.ImageProcessor import ImageProcessor
+from modules.pose.nodes.processor.algorithms.ImageProcessor import ImageProcessor
 from modules.pose.features import AngleFactory, BBoxFeature, Point2DFeature
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 

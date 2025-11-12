@@ -1,7 +1,7 @@
 """Pose filter modules for processing and enriching pose data."""
 
 # from ..Nodes import                         FilterNode
-from .Nodes import                              NodeConfigBase, NodeBase, GeneratorNode, FilterNode, InterpolatorNode, BatchExtractorNode
+from .Nodes import                              NodeConfigBase, NodeBase, GeneratorNode, FilterNode, InterpolatorNode
 from .CallbackFilter import                     CallbackFilter
 from .FilterPipeline import                     FilterPipeline
 

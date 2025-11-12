@@ -329,7 +329,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
     # ========== OVERWRITTEN FACTORY METHOD ==========
 
     @classmethod
-    def create_empty(cls, pair_id: tuple[int, int]) -> 'SimilarityFeature':
+    def create_dummy(cls, pair_id: tuple[int, int]) -> 'SimilarityFeature':
         """Create empty SimilarityFeature with all NaN values and zero scores.
 
         Args:

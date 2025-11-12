@@ -28,7 +28,7 @@ class CallbackFilter(PoseCallbackMixin):
     def add_pose(self, pose: Pose) -> None:
         """Process a pose and notify all registered callbacks."""
         processed_pose: Pose = self._filter.process(pose)
-        self._notify_callbacks(processed_pose)
+        self._notify_pose_callbacks(processed_pose)
 
         if pose.lost:
             self.reset()

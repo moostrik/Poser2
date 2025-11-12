@@ -54,6 +54,7 @@ class PoseFromTracklet(GeneratorNode[Tracklet]):
 
         return Pose(
             track_id=self._tracklet.id,
+            cam_id=self._tracklet.cam_id,
             tracklet=self._tracklet,
             bbox=bounding_box,
             time_stamp=time_stamp,

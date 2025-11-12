@@ -253,7 +253,7 @@ class BBoxFeature(BaseScalarFeature[BBoxElement]):
         return cls(values, scores)
 
     @classmethod
-    def create_empty(cls) -> 'BBoxFeature':
+    def create_dummy(cls) -> 'BBoxFeature':
         """Create empty feature with all NaN values and zero scores."""
         values = np.full(len(cls.feature_enum()), np.nan, dtype=np.float32)
         scores = np.zeros(len(cls.feature_enum()), dtype=np.float32)

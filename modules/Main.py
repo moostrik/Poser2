@@ -19,7 +19,7 @@ from modules.pose.detection.DetectionPipeline import DetectionPipeline
 
 from modules.pose import nodes
 from modules.pose.nodes import ChaseInterpolatorConfig, InterpolatorGui
-from modules.pose.batch import FilterPipelineTracker
+from modules.pose.trackers import FilterTracker
 
 from modules.pose.similarity.SimilarityComputer import SimilarityComputer
 
@@ -73,7 +73,7 @@ class Main():
         # POSE
         self.pose_detection = DetectionPipeline(settings)
 
-        self.pose_raw_pipeline = FilterPipelineTracker(
+        self.pose_raw_pipeline = FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.PoseConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose_conf_threshold)),
@@ -89,7 +89,7 @@ class Main():
         self.angle_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
         self.delta_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
 
-        self.pose_smooth_pipeline = FilterPipelineTracker(
+        self.pose_smooth_pipeline = FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.PointSmoother(self.point_smooth_config),
@@ -103,7 +103,7 @@ class Main():
 
         self.prediction_config = nodes.PredictorConfig(frequency=settings.camera_fps)
         self.prediction_gui: nodes.PredictionGui = nodes.PredictionGui(self.prediction_config, self.gui, 'Predictor')
-        self.pose_prediction_pipeline = FilterPipelineTracker(
+        self.pose_prediction_pipeline = FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.PointPredictor(self.prediction_config),
@@ -158,11 +158,11 @@ class Main():
         self.pose_streamer.start()
 
         self.pose_detection.add_callback(self.pose_raw_pipeline.add_poses)
-        self.pose_raw_pipeline.add_callback(self.capture_data_hub.set_raw_poses)
-        self.pose_raw_pipeline.add_callback(self.pose_smooth_pipeline.add_poses)
-        self.pose_smooth_pipeline.add_callback(self.capture_data_hub.set_smooth_poses)
-        self.pose_smooth_pipeline.add_callback(self.pose_prediction_pipeline.add_poses)
-        self.pose_prediction_pipeline.add_callback(self.render_data_hub.add_poses)
+        self.pose_raw_pipeline.add_pose_dict_callback(self.capture_data_hub.set_raw_poses)
+        self.pose_raw_pipeline.add_pose_dict_callback(self.pose_smooth_pipeline.add_poses)
+        self.pose_smooth_pipeline.add_pose_dict_callback(self.capture_data_hub.set_smooth_poses)
+        self.pose_smooth_pipeline.add_pose_dict_callback(self.pose_prediction_pipeline.add_poses)
+        self.pose_prediction_pipeline.add_pose_dict_callback(self.render_data_hub.add_poses)
 
         # DETECTION
         self.pose_detection.add_callback(self.render_data_hub_old.add_poses)

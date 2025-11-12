@@ -24,32 +24,32 @@ class Pose:
 
     tracklet: Tracklet                              # Deprecated, but kept for backward compatibility
     crop_image: np.ndarray =    field(init=False)   # Deprecated Cropped image corresponding to bounding_box (with padding)
+    lost: bool =                field(default=False) # Depricated, this is a tracking state, not a pose property
 
     time_stamp: float =         field(default_factory=time.time)
-    lost: bool =                field(default=False)
-
-    bbox: BBoxFeature =         field(default_factory=BBoxFeature.create_empty)
-    points: Point2DFeature =    field(default_factory=Point2DFeature.create_empty)
-    angles: AngleFeature =      field(default_factory=AngleFeature.create_empty)
-    deltas: AngleFeature =      field(default_factory=AngleFeature.create_empty)
-    symmetry: SymmetryFeature = field(default_factory=SymmetryFeature.create_empty)
+    bbox: BBoxFeature =         field(default_factory=BBoxFeature.create_dummy)
+    points: Point2DFeature =    field(default_factory=Point2DFeature.create_dummy)
+    angles: AngleFeature =      field(default_factory=AngleFeature.create_dummy)
+    deltas: AngleFeature =      field(default_factory=AngleFeature.create_dummy)
+    symmetry: SymmetryFeature = field(default_factory=SymmetryFeature.create_dummy)
     motion_time: float =        field(default=0.0)
 
     def __repr__(self) -> str:
         return (f"Pose(id={self.tracklet.id}, points={self.points.valid_count if self.points else 0}, age={self.age:.2f}s)")
 
+
+
     @property
-    def age(self) -> float:
-        """Time in seconds since pose was captured"""
+    def age(self) -> float: # this also makes no sense
         return time.time() - self.time_stamp
 
     # LAZY FEATURES
     @cached_property
-    def measurement_data(self) -> PoseMeasurementData:
+    def measurement_data(self) -> PoseMeasurementData:# deprecated
         return PoseMeasurementFactory.compute(self.points, self.bbox.to_rect())
 
     @cached_property
-    def camera_points(self) -> Point2DFeature:
+    def camera_points(self) -> Point2DFeature: # DEPRECATED
         pose_joints: np.ndarray = self.points.values
         rect: Rect = self.bbox.to_rect()
 

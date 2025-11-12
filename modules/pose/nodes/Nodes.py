@@ -31,6 +31,10 @@ class NodeConfigBase:
             listener()
 
 
+TInput = TypeVar('TInput')
+TOutput = TypeVar('TOutput')
+
+
 class NodeBase(ABC):
     """Abstract base class for pose processing nodes."""
 
@@ -45,6 +49,33 @@ class FilterNode(NodeBase):
 
     def reset(self) -> None:
         """Optional reset the node's internal state."""
+        pass
+
+
+class GeneratorNode(NodeBase, Generic[TInput]):
+    """Base class for nodes that generate Pose objects from external data sources.
+
+    Converts non-pose data (tracklets, images, templates, etc.) into Pose objects
+    using a two-step pattern: set input data, then generate pose.
+    """
+
+    @abstractmethod
+    def set(self, input_data: TInput) -> None:
+        """Set the input data for pose generation."""
+        pass
+
+    @abstractmethod
+    def generate(self, time_stamp: float | None = None) -> Pose:
+        """Generate a new pose."""
+        pass
+
+    @abstractmethod
+    def is_ready(self) -> bool:
+        """Check if the generator is ready to produce a pose."""
+        pass
+
+    def reset(self) -> None:
+        """Optional reset the generator's internal state."""
         pass
 
 
@@ -66,26 +97,28 @@ class InterpolatorNode(NodeBase):
         pass
 
 
-TInput = TypeVar('TInput')
+class ProcessorNode(NodeBase, Generic[TInput, TOutput]):
+    """Base class for processor nodes that extract derived data from poses using stored context.
 
-class GeneratorNode(NodeBase, Generic[TInput]):
-    """Base class for generator nodes that create poses."""
+    Stores data of TInput (i.e. images) via set(), then processes poses to produce
+    derived outputs (i.e. cropped images) of type TOutput.
+    """
 
     @abstractmethod
     def set(self, input_data: TInput) -> None:
-        """Set the input data for pose generation."""
+        """Set the context data for processing."""
         pass
 
     @abstractmethod
-    def generate(self, time_stamp: float | None = None) -> Pose:
-        """Generate a new pose."""
+    def process(self, pose: Pose) -> TOutput:
+        """Process pose using stored context to produce derived output."""
         pass
 
     @abstractmethod
     def is_ready(self) -> bool:
-        """Check if the generator is ready to produce a pose."""
+        """Check if the processor has context data and is ready."""
         pass
 
     def reset(self) -> None:
-        """Optional reset the generator's internal state."""
+        """Optional reset the processor's internal state."""
         pass

@@ -46,12 +46,12 @@ class PoseAngleTracker(PoseTrackerBase):
             self._cumulative_motions[joint] = 0.0
 
 
-        self._angles: AngleFeature = AngleFeature.create_empty()
-        self._velocity_data: AngleFeature = AngleFeature.create_empty()
-        self._acceleration_data: AngleFeature = AngleFeature.create_empty()
-        self._motion_data: AngleFeature = AngleFeature.create_empty()
-        self._cumulative_motion_data: AngleFeature = AngleFeature.create_empty()
-        self._symmetry_data: SymmetryFeature = SymmetryFeature.create_empty()
+        self._angles: AngleFeature = AngleFeature.create_dummy()
+        self._velocity_data: AngleFeature = AngleFeature.create_dummy()
+        self._acceleration_data: AngleFeature = AngleFeature.create_dummy()
+        self._motion_data: AngleFeature = AngleFeature.create_dummy()
+        self._cumulative_motion_data: AngleFeature = AngleFeature.create_dummy()
+        self._symmetry_data: SymmetryFeature = SymmetryFeature.create_dummy()
 
         self._angles_dirty = False
         self._velocities_dirty = False
@@ -122,12 +122,12 @@ class PoseAngleTracker(PoseTrackerBase):
         self._total_motion = 0.0
         self._cumulative_total_motion = 0.0
 
-        self._angles = AngleFeature.create_empty()
-        self._velocity_data = AngleFeature.create_empty()
-        self._acceleration_data = AngleFeature.create_empty()
-        self._motion_data = AngleFeature.create_empty()
-        self._cumulative_motion_data = AngleFeature.create_empty()
-        self._symmetry_data = SymmetryFeature.create_empty()
+        self._angles = AngleFeature.create_dummy()
+        self._velocity_data = AngleFeature.create_dummy()
+        self._acceleration_data = AngleFeature.create_dummy()
+        self._motion_data = AngleFeature.create_dummy()
+        self._cumulative_motion_data = AngleFeature.create_dummy()
+        self._symmetry_data = SymmetryFeature.create_dummy()
 
         self._angles_dirty = False
         self._velocities_dirty = False
