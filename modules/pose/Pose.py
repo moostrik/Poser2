@@ -2,7 +2,7 @@
 from dataclasses import dataclass, field
 from functools import cached_property
 import time
-from typing import Callable
+from typing import Callable, Any
 
 # Third-party imports
 import numpy as np
@@ -62,6 +62,6 @@ class Pose:
         return Point2DFeature(values=camera_values, scores=self.points.scores)
 
 
-PoseCallback = Callable[[Pose], None]
+PoseCallback = Callable[[Pose], Any]
 PoseDict = dict[int, Pose]
-PoseDictCallback = Callable[[PoseDict], None]
+PoseDictCallback = Callable[[PoseDict], Any]

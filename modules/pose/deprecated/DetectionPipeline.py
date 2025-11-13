@@ -8,8 +8,8 @@ import traceback
 import numpy as np
 
 # Pose imports
-from modules.pose.detection.Detection import Detection, DetectionInput, DetectionOutput, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
-from modules.pose.nodes.processor.algorithms.ImageProcessor import ImageProcessor
+from modules.pose.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
+from modules.pose.nodes.processors.algorithms.ImageProcessor import ImageProcessor
 from modules.pose.features import AngleFactory, BBoxFeature, Point2DFeature
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 
@@ -54,11 +54,11 @@ class DetectionPipeline(Thread):
         self.verbose: bool = settings.pose_verbose
 
         # Components
-        self.pose_detector: Detection | None = None
+        self.pose_detector: MMDetection | None = None
         self.image_processor: ImageProcessor = ImageProcessor(self.pose_crop_expansion, self.pose_detector_frame_width, self.pose_detector_frame_height)
 
         if self.pose_active:
-            self.pose_detector = Detection(
+            self.pose_detector = MMDetection(
                 settings.path_model,
                 settings.pose_model_type,
                 settings.pose_model_warmups,

@@ -1,6 +1,6 @@
 from modules.pose.Pose import Pose
 from modules.pose.nodes.Nodes import ProcessorNode, NodeConfigBase
-from modules.pose.nodes.processor.algorithms.ImageProcessor import ImageProcessor
+from modules.pose.nodes.processors.algorithms.ImageProcessor import ImageProcessor
 import numpy as np
 
 class ImageCropProcessorConfig(NodeConfigBase):
@@ -35,9 +35,6 @@ class ImageCropProcessor(ProcessorNode[np.ndarray, np.ndarray]):
             raise RuntimeError("ImageCropProcessor.process called before image was set.")
 
         result = self._image_processor.process_pose_image(pose.bbox, self._image)
-
-        if pose.lost:
-            self.reset()
 
         return result
 

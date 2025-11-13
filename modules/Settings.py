@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 
 from modules.cam.depthcam.Definitions import FrameType, get_device_list
-from modules.pose.detection.Detection import ModelType
+from modules.pose.detection.MMDetection import ModelType
 from modules.tracker.TrackerBase import TrackerType
 
 class Settings():

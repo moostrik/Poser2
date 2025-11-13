@@ -51,7 +51,7 @@ class ProcessorTracker(TrackerBase, Generic[TInput, TOutput]):
                 print_exc()
 
         self._notify_output_callbacks(output_data_dict)
-        self._notify_pose_dict_callbacks(poses)
+        self._notify_poses_callbacks(poses)
 
         return output_data_dict
 

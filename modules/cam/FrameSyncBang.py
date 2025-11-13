@@ -1,5 +1,5 @@
 from threading import Lock
-from typing import Callable
+from typing import Callable, Any
 import numpy as np
 import time
 from collections import deque
@@ -139,7 +139,7 @@ class FrameSyncBang:
             cameras.add(cam_id)
         return cameras
 
-    def add_callback(self, callback: Callable[[], None]) -> None:
+    def add_callback(self, callback: Callable[[], Any]) -> None:
         with self._lock:
             self._callbacks.add(callback)
 

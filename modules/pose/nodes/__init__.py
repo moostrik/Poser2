@@ -10,11 +10,14 @@ from .extractors.DeltaExtractor import          DeltaExtractor
 from .extractors.SymmetryExtractor import       SymmetryExtractor
 from .extractors.MotionTimeAccumulator import   MotionTimeAccumulator
 
+from .processors.ImageCropProcessor import      ImageCropProcessor, ImageCropProcessorConfig
+
 from .filters.Validators import                 ValidatorConfig, NanValidator, RangeValidator, ScoreValidator, PoseValidator
+
 
 from .filters.ConfidenceFilters import          ConfidenceFilterConfig, AngleConfidenceFilter, DeltaConfidenceFilter, PointConfidenceFilter, PoseConfidenceFilter
 from .filters.Predictors import                 PredictorConfig, AnglePredictor, DeltaPredictor, PointPredictor, PosePredictor
-from .filters.Smoothers import                  SmootherConfig, AngleSmoother, DeltaSmoother, PointSmoother, PoseSmoother
+from .filters.Smoothers import                  SmootherConfig, AngleSmoother, BboxSmoother, DeltaSmoother, Point2DSmoother, SymmetrySmoother, PoseSmoother
 from .filters.StickyFillers import              StickyFillerConfig, AngleStickyFiller, DeltaStickyFiller, PointStickyFiller, PoseStickyFiller
 
 from .filters.gui.SmootherGui import            SmootherGui

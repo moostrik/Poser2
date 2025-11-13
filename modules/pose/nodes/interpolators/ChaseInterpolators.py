@@ -26,7 +26,7 @@ import numpy as np
 from modules.pose.nodes.Nodes import InterpolatorNode, NodeConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.nodes.interpolators.algorithms.VectorChase import Chase, VectorChase, AngleChase, PointChase
-from modules.pose.features import PoseFeatureData, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
+from modules.pose.features import PoseFeature, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
 
 
 class ChaseInterpolatorConfig(NodeConfigBase):
@@ -75,17 +75,17 @@ class ChaseInterpolatorBase(InterpolatorNode):
         pass
 
     @abstractmethod
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         """Extract the feature data to interpolate from the pose."""
         pass
 
     @abstractmethod
-    def _create_interpolated_data(self, original_data: PoseFeatureData, interpolated_values: np.ndarray) -> PoseFeatureData:
+    def _create_interpolated_data(self, original_data: PoseFeature, interpolated_values: np.ndarray) -> PoseFeature:
         """Create new feature data with interpolated values."""
         pass
 
     @abstractmethod
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         """Create new pose with replaced feature data."""
         pass
 
@@ -146,10 +146,10 @@ class AngleChaseInterpolator(ChaseInterpolatorBase):
             friction=self._config.friction
         )
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.angles
 
-    def _create_interpolated_data(self, original_data: PoseFeatureData, interpolated_values: np.ndarray) -> PoseFeatureData:
+    def _create_interpolated_data(self, original_data: PoseFeature, interpolated_values: np.ndarray) -> PoseFeature:
         """Create angle data with interpolated values and adjusted scores.
 
         Sets scores to 0 where interpolations are NaN, preserves original scores otherwise.
@@ -158,7 +158,7 @@ class AngleChaseInterpolator(ChaseInterpolatorBase):
         interpolated_scores: np.ndarray = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
         return type(original_data)(values=interpolated_values, scores=interpolated_scores)
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, angles=new_data)
 
 
@@ -177,10 +177,10 @@ class PointChaseInterpolator(ChaseInterpolatorBase):
             clamp_range=POINT2D_COORD_RANGE
         )
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.points
 
-    def _create_interpolated_data(self, original_data: PoseFeatureData, interpolated_values: np.ndarray) -> PoseFeatureData:
+    def _create_interpolated_data(self, original_data: PoseFeature, interpolated_values: np.ndarray) -> PoseFeature:
         """Create point data with interpolated values and adjusted scores.
 
         Checks if ANY coordinate (x or y) is NaN per joint.
@@ -190,7 +190,7 @@ class PointChaseInterpolator(ChaseInterpolatorBase):
         interpolated_scores: np.ndarray = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
         return type(original_data)(values=interpolated_values, scores=interpolated_scores)
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, points=new_data)
 
 
@@ -208,10 +208,10 @@ class DeltaChaseInterpolator(ChaseInterpolatorBase):
             friction=self._config.friction
         )
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.deltas
 
-    def _create_interpolated_data(self, original_data: PoseFeatureData, interpolated_values: np.ndarray) -> PoseFeatureData:
+    def _create_interpolated_data(self, original_data: PoseFeature, interpolated_values: np.ndarray) -> PoseFeature:
         """Create delta data with interpolated values and adjusted scores.
 
         Sets scores to 0 where interpolations are NaN, preserves original scores otherwise.
@@ -220,7 +220,7 @@ class DeltaChaseInterpolator(ChaseInterpolatorBase):
         interpolated_scores: np.ndarray = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
         return type(original_data)(values=interpolated_values, scores=interpolated_scores)
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, deltas=new_data)
 
 

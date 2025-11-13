@@ -7,7 +7,7 @@ import numpy as np
 
 from modules.pose.Pose import Pose
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
-from modules.pose.features import POSE_FEATURE_RANGES, POSE_CLASS_TO_FEATURE_TYPE, PoseFeatureData
+from modules.pose.features import POSE_FEATURE_RANGES, POSE_CLASS_TO_FEATURE_TYPE, PoseFeature
 
 
 class ValidatorConfig(NodeConfigBase):
@@ -70,7 +70,7 @@ class ValidatorBase(FilterNode):
         return pose
 
     @abstractmethod
-    def _validate_feature_data(self, pose_id: int, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
+    def _validate_feature_data(self, pose_id: int, data: PoseFeature, feature_name: str) -> PoseFeature:
         """Validate a single feature's data.
 
         Args:
@@ -91,7 +91,7 @@ class NanValidator(ValidatorBase):
     Optionally fixes inconsistencies by setting scores to 0 when values are NaN.
     """
 
-    def _validate_feature_data(self, pose_id: int, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
+    def _validate_feature_data(self, pose_id: int, data: PoseFeature, feature_name: str) -> PoseFeature:
         """Validate that scores are 0 when values are NaN."""
         values: np.ndarray = data.values
 
@@ -130,7 +130,7 @@ class RangeValidator(ValidatorBase):
     Optionally fixes out-of-range values by clamping them to the valid range.
     """
 
-    def _validate_feature_data(self, pose_id: int, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
+    def _validate_feature_data(self, pose_id: int, data: PoseFeature, feature_name: str) -> PoseFeature:
         """Validate feature values are within expected range."""
         # Get feature type from data's class type using reverse lookup
         data_type = type(data)
@@ -182,7 +182,7 @@ class RangeValidator(ValidatorBase):
 class ScoreValidator(ValidatorBase):
     """Validates that confidence scores are in [0.0, 1.0]."""
 
-    def _validate_feature_data(self, pose_id: int, data: PoseFeatureData, feature_name: str) -> PoseFeatureData:
+    def _validate_feature_data(self, pose_id: int, data: PoseFeature, feature_name: str) -> PoseFeature:
         if not hasattr(data, 'scores'):
             return data
 

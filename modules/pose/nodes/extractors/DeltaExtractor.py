@@ -36,10 +36,6 @@ class DeltaExtractor(FilterNode):
             deltas=deltas
         )
 
-        # Cleanup if pose is lost
-        if pose.lost:
-            self._prev_pose = None
-
         return enriched_pose
 
     def reset(self) -> None:

@@ -68,7 +68,7 @@ class PresenceMonitor(PoseDictCallbackMixin):
         self._previous_poses = poses.copy()
 
         # Emit to callbacks
-        self._notify_pose_dict_callbacks(poses)
+        self._notify_poses_callbacks(poses)
 
     def reset(self) -> None:
         """Reset all tracked poses."""

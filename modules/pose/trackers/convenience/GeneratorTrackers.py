@@ -2,6 +2,8 @@ from modules.pose.nodes.generators.PoseFromTracklet import PoseFromTracklet
 from modules.pose.Pose import PoseDict
 from ..GeneratorTracker import GeneratorTracker
 
+from modules.tracker.Tracklet import Tracklet
+
 class PoseFromTrackletGenerator(GeneratorTracker):
     """Convenience tracker for generating poses from tracklets."""
 
@@ -10,3 +12,7 @@ class PoseFromTrackletGenerator(GeneratorTracker):
             num_tracks=num_tracks,
             generator_factory=lambda: PoseFromTracklet()
         )
+
+    def set_tracklets(self, tracklet_dict: dict[int, Tracklet]) -> None:
+        """Set tracklets for pose generation."""
+        self.set(tracklet_dict)

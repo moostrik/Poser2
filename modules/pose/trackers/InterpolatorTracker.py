@@ -54,7 +54,7 @@ class InterpolatorTracker(TrackerBase):
 
         # Emit callbacks with interpolated poses
         if interpolated_poses:
-            self._notify_pose_dict_callbacks(interpolated_poses)
+            self._notify_poses_callbacks(interpolated_poses)
 
         return interpolated_poses
 

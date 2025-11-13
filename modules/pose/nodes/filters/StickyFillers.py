@@ -14,7 +14,7 @@ import numpy as np
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.features import PoseFeatureData, AngleFeature, Point2DFeature
+from modules.pose.features import PoseFeature, AngleFeature, Point2DFeature
 
 
 class StickyFillerConfig(NodeConfigBase):
@@ -47,7 +47,7 @@ class StickyFillerBase(FilterNode):
 
     def __init__(self, config: StickyFillerConfig) -> None:
         self._config: StickyFillerConfig = config
-        self._last_valid: PoseFeatureData = self._initialize_last_valid()
+        self._last_valid: PoseFeature = self._initialize_last_valid()
 
     @property
     def config(self) -> StickyFillerConfig:
@@ -55,21 +55,21 @@ class StickyFillerBase(FilterNode):
         return self._config
 
     @abstractmethod
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         """Extract the feature data to process from the pose."""
         pass
 
     @abstractmethod
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         """Create new pose with replaced feature data."""
         pass
 
     @abstractmethod
-    def _create_empty_feature_data(self) -> PoseFeatureData:
+    def _create_empty_feature_data(self) -> PoseFeature:
         """Create empty feature data for initialization."""
         pass
 
-    def _initialize_last_valid(self) -> PoseFeatureData:
+    def _initialize_last_valid(self) -> PoseFeature:
         """Initialize last_valid based on config."""
 
         if self._config.init_to_zero:
@@ -139,13 +139,13 @@ class AngleStickyFiller(StickyFillerBase):
     Maintains continuity of joint angles when pose detection temporarily fails.
     """
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.angles
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, angles=new_data)
 
-    def _create_empty_feature_data(self) -> PoseFeatureData:
+    def _create_empty_feature_data(self) -> PoseFeature:
         return AngleFeature.create_dummy()
 
 
@@ -156,13 +156,13 @@ class PointStickyFiller(StickyFillerBase):
     Handles 2D coordinates (x, y) per joint independently.
     """
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.points
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, points=new_data)
 
-    def _create_empty_feature_data(self) -> PoseFeatureData:
+    def _create_empty_feature_data(self) -> PoseFeature:
         return Point2DFeature.create_dummy()
 
 
@@ -172,13 +172,13 @@ class DeltaStickyFiller(StickyFillerBase):
     Maintains continuity of angle changes when pose detection temporarily fails.
     """
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.deltas
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, deltas=new_data)
 
-    def _create_empty_feature_data(self) -> PoseFeatureData:
+    def _create_empty_feature_data(self) -> PoseFeature:
         return AngleFeature.create_dummy()
 
 

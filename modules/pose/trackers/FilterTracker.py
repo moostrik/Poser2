@@ -53,7 +53,7 @@ class FilterTracker(TrackerBase):
                 print_exc()
                 filtered_poses[id] = pose
 
-        self._notify_pose_dict_callbacks(filtered_poses)
+        self._notify_poses_callbacks(filtered_poses)
 
         return filtered_poses
 

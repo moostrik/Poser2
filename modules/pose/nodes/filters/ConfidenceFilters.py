@@ -13,7 +13,7 @@ import numpy as np
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.features import PoseFeatureData
+from modules.pose.features import PoseFeature
 
 
 class ConfidenceFilterConfig(NodeConfigBase):
@@ -54,12 +54,12 @@ class ConfidenceFilterBase(FilterNode):
         return self._config
 
     @abstractmethod
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         """Extract the feature data to process from the pose."""
         pass
 
     @abstractmethod
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         """Create new pose with replaced feature data."""
         pass
 
@@ -114,10 +114,10 @@ class AngleConfidenceFilter(ConfidenceFilterBase):
     Sets low-confidence angles to NaN and rescales remaining scores.
     """
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.angles
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, angles=new_data)
 
 
@@ -128,10 +128,10 @@ class PointConfidenceFilter(ConfidenceFilterBase):
     Handles 2D coordinates (x, y) per joint.
     """
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.points
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, points=new_data)
 
 
@@ -141,10 +141,10 @@ class DeltaConfidenceFilter(ConfidenceFilterBase):
     Sets low-confidence deltas to NaN and rescales remaining scores.
     """
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.deltas
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, deltas=new_data)
 
 

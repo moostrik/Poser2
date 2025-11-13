@@ -30,9 +30,6 @@ class CallbackFilter(PoseCallbackMixin):
         processed_pose: Pose = self._filter.process(pose)
         self._notify_pose_callbacks(processed_pose)
 
-        if pose.lost:
-            self.reset()
-
     def reset(self) -> None:
         """Reset the filter's internal state."""
         self._filter.reset()

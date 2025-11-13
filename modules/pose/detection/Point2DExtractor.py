@@ -2,7 +2,7 @@ from dataclasses import replace
 from threading import Lock
 
 from modules.pose.Pose import PoseDict
-from modules.pose.detection.Detection import Detection, DetectionInput, DetectionOutput
+from modules.pose.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput
 from modules.pose.features import Point2DFeature
 from modules.pose.callback.mixins import PoseDictCallbackMixin
 import numpy as np
@@ -19,7 +19,7 @@ class Point2DExtractor(PoseDictCallbackMixin):
     for real-time visualization where recent data is more valuable than old data.
     """
 
-    def __init__(self, detection: Detection):
+    def __init__(self, detection: MMDetection):
         super().__init__()
         self._detection = detection
         self._lock = Lock()
@@ -28,7 +28,16 @@ class Point2DExtractor(PoseDictCallbackMixin):
 
         self._detection.register_callback(self._on_detection_result)
 
-    def process(self, poses: PoseDict, images: dict[int, np.ndarray]) -> None:
+    def set_images(self, images: dict[int, np.ndarray]) -> None:
+        """Set images for processing.
+
+        Args:
+            images: Dictionary of pre-cropped/resized images (256x192) keyed by tracklet ID
+        """
+        with self._lock:
+            self._images = images
+
+    def process(self, poses: PoseDict) -> None:
         """Submit poses for async processing. Results broadcast via callbacks.
 
         Args:
@@ -42,9 +51,9 @@ class Point2DExtractor(PoseDictCallbackMixin):
         image_list: list[np.ndarray] = []
 
         for tracklet_id in poses.keys():
-            if tracklet_id in images:
+            if tracklet_id in self._images:
                 tracklet_ids.append(tracklet_id)
-                image_list.append(images[tracklet_id])
+                image_list.append(self._images[tracklet_id])
 
         if not image_list:
             return
@@ -81,7 +90,7 @@ class Point2DExtractor(PoseDictCallbackMixin):
                     )
                     result_poses[tracklet_id] = replace(original_poses[tracklet_id], points=point_feature)
 
-            self._notify_pose_dict_callbacks(result_poses)
+            self._notify_poses_callbacks(result_poses)
 
     def reset(self) -> None:
         """Clear all pending and buffered data."""

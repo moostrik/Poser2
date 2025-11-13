@@ -4,8 +4,7 @@ from threading import Lock
 from typing import Callable, Generic, TypeVar, Set
 from traceback import print_exc
 
-from modules.pose.Pose import Pose, PoseDict
-from modules.pose.callback.types import PoseCallback, PoseDictCallback
+from modules.pose.Pose import Pose, PoseDict, PoseCallback, PoseDictCallback
 
 T = TypeVar('T')
 Callback = Callable[[T], None]
@@ -119,7 +118,7 @@ class PoseDictCallbackMixin:
         self._output_callbacks: set[PoseDictCallback] = set()
         self._callback_lock = Lock()
 
-    def _notify_pose_dict_callbacks(self, poses: PoseDict) -> None:
+    def _notify_poses_callbacks(self, poses: PoseDict) -> None:
         """Emit callbacks with poses.
 
         Broadcasts poses to all registered callbacks in a thread-safe manner.
@@ -137,7 +136,7 @@ class PoseDictCallbackMixin:
                     print(f"{self.__class__.__name__}: Error in callback: {e}")
                     print_exc()
 
-    def add_pose_dict_callback(self, callback: PoseDictCallback) -> None:
+    def add_poses_callback(self, callback: PoseDictCallback) -> None:
         """Register output callback.
 
         Args:
@@ -146,7 +145,7 @@ class PoseDictCallbackMixin:
         with self._callback_lock:
             self._output_callbacks.add(callback)
 
-    def remove_pose_dict_callback(self, callback: PoseDictCallback) -> None:
+    def remove_poses_callback(self, callback: PoseDictCallback) -> None:
         """Unregister output callback.
 
         Args:

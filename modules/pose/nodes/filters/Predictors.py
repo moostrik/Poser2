@@ -14,7 +14,7 @@ import numpy as np
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
 from modules.pose.nodes.filters.algorithms.VectorPredict import Predict, AnglePredict, PointPredict, PredictionMethod
-from modules.pose.features import PoseFeatureData, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
+from modules.pose.features import PoseFeature, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
 
 
 class PredictorConfig(NodeConfigBase):
@@ -57,17 +57,17 @@ class PredictorBase(FilterNode):
         pass
 
     @abstractmethod
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         """Extract the feature data to predict from the pose."""
         pass
 
     @abstractmethod
-    def _create_predicted_data(self, original_data: PoseFeatureData, predicted_values: np.ndarray) -> PoseFeatureData:
+    def _create_predicted_data(self, original_data: PoseFeature, predicted_values: np.ndarray) -> PoseFeature:
         """Create new feature data with predicted values."""
         pass
 
     @abstractmethod
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         """Create new pose with replaced feature data."""
         pass
 
@@ -106,10 +106,10 @@ class AnglePredictor(PredictorBase):
     def _initialize_predictor(self) -> None:
         self._predictor = AnglePredict(vector_size=ANGLE_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method)
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.angles
 
-    def _create_predicted_data(self, original_data: PoseFeatureData, predicted_values: np.ndarray) -> PoseFeatureData:
+    def _create_predicted_data(self, original_data: PoseFeature, predicted_values: np.ndarray) -> PoseFeature:
         """Create angle data with predicted values and adjusted scores.
 
         Sets scores to 0 where predictions are NaN, preserves original scores otherwise.
@@ -118,7 +118,7 @@ class AnglePredictor(PredictorBase):
         interpolated_scores: np.ndarray = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
         return type(original_data)(values=predicted_values, scores=interpolated_scores)
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, angles=new_data)
 
 
@@ -131,10 +131,10 @@ class PointPredictor(PredictorBase):
     def _initialize_predictor(self) -> None:
         self._predictor = PointPredict(num_points=POINT_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method, clamp_range=POINT2D_COORD_RANGE)
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.points
 
-    def _create_predicted_data(self, original_data: PoseFeatureData, predicted_values: np.ndarray) -> PoseFeatureData:
+    def _create_predicted_data(self, original_data: PoseFeature, predicted_values: np.ndarray) -> PoseFeature:
         """Create point data with predicted values and adjusted scores.
 
         Checks if ANY coordinate (x or y) is NaN per joint.
@@ -144,7 +144,7 @@ class PointPredictor(PredictorBase):
         interpolated_scores: np.ndarray = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
         return type(original_data)(values=predicted_values, scores=interpolated_scores)
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, points=new_data)
 
 
@@ -157,10 +157,10 @@ class DeltaPredictor(PredictorBase):
     def _initialize_predictor(self) -> None:
         self._predictor = AnglePredict(vector_size=ANGLE_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method)
 
-    def _get_feature_data(self, pose: Pose) -> PoseFeatureData:
+    def _get_feature_data(self, pose: Pose) -> PoseFeature:
         return pose.deltas
 
-    def _create_predicted_data(self, original_data: PoseFeatureData, predicted_values: np.ndarray) -> PoseFeatureData:
+    def _create_predicted_data(self, original_data: PoseFeature, predicted_values: np.ndarray) -> PoseFeature:
         """Create delta data with predicted values and adjusted scores.
 
         Sets scores to 0 where predictions are NaN, preserves original scores otherwise.
@@ -169,7 +169,7 @@ class DeltaPredictor(PredictorBase):
         interpolated_scores: np.ndarray = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
         return type(original_data)(values=predicted_values, scores=interpolated_scores)
 
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeatureData) -> Pose:
+    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
         return replace(pose, deltas=new_data)
 
 

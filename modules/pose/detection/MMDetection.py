@@ -65,7 +65,7 @@ class DetectionOutput:
 
 PoseDetectionOutputCallback = Callable[[DetectionOutput], None]
 
-class Detection(Thread):
+class MMDetection(Thread):
     """Asynchronous GPU pose detection using RTMPose.
 
     Uses a single-slot queue: only the most recent submitted batch waits to be processed.
@@ -231,8 +231,8 @@ class Detection(Thread):
             batch_start = time.perf_counter()
 
             with torch.cuda.stream(stream):
-                data_samples: list[list[PoseDataSample]] = Detection._infer_batch(model, pipeline, batch.images)
-                point_list, score_list = Detection._extract_pose_points(data_samples, self.model_width, self.model_height, self.confidence_threshold)
+                data_samples: list[list[PoseDataSample]] = MMDetection._infer_batch(model, pipeline, batch.images)
+                point_list, score_list = MMDetection._extract_pose_points(data_samples, self.model_width, self.model_height, self.confidence_threshold)
                 stream.synchronize()
 
             inference_time_ms: float = (time.perf_counter() - batch_start) * 1000.0
@@ -299,7 +299,7 @@ class Detection(Thread):
         for batch_size in dummy_sizes:
             # Create batch of dummy images
             dummy_imgs: list[np.ndarray] = [np.zeros((POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH, 3), dtype=np.uint8) for _ in range(batch_size)]
-            _: list[list[PoseDataSample]] = Detection._infer_batch(model, pipeline, dummy_imgs)
+            _: list[list[PoseDataSample]] = MMDetection._infer_batch(model, pipeline, dummy_imgs)
 
             # Ensure GPU operations are complete
             torch.cuda.synchronize()

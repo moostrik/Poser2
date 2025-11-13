@@ -43,7 +43,7 @@ class GeneratorTracker(TrackerBase, Generic[TInput]):
                 print_exc()
 
         if generated_poses:
-            self._notify_pose_dict_callbacks(generated_poses)
+            self._notify_poses_callbacks(generated_poses)
 
         return generated_poses
 

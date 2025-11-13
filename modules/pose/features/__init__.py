@@ -16,8 +16,13 @@ from modules.pose.features.base.BaseFeature import (
     NORMALIZED_RANGE,
 )
 
+from modules.pose.features.base.BaseScalarFeature import (
+    BaseScalarFeature,
+)
+
 from modules.pose.features.base.NormalizedScalarFeature import (
     AggregationMethod,
+    NormalizedScalarFeature,
 )
 
 from modules.pose.features.BBoxFeature import (
@@ -69,31 +74,34 @@ from modules.pose.features.factories.SymmetryFactory import (
 # Feature type enum for dynamic dispatch
 class PoseFeatureType(Enum):
     """Enum for different pose feature types."""
-    POINTS = "points"
     ANGLES = "angles"
+    BBOX = "bbox"
     DELTA = "delta"
+    POINTS = "points"
     SYMMETRY = "symmetry"
 
-
 # Type alias for any feature data
-PoseFeatureData = Union[
-    Point2DFeature,
+PoseFeature = Union[
     AngleFeature,
+    BBoxFeature,
+    Point2DFeature,
     SymmetryFeature,
 ]
 
 POSE_FEATURE_CLASSES: dict[PoseFeatureType, type] = {
-    PoseFeatureType.POINTS: Point2DFeature,
     PoseFeatureType.ANGLES: AngleFeature,
+    PoseFeatureType.BBOX: BBoxFeature,
     PoseFeatureType.DELTA: AngleFeature,
+    PoseFeatureType.POINTS: Point2DFeature,
     PoseFeatureType.SYMMETRY: SymmetryFeature,
 }
 
 POSE_FEATURE_RANGES: dict[PoseFeatureType, tuple[float, float]] = {
-    PoseFeatureType.POINTS: POINT2D_COORD_RANGE,
-    PoseFeatureType.ANGLES: ANGLE_RANGE,
-    PoseFeatureType.DELTA: ANGLE_RANGE,
-    PoseFeatureType.SYMMETRY: NORMALIZED_RANGE,
+    PoseFeatureType.ANGLES: AngleFeature.default_range(),
+    PoseFeatureType.BBOX: BBoxFeature.default_range(),
+    PoseFeatureType.DELTA: AngleFeature.default_range(),
+    PoseFeatureType.POINTS: Point2DFeature.default_range(),
+    PoseFeatureType.SYMMETRY: SymmetryFeature.default_range(),
 }
 
 POSE_FEATURE_DIMENSIONS: dict[PoseFeatureType, int] = {
@@ -104,7 +112,9 @@ POSE_FEATURE_DIMENSIONS: dict[PoseFeatureType, int] = {
 }
 
 POSE_CLASS_TO_FEATURE_TYPE: dict[type, PoseFeatureType] = {
-    Point2DFeature: PoseFeatureType.POINTS,
     AngleFeature: PoseFeatureType.ANGLES,
+    BBoxFeature: PoseFeatureType.BBOX,
+    AngleFeature: PoseFeatureType.DELTA,
+    Point2DFeature: PoseFeatureType.POINTS,
     SymmetryFeature: PoseFeatureType.SYMMETRY,
 }
