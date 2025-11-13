@@ -95,9 +95,9 @@ class Main():
         self.pose_from_tracklet =   trackers.PoseFromTrackletGenerator(num_players)
         self.bbox_smoother =        trackers.BboxSmootherTracker(num_players, nodes.SmootherConfig())
         self.image_crop_processor = trackers.ImageCropProcessorTracker(num_players, self.image_crop_config)
-        self.Point2D_extractor =    PointBatchExtractor(self.pose_detector)
+        self.point_extractor =      PointBatchExtractor(self.pose_detector)
 
-        self.pose_raw_pipeline = trackers.FilterTracker(
+        self.pose_raw_filters =     trackers.FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.PointConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose_conf_threshold)),
@@ -105,7 +105,7 @@ class Main():
             ]
         )
 
-        self.pose_smooth_pipeline = trackers.FilterTracker(
+        self.pose_smooth_filters = trackers.FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.PointSmoother(self.point_smooth_config),
@@ -117,12 +117,11 @@ class Main():
             ]
         )
 
-        self.pose_prediction_pipeline = trackers.FilterTracker(
+        self.pose_prediction_filters = trackers.FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.PointPredictor(self.prediction_config),
                 lambda: nodes.AnglePredictor(self.prediction_config),
-                lambda: nodes.DeltaPredictor(self.prediction_config),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig()),
             ]
         )
@@ -173,30 +172,30 @@ class Main():
             camera.start()
 
         if self.pd_stream_correlator:
+            self.pd_pose_streamer.add_stream_callback(self.pd_stream_correlator.set_pose_stream)
             self.pd_stream_correlator.add_correlation_callback(self.data_hub.set_motion_correlation)
             self.pd_stream_correlator.start()
-            self.pd_pose_streamer.add_stream_callback(self.pd_stream_correlator.set_pose_stream)
-
-        self.pose_correlator.add_correlation_callback(self.data_hub.set_pose_correlation)
-        self.pose_correlator.start()
 
         self.pd_pose_streamer.add_stream_callback(self.data_hub.set_pose_stream)
         self.pd_pose_streamer.start()
 
+        self.pose_correlator.add_correlation_callback(self.data_hub.set_pose_correlation)
+        self.pose_correlator.start()
+
         # POSE PROCESSING PIPELINES
         self.pose_from_tracklet.add_poses_callback(self.bbox_smoother.process)
         self.bbox_smoother.add_poses_callback(self.image_crop_processor.process)
-        self.image_crop_processor.add_image_callback(self.Point2D_extractor.set_images)
-        self.image_crop_processor.add_poses_callback(self.Point2D_extractor.process)
-        self.Point2D_extractor.add_poses_callback(self.pose_raw_pipeline.process)
-        self.pose_raw_pipeline.add_poses_callback(self.data_hub.set_raw_poses) # raw poses
+        self.image_crop_processor.add_image_callback(self.point_extractor.set_images)
+        self.image_crop_processor.add_poses_callback(self.point_extractor.process)
+        self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
+        self.pose_raw_filters.add_poses_callback(self.data_hub.set_raw_poses) # raw poses
 
-        self.pose_raw_pipeline.add_poses_callback(self.pose_smooth_pipeline.process)
-        self.pose_smooth_pipeline.add_poses_callback(self.data_hub.set_smooth_poses) # smooth poses
+        self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
+        self.pose_smooth_filters.add_poses_callback(self.data_hub.set_smooth_poses) # smooth poses
 
-        self.pose_smooth_pipeline.add_poses_callback(self.pose_prediction_pipeline.process)
-        self.pose_prediction_pipeline.add_poses_callback(self.point_interpolator.submit) # to 60 fps
-        self.pose_prediction_pipeline.add_poses_callback(self.angle_interpolator.submit) # to 60 fps
+        self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
+        self.pose_prediction_filters.add_poses_callback(self.point_interpolator.submit)
+        self.point_interpolator.add_poses_callback(self.angle_interpolator.submit)
         self.angle_interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
         self.pose_interpolation_pipeline.add_poses_callback(self.data_hub.set_interpolated_poses) # interpolated poses
 
@@ -204,13 +203,10 @@ class Main():
         self.data_hub.add_update_callback(self.point_interpolator.update)
         self.data_hub.add_update_callback(self.angle_interpolator.update)
 
-        # self.pose_prediction_pipeline.add_poses_callback(self.render_data_hub.add_poses)
-
-
-
         # DETECTION
         self.pose_detector.start()
 
+        # TRACKER
         self.tracker.add_tracklet_callback(self.pose_from_tracklet.set_tracklets)
         self.tracker.add_tracklet_callback(self.data_hub.set_tracklets)
         self.tracker.start()
