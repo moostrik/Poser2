@@ -23,9 +23,8 @@ from modules.render.meshes.PoseMesh import PoseMesh
 from modules.gl.Mesh import Mesh
 
 class CentreCamLayer(LayerBase):
-    def __init__(self, data: DataHub, smooth_data: RenderDataHub_Old, cam_id: int) -> None:
+    def __init__(self, data: DataHub, cam_id: int) -> None:
         self.data: DataHub = data
-        self.smooth_data: RenderDataHub_Old = smooth_data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.cam_id: int = cam_id
         self.cam_fbo: Fbo = Fbo()
@@ -51,16 +50,18 @@ class CentreCamLayer(LayerBase):
         key: int = self.cam_id
 
         pose: Pose | None = self.data.get_smooth_pose(key, only_new_data=True, consumer_key=self.data_consumer_key)
-        if pose is not None:
+        if pose is None:
+            return
 
-            if pose.tracklet.is_removed:
-                self.clear_render()
-                self.is_active = False
-                return
 
-            if pose.tracklet.is_being_tracked:
-                self.is_active = True
-                self.last_pose_rect = pose.bbox if pose.bbox is not None else Rect(0.0, 0.0, 1.0, 1.0)
+        if pose.tracklet.is_removed:
+            self.clear_render()
+            self.is_active = False
+            return
+
+        if pose.tracklet.is_being_tracked:
+            self.is_active = True
+            self.last_pose_rect = pose.bbox.to_rect()
 
         if not self.is_active:
             return
@@ -70,7 +71,7 @@ class CentreCamLayer(LayerBase):
             self.cam_image.set_image(cam_image_np)
             self.cam_image.update()
 
-        smooth_pose_rect: Rect | None = self.smooth_data.get_viewport(key)
+        smooth_pose_rect: Rect | None = pose.bbox.to_rect()
         if smooth_pose_rect is None:
             return
 
