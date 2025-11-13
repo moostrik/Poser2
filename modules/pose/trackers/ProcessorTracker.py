@@ -50,8 +50,6 @@ class ProcessorTracker(TrackerBase, Generic[TInput, TOutput]):
                 print(f"ProcessorTracker: Error processing pose {id}: {e}")
                 print_exc()
 
-        print(type(output_data_dict[0]))
-
         self._notify_output_callbacks(output_data_dict)
         self._notify_poses_callbacks(poses)
 
