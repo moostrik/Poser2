@@ -154,7 +154,7 @@ class Main():
             camera.add_preview_callback(self.capture_data_hub.set_cam_image)
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
-            camera.add_frame_callback(self.Point2D_extractor.set_image)
+            camera.add_frame_callback(self.image_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.capture_data_hub.set_cam_tracklets)
@@ -194,7 +194,7 @@ class Main():
         self.tracker.start()
 
         self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
-        self.frame_sync_bang.add_callback(self.pose_detection.notify_update)
+        self.frame_sync_bang.add_callback(self.pose_from_tracklet.generate)
 
         # if self.WS:
         #     self.pose_detection.add_callback(self.WS.add_poses)

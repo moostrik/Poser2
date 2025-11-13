@@ -25,6 +25,7 @@ class Point2DExtractor(PoseDictCallbackMixin):
         self._lock = Lock()
         self._batch_counter: int = 0
         self._waiting_batches: dict[int, tuple[PoseDict, list[int]]] = {}
+        self._images: dict[int, np.ndarray] = {}
 
         self._detection.register_callback(self._on_detection_result)
 

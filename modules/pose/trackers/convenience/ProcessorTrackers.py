@@ -4,7 +4,7 @@ from threading import Lock
 import numpy as np
 
 from modules.pose.nodes.processors.ImageCropProcessor import ImageCropProcessor, ImageCropProcessorConfig
-from ..ProcessorTracker import ProcessorTracker, Output_Callback
+from ..ProcessorTracker import ProcessorTracker, TOutput_Callback
 
 from modules.cam.depthcam.Definitions import FrameType
 
@@ -37,8 +37,8 @@ class ImageCropProcessorTracker(ProcessorTracker[np.ndarray, np.ndarray]):
             self._images[id] = image
         self.set(self._images)
 
-    def add_image_callback(self, callback: Output_Callback) -> None:
+    def add_image_callback(self, callback: TOutput_Callback) -> None:
         self.add_output_callback(callback)
 
-    def remove_image_callback(self, callback: Output_Callback) -> None:
+    def remove_image_callback(self, callback: TOutput_Callback) -> None:
         self.remove_output_callback(callback)

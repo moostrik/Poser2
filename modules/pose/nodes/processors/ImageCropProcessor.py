@@ -6,7 +6,7 @@ import numpy as np
 class ImageCropProcessorConfig(NodeConfigBase):
     """Configuration for pose chase interpolation with automatic change notification."""
 
-    def __init__(self, crop_expansion: float = 0.1, output_width: int = 192, output_height: int = 265) -> None:
+    def __init__(self, crop_expansion: float = 0.1, output_width: int = 192, output_height: int = 256) -> None:
         super().__init__()
         self.crop_expansion: float = crop_expansion
         self.output_width: int = output_width

@@ -13,7 +13,7 @@ TInput = TypeVar('TInput')
 TOutput = TypeVar('TOutput')
 
 TOutputDict = dict[int, TOutput]
-Output_Callback = Callable[[TOutputDict], None]
+TOutput_Callback = Callable[[TOutputDict], None]
 
 class ProcessorTracker(TrackerBase, Generic[TInput, TOutput]):
     """Tracks multiple poses, maintaining a separate processor for each."""
@@ -27,8 +27,8 @@ class ProcessorTracker(TrackerBase, Generic[TInput, TOutput]):
             for id in range(num_tracks)
         }
 
-        self._output_callbacks: set[Output_Callback] = set()
-        self._callback_lock = Lock()
+        self._t_output_callbacks: set[TOutput_Callback] = set()
+        self._t_output_callback_lock = Lock()
 
     def set(self, input_data_dict: dict[int, TInput]) -> None:
         """Set input data for processor(s)."""
@@ -50,6 +50,8 @@ class ProcessorTracker(TrackerBase, Generic[TInput, TOutput]):
                 print(f"ProcessorTracker: Error processing pose {id}: {e}")
                 print_exc()
 
+        print(type(output_data_dict[0]))
+
         self._notify_output_callbacks(output_data_dict)
         self._notify_poses_callbacks(poses)
 
@@ -67,20 +69,20 @@ class ProcessorTracker(TrackerBase, Generic[TInput, TOutput]):
 
     def _notify_output_callbacks(self, output: TOutputDict) -> None:
         """Emit callbacks with output of type TOutput."""
-        with self._callback_lock:
-            for callback in self._output_callbacks:
+        with self._t_output_callback_lock:
+            for callback in self._t_output_callbacks:
                 try:
                     callback(output)
                 except Exception as e:
                     print(f"{self.__class__.__name__}: Error in callback: {e}")
                     print_exc()
 
-    def add_output_callback(self, callback: Output_Callback) -> None:
+    def add_output_callback(self, callback: TOutput_Callback) -> None:
         """Register output callback."""
-        with self._callback_lock:
-            self._output_callbacks.add(callback)
+        with self._t_output_callback_lock:
+            self._t_output_callbacks.add(callback)
 
-    def remove_output_callback(self, callback: Output_Callback) -> None:
+    def remove_output_callback(self, callback: TOutput_Callback) -> None:
         """Unregister output callback."""
-        with self._callback_lock:
-            self._output_callbacks.discard(callback)
+        with self._t_output_callback_lock:
+            self._t_output_callbacks.discard(callback)

@@ -51,7 +51,7 @@ class GenericSmoother(FilterNode):
             raise ValueError(f"Smoother not implemented for feature type: {feature_type.__name__}")
 
         self._smoother: Smooth = SMOOTHER_LOOKUP[feature_type](
-            vector_size=feature_type.default_range(),
+            vector_size=len(feature_type.feature_enum()),
             frequency=self._config.frequency,
             min_cutoff=self._config.min_cutoff,
             beta=self._config.beta,

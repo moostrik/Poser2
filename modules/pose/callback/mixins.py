@@ -13,13 +13,13 @@ class TypedCallbackMixin(Generic[T]):
     """Generic mixin providing callback management for broadcasting any output type."""
 
     def __init__(self):
-        self._output_callbacks: Set[Callback] = set()
-        self._callback_lock = Lock()
+        self._typed_output_callbacks: Set[Callback] = set()
+        self._typed_callback_lock = Lock()
 
     def _notify_callbacks(self, output: T) -> None:
         """Emit callbacks with output of type T."""
-        with self._callback_lock:
-            for callback in self._output_callbacks:
+        with self._typed_callback_lock:
+            for callback in self._typed_output_callbacks:
                 try:
                     callback(output)
                 except Exception as e:
@@ -28,13 +28,13 @@ class TypedCallbackMixin(Generic[T]):
 
     def add_callback(self, callback: Callback) -> None:
         """Register output callback."""
-        with self._callback_lock:
-            self._output_callbacks.add(callback)
+        with self._typed_callback_lock:
+            self._typed_output_callbacks.add(callback)
 
     def remove_callback(self, callback: Callback) -> None:
         """Unregister output callback."""
-        with self._callback_lock:
-            self._output_callbacks.discard(callback)
+        with self._typed_callback_lock:
+            self._typed_output_callbacks.discard(callback)
 
 
 class PoseCallbackMixin:
@@ -55,8 +55,8 @@ class PoseCallbackMixin:
 
     def __init__(self):
         """Initialize callback system."""
-        self._output_callbacks: set[PoseCallback] = set()
-        self._callback_lock = Lock()
+        self._pose_callbacks: set[PoseCallback] = set()
+        self._pose_callback_lock = Lock()
 
     def _notify_pose_callbacks(self, pose: Pose) -> None:
         """Emit callbacks with pose.
@@ -68,8 +68,8 @@ class PoseCallbackMixin:
         Args:
             pose: Pose to broadcast to callbacks.
         """
-        with self._callback_lock:
-            for callback in self._output_callbacks:
+        with self._pose_callback_lock:
+            for callback in self._pose_callbacks:
                 try:
                     callback(pose)
                 except Exception as e:
@@ -83,8 +83,8 @@ class PoseCallbackMixin:
         Args:
             callback: Function to call with poses.
         """
-        with self._callback_lock:
-            self._output_callbacks.add(callback)
+        with self._pose_callback_lock:
+            self._pose_callbacks.add(callback)
 
     def remove_pose_callback(self, callback: PoseCallback) -> None:
         """Unregister output callback.
@@ -92,8 +92,8 @@ class PoseCallbackMixin:
         Args:
             callback: Function to remove. Safe to call even if not registered.
         """
-        with self._callback_lock:
-            self._output_callbacks.discard(callback)
+        with self._pose_callback_lock:
+            self._pose_callbacks.discard(callback)
 
 
 class PoseDictCallbackMixin:
@@ -115,8 +115,8 @@ class PoseDictCallbackMixin:
 
     def __init__(self):
         """Initialize callback system."""
-        self._output_callbacks: set[PoseDictCallback] = set()
-        self._callback_lock = Lock()
+        self._poses_callbacks: set[PoseDictCallback] = set()
+        self._poses_callback_lock = Lock()
 
     def _notify_poses_callbacks(self, poses: PoseDict) -> None:
         """Emit callbacks with poses.
@@ -128,8 +128,8 @@ class PoseDictCallbackMixin:
         Args:
             poses: Dictionary of poses to broadcast to callbacks.
         """
-        with self._callback_lock:
-            for callback in self._output_callbacks:
+        with self._poses_callback_lock:
+            for callback in self._poses_callbacks:
                 try:
                     callback(poses)
                 except Exception as e:
@@ -142,8 +142,8 @@ class PoseDictCallbackMixin:
         Args:
             callback: Function to call with pose dictionaries.
         """
-        with self._callback_lock:
-            self._output_callbacks.add(callback)
+        with self._poses_callback_lock:
+            self._poses_callbacks.add(callback)
 
     def remove_poses_callback(self, callback: PoseDictCallback) -> None:
         """Unregister output callback.
@@ -151,5 +151,5 @@ class PoseDictCallbackMixin:
         Args:
             callback: Function to remove. Safe to call even if not registered.
         """
-        with self._callback_lock:
-            self._output_callbacks.discard(callback)
+        with self._poses_callback_lock:
+            self._poses_callbacks.discard(callback)

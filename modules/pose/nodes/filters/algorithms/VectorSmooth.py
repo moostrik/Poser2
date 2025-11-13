@@ -220,11 +220,11 @@ class AngleSmooth(VectorSmooth):
 class PointSmooth(VectorSmooth):
     """Smoother for 2D points with (x, y) coordinates."""
 
-    def __init__(self, num_points: int, frequency: float, min_cutoff: float, beta: float,
+    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, beta: float,
                  d_cutoff: float, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the point smoother."""
-        super().__init__(num_points * 2, frequency, min_cutoff, beta, d_cutoff, clamp_range)
-        self._num_points: int = num_points
+        super().__init__(vector_size * 2, frequency, min_cutoff, beta, d_cutoff, clamp_range)
+        self._num_points: int = vector_size
 
     def add_sample(self, points: np.ndarray) -> None:
         """Add new point samples with shape (num_points, 2)."""
