@@ -6,8 +6,8 @@ import numpy as np
 # Local application imports
 from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose
-from modules.pose.features.deprecated.PoseVertices import PoseVertexData, PoseVertexFactory
-from modules.pose.features.deprecated.PoseVertices import POSE_VERTEX_INDICES
+from modules.deprecated.PoseVertices import PoseVertexData, PoseVertexFactory
+from modules.deprecated.PoseVertices import POSE_VERTEX_INDICES
 from modules.DataHub import DataHub
 from modules.gl.LayerBase import LayerBase, Rect
 

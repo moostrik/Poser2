@@ -14,7 +14,7 @@ from modules.pose.features.AngleFeature import AngleFeature
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 
-from modules.pose.features.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
+from modules.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features import AngleFeature
 
 from modules.DataHub import DataHub
