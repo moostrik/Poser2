@@ -53,17 +53,7 @@ class CentrePoseRender(LayerBase):
         if pose is None:
             return
 
-        # if pose.tracklet_poep.is_removed:
-        #     self.clear_render()
-        #     self.is_active = False
-        #     return
-
-        # if pose.tracklet_poep.is_being_tracked:
-        #     self.is_active = True
-        #     self.last_pose_rect = pose.bbox.to_rect()
-
-        # if not self.is_active:
-        #     return
+        self.last_pose_rect = pose.bbox.to_rect()
 
         smooth_pose_rect: Rect = pose.bbox.to_rect()
 
