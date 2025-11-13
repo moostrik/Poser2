@@ -7,7 +7,7 @@ import math
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.pose.similarity.features.SimilarityStream import SimilarityStream
+from modules.pose.similarity.features.SimilarityStream import SimilarityStreamData
 from modules.gl.Image import Image
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
@@ -64,7 +64,7 @@ class SynchronyCamLayer(LayerBase):
         key: int = self.cam_id
         other_keys: list[int] = [i for i in range(len(cam_fbos)) if i != key]
 
-        syncs: SimilarityStream | None = self.data.get_correlation_streams(False, self.data_consumer_key)
+        syncs: SimilarityStreamData | None = self.data.get_correlation_streams(False, self.data_consumer_key)
 
 
         score_1: float = 0.0
