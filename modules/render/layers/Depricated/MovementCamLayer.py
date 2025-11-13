@@ -9,7 +9,7 @@ from modules.gl.Image import Image
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.pd_stream.Stream import StreamData
+from modules.pose.pd_stream.PDStream import PDStreamData
 from modules.tracker.Tracklet import Tracklet
 
 from modules.DataHub import DataHub
@@ -74,7 +74,7 @@ class MovementCamLayer(LayerBase):
             return
 
         glColor4f(0.0, 0., 0., 0.01)
-        pose_stream: StreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
+        pose_stream: PDStreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
             self.movement_for_synchrony = pose_stream.mean_movement
             if pose_stream.mean_movement > 0.009:

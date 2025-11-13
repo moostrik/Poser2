@@ -8,7 +8,7 @@ from modules.tracker.Tracklet import Tracklet
 # from modules.pose.Pose import Pose, Point2DFeature, AngleFeature, PoseMeasurementData
 from modules.pose.features.AngleFeature import AngleLandmark, ANGLE_LANDMARK_NAMES
 from modules.pose.features.Point2DFeature import PointLandmark
-from modules.pose.pd_stream.Stream import StreamData
+from modules.pose.pd_stream.PDStream import PDStreamData
 from modules.utils.PointsAndRects import Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -118,7 +118,7 @@ class WSData:
         if pose.tracklet_poep.is_removed:
             self.reset()
 
-    def add_stream(self, stream: StreamData) -> None:
+    def add_stream(self, stream: PDStreamData) -> None:
         if not self.present:
             return
 

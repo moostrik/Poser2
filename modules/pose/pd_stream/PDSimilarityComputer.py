@@ -16,7 +16,7 @@ import pandas as pd
 
 # Pose imports
 from modules.pose.similarity import SimilarityFeature, SimilarityBatch, SimilarityBatchCallback
-from modules.pose.pd_stream.Stream import StreamData, StreamDataDict
+from modules.pose.pd_stream.PDStream import PDStreamData, PDStreamDataDict
 
 # Local application imports
 from modules.Settings import Settings
@@ -107,7 +107,7 @@ def dtw_angular_sakoe_chiba_path(x: np.ndarray, y: np.ndarray, band) -> tuple[fl
 def ignore_keyboard_interrupt() -> None:
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-class StreamCorrelator():
+class PDStreamComputer():
     def __init__(self, settings: Settings) -> None:
 
         self.interval: float = 1.0 / settings.corr_rate_hz
@@ -128,7 +128,7 @@ class StreamCorrelator():
 
         # INPUTS
         self._input_lock = threading.Lock()
-        self._input_pose_streams: StreamDataDict = {}
+        self._input_pose_streams: PDStreamDataDict = {}
 
         # CALLBACKS
         self._callback_lock = threading.Lock()
@@ -138,7 +138,7 @@ class StreamCorrelator():
         self.hot_reloader = HotReloadMethods(self.__class__, False, False)
         self.hot_reloader.add_file_changed_callback(self._reload_and_restart)
 
-    def set_pose_stream(self, data: StreamData) -> None:
+    def set_pose_stream(self, data: PDStreamData) -> None:
         with self._input_lock:
             self._input_pose_streams[data.id] = data
         return
@@ -172,7 +172,7 @@ class StreamCorrelator():
             loop_start: float = time.perf_counter()
 
             with self._input_lock:
-                pose_streams: StreamDataDict = self._input_pose_streams.copy()
+                pose_streams: PDStreamDataDict = self._input_pose_streams.copy()
 
             # print(pose_streams)
             pose_streams = self._filter_streams_by_angles(pose_streams, 4) # use only arms
@@ -233,10 +233,10 @@ class StreamCorrelator():
         self._correlation_thread.start()
 
     @staticmethod
-    def _filter_streams_by_time(streams: StreamDataDict, max_age_s: float = 2.0) -> StreamDataDict:
+    def _filter_streams_by_time(streams: PDStreamDataDict, max_age_s: float = 2.0) -> PDStreamDataDict:
         """Return only streams whose last timestamp is within max_age_s seconds from now."""
         now: float = time.time()  # Use float timestamp
-        filtered: StreamDataDict = {}
+        filtered: PDStreamDataDict = {}
         for id, data in streams.items():
             if not data.angles.empty:
                 last_time = data.angles.index[-1]  # This is a pd.Timestamp
@@ -247,7 +247,7 @@ class StreamCorrelator():
         return filtered
 
     @staticmethod
-    def _filter_streams_by_angles(streams: StreamDataDict, num_angles) -> StreamDataDict:
+    def _filter_streams_by_angles(streams: PDStreamDataDict, num_angles) -> PDStreamDataDict:
         for key, data in streams.items():
             # angles: pd.DataFrame = data.angles.head(num_angles) # keep ony first angles
             # confidences: pd.DataFrame = data.confidences.head(num_angles) # keep ony first angles
@@ -263,14 +263,14 @@ class StreamCorrelator():
         return streams
 
     @staticmethod
-    def _filter_streams_by_length(streams: StreamDataDict, min_length: int = 20) -> StreamDataDict:
+    def _filter_streams_by_length(streams: PDStreamDataDict, min_length: int = 20) -> PDStreamDataDict:
         """Return only streams with at least min_length frames."""
         return {wid: data for wid, data in streams.items() if len(data.angles) >= min_length}
 
     @staticmethod
-    def _filter_streams_by_nan(streams: StreamDataDict, min_valid_ratio: float = 0.7) -> StreamDataDict:
+    def _filter_streams_by_nan(streams: PDStreamDataDict, min_valid_ratio: float = 0.7) -> PDStreamDataDict:
         """Return only streams where the ratio of non-NaN values is above min_valid_ratio."""
-        filtered: StreamDataDict = {}
+        filtered: PDStreamDataDict = {}
         for wid, data in streams.items():
             total: int = data.angles.size
             valid: int = data.angles.count().sum()
@@ -279,7 +279,7 @@ class StreamCorrelator():
         return filtered
 
     @ staticmethod
-    def _remove_nans_from_streams(streams: StreamDataDict) -> StreamDataDict:
+    def _remove_nans_from_streams(streams: PDStreamDataDict) -> PDStreamDataDict:
         """Remove NaN values from angles and confidences DataFrames in each stream."""
         for key, data in streams.items():
             angles: pd.DataFrame = data.angles.dropna()
@@ -293,7 +293,7 @@ class StreamCorrelator():
         return streams
 
     @staticmethod
-    def _trim_streams_to_length(streams: StreamDataDict, max_length: int ) -> StreamDataDict:
+    def _trim_streams_to_length(streams: PDStreamDataDict, max_length: int ) -> PDStreamDataDict:
         """ Trim each stream's DataFrames to the last max_length frames. """
         for key, data in streams.items():
             if len(data.angles) > max_length:
@@ -307,10 +307,10 @@ class StreamCorrelator():
         return streams
 
     @staticmethod
-    def _generate_overlapping_angle_pairs(streams: StreamDataDict) -> list[AnglePair]:
+    def _generate_overlapping_angle_pairs(streams: PDStreamDataDict) -> list[AnglePair]:
         """Generate all unique pairs of streams with overlapping time ranges."""
         angle_pairs: list[AnglePair] = []
-        stream_items: list[tuple[int, StreamData]] = list(streams.items())
+        stream_items: list[tuple[int, PDStreamData]] = list(streams.items())
 
         for (id1, win1), (id2, win2) in combinations(stream_items, 2):
             # Find overlapping time range
@@ -343,14 +343,14 @@ class StreamCorrelator():
         return angle_pairs
 
     @staticmethod
-    def _generate_asof_angle_pairs(streams: StreamDataDict, tolerance: pd.Timedelta) -> list[AnglePair]:
+    def _generate_asof_angle_pairs(streams: PDStreamDataDict, tolerance: pd.Timedelta) -> list[AnglePair]:
         """
         For each unique pair of PoseStream
         Data, align their angles and confidences DataFrames using merge_asof.
         Returns a list of AnglePair(id1, id2, angles1_aligned, angles2_aligned, confidences1_aligned, confidences2_aligned).
         """
         pairs: list[AnglePair] = []
-        stream_items: list[tuple[int, StreamData]] = list(streams.items())
+        stream_items: list[tuple[int, PDStreamData]] = list(streams.items())
 
         for (id1, win1), (id2, win2) in combinations(stream_items, 2):
             # Get the DataFrames
@@ -394,13 +394,13 @@ class StreamCorrelator():
         return pairs
 
     @staticmethod
-    def _generate_naive_angle_pairs(streams: StreamDataDict, max_length: int) -> list[AnglePair]:
+    def _generate_naive_angle_pairs(streams: PDStreamDataDict, max_length: int) -> list[AnglePair]:
         """
         Generate angle pairs from streams,
         Returns a list of AnglePair(id1, id2, angles1, angles2, confidences_1, confidences_2).
         """
         pairs: list[AnglePair] = []
-        stream_items: list[tuple[int, StreamData]] = list(streams.items())
+        stream_items: list[tuple[int, PDStreamData]] = list(streams.items())
 
         for (id1, win1), (id2, win2) in combinations(stream_items, 2):
             # Get the DataFrames
@@ -481,7 +481,7 @@ class StreamCorrelator():
 
             # Calculate similarity
             try:
-                similarity: float = StreamCorrelator._compute_correlation(angles_1, angles_2, dtw_band, similarity_exponent)
+                similarity: float = PDStreamComputer._compute_correlation(angles_1, angles_2, dtw_band, similarity_exponent)
                 values[joint] = similarity
             except Exception as e:
                 print(f"PoseStreamCorrelator: {column}: correlation failed - {e}")

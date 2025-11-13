@@ -15,7 +15,7 @@ from modules.pose.Pose import Pose
 
 from modules.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.AngleFeature import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
-from modules.pose.pd_stream.Stream import StreamData
+from modules.pose.pd_stream.PDStream import PDStreamData
 
 from modules.DataHub import DataHub
 from modules.render.meshes.PoseMesh import PoseMesh
@@ -59,7 +59,7 @@ class PoseStreamLayer(LayerBase):
         if pose is None:
             return #??
         pose_mesh: Mesh = self.pose_meshes.meshes[pose.track_id]
-        pose_stream: StreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
+        pose_stream: PDStreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
             stream_image: np.ndarray = StreamPose.pose_stream_to_image(pose_stream)
             self.pose_stream_image.set_image(stream_image)

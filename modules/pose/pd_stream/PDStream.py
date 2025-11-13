@@ -22,14 +22,14 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass (frozen=True)
-class StreamInput:
+class PDStreamInput:
     id: int
     time_stamp: float  # Unix timestamp in seconds
     angles: AngleFeature | None
     is_removed: bool
 
     @classmethod
-    def from_pose(cls, pose: Pose) -> 'StreamInput':
+    def from_pose(cls, pose: Pose) -> 'PDStreamInput':
         return cls(
             id=pose.track_id,
             time_stamp=pose.time_stamp,  # Now a float
@@ -39,7 +39,7 @@ class StreamInput:
 
 # Type for analysis output callback
 @dataclass (frozen=True)
-class StreamData:
+class PDStreamData:
     id: int
     angles: pd.DataFrame
     confidences: pd.DataFrame
@@ -52,10 +52,10 @@ class StreamData:
             return [0.0] * ANGLE_NUM_LANDMARKS
         return self.angles.iloc[-1].tolist()
 
-StreamDataCallback = Callable[[StreamData], None]
-StreamDataDict = dict[int, StreamData]
+PDStreamDataCallback = Callable[[PDStreamData], None]
+PDStreamDataDict = dict[int, PDStreamData]
 
-class StreamManager:
+class PDStreamManager:
     def __init__(self, settings: Settings) -> None:
         self.settings: Settings = settings
         num_players: int = settings.num_players
@@ -68,7 +68,7 @@ class StreamManager:
             self.processors.append(StreamProcessor(settings, self.result_queues[i]))
             self.result_threads.append(Thread(target=self._handle_results, args=(self.result_queues[i],), daemon=True))
 
-        self.output_callbacks: set[StreamDataCallback] = set()
+        self.output_callbacks: set[PDStreamDataCallback] = set()
         self.running = False
 
         # Hot reload setup for restarting processor
@@ -150,14 +150,14 @@ class StreamManager:
         """Add pose to the appropriate processor's queue based on pose id."""
         for pose in poses.values():
             try:
-                pose_stream_input: StreamInput = StreamInput.from_pose(pose)
+                pose_stream_input: PDStreamInput = PDStreamInput.from_pose(pose)
                 # Distribute by id modulo number of processors
                 processor_idx = pose_stream_input.id % len(self.processors)
                 self.processors[processor_idx].add_pose(pose_stream_input)
             except Exception as e:
                 print(f"[PoseStream] Error adding pose: {e}")
 
-    def add_stream_callback(self, callback: StreamDataCallback) -> None:
+    def add_stream_callback(self, callback: PDStreamDataCallback) -> None:
         """Register a callback to receive processed data."""
         self.output_callbacks.add(callback)
 
@@ -165,7 +165,7 @@ class StreamManager:
         """Handle results from a single processor's result queue in the main process."""
         while self.running:
             try:
-                data: StreamData = result_queue.get(timeout=0.1)
+                data: PDStreamData = result_queue.get(timeout=0.1)
                 for callback in self.output_callbacks:
                     try:
                         # this might need a lock if callbacks modify shared state
@@ -181,10 +181,10 @@ class StreamProcessor(Process):
         super().__init__()
 
         self._stop_event = Event()
-        self.pose_input_queue: Queue[StreamInput] = Queue()
+        self.pose_input_queue: Queue[PDStreamInput] = Queue()
 
         # For sending results back to main process
-        self.result_queue: Queue[StreamData] = result_queue if result_queue else Queue()
+        self.result_queue: Queue[PDStreamData] = result_queue if result_queue else Queue()
 
         # Store settings values (not the settings object itself)
         self.buffer_capacity: int = settings.pose_stream_capacity
@@ -201,11 +201,11 @@ class StreamProcessor(Process):
     def run(self) -> None:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         while not self._stop_event.is_set():
-            poses: list[StreamInput] = []
+            poses: list[PDStreamInput] = []
             queue_empty = False
             while not queue_empty:
                 try:
-                    pose: StreamInput = self.pose_input_queue.get(block=False)
+                    pose: PDStreamInput = self.pose_input_queue.get(block=False)
                     if pose is not None:
                         poses.append(pose)
                 except Empty:
@@ -221,7 +221,7 @@ class StreamProcessor(Process):
                 print(f"Error processing poses: {e}")
                 traceback.print_exc()
 
-    def add_pose(self, pose: StreamInput) -> None:
+    def add_pose(self, pose: PDStreamInput) -> None:
         """Add pose to processing queue - can be called from main process."""
         try:
             self.pose_input_queue.put(pose, block=False)
@@ -229,14 +229,14 @@ class StreamProcessor(Process):
             # Queue is full, skip this pose
             pass
 
-    def _notify_callbacks(self, data: StreamData) -> None:
+    def _notify_callbacks(self, data: PDStreamData) -> None:
         """ Send results back to main process via queue. """
         try:
             self.result_queue.put(data, block=False)
         except:
             pass
 
-    def _process(self, poses: list[StreamInput]) -> None:
+    def _process(self, poses: list[PDStreamInput]) -> None:
         """ Process a pose and update the joint angle windows. """
         if not poses:
             return
@@ -246,7 +246,7 @@ class StreamProcessor(Process):
                 # reset buffers if pose is removed
                 self.angle_df: pd.DataFrame = self.empty_df.copy()
                 self.score_df: pd.DataFrame = self.empty_df.copy()
-                self._notify_callbacks(StreamData(pose.id, self.angle_df, self.score_df, self.buffer_capacity, 0.0, True))
+                self._notify_callbacks(PDStreamData(pose.id, self.angle_df, self.score_df, self.buffer_capacity, 0.0, True))
                 return
             if pose.angles is None:
                 print(f"[PoseStreamProcessor] Pose {pose.id} has no angles, this should not happen")
@@ -273,10 +273,10 @@ class StreamProcessor(Process):
 
         # interpolated_score: pd.DataFrame = self.score_df.interpolate(method='time', limit_direction='both')#, limit=15)
 
-        self._notify_callbacks(StreamData(pose.id, smoothed, self.score_df, self.buffer_capacity, mean_movement, False))
+        self._notify_callbacks(PDStreamData(pose.id, smoothed, self.score_df, self.buffer_capacity, mean_movement, False))
 
     @ staticmethod
-    def get_data_frames_from_poses(poses: list[StreamInput]) ->tuple[pd.DataFrame, pd.DataFrame]:
+    def get_data_frames_from_poses(poses: list[PDStreamInput]) ->tuple[pd.DataFrame, pd.DataFrame]:
         """
         Convert a list of PoseStreamInput objects to two DataFrames: one for angles and one for confidences.
         Args:

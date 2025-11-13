@@ -23,8 +23,8 @@ from modules.pose import gui
 
 from modules.pose.similarity.SimilarityComputer import SimilarityComputer
 
-from modules.pose.pd_stream.Stream import StreamManager
-from modules.pose.pd_stream.StreamSimilarityComputer import StreamCorrelator
+from modules.pose.pd_stream.PDStream import PDStreamManager
+from modules.pose.pd_stream.PDSimilarityComputer import PDStreamComputer
 
 from modules.DataHub import DataHub
 
@@ -139,8 +139,8 @@ class Main():
 
         self.pose_correlator: SimilarityComputer = SimilarityComputer(settings)
 
-        self.pose_streamer = StreamManager(settings)
-        self.stream_correlator: Optional[StreamCorrelator] = None #PoseStreamCorrelator(settings)
+        self.pd_pose_streamer = PDStreamManager(settings)
+        self.pd_stream_correlator: Optional[PDStreamComputer] = None #PoseStreamCorrelator(settings)
 
 
         # DATA
@@ -168,16 +168,16 @@ class Main():
             camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
             camera.start()
 
-        if self.stream_correlator:
-            self.stream_correlator.add_correlation_callback(self.data_hub.set_motion_correlation)
-            self.stream_correlator.start()
-            self.pose_streamer.add_stream_callback(self.stream_correlator.set_pose_stream)
+        if self.pd_stream_correlator:
+            self.pd_stream_correlator.add_correlation_callback(self.data_hub.set_motion_correlation)
+            self.pd_stream_correlator.start()
+            self.pd_pose_streamer.add_stream_callback(self.pd_stream_correlator.set_pose_stream)
 
         self.pose_correlator.add_correlation_callback(self.data_hub.set_pose_correlation)
         self.pose_correlator.start()
 
-        self.pose_streamer.add_stream_callback(self.data_hub.set_pose_stream)
-        self.pose_streamer.start()
+        self.pd_pose_streamer.add_stream_callback(self.data_hub.set_pose_stream)
+        self.pd_pose_streamer.start()
 
         # POSE PROCESSING PIPELINES
         self.pose_from_tracklet.add_poses_callback(self.bbox_smoother.process)
@@ -282,10 +282,10 @@ class Main():
 
         if self.pose_detector:
             self.pose_detector.stop()
-        if self.pose_streamer:
-            self.pose_streamer.stop()
-        if self.stream_correlator:
-            self.stream_correlator.stop()
+        if self.pd_pose_streamer:
+            self.pd_pose_streamer.stop()
+        if self.pd_stream_correlator:
+            self.pd_stream_correlator.stop()
 
         # print('stop av')
         # if self.WS:
