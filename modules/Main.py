@@ -18,7 +18,7 @@ from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
 from modules.pose import nodes
 from modules.pose.nodes import ChaseInterpolatorConfig, InterpolatorGui
-from modules.pose.trackers import FilterTracker, PoseFromTrackletGenerator, ImageCropProcessorTracker, BboxSmootherTracker
+from modules.pose.trackers import FilterTracker, PoseFromTrackletGenerator, ImageCropProcessorTracker, BboxSmootherTracker, PoseChaseInterpolatorTracker
 
 from modules.pose.detection import Point2DExtractor, MMDetection
 
@@ -27,9 +27,7 @@ from modules.pose.similarity.SimilarityComputer import SimilarityComputer
 from modules.pose.similarity.Stream import StreamManager
 from modules.pose.similarity.StreamSimilarityComputer import StreamCorrelator
 
-from modules.data.CaptureDataHub import CaptureDataHub
-from modules.data.RenderDataHub import RenderDataHub
-from modules.data.depricated.RenderDataHub import RenderDataHub_Old
+from modules.DataHub import DataHub
 
 from modules.render.HDTRenderManager import HDTRenderManager
 from modules.WS.WSPipeline import WSPipeline
@@ -44,11 +42,6 @@ class Main():
 
         self.is_running: bool = False
         self.is_finished: bool = False
-
-        # DATA
-        self.capture_data_hub = CaptureDataHub()
-        self.render_data_hub = RenderDataHub(settings)
-        self.render_data_hub_old = RenderDataHub_Old(settings)
 
         # CAMERA
         self.cameras: list[DepthCam | DepthSimulator] = []
@@ -81,13 +74,22 @@ class Main():
             settings.pose_verbose
         )
 
-        # POSE
+        # POSE CONFIGURATION
         self.b_box_smooth_config = nodes.SmootherConfig()
         self.point_smooth_config = nodes.SmootherConfig()
         self.angle_smooth_config = nodes.SmootherConfig()
         self.delta_smooth_config = nodes.SmootherConfig()
         self.image_crop_config =   nodes.ImageCropProcessorConfig()
+        self.prediction_config = nodes.PredictorConfig(frequency=settings.camera_fps)
+        self.interpolation_config: ChaseInterpolatorConfig = nodes.ChaseInterpolatorConfig()
 
+        self.point_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
+        self.angle_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
+        self.delta_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
+        self.prediction_gui: nodes.PredictionGui = nodes.PredictionGui(self.prediction_config, self.gui, 'Predictor')
+        self.interpolation_gui: InterpolatorGui = InterpolatorGui(self.interpolation_config, self.gui, 'Interpolator')
+
+        # POSE PROCESSING PIPELINES
         self.pose_from_tracklet = PoseFromTrackletGenerator(num_players)
         self.bbox_smoother = BboxSmootherTracker(num_players, nodes.SmootherConfig())
         self.image_crop_processor = ImageCropProcessorTracker(num_players, self.image_crop_config)
@@ -102,24 +104,19 @@ class Main():
             ]
         )
 
-        self.point_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
-        self.angle_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
-        self.delta_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
-
         self.pose_smooth_pipeline = FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.Point2DSmoother(self.point_smooth_config),
                 lambda: nodes.AngleSmoother(self.angle_smooth_config),
                 nodes.DeltaExtractor,
+                nodes.SymmetryExtractor,
                 nodes.MotionTimeAccumulator,
-                lambda: nodes.DeltaSmoother(self.delta_smooth_config),
+                # lambda: nodes.DeltaSmoother(self.delta_smooth_config),
                 # filters.PoseValidator,
             ]
         )
 
-        self.prediction_config = nodes.PredictorConfig(frequency=settings.camera_fps)
-        self.prediction_gui: nodes.PredictionGui = nodes.PredictionGui(self.prediction_config, self.gui, 'Predictor')
         self.pose_prediction_pipeline = FilterTracker(
             settings.num_players,
             [
@@ -130,8 +127,16 @@ class Main():
             ]
         )
 
-        self.interpolation_config: ChaseInterpolatorConfig = self.render_data_hub.interpolator_config
-        self.interpolation_gui: InterpolatorGui = InterpolatorGui(self.interpolation_config, self.gui, 'Interpolator')
+        self.interpolator = PoseChaseInterpolatorTracker(settings.num_players, self.interpolation_config)
+
+        self.pose_interpolation_pipeline = FilterTracker(
+            settings.num_players,
+            [
+                nodes.DeltaExtractor,
+                nodes.SymmetryExtractor,
+                nodes.MotionTimeAccumulator,
+            ]
+        )
 
 
         self.pose_correlator: SimilarityComputer = SimilarityComputer(settings)
@@ -139,39 +144,41 @@ class Main():
         self.pose_streamer = StreamManager(settings)
         self.stream_correlator: Optional[StreamCorrelator] = None #PoseStreamCorrelator(settings)
 
+
+        # DATA
+        self.data_hub = DataHub()
+
         # RENDER
         self.WS: Optional[WSPipeline] = None
         if settings.art_type == Settings.ArtType.WS:
             self.WS = WSPipeline(self.gui, settings)
             # self.render = WSRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, settings)
         if settings.art_type == Settings.ArtType.HDT:
-            self.render = HDTRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, self.render_data_hub_old, settings)
+            self.render = HDTRenderManager(self.gui, self.data_hub, settings)
 
     def start(self) -> None:
 
         for camera in self.cameras:
 
-            camera.add_preview_callback(self.capture_data_hub.set_cam_image)
+            camera.add_preview_callback(self.data_hub.set_cam_image)
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.image_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
-            camera.add_tracker_callback(self.capture_data_hub.set_cam_tracklets)
+            camera.add_tracker_callback(self.data_hub.set_cam_tracklets)
             camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
             camera.start()
 
         if self.stream_correlator:
-            self.stream_correlator.add_correlation_callback(self.capture_data_hub.set_motion_correlation)
-            self.stream_correlator.add_correlation_callback(self.render_data_hub_old.add_motion_correlation)
+            self.stream_correlator.add_correlation_callback(self.data_hub.set_motion_correlation)
             self.stream_correlator.start()
             self.pose_streamer.add_stream_callback(self.stream_correlator.set_pose_stream)
 
-        self.pose_correlator.add_correlation_callback(self.capture_data_hub.set_pose_correlation)
-        self.pose_correlator.add_correlation_callback(self.render_data_hub_old.add_pose_correlation)
+        self.pose_correlator.add_correlation_callback(self.data_hub.set_pose_correlation)
         self.pose_correlator.start()
 
-        self.pose_streamer.add_stream_callback(self.capture_data_hub.set_pose_stream)
+        self.pose_streamer.add_stream_callback(self.data_hub.set_pose_stream)
         self.pose_streamer.start()
 
         # POSE PROCESSING PIPELINES
@@ -180,17 +187,28 @@ class Main():
         self.image_crop_processor.add_image_callback(self.Point2D_extractor.set_images)
         self.image_crop_processor.add_poses_callback(self.Point2D_extractor.process)
         self.Point2D_extractor.add_poses_callback(self.pose_raw_pipeline.process)
-        self.pose_raw_pipeline.add_poses_callback(self.capture_data_hub.set_raw_poses)
+        self.pose_raw_pipeline.add_poses_callback(self.data_hub.set_raw_poses) # raw poses
+
         self.pose_raw_pipeline.add_poses_callback(self.pose_smooth_pipeline.process)
-        self.pose_smooth_pipeline.add_poses_callback(self.capture_data_hub.set_smooth_poses)
+        self.pose_smooth_pipeline.add_poses_callback(self.data_hub.set_smooth_poses) # smooth poses
+
         self.pose_smooth_pipeline.add_poses_callback(self.pose_prediction_pipeline.process)
-        self.pose_prediction_pipeline.add_poses_callback(self.render_data_hub.add_poses)
+        self.pose_prediction_pipeline.add_poses_callback(self.interpolator.submit) # to 60 fps
+        self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
+        self.pose_interpolation_pipeline.add_poses_callback(self.data_hub.set_interpolated_poses) # interpolated poses
+
+
+        self.data_hub.add_update_callback(self.interpolator.update)
+
+        # self.pose_prediction_pipeline.add_poses_callback(self.render_data_hub.add_poses)
+
+
 
         # DETECTION
         self.pose_detector.start()
 
         self.tracker.add_tracklet_callback(self.pose_from_tracklet.set_tracklets)
-        self.tracker.add_tracklet_callback(self.capture_data_hub.set_tracklets)
+        self.tracker.add_tracklet_callback(self.data_hub.set_tracklets)
         self.tracker.start()
 
         self.tracklet_sync_bang.add_callback(self.tracker.notify_update)

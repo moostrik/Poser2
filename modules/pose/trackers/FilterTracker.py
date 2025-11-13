@@ -65,6 +65,5 @@ class FilterTracker(TrackerBase):
 
     def reset_at(self, id: int) -> None:
         """Reset filters in pipeline for a specific pose."""
-        if id in self._filter_pipelines:
-            for filter_node in self._filter_pipelines[id]:
-                filter_node.reset()
+        for filter_node in self._filter_pipelines[id]:
+            filter_node.reset()

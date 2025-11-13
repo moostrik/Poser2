@@ -1,7 +1,7 @@
 """Callback mixins for pose broadcasting."""
 
 from threading import Lock
-from typing import Callable, Generic, TypeVar, Set
+from typing import Callable, Generic, TypeVar
 from traceback import print_exc
 
 from modules.pose.Pose import Pose, PoseDict, PoseCallback, PoseDictCallback
@@ -13,7 +13,7 @@ class TypedCallbackMixin(Generic[T]):
     """Generic mixin providing callback management for broadcasting any output type."""
 
     def __init__(self):
-        self._typed_output_callbacks: Set[Callback] = set()
+        self._typed_output_callbacks: set[Callback] = set()
         self._typed_callback_lock = Lock()
 
     def _notify_callbacks(self, output: T) -> None:

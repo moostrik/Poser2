@@ -21,7 +21,7 @@ from signal import signal, SIGINT
 from time import sleep
 
 from modules.Main import Main
-from modules.Settings import Settings, PoseModelType, FrameType, TrackerType
+from modules.Settings import Settings, ModelType, FrameType, TrackerType
 
 import multiprocessing as mp
 
@@ -63,9 +63,9 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         camera_list = ['19443010D153874800',
                        '19443010D1E4974800',
                        '19443010D14C874800']
-        # camera_list = ['14442C101136D1D200', # STUDIO
-        #                '14442C10F124D9D600',
-        #                '14442C10110AD3D200']
+        camera_list = ['14442C101136D1D200', # STUDIO
+                       '14442C10F124D9D600',
+                       '14442C10110AD3D200']
 
     if args.cameras < len(camera_list):
         camera_list = camera_list[:args.cameras]
@@ -110,7 +110,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.tracker_timeout =      2.0 # in seconds
 
     settings.pose_active =      not args.nopose
-    settings.pose_model_type =      PoseModelType.NONE if args.nopose else PoseModelType.SMALL
+    settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.SMALL
     settings.pose_model_warmups =    settings.num_players
     settings.pose_conf_threshold =  0.5
     settings.pose_crop_expansion =  0.1 # * height of the camera
@@ -152,29 +152,30 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.gui_default_file =     'default'
 
     if settings.art_type == Settings.ArtType.HDT:
-        settings.camera_fps =       24
+        # settings.camera_fps =       2
+        # settings.camera_player_fps= settings.camera_fps
         settings.render_title =     'Harmonic Dissonance'
         settings.num_players =      3
         settings.camera_num =       settings.num_players
         settings.camera_list =      camera_list[:settings.camera_num]
         settings.camera_flip_h =        False
         settings.camera_flip_v =        True
-        settings.camera_perspective =   -0.22
+        settings.camera_perspective =   -0.25
         settings.tracker_type =     TrackerType.ONEPERCAM
         settings.render_monitor =   0
         settings.render_secondary_list =     [1,2,3]
         settings.render_x =         0
-        settings.render_y =         100
+        settings.render_y =         0#2600
         settings.render_width =         1920
-        settings.render_height =        1080 - settings.render_y
+        settings.render_height =        1080 #- settings.render_y
         settings.render_fps =       60
         settings.gui_location_x =   0 #2200
         settings.gui_location_y =   0 #-700
         settings.gui_on_top =       False
 
-        settings.pose_model_type =  PoseModelType.NONE if args.nopose else PoseModelType.SMALL
+        settings.pose_model_type =  ModelType.NONE if args.nopose else ModelType.SMALL
         settings.pose_model_warmups =  settings.num_players
-        settings.pose_verbose =     True
+        settings.pose_verbose =     False
 
         settings.camera_color =     True
         settings.camera_square =    True

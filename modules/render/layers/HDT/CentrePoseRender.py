@@ -11,9 +11,9 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.Pose import Pose
 from modules.pose.features.Point2DFeature import PointLandmark
-from modules.data.depricated.RenderDataHub import RenderDataHub_Old
+from modules.data.depricated.RenderDataHub_old import RenderDataHub_Old
 
-from modules.data.CaptureDataHub import CaptureDataHub
+from modules.DataHub import DataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -23,8 +23,8 @@ from modules.render.meshes import PoseMesh
 from modules.gl.Mesh import Mesh
 
 class CentrePoseRender(LayerBase):
-    def __init__(self, data: CaptureDataHub, smooth_data: RenderDataHub_Old, pose_meshes: PoseMesh, cam_id: int) -> None:
-        self.data: CaptureDataHub = data
+    def __init__(self, data: DataHub, smooth_data: RenderDataHub_Old, pose_meshes: PoseMesh, cam_id: int) -> None:
+        self.data: DataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.smooth_data: RenderDataHub_Old = smooth_data
         self.cam_id: int = cam_id

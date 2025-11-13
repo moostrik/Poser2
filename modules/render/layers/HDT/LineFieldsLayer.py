@@ -27,7 +27,7 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Image import Image
 from modules.gl.shaders.HDT_Lines import HDT_Lines
 from modules.gl.shaders.HDT_LineBlend import HDT_LineBlend
-from modules.data.depricated.RenderDataHub import RenderDataHub_Old
+from modules.data.depricated.RenderDataHub_old import RenderDataHub_Old
 from modules.pose.features.SymmetryFeature import SymmetryFeature
 from modules.pose.features.AngleFeature import AngleLandmark
 from modules.gl.LayerBase import LayerBase, Rect

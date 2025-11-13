@@ -17,9 +17,8 @@ from modules.pose.Pose import Pose
 from modules.pose.features.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features import AngleFeature
 
-from modules.data.RenderDataHub import RenderDataHub
-from modules.data.CaptureDataHub import CaptureDataHub
-from modules.render.meshes.PoseMeshesCapture import PoseMeshesCapture
+from modules.DataHub import DataHub
+from modules.render.meshes.PoseMesh import PoseMesh
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -29,10 +28,9 @@ from modules.gl.shaders.PoseFeature import PoseFeature
 class PoseFeatureLayer(LayerBase):
     pose_feature_shader = PoseFeature()
 
-    def __init__(self, render_data: RenderDataHub, capture_data: CaptureDataHub, cam_id: int) -> None:
-        self.render_data: RenderDataHub = render_data
-        self.capture_data: CaptureDataHub = capture_data
-        self.capture_key: str = capture_data.get_unique_consumer_key()
+    def __init__(self, data_hub: DataHub, cam_id: int) -> None:
+        self.data_hub: DataHub = data_hub
+        self.capture_key: str = data_hub.get_unique_consumer_key()
         self.raw_fbo: Fbo = Fbo()
         self.smooth_fbo: Fbo = Fbo()
         self.render_fbo: Fbo = Fbo()
@@ -74,7 +72,8 @@ class PoseFeatureLayer(LayerBase):
 
         key: int = self.cam_id
 
-        if self.render_data.is_active(key) is False:
+        render_pose = self.data_hub.get_interpolated_pose(key, True, self.capture_key)
+        if render_pose is None:
             self.raw_fbo.clear()
             self.smooth_fbo.clear()
             self.render_fbo.clear()
@@ -92,23 +91,21 @@ class PoseFeatureLayer(LayerBase):
         self.draw_smooth = False
         self.draw_render = True
 
-        if self.capture_data.get_is_active(key):
-            raw_pose: Pose | None = self.capture_data.get_raw_pose(key, True, self.capture_key)
-            if raw_pose is not None:
-                self.raw_fbo.clear()
-                data: AngleFeature = raw_pose.angles
-                PoseFeatureLayer.pose_feature_shader.use(self.raw_fbo.fbo_id, data, range_scale, raw_color, raw_color)
-            smooth_pose: Pose | None = self.capture_data.get_smooth_pose(key, True, self.capture_key)
-            if smooth_pose is not None:
-                self.smooth_fbo.clear()
-                data: AngleFeature = smooth_pose.angles
-                PoseFeatureLayer.pose_feature_shader.use(self.smooth_fbo.fbo_id, data, range_scale, smooth_color, smooth_color)
 
-        if self.render_data.is_active(key):
-            render_pose: Pose = self.render_data.get_pose(key)
-            v_c: AngleFeature = render_pose.angles
-            PoseFeatureLayer.pose_feature_shader.use(self.render_fbo.fbo_id, v_c, range_scale, render_color, render_color)
-            self.draw_joint_labels(self.render_fbo, render_pose.angles)
+        raw_pose: Pose | None = self.data_hub.get_raw_pose(key, True, self.capture_key)
+        if raw_pose is not None:
+            self.raw_fbo.clear()
+            data: AngleFeature = raw_pose.angles
+            PoseFeatureLayer.pose_feature_shader.use(self.raw_fbo.fbo_id, data, range_scale, raw_color, raw_color)
+        smooth_pose: Pose | None = self.data_hub.get_smooth_pose(key, True, self.capture_key)
+        if smooth_pose is not None:
+            self.smooth_fbo.clear()
+            data: AngleFeature = smooth_pose.angles
+            PoseFeatureLayer.pose_feature_shader.use(self.smooth_fbo.fbo_id, data, range_scale, smooth_color, smooth_color)
+
+        data: AngleFeature = render_pose.angles
+        PoseFeatureLayer.pose_feature_shader.use(self.render_fbo.fbo_id, data, range_scale, render_color, render_color)
+        self.draw_joint_labels(self.render_fbo, render_pose.angles)
 
     @staticmethod
     def draw_joint_labels(fbo: Fbo, feature: AngleFeature) -> None:

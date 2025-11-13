@@ -15,9 +15,9 @@ from modules.pose.Pose import Pose
 from modules.pose.features.AngleFeature import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.pose.similarity.Stream import StreamData
 
-from modules.data.CaptureDataHub import CaptureDataHub
+from modules.DataHub import DataHub
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.render.meshes.PoseMeshesCapture import PoseMeshesCapture
+from modules.render.meshes.PoseMesh import PoseMesh
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -28,14 +28,14 @@ from modules.gl.shaders.StreamPose import StreamPose
 class PoseLayer(LayerBase):
     pose_stream_shader = StreamPose()
 
-    def __init__(self, data: CaptureDataHub, pose_meshes: PoseMeshesCapture, angle_meshes: AngleMeshes, cam_id: int) -> None:
-        self.data: CaptureDataHub = data
+    def __init__(self, data: DataHub, pose_meshes: PoseMesh, angle_meshes: AngleMeshes, cam_id: int) -> None:
+        self.data: DataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.cam_id: int = cam_id
         self.pose_stream_image: Image = Image()
-        self.pose_meshes: PoseMeshesCapture = pose_meshes
+        self.pose_meshes: PoseMesh = pose_meshes
         self.angle_meshes: AngleMeshes = angle_meshes
         text_init()
 

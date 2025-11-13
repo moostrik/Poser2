@@ -254,16 +254,14 @@ class PoseChaseInterpolator(InterpolatorNode):
         # Update all features (each caches internally)
         angle_pose: Pose | None = self._angle_interpolator.update(current_time)
         point_pose: Pose | None = self._point_interpolator.update(current_time)
-        delta_pose: Pose | None = self._delta_interpolator.update(current_time)
 
-        if angle_pose is None or point_pose is None or delta_pose is None:
+        if angle_pose is None or point_pose is None:
             return None
 
         # Combine all interpolated features
         combined: Pose = replace(
             angle_pose,
             points=point_pose.points,
-            deltas=delta_pose.deltas
         )
 
         # Cache combined result

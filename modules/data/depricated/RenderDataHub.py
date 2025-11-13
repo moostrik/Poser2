@@ -14,179 +14,115 @@ Key capabilities:
 3. Enables higher framerate output through interpolation
 4. Manages pose correlation analysis between tracklets
 
-Note: Interpolation introduces latency of approximately 1 input frame.
+Thread Safety:
+--------------
+Designed for multi-threaded operation:
+- Input thread: Calls add_poses() at ~30 FPS
+- Render thread: Calls update() and get_pose() at 60+ FPS
+
+Completely lock-free using fixed-size arrays:
+- Array sizes never change (no structural modifications)
+- Element assignment/reads are atomic (single reference operations)
+- Interpolators have internal locks for their own state
+- Pose cache is separate - written once per update(), read many times per frame
 """
+import time as time
 
-from threading import Lock
-from collections.abc import Mapping
+# Local application imports
+from modules.pose import features
+from modules.pose.nodes import PoseChaseInterpolator, ChaseInterpolatorConfig
+from modules.pose.Pose import Pose, PoseDict
 
-from modules.pose.Pose import PoseDict
-from modules.pose.features import AngleFeature, SymmetryFeature, SimilarityBatch
-from modules.data.depricated.PoseViewportTracker import PoseViewportTracker, PoseViewportTrackerSettings
-from modules.data.depricated.PoseAngleTracker import PoseAngleTracker, PoseAngleTrackerSettings
 from modules.Settings import Settings
-from modules.utils.depricated.SmoothedInterpolator import OneEuroSettings, SmoothedInterpolator
-from modules.utils.PointsAndRects import Rect
-
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class RenderDataHub_Old:
+
+class RenderDataHub:
     def __init__(self, settings: Settings) -> None:
         self._num_players: int = settings.num_players
-        fps: float = settings.camera_fps
 
-        self.one_euro_settings: OneEuroSettings = OneEuroSettings(fps, 1.0, 0.1)
-        self.viewport_settings: PoseViewportTrackerSettings = PoseViewportTrackerSettings(
-            smooth_settings=self.one_euro_settings,
-            center_dest_x=0.5,
-            centre_dest_y=0.2,
-            height_dest=0.95,
-            dst_aspectratio=9/16
-        )
-        self.angle_settings: PoseAngleTrackerSettings = PoseAngleTrackerSettings(
-            smooth_settings=self.one_euro_settings,
-            motion_threshold=0.003
+        self.interpolator_config: ChaseInterpolatorConfig = ChaseInterpolatorConfig(
+            input_frequency=settings.camera_fps,
+            responsiveness=0.2,
+            friction=0.03
         )
 
-        # Dictionaries to store smoothers for each tracklet ID
-        self._viewport_trackers: dict[int, PoseViewportTracker] = {}
-        self._angle_trackers: dict[int, PoseAngleTracker] = {}
+        # Lazy init - create on first add_poses()
+        self._interpolators: list[PoseChaseInterpolator | None] = [None] * self._num_players
+        self._cached_poses: list[Pose | None] = [None] * self._num_players
 
-        for i in range(self._num_players):
-            self._viewport_trackers[i] = PoseViewportTracker(self.viewport_settings)
-            self._angle_trackers[i] = PoseAngleTracker(self.angle_settings)
-
-        # Correlation smoothing (automatically managed)
-        self._pose_correlation_smoothers: dict[tuple[int, int], SmoothedInterpolator] = {}
-        self._motion_correlation_smoothers: dict[tuple[int, int], SmoothedInterpolator] = {}
-
-        # Lock to ensure thread safety
-        self._lock = Lock()
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
+        # self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def update(self) -> None:
-        """Update all active trackers and smoothers."""
-        with self._lock:
-            for tracker in self._viewport_trackers.values():
-                if tracker.is_active:
-                    tracker.update()
-            for tracker in self._angle_trackers.values():
-                if tracker.is_active:
-                    tracker.update()
-
-            for smoother in self._pose_correlation_smoothers.values():
-                smoother.update()
-            for smoother in self._motion_correlation_smoothers.values():
-                smoother.update()
+        """Update all active interpolators and cache results. Completely lock-free."""
+        current_time: float = time.time()
+        for i, interpolator in enumerate(self._interpolators):
+            if interpolator is not None:
+                # sets cached pose to None if not ready yet
+                self._cached_poses[i] = interpolator.update(current_time)
 
     def reset(self) -> None:
-        """Reset all trackers and smoothers."""
-        with self._lock:
-            for tracker in self._viewport_trackers.values():
-                tracker.reset()
-            for tracker in self._angle_trackers.values():
-                tracker.reset()
+        """Reset all interpolators and clear cache. Completely lock-free."""
+        for i, interpolator in enumerate(self._interpolators):
+            if interpolator is not None:
+                interpolator.reset()
 
-            self._pose_correlation_smoothers.clear()
-            self._motion_correlation_smoothers.clear()
+            self._cached_poses[i] = None
 
     def add_poses(self, poses: PoseDict) -> None:
-        """ Add a new pose data point for processing."""
-        with self._lock:
-            for pose in poses.values():
-                tracklet_id: int = pose.tracklet.id
+        """Add new pose data points for processing. Completely lock-free."""
+        for id, pose in poses.items():
+            if id >= self._num_players:
+                continue
 
-                self._viewport_trackers[tracklet_id].add_pose(pose)
-                self._angle_trackers[tracklet_id].add_pose(pose)
+            if pose.lost:
+                self._interpolators[id] = None
+                self._cached_poses[id] = None
+            else:
+                interpolator = self._interpolators[id]
+                if interpolator is None:
+                    # Create and initialize together
+                    interpolator = PoseChaseInterpolator(self.interpolator_config)
+                    self._interpolators[id] = interpolator
+                interpolator.submit(pose)
 
-    def _add_correlation(self, batch: SimilarityBatch , smoothers: dict[tuple[int, int], SmoothedInterpolator]
-    ) -> None:
-        """Helper to add correlation data and manage smoother lifecycle."""
-        batch_pair_ids: set[tuple[int, int]] = {pair.pair_id for pair in batch}
-        pairs_to_remove: set[tuple[int, int]] = set(smoothers.keys()) - batch_pair_ids
+    def is_active(self, pose_id: int) -> bool:
+        """Check if player has cached pose available."""
+        if pose_id >= self._num_players:
+            return False
+        return self._cached_poses[pose_id] is not None
 
-        for pair_id in pairs_to_remove:
-            del smoothers[pair_id]
+    def get_pose(self, pose_id: int) -> Pose:
+        """Get smoothed pose from cache.
 
-        for pair in batch:
-            if pair.pair_id not in smoothers:
-                smoothers[pair.pair_id] = SmoothedInterpolator(self.one_euro_settings)
-            smoothers[pair.pair_id].add_sample(pair.geometric_mean())
-
-    def add_pose_correlation(self, batch: SimilarityBatch ) -> None:
-        """Add new pose correlation and manage smoothers.
-           Smoothers for pairs not in batch are automatically removed.
+        Raises KeyError if no pose available. Use is_active() to check first.
         """
+        if pose_id >= self._num_players:
+            raise KeyError(f"Pose ID {pose_id} out of range")
 
-        with self._lock:
-            self._add_correlation(batch, self._pose_correlation_smoothers)
+        pose: Pose | None = self._cached_poses[pose_id]
+        if pose is None:
+            raise KeyError(f"No pose found for tracklet ID {pose_id}")
 
-    def add_motion_correlation(self, batch: SimilarityBatch ) -> None:
-        """Add new motion correlation and manage smoothers.
-           Smoothers for pairs not in batch are automatically removed.
-        """
-        with self._lock:
-            self._add_correlation(batch, self._motion_correlation_smoothers)
+        return pose
 
-    # ACTIVE
-    def get_is_active(self, tracklet_id: int) -> bool:
-        """Check if the smoother for the specified tracklet ID is active."""
-        with self._lock:
-            return self._viewport_trackers[tracklet_id].is_active
+   #  BODY JOINT ANGLES
+    def get_angles(self, tracklet_id: int) -> features.AngleFeature:
+        """Get angles for the specified tracklet ID"""
+        return self.get_pose(tracklet_id).angles
 
-    # RECT
-    def get_viewport(self, tracklet_id: int) -> Rect:
-        """Get smoothed rectangle for the specified tracklet ID."""
-        with self._lock:
-            return self._viewport_trackers[tracklet_id].smoothed_rect
+    def get_delta(self, tracklet_id: int) -> features.AngleFeature:
+        """Get delta for the specified tracklet ID"""
+        return self.get_pose(tracklet_id).deltas
 
-    #  BODY JOINT ANGLES
-    def get_angles(self, tracklet_id: int) -> AngleFeature:
-        """Get smoothed angle for the specified tracklet ID and joint."""
-        with self._lock:
-            return self._angle_trackers[tracklet_id].angles
-
-    def get_velocities(self, tracklet_id: int) -> AngleFeature:
-        """Get smoothed angle for the specified tracklet ID and joint."""
-        with self._lock:
-            return self._angle_trackers[tracklet_id].velocities
-
-    def get_motions(self, tracklet_id: int) -> AngleFeature:
-        """Get smoothed angle change for the specified tracklet ID and joint."""
-        with self._lock:
-            return self._angle_trackers[tracklet_id].motions
-
-    def get_symmetries(self, tracklet_id: int) -> SymmetryFeature:
-        """Get the synchrony value for the specified symmetric joint type."""
-        with self._lock:
-            return self._angle_trackers[tracklet_id].symmetries
+    def get_symmetries(self, tracklet_id: int) -> features.SymmetryFeature:
+        return self.get_pose(tracklet_id).symmetry
 
     # TIME
-    def get_cumulative_motion(self, tracklet_id: int) -> float:
-        """Get combined motion (body + head) for the specified tracklet ID."""
-        with self._lock:
-            return self._angle_trackers[tracklet_id].cumulative_total_motion
+    def get_motion_time(self, tracklet_id: int) -> float:
+        """Get motion time for the specified tracklet ID."""
+        return self.get_pose(tracklet_id).motion_time
 
     def get_age(self, tracklet_id: int) -> float:
         """Get the age in seconds since the tracklet was first detected."""
-        with self._lock:
-            return self._viewport_trackers[tracklet_id].age
-
-    # CORRELATION
-    def _get_correlation(self, id1: int, id2: int, smoothers: dict[tuple[int, int], SmoothedInterpolator]) -> float:
-        """Helper to get smoothed correlation value."""
-        pair_id: tuple[int, int] = (min(id1, id2), max(id1, id2))
-        smoother: SmoothedInterpolator | None = smoothers.get(pair_id)
-        if smoother is None:
-            return 0.0
-        value: float = smoother.smooth_value
-        return value if value is not None else 0.0
-
-    def get_pose_correlation(self, id1: int, id2: int) -> float:
-        with self._lock:
-            return self._get_correlation(id1, id2, self._pose_correlation_smoothers)
-
-    def get_motion_correlation(self, id1: int, id2: int) -> float:
-        with self._lock:
-            return self._get_correlation(id1, id2, self._motion_correlation_smoothers)
+        return self.get_pose(tracklet_id).age

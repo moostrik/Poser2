@@ -12,7 +12,7 @@ from modules.gl.Image import Image
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.data.CaptureDataHub import CaptureDataHub
+from modules.DataHub import DataHub
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.gl.shaders.HD_Sync import HD_Sync
@@ -25,8 +25,8 @@ class SynchronyCamLayer(LayerBase):
     shader = HD_Sync()
     noise_shader = NoiseSimplex()
 
-    def __init__(self, data: CaptureDataHub, cam_id: int) -> None:
-        self.data: CaptureDataHub = data
+    def __init__(self, data: DataHub, cam_id: int) -> None:
+        self.data: DataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.cam_id: int = cam_id
         self.fbo: Fbo = Fbo()

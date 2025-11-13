@@ -11,7 +11,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.similarity.SimilarityStream import SimilarityStream, SimilarityStreamData, SimilarityBatch , AggregationMethod
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.data.CaptureDataHub import CaptureDataHub
+from modules.DataHub import DataHub
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,8 +22,8 @@ from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 class CorrelationStreamLayer(LayerBase):
     r_stream_shader = StreamCorrelation()
 
-    def __init__(self, data: CaptureDataHub, num_streams: int, capacity: int, use_motion: bool = False) -> None:
-        self.data: CaptureDataHub = data
+    def __init__(self, data: DataHub, num_streams: int, capacity: int, use_motion: bool = False) -> None:
+        self.data: DataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()

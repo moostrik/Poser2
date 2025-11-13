@@ -40,8 +40,9 @@ Example:
     pose = hub.get_pose(tracklet_id, only_new_data=True, consumer_key=consumer_key)
 """
 
+from traceback import print_exc
 import numpy as np
-from typing import Optional
+from typing import Optional, Callable
 from threading import Lock
 from dataclasses import dataclass, field
 from typing import Optional, TypeVar, Generic
@@ -63,7 +64,7 @@ class DataItem(Generic[T]):
     value: T
     accessed: dict[str, bool] = field(default_factory=dict)
 
-class CaptureDataHub:
+class DataHub:
     _consumer_counter: int = 0  # Class variable for unique IDs
 
     def __init__(self) -> None:
@@ -74,11 +75,17 @@ class CaptureDataHub:
         self.cam_image: dict[int, DataItem[np.ndarray]] = {}
         self.depth_tracklets: dict[int, DataItem[list[DepthTracklet]]] = {}
         self.tracklets: dict[int, DataItem[Tracklet]] = {}
-        self.smooth_poses: dict[int, DataItem[Pose]] = {}
+
         self.raw_poses: dict[int, DataItem[Pose]] = {}
+        self.smooth_poses: dict[int, DataItem[Pose]] = {}
+        self.interpolated_poses: dict[int, DataItem[Pose]] = {}
+
         self.pose_streams: dict[int, DataItem[StreamData]] = {}
         self.pose_correlation: dict[int, DataItem[SimilarityBatch ]] = {}
         self.motion_correlation: dict[int, DataItem[SimilarityBatch ]] = {}
+
+        self._update_callback_lock = Lock()
+        self._update_callbacks: set[Callable] = set()
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -168,6 +175,17 @@ class CaptureDataHub:
         with self.mutex:
             return [v.value for v in self.smooth_poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
 
+    def set_interpolated_poses(self, poses: PoseDict) -> None:
+        for pose in poses.values():
+            self._set_data_dict(self.interpolated_poses, pose.tracklet.id, pose)
+
+    def get_interpolated_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
+        return self._get_data_dict(self.interpolated_poses, id, only_new_data, consumer_key)
+
+    def get_interpolated_poses_for_cam(self, cam_id: int) -> list[Pose]:
+        with self.mutex:
+            return [v.value for v in self.interpolated_poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
+
     # Pose window/stream management
     def set_pose_stream(self, value: StreamData) -> None:
         self._set_data_dict(self.pose_streams, value.id, value)
@@ -201,3 +219,23 @@ class CaptureDataHub:
             if not pose_item or not pose_item.value:
                 return None
             return pose_item.value.angles
+
+    # update callback
+    def update(self) -> None:
+        with self._update_callback_lock:
+            for callback in self._update_callbacks:
+                try:
+                    callback()
+                except Exception as e:
+                    print(f"{self.__class__.__name__}: Error in callback: {e}")
+                    print_exc()
+
+    def add_update_callback(self, callback: Callable) -> None:
+        """Register output callback."""
+        with self._update_callback_lock:
+            self._update_callbacks.add(callback)
+
+    def remove_update_callback(self, callback: Callable) -> None:
+        """Unregister output callback."""
+        with self._update_callback_lock:
+            self._update_callbacks.discard(callback)
