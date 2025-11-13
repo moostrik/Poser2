@@ -235,16 +235,15 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
     # ========== STATISTICS (CONFIDENCE-WEIGHTED) ==========
 
     def aggregate(self, method: AggregationMethod = AggregationMethod.MEAN,
-                  min_confidence: float = 0.0) -> float:
-        """Compute statistical aggregate of values with confidence filtering.
-
-        All aggregation methods use confidence-weighted computation where
-        applicable (mean, geometric mean, harmonic mean, std).
+                  min_confidence: float = 0.0,
+                  exponent: float = 1.0) -> float:
+        """
+        Compute statistical aggregate of values with confidence filtering and optional exponentiation.
 
         Args:
             method: Aggregation method to use
             min_confidence: Minimum confidence to include value (default: 0.0)
-                           Set higher (e.g., 0.5 or 0.7) to ignore uncertain values
+            exponent: Exponent to apply to each value before aggregation (default: 1.0)
 
         Returns:
             Aggregated value, or NaN if no values meet criteria
@@ -263,6 +262,10 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
 
         confident_values = self._values[confident_mask]
         confident_scores = self._scores[confident_mask]
+
+        # Apply exponent to each value before aggregation
+        if exponent != 1.0:
+            confident_values = confident_values ** exponent
 
         # Apply aggregation method
         if method == AggregationMethod.MEAN:

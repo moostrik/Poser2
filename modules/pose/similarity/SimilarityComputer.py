@@ -29,8 +29,7 @@ class SimilarityComputer:
     for all pairs. Results are published via callbacks to registered listeners.
     """
 
-    def __init__(self, settings: Settings) -> None:
-        self.similarity_exponent: float = settings.corr_similarity_exp
+    def __init__(self) -> None:
 
         self._correlation_thread = threading.Thread(target=self.run, daemon=True)
         self._stop_event = threading.Event()
@@ -105,7 +104,7 @@ class SimilarityComputer:
         similarities: list[SimilarityFeature] = []
         for (id1, angles_1), (id2, angles_2) in combinations(angles.items(), 2):
             # Compute similarity scores
-            similarity_data: AngleFeature = SimilarityUtils.compute_similarity(angles_1, angles_2, self.similarity_exponent)
+            similarity_data: AngleFeature = SimilarityUtils.compute_similarity(angles_1, angles_2, 1.0) # do exponent at retreival
 
             # Only include pairs with at least one valid joint
             if similarity_data.valid_count > 0:
@@ -120,7 +119,7 @@ class SimilarityComputer:
 
         return SimilarityBatch(similarities=similarities)
 
-    def add_poses(self, poses: PoseDict) -> None:
+    def submit(self, poses: PoseDict) -> None:
         """Update input poses and trigger correlation processing.
 
         Args:

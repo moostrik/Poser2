@@ -16,7 +16,7 @@ from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker
 from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
 
-from modules.pose.detection import Point2DExtractor, MMDetection
+from modules.pose.detection import PointBatchExtractor, MMDetection
 from modules.pose import nodes
 from modules.pose import trackers
 from modules.pose import gui
@@ -63,6 +63,10 @@ class Main():
             self.tracker = OnePerCamTracker(self.gui, settings)
         self.tracklet_sync_bang = FrameSyncBang(settings, False, 'tracklet_sync')
 
+        # TRACKER POSE BRIDGE
+        # a bridge that gathers tracklets and images and "bangs" the pose processing pipeline
+        # similar to or in concert with FrameSyncBang and TrackletSyncBang
+
         # POSE DETECTOR
         self.pose_detector = MMDetection(
             settings.path_model,
@@ -91,7 +95,7 @@ class Main():
         self.pose_from_tracklet =   trackers.PoseFromTrackletGenerator(num_players)
         self.bbox_smoother =        trackers.BboxSmootherTracker(num_players, nodes.SmootherConfig())
         self.image_crop_processor = trackers.ImageCropProcessorTracker(num_players, self.image_crop_config)
-        self.Point2D_extractor =    Point2DExtractor(self.pose_detector)
+        self.Point2D_extractor =    PointBatchExtractor(self.pose_detector)
 
         self.pose_raw_pipeline = trackers.FilterTracker(
             settings.num_players,
@@ -137,7 +141,7 @@ class Main():
         )
 
 
-        self.pose_correlator: SimilarityComputer = SimilarityComputer(settings)
+        self.pose_correlator: SimilarityComputer = SimilarityComputer()
 
         self.pd_pose_streamer = PDStreamManager(settings)
         self.pd_stream_correlator: Optional[PDStreamComputer] = None #PoseStreamCorrelator(settings)

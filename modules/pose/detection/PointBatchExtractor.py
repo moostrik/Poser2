@@ -9,7 +9,7 @@ from modules.pose.callback.mixins import PoseDictCallbackMixin
 from modules.pose.Pose import PoseDict
 
 
-class Point2DExtractor(PoseDictCallbackMixin):
+class PointBatchExtractor(PoseDictCallbackMixin):
     """GPU-based batch extractor for 2D pose points using RTMPose detection.
 
     Batches are processed asynchronously on GPU. Under load, pending batches may
