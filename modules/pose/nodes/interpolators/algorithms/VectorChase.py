@@ -261,7 +261,7 @@ class AngleChase(VectorChase):
     """Chase interpolator for angular/circular data with proper wrapping."""
 
     def __init__(self, vector_size: int, input_frequency: float = 30.0, responsiveness: float = 0.2,
-                 friction: float = 0.03) -> None:
+                 friction: float = 0.03, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the angle chase interpolator."""
         super().__init__(vector_size, input_frequency, responsiveness, friction, clamp_range=None)
 
@@ -281,11 +281,11 @@ class AngleChase(VectorChase):
 class PointChase(VectorChase):
     """Chase interpolator for 2D points with (x, y) coordinates."""
 
-    def __init__(self, num_points: int, input_frequency: float = 30.0, responsiveness: float = 0.2,
+    def __init__(self, vector_size: int, input_frequency: float = 30.0, responsiveness: float = 0.2,
                  friction: float = 0.03, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the point chase interpolator."""
-        super().__init__(num_points * 2, input_frequency, responsiveness, friction, clamp_range)
-        self._num_points: int = num_points
+        super().__init__(vector_size * 2, input_frequency, responsiveness, friction, clamp_range)
+        self._num_points: int = vector_size
 
     def set_target(self, points: np.ndarray) -> None:
         """Set new target points."""

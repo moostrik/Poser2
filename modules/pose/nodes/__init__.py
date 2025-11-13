@@ -23,5 +23,5 @@ from .filters.StickyFillers import              StickyFillerConfig, AngleStickyF
 from .filters.gui.SmootherGui import            SmootherGui
 from .filters.gui.PredictionGui import          PredictionGui
 
-from .interpolators.ChaseInterpolators import   ChaseInterpolatorConfig, AngleChaseInterpolator, DeltaChaseInterpolator, PointChaseInterpolator, PoseChaseInterpolator
+from .interpolators.ChaseInterpolators import   ChaseInterpolatorConfig, AngleChaseInterpolator, DeltaChaseInterpolator, PointChaseInterpolator
 from .interpolators.gui.InterpolatorGui import  InterpolatorGui

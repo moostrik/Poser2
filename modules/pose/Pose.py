@@ -9,8 +9,6 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features import Point2DFeature, AngleFeature, SymmetryFeature, BBoxFeature
-from modules.pose.features.deprecated.PoseMeasurements import PoseMeasurementData, PoseMeasurementFactory
-
 # Local application imports
 from modules.tracker.Tracklet import Tracklet
 from modules.utils.PointsAndRects import Rect

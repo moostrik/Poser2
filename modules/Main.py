@@ -16,11 +16,9 @@ from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker
 from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
 
-from modules.pose import nodes
-from modules.pose.nodes import ChaseInterpolatorConfig, InterpolatorGui
-from modules.pose.trackers import FilterTracker, PoseFromTrackletGenerator, ImageCropProcessorTracker, BboxSmootherTracker, PoseChaseInterpolatorTracker
-
 from modules.pose.detection import Point2DExtractor, MMDetection
+from modules.pose import nodes
+from modules.pose import trackers
 
 from modules.pose.similarity.SimilarityComputer import SimilarityComputer
 
@@ -30,7 +28,6 @@ from modules.pose.similarity.StreamSimilarityComputer import StreamCorrelator
 from modules.DataHub import DataHub
 
 from modules.render.HDTRenderManager import HDTRenderManager
-from modules.WS.WSPipeline import WSPipeline
 
 
 class Main():
@@ -75,36 +72,35 @@ class Main():
         )
 
         # POSE CONFIGURATION
-        self.b_box_smooth_config = nodes.SmootherConfig()
-        self.point_smooth_config = nodes.SmootherConfig()
-        self.angle_smooth_config = nodes.SmootherConfig()
-        self.delta_smooth_config = nodes.SmootherConfig()
-        self.image_crop_config =   nodes.ImageCropProcessorConfig()
-        self.prediction_config = nodes.PredictorConfig(frequency=settings.camera_fps)
-        self.interpolation_config: ChaseInterpolatorConfig = nodes.ChaseInterpolatorConfig()
+        self.b_box_smooth_config =  nodes.SmootherConfig()
+        self.point_smooth_config =  nodes.SmootherConfig()
+        self.angle_smooth_config =  nodes.SmootherConfig()
+        self.delta_smooth_config =  nodes.SmootherConfig()
+        self.image_crop_config =    nodes.ImageCropProcessorConfig()
+        self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera_fps)
+        self.interpolation_config = nodes.ChaseInterpolatorConfig()
 
-        self.point_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
-        self.angle_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
-        self.delta_smooth_gui: nodes.SmootherGui = nodes.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
-        self.prediction_gui: nodes.PredictionGui = nodes.PredictionGui(self.prediction_config, self.gui, 'Predictor')
-        self.interpolation_gui: InterpolatorGui = InterpolatorGui(self.interpolation_config, self.gui, 'Interpolator')
+        self.point_smooth_gui =     nodes.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
+        self.angle_smooth_gui =     nodes.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
+        self.delta_smooth_gui =     nodes.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
+        self.prediction_gui =       nodes.PredictionGui(self.prediction_config, self.gui, 'Predictor')
+        self.interpolation_gui =    nodes.InterpolatorGui(self.interpolation_config, self.gui, 'Interpolator')
 
         # POSE PROCESSING PIPELINES
-        self.pose_from_tracklet = PoseFromTrackletGenerator(num_players)
-        self.bbox_smoother = BboxSmootherTracker(num_players, nodes.SmootherConfig())
-        self.image_crop_processor = ImageCropProcessorTracker(num_players, self.image_crop_config)
-        self.Point2D_extractor = Point2DExtractor(self.pose_detector)
+        self.pose_from_tracklet =   trackers.PoseFromTrackletGenerator(num_players)
+        self.bbox_smoother =        trackers.BboxSmootherTracker(num_players, nodes.SmootherConfig())
+        self.image_crop_processor = trackers.ImageCropProcessorTracker(num_players, self.image_crop_config)
+        self.Point2D_extractor =    Point2DExtractor(self.pose_detector)
 
-        self.pose_raw_pipeline = FilterTracker(
+        self.pose_raw_pipeline = trackers.FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.PointConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose_conf_threshold)),
                 nodes.AngleExtractor,
-                nodes.DeltaExtractor
             ]
         )
 
-        self.pose_smooth_pipeline = FilterTracker(
+        self.pose_smooth_pipeline = trackers.FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.PointSmoother(self.point_smooth_config),
@@ -112,29 +108,30 @@ class Main():
                 nodes.DeltaExtractor,
                 nodes.SymmetryExtractor,
                 nodes.MotionTimeAccumulator,
-                # lambda: nodes.DeltaSmoother(self.delta_smooth_config),
-                # filters.PoseValidator,
+                lambda: nodes.PoseValidator(nodes.ValidatorConfig()),
             ]
         )
 
-        self.pose_prediction_pipeline = FilterTracker(
+        self.pose_prediction_pipeline = trackers.FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.PointPredictor(self.prediction_config),
                 lambda: nodes.AnglePredictor(self.prediction_config),
                 lambda: nodes.DeltaPredictor(self.prediction_config),
-                # filters.PoseValidator
+                lambda: nodes.PoseValidator(nodes.ValidatorConfig()),
             ]
         )
 
-        self.interpolator = PoseChaseInterpolatorTracker(settings.num_players, self.interpolation_config)
+        self.point_interpolator = trackers.PointChaseInterpolatorTracker(settings.num_players, self.interpolation_config)
+        self.angle_interpolator = trackers.AngleChaseInterpolatorTracker(settings.num_players, self.interpolation_config)
 
-        self.pose_interpolation_pipeline = FilterTracker(
+        self.pose_interpolation_pipeline = trackers.FilterTracker(
             settings.num_players,
             [
                 nodes.DeltaExtractor,
                 nodes.SymmetryExtractor,
                 nodes.MotionTimeAccumulator,
+                lambda: nodes.PoseValidator(nodes.ValidatorConfig()),
             ]
         )
 
@@ -149,9 +146,9 @@ class Main():
         self.data_hub = DataHub()
 
         # RENDER
-        self.WS: Optional[WSPipeline] = None
-        if settings.art_type == Settings.ArtType.WS:
-            self.WS = WSPipeline(self.gui, settings)
+        # self.WS: Optional[WSPipeline] = None
+        # if settings.art_type == Settings.ArtType.WS:
+        #     self.WS = WSPipeline(self.gui, settings)
             # self.render = WSRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, settings)
         if settings.art_type == Settings.ArtType.HDT:
             self.render = HDTRenderManager(self.gui, self.data_hub, settings)
@@ -193,12 +190,14 @@ class Main():
         self.pose_smooth_pipeline.add_poses_callback(self.data_hub.set_smooth_poses) # smooth poses
 
         self.pose_smooth_pipeline.add_poses_callback(self.pose_prediction_pipeline.process)
-        self.pose_prediction_pipeline.add_poses_callback(self.interpolator.submit) # to 60 fps
-        self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
+        self.pose_prediction_pipeline.add_poses_callback(self.point_interpolator.submit) # to 60 fps
+        self.pose_prediction_pipeline.add_poses_callback(self.angle_interpolator.submit) # to 60 fps
+        self.angle_interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
         self.pose_interpolation_pipeline.add_poses_callback(self.data_hub.set_interpolated_poses) # interpolated poses
 
 
-        self.data_hub.add_update_callback(self.interpolator.update)
+        self.data_hub.add_update_callback(self.point_interpolator.update)
+        self.data_hub.add_update_callback(self.angle_interpolator.update)
 
         # self.pose_prediction_pipeline.add_poses_callback(self.render_data_hub.add_poses)
 
@@ -230,8 +229,8 @@ class Main():
             else:
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
-        if self.WS:
-            self.gui.addFrame([self.WS.gui.get_gui_frame(), self.WS.gui.get_gui_test_frame()])
+        # if self.WS:
+        #     self.gui.addFrame([self.WS.gui.get_gui_frame(), self.WS.gui.get_gui_test_frame()])
 
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.angle_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.prediction_gui.get_gui_frame(), self.interpolation_gui.get_gui_frame()])
@@ -288,8 +287,8 @@ class Main():
             self.stream_correlator.stop()
 
         # print('stop av')
-        if self.WS:
-            self.WS.stop()
+        # if self.WS:
+        #     self.WS.stop()
 
         # print('stop recorder')
         if self.recorder:
