@@ -410,7 +410,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
 
     # ========== SIMILARITY-SPECIFIC CONVENIENCE METHODS ==========
 
-    def similarity(self, method: AggregationMethod = AggregationMethod.MEAN,
+    def aggregate_similarity(self, method: AggregationMethod = AggregationMethod.MEAN,
                           min_confidence: float = 0.0) -> float:
         """Compute overall similarity score using specified aggregation method.
 
@@ -471,7 +471,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
             >>> if similarity.matches_pose(0.7, AggregationMethod.MEAN):
             ...     print("Poses are somewhat similar")
         """
-        overall = self.similarity(method, min_confidence)
+        overall = self.aggregate_similarity(method, min_confidence)
         return not np.isnan(overall) and overall >= threshold
 
 
@@ -479,161 +479,8 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
 
     def __repr__(self) -> str:
         """String representation showing pair IDs and overall similarity."""
-        overall = self.similarity()
+        overall = self.aggregate_similarity()
         valid = self.valid_count
         total = len(self)
         return (f"SimilarityFeature(pair={self.pair_id}, "
                 f"similarity={overall:.3f}, valid={valid}/{total})")
-
-# ========== BATCH COLLECTION ==========
-
-@dataclass(frozen=True)
-class SimilarityBatch:
-    """Collection of all similarity features for multiple pose pairs in a frame.
-
-    Simple container with O(1) lookup and iteration support.
-    Stores similarity comparisons between all pose pairs detected in a frame.
-
-    Attributes:
-        similarities: List of SimilarityFeature objects (one per pose pair)
-        timestamp: When this batch was created (default: current time)
-
-    Examples:
-        >>> # Create batch
-        >>> batch = SimilarityFeatureBatch([sim1, sim2, sim3])
-        >>>
-        >>> # Check size
-        >>> print(f"Comparing {len(batch)} pose pairs")
-        >>>
-        >>> # Lookup specific pair
-        >>> sim = batch.get_pair((5, 8))
-        >>> if sim:
-        ...     print(f"Similarity: {sim.similarity():.2f}")
-        >>>
-        >>> # Iterate all pairs
-        >>> for similarity in batch:
-        ...     print(f"{similarity.pair_id}: {similarity.similarity():.2f}")
-        >>>
-        >>> # Get top matches
-        >>> top_5 = batch.get_top_pairs(n=5)
-        >>> for sim in top_5:
-        ...     print(f"Pair {sim.pair_id}: {sim.similarity():.2f}")
-    """
-    similarities: list[SimilarityFeature]
-    timestamp: float = field(default_factory=time.time)
-    _pair_lookup: dict[tuple[int, int], SimilarityFeature] = field(
-        init=False, repr=False, compare=False, default_factory=dict
-    )
-
-    def __post_init__(self) -> None:
-        """Build O(1) lookup index for pair access."""
-        lookup: dict[tuple[int, int], SimilarityFeature] = {
-            sim.pair_id: sim for sim in self.similarities
-        }
-        object.__setattr__(self, '_pair_lookup', lookup)
-
-    def __repr__(self) -> str:
-        return f"SimilarityFeatureBatch({len(self)} pairs, timestamp={self.timestamp:.3f})"
-
-    def __len__(self) -> int:
-        """Number of pairs in batch."""
-        return len(self.similarities)
-
-    def __contains__(self, pair_id: tuple[int, int]) -> bool:
-        """Support 'pair_id in batch' syntax.
-
-        Args:
-            pair_id: Tuple of (id_1, id_2), will be normalized to (min, max)
-
-        Returns:
-            True if pair exists in batch
-
-        Examples:
-            >>> if (5, 8) in batch:
-            ...     print("Found pair (5, 8)")
-        """
-        pair_id = (min(pair_id), max(pair_id))
-        return pair_id in self._pair_lookup
-
-    def __iter__(self) -> Iterator[SimilarityFeature]:
-        """Support 'for similarity in batch' syntax."""
-        return iter(self.similarities)
-
-    @property
-    def is_empty(self) -> bool:
-        """True if batch contains no pairs."""
-        return len(self) == 0
-
-    def get_pair(self, pair_id: tuple[int, int]) -> Optional[SimilarityFeature]:
-        """Get similarity for specific pair (O(1) lookup).
-
-        Args:
-            pair_id: Tuple of (id_1, id_2), will be normalized to (min, max)
-
-        Returns:
-            SimilarityFeature if pair exists, None otherwise
-
-        Examples:
-            >>> sim = batch.get_pair((5, 8))
-            >>> if sim:
-            ...     print(f"Similarity: {sim.similarity():.2f}")
-        """
-        pair_id = (min(pair_id), max(pair_id))
-        return self._pair_lookup.get(pair_id)
-
-    def get_top_pairs(
-        self,
-        n: int = 5,
-        min_valid_landmarks: int = 1,
-        method: AggregationMethod = AggregationMethod.MEAN,
-        min_confidence: float = 0.0
-    ) -> list[SimilarityFeature]:
-        """Get top N most similar pairs, sorted by similarity (descending).
-
-        Args:
-            n: Number of top pairs to return (default: 5)
-            min_valid_landmarks: Minimum valid elements required (default: 1)
-            method: Aggregation method for sorting (default: MEAN)
-            min_confidence: Minimum confidence for aggregation (default: 0.0)
-
-        Returns:
-            List of top N most similar pairs, sorted best-first
-
-        Examples:
-            >>> # Get top 5 most similar pairs
-            >>> top = batch.get_top_pairs(n=5)
-            >>> for sim in top:
-            ...     print(f"{sim.pair_id}: {sim.similarity():.2f}")
-            >>>
-            >>> # Get top pairs with strict criteria
-            >>> top = batch.get_top_pairs(
-            ...     n=3,
-            ...     min_valid_landmarks=10,
-            ...     method=AggregationMethod.GEOMETRIC_MEAN,
-            ...     min_confidence=0.7
-            ... )
-        """
-        if self.is_empty or n <= 0:
-            return []
-
-        # Filter by minimum valid landmarks
-        valid_pairs = [
-            sim for sim in self.similarities
-            if sim.valid_count >= min_valid_landmarks
-        ]
-
-        # Compute scores and filter out NaN
-        scored_pairs: list[tuple[SimilarityFeature, float]] = []
-        for sim in valid_pairs:
-            score = sim.aggregate(method, min_confidence)
-            if not np.isnan(score):
-                scored_pairs.append((sim, score))
-
-        # Sort by score (descending)
-        scored_pairs.sort(key=lambda x: x[1], reverse=True)
-
-        return [sim for sim, _ in scored_pairs[:n]]
-
-
-# Type alias for batch callbacks
-SimilarityBatchCallback = Callable[[SimilarityBatch], None]

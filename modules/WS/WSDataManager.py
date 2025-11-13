@@ -8,7 +8,7 @@ from modules.tracker.Tracklet import Tracklet
 # from modules.pose.Pose import Pose, Point2DFeature, AngleFeature, PoseMeasurementData
 from modules.pose.features.AngleFeature import AngleLandmark, ANGLE_LANDMARK_NAMES
 from modules.pose.features.Point2DFeature import PointLandmark
-from modules.pose.similarity.Stream import StreamData
+from modules.pose.pd_stream.Stream import StreamData
 from modules.utils.PointsAndRects import Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods

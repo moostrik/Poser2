@@ -19,13 +19,14 @@ and makes sure the last_pose always corresponds to interpolator's last set targe
 from dataclasses import replace
 from threading import Lock
 
+# Third-party imports
 import numpy as np
 
 # Pose imports
+from modules.pose.features import PoseFeature, AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
+from modules.pose.nodes._utils.VectorChase import AngleChase, PointChase, VectorChase
 from modules.pose.nodes.Nodes import InterpolatorNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.nodes.interpolators.algorithms.VectorChase import AngleChase, PointChase, VectorChase
-from modules.pose.features import PoseFeature, AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
 
 
 class ChaseInterpolatorConfig(NodeConfigBase):
@@ -40,7 +41,7 @@ class ChaseInterpolatorConfig(NodeConfigBase):
 
 class FeatureChaseInterpolator(InterpolatorNode):
     """Generic pose feature chase interpolator."""
-    
+
     # Registry mapping feature classes to interpolator classes
     INTERPOLATOR_REGISTRY = {
         AngleFeature: AngleChase,
@@ -48,7 +49,7 @@ class FeatureChaseInterpolator(InterpolatorNode):
         Point2DFeature: PointChase,
         SymmetryFeature: VectorChase,
     }
-    
+
     def __init__(self, config: ChaseInterpolatorConfig, feature_class: type, attr_name: str):
         if feature_class not in self.INTERPOLATOR_REGISTRY:
             valid_classes = [cls.__name__ for cls in self.INTERPOLATOR_REGISTRY.keys()]

@@ -6,8 +6,9 @@ from typing import Optional
 import numpy as np
 
 # Pose imports
-from modules.pose.features import AngleFeature, AngleLandmark, ANGLE_KEYPOINTS
+from modules.pose.features import AngleFeature, AngleLandmark
 from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
+from modules.pose.nodes._utils.AngleUtils import ANGLE_KEYPOINTS
 
 # COLORS
 POSE_COLOR_ALPHA_BASE:      float = 0.2

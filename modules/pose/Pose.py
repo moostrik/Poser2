@@ -1,17 +1,10 @@
 # Standard library imports
 from dataclasses import dataclass, field
-from functools import cached_property
 import time
 from typing import Callable, Any
 
-# Third-party imports
-import numpy as np
-
 # Pose imports
 from modules.pose.features import Point2DFeature, AngleFeature, SymmetryFeature, BBoxFeature
-# Local application imports
-from modules.tracker.Tracklet import Tracklet
-from modules.utils.PointsAndRects import Rect
 
 
 @dataclass(frozen=True)

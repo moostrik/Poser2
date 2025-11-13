@@ -11,10 +11,10 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
+from modules.pose.features import AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
+from modules.pose.nodes._utils.VectorSmooth import VectorSmooth, AngleSmooth, PointSmooth
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.nodes.filters.algorithms.VectorSmooth import VectorSmooth, AngleSmooth, PointSmooth
-from modules.pose.features import AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
 
 
 class SmootherConfig(NodeConfigBase):

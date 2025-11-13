@@ -15,7 +15,7 @@ from modules.pose.Pose import Pose
 
 from modules.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.AngleFeature import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
-from modules.pose.similarity.Stream import StreamData
+from modules.pose.pd_stream.Stream import StreamData
 
 from modules.DataHub import DataHub
 from modules.render.meshes.PoseMesh import PoseMesh

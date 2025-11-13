@@ -7,10 +7,14 @@ when pose detection temporarily fails.
 
 # Standard library imports
 from dataclasses import replace
+
+# Third-party imports
 import numpy as np
+
+# Pose imports
+from modules.pose.features import AngleFeature, Point2DFeature, SymmetryFeature, BBoxFeature, PoseFeature
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.features import AngleFeature, Point2DFeature, SymmetryFeature, BBoxFeature, PoseFeature
 
 
 class StickyFillerConfig(NodeConfigBase):

@@ -3,7 +3,7 @@ import numpy as np
 from modules.pose.features import AngleFeature, AngleLandmark
 
 
-class AngleSimilarity:
+class SimilarityUtils:
     """Utilities for comparing poses and computing similarity metrics."""
 
     @staticmethod
@@ -89,7 +89,7 @@ class AngleSimilarity:
             ... )
         """
         # Compute similarity with confidence scores
-        sim = AngleSimilarity.compute_similarity(angles1, angles2, exponent)
+        sim = SimilarityUtils.compute_similarity(angles1, angles2, exponent)
 
         # Apply weights and confidence threshold
         weighted_sum = 0.0
@@ -105,45 +105,3 @@ class AngleSimilarity:
                 weight_sum += weight * confidence
 
         return weighted_sum / weight_sum if weight_sum > 0 else 0.0
-
-    @staticmethod
-    def overall_similarity(angles1: AngleFeature, angles2: AngleFeature,
-                          exponent: float = 2.0,
-                          min_confidence: float = 0.5) -> float:
-        """Compute overall similarity score (unweighted average).
-
-        Args:
-            angles1: First angle feature
-            angles2: Second angle feature
-            exponent: Decay rate for similarity calculation (default: 2.0)
-            min_confidence: Minimum confidence to include joint (default: 0.5)
-
-        Returns:
-            Overall similarity score [0, 1], confidence-weighted average
-            Returns 0.0 if no joints meet confidence threshold
-
-        Examples:
-            >>> # Simple overall comparison
-            >>> score = AngleSimilarity.overall_similarity(ref, current)
-            >>> if score > 0.8:
-            ...     print("Poses are very similar!")
-            >>>
-            >>> # Stricter matching, only trust high-confidence
-            >>> score = AngleSimilarity.overall_similarity(
-            ...     ref, current,
-            ...     exponent=3.0, min_confidence=0.7
-            ... )
-        """
-        sim = AngleSimilarity.compute_similarity(angles1, angles2, exponent)
-
-        # Filter by confidence threshold
-        confident_mask = (sim.scores >= min_confidence) & (~np.isnan(sim.values))
-
-        if not np.any(confident_mask):
-            return 0.0
-
-        # Confidence-weighted average
-        return float(np.average(
-            sim.values[confident_mask],
-            weights=sim.scores[confident_mask]
-        ))

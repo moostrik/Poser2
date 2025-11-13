@@ -11,7 +11,7 @@ _SYMMETRY_PAIRS: dict[SymmetryElement, tuple[AngleLandmark, AngleLandmark]] = {
     SymmetryElement.knee: (AngleLandmark.left_knee, AngleLandmark.right_knee),
 }
 
-class SymmetryFactory:
+class SymmetryUtils:
     """Utility class for computing symmetry metrics from angle data."""
 
     @staticmethod

@@ -8,8 +8,12 @@ from typing import Optional
 # Third-party imports
 
 # Pose imports
-from modules.pose.features import AngleFeature, SimilarityFeature , SimilarityBatch , SimilarityBatchCallback
-from modules.pose.similarity.AngleSimilarity import AngleSimilarity
+from modules.pose.features import AngleFeature
+from modules.pose.similarity.features.SimilarityFeature import SimilarityFeature
+from modules.pose.similarity.features.SimilarityBatch import SimilarityBatch, SimilarityBatchCallback
+
+
+from modules.pose.similarity._utils.SimilarityUtils import SimilarityUtils
 from modules.pose.Pose import PoseDict
 
 # Local application imports
@@ -101,7 +105,7 @@ class SimilarityComputer:
         similarities: list[SimilarityFeature] = []
         for (id1, angles_1), (id2, angles_2) in combinations(angles.items(), 2):
             # Compute similarity scores
-            similarity_data: AngleFeature = AngleSimilarity.compute_similarity(angles_1, angles_2, self.similarity_exponent)
+            similarity_data: AngleFeature = SimilarityUtils.compute_similarity(angles_1, angles_2, self.similarity_exponent)
 
             # Only include pairs with at least one valid joint
             if similarity_data.valid_count > 0:

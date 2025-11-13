@@ -1,7 +1,8 @@
-from modules.pose.Pose import Pose
-from modules.pose.nodes.Nodes import ProcessorNode, NodeConfigBase
-from modules.pose.nodes.processors.algorithms.ImageProcessor import ImageProcessor
 import numpy as np
+
+from modules.pose.nodes._utils.ImageProcessor import ImageProcessor
+from modules.pose.nodes.Nodes import ProcessorNode, NodeConfigBase
+from modules.pose.Pose import Pose
 
 class ImageCropProcessorConfig(NodeConfigBase):
     """Configuration for pose chase interpolation with automatic change notification."""

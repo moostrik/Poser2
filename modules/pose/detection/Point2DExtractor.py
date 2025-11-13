@@ -1,11 +1,12 @@
 from dataclasses import replace
 from threading import Lock
 
-from modules.pose.Pose import PoseDict
+import numpy as np
+
 from modules.pose.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput
 from modules.pose.features import Point2DFeature
 from modules.pose.callback.mixins import PoseDictCallbackMixin
-import numpy as np
+from modules.pose.Pose import PoseDict
 
 
 class Point2DExtractor(PoseDictCallbackMixin):

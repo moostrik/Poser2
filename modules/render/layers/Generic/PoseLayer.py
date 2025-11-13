@@ -13,7 +13,7 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 from modules.pose.features.AngleFeature import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
-from modules.pose.similarity.Stream import StreamData
+from modules.pose.pd_stream.Stream import StreamData
 
 from modules.DataHub import DataHub
 from modules.gl.LayerBase import LayerBase, Rect

@@ -19,11 +19,12 @@ from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 from modules.pose.detection import Point2DExtractor, MMDetection
 from modules.pose import nodes
 from modules.pose import trackers
+from modules.pose import gui
 
 from modules.pose.similarity.SimilarityComputer import SimilarityComputer
 
-from modules.pose.similarity.Stream import StreamManager
-from modules.pose.similarity.StreamSimilarityComputer import StreamCorrelator
+from modules.pose.pd_stream.Stream import StreamManager
+from modules.pose.pd_stream.StreamSimilarityComputer import StreamCorrelator
 
 from modules.DataHub import DataHub
 
@@ -80,11 +81,11 @@ class Main():
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera_fps)
         self.interpolation_config = nodes.ChaseInterpolatorConfig()
 
-        self.point_smooth_gui =     nodes.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
-        self.angle_smooth_gui =     nodes.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
-        self.delta_smooth_gui =     nodes.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
-        self.prediction_gui =       nodes.PredictionGui(self.prediction_config, self.gui, 'Predictor')
-        self.interpolation_gui =    nodes.InterpolatorGui(self.interpolation_config, self.gui, 'Interpolator')
+        self.point_smooth_gui =     gui.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
+        self.angle_smooth_gui =     gui.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
+        self.delta_smooth_gui =     gui.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
+        self.prediction_gui =       gui.PredictionGui(self.prediction_config, self.gui, 'Predictor')
+        self.interpolation_gui =    gui.InterpolatorGui(self.interpolation_config, self.gui, 'Interpolator')
 
         # POSE PROCESSING PIPELINES
         self.pose_from_tracklet =   trackers.PoseFromTrackletGenerator(num_players)

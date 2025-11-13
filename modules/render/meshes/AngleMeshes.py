@@ -5,7 +5,7 @@ import numpy as np
 
 # Local application imports
 from modules.gl.Mesh import Mesh
-from modules.pose.similarity.Stream import StreamData
+from modules.pose.pd_stream.Stream import StreamData
 from modules.DataHub import DataHub
 from modules.gl.LayerBase import LayerBase, Rect
 

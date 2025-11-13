@@ -2,9 +2,9 @@
 
 from dataclasses import replace
 
-from modules.pose.Pose import Pose
-from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.features import AngleFeature, Point2DFeature, BBoxFeature, SymmetryFeature
+from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
+from modules.pose.Pose import Pose
 
 
 class ValidatorConfig(NodeConfigBase):

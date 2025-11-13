@@ -4,7 +4,8 @@ from dataclasses import dataclass
 import numpy as np
 
 # Pose imports
-from modules.pose.features import SimilarityBatch, AggregationMethod
+from modules.pose.features import AggregationMethod
+from modules.pose.similarity.features.SimilarityBatch import SimilarityBatch
 
 # Local application imports
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -86,7 +87,7 @@ class SimilarityStream:
             pair_id: tuple[int, int] = (min(pair_corr.pair_id), max(pair_corr.pair_id))
             current_pairs.add(pair_id)
 
-            similarity: float = pair_corr.similarity(statistic)
+            similarity: float = pair_corr.aggregate_similarity(statistic)
 
             if pair_id in self._pair_history:
                 similarities, write_idx = self._pair_history[pair_id]

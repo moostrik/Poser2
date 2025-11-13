@@ -16,7 +16,7 @@ from modules.WS.WSUdpSender import WSUdpSender, WSUdpSenderSettings
 
 from modules.Settings import Settings
 from modules.pose.Pose import Pose, PoseDict
-from modules.pose.similarity.Stream import StreamData
+from modules.pose.pd_stream.Stream import StreamData
 
 from modules.gl.Utils import FpsCounter
 

@@ -15,8 +15,8 @@ from numba import njit
 import pandas as pd
 
 # Pose imports
-from modules.pose.features import SimilarityFeature , SimilarityBatch , SimilarityBatchCallback
-from modules.pose.similarity.Stream import StreamData, StreamDataDict
+from modules.pose.similarity import SimilarityFeature, SimilarityBatch, SimilarityBatchCallback
+from modules.pose.pd_stream.Stream import StreamData, StreamDataDict
 
 # Local application imports
 from modules.Settings import Settings

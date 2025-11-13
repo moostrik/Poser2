@@ -7,13 +7,14 @@ extrapolation with proper handling of circular values and coordinate clamping.
 # Standard library imports
 from dataclasses import replace
 
+# Third-party imports
 import numpy as np
 
 # Pose imports
+from modules.pose.features import AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
+from modules.pose.nodes._utils.VectorPredict import AnglePredict, PointPredict, VectorPredict, PredictionMethod
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.nodes.filters.algorithms.VectorPredict import AnglePredict, PointPredict, VectorPredict, PredictionMethod
-from modules.pose.features import AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
 
 
 class PredictorConfig(NodeConfigBase):
@@ -117,7 +118,7 @@ class FeaturePredictor(FilterNode):
         self._predictor.method = self._config.method
 
 
-# Convenience classes for common use cases
+# Convenience classes
 class AnglePredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
         super().__init__(config, AngleFeature, "angles")

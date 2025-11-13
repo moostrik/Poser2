@@ -10,9 +10,9 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
+from modules.pose.features import AngleFeature, Point2DFeature, BBoxFeature, SymmetryFeature
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.features import AngleFeature, Point2DFeature, BBoxFeature, SymmetryFeature
 
 
 class ConfidenceFilterConfig(NodeConfigBase):

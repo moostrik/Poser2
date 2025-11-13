@@ -9,7 +9,7 @@ from modules.gl.Image import Image
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.similarity.Stream import StreamData
+from modules.pose.pd_stream.Stream import StreamData
 from modules.tracker.Tracklet import Tracklet
 
 from modules.DataHub import DataHub

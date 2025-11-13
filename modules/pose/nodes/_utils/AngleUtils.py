@@ -39,7 +39,7 @@ _ANGLE_MIRRORED: set[AngleLandmark] = {
     AngleLandmark.right_knee,
 }
 
-class AngleFactory:
+class AngleUtils:
 
     @staticmethod
     def from_points(points: Point2DFeature) -> AngleFeature:
@@ -72,9 +72,9 @@ class AngleFactory:
 
             # Compute angle based on number of keypoints (no NaN checks needed)
             if len(keypoints) == 3:
-                angle = AngleFactory._calculate_angle(P[0], P[1], P[2], rotate_by)
+                angle = AngleUtils._calculate_angle(P[0], P[1], P[2], rotate_by)
             elif landmark == AngleLandmark.head:
-                angle = AngleFactory._calculate_head_yaw(P[0], P[1], P[2], P[3], rotate_by)
+                angle = AngleUtils._calculate_head_yaw(P[0], P[1], P[2], P[3], rotate_by)
             else:
                 continue
 

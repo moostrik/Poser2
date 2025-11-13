@@ -9,7 +9,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.similarity.SimilarityStream import SimilarityStream, SimilarityStreamData, SimilarityBatch , AggregationMethod
+from modules.pose.similarity.features.SimilarityStream import SimilarityStream, SimilarityStream, SimilarityBatch , AggregationMethod
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.DataHub import DataHub
 
@@ -74,7 +74,7 @@ class CorrelationStreamLayer(LayerBase):
             return
 
         self.correlation_stream.update(correlation_batch, AggregationMethod.GEOMETRIC_MEAN)
-        stream_data: SimilarityStreamData = self.correlation_stream.get_stream_data()
+        stream_data: SimilarityStream = self.correlation_stream.get_stream_data()
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         self.fbo.begin()
