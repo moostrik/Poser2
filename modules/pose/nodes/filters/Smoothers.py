@@ -5,7 +5,6 @@ of circular values and coordinate clamping.
 """
 
 # Standard library imports
-from abc import abstractmethod
 from dataclasses import replace
 
 # Third-party imports
@@ -14,9 +13,8 @@ import numpy as np
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.nodes.filters.algorithms.VectorSmooth import Smooth, VectorSmooth, AngleSmooth, PointSmooth
-from modules.pose.features import PoseFeature, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
-from modules.pose.features import BaseFeature, AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
+from modules.pose.nodes.filters.algorithms.VectorSmooth import VectorSmooth, AngleSmooth, PointSmooth
+from modules.pose.features import AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
 
 
 class SmootherConfig(NodeConfigBase):
@@ -29,36 +27,63 @@ class SmootherConfig(NodeConfigBase):
         self.beta: float = beta
         self.d_cutoff: float = d_cutoff
 
-SMOOTHER_LOOKUP = {
-    AngleFeature:       AngleSmooth,
-    BBoxFeature:        VectorSmooth,
-    Point2DFeature:     PointSmooth,
-    SymmetryFeature:    VectorSmooth
-}
 
-class GenericSmoother(FilterNode):
+class FeatureSmoother(FilterNode):
     """Generic pose feature smoother using OneEuroFilter.
 
-    Handles smoothing for any pose feature by specifying the feature type and attribute name.
+    Args:
+        config: Smoother configuration
+        feature_class: Feature class type (e.g., AngleFeature, Point2DFeature)
+        attr_name: Name of the pose attribute to smooth
+
+    Example:
+        smoother = GenericSmoother(config, AngleFeature, "angles")
+        smoother = GenericSmoother(config, Point2DFeature, "points")
     """
 
-    def __init__(self, config: SmootherConfig, feature_type: type, attr_name: str):
-        self._config: SmootherConfig = config
-        self._feature_type: type = feature_type
-        self._attr_name: str = attr_name
+    # Registry mapping feature classes to smoother classes
+    SMOOTHER_REGISTRY = {
+        AngleFeature: AngleSmooth,
+        BBoxFeature: VectorSmooth,
+        Point2DFeature: PointSmooth,
+        SymmetryFeature: VectorSmooth,
+    }
 
-        if feature_type not in SMOOTHER_LOOKUP:
-            raise ValueError(f"Smoother not implemented for feature type: {feature_type.__name__}")
+    def __init__(self, config: SmootherConfig, feature_class: type, attr_name: str):
+        if feature_class not in self.SMOOTHER_REGISTRY:
+            valid_classes = [cls.__name__ for cls in self.SMOOTHER_REGISTRY.keys()]
+            raise ValueError(
+                f"Unknown feature class '{feature_class.__name__}'. "
+                f"Must be one of: {valid_classes}"
+            )
 
-        self._smoother: Smooth = SMOOTHER_LOOKUP[feature_type](
-            vector_size=len(feature_type.feature_enum()),
-            frequency=self._config.frequency,
-            min_cutoff=self._config.min_cutoff,
-            beta=self._config.beta,
-            d_cutoff=self._config.d_cutoff
+        self._config = config
+        self._attr_name = attr_name
+        self._feature_class = feature_class
+
+        smoother_cls = self.SMOOTHER_REGISTRY[feature_class]
+        self._smoother = smoother_cls(
+            vector_size=len(feature_class.feature_enum()),
+            frequency=config.frequency,
+            min_cutoff=config.min_cutoff,
+            beta=config.beta,
+            d_cutoff=config.d_cutoff,
+            clamp_range=feature_class.default_range()
         )
-
         self._config.add_listener(self._on_config_changed)
+
+    def __del__(self):
+        """Cleanup config listener to prevent memory leaks."""
+        try:
+            self._config.remove_listener(self._on_config_changed)
+        except (AttributeError, ValueError):
+            pass  # Config already cleaned up or listener not found
+
+    def _on_config_changed(self) -> None:
+        self._smoother.frequency = self._config.frequency
+        self._smoother.min_cutoff = self._config.min_cutoff
+        self._smoother.beta = self._config.beta
+        self._smoother.d_cutoff = self._config.d_cutoff
 
     @property
     def config(self) -> SmootherConfig:
@@ -74,68 +99,28 @@ class GenericSmoother(FilterNode):
     def reset(self) -> None:
         self._smoother.reset()
 
-    def _on_config_changed(self) -> None:
-        self._smoother.frequency = self._config.frequency
-        self._smoother.min_cutoff = self._config.min_cutoff
-        self._smoother.beta = self._config.beta
-        self._smoother.d_cutoff = self._config.d_cutoff
 
-
-class AngleSmoother(GenericSmoother):
+# Convenience classes
+class AngleSmoother(FeatureSmoother):
     def __init__(self, config: SmootherConfig) -> None:
         super().__init__(config, AngleFeature, "angles")
 
 
-class BboxSmoother(GenericSmoother):
-    def __init__(self, config: SmootherConfig) -> None:
-        super().__init__(config, BBoxFeature, "bbox")
-
-
-class DeltaSmoother(GenericSmoother):
+class DeltaSmoother(FeatureSmoother):
     def __init__(self, config: SmootherConfig) -> None:
         super().__init__(config, AngleFeature, "deltas")
 
 
-class Point2DSmoother(GenericSmoother):
+class BBoxSmoother(FeatureSmoother):
+    def __init__(self, config: SmootherConfig) -> None:
+        super().__init__(config, BBoxFeature, "bbox")
+
+
+class PointSmoother(FeatureSmoother):
     def __init__(self, config: SmootherConfig) -> None:
         super().__init__(config, Point2DFeature, "points")
 
 
-class SymmetrySmoother(GenericSmoother):
+class SymmetrySmoother(FeatureSmoother):
     def __init__(self, config: SmootherConfig) -> None:
         super().__init__(config, SymmetryFeature, "symmetry")
-
-
-class PoseSmoother(FilterNode):
-    """Smooths all pose features (angles, points, and deltas) using OneEuroFilter.
-
-    Applies the same smoothing configuration to all features. For independent
-    control of each feature, use PoseAngleSmoother, PosePointSmoother, and
-    PoseDeltaSmoother separately.
-    """
-
-    def __init__(self, config: SmootherConfig) -> None:
-        self._config: SmootherConfig = config
-
-        # Create individual smoothers for each feature
-        self._angle_smoother = AngleSmoother(config)
-        self._point_smoother = Point2DSmoother(config)
-        self._delta_smoother = DeltaSmoother(config)
-
-    @property
-    def config(self) -> SmootherConfig:
-        """Access the smoother's configuration."""
-        return self._config
-
-    def process(self, pose: Pose) -> Pose:
-        """Smooth all features in the pose."""
-        pose = self._angle_smoother.process(pose)
-        pose = self._point_smoother.process(pose)
-        pose = self._delta_smoother.process(pose)
-        return pose
-
-    def reset(self) -> None:
-        """Reset all smoothers' internal state."""
-        self._angle_smoother.reset()
-        self._point_smoother.reset()
-        self._delta_smoother.reset()

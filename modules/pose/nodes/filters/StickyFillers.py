@@ -6,15 +6,11 @@ when pose detection temporarily fails.
 """
 
 # Standard library imports
-from abc import abstractmethod
 from dataclasses import replace
-
 import numpy as np
-
-# Pose imports
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.features import PoseFeature, AngleFeature, Point2DFeature
+from modules.pose.features import AngleFeature, Point2DFeature, SymmetryFeature, BBoxFeature, PoseFeature
 
 
 class StickyFillerConfig(NodeConfigBase):
@@ -33,185 +29,85 @@ class StickyFillerConfig(NodeConfigBase):
         self.hold_scores: bool = hold_scores
 
 
-class StickyFillerBase(FilterNode):
-    """Base class for pose hold filters.
+class FeatureStickyFiller(FilterNode):
+    """Generic sticky filler for pose features."""
 
-    Replaces NaN values with the last valid value for each feature element.
-    Maintains separate history for each joint/point as PoseFeatureData.
+    def __init__(self, config: StickyFillerConfig, feature_class: type, attr_name: str) -> None:
+        self._config = config
+        self._feature_class = feature_class
+        self._attr_name = attr_name
+        self._last_valid = self._initialize_last_valid()
 
-    Subclasses only need to specify:
-    - Which feature to extract from pose (_get_feature_data)
-    - How to replace feature data in pose (_replace_feature_data)
-    - How to create empty feature data (_create_empty_feature_data)
-    """
+    def _initialize_last_valid(self) -> PoseFeature:
+        """Initialize last valid state based on config."""
+        empty_data = self._feature_class.create_dummy()
+        if self._config.init_to_zero:
+            values = np.zeros_like(empty_data.values)
+            scores = np.ones_like(empty_data.scores)
+            return self._feature_class(values=values, scores=scores)
+        return empty_data
 
-    def __init__(self, config: StickyFillerConfig) -> None:
-        self._config: StickyFillerConfig = config
-        self._last_valid: PoseFeature = self._initialize_last_valid()
+    @staticmethod
+    def _broadcast_mask(mask: np.ndarray, values: np.ndarray) -> np.ndarray:
+        """Broadcast 1D mask to match values shape if needed."""
+        return mask[:, np.newaxis] if values.ndim > 1 else mask
 
     @property
     def config(self) -> StickyFillerConfig:
-        """Access the filter's configuration."""
         return self._config
 
-    @abstractmethod
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        """Extract the feature data to process from the pose."""
-        pass
-
-    @abstractmethod
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        """Create new pose with replaced feature data."""
-        pass
-
-    @abstractmethod
-    def _create_empty_feature_data(self) -> PoseFeature:
-        """Create empty feature data for initialization."""
-        pass
-
-    def _initialize_last_valid(self) -> PoseFeature:
-        """Initialize last_valid based on config."""
-
-        if self._config.init_to_zero:
-            empty_data = self._create_empty_feature_data()
-            values = np.zeros_like(empty_data.values)
-            scores = np.ones_like(empty_data.scores)  # Valid scores for valid zeros
-            return type(empty_data)(values=values, scores=scores)
-        else:
-            return self._create_empty_feature_data()
-
     def process(self, pose: Pose) -> Pose:
-        """Replace NaN values with last valid values."""
-
-        # Get feature data
-        feature_data = self._get_feature_data(pose)
-
-        # Use feature data's valid_mask (per-joint level)
-        # valid_mask is True for valid joints (score > 0), False for invalid joints
+        """Replace invalid values with last valid, update state with new valid values."""
+        feature_data = getattr(pose, self._attr_name)
         valid_mask = feature_data.valid_mask
         invalid_mask = ~valid_mask
 
-        # Replace invalid values with last valid values
-        # Need to broadcast invalid_mask to match values shape for points (17,) -> (17, 2)
-        if feature_data.values.ndim > 1:
-            # For 2D data (points), expand mask to match shape
-            invalid_values_mask = invalid_mask[:, np.newaxis]
-        else:
-            # For 1D data (angles, deltas), use directly
-            invalid_values_mask = invalid_mask
+        # Broadcast masks for value arrays
+        invalid_values_mask = self._broadcast_mask(invalid_mask, feature_data.values)
+        valid_values_mask = ~invalid_values_mask
 
+        # Create output with held values
         held_values = np.where(invalid_values_mask, self._last_valid.values, feature_data.values)
+        score_replacement = self._last_valid.scores if self._config.hold_scores else 0.0
+        held_scores = np.where(invalid_mask, score_replacement, feature_data.scores).astype(np.float32)
 
-        # Handle scores (always at joint level)
-        if self._config.hold_scores:
-            held_scores = np.where(invalid_mask, self._last_valid.scores, feature_data.scores)
-        else:
-            held_scores = np.where(invalid_mask, 0.0, feature_data.scores)
-
-        held_scores = held_scores.astype(np.float32)
-
-        # Update last valid (only where current is valid)
-        if feature_data.values.ndim > 1:
-            valid_values_mask = valid_mask[:, np.newaxis]
-        else:
-            valid_values_mask = valid_mask
-
+        # Update internal state (only valid values)
         updated_values = np.where(valid_values_mask, feature_data.values, self._last_valid.values)
         updated_scores = np.where(valid_mask, feature_data.scores, self._last_valid.scores).astype(np.float32)
-
-        # Store updated last valid data
         self._last_valid = type(feature_data)(values=updated_values, scores=updated_scores)
 
-        # Create new feature data with held values
+        # Return updated pose
         held_data = type(feature_data)(values=held_values, scores=held_scores)
-
-        # Return new pose with held feature
-        return self._replace_feature_data(pose, held_data)
+        return replace(pose, **{self._attr_name: held_data})
 
     def reset(self) -> None:
-        """Reset the filter's internal state."""
+        """Reset to initial state."""
         self._last_valid = self._initialize_last_valid()
 
 
-class AngleStickyFiller(StickyFillerBase):
-    """Holds last valid angle values when angles become NaN.
-
-    Maintains continuity of joint angles when pose detection temporarily fails.
-    """
-
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        return pose.angles
-
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        return replace(pose, angles=new_data)
-
-    def _create_empty_feature_data(self) -> PoseFeature:
-        return AngleFeature.create_dummy()
-
-
-class PointStickyFiller(StickyFillerBase):
-    """Holds last valid point coordinates when points become NaN.
-
-    Maintains continuity of keypoint positions when pose detection temporarily fails.
-    Handles 2D coordinates (x, y) per joint independently.
-    """
-
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        return pose.points
-
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        return replace(pose, points=new_data)
-
-    def _create_empty_feature_data(self) -> PoseFeature:
-        return Point2DFeature.create_dummy()
-
-
-class DeltaStickyFiller(StickyFillerBase):
-    """Holds last valid delta values when deltas become NaN.
-
-    Maintains continuity of angle changes when pose detection temporarily fails.
-    """
-
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        return pose.deltas
-
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        return replace(pose, deltas=new_data)
-
-    def _create_empty_feature_data(self) -> PoseFeature:
-        return AngleFeature.create_dummy()
-
-
-class PoseStickyFiller(FilterNode):
-    """Holds last valid values for all pose features (angles, points, and deltas).
-
-    Applies the same hold configuration to all features. For independent
-    control of each feature, use PoseAngleHoldFilter, PosePointHoldFilter, and
-    PoseDeltaHoldFilter separately.
-    """
-
+# Convenience classes
+class AngleStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerConfig) -> None:
-        self._config: StickyFillerConfig = config
+        super().__init__(config, AngleFeature, "angles")
 
-        # Create individual hold filters for each feature
-        self._angle_filter = AngleStickyFiller(config)
-        self._point_filter = PointStickyFiller(config)
-        self._delta_filter = DeltaStickyFiller(config)
 
-    @property
-    def config(self) -> StickyFillerConfig:
-        """Access the filter's configuration."""
-        return self._config
+class BBoxStickyFiller(FeatureStickyFiller):
+    def __init__(self, config: StickyFillerConfig) -> None:
+        super().__init__(config, BBoxFeature, "bbox")
 
-    def process(self, pose: Pose) -> Pose:
-        """Hold last valid values for all features in the pose."""
-        pose = self._angle_filter.process(pose)
-        pose = self._point_filter.process(pose)
-        pose = self._delta_filter.process(pose)
-        return pose
 
-    def reset(self) -> None:
-        """Reset all hold filters' internal state."""
-        self._angle_filter.reset()
-        self._point_filter.reset()
-        self._delta_filter.reset()
+class DeltaStickyFiller(FeatureStickyFiller):
+    def __init__(self, config: StickyFillerConfig) -> None:
+        super().__init__(config, AngleFeature, "deltas")
+
+
+class PointStickyFiller(FeatureStickyFiller):
+    def __init__(self, config: StickyFillerConfig) -> None:
+        super().__init__(config, Point2DFeature, "points")
+
+
+class SymmetryStickyFiller(FeatureStickyFiller):
+    def __init__(self, config: StickyFillerConfig) -> None:
+        super().__init__(config, SymmetryFeature, "symmetry")
+
+

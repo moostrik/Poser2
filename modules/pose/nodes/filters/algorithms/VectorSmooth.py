@@ -174,7 +174,7 @@ class AngleSmooth(VectorSmooth):
     """
 
     def __init__(self, vector_size: int, frequency: float, min_cutoff: float, beta: float,
-                 d_cutoff: float) -> None:
+                 d_cutoff: float, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the angle smoother.
 
         Note: clamp_range is not supported for angles (automatic wrapping to [-π, π]).

@@ -2,10 +2,9 @@ from ..FilterTracker import FilterTracker
 from modules.pose.nodes import (
     SmootherConfig,
     AngleSmoother,
-    BboxSmoother,
-    Point2DSmoother,
-    DeltaSmoother,
-    PoseSmoother
+    BBoxSmoother,
+    PointSmoother,
+    DeltaSmoother
 )
 
 class AngleSmootherTracker(FilterTracker):
@@ -24,8 +23,9 @@ class BboxSmootherTracker(FilterTracker):
     def __init__(self, num_tracks: int, config: SmootherConfig) -> None:
         super().__init__(
             num_tracks=num_tracks,
-            filter_factory=lambda: BboxSmoother(config)
+            filter_factory=lambda: BBoxSmoother(config)
         )
+
 
 class PointSmootherTracker(FilterTracker):
     """Convenience tracker for point smoothing interpolation."""
@@ -33,8 +33,9 @@ class PointSmootherTracker(FilterTracker):
     def __init__(self, num_tracks: int, config: SmootherConfig) -> None:
         super().__init__(
             num_tracks=num_tracks,
-            filter_factory=lambda: Point2DSmoother(config)
+            filter_factory=lambda: PointSmoother(config)
         )
+
 
 class DeltaSmootherTracker(FilterTracker):
     """Convenience tracker for delta smoothing interpolation."""
@@ -43,13 +44,4 @@ class DeltaSmootherTracker(FilterTracker):
         super().__init__(
             num_tracks=num_tracks,
             filter_factory=lambda: DeltaSmoother(config)
-        )
-
-class PoseSmootherTracker(FilterTracker):
-    """Convenience tracker for full pose smoothing interpolation."""
-
-    def __init__(self, num_tracks: int, config: SmootherConfig) -> None:
-        super().__init__(
-            num_tracks=num_tracks,
-            filter_factory=lambda: PoseSmoother(config)
         )

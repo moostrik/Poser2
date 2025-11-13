@@ -5,7 +5,6 @@ below threshold are set to NaN and scores are rescaled to [0, 1] range.
 """
 
 # Standard library imports
-from abc import abstractmethod
 from dataclasses import replace
 
 import numpy as np
@@ -13,7 +12,7 @@ import numpy as np
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.features import PoseFeature
+from modules.pose.features import AngleFeature, Point2DFeature, BBoxFeature, SymmetryFeature
 
 
 class ConfidenceFilterConfig(NodeConfigBase):
@@ -33,41 +32,35 @@ class ConfidenceFilterConfig(NodeConfigBase):
         self.rescale_scores: bool = rescale_scores
 
 
-class ConfidenceFilterBase(FilterNode):
-    """Base class for pose confidence filters.
+class FeatureConfidenceFilter(FilterNode):
+    """Generic confidence filter for pose features.
 
     Filters low-confidence values by:
     1. Setting values to NaN when score < threshold
     2. Optionally rescaling remaining scores to [0, 1] range
 
-    Subclasses only need to specify:
-    - Which feature to extract from pose (_get_feature_data)
-    - How to replace feature data in pose (_replace_feature_data)
+    Args:
+        config: Confidence filter configuration
+        feature_class: Feature class type (e.g., AngleFeature, Point2DFeature)
+        attr_name: Name of the pose attribute to filter
+
+    Example:
+        filter = FeatureConfidenceFilter(config, AngleFeature, "angles")
+        filter = FeatureConfidenceFilter(config, Point2DFeature, "points")
     """
 
-    def __init__(self, config: ConfidenceFilterConfig) -> None:
-        self._config: ConfidenceFilterConfig = config
+    def __init__(self, config: ConfidenceFilterConfig, feature_class: type, attr_name: str):
+        self._config = config
+        self._feature_class = feature_class
+        self._attr_name = attr_name
 
     @property
     def config(self) -> ConfidenceFilterConfig:
-        """Access the filter's configuration."""
         return self._config
-
-    @abstractmethod
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        """Extract the feature data to process from the pose."""
-        pass
-
-    @abstractmethod
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        """Create new pose with replaced feature data."""
-        pass
 
     def process(self, pose: Pose) -> Pose:
         """Filter values based on confidence threshold."""
-
-        # Get feature data
-        feature_data = self._get_feature_data(pose)
+        feature_data = getattr(pose, self._attr_name)
 
         # Skip if no valid values
         if feature_data.valid_count == 0:
@@ -105,73 +98,30 @@ class ConfidenceFilterBase(FilterNode):
         filtered_data = type(feature_data)(values=filtered_values, scores=filtered_scores)
 
         # Return new pose with filtered feature
-        return self._replace_feature_data(pose, filtered_data)
+        return replace(pose, **{self._attr_name: filtered_data})
 
 
-class AngleConfidenceFilter(ConfidenceFilterBase):
-    """Filters angle values based on confidence scores.
-
-    Sets low-confidence angles to NaN and rescales remaining scores.
-    """
-
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        return pose.angles
-
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        return replace(pose, angles=new_data)
-
-
-class PointConfidenceFilter(ConfidenceFilterBase):
-    """Filters point coordinates based on confidence scores.
-
-    Sets low-confidence points to NaN and rescales remaining scores.
-    Handles 2D coordinates (x, y) per joint.
-    """
-
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        return pose.points
-
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        return replace(pose, points=new_data)
-
-
-class DeltaConfidenceFilter(ConfidenceFilterBase):
-    """Filters delta values based on confidence scores.
-
-    Sets low-confidence deltas to NaN and rescales remaining scores.
-    """
-
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        return pose.deltas
-
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        return replace(pose, deltas=new_data)
-
-
-class PoseConfidenceFilter(FilterNode):
-    """Filters all pose features (angles, points, and deltas) based on confidence.
-
-    Applies the same confidence threshold to all features. For independent
-    control of each feature, use PoseAngleConfidenceFilter, PosePointConfidenceFilter,
-    and PoseDeltaConfidenceFilter separately.
-    """
-
+# Convenience classes
+class AngleConfidenceFilter(FeatureConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
-        self._config: ConfidenceFilterConfig = config
+        super().__init__(config, AngleFeature, "angles")
 
-        # Create individual confidence filters for each feature
-        self._angle_filter = AngleConfidenceFilter(config)
-        self._point_filter = PointConfidenceFilter(config)
-        self._delta_filter = DeltaConfidenceFilter(config)
 
-    @property
-    def config(self) -> ConfidenceFilterConfig:
-        """Access the filter's configuration."""
-        return self._config
+class PointConfidenceFilter(FeatureConfidenceFilter):
+    def __init__(self, config: ConfidenceFilterConfig) -> None:
+        super().__init__(config, Point2DFeature, "points")
 
-    def process(self, pose: Pose) -> Pose:
-        """Filter all features based on confidence threshold."""
-        pose = self._angle_filter.process(pose)
-        pose = self._point_filter.process(pose)
-        pose = self._delta_filter.process(pose)
-        return pose
+
+class DeltaConfidenceFilter(FeatureConfidenceFilter):
+    def __init__(self, config: ConfidenceFilterConfig) -> None:
+        super().__init__(config, AngleFeature, "deltas")
+
+
+class BBoxConfidenceFilter(FeatureConfidenceFilter):
+    def __init__(self, config: ConfidenceFilterConfig) -> None:
+        super().__init__(config, BBoxFeature, "bbox")
+
+
+class SymmetryConfidenceFilter(FeatureConfidenceFilter):
+    def __init__(self, config: ConfidenceFilterConfig) -> None:
+        super().__init__(config, SymmetryFeature, "symmetry")

@@ -12,13 +12,13 @@ from .extractors.MotionTimeAccumulator import   MotionTimeAccumulator
 
 from .processors.ImageCropProcessor import      ImageCropProcessor, ImageCropProcessorConfig
 
-from .filters.Validators import                 ValidatorConfig, NanValidator, RangeValidator, ScoreValidator, PoseValidator
+from .filters.Validators import                 ValidatorConfig, AngleValidator, BBoxValidator, DeltaValidator, PointValidator, SymmetryValidator, PoseValidator
 
 
-from .filters.ConfidenceFilters import          ConfidenceFilterConfig, AngleConfidenceFilter, DeltaConfidenceFilter, PointConfidenceFilter, PoseConfidenceFilter
-from .filters.Predictors import                 PredictorConfig, AnglePredictor, DeltaPredictor, PointPredictor, PosePredictor
-from .filters.Smoothers import                  SmootherConfig, AngleSmoother, BboxSmoother, DeltaSmoother, Point2DSmoother, SymmetrySmoother, PoseSmoother
-from .filters.StickyFillers import              StickyFillerConfig, AngleStickyFiller, DeltaStickyFiller, PointStickyFiller, PoseStickyFiller
+from .filters.ConfidenceFilters import          ConfidenceFilterConfig, AngleConfidenceFilter, DeltaConfidenceFilter, PointConfidenceFilter
+from .filters.Predictors import                 PredictorConfig, AnglePredictor, DeltaPredictor, PointPredictor
+from .filters.Smoothers import                  SmootherConfig, AngleSmoother, BBoxSmoother, DeltaSmoother, PointSmoother, SymmetrySmoother
+from .filters.StickyFillers import              StickyFillerConfig, AngleStickyFiller, DeltaStickyFiller, PointStickyFiller
 
 from .filters.gui.SmootherGui import            SmootherGui
 from .filters.gui.PredictionGui import          PredictionGui

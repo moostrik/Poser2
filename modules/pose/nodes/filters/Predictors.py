@@ -5,7 +5,6 @@ extrapolation with proper handling of circular values and coordinate clamping.
 """
 
 # Standard library imports
-from abc import abstractmethod
 from dataclasses import replace
 
 import numpy as np
@@ -13,8 +12,8 @@ import numpy as np
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
-from modules.pose.nodes.filters.algorithms.VectorPredict import Predict, AnglePredict, PointPredict, PredictionMethod
-from modules.pose.features import PoseFeature, ANGLE_NUM_LANDMARKS, POINT_NUM_LANDMARKS, POINT2D_COORD_RANGE
+from modules.pose.nodes.filters.algorithms.VectorPredict import AnglePredict, PointPredict, VectorPredict, PredictionMethod
+from modules.pose.features import AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
 
 
 class PredictorConfig(NodeConfigBase):
@@ -26,56 +25,77 @@ class PredictorConfig(NodeConfigBase):
         self.method: PredictionMethod = method
 
 
-class PredictorBase(FilterNode):
-    """Base class for pose predictors.
+class FeaturePredictor(FilterNode):
+    """Generic pose feature predictor.
 
-    Handles common prediction logic. Subclasses only need to specify:
-    - Which predictor instance to create
-    - Which feature to extract/replace from pose
-    - How to reconstruct feature data with predictions
+    Args:
+        config: Predictor configuration
+        feature_class: Feature class type (e.g., AngleFeature, Point2DFeature)
+        attr_name: Name of the pose attribute to predict
 
-    Note: Predictions preserve original confidence scores for valid values,
-    but set scores to 0 where predictions are NaN (insufficient history).
-    When predictor has insufficient samples, all predictions will be NaN
-    and all scores will be 0.
+    Example:
+        predictor = FeaturePredictor(config, AngleFeature, "angles")
+        predictor = FeaturePredictor(config, Point2DFeature, "points")
     """
 
-    def __init__(self, config: PredictorConfig) -> None:
-        self._config: PredictorConfig = config
-        self._predictor: Predict
-        self._initialize_predictor()
+    # Registry mapping feature classes to predictor classes
+    PREDICTOR_REGISTRY = {
+        AngleFeature: AnglePredict,
+        BBoxFeature: VectorPredict,
+        Point2DFeature: PointPredict,
+        SymmetryFeature: VectorPredict,
+    }
+
+    def __init__(self, config: PredictorConfig, feature_class: type, attr_name: str):
+        if feature_class not in self.PREDICTOR_REGISTRY:
+            valid_classes = [cls.__name__ for cls in self.PREDICTOR_REGISTRY.keys()]
+            raise ValueError(
+                f"Unknown feature class '{feature_class.__name__}'. "
+                f"Must be one of: {valid_classes}"
+            )
+
+        self._config = config
+        self._attr_name = attr_name
+        self._feature_class = feature_class
+
+        predictor_cls = self.PREDICTOR_REGISTRY[feature_class]
+        self._predictor = predictor_cls(
+            vector_size=len(feature_class.feature_enum()),
+            input_frequency=config.frequency,
+            method=config.method,
+            clamp_range=feature_class.default_range()
+        )
         self._config.add_listener(self._on_config_changed)
+
+    def __del__(self):
+        """Cleanup config listener to prevent memory leaks."""
+        try:
+            self._config.remove_listener(self._on_config_changed)
+        except (AttributeError, ValueError):
+            pass
 
     @property
     def config(self) -> PredictorConfig:
-        """Access the predictor's configuration."""
         return self._config
 
-    @abstractmethod
-    def _initialize_predictor(self) -> None:
-        """Create the appropriate predictor instance."""
-        pass
+    def _create_predicted_data(self, original_data, predicted_values: np.ndarray):
+        """Create feature data with predicted values and adjusted scores.
 
-    @abstractmethod
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        """Extract the feature data to predict from the pose."""
-        pass
+        Sets scores to 0 where predictions are NaN, preserves original scores otherwise.
+        For 2D data (points), checks if ANY coordinate is NaN per element.
+        """
+        # Check for NaN - handle both 1D and 2D cases
+        if predicted_values.ndim > 1:
+            has_nan = np.any(np.isnan(predicted_values), axis=-1)
+        else:
+            has_nan = np.isnan(predicted_values)
 
-    @abstractmethod
-    def _create_predicted_data(self, original_data: PoseFeature, predicted_values: np.ndarray) -> PoseFeature:
-        """Create new feature data with predicted values."""
-        pass
-
-    @abstractmethod
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        """Create new pose with replaced feature data."""
-        pass
+        interpolated_scores = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
+        return type(original_data)(values=predicted_values, scores=interpolated_scores)
 
     def process(self, pose: Pose) -> Pose:
         """Add current feature data to predictor and return pose with predicted values."""
-
-        # Get feature data
-        feature_data = self._get_feature_data(pose)
+        feature_data = getattr(pose, self._attr_name)
 
         # Add sample and get prediction
         self._predictor.add_sample(feature_data.values)
@@ -85,7 +105,7 @@ class PredictorBase(FilterNode):
         predicted_data = self._create_predicted_data(feature_data, predicted_values)
 
         # Return new pose with predicted feature
-        return self._replace_feature_data(pose, predicted_data)
+        return replace(pose, **{self._attr_name: predicted_data})
 
     def reset(self) -> None:
         """Reset the predictor's internal state (clear sample history)."""
@@ -97,112 +117,27 @@ class PredictorBase(FilterNode):
         self._predictor.method = self._config.method
 
 
-class AnglePredictor(PredictorBase):
-    """Predicts angle data for the next frame using vectorized angle prediction.
-
-    Uses AnglePredictor which handles circular wrapping of angle values.
-    """
-
-    def _initialize_predictor(self) -> None:
-        self._predictor = AnglePredict(vector_size=ANGLE_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method)
-
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        return pose.angles
-
-    def _create_predicted_data(self, original_data: PoseFeature, predicted_values: np.ndarray) -> PoseFeature:
-        """Create angle data with predicted values and adjusted scores.
-
-        Sets scores to 0 where predictions are NaN, preserves original scores otherwise.
-        """
-        has_nan: np.ndarray = np.isnan(predicted_values)
-        interpolated_scores: np.ndarray = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
-        return type(original_data)(values=predicted_values, scores=interpolated_scores)
-
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        return replace(pose, angles=new_data)
-
-
-class PointPredictor(PredictorBase):
-    """Predicts point data for the next frame using vectorized point prediction.
-
-    Uses PointPredictor which clamps coordinates to [0, 1] range and handles 2D data.
-    """
-
-    def _initialize_predictor(self) -> None:
-        self._predictor = PointPredict(num_points=POINT_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method, clamp_range=POINT2D_COORD_RANGE)
-
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        return pose.points
-
-    def _create_predicted_data(self, original_data: PoseFeature, predicted_values: np.ndarray) -> PoseFeature:
-        """Create point data with predicted values and adjusted scores.
-
-        Checks if ANY coordinate (x or y) is NaN per joint.
-        Sets scores to 0 for joints with NaN predictions, preserves original scores otherwise.
-        """
-        has_nan: np.ndarray = np.any(np.isnan(predicted_values), axis=-1)
-        interpolated_scores: np.ndarray = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
-        return type(original_data)(values=predicted_values, scores=interpolated_scores)
-
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        return replace(pose, points=new_data)
-
-
-class DeltaPredictor(PredictorBase):
-    """Predicts delta data for the next frame using vectorized angle prediction.
-
-    Uses AnglePredictor since delta represents angle changes (circular values).
-    """
-
-    def _initialize_predictor(self) -> None:
-        self._predictor = AnglePredict(vector_size=ANGLE_NUM_LANDMARKS, input_frequency=self._config.frequency, method=self._config.method)
-
-    def _get_feature_data(self, pose: Pose) -> PoseFeature:
-        return pose.deltas
-
-    def _create_predicted_data(self, original_data: PoseFeature, predicted_values: np.ndarray) -> PoseFeature:
-        """Create delta data with predicted values and adjusted scores.
-
-        Sets scores to 0 where predictions are NaN, preserves original scores otherwise.
-        """
-        has_nan: np.ndarray = np.isnan(predicted_values)
-        interpolated_scores: np.ndarray = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
-        return type(original_data)(values=predicted_values, scores=interpolated_scores)
-
-    def _replace_feature_data(self, pose: Pose, new_data: PoseFeature) -> Pose:
-        return replace(pose, deltas=new_data)
-
-
-class PosePredictor(FilterNode):
-    """Predicts all pose features (angles, points, and deltas) for the next frame.
-
-    Applies the same prediction configuration to all features. For independent
-    control of each feature, use PoseAnglePredictor, PosePointPredictor, and
-    PoseDeltaPredictor separately.
-    """
-
+# Convenience classes for common use cases
+class AnglePredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        self._config: PredictorConfig = config
+        super().__init__(config, AngleFeature, "angles")
 
-        # Create individual predictors for each feature
-        self._angle_predictor = AnglePredictor(config)
-        self._point_predictor = PointPredictor(config)
-        self._delta_predictor = DeltaPredictor(config)
 
-    @property
-    def config(self) -> PredictorConfig:
-        """Access the predictor's configuration."""
-        return self._config
+class BBoxPredictor(FeaturePredictor):
+    def __init__(self, config: PredictorConfig) -> None:
+        super().__init__(config, BBoxFeature, "bbox")
 
-    def process(self, pose: Pose) -> Pose:
-        """Predict all features in the pose."""
-        pose = self._angle_predictor.process(pose)
-        pose = self._point_predictor.process(pose)
-        pose = self._delta_predictor.process(pose)
-        return pose
 
-    def reset(self) -> None:
-        """Reset all predictors' internal state."""
-        self._angle_predictor.reset()
-        self._point_predictor.reset()
-        self._delta_predictor.reset()
+class DeltaPredictor(FeaturePredictor):
+    def __init__(self, config: PredictorConfig) -> None:
+        super().__init__(config, AngleFeature, "deltas")
+
+
+class PointPredictor(FeaturePredictor):
+    def __init__(self, config: PredictorConfig) -> None:
+        super().__init__(config, Point2DFeature, "points")
+
+
+class SymmetryPredictor(FeaturePredictor):
+    def __init__(self, config: PredictorConfig) -> None:
+        super().__init__(config, SymmetryFeature, "symmetry")

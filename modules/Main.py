@@ -98,7 +98,7 @@ class Main():
         self.pose_raw_pipeline = FilterTracker(
             settings.num_players,
             [
-                lambda: nodes.PoseConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose_conf_threshold)),
+                lambda: nodes.PointConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose_conf_threshold)),
                 nodes.AngleExtractor,
                 nodes.DeltaExtractor
             ]
@@ -107,7 +107,7 @@ class Main():
         self.pose_smooth_pipeline = FilterTracker(
             settings.num_players,
             [
-                lambda: nodes.Point2DSmoother(self.point_smooth_config),
+                lambda: nodes.PointSmoother(self.point_smooth_config),
                 lambda: nodes.AngleSmoother(self.angle_smooth_config),
                 nodes.DeltaExtractor,
                 nodes.SymmetryExtractor,

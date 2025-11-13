@@ -13,7 +13,8 @@ class PredictionMethod(IntEnum):
 class VectorPredict:
     """Predictor for arbitrary vector data (positions, coordinates, etc.)."""
 
-    def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod, clamp_range: tuple[float, float] | None = None) -> None:
+    def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod,
+                 clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the vectorized predictor."""
 
         if vector_size <= 0:
@@ -136,7 +137,8 @@ class VectorPredict:
 class AnglePredict(VectorPredict):
     """Predictor for angular/circular data with proper wrapping."""
 
-    def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod) -> None:
+    def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod,
+                 clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the angle predictor.
 
         Note: clamp_range is not supported for angles (automatic wrapping to [-π, π]).
@@ -167,11 +169,11 @@ class AnglePredict(VectorPredict):
 class PointPredict(VectorPredict):
     """Predictor for 2D points with (x, y) coordinates."""
 
-    def __init__(self, num_points: int, input_frequency: float, method: PredictionMethod,
+    def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod,
                  clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the point predictor."""
-        super().__init__(num_points * 2, input_frequency, method, clamp_range)
-        self._num_points: int = num_points
+        super().__init__(vector_size * 2, input_frequency, method, clamp_range)
+        self._num_points: int = vector_size
 
     def add_sample(self, points: np.ndarray) -> None:
         """Add new point samples."""
