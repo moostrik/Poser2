@@ -155,36 +155,36 @@ class DataHub:
     # Pose management
     def set_raw_poses(self, poses: PoseDict) -> None:
         for pose in poses.values():
-            self._set_data_dict(self.raw_poses, pose.tracklet.id, pose)
+            self._set_data_dict(self.raw_poses, pose.track_id, pose)
 
     def get_raw_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
         return self._get_data_dict(self.raw_poses, id, only_new_data, consumer_key)
 
     def get_raw_poses_for_cam(self, cam_id: int) -> list[Pose]:
         with self.mutex:
-            return [v.value for v in self.raw_poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
+            return [v.value for v in self.raw_poses.values() if v.value is not None and v.value.cam_id == cam_id]
 
     def set_smooth_poses(self, poses: PoseDict) -> None:
         for pose in poses.values():
-            self._set_data_dict(self.smooth_poses, pose.tracklet.id, pose)
+            self._set_data_dict(self.smooth_poses, pose.track_id, pose)
 
     def get_smooth_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
         return self._get_data_dict(self.smooth_poses, id, only_new_data, consumer_key)
 
     def get_smooth_poses_for_cam(self, cam_id: int) -> list[Pose]:
         with self.mutex:
-            return [v.value for v in self.smooth_poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
+            return [v.value for v in self.smooth_poses.values() if v.value is not None and v.value.cam_id == cam_id]
 
     def set_interpolated_poses(self, poses: PoseDict) -> None:
         for pose in poses.values():
-            self._set_data_dict(self.interpolated_poses, pose.tracklet.id, pose)
+            self._set_data_dict(self.interpolated_poses, pose.track_id, pose)
 
     def get_interpolated_pose(self, id: int, only_new_data: bool, consumer_key: str) -> Optional[Pose]:
         return self._get_data_dict(self.interpolated_poses, id, only_new_data, consumer_key)
 
     def get_interpolated_poses_for_cam(self, cam_id: int) -> list[Pose]:
         with self.mutex:
-            return [v.value for v in self.interpolated_poses.values() if v.value is not None and v.value.tracklet.cam_id == cam_id]
+            return [v.value for v in self.interpolated_poses.values() if v.value is not None and v.value.cam_id == cam_id]
 
     # Pose window/stream management
     def set_pose_stream(self, value: StreamData) -> None:

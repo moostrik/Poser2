@@ -31,12 +31,12 @@ class PoseHeadTracker(PoseTrackerBase):
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def add_pose(self, pose: Pose) -> None:
-        if pose.tracklet.is_removed:
+        if pose.tracklet_poep.is_removed:
             self._active = False
             self.reset()
             return
 
-        if pose.tracklet.is_active and not self._active:
+        if pose.tracklet_poep.is_active and not self._active:
             self._active = True
 
         if not self._active:

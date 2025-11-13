@@ -10,9 +10,7 @@ from modules.gl.Image import Image
 from modules.gl.Mesh import Mesh
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
-from modules.gl.Texture import Texture
 
-from modules.tracker.Tracklet import Tracklet
 from modules.pose.Pose import Pose
 
 from modules.pose.features.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
@@ -60,7 +58,7 @@ class PoseStreamLayer(LayerBase):
         pose: Pose | None = self.data.get_smooth_pose(key, True, self.data_consumer_key)
         if pose is None:
             return #??
-        pose_mesh: Mesh = self.pose_meshes.meshes[pose.tracklet.id]
+        pose_mesh: Mesh = self.pose_meshes.meshes[pose.track_id]
         pose_stream: StreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
             stream_image: np.ndarray = StreamPose.pose_stream_to_image(pose_stream)
@@ -83,13 +81,7 @@ class PoseStreamLayer(LayerBase):
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        if pose.tracklet.is_removed:
-            return
 
-        tracklet: Tracklet | None = pose.tracklet
-        if tracklet is not None:
-            draw_box: bool = tracklet.is_lost
-            PoseStreamLayer.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)
         fbo.end()
         shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, line_width=1.5 / fbo.height)
 
@@ -111,22 +103,3 @@ class PoseStreamLayer(LayerBase):
         fbo.end()
 
 
-    @staticmethod
-    def draw_pose_box(tracklet: Tracklet, pose_mesh: Mesh, x: float, y: float, width: float, height: float, draw_box = False) -> None:
-        if draw_box:
-            glColor4f(0.0, 0.0, 0.0, 0.1)
-            glBegin(GL_QUADS)
-            glVertex2f(x, y)        # Bottom left
-            glVertex2f(x, y + height)    # Bottom right
-            glVertex2f(x + width, y + height)# Top right
-            glVertex2f(x + width, y)    # Top left
-            glEnd()                 # End drawing
-            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
-
-        # if pose_mesh.isInitialized():
-        #     pose_mesh.draw(x, y, width, height)
-
-        string: str = f'ID: {tracklet.id} Cam: {tracklet.cam_id} Age: {tracklet.age_in_seconds:.2f}'
-        x += 9
-        y += 12
-        draw_box_string(x, y, string)

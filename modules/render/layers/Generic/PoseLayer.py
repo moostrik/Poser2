@@ -64,14 +64,14 @@ class PoseLayer(LayerBase):
         if pose_image_np is not None:
             self.image.set_image(pose_image_np)
             self.image.update()
-        pose_mesh: Mesh = self.pose_meshes.meshes[pose.tracklet.id]
+        pose_mesh: Mesh = self.pose_meshes.meshes[pose.track_id]
         pose_stream: StreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
             stream_image: np.ndarray = StreamPose.pose_stream_to_image(pose_stream)
             self.pose_stream_image.set_image(stream_image)
             self.pose_stream_image.update()
 
-        angle_mesh: Mesh = self.angle_meshes.meshes[pose.tracklet.id]
+        angle_mesh: Mesh = self.angle_meshes.meshes[pose.track_id]
 
         # shader gets reset on hot reload, so we need to check if it's allocated
         if not PoseLayer.pose_stream_shader.allocated:
@@ -87,13 +87,13 @@ class PoseLayer(LayerBase):
     def draw_pose(fbo: Fbo, pose_image: Image, pose: Pose, pose_mesh: Mesh, angle_image: Image, angle_mesh: Mesh, shader: StreamPose) -> None:
         fbo.begin()
 
-        if pose.tracklet.is_removed:
+        if pose.is_removed:
             glClearColor(0.0, 0.0, 0.0, 1.0)
             glClear(GL_COLOR_BUFFER_BIT)
             return
 
         pose_image.draw(0, 0, fbo.width, fbo.height)
-        tracklet: Tracklet | None = pose.tracklet
+        tracklet: Tracklet | None = pose.tracklet_poep
         if tracklet is not None:
             draw_box: bool = tracklet.is_lost
             PoseLayer.draw_pose_box(tracklet, pose_mesh, 0, 0, fbo.width, fbo.height, draw_box)

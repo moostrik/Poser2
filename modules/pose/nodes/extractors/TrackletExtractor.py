@@ -34,8 +34,8 @@ class TrackletExtractor(NodeBase):
         return Pose(
             track_id=tracklet.id,
             cam_id=tracklet.cam_id,
-            tracklet=tracklet,
             time_stamp=time.time(),
-            lost=tracklet.is_lost,
-            bbox=bbox
+            bbox=bbox,
+
+            is_removed=tracklet.is_removed
         )

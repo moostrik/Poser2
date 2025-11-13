@@ -48,22 +48,22 @@ class ValidatorBase(FilterNode):
         """Validate all enabled features."""
 
         if self._config.validate_points:
-            points = self._validate_feature_data(pose.tracklet.id, pose.points, "points")
+            points = self._validate_feature_data(pose.track_id, pose.points, "points")
             if points is not pose.points:
                 pose = replace(pose, points=points)
 
         if self._config.validate_angles:
-            angles = self._validate_feature_data(pose.tracklet.id, pose.angles, "angles")
+            angles = self._validate_feature_data(pose.track_id, pose.angles, "angles")
             if angles is not pose.angles:
                 pose = replace(pose, angles=angles)
 
         if self._config.validate_delta:
-            deltas = self._validate_feature_data(pose.tracklet.id, pose.deltas, "delta")
+            deltas = self._validate_feature_data(pose.track_id, pose.deltas, "delta")
             if deltas is not pose.deltas:
                 pose = replace(pose, deltas=deltas)
 
         if self._config.validate_symmetry:
-            symmetry_data = self._validate_feature_data(pose.tracklet.id, pose.symmetry, "symmetry")
+            symmetry_data = self._validate_feature_data(pose.track_id, pose.symmetry, "symmetry")
             if symmetry_data is not pose.symmetry:
                 pose = replace(pose, symmetry_data=symmetry_data)
 

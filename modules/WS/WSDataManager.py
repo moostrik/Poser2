@@ -77,7 +77,7 @@ class WSData:
         self.age = time() - self.start_age if self.start_age is not None else 0.0
 
     def add_pose(self, pose: Pose) -> None:
-        tracklet: Tracklet | None = pose.tracklet
+        tracklet: Tracklet | None = pose.tracklet_poep
 
         if tracklet is not None and tracklet.is_active and tracklet.age_in_seconds > 2.0:
             if self.start_age == 0.0:
@@ -115,7 +115,7 @@ class WSData:
             # convert from [0...360] to [-pi, pi]
             self.world_angle: float = np.deg2rad(world_angle - 180)
 
-        if pose.tracklet.is_removed:
+        if pose.tracklet_poep.is_removed:
             self.reset()
 
     def add_stream(self, stream: StreamData) -> None:
@@ -177,7 +177,7 @@ class WSDataManager:
 
     def add_poses(self, poses: list[Pose]) -> None:
         for pose in poses:
-            self.smooth_metrics_dict[pose.tracklet.id].add_pose(pose)
+            self.smooth_metrics_dict[pose.tracklet_poep.id].add_pose(pose)
 
     def add_streams(self, streams: list) -> None:
         for stream in streams:

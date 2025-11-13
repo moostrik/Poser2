@@ -92,7 +92,6 @@ class SimilarityComputer:
         angles: dict[int, AngleFeature] = {
             tracklet_id: pose.angles
             for tracklet_id, pose in poses.items()
-            if pose.tracklet.is_being_tracked
         }
 
         if len(angles) < 2:

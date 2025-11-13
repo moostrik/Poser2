@@ -53,19 +53,6 @@ class CentreCamLayer(LayerBase):
         if pose is None:
             return
 
-
-        if pose.tracklet.is_removed:
-            self.clear_render()
-            self.is_active = False
-            return
-
-        if pose.tracklet.is_being_tracked:
-            self.is_active = True
-            self.last_pose_rect = pose.bbox.to_rect()
-
-        if not self.is_active:
-            return
-
         cam_image_np: np.ndarray | None = self.data.get_cam_image(key, True, self.data_consumer_key)
         if cam_image_np is not None:
             self.cam_image.set_image(cam_image_np)

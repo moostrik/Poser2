@@ -47,19 +47,19 @@ class PoseViewportTracker(PoseTrackerBase):
         return self._age
 
     def add_pose(self, pose: Pose) -> None:
-        if pose.tracklet.is_removed:
+        if pose.tracklet_poep.is_removed:
             self._active = False
             self.reset()
             return
 
-        if pose.tracklet.is_active and not self._active:
+        if pose.tracklet_poep.is_active and not self._active:
             self._active = True
             self.reset()
 
         if not self._active:
             return
 
-        self._age = pose.tracklet.age_in_seconds
+        self._age = pose.tracklet_poep.age_in_seconds
 
         pose_rect: Rect | None = pose.bbox.to_rect()
         pose_points: np.ndarray | None = pose.points.values if pose.points is not None else None

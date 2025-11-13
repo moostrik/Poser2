@@ -95,7 +95,7 @@ class RenderDataHub_Old:
         """ Add a new pose data point for processing."""
         with self._lock:
             for pose in poses.values():
-                tracklet_id: int = pose.tracklet.id
+                tracklet_id: int = pose.tracklet_poep.id
 
                 self._viewport_trackers[tracklet_id].add_pose(pose)
                 self._angle_trackers[tracklet_id].add_pose(pose)

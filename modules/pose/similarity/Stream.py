@@ -31,10 +31,10 @@ class StreamInput:
     @classmethod
     def from_pose(cls, pose: Pose) -> 'StreamInput':
         return cls(
-            id=pose.tracklet.id,
+            id=pose.track_id,
             time_stamp=pose.time_stamp,  # Now a float
             angles=pose.angles,
-            is_removed=pose.tracklet.is_removed
+            is_removed=pose.is_removed
         )
 
 # Type for analysis output callback
