@@ -86,6 +86,11 @@ class FeatureChaseInterpolator(InterpolatorNode):
     def config(self) -> ChaseInterpolatorConfig:
         return self._config
 
+    @property
+    def attr_name(self) -> str:
+        """Return the attribute name this interpolator processes."""
+        return self._attr_name
+
     def submit(self, pose: Pose) -> None:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
         feature_data = getattr(pose, self._attr_name)
@@ -159,3 +164,31 @@ class SymmetryChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorConfig) -> None:
         super().__init__(config, SymmetryFeature, "symmetry")
 
+
+# class PointAngleChaseInterpolator(InterpolatorNode):
+#     def __init__(self, config: ChaseInterpolatorConfig):
+#         super().__init__()
+#         self.point_interpolator = PointChaseInterpolator(config)
+#         self.angle_interpolator = AngleChaseInterpolator(config)
+#         self._last_pose: Pose | None = None
+
+#     def submit(self, pose: Pose) -> None:
+#         self.point_interpolator.submit(pose)
+#         self.angle_interpolator.submit(pose)
+#         self._last_pose = pose
+
+#     def update(self, current_time: float | None = None) -> Pose | None:
+#         if self._last_pose is None:
+#             return None
+
+#         # Update both interpolators
+#         interpolated_points_pose = self.point_interpolator.update(current_time)
+#         interpolated_angles_pose = self.angle_interpolator.update(current_time)
+
+#         # Merge interpolated features into a new pose
+#         # (Assumes Pose is a dataclass and can be replaced with new features)
+#         return replace(
+#             self._last_pose,
+#             points=getattr(interpolated_points_pose, "points"),
+#             angles=getattr(interpolated_angles_pose, "angles"),
+#         )

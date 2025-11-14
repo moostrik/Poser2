@@ -47,3 +47,16 @@ class DeltaChaseInterpolatorTracker(InterpolatorTracker):
         )
 
 
+class APChaseInterpolatorTracker(InterpolatorTracker):
+    """Convenience tracker for delta chase interpolation."""
+
+    def __init__(self, num_tracks: int, config: ChaseInterpolatorConfig) -> None:
+        super().__init__(
+            num_tracks=num_tracks,
+            interpolator_factory= [
+                lambda: AngleChaseInterpolator(config),
+                lambda: PointChaseInterpolator(config)
+            ]
+        )
+
+

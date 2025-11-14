@@ -8,5 +8,5 @@ from .InterpolatorTracker import    InterpolatorTracker
 
 from .convenience.GeneratorTrackers import      PoseFromTrackletGenerator
 from .convenience.ProcessorTrackers import      ImageCropProcessorTracker
-from .convenience.InterpolatorTrackers import   ChaseInterpolatorConfig, AngleChaseInterpolatorTracker, PointChaseInterpolatorTracker, DeltaChaseInterpolatorTracker
+from .convenience.InterpolatorTrackers import   ChaseInterpolatorConfig, AngleChaseInterpolatorTracker, BBoxChaseInterpolatorTracker, DeltaChaseInterpolatorTracker, PointChaseInterpolatorTracker, APChaseInterpolatorTracker
 from .convenience.SmootherTrackers import       SmootherConfig, AngleSmootherTracker, BboxSmootherTracker, DeltaSmootherTracker, PointSmootherTracker

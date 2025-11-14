@@ -93,7 +93,15 @@ class Main():
 
         # POSE PROCESSING PIPELINES
         self.pose_from_tracklet =   trackers.PoseFromTrackletGenerator(num_players)
-        self.bbox_smoother =        trackers.BboxSmootherTracker(num_players, nodes.SmootherConfig())
+
+        self.bbox_filters =      trackers.FilterTracker(
+            settings.num_players,
+            [
+                lambda: nodes.BBoxSmoother(self.b_box_smooth_config),
+                lambda: nodes.BBoxPredictor(self.prediction_config),
+            ]
+        )
+
         self.image_crop_processor = trackers.ImageCropProcessorTracker(num_players, self.image_crop_config)
         self.point_extractor =      PointBatchExtractor(self.pose_detector)
 
@@ -126,8 +134,7 @@ class Main():
             ]
         )
 
-        self.point_interpolator = trackers.PointChaseInterpolatorTracker(settings.num_players, self.interpolation_config)
-        self.angle_interpolator = trackers.AngleChaseInterpolatorTracker(settings.num_players, self.interpolation_config)
+        self.interpolator = trackers.APChaseInterpolatorTracker(settings.num_players, self.interpolation_config)
 
         self.pose_interpolation_pipeline = trackers.FilterTracker(
             settings.num_players,
@@ -183,8 +190,8 @@ class Main():
         self.pose_correlator.start()
 
         # POSE PROCESSING PIPELINES
-        self.pose_from_tracklet.add_poses_callback(self.bbox_smoother.process)
-        self.bbox_smoother.add_poses_callback(self.image_crop_processor.process)
+        self.pose_from_tracklet.add_poses_callback(self.bbox_filters.process)
+        self.bbox_filters.add_poses_callback(self.image_crop_processor.process)
         self.image_crop_processor.add_image_callback(self.point_extractor.set_images)
         self.image_crop_processor.add_poses_callback(self.point_extractor.process)
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
@@ -194,14 +201,12 @@ class Main():
         self.pose_smooth_filters.add_poses_callback(self.data_hub.set_smooth_poses) # smooth poses
 
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_poses_callback(self.point_interpolator.submit)
-        self.point_interpolator.add_poses_callback(self.angle_interpolator.submit)
-        self.angle_interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
+        self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
+        self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
         self.pose_interpolation_pipeline.add_poses_callback(self.data_hub.set_interpolated_poses) # interpolated poses
 
 
-        self.data_hub.add_update_callback(self.point_interpolator.update)
-        self.data_hub.add_update_callback(self.angle_interpolator.update)
+        self.data_hub.add_update_callback(self.interpolator.update)
 
         # DETECTION
         self.pose_detector.start()

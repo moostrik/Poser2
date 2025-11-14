@@ -96,6 +96,12 @@ class InterpolatorNode(NodeBase):
         """Reset the interpolator's internal state (position, velocity, history)."""
         pass
 
+    @property
+    @abstractmethod
+    def attr_name(self) -> str:
+        """Return the attribute name this interpolator processes, or None if not applicable."""
+        pass
+
 
 class ProcessorNode(NodeBase, Generic[TInput, TOutput]):
     """Base class for processor nodes that extract derived data from poses using stored context.
