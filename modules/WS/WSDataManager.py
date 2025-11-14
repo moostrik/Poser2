@@ -6,8 +6,8 @@ from time import time
 from modules.utils.depricated.SmoothOneEuro import SmoothOneEuro, SmoothOneEuroCircular
 from modules.tracker.Tracklet import Tracklet
 # from modules.pose.Pose import Pose, Point2DFeature, AngleFeature, PoseMeasurementData
-from modules.pose.features.AngleFeature import AngleLandmark, ANGLE_LANDMARK_NAMES
-from modules.pose.features.Point2DFeature import PointLandmark
+from modules.pose.features.Angles import AngleLandmark, ANGLE_LANDMARK_NAMES
+from modules.pose.features.Points2D import PointLandmark
 from modules.pose.pd_stream.PDStream import PDStreamData
 from modules.utils.PointsAndRects import Rect
 

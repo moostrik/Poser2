@@ -12,7 +12,7 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.features import AngleFeature, Point2DFeature, SymmetryFeature, BBoxFeature, PoseFeature
+from modules.pose.features import Angles, Points2D, Symmetry, BBox, PoseFeature
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
 
@@ -92,26 +92,26 @@ class FeatureStickyFiller(FilterNode):
 # Convenience classes
 class AngleStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerConfig) -> None:
-        super().__init__(config, AngleFeature, "angles")
+        super().__init__(config, Angles, "angles")
 
 
 class BBoxStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerConfig) -> None:
-        super().__init__(config, BBoxFeature, "bbox")
+        super().__init__(config, BBox, "bbox")
 
 
 class DeltaStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerConfig) -> None:
-        super().__init__(config, AngleFeature, "deltas")
+        super().__init__(config, Angles, "deltas")
 
 
 class PointStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerConfig) -> None:
-        super().__init__(config, Point2DFeature, "points")
+        super().__init__(config, Points2D, "points")
 
 
 class SymmetryStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerConfig) -> None:
-        super().__init__(config, SymmetryFeature, "symmetry")
+        super().__init__(config, Symmetry, "symmetry")
 
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 # Local imports
 from modules.pose.Pose import Pose
-from modules.pose.features.Point2DFeature import PointLandmark
+from modules.pose.features.Points2D import PointLandmark
 from modules.data.depricated.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.PointsAndRects import Rect

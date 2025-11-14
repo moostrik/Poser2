@@ -8,7 +8,7 @@ from typing import Optional
 # Third-party imports
 
 # Pose imports
-from modules.pose.features import AngleFeature
+from modules.pose.features import Angles
 from modules.pose.similarity.features.SimilarityFeature import SimilarityFeature
 from modules.pose.similarity.features.SimilarityBatch import SimilarityBatch, SimilarityBatchCallback
 
@@ -92,7 +92,7 @@ class SimilarityComputer:
     def _evaluate_pose_similarity(self, poses: PoseDict) -> SimilarityBatch :
         """Process all pose pairs and compute their correlations."""
         # Extract angle data from actively tracked poses
-        angles: dict[int, AngleFeature] = {
+        angles: dict[int, Angles] = {
             tracklet_id: pose.angles
             for tracklet_id, pose in poses.items()
         }
@@ -104,7 +104,7 @@ class SimilarityComputer:
         similarities: list[SimilarityFeature] = []
         for (id1, angles_1), (id2, angles_2) in combinations(angles.items(), 2):
             # Compute similarity scores
-            similarity_data: AngleFeature = SimilarityUtils.compute_similarity(angles_1, angles_2, 1.0) # do exponent at retreival
+            similarity_data: Angles = SimilarityUtils.compute_similarity(angles_1, angles_2, 1.0) # do exponent at retreival
 
             # Only include pairs with at least one valid joint
             if similarity_data.valid_count > 0:

@@ -2,7 +2,7 @@ import time
 
 from modules.pose.nodes.Nodes import GeneratorNode
 from modules.pose.Pose import Pose
-from modules.pose.features import BBoxFeature
+from modules.pose.features import BBox
 from modules.tracker.Tracklet import Tracklet
 
 
@@ -48,7 +48,7 @@ class PoseFromTracklet(GeneratorNode[Tracklet]):
         if self._tracklet is None:
             raise RuntimeError("No tracklet set. Call set() before generate().")
 
-        bounding_box: BBoxFeature = BBoxFeature.from_rect(self._tracklet.roi)
+        bounding_box: BBox = BBox.from_rect(self._tracklet.roi)
         if not time_stamp:
             time_stamp = self._tracklet.time_stamp
 

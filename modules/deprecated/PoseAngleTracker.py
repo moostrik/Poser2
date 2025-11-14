@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from time import time
 
 from modules.pose.Pose import Pose
-from modules.pose.features import AngleLandmark, AngleFeature, SymmetryFeature, SymmetryFactory
+from modules.pose.features import AngleLandmark, Angles, Symmetry, SymmetryFactory
 from modules.data.depricated.PoseTrackerBase import PoseTrackerBase
 
 from modules.utils.depricated.SmoothedInterpolator import SmoothedAngleInterpolator, OneEuroSettings
@@ -46,12 +46,12 @@ class PoseAngleTracker(PoseTrackerBase):
             self._cumulative_motions[joint] = 0.0
 
 
-        self._angles: AngleFeature = AngleFeature.create_dummy()
-        self._velocity_data: AngleFeature = AngleFeature.create_dummy()
-        self._acceleration_data: AngleFeature = AngleFeature.create_dummy()
-        self._motion_data: AngleFeature = AngleFeature.create_dummy()
-        self._cumulative_motion_data: AngleFeature = AngleFeature.create_dummy()
-        self._symmetry_data: SymmetryFeature = SymmetryFeature.create_dummy()
+        self._angles: Angles = Angles.create_dummy()
+        self._velocity_data: Angles = Angles.create_dummy()
+        self._acceleration_data: Angles = Angles.create_dummy()
+        self._motion_data: Angles = Angles.create_dummy()
+        self._cumulative_motion_data: Angles = Angles.create_dummy()
+        self._symmetry_data: Symmetry = Symmetry.create_dummy()
 
         self._angles_dirty = False
         self._velocities_dirty = False
@@ -122,12 +122,12 @@ class PoseAngleTracker(PoseTrackerBase):
         self._total_motion = 0.0
         self._cumulative_total_motion = 0.0
 
-        self._angles = AngleFeature.create_dummy()
-        self._velocity_data = AngleFeature.create_dummy()
-        self._acceleration_data = AngleFeature.create_dummy()
-        self._motion_data = AngleFeature.create_dummy()
-        self._cumulative_motion_data = AngleFeature.create_dummy()
-        self._symmetry_data = SymmetryFeature.create_dummy()
+        self._angles = Angles.create_dummy()
+        self._velocity_data = Angles.create_dummy()
+        self._acceleration_data = Angles.create_dummy()
+        self._motion_data = Angles.create_dummy()
+        self._cumulative_motion_data = Angles.create_dummy()
+        self._symmetry_data = Symmetry.create_dummy()
 
         self._angles_dirty = False
         self._velocities_dirty = False
@@ -144,47 +144,47 @@ class PoseAngleTracker(PoseTrackerBase):
         return self._active
 
     @property
-    def angles(self) -> AngleFeature:
+    def angles(self) -> Angles:
         """Current smoothed angles (radians)"""
         if self._angles_dirty:
             angle_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_value for joint in AngleLandmark], dtype=np.float32)
-            self._angles = AngleFeature.from_values(angle_values)
+            self._angles = Angles.from_values(angle_values)
             self._angles_dirty = False
         return self._angles
 
     @property
-    def velocities(self) -> AngleFeature:
+    def velocities(self) -> Angles:
         """Current angular velocities (rad/s)"""
         if self._velocities_dirty:
             velocity_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_velocity for joint in AngleLandmark], dtype=np.float32)
-            self._velocity_data = AngleFeature.from_values(velocity_values)
+            self._velocity_data = Angles.from_values(velocity_values)
             self._velocities_dirty = False
         return self._velocity_data
 
     @property
-    def accelerations(self) -> AngleFeature:
+    def accelerations(self) -> Angles:
         """Current angular accelerations (rad/s²)"""
         if self._accelerations_dirty:
             acceleration_values: np.ndarray = np.array([self._angle_smoothers[joint].smooth_acceleration for joint in AngleLandmark], dtype=np.float32)
-            self._acceleration_data = AngleFeature.from_values(acceleration_values)
+            self._acceleration_data = Angles.from_values(acceleration_values)
             self._accelerations_dirty = False
         return self._acceleration_data
 
     @property
-    def motions(self) -> AngleFeature:
+    def motions(self) -> Angles:
         """Current weighted motion values"""
         if self._motions_dirty:
             motion_values: np.ndarray = np.array([self._motions[joint] for joint in AngleLandmark], dtype=np.float32)
-            self._motion_data = AngleFeature.from_values(motion_values)
+            self._motion_data = Angles.from_values(motion_values)
             self._motions_dirty = False
         return self._motion_data
 
     @property
-    def cumulative_motions(self) -> AngleFeature:
+    def cumulative_motions(self) -> Angles:
         """Cumulative motion values since tracking started"""
         if self._cumulative_motions_dirty:
             cumulative_values: np.ndarray = np.array([self._cumulative_motions[joint] for joint in AngleLandmark], dtype=np.float32)
-            self._cumulative_motion_data = AngleFeature.from_values(cumulative_values)
+            self._cumulative_motion_data = Angles.from_values(cumulative_values)
             self._cumulative_motions_dirty = False
         return self._cumulative_motion_data
 
@@ -199,6 +199,6 @@ class PoseAngleTracker(PoseTrackerBase):
         return self._cumulative_total_motion
 
     @property
-    def symmetries(self) -> SymmetryFeature:
+    def symmetries(self) -> Symmetry:
         """Current pose symmetry metrics"""
         return self._symmetry_data

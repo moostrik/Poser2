@@ -10,7 +10,7 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.features import AngleFeature, Point2DFeature, BBoxFeature, SymmetryFeature
+from modules.pose.features import Angles, Points2D, BBox, Symmetry
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
 
@@ -104,24 +104,24 @@ class FeatureConfidenceFilter(FilterNode):
 # Convenience classes
 class AngleConfidenceFilter(FeatureConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
-        super().__init__(config, AngleFeature, "angles")
+        super().__init__(config, Angles, "angles")
 
 
 class PointConfidenceFilter(FeatureConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
-        super().__init__(config, Point2DFeature, "points")
+        super().__init__(config, Points2D, "points")
 
 
 class DeltaConfidenceFilter(FeatureConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
-        super().__init__(config, AngleFeature, "deltas")
+        super().__init__(config, Angles, "deltas")
 
 
 class BBoxConfidenceFilter(FeatureConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
-        super().__init__(config, BBoxFeature, "bbox")
+        super().__init__(config, BBox, "bbox")
 
 
 class SymmetryConfidenceFilter(FeatureConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
-        super().__init__(config, SymmetryFeature, "symmetry")
+        super().__init__(config, Symmetry, "symmetry")

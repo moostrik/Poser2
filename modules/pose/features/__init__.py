@@ -1,8 +1,8 @@
 from typing import Union
 
-from modules.pose.features.BBoxFeature import       BBoxFeature, BBoxElement
-from modules.pose.features.AngleFeature import      AngleFeature, AngleLandmark
-from modules.pose.features.Point2DFeature import    Point2DFeature, PointLandmark
-from modules.pose.features.SymmetryFeature import   SymmetryFeature, SymmetryElement, AggregationMethod
+from modules.pose.features.BBox import       BBox, BBoxElement
+from modules.pose.features.Angles import      Angles, AngleLandmark
+from modules.pose.features.Points2D import    Points2D, PointLandmark
+from modules.pose.features.Symmetry import   Symmetry, SymmetryElement, AggregationMethod
 
-PoseFeature = Union[AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature]
+PoseFeature = Union[Angles, BBox, Points2D, Symmetry]

@@ -1,7 +1,7 @@
 import numpy as np
 
-from modules.pose.features.AngleFeature import AngleFeature, AngleLandmark
-from modules.pose.features.SymmetryFeature import SymmetryFeature, SymmetryElement
+from modules.pose.features.Angles import Angles, AngleLandmark
+from modules.pose.features.Symmetry import Symmetry, SymmetryElement
 
 # Maps each symmetric joint type to its left/right AngleLandmark pair
 _SYMMETRY_PAIRS: dict[SymmetryElement, tuple[AngleLandmark, AngleLandmark]] = {
@@ -15,7 +15,7 @@ class SymmetryUtils:
     """Utility class for computing symmetry metrics from angle data."""
 
     @staticmethod
-    def from_angles(angles: AngleFeature, symmetry_exponent: float = 1.0) -> SymmetryFeature:
+    def from_angles(angles: Angles, symmetry_exponent: float = 1.0) -> Symmetry:
         """Calculate symmetry metrics from angle data.
 
         Args:
@@ -46,4 +46,4 @@ class SymmetryUtils:
                 symmetry = (1.0 - normalized_diff) ** symmetry_exponent
                 values[joint_type] = float(max(0.0, min(1.0, symmetry)))
 
-        return SymmetryFeature.from_values(values)
+        return Symmetry.from_values(values)

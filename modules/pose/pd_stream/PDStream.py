@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 
 from modules.pose.Pose import Pose, PoseDict
-from modules.pose.features.AngleFeature import AngleFeature, ANGLE_LANDMARK_NAMES, ANGLE_NUM_LANDMARKS
+from modules.pose.features.Angles import Angles, ANGLE_LANDMARK_NAMES, ANGLE_NUM_LANDMARKS
 
 # Local application imports
 from modules.Settings import Settings
@@ -25,7 +25,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class PDStreamInput:
     track_id: int
     time_stamp: float  # Unix timestamp in seconds
-    angles: AngleFeature | None
+    angles: Angles | None
     is_removed: bool
 
     @classmethod

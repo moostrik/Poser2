@@ -267,7 +267,7 @@ import numpy as np
 
 from modules.pose.features.base.BaseFeature import NORMALIZED_RANGE
 from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod
-from modules.pose.features.AngleFeature import AngleLandmark
+from modules.pose.features.Angles import AngleLandmark
 
 
 # Reuse AngleLandmark enum for similarity (same landmarks as angles)

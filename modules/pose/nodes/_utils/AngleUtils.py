@@ -1,7 +1,7 @@
 import numpy as np
 
-from modules.pose.features.AngleFeature import AngleFeature, AngleLandmark
-from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
+from modules.pose.features.Angles import Angles, AngleLandmark
+from modules.pose.features.Points2D import Points2D, PointLandmark
 
 """Maps angle joints to the point landmarks needed to compute them"""
 ANGLE_KEYPOINTS: dict[AngleLandmark, tuple[PointLandmark, ...]] = {
@@ -42,7 +42,7 @@ _ANGLE_MIRRORED: set[AngleLandmark] = {
 class AngleUtils:
 
     @staticmethod
-    def from_points(points: Point2DFeature) -> AngleFeature:
+    def from_points(points: Points2D) -> Angles:
         """Create angle measurements from keypoint data.
 
         Computes joint angles from 2D keypoint positions, applies rotation offsets,
@@ -55,7 +55,7 @@ class AngleUtils:
             AngleFeature with computed angles and confidence scores
         """
         if points.valid_count == 0:
-            return AngleFeature.create_dummy()
+            return Angles.create_dummy()
 
         angle_values = np.full(len(AngleLandmark), np.nan, dtype=np.float32)
         angle_scores = np.zeros(len(AngleLandmark), dtype=np.float32)
@@ -88,7 +88,7 @@ class AngleUtils:
             scores = points.get_scores(list(keypoints))
             angle_scores[landmark] = min(scores)
 
-        return AngleFeature(values=angle_values, scores=angle_scores)
+        return Angles(values=angle_values, scores=angle_scores)
 
     @staticmethod
     def _calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, rotate_by: float = 0) -> float:

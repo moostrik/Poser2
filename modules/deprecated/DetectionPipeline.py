@@ -10,7 +10,7 @@ import numpy as np
 # Pose imports
 from modules.pose.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput, POSE_MODEL_TYPE_NAMES, POSE_MODEL_WIDTH, POSE_MODEL_HEIGHT
 from modules.pose.nodes._utils.ImageProcessor import ImageProcessor
-from modules.pose.features import AngleFactory, BBoxFeature, Point2DFeature
+from modules.pose.features import AngleFactory, BBox, Points2D
 from modules.pose.Pose import Pose, PoseDict, PoseDictCallback
 
 # Local application imports
@@ -185,10 +185,10 @@ class DetectionPipeline(Thread):
                 track_id=tracklet.id,
                 cam_id=tracklet.cam_id,
                 tracklet_poep=tracklet,
-                bbox = BBoxFeature.from_rect(pending_request.crop_rects[i]),
+                bbox = BBox.from_rect(pending_request.crop_rects[i]),
                 time_stamp = pending_request.time_stamp,
                 lost=tracklet.is_removed,
-                points = Point2DFeature(batch_detection.point_batch[i], scores=batch_detection.score_batch[i])
+                points = Points2D(batch_detection.point_batch[i], scores=batch_detection.score_batch[i])
             )
 
             object.__setattr__(pose, "crop_image", pending_request.crop_images[i])

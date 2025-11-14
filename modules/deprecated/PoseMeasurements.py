@@ -7,7 +7,7 @@ from typing import Optional
 import numpy as np
 
 # Pose imports
-from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
+from modules.pose.features.Points2D import Points2D, PointLandmark
 
 # Local application imports
 from modules.utils.PointsAndRects import Rect
@@ -107,7 +107,7 @@ class PoseMeasurementFactory:
         return None
 
     @staticmethod
-    def compute(points: Optional['Point2DFeature'], crop_rect: Optional[Rect]) -> PoseMeasurementData:
+    def compute(points: Optional['Points2D'], crop_rect: Optional[Rect]) -> PoseMeasurementData:
         if PoseMeasurementFactory.hotreload is None:
             PoseMeasurementFactory.hotreload = HotReloadMethods(PoseMeasurementFactory)
 

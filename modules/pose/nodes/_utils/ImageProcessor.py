@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 
 # Local application imports
-from modules.pose.features import BBoxFeature
+from modules.pose.features import BBox
 from modules.utils.PointsAndRects import Rect
 
 
@@ -18,7 +18,7 @@ class ImageProcessor:
         self.output_height: int = output_height
         self.aspect_ratio: float = output_width / output_height
 
-    def process_pose_image(self, bbox: BBoxFeature, image: np.ndarray) -> np.ndarray:
+    def process_pose_image(self, bbox: BBox, image: np.ndarray) -> np.ndarray:
 
         roi: Rect = bbox.to_rect()
 

@@ -52,7 +52,7 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet, FrameTyp
 from modules.tracker.Tracklet import Tracklet, TrackletDict
 from modules.pose.Pose import Pose, PoseDict
 from modules.pose.pd_stream.PDStream import PDStreamData
-from modules.pose.features import AngleFeature
+from modules.pose.features import Angles
 from modules.pose.similarity import SimilarityBatch
 from modules.WS.WSOutput import WSOutput
 
@@ -214,7 +214,7 @@ class DataHub:
                 return False
             return tracklet_item.value.is_being_tracked
 
-    def get_angles(self, tracklet_id: int) -> Optional[AngleFeature]:
+    def get_angles(self, tracklet_id: int) -> Optional[Angles]:
         with self.mutex:
             pose_item: Optional[DataItem[Pose]] = self.smooth_poses.get(tracklet_id)
             if not pose_item or not pose_item.value:

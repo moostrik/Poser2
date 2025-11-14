@@ -6,8 +6,8 @@ from typing import Optional
 import numpy as np
 
 # Pose imports
-from modules.pose.features import AngleFeature, AngleLandmark
-from modules.pose.features.Point2DFeature import Point2DFeature, PointLandmark
+from modules.pose.features import Angles, AngleLandmark
+from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.pose.nodes._utils.AngleUtils import ANGLE_KEYPOINTS
 
 # COLORS
@@ -89,7 +89,7 @@ class PoseVertexData:
 
 class PoseVertexFactory:
     @staticmethod
-    def compute_vertices(points: Point2DFeature) -> PoseVertexData:
+    def compute_vertices(points: Points2D) -> PoseVertexData:
 
         vertices: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 2), dtype=np.float32)
         colors: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 4), dtype=np.float32)
@@ -104,7 +104,7 @@ class PoseVertexFactory:
         return vertex_data
 
     @staticmethod
-    def compute_angled_vertices(points: Point2DFeature, angles: AngleFeature) -> PoseVertexData:
+    def compute_angled_vertices(points: Points2D, angles: Angles) -> PoseVertexData:
 
 
         vertex_data: Optional[PoseVertexData] = PoseVertexFactory.compute_vertices(points)

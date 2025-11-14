@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from modules.pose.features import AngleFeature, Point2DFeature, BBoxFeature, SymmetryFeature
+from modules.pose.features import Angles, Points2D, BBox, Symmetry
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
 
@@ -62,31 +62,31 @@ class FeatureValidator(FilterNode):
 class AngleValidator(FeatureValidator):
     """Validates angle feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, AngleFeature, "angles")
+        super().__init__(config, Angles, "angles")
 
 
 class PointValidator(FeatureValidator):
     """Validates point feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, Point2DFeature, "points")
+        super().__init__(config, Points2D, "points")
 
 
 class DeltaValidator(FeatureValidator):
     """Validates delta feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, AngleFeature, "deltas")
+        super().__init__(config, Angles, "deltas")
 
 
 class BBoxValidator(FeatureValidator):
     """Validates bounding box feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, BBoxFeature, "bbox")
+        super().__init__(config, BBox, "bbox")
 
 
 class SymmetryValidator(FeatureValidator):
     """Validates symmetry feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, SymmetryFeature, "symmetry")
+        super().__init__(config, Symmetry, "symmetry")
 
 
 class PoseValidator(FilterNode):

@@ -207,7 +207,7 @@ from enum import IntEnum
 
 from modules.pose.features.base.BaseFeature import NORMALIZED_RANGE
 from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod
-from modules.pose.features.AngleFeature import AngleLandmark
+from modules.pose.features.Angles import AngleLandmark
 
 
 class SymmetryElement(IntEnum):
@@ -237,7 +237,7 @@ _SYMMETRY_PAIRS: dict[SymmetryElement, tuple[AngleLandmark, AngleLandmark]] = {
 SYMMETRY_RANGE: tuple[float, float] = NORMALIZED_RANGE
 
 
-class SymmetryFeature(NormalizedScalarFeature[SymmetryElement]):
+class Symmetry(NormalizedScalarFeature[SymmetryElement]):
     """Symmetry scores for left/right landmark pairs (range [0, 1]).
 
     Measures how similar left/right landmark angles are after mirroring.

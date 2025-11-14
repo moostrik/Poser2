@@ -8,10 +8,10 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.Pose import Pose
-from modules.pose.features.Point2DFeature import PointLandmark
-from modules.pose.features.SymmetryFeature import SymmetryElement
+from modules.pose.features.Points2D import PointLandmark
+from modules.pose.features.Symmetry import SymmetryElement
 from modules.data.depricated.RenderDataHub_old import RenderDataHub_Old
-from modules.pose.features.AngleFeature import AngleLandmark
+from modules.pose.features.Angles import AngleLandmark
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

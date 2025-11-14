@@ -196,7 +196,7 @@ POINT_NUM_LANDMARKS: int = len(PointLandmark) # for backward compatibility
 POINT2D_COORD_RANGE: tuple[float, float] = NORMALIZED_RANGE # for backward compatibility
 
 
-class Point2DFeature(BaseVectorFeature[PointLandmark]):
+class Points2D(BaseVectorFeature[PointLandmark]):
     """2D point coordinates for body landmarks (normalized [0, 1] range).
 
     Represents 2D keypoint positions for pose estimation, where:
@@ -316,7 +316,7 @@ class Point2DFeature(BaseVectorFeature[PointLandmark]):
         """
         return self._values[:, 0], self._values[:, 1]
 
-    def distance_to(self, other: 'Point2DFeature', element: PointLandmark | int) -> float:
+    def distance_to(self, other: 'Points2D', element: PointLandmark | int) -> float:
         """Calculate Euclidean distance between element positions in two features.
 
         Args:

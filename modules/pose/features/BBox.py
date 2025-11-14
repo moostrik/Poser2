@@ -176,7 +176,7 @@ BBOX_ELEMENT_NAMES: list[str] = [e.name for e in BBoxElement]
 BBOX_NUM_ELEMENTS: int = len(BBoxElement)
 
 
-class BBoxFeature(BaseScalarFeature[BBoxElement]):
+class BBox(BaseScalarFeature[BBoxElement]):
     """Bounding box feature storing center position, width, and height.
 
     Use downstream code to apply target aspect ratios as needed.
@@ -228,7 +228,7 @@ class BBoxFeature(BaseScalarFeature[BBoxElement]):
     # ========== FACTORY METHODS ==========
 
     @classmethod
-    def from_rect(cls, rect: Rect, scores: np.ndarray | None = None) -> 'BBoxFeature':
+    def from_rect(cls, rect: Rect, scores: np.ndarray | None = None) -> 'BBox':
         """Create BBoxFeature from Rect (stores all dimensions).
 
         Args:
@@ -253,7 +253,7 @@ class BBoxFeature(BaseScalarFeature[BBoxElement]):
         return cls(values, scores)
 
     @classmethod
-    def create_dummy(cls) -> 'BBoxFeature':
+    def create_dummy(cls) -> 'BBox':
         """Create empty feature with all NaN values and zero scores."""
         values = np.full(len(cls.feature_enum()), np.nan, dtype=np.float32)
         scores = np.zeros(len(cls.feature_enum()), dtype=np.float32)

@@ -4,7 +4,7 @@ from threading import Lock
 import numpy as np
 
 from modules.pose.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput
-from modules.pose.features import Point2DFeature
+from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin
 from modules.pose.Pose import PoseDict
 
@@ -86,7 +86,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         if output.processed:
             for idx, tracklet_id in enumerate(tracklet_ids):
                 if idx < len(output.point_batch) and tracklet_id in original_poses:
-                    point_feature = Point2DFeature(
+                    point_feature = Points2D(
                         values=output.point_batch[idx],
                         scores=output.score_batch[idx]
                     )

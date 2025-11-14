@@ -21,7 +21,7 @@ from threading import Lock
 from collections.abc import Mapping
 
 from modules.pose.Pose import PoseDict
-from modules.pose.features import AngleFeature, SymmetryFeature, SimilarityBatch
+from modules.pose.features import Angles, Symmetry, SimilarityBatch
 from modules.data.depricated.PoseViewportTracker import PoseViewportTracker, PoseViewportTrackerSettings
 from modules.data.depricated.PoseAngleTracker import PoseAngleTracker, PoseAngleTrackerSettings
 from modules.Settings import Settings
@@ -142,22 +142,22 @@ class RenderDataHub_Old:
             return self._viewport_trackers[tracklet_id].smoothed_rect
 
     #  BODY JOINT ANGLES
-    def get_angles(self, tracklet_id: int) -> AngleFeature:
+    def get_angles(self, tracklet_id: int) -> Angles:
         """Get smoothed angle for the specified tracklet ID and joint."""
         with self._lock:
             return self._angle_trackers[tracklet_id].angles
 
-    def get_velocities(self, tracklet_id: int) -> AngleFeature:
+    def get_velocities(self, tracklet_id: int) -> Angles:
         """Get smoothed angle for the specified tracklet ID and joint."""
         with self._lock:
             return self._angle_trackers[tracklet_id].velocities
 
-    def get_motions(self, tracklet_id: int) -> AngleFeature:
+    def get_motions(self, tracklet_id: int) -> Angles:
         """Get smoothed angle change for the specified tracklet ID and joint."""
         with self._lock:
             return self._angle_trackers[tracklet_id].motions
 
-    def get_symmetries(self, tracklet_id: int) -> SymmetryFeature:
+    def get_symmetries(self, tracklet_id: int) -> Symmetry:
         """Get the synchrony value for the specified symmetric joint type."""
         with self._lock:
             return self._angle_trackers[tracklet_id].symmetries

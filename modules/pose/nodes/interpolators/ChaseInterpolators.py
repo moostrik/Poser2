@@ -23,7 +23,7 @@ from threading import Lock
 import numpy as np
 
 # Pose imports
-from modules.pose.features import PoseFeature, AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
+from modules.pose.features import PoseFeature, Angles, BBox, Points2D, Symmetry
 from modules.pose.nodes._utils.VectorChase import AngleChase, PointChase, VectorChase
 from modules.pose.nodes.Nodes import InterpolatorNode, NodeConfigBase
 from modules.pose.Pose import Pose
@@ -44,10 +44,10 @@ class FeatureChaseInterpolator(InterpolatorNode):
 
     # Registry mapping feature classes to interpolator classes
     INTERPOLATOR_REGISTRY = {
-        AngleFeature: AngleChase,
-        BBoxFeature: VectorChase,
-        Point2DFeature: PointChase,
-        SymmetryFeature: VectorChase,
+        Angles: AngleChase,
+        BBox: VectorChase,
+        Points2D: PointChase,
+        Symmetry: VectorChase,
     }
 
     def __init__(self, config: ChaseInterpolatorConfig, feature_class: type, attr_name: str):
@@ -142,27 +142,27 @@ class FeatureChaseInterpolator(InterpolatorNode):
 # Convenience classes
 class AngleChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorConfig) -> None:
-        super().__init__(config, AngleFeature, "angles")
+        super().__init__(config, Angles, "angles")
 
 
 class BBoxChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorConfig) -> None:
-        super().__init__(config, BBoxFeature, "bbox")
+        super().__init__(config, BBox, "bbox")
 
 
 class DeltaChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorConfig) -> None:
-        super().__init__(config, AngleFeature, "deltas")
+        super().__init__(config, Angles, "deltas")
 
 
 class PointChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorConfig) -> None:
-        super().__init__(config, Point2DFeature, "points")
+        super().__init__(config, Points2D, "points")
 
 
 class SymmetryChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorConfig) -> None:
-        super().__init__(config, SymmetryFeature, "symmetry")
+        super().__init__(config, Symmetry, "symmetry")
 
 
 # class PointAngleChaseInterpolator(InterpolatorNode):

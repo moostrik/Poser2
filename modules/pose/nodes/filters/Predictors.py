@@ -11,7 +11,7 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.features import AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
+from modules.pose.features import Angles, BBox, Points2D, Symmetry
 from modules.pose.nodes._utils.VectorPredict import AnglePredict, PointPredict, VectorPredict, PredictionMethod
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
@@ -41,10 +41,10 @@ class FeaturePredictor(FilterNode):
 
     # Registry mapping feature classes to predictor classes
     PREDICTOR_REGISTRY = {
-        AngleFeature: AnglePredict,
-        BBoxFeature: VectorPredict,
-        Point2DFeature: PointPredict,
-        SymmetryFeature: VectorPredict,
+        Angles: AnglePredict,
+        BBox: VectorPredict,
+        Points2D: PointPredict,
+        Symmetry: VectorPredict,
     }
 
     def __init__(self, config: PredictorConfig, feature_class: type, attr_name: str):
@@ -121,24 +121,24 @@ class FeaturePredictor(FilterNode):
 # Convenience classes
 class AnglePredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, AngleFeature, "angles")
+        super().__init__(config, Angles, "angles")
 
 
 class BBoxPredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, BBoxFeature, "bbox")
+        super().__init__(config, BBox, "bbox")
 
 
 class DeltaPredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, AngleFeature, "deltas")
+        super().__init__(config, Angles, "deltas")
 
 
 class PointPredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, Point2DFeature, "points")
+        super().__init__(config, Points2D, "points")
 
 
 class SymmetryPredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, SymmetryFeature, "symmetry")
+        super().__init__(config, Symmetry, "symmetry")

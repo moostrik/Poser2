@@ -3,7 +3,7 @@ import time
 
 # Pose imports
 from modules.pose.nodes.Nodes import NodeBase
-from modules.pose.features import BBoxFeature
+from modules.pose.features import BBox
 from modules.pose.Pose import Pose
 from modules.tracker.Tracklet import Tracklet
 
@@ -29,7 +29,7 @@ class TrackletExtractor(NodeBase):
             Pose with basic tracking data populated
         """
         # Extract bounding box from tracklet
-        bbox = BBoxFeature.from_rect(tracklet.roi)
+        bbox = BBox.from_rect(tracklet.roi)
 
         return Pose(
             track_id=tracklet.id,

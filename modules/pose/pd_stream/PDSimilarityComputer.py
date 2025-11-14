@@ -445,7 +445,7 @@ class PDStreamComputer():
         Returns:
             PoseSimilarity with per-joint similarity scores, or None if no valid joints
         """
-        from modules.pose.features.AngleFeature import AngleLandmark
+        from modules.pose.features.Angles import AngleLandmark
 
         # Initialize arrays for all joints
         num_joints = len(AngleLandmark)

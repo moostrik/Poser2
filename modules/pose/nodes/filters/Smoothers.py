@@ -11,7 +11,7 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.features import AngleFeature, BBoxFeature, Point2DFeature, SymmetryFeature
+from modules.pose.features import Angles, BBox, Points2D, Symmetry
 from modules.pose.nodes._utils.VectorSmooth import VectorSmooth, AngleSmooth, PointSmooth
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Pose import Pose
@@ -43,10 +43,10 @@ class FeatureSmoother(FilterNode):
 
     # Registry mapping feature classes to smoother classes
     SMOOTHER_REGISTRY = {
-        AngleFeature: AngleSmooth,
-        BBoxFeature: VectorSmooth,
-        Point2DFeature: PointSmooth,
-        SymmetryFeature: VectorSmooth,
+        Angles: AngleSmooth,
+        BBox: VectorSmooth,
+        Points2D: PointSmooth,
+        Symmetry: VectorSmooth,
     }
 
     def __init__(self, config: SmootherConfig, feature_class: type, attr_name: str):
@@ -103,24 +103,24 @@ class FeatureSmoother(FilterNode):
 # Convenience classes
 class AngleSmoother(FeatureSmoother):
     def __init__(self, config: SmootherConfig) -> None:
-        super().__init__(config, AngleFeature, "angles")
+        super().__init__(config, Angles, "angles")
 
 
 class DeltaSmoother(FeatureSmoother):
     def __init__(self, config: SmootherConfig) -> None:
-        super().__init__(config, AngleFeature, "deltas")
+        super().__init__(config, Angles, "deltas")
 
 
 class BBoxSmoother(FeatureSmoother):
     def __init__(self, config: SmootherConfig) -> None:
-        super().__init__(config, BBoxFeature, "bbox")
+        super().__init__(config, BBox, "bbox")
 
 
 class PointSmoother(FeatureSmoother):
     def __init__(self, config: SmootherConfig) -> None:
-        super().__init__(config, Point2DFeature, "points")
+        super().__init__(config, Points2D, "points")
 
 
 class SymmetrySmoother(FeatureSmoother):
     def __init__(self, config: SmootherConfig) -> None:
-        super().__init__(config, SymmetryFeature, "symmetry")
+        super().__init__(config, Symmetry, "symmetry")

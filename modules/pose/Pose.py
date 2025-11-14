@@ -4,19 +4,19 @@ import time
 from typing import Callable, Any
 
 # Pose imports
-from modules.pose.features import Point2DFeature, AngleFeature, SymmetryFeature, BBoxFeature
+from modules.pose.features import Points2D, Angles, Symmetry, BBox
 from enum import Enum
 
 class PoseField(Enum):
-    track_id = "track_id"
-    cam_id = "cam_id"
-    time_stamp = "time_stamp"
-    bbox = "bbox"
-    points = "points"
-    angles = "angles"
-    deltas = "deltas"
-    symmetry = "symmetry"
-    motion_time = "motion_time"
+    track_id =      "track_id"
+    cam_id =        "cam_id"
+    time_stamp =    "time_stamp"
+    bbox =          "bbox"
+    points =        "points"
+    angles =        "angles"
+    deltas =        "deltas"
+    symmetry =      "symmetry"
+    motion_time =   "motion_time"
 
 @dataclass(frozen=True)
 class Pose:
@@ -26,13 +26,13 @@ class Pose:
 
     is_removed: bool    # depricated, for use in stream
 
-    time_stamp: float =         field(default_factory=time.time)
-    bbox: BBoxFeature =         field(default_factory=BBoxFeature.create_dummy)
-    points: Point2DFeature =    field(default_factory=Point2DFeature.create_dummy)
-    angles: AngleFeature =      field(default_factory=AngleFeature.create_dummy)
-    deltas: AngleFeature =      field(default_factory=AngleFeature.create_dummy)
-    symmetry: SymmetryFeature = field(default_factory=SymmetryFeature.create_dummy)
-    motion_time: float =        field(default=0.0)
+    time_stamp: float =     field(default_factory=time.time)
+    bbox: BBox =            field(default_factory=BBox.create_dummy)
+    points: Points2D =      field(default_factory=Points2D.create_dummy)
+    angles: Angles =        field(default_factory=Angles.create_dummy)
+    deltas: Angles =        field(default_factory=Angles.create_dummy)
+    symmetry: Symmetry =    field(default_factory=Symmetry.create_dummy)
+    motion_time: float =    field(default=0.0)
 
     def get_feature(self, feature: PoseField) -> Any:
         """Get a feature by its Enum value"""

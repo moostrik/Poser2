@@ -1,14 +1,14 @@
 import numpy as np
 
-from modules.pose.features import AngleFeature, AngleLandmark
+from modules.pose.features import Angles, AngleLandmark
 
 
 class SimilarityUtils:
     """Utilities for comparing poses and computing similarity metrics."""
 
     @staticmethod
-    def compute_similarity(angles1: AngleFeature, angles2: AngleFeature,
-                          exponent: float = 2.0) -> AngleFeature:
+    def compute_similarity(angles1: Angles, angles2: Angles,
+                          exponent: float = 2.0) -> Angles:
         """Compute angle-based similarity with confidence scores.
 
         Uses exponential decay based on angular difference:
@@ -50,10 +50,10 @@ class SimilarityUtils:
         similarity_values = np.power(1.0 - np.abs(delta.values) / np.pi, exponent)
 
         # Return as AngleFeature to preserve confidence scores
-        return AngleFeature(values=similarity_values, scores=delta.scores)
+        return Angles(values=similarity_values, scores=delta.scores)
 
     @staticmethod
-    def weighted_similarity(angles1: AngleFeature, angles2: AngleFeature,
+    def weighted_similarity(angles1: Angles, angles2: Angles,
                            weights: dict[AngleLandmark, float],
                            exponent: float = 2.0,
                            min_confidence: float = 0.0) -> float:

@@ -189,7 +189,7 @@ ANGLE_NUM_LANDMARKS: int = len(AngleLandmark) # for backward compatibility
 ANGLE_RANGE: tuple[float, float] = SYMMETRIC_PI_RANGE # for backward compatibility
 
 
-class AngleFeature(BaseScalarFeature[AngleLandmark]):
+class Angles(BaseScalarFeature[AngleLandmark]):
     """Angles for body landmarks (radians, range [-π, π]).
 
     Represents angles at articulation points for pose analysis:
@@ -213,7 +213,7 @@ class AngleFeature(BaseScalarFeature[AngleLandmark]):
 
     # ========== RAW ANGLE-SPECIFIC OPERATIONS =========
 
-    def subtract(self, other: 'AngleFeature') -> 'AngleFeature':
+    def subtract(self, other: 'Angles') -> 'Angles':
         """Compute angular differences with proper wrapping (batch operation).
 
         Calculates the shortest angular distance between corresponding angles
@@ -226,7 +226,7 @@ class AngleFeature(BaseScalarFeature[AngleLandmark]):
         # Wrap angles to [-π, π] range (shortest angular distance)
         wrapped_diff: np.ndarray = np.arctan2(np.sin(diff), np.cos(diff))
         min_scores: np.ndarray = np.minimum(self.scores, other.scores)
-        return AngleFeature(values=wrapped_diff, scores=min_scores)
+        return Angles(values=wrapped_diff, scores=min_scores)
 
     # ========== CONVENIENCE ACCESSORS ==========
 

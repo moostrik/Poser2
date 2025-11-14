@@ -2,7 +2,7 @@
 from dataclasses import replace
 
 # Pose imports
-from modules.pose.features import AngleFeature
+from modules.pose.features import Angles
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.nodes._utils.AngleUtils import AngleUtils
 from modules.pose.Pose import Pose
@@ -21,5 +21,5 @@ class AngleExtractor(FilterNode):
 
     def process(self, pose: Pose) -> Pose:
         """Compute angles for all poses and emit enriched results."""
-        angles: AngleFeature = AngleUtils.from_points(pose.points)
+        angles: Angles = AngleUtils.from_points(pose.points)
         return replace(pose, angles=angles)
