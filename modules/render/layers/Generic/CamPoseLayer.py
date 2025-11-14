@@ -39,9 +39,7 @@ class CamPoseLayer(LayerBase):
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        poses: dict[int, Pose] = self._data.get_dict(self._type)
-
-        cam_poses: set[Pose] = {pose for pose in poses.values() if pose.cam_id == self._cam_id}
+        cam_poses: set[Pose] = self._data.get_items_for_cam(self._type, self._cam_id)
 
         if cam_poses == self._p_cam_poses:
             # Sets contain the same pose objects (by pointer), no update needed

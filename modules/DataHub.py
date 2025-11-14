@@ -19,7 +19,7 @@ from modules.WS.WSOutput import WSOutput
 class DataType(IntEnum):
     cam_image =         0   # sorted by cam_id
     depth_tracklet =    1   # sorted by cam_id
-    tracklet =          2   # sorted by track_id, has cam_id (track_id is named id -> RENAME)
+    tracklet =          2   # sorted by track_id, has cam_id
     R_pose =            3   # sorted by track_id, has cam_id
     S_pose =            4   # sorted by track_id, has cam_id
     I_pose =            5   # sorted by track_id, has cam_id
@@ -47,22 +47,22 @@ class DataHub:
         with self.mutex:
             return dict(self._data.get(data_type, {}))
 
-    def get_filtered(self, data_type: DataType, filter_fn: Callable[[Any], bool]) -> list[Any]:
+    def get_filtered(self, data_type: DataType, filter_fn: Callable[[Any], bool]) -> set[Any]:
         with self.mutex:
-            return [v for v in self._data.get(data_type, {}).values() if filter_fn(v)]
+            return {v for v in self._data.get(data_type, {}).values() if filter_fn(v)}
 
     def has_item(self, data_type: DataType, key: int = 0) -> bool:
         with self.mutex:
             return key in self._data.get(data_type, {})
 
     # CONVENIENCE GETTERS
-    # def get_items_for_cam(self, data_type: DataType, cam_id: int) -> list[Any]:
-    #     """ this works on tracklets and poses """
-    #     return self.get_filtered(data_type, lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id)
+    def get_items_for_cam(self, data_type: DataType, cam_id: int) -> set[Any]:
+        """ this works on tracklets and poses """
+        return self.get_filtered(data_type, lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id)
 
-    # def has_items_for_cam(self, data_type: DataType, cam_id: int) -> bool:
-    #     """ this works on tracklets and poses """
-    #     return any(self.get_filtered(data_type, lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id))
+    def has_items_for_cam(self, data_type: DataType, cam_id: int) -> bool:
+        """ this works on tracklets and poses """
+        return any(self.get_filtered(data_type, lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id))
 
     # GENERIC SETTERS
     def set_item(self, data_type: DataType, key: int, value: Any) -> None:

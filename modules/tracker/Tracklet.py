@@ -44,6 +44,10 @@ class Tracklet:
     needs_notification: bool =  field(default=True, repr=False)
 
     @property
+    def track_id(self) -> int:
+        return self.id
+
+    @property
     def is_new(self) -> bool:
         return self.status == TrackingStatus.NEW
 
