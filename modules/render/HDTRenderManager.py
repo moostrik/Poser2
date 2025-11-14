@@ -24,7 +24,7 @@ from modules.Settings import Settings
 from modules.utils.PointsAndRects import Rect, Point2f
 
 from modules.gui.PyReallySimpleGui import Gui
-from modules.DataHub import DataHub
+from modules.DataHub import DataHub, DataType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -143,7 +143,7 @@ class HDTRenderManager(RenderBase):
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
 
-        self.data_hub.update()
+        self.data_hub.notify_update()
         self.pose_meshes.update()
         # self.pose_meshes_fast.update()
 
@@ -199,7 +199,7 @@ class HDTRenderManager(RenderBase):
         # self.pose_overlays[camera_id].draw(Rect(0, 0, width, height))
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
 
-        if self.data_hub.get_is_active(camera_id):
+        if self.data_hub.has_item(DataType.I_pose, camera_id): # camera_id is pose id
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             # glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
             self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))

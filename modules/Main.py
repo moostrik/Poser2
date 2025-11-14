@@ -1,6 +1,7 @@
 # Standard library imports
 from math import ceil
 from typing import Optional
+from functools import partial
 
 # Local application imports
 from modules.Settings import Settings
@@ -26,7 +27,7 @@ from modules.pose.similarity.SimilarityComputer import SimilarityComputer
 from modules.pose.pd_stream.PDStream import PDStreamManager
 from modules.pose.pd_stream.PDSimilarityComputer import PDStreamComputer
 
-from modules.DataHub import DataHub
+from modules.DataHub import DataHub, DataType
 
 from modules.render.HDTRenderManager import HDTRenderManager
 
@@ -174,7 +175,7 @@ class Main():
             camera.add_frame_callback(self.image_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
-            camera.add_tracker_callback(self.data_hub.set_cam_tracklets)
+            camera.add_tracker_callback(self.data_hub.set_depth_tracklets)
             camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
             camera.start()
 
@@ -195,15 +196,15 @@ class Main():
         self.image_crop_processor.add_image_callback(self.point_extractor.set_images)
         self.image_crop_processor.add_poses_callback(self.point_extractor.process)
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
-        self.pose_raw_filters.add_poses_callback(self.data_hub.set_raw_poses) # raw poses
+        self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.R_pose)) # raw poses
 
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
-        self.pose_smooth_filters.add_poses_callback(self.data_hub.set_smooth_poses) # smooth poses
+        self.pose_smooth_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.S_pose)) # smooth poses
 
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
-        self.pose_interpolation_pipeline.add_poses_callback(self.data_hub.set_interpolated_poses) # interpolated poses
+        self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataType.I_pose)) # interpolated poses
 
 
         self.data_hub.add_update_callback(self.interpolator.update)

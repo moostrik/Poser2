@@ -40,7 +40,7 @@ class PDStreamInput:
 # Type for analysis output callback
 @dataclass (frozen=True)
 class PDStreamData:
-    id: int
+    track_id: int
     angles: pd.DataFrame
     confidences: pd.DataFrame
     capacity: int

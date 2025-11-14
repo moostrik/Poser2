@@ -140,7 +140,7 @@ class PDStreamComputer():
 
     def set_pose_stream(self, data: PDStreamData) -> None:
         with self._input_lock:
-            self._input_pose_streams[data.id] = data
+            self._input_pose_streams[data.track_id] = data
         return
 
     def add_correlation_callback(self, callback: SimilarityBatchCallback) -> None:
