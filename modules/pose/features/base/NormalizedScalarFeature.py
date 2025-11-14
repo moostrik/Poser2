@@ -270,6 +270,84 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
         # Apply aggregation method
         if method == AggregationMethod.MEAN:
             # Confidence-weighted arithmetic mean
+            return float(np.average(confident_values))
+
+        elif method == AggregationMethod.GEOMETRIC_MEAN:
+            # Replace zeros with TINY (don't filter - zero has meaning!)
+            safe_values = np.where(confident_values > _TINY, confident_values, _TINY)
+
+            # Geometric mean in log space for numerical stability
+            weighted_log_mean = np.average(np.log(safe_values))
+            return float(np.exp(weighted_log_mean))
+
+        elif method == AggregationMethod.HARMONIC_MEAN:
+            # Replace zeros with TINY (don't filter - zero has meaning!)
+            safe_values = np.where(confident_values > _TINY, confident_values, _TINY)
+
+            # Weighted harmonic mean: sum(w) / sum(w/x)
+            return float(len(confident_values) / np.sum(1.0 / confident_values))
+
+        elif method == AggregationMethod.MIN:
+            # Minimum value (no weighting applicable)
+            return float(np.min(confident_values))
+
+        elif method == AggregationMethod.MAX:
+            # Maximum value (no weighting applicable)
+            return float(np.max(confident_values))
+
+        elif method == AggregationMethod.MEDIAN:
+            # Median (no weighting - numpy median doesn't support weights)
+            return float(np.median(confident_values))
+
+        elif method == AggregationMethod.STD:
+            # Confidence-weighted standard deviation
+            if len(confident_values) < 2:
+                return np.nan
+
+            # Weighted variance formula: sum(w * (x - mean)^2) / sum(w)
+            weighted_mean = np.average(confident_values)
+            variance = np.average((confident_values - weighted_mean) ** 2,)
+            return float(np.sqrt(variance))
+
+        else:
+            raise ValueError(f"Unknown aggregation method: {method}")
+
+    def aggregate_weighted(self, method: AggregationMethod = AggregationMethod.MEAN,
+                  min_confidence: float = 0.0,
+                  exponent: float = 1.0) -> float:
+        """
+        Compute statistical aggregate of values with confidence filtering and optional exponentiation.
+
+        Args:
+            method: Aggregation method to use
+            min_confidence: Minimum confidence to include value (default: 0.0)
+            exponent: Exponent to apply to each value before aggregation (default: 1.0)
+
+        Returns:
+            Aggregated value, or NaN if no values meet criteria
+
+        Note:
+            For geometric and harmonic means, zero values are replaced with
+            a tiny value (1e-6) rather than filtered out, because zero has
+            semantic meaning (complete failure/mismatch) and should penalize
+            the overall score rather than being ignored.
+        """
+        # Filter by confidence threshold and validity
+        confident_mask = (self._scores >= min_confidence) & self._valid_mask
+
+        if not np.any(confident_mask):
+            return np.nan
+
+        confident_values = self._values[confident_mask]
+        confident_scores = self._scores[confident_mask]
+
+        # Apply exponent to each value before aggregation
+        if exponent != 1.0:
+            confident_values = confident_values ** exponent
+
+        # Apply aggregation method
+        if method == AggregationMethod.MEAN:
+            # Confidence-weighted arithmetic mean
             return float(np.average(confident_values, weights=confident_scores))
 
         elif method == AggregationMethod.GEOMETRIC_MEAN:

@@ -20,15 +20,16 @@ class DataType(IntEnum):
     cam_image =         0   # sorted by cam_id
     depth_tracklet =    1   # sorted by cam_id
     tracklet =          2   # sorted by track_id, has cam_id
-    R_pose =            3   # sorted by track_id, has cam_id
-    S_pose =            4   # sorted by track_id, has cam_id
-    I_pose =            5   # sorted by track_id, has cam_id
+    pose_R =            3   # sorted by track_id, has cam_id
+    pose_S =            4   # sorted by track_id, has cam_id
+    pose_I =            5   # sorted by track_id, has cam_id
     pose_stream =       6   # sorted by track_id, (cam_id not needed)
-    pose_similarity =   7   # single SimilarityBatch
-    motion_similarity = 8   # single SimilarityBatch
+    sim_P =             7   # single SimilarityBatch
+    sim_M =             8   # single SimilarityBatch
     light_image =       9   # single image
 
-POSE_ENUMS: set[DataType] = {DataType.R_pose, DataType.S_pose, DataType.I_pose}
+POSE_ENUMS: set[DataType] = {DataType.pose_R, DataType.pose_S, DataType.pose_I}
+SIMILARITY_ENUMS: set[DataType] = {DataType.sim_P, DataType.sim_M}
 
 class DataHub:
     def __init__(self) -> None:
@@ -95,11 +96,11 @@ class DataHub:
         self.set_item(DataType.pose_stream, pd_stream.track_id, pd_stream)
 
     # TYPE-SPECIFIC SETTERS WITHOUT KEY
-    def set_pose_correlation(self, value: SimilarityBatch) -> None:
-        self.set_dict(DataType.pose_similarity, {0: value})
+    def set_pose_similarity(self, value: SimilarityBatch) -> None:
+        self.set_dict(DataType.sim_P, {0: value})
 
-    def set_motion_correlation(self, value: SimilarityBatch) -> None:
-        self.set_dict(DataType.motion_similarity, {0: value})
+    def set_motion_similarity(self, value: SimilarityBatch) -> None:
+        self.set_dict(DataType.sim_M, {0: value})
 
     def set_light_image(self, value: WSOutput) -> None:
         self.set_dict(DataType.light_image, {0: value})

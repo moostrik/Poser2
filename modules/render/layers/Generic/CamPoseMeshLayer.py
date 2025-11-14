@@ -8,7 +8,6 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.gl.Mesh import Mesh
 
-from modules.pose.features import BBoxFeature
 from modules.pose.Pose import Pose
 
 from modules.DataHub import DataHub, DataType, POSE_ENUMS
@@ -16,7 +15,7 @@ from modules.gl.LayerBase import LayerBase, Rect
 from modules.render.meshes.PoseMesh import PoseMesh
 
 
-class CamPoseLayer(LayerBase):
+class CamPoseMeshLayer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub, type: DataType, pose_meshes: PoseMesh, bbox_color: tuple[float, float, float, float]) -> None:
         # for now make sure the pose meshes are for the correct data type
         self._data: DataHub = data
@@ -74,7 +73,7 @@ class CamPoseLayer(LayerBase):
 
         if self._bbox_color[3] > 0.0:
             for bbox in cam_bboxes.values():
-                CamPoseLayer.draw_bbox(bbox, self._bbox_color)
+                CamPoseMeshLayer.draw_bbox(bbox, self._bbox_color)
         self._fbo.end()
 
     @staticmethod

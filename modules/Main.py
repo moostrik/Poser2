@@ -148,10 +148,10 @@ class Main():
         )
 
 
-        self.pose_correlator: SimilarityComputer = SimilarityComputer()
+        self.pose_similator: SimilarityComputer = SimilarityComputer()
 
         self.pd_pose_streamer = PDStreamManager(settings)
-        self.pd_stream_correlator: Optional[PDStreamComputer] = None #PoseStreamCorrelator(settings)
+        self.pd_stream_similator: Optional[PDStreamComputer] = None #PoseStreamCorrelator(settings)
 
 
         # DATA
@@ -179,16 +179,16 @@ class Main():
             camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
             camera.start()
 
-        if self.pd_stream_correlator:
-            self.pd_pose_streamer.add_stream_callback(self.pd_stream_correlator.set_pose_stream)
-            self.pd_stream_correlator.add_correlation_callback(self.data_hub.set_motion_correlation)
-            self.pd_stream_correlator.start()
+        if self.pd_stream_similator:
+            self.pd_pose_streamer.add_stream_callback(self.pd_stream_similator.set_pose_stream)
+            self.pd_stream_similator.add_correlation_callback(self.data_hub.set_motion_similarity)
+            self.pd_stream_similator.start()
 
         self.pd_pose_streamer.add_stream_callback(self.data_hub.set_pose_stream)
         self.pd_pose_streamer.start()
 
-        self.pose_correlator.add_correlation_callback(self.data_hub.set_pose_correlation)
-        self.pose_correlator.start()
+        self.pose_similator.add_correlation_callback(self.data_hub.set_pose_similarity)
+        self.pose_similator.start()
 
         # POSE PROCESSING PIPELINES
         self.pose_from_tracklet.add_poses_callback(self.bbox_filters.process)
@@ -196,15 +196,17 @@ class Main():
         self.image_crop_processor.add_image_callback(self.point_extractor.set_images)
         self.image_crop_processor.add_poses_callback(self.point_extractor.process)
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
-        self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.R_pose)) # raw poses
+        self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_R)) # raw poses
 
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
-        self.pose_smooth_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.S_pose)) # smooth poses
+        self.pose_smooth_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_S)) # smooth poses
 
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
-        self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataType.I_pose)) # interpolated poses
+        self.pose_interpolation_pipeline.add_poses_callback(self.pose_similator.submit)
+        self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_I)) # interpolated poses
+
 
 
         self.data_hub.add_update_callback(self.interpolator.update)
@@ -290,8 +292,8 @@ class Main():
             self.pose_detector.stop()
         if self.pd_pose_streamer:
             self.pd_pose_streamer.stop()
-        if self.pd_stream_correlator:
-            self.pd_stream_correlator.stop()
+        if self.pd_stream_similator:
+            self.pd_stream_similator.stop()
 
         # print('stop av')
         # if self.WS:

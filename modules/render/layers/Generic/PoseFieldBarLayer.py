@@ -1,0 +1,112 @@
+
+# Third-party imports
+from OpenGL.GL import * # type: ignore
+
+# Local application imports
+from modules.gl.Fbo import Fbo
+from modules.gl.LayerBase import LayerBase, Rect
+from modules.gl.Text import draw_box_string, text_init
+
+from modules.pose.features import PoseFeature
+from modules.pose.Pose import Pose, PoseField
+
+from modules.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
+
+from modules.DataHub import DataHub, DataType
+
+from modules.utils.HotReloadMethods import HotReloadMethods
+
+# Shaders
+from modules.gl.shaders.PoseFeature import PoseFeature as PoseFeatureShader
+
+class PoseFieldBarLayer(LayerBase):
+    pose_feature_shader = PoseFeatureShader()
+
+    def __init__(self, cam_id: int, data_hub: DataHub, data_type: DataType, feature_type: PoseField,
+                min_color=(0.0, 0.5, 1.0), max_color=(1.0, 0.2, 0.0),
+                draw_labels: bool = True, range_scale: float = 1.0) -> None:
+        self._cam_id: int = cam_id
+        self._data_hub: DataHub = data_hub
+        self._data_type: DataType = data_type
+        self._fbo: Fbo = Fbo()
+        self._p_pose: Pose | None = None
+
+        self.feature_type: PoseField = feature_type
+        self.min_color: tuple[float, float, float] = min_color
+        self.max_color: tuple[float, float, float] = max_color
+        self.draw_labels: bool = draw_labels
+        self.range_scale: float = range_scale
+
+        text_init()
+
+        hot_reload = HotReloadMethods(self.__class__, True, True)
+
+    def allocate(self, width: int, height: int, internal_format: int) -> None:
+        self._fbo.allocate(width, height, internal_format)
+        if not PoseFieldBarLayer.pose_feature_shader.allocated:
+            PoseFieldBarLayer.pose_feature_shader.allocate(monitor_file=True)
+
+    def deallocate(self) -> None:
+        self._fbo.deallocate()
+        if PoseFieldBarLayer.pose_feature_shader.allocated:
+            PoseFieldBarLayer.pose_feature_shader.deallocate()
+
+    def draw(self, rect: Rect) -> None:
+        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+
+    def update(self) -> None:
+        # shader gets reset on hot reload, so we need to check if it's allocated
+        if not PoseFieldBarLayer.pose_feature_shader.allocated:
+            PoseFieldBarLayer.pose_feature_shader.allocate(monitor_file=True)
+
+        key: int = self._cam_id
+
+        pose: Pose | None = self._data_hub.get_item(self._data_type, key)
+
+        if pose == self._p_pose:
+            # no update needed
+            return
+
+        LayerBase.setView(self._fbo.width, self._fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
+        if pose is None:
+            return
+
+        data = pose.get_feature(self.feature_type)
+        if not isinstance(data, PoseFeature):
+            raise ValueError(f"PoseFeatureLayer expected feature of type PoseFeature, got {type(data)}")
+
+        PoseFieldBarLayer.pose_feature_shader.use(self._fbo.fbo_id, data, self.range_scale, self.min_color, self.max_color)
+
+
+        self.draw_joint_labels(self._fbo, data)
+
+    @staticmethod
+    def draw_joint_labels(fbo: Fbo, feature: PoseFeature) -> None:
+        """Draw joint names at the bottom of each bar."""
+        num_joints: int = len(feature)
+        step: float = fbo.width / num_joints
+
+        fbo.begin()
+
+        # Get joint names from the feature's enum
+        joint_enum_type = feature.__class__.feature_enum()
+        joint_names: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
+
+        # Alternate colors for readability
+        colors: list[tuple[float, float, float, float]] = [
+            (*POSE_COLOR_LEFT, 1.0),
+            (*POSE_COLOR_RIGHT, 1.0)
+        ]
+
+        for i in range(num_joints):
+            string: str = joint_names[i]
+            x: int = int((i + 0.1) * step)
+            y: int = int(fbo.height * 0.5 - 12)
+            clr: int = i % 2
+
+            draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
+
+        fbo.end()

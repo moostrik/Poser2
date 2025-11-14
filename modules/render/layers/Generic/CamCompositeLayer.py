@@ -11,7 +11,7 @@ from modules.render.meshes.PoseMesh import PoseMesh
 
 from modules.render.layers.Generic.CamImageLayer import CamImageLayer
 from modules.render.layers.Generic.CamDepthTrackLayer import CamDepthTrackLayer
-from modules.render.layers.Generic.CamPoseLayer import CamPoseLayer
+from modules.render.layers.Generic.CamPoseMeshLayer import CamPoseMeshLayer
 
 
 class CamCompositeLayer(LayerBase):
@@ -22,7 +22,7 @@ class CamCompositeLayer(LayerBase):
 
         self._image_layer: CamImageLayer = CamImageLayer(cam_id, data)
         self._depth_track_layer: CamDepthTrackLayer = CamDepthTrackLayer(cam_id, data)
-        self._pose_layer: CamPoseLayer = CamPoseLayer(cam_id, data, type, pose_meshes, bbox_color)
+        self._pose_layer: CamPoseMeshLayer = CamPoseMeshLayer(cam_id, data, type, pose_meshes, bbox_color)
 
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:

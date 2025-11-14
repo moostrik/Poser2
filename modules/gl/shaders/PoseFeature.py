@@ -3,7 +3,7 @@ from modules.gl.Shader import Shader, draw_quad
 
 import numpy as np
 
-from modules.pose.features import AngleFeature
+from modules.pose.features import PoseFeature as PoseFeatureUnion
 
 class PoseFeature(Shader):
     def __init__(self) -> None:
@@ -13,7 +13,7 @@ class PoseFeature(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, feature: AngleFeature, range_scale: float = 1.0, color_low=(0.0, 0.5, 1.0), color_high=(1.0, 0.2, 0.0)) -> None:
+    def use(self, fbo: int, feature: PoseFeatureUnion, range_scale: float = 1.0, color_low=(0.0, 0.5, 1.0), color_high=(1.0, 0.2, 0.0)) -> None:
         super().use()
         if not self.allocated: return
         if not fbo: return
