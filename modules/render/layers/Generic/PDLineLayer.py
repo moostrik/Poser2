@@ -7,7 +7,6 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
-from modules.gl.Mesh import Mesh
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 
@@ -17,9 +16,7 @@ from modules.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.Angles import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.pose.pd_stream.PDStream import PDStreamData
 
-from modules.DataHub import DataHub
-from modules.render.meshes.PoseMesh import PoseMesh
-from modules.render.meshes.AngleMeshes import AngleMeshes
+from modules.DataHub import DataHub, DataType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -29,70 +26,63 @@ from modules.gl.shaders.StreamPose import StreamPose
 class PDLineLayer(LayerBase):
     pose_stream_shader = StreamPose()
 
-    def __init__(self, data: DataHub, pose_meshes: PoseMesh, cam_id: int) -> None:
-        self.data: DataHub = data
-        # self.data_consumer_key: str = data.get_unique_consumer_key()
-        self.fbo: Fbo = Fbo()
-        self.cam_id: int = cam_id
-        self.pose_stream_image: Image = Image()
-        self.pose_meshes: PoseMesh = pose_meshes
+    def __init__(self, cam_id: int, data: DataHub) -> None:
+        self._cam_id: int = cam_id
+        self._data: DataHub = data
+        self._fbo: Fbo = Fbo()
+        self._image: Image = Image()
+        self._p_pd_stream: PDStreamData | None = None
         text_init()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
-        self.fbo.allocate(width, height, internal_format)
+        self._fbo.allocate(width, height, internal_format)
         if not PDLineLayer.pose_stream_shader.allocated:
             PDLineLayer.pose_stream_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
-        self.fbo.deallocate()
+        self._fbo.deallocate()
         if PDLineLayer.pose_stream_shader.allocated:
             PDLineLayer.pose_stream_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
-        self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        key: int = self.cam_id
-        pose: Pose | None = None # self.data.get_smooth_pose(key, True, self.data_consumer_key)
-        if pose is None:
-            return #??
-        pose_mesh: Mesh = self.pose_meshes.meshes[pose.track_id]
-        pose_stream: PDStreamData | None = None #self.data.get_pose_stream(key, True, self.data_consumer_key)
-        if pose_stream is not None:
-            stream_image: np.ndarray = StreamPose.pose_stream_to_image(pose_stream)
-            self.pose_stream_image.set_image(stream_image)
-            self.pose_stream_image.update()
-
         # shader gets reset on hot reload, so we need to check if it's allocated
         if not PDLineLayer.pose_stream_shader.allocated:
             PDLineLayer.pose_stream_shader.allocate(monitor_file=False)
 
-        LayerBase.setView(self.fbo.width, self.fbo.height)
+        pd_stream: PDStreamData | None = self._data.get_item(DataType.pd_stream, self._cam_id)
+
+        if pd_stream is self._p_pd_stream:
+            return  # no update needed
+        self._p_pd_stream = pd_stream
+
+        LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        PDLineLayer.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, PDLineLayer.pose_stream_shader)
+        self._fbo.clear(0.0, 0.0, 0.0, 1.0)
+        if pd_stream is None:
+            return
 
+        stream_image: np.ndarray = StreamPose.pose_stream_to_image(pd_stream)
+        self._image.set_image(stream_image)
+        self._image.update()
+
+        PDLineLayer.pose_stream_shader.use(self._fbo.fbo_id, self._image.tex_id, self._image.width, self._image.height, line_width=1.5 / self._fbo.height)
+
+        # PDLineLayer.draw_strings(self._fbo)
 
     @staticmethod
-    def draw_pose(fbo: Fbo, pose: Pose, pose_mesh: Mesh, angle_image: Image, shader: StreamPose) -> None:
-        fbo.begin()
-
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT)
-
-        fbo.end()
-        shader.use(fbo.fbo_id, angle_image.tex_id, angle_image.width, angle_image.height, line_width=1.5 / fbo.height)
-
-
+    def draw_strings(fbo: Fbo) -> None:
         angle_num: int = ANGLE_NUM_LANDMARKS
         step: float = fbo.height / angle_num
-        fbo.begin()
-
         # yellow and light blue
         colors: list[tuple[float, float, float, float]] = [(*POSE_COLOR_LEFT, 1.0), (*POSE_COLOR_RIGHT, 1.0)]
 
+        fbo.begin()
         for i in range(angle_num):
             string: str = ANGLE_LANDMARK_NAMES[i]
             x: int = 10
@@ -101,5 +91,3 @@ class PDLineLayer(LayerBase):
 
             draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
         fbo.end()
-
-

@@ -184,7 +184,7 @@ class Main():
             self.pd_stream_similator.add_correlation_callback(self.data_hub.set_motion_similarity)
             self.pd_stream_similator.start()
 
-        self.pd_pose_streamer.add_stream_callback(self.data_hub.set_pose_stream)
+        self.pd_pose_streamer.add_stream_callback(self.data_hub.set_pd_stream)
         self.pd_pose_streamer.start()
 
         self.pose_similator.add_correlation_callback(self.data_hub.set_pose_similarity)
@@ -196,15 +196,16 @@ class Main():
         self.image_crop_processor.add_image_callback(self.point_extractor.set_images)
         self.image_crop_processor.add_poses_callback(self.point_extractor.process)
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
+        self.pose_raw_filters.add_poses_callback(self.pd_pose_streamer.submit)
         self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_R)) # raw poses
 
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
+        self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
         self.pose_smooth_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_S)) # smooth poses
 
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
-        self.pose_interpolation_pipeline.add_poses_callback(self.pose_similator.submit)
         self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_I)) # interpolated poses
 
 

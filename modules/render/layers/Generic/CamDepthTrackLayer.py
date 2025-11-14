@@ -46,10 +46,9 @@ class CamDepthTrackLayer(LayerBase):
             self._fbo.clear(0.0, 0.0, 0.0, 0.0) # Clear with transparent color
             return
 
-        if depth_tracklets != self._p_tracklets:
-            self._p_tracklets = depth_tracklets
-        else:
-            return
+        if depth_tracklets is self._p_tracklets:
+            return  # no update needed
+        self._p_tracklets = depth_tracklets
 
         self._fbo.clear(0.0, 0.0, 0.0, 0.0) # Clear with transparent color
         self._fbo.begin()

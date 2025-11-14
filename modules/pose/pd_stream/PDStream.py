@@ -146,7 +146,7 @@ class PDStreamManager:
                 processor.terminate()
                 processor.join(timeout=1.0)
 
-    def add_poses(self, poses: PoseDict) -> None:
+    def submit(self, poses: PoseDict) -> None:
         """Add pose to the appropriate processor's queue based on pose id."""
         for pose in poses.values():
             try:

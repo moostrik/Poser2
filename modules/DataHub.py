@@ -23,7 +23,7 @@ class DataType(IntEnum):
     pose_R =            3   # sorted by track_id, has cam_id
     pose_S =            4   # sorted by track_id, has cam_id
     pose_I =            5   # sorted by track_id, has cam_id
-    pose_stream =       6   # sorted by track_id, (cam_id not needed)
+    pd_stream =         6   # sorted by track_id, (cam_id not needed)
     sim_P =             7   # single SimilarityBatch
     sim_M =             8   # single SimilarityBatch
     light_image =       9   # single image
@@ -92,8 +92,8 @@ class DataHub:
     def set_poses(self, data_type: DataType, poses: PoseDict) -> None:
         self.set_dict(data_type, poses)
 
-    def set_pose_stream(self, pd_stream: PDStreamData) -> None:
-        self.set_item(DataType.pose_stream, pd_stream.track_id, pd_stream)
+    def set_pd_stream(self, pd_stream: PDStreamData) -> None:
+        self.set_item(DataType.pd_stream, pd_stream.track_id, pd_stream)
 
     # TYPE-SPECIFIC SETTERS WITHOUT KEY
     def set_pose_similarity(self, value: SimilarityBatch) -> None:

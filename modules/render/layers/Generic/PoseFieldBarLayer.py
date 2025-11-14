@@ -63,7 +63,7 @@ class PoseScalarBarLayer(LayerBase):
 
         pose: Pose | None = self._data_hub.get_item(self._data_type, key)
 
-        if pose == self._p_pose:
+        if pose is self._p_pose:
             # no update needed
             return
 

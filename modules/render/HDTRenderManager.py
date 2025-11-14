@@ -6,8 +6,7 @@ from OpenGL.GL import * # type: ignore
 
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.layers import CamCompositeLayer, PoseScalarBarLayer, SimilarityLineLayer
-from modules.render.layers.Generic.PDLineLayer import PDLineLayer
+from modules.render.layers import CamCompositeLayer, PoseScalarBarLayer, SimilarityLineLayer, PDLineLayer
 from modules.render.meshes import PoseMesh
 # from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
 # from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
@@ -32,7 +31,7 @@ class HDTRenderManager(RenderBase):
         self.num_players: int =     settings.num_players
         self.num_cams: int =        settings.camera_num
         num_R_streams: int =   settings.render_R_num
-        R_stream_capacity: int = int(settings.camera_fps * 10)  # 10 seconds buffer
+        R_stream_capacity: int = int(settings.camera_fps * 30)  # 10 seconds buffer
 
         # data
         self.data_hub: DataHub = data_hub
@@ -45,7 +44,7 @@ class HDTRenderManager(RenderBase):
         self.cam_comps:             dict[int, CamCompositeLayer] = {}
         # self.centre_cam_layers:         dict[int, CentreCamLayer] = {}
         # self.centre_pose_layers:        dict[int, CentrePoseRender] = {}
-        # self.pose_overlays:             dict[int, PoseStreamLayer] = {}
+        self.pd_angle_overlay:      dict[int, PDLineLayer] = {}
         self.field_bars:            dict[int, PoseScalarBarLayer] = {}
         # self.line_field_layers:         dict[int, LineFieldLayer] = {}
         self.pose_sim_window =      SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, DataType.sim_P)
@@ -60,7 +59,7 @@ class HDTRenderManager(RenderBase):
             # self.centre_cam_layers[i] = CentreCamLayer(self.data_hub, i)
             # self.centre_pose_layers[i] = CentrePoseRender(self.data_hub, self.pose_meshes, i)
             # self.centre_pose_layers_fast[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes_fast, i)
-            # self.pose_overlays[i] = PoseStreamLayer(self.data_hub, self.pose_meshes, i)
+            self.pd_angle_overlay[i] = PDLineLayer(i, self.data_hub)
             self.field_bars[i] = PoseScalarBarLayer(i, self.data_hub, DataType.pose_R, ScalarPoseField.angles)
             # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
             # self.cam_fbos[i] = self.centre_cam_layers[i].get_fbo()
@@ -69,7 +68,7 @@ class HDTRenderManager(RenderBase):
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name=CamCompositeLayer.__name__,      columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=PDLineLayer.__name__,        columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=SimilarityLineLayer.__name__, columns=2,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
+            SubdivisionRow(name=SimilarityLineLayer.__name__, columns=1,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
@@ -113,7 +112,7 @@ class HDTRenderManager(RenderBase):
             w, h = self.subdivision.get_allocation_size(CamCompositeLayer.__name__, i)
             self.cam_comps[i].allocate(w , h, GL_RGBA)
             w, h = self.subdivision.get_allocation_size(PDLineLayer.__name__, i)
-            # self.pose_overlays[i].allocate(w, h, GL_RGBA)
+            self.pd_angle_overlay[i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         self.pose_meshes.deallocate()
@@ -127,8 +126,8 @@ class HDTRenderManager(RenderBase):
         #     layer.deallocate()
         # for layer in self.centre_pose_layers_fast.values():
         #     layer.deallocate()
-        # for layer in self.pose_overlays.values():
-        #     layer.deallocate()
+        for layer in self.pd_angle_overlay.values():
+            layer.deallocate()
         # for layer in self.line_field_layers.values():
         #     layer.deallocate()
         for layer in self.field_bars.values():
@@ -152,7 +151,7 @@ class HDTRenderManager(RenderBase):
             # self.centre_cam_layers[i].update()
             # self.centre_pose_layers[i].update()
             # self.centre_pose_layers_fast[i].update()
-            # self.pose_overlays[i].update()
+            self.pd_angle_overlay[i].update()
             self.field_bars[i].update()
             # self.line_field_layers[i].update()
 
@@ -178,9 +177,9 @@ class HDTRenderManager(RenderBase):
             # self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
             # self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
             # self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            # self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            self.pd_angle_overlay[i].draw(self.subdivision.get_rect(PDLineLayer.__name__, i))
 
-            self.field_bars[i].draw(self.subdivision.get_rect(PDLineLayer.__name__, i))
+            # self.field_bars[i].draw(self.subdivision.get_rect(PDLineLayer.__name__, i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         return
@@ -197,7 +196,7 @@ class HDTRenderManager(RenderBase):
         self.cam_comps[camera_id].draw(Rect(0, 0, width, height))
         # self.centre_cam_layers[camera_id].draw(Rect(0, 0, width, height))
         self.field_bars[camera_id].draw(Rect(0, 0, width, height))
-        # self.pose_overlays[camera_id].draw(Rect(0, 0, width, height))
+        self.pd_angle_overlay[camera_id].draw(Rect(0, 0, width, height))
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
 
         if self.data_hub.has_item(DataType.pose_I, camera_id): # camera_id is pose id

@@ -40,7 +40,7 @@ class CamPoseMeshLayer(LayerBase):
     def update(self) -> None:
         cam_poses: set[Pose] = self._data.get_items_for_cam(self._type, self._cam_id)
 
-        if cam_poses == self._p_cam_poses:
+        if cam_poses is self._p_cam_poses:
             # Sets contain the same pose objects (by pointer), no update needed
             return
         self._p_cam_poses = cam_poses
