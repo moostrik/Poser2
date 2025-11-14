@@ -23,7 +23,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 @dataclass (frozen=True)
 class PDStreamInput:
-    id: int
+    track_id: int
     time_stamp: float  # Unix timestamp in seconds
     angles: AngleFeature | None
     is_removed: bool
@@ -31,7 +31,7 @@ class PDStreamInput:
     @classmethod
     def from_pose(cls, pose: Pose) -> 'PDStreamInput':
         return cls(
-            id=pose.track_id,
+            track_id=pose.track_id,
             time_stamp=pose.time_stamp,  # Now a float
             angles=pose.angles,
             is_removed=pose.is_removed
@@ -152,7 +152,7 @@ class PDStreamManager:
             try:
                 pose_stream_input: PDStreamInput = PDStreamInput.from_pose(pose)
                 # Distribute by id modulo number of processors
-                processor_idx = pose_stream_input.id % len(self.processors)
+                processor_idx = pose_stream_input.track_id % len(self.processors)
                 self.processors[processor_idx].add_pose(pose_stream_input)
             except Exception as e:
                 print(f"[PoseStream] Error adding pose: {e}")
@@ -246,10 +246,10 @@ class StreamProcessor(Process):
                 # reset buffers if pose is removed
                 self.angle_df: pd.DataFrame = self.empty_df.copy()
                 self.score_df: pd.DataFrame = self.empty_df.copy()
-                self._notify_callbacks(PDStreamData(pose.id, self.angle_df, self.score_df, self.buffer_capacity, 0.0, True))
+                self._notify_callbacks(PDStreamData(pose.track_id, self.angle_df, self.score_df, self.buffer_capacity, 0.0, True))
                 return
             if pose.angles is None:
-                print(f"[PoseStreamProcessor] Pose {pose.id} has no angles, this should not happen")
+                print(f"[PoseStreamProcessor] Pose {pose.track_id} has no angles, this should not happen")
                 return
 
         angle_slice_df, conf_slice_df = self.get_data_frames_from_poses(poses)
@@ -273,7 +273,7 @@ class StreamProcessor(Process):
 
         # interpolated_score: pd.DataFrame = self.score_df.interpolate(method='time', limit_direction='both')#, limit=15)
 
-        self._notify_callbacks(PDStreamData(pose.id, smoothed, self.score_df, self.buffer_capacity, mean_movement, False))
+        self._notify_callbacks(PDStreamData(pose.track_id, smoothed, self.score_df, self.buffer_capacity, mean_movement, False))
 
     @ staticmethod
     def get_data_frames_from_poses(poses: list[PDStreamInput]) ->tuple[pd.DataFrame, pd.DataFrame]:

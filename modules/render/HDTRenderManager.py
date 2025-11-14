@@ -6,13 +6,13 @@ from OpenGL.GL import * # type: ignore
 
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.layers.Generic.CamTrackPoseLayer import CamTrackPoseLayer
+from modules.render.layers import CamCompositeLayer
 from modules.render.layers.Generic.PoseStreamLayer import PoseStreamLayer
 from modules.render.layers.Generic.CorrelationStreamLayer import CorrelationStreamLayer
-from modules.render.layers.Generic.PoseFeatureLayer import PoseFeatureLayer
+# from modules.render.layers.Generic.PoseFeatureLayer import PoseFeatureLayer
 from modules.render.meshes import PoseMesh
-from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
-from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
+# from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
+# from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
 # from modules.render.layers.HDT.LineFieldsLayer import LF as LineFieldLayer
 # from modules.render.HDTSoundOSC import HDTSoundOSC
 
@@ -41,35 +41,35 @@ class HDTRenderManager(RenderBase):
         # self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data_old, "localhost", 8000, 60.0)
 
         # meshes
-        self.pose_meshes =              PoseMesh(self.data_hub, self.num_players)
+        self.pose_meshes =              PoseMesh(self.num_players, self.data_hub, DataType.R_pose)
 
         # layers
-        self.camera_layers:             dict[int, CamTrackPoseLayer] = {}
-        self.centre_cam_layers:         dict[int, CentreCamLayer] = {}
-        self.centre_pose_layers:        dict[int, CentrePoseRender] = {}
-        self.pose_overlays:             dict[int, PoseStreamLayer] = {}
-        self.pose_feature_layers:       dict[int, PoseFeatureLayer] = {}
+        self.camera_layers:             dict[int, CamCompositeLayer] = {}
+        # self.centre_cam_layers:         dict[int, CentreCamLayer] = {}
+        # self.centre_pose_layers:        dict[int, CentrePoseRender] = {}
+        # self.pose_overlays:             dict[int, PoseStreamLayer] = {}
+        # self.pose_feature_layers:       dict[int, PoseFeatureLayer] = {}
         # self.line_field_layers:         dict[int, LineFieldLayer] = {}
-        self.pose_corr_stream_layer =   CorrelationStreamLayer(self.data_hub, num_R_streams, R_stream_capacity, use_motion=False)
-        self.motion_corr_stream_layer = CorrelationStreamLayer(self.data_hub, num_R_streams, R_stream_capacity, use_motion=True)
+        # self.pose_corr_stream_layer =   CorrelationStreamLayer(self.data_hub, num_R_streams, R_stream_capacity, use_motion=False)
+        # self.motion_corr_stream_layer = CorrelationStreamLayer(self.data_hub, num_R_streams, R_stream_capacity, use_motion=True)
 
         # fbos
         self.cam_fbos: dict[int, Fbo] = {}
 
         # populate
         for i in range(self.num_cams):
-            self.camera_layers[i] = CamTrackPoseLayer(self.data_hub, self.pose_meshes, i)
-            self.centre_cam_layers[i] = CentreCamLayer(self.data_hub, i)
-            self.centre_pose_layers[i] = CentrePoseRender(self.data_hub, self.pose_meshes, i)
+            self.camera_layers[i] = CamCompositeLayer(i, self.data_hub, DataType.R_pose, self.pose_meshes, (0.0, 0.0, 0.0, 0.2))
+            # self.centre_cam_layers[i] = CentreCamLayer(self.data_hub, i)
+            # self.centre_pose_layers[i] = CentrePoseRender(self.data_hub, self.pose_meshes, i)
             # self.centre_pose_layers_fast[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes_fast, i)
-            self.pose_overlays[i] = PoseStreamLayer(self.data_hub, self.pose_meshes, i)
-            self.pose_feature_layers[i] = PoseFeatureLayer(self.data_hub, i)
+            # self.pose_overlays[i] = PoseStreamLayer(self.data_hub, self.pose_meshes, i)
+            # self.pose_feature_layers[i] = PoseFeatureLayer(self.data_hub, i)
             # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
-            self.cam_fbos[i] = self.centre_cam_layers[i].get_fbo()
-            self.cam_fbos[i] = self.camera_layers[i].fbo
+            # self.cam_fbos[i] = self.centre_cam_layers[i].get_fbo()
+            self.cam_fbos[i] = self.camera_layers[i]._fbo
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name=CamTrackPoseLayer.__name__,      columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=CamCompositeLayer.__name__,      columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=PoseStreamLayer.__name__,        columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=CorrelationStreamLayer.__name__, columns=2,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
         ]
@@ -93,11 +93,11 @@ class HDTRenderManager(RenderBase):
         self.allocate_window_renders()
 
     def allocate(self) -> None:
-        for i in range(self.num_cams):
-            self.centre_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
-            self.centre_pose_layers[i].allocate(1080, 1920, GL_RGBA32F)
+        # for i in range(self.num_cams):
+            # self.centre_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
+            # self.centre_pose_layers[i].allocate(1080, 1920, GL_RGBA32F)
             # self.centre_pose_layers_fast[i].allocate(1080, 1920, GL_RGBA32F)
-            self.pose_feature_layers[i].allocate(1080, 1920, GL_RGBA32F)
+            # self.pose_feature_layers[i].allocate(1080, 1920, GL_RGBA32F)
             # self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
 
         self.pose_meshes.allocate()
@@ -108,34 +108,34 @@ class HDTRenderManager(RenderBase):
 
     def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size(CorrelationStreamLayer.__name__, 0)
-        self.motion_corr_stream_layer.allocate(w, h, GL_RGBA)
-        self.pose_corr_stream_layer.allocate(w, h, GL_RGBA)
+        # self.motion_corr_stream_layer.allocate(w, h, GL_RGBA)
+        # self.pose_corr_stream_layer.allocate(w, h, GL_RGBA)
 
         for i in range(self.num_cams):
-            w, h = self.subdivision.get_allocation_size(CamTrackPoseLayer.__name__, i)
+            w, h = self.subdivision.get_allocation_size(CamCompositeLayer.__name__, i)
             self.camera_layers[i].allocate(w , h, GL_RGBA)
             w, h = self.subdivision.get_allocation_size(PoseStreamLayer.__name__, i)
-            self.pose_overlays[i].allocate(w, h, GL_RGBA)
+            # self.pose_overlays[i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         self.pose_meshes.deallocate()
         # self.pose_meshes_fast.deallocate()
-        self.motion_corr_stream_layer.deallocate()
-        self.pose_corr_stream_layer.deallocate()
+        # self.motion_corr_stream_layer.deallocate()
+        # self.pose_corr_stream_layer.deallocate()
         for layer in self.camera_layers.values():
             layer.deallocate()
-        for layer in self.centre_cam_layers.values():
-            layer.deallocate()
-        for layer in self.centre_pose_layers.values():
-            layer.deallocate()
+        # for layer in self.centre_cam_layers.values():
+        #     layer.deallocate()
+        # for layer in self.centre_pose_layers.values():
+        #     layer.deallocate()
         # for layer in self.centre_pose_layers_fast.values():
         #     layer.deallocate()
-        for layer in self.pose_overlays.values():
-            layer.deallocate()
+        # for layer in self.pose_overlays.values():
+        #     layer.deallocate()
         # for layer in self.line_field_layers.values():
-            layer.deallocate()
-        for layer in self.pose_feature_layers.values():
-            layer.deallocate()
+        #     layer.deallocate()
+        # for layer in self.pose_feature_layers.values():
+        #     layer.deallocate()
 
         # self.sound_osc.stop()
 
@@ -147,16 +147,16 @@ class HDTRenderManager(RenderBase):
         self.pose_meshes.update()
         # self.pose_meshes_fast.update()
 
-        self.motion_corr_stream_layer.update()
-        self.pose_corr_stream_layer.update()
+        # self.motion_corr_stream_layer.update()
+        # self.pose_corr_stream_layer.update()
 
         for i in range(self.num_cams):
             self.camera_layers[i].update()
-            self.centre_cam_layers[i].update()
-            self.centre_pose_layers[i].update()
+            # self.centre_cam_layers[i].update()
+            # self.centre_pose_layers[i].update()
             # self.centre_pose_layers_fast[i].update()
-            self.pose_overlays[i].update()
-            self.pose_feature_layers[i].update()
+            # self.pose_overlays[i].update()
+            # self.pose_feature_layers[i].update()
             # self.line_field_layers[i].update()
 
         # if (t5-t0) * 1000 > 10:
@@ -171,17 +171,17 @@ class HDTRenderManager(RenderBase):
         glClear(GL_COLOR_BUFFER_BIT)
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        self.motion_corr_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__, 0))
-        self.pose_corr_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__, 1))
+        # self.motion_corr_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__, 0))
+        # self.pose_corr_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__, 1))
         for i in range(self.num_cams):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            self.camera_layers[i].draw(self.subdivision.get_rect(CamTrackPoseLayer.__name__, i))
+            self.camera_layers[i].draw(self.subdivision.get_rect(CamCompositeLayer.__name__, i))
 
             glBlendFunc(GL_ONE, GL_ONE)
-            self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            # self.centre_cam_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
             # self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-            self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            # self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            # self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glEnable(GL_TEXTURE_2D)
@@ -194,15 +194,16 @@ class HDTRenderManager(RenderBase):
         glBlendFunc(GL_ONE, GL_ONE)
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
-        self.centre_cam_layers[camera_id].draw(Rect(0, 0, width, height))
-        self.pose_feature_layers[camera_id].draw(Rect(0, 0, width, height))
+        self.camera_layers[camera_id].draw(Rect(0, 0, width, height))
+        # self.centre_cam_layers[camera_id].draw(Rect(0, 0, width, height))
+        # self.pose_feature_layers[camera_id].draw(Rect(0, 0, width, height))
         # self.pose_overlays[camera_id].draw(Rect(0, 0, width, height))
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
 
         if self.data_hub.has_item(DataType.I_pose, camera_id): # camera_id is pose id
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             # glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
-            self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))
+            # self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))
             # self.centre_pose_layers_fast[camera_id].draw(Rect(0, 0, width, height))
         glBlendFunc(GL_ONE, GL_ONE)
 

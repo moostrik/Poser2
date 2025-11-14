@@ -24,7 +24,7 @@ class CorrelationStreamLayer(LayerBase):
 
     def __init__(self, data: DataHub, num_streams: int, capacity: int, use_motion: bool = False) -> None:
         self.data: DataHub = data
-        self.data_consumer_key: str = data.get_unique_consumer_key()
+        # self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.num_streams: int = num_streams
@@ -66,9 +66,9 @@ class CorrelationStreamLayer(LayerBase):
             CorrelationStreamLayer.r_stream_shader.allocate(monitor_file=True)
 
         if self.use_motion:
-            correlation_batch: SimilarityBatch  | None = self.data.get_motion_correlation(True, self.data_consumer_key)
+            correlation_batch: SimilarityBatch  | None = None # self.data.get_motion_correlation(True, self.data_consumer_key)
         else:
-            correlation_batch: SimilarityBatch  | None = self.data.get_pose_correlation(True, self.data_consumer_key)
+            correlation_batch: SimilarityBatch  | None = None # self.data.get_pose_correlation(True, self.data_consumer_key)
 
         if correlation_batch is None:
             return

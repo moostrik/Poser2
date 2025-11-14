@@ -31,7 +31,7 @@ class PoseStreamLayer(LayerBase):
 
     def __init__(self, data: DataHub, pose_meshes: PoseMesh, cam_id: int) -> None:
         self.data: DataHub = data
-        self.data_consumer_key: str = data.get_unique_consumer_key()
+        # self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.cam_id: int = cam_id
         self.pose_stream_image: Image = Image()
@@ -55,11 +55,11 @@ class PoseStreamLayer(LayerBase):
 
     def update(self) -> None:
         key: int = self.cam_id
-        pose: Pose | None = self.data.get_smooth_pose(key, True, self.data_consumer_key)
+        pose: Pose | None = None # self.data.get_smooth_pose(key, True, self.data_consumer_key)
         if pose is None:
             return #??
         pose_mesh: Mesh = self.pose_meshes.meshes[pose.track_id]
-        pose_stream: PDStreamData | None = self.data.get_pose_stream(key, True, self.data_consumer_key)
+        pose_stream: PDStreamData | None = None #self.data.get_pose_stream(key, True, self.data_consumer_key)
         if pose_stream is not None:
             stream_image: np.ndarray = StreamPose.pose_stream_to_image(pose_stream)
             self.pose_stream_image.set_image(stream_image)

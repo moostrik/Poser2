@@ -15,7 +15,7 @@ from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRo
 from modules.render.meshes.PoseMesh import PoseMesh
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
-from modules.render.layers.Generic.CamTrackPoseLayer import CamTrackPoseLayer
+from modules.render.layers.Depricated.CamTrackPoseLayer import CamTrackPoseLayer
 from modules.render.layers.Generic.PoseLayer import PoseLayer
 from modules.render.layers.Generic.CorrelationStreamLayer import CorrelationStreamLayer
 from modules.render.layers.Generic.TrackerPanoramicLayer import TrackerPanoramicLayer as TrackerLayer

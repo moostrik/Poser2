@@ -17,17 +17,18 @@ from modules.WS.WSOutput import WSOutput
 
 
 class DataType(IntEnum):
-    light_image = 0         # single image
-    cam_image = 1           # sorted by cam_id
-    depth_tracklet = 2      # sorted by cam_id
-    tracklet = 3            # sorted by track_id, has cam_id (currelntly named id -> RENAME)
-    R_pose = 4              # sorted by track_id, has cam_id
-    S_pose = 5              # sorted by track_id, has cam_id
-    I_pose = 6              # sorted by track_id, has cam_id
-    pose_correlation = 7    # single SimilarityBatch
-    motion_correlation = 8  # single SimilarityBatch
-    pose_stream = 9         # sorted by track_id
+    cam_image =         0   # sorted by cam_id
+    depth_tracklet =    1   # sorted by cam_id
+    tracklet =          2   # sorted by track_id, has cam_id (track_id is named id -> RENAME)
+    R_pose =            3   # sorted by track_id, has cam_id
+    S_pose =            4   # sorted by track_id, has cam_id
+    I_pose =            5   # sorted by track_id, has cam_id
+    pose_stream =       6   # sorted by track_id, (cam_id not needed)
+    pose_similarity =   7   # single SimilarityBatch
+    motion_similarity = 8   # single SimilarityBatch
+    light_image =       9   # single image
 
+POSE_ENUMS: set[DataType] = {DataType.R_pose, DataType.S_pose, DataType.I_pose}
 
 class DataHub:
     def __init__(self) -> None:
@@ -76,30 +77,32 @@ class DataHub:
         with self.mutex:
             self._data[data_type] = dict(values)
 
-    # TYPE-SPECIFIC SETTERS
-    def set_light_image(self, value: WSOutput) -> None:
-        self.set_dict(DataType.light_image, {0: value})
-
+    # TYPE-SPECIFIC SETTERS WITH CAM_ID KEY
     def set_cam_image(self, key: int, frame_type, value: np.ndarray) -> None:
         self.set_item(DataType.cam_image, key, value)
 
     def set_depth_tracklets(self, key: int, value: list[DepthTracklet]) -> None:
         self.set_item(DataType.depth_tracklet, key, value)
 
+    # TYPE-SPECIFIC SETTERS WITH TRACK_ID KEY
     def set_tracklets(self, tracklets: TrackletDict) -> None:
         self.set_dict(DataType.tracklet, tracklets)
 
     def set_poses(self, data_type: DataType, poses: PoseDict) -> None:
         self.set_dict(data_type, poses)
 
-    def set_pose_correlation(self, value: SimilarityBatch) -> None:
-        self.set_dict(DataType.pose_correlation, {0: value})
-
-    def set_motion_correlation(self, value: SimilarityBatch) -> None:
-        self.set_dict(DataType.motion_correlation, {0: value})
-
     def set_pose_stream(self, pd_stream: PDStreamData) -> None:
         self.set_item(DataType.pose_stream, pd_stream.track_id, pd_stream)
+
+    # TYPE-SPECIFIC SETTERS WITHOUT KEY
+    def set_pose_correlation(self, value: SimilarityBatch) -> None:
+        self.set_dict(DataType.pose_similarity, {0: value})
+
+    def set_motion_correlation(self, value: SimilarityBatch) -> None:
+        self.set_dict(DataType.motion_similarity, {0: value})
+
+    def set_light_image(self, value: WSOutput) -> None:
+        self.set_dict(DataType.light_image, {0: value})
 
     # UPDATE CALLBACK
     def notify_update(self) -> None:
