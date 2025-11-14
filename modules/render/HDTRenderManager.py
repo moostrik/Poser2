@@ -6,8 +6,8 @@ from OpenGL.GL import * # type: ignore
 
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.layers import CamCompositeLayer, PoseFieldBarLayer, SimilarityWindowLayer
-from modules.render.layers.Generic.PoseStreamLayer import PoseStreamLayer
+from modules.render.layers import CamCompositeLayer, PoseScalarBarLayer, SimilarityLineLayer
+from modules.render.layers.Generic.PDLineLayer import PDLineLayer
 from modules.render.meshes import PoseMesh
 # from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
 # from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
@@ -25,7 +25,7 @@ from modules.gui.PyReallySimpleGui import Gui
 from modules.DataHub import DataHub, DataType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-from modules.pose.Pose import Pose, PoseField
+from modules.pose.Pose import ScalarPoseField
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
@@ -46,9 +46,9 @@ class HDTRenderManager(RenderBase):
         # self.centre_cam_layers:         dict[int, CentreCamLayer] = {}
         # self.centre_pose_layers:        dict[int, CentrePoseRender] = {}
         # self.pose_overlays:             dict[int, PoseStreamLayer] = {}
-        self.field_bars:            dict[int, PoseFieldBarLayer] = {}
+        self.field_bars:            dict[int, PoseScalarBarLayer] = {}
         # self.line_field_layers:         dict[int, LineFieldLayer] = {}
-        self.pose_sim_window =      SimilarityWindowLayer(num_R_streams, R_stream_capacity, self.data_hub, DataType.sim_P)
+        self.pose_sim_window =      SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, DataType.sim_P)
         # self.motion_corr_stream_layer = CorrelationStreamLayer(self.data_hub, num_R_streams, R_stream_capacity, use_motion=True)
 
         # fbos
@@ -61,15 +61,15 @@ class HDTRenderManager(RenderBase):
             # self.centre_pose_layers[i] = CentrePoseRender(self.data_hub, self.pose_meshes, i)
             # self.centre_pose_layers_fast[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes_fast, i)
             # self.pose_overlays[i] = PoseStreamLayer(self.data_hub, self.pose_meshes, i)
-            self.field_bars[i] = PoseFieldBarLayer(i, self.data_hub, DataType.pose_R, PoseField.angles)
+            self.field_bars[i] = PoseScalarBarLayer(i, self.data_hub, DataType.pose_R, ScalarPoseField.angles)
             # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
             # self.cam_fbos[i] = self.centre_cam_layers[i].get_fbo()
             self.cam_fbos[i] = self.cam_comps[i]._fbo
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name=CamCompositeLayer.__name__,      columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=PoseStreamLayer.__name__,        columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=SimilarityWindowLayer.__name__, columns=2,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
+            SubdivisionRow(name=PDLineLayer.__name__,        columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name=SimilarityLineLayer.__name__, columns=2,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
 
@@ -105,14 +105,14 @@ class HDTRenderManager(RenderBase):
         # self.sound_osc.start()
 
     def allocate_window_renders(self) -> None:
-        w, h = self.subdivision.get_allocation_size(SimilarityWindowLayer.__name__, 0)
+        w, h = self.subdivision.get_allocation_size(SimilarityLineLayer.__name__, 0)
         self.pose_sim_window.allocate(w, h, GL_RGBA)
         # self.motion_corr_stream_layer.allocate(w, h, GL_RGBA)
 
         for i in range(self.num_cams):
             w, h = self.subdivision.get_allocation_size(CamCompositeLayer.__name__, i)
             self.cam_comps[i].allocate(w , h, GL_RGBA)
-            w, h = self.subdivision.get_allocation_size(PoseStreamLayer.__name__, i)
+            w, h = self.subdivision.get_allocation_size(PDLineLayer.__name__, i)
             # self.pose_overlays[i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
@@ -168,7 +168,7 @@ class HDTRenderManager(RenderBase):
         glClear(GL_COLOR_BUFFER_BIT)
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        self.pose_sim_window.draw(self.subdivision.get_rect(SimilarityWindowLayer.__name__, 0))
+        self.pose_sim_window.draw(self.subdivision.get_rect(SimilarityLineLayer.__name__, 0))
         # self.motion_corr_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__, 1))
         for i in range(self.num_cams):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -180,7 +180,7 @@ class HDTRenderManager(RenderBase):
             # self.centre_pose_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
             # self.pose_overlays[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
 
-            self.field_bars[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
+            self.field_bars[i].draw(self.subdivision.get_rect(PDLineLayer.__name__, i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         return

@@ -8,7 +8,7 @@ from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.features import PoseFeature
-from modules.pose.Pose import Pose, PoseField
+from modules.pose.Pose import Pose, PoseField, ScalarPoseField
 
 from modules.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
@@ -19,10 +19,10 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # Shaders
 from modules.gl.shaders.PoseFeature import PoseFeature as PoseFeatureShader
 
-class PoseFieldBarLayer(LayerBase):
+class PoseScalarBarLayer(LayerBase):
     pose_feature_shader = PoseFeatureShader()
 
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: DataType, feature_type: PoseField,
+    def __init__(self, cam_id: int, data_hub: DataHub, data_type: DataType, feature_type: ScalarPoseField,
                 min_color=(0.0, 0.5, 1.0), max_color=(1.0, 0.2, 0.0),
                 draw_labels: bool = True, range_scale: float = 1.0) -> None:
         self._cam_id: int = cam_id
@@ -31,7 +31,7 @@ class PoseFieldBarLayer(LayerBase):
         self._fbo: Fbo = Fbo()
         self._p_pose: Pose | None = None
 
-        self.feature_type: PoseField = feature_type
+        self.feature_type: ScalarPoseField = feature_type
         self.min_color: tuple[float, float, float] = min_color
         self.max_color: tuple[float, float, float] = max_color
         self.draw_labels: bool = draw_labels
@@ -43,21 +43,21 @@ class PoseFieldBarLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
-        if not PoseFieldBarLayer.pose_feature_shader.allocated:
-            PoseFieldBarLayer.pose_feature_shader.allocate(monitor_file=True)
+        if not PoseScalarBarLayer.pose_feature_shader.allocated:
+            PoseScalarBarLayer.pose_feature_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
-        if PoseFieldBarLayer.pose_feature_shader.allocated:
-            PoseFieldBarLayer.pose_feature_shader.deallocate()
+        if PoseScalarBarLayer.pose_feature_shader.allocated:
+            PoseScalarBarLayer.pose_feature_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
-        if not PoseFieldBarLayer.pose_feature_shader.allocated:
-            PoseFieldBarLayer.pose_feature_shader.allocate(monitor_file=True)
+        if not PoseScalarBarLayer.pose_feature_shader.allocated:
+            PoseScalarBarLayer.pose_feature_shader.allocate(monitor_file=True)
 
         key: int = self._cam_id
 
@@ -74,11 +74,11 @@ class PoseFieldBarLayer(LayerBase):
         if pose is None:
             return
 
-        data = pose.get_feature(self.feature_type)
+        data = pose.get_feature(PoseField[self.feature_type.name])
         if not isinstance(data, PoseFeature):
             raise ValueError(f"PoseFeatureLayer expected feature of type PoseFeature, got {type(data)}")
 
-        PoseFieldBarLayer.pose_feature_shader.use(self._fbo.fbo_id, data, self.range_scale, self.min_color, self.max_color)
+        PoseScalarBarLayer.pose_feature_shader.use(self._fbo.fbo_id, data, self.range_scale, self.min_color, self.max_color)
 
 
         self.draw_joint_labels(self._fbo, data)

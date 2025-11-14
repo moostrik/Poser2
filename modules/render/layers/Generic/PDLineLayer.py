@@ -26,7 +26,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 # Shaders
 from modules.gl.shaders.StreamPose import StreamPose
 
-class PoseStreamLayer(LayerBase):
+class PDLineLayer(LayerBase):
     pose_stream_shader = StreamPose()
 
     def __init__(self, data: DataHub, pose_meshes: PoseMesh, cam_id: int) -> None:
@@ -42,13 +42,13 @@ class PoseStreamLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self.fbo.allocate(width, height, internal_format)
-        if not PoseStreamLayer.pose_stream_shader.allocated:
-            PoseStreamLayer.pose_stream_shader.allocate(monitor_file=True)
+        if not PDLineLayer.pose_stream_shader.allocated:
+            PDLineLayer.pose_stream_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self.fbo.deallocate()
-        if PoseStreamLayer.pose_stream_shader.allocated:
-            PoseStreamLayer.pose_stream_shader.deallocate()
+        if PDLineLayer.pose_stream_shader.allocated:
+            PDLineLayer.pose_stream_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self.fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -66,13 +66,13 @@ class PoseStreamLayer(LayerBase):
             self.pose_stream_image.update()
 
         # shader gets reset on hot reload, so we need to check if it's allocated
-        if not PoseStreamLayer.pose_stream_shader.allocated:
-            PoseStreamLayer.pose_stream_shader.allocate(monitor_file=False)
+        if not PDLineLayer.pose_stream_shader.allocated:
+            PDLineLayer.pose_stream_shader.allocate(monitor_file=False)
 
         LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        PoseStreamLayer.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, PoseStreamLayer.pose_stream_shader)
+        PDLineLayer.draw_pose(self.fbo, pose, pose_mesh, self.pose_stream_image, PDLineLayer.pose_stream_shader)
 
 
     @staticmethod

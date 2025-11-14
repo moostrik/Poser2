@@ -19,7 +19,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 
 
-class SimilarityWindowLayer(LayerBase):
+class SimilarityLineLayer(LayerBase):
     r_stream_shader = StreamCorrelation()
 
     def __init__(self, num_streams: int, capacity: int, data: DataHub, type: DataType) -> None:
@@ -39,14 +39,14 @@ class SimilarityWindowLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
-        if not SimilarityWindowLayer.r_stream_shader.allocated:
-            SimilarityWindowLayer.r_stream_shader.allocate(monitor_file=True)
+        if not SimilarityLineLayer.r_stream_shader.allocated:
+            SimilarityLineLayer.r_stream_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._image.deallocate()
-        if SimilarityWindowLayer.r_stream_shader.allocated:
-            SimilarityWindowLayer.r_stream_shader.deallocate()
+        if SimilarityLineLayer.r_stream_shader.allocated:
+            SimilarityLineLayer.r_stream_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -63,8 +63,8 @@ class SimilarityWindowLayer(LayerBase):
         The FBO is always cleared, even if no data is available.
         """
         # reallocate shader if needed if hot-reloaded
-        if not SimilarityWindowLayer.r_stream_shader.allocated:
-            SimilarityWindowLayer.r_stream_shader.allocate(monitor_file=True)
+        if not SimilarityLineLayer.r_stream_shader.allocated:
+            SimilarityLineLayer.r_stream_shader.allocate(monitor_file=True)
 
         batch: SimilarityBatch  | None = self._data.get_item(self._type)
 

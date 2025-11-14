@@ -18,6 +18,13 @@ class PoseField(Enum):
     symmetry =      "symmetry"
     motion_time =   "motion_time"
 
+class ScalarPoseField(Enum):
+    """Enum containing only scalar pose fields"""
+    bbox =      PoseField.bbox.value
+    angles =    PoseField.angles.value
+    deltas =    PoseField.deltas.value
+    symmetry =  PoseField.symmetry.value
+
 @dataclass(frozen=True)
 class Pose:
     """Immutable pose data structure"""
