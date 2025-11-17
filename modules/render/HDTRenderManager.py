@@ -21,7 +21,7 @@ from modules.Settings import Settings
 from modules.utils.PointsAndRects import Rect, Point2f
 
 from modules.gui.PyReallySimpleGui import Gui
-from modules.DataHub import DataHub, DataType
+from modules.DataHub import DataHub, DataType, PoseDataTypes, SimilarityDataType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.pose.Pose import ScalarPoseField
@@ -38,7 +38,7 @@ class HDTRenderManager(RenderBase):
         # self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data_old, "localhost", 8000, 60.0)
 
         # meshes
-        self.pose_meshes =              PoseMesh(self.num_players, self.data_hub, DataType.pose_R)
+        self.pose_meshes =              PoseMesh(self.num_players, self.data_hub, PoseDataTypes.pose_R)
 
         # layers
         self.cam_comps:             dict[int, CamCompositeLayer] = {}
@@ -47,7 +47,7 @@ class HDTRenderManager(RenderBase):
         self.pd_angle_overlay:      dict[int, PDLineLayer] = {}
         self.field_bars:            dict[int, PoseScalarBarLayer] = {}
         # self.line_field_layers:         dict[int, LineFieldLayer] = {}
-        self.pose_sim_window =      SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, DataType.sim_P)
+        self.pose_sim_window =      SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataType.sim_P)
         # self.motion_corr_stream_layer = CorrelationStreamLayer(self.data_hub, num_R_streams, R_stream_capacity, use_motion=True)
 
         # fbos

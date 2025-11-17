@@ -11,7 +11,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.similarity.features.SimilarityStream import SimilarityStream, SimilarityStreamData, SimilarityBatch , AggregationMethod
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.DataHub import DataHub, DataType, SIMILARITY_ENUMS
+from modules.DataHub import DataHub, DataType, SimilarityDataType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,12 +22,10 @@ from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 class SimilarityLineLayer(LayerBase):
     r_stream_shader = StreamCorrelation()
 
-    def __init__(self, num_streams: int, capacity: int, data: DataHub, type: DataType) -> None:
+    def __init__(self, num_streams: int, capacity: int, data: DataHub, type: SimilarityDataType) -> None:
         self._num_streams: int = num_streams
         self._data: DataHub = data
-        if type not in SIMILARITY_ENUMS:
-            raise ValueError(f"Invalid DataType for CorrelationStreamLayer: {type}")
-        self._type: DataType = type
+        self._type: SimilarityDataType = type
         self._fbo: Fbo = Fbo()
         self._image: Image = Image()
         self._correlation_stream: SimilarityStream = SimilarityStream(capacity)
@@ -66,7 +64,7 @@ class SimilarityLineLayer(LayerBase):
         if not SimilarityLineLayer.r_stream_shader.allocated:
             SimilarityLineLayer.r_stream_shader.allocate(monitor_file=True)
 
-        batch: SimilarityBatch  | None = self._data.get_item(self._type)
+        batch: SimilarityBatch  | None = self._data.get_item(DataType(self._type))
 
         # print("yes", batch)
         if batch is self._p_batch:

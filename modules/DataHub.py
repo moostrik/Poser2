@@ -28,8 +28,18 @@ class DataType(IntEnum):
     sim_M =             8   # single SimilarityBatch
     light_image =       9   # single image
 
-POSE_ENUMS: set[DataType] = {DataType.pose_R, DataType.pose_S, DataType.pose_I}
-SIMILARITY_ENUMS: set[DataType] = {DataType.sim_P, DataType.sim_M}
+
+class PoseDataTypes(IntEnum):
+    pose_R =      DataType.pose_R.value
+    pose_S =      DataType.pose_S.value
+    pose_I =      DataType.pose_I.value
+
+class SimilarityDataType(IntEnum):
+    sim_P =      DataType.sim_P.value
+    sim_M =      DataType.sim_M.value
+
+# POSE_ENUMS: set[DataType] = {DataType.pose_R, DataType.pose_S, DataType.pose_I}
+# SIMILARITY_ENUMS: set[DataType] = {DataType.sim_P, DataType.sim_M}
 
 class DataHub:
     def __init__(self) -> None:

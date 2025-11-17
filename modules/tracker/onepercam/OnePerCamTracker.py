@@ -10,7 +10,6 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.Settings import Settings
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
-from modules.tracker.onepercam.OnePerCamSmoothRect import OnePerCamSmoothRect
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager
 from modules.tracker.onepercam.OnePerCamTrackerGui import OnePerCamTrackerGui
 
@@ -48,7 +47,6 @@ class OnePerCamTracker(Thread, BaseTracker):
         self.add_bottom_threshold: float =     0.2
 
         self.tracklet_manager: TrackletManager = TrackletManager(self._num_cams)
-        self.smooth_rects: OnePerCamSmoothRect = OnePerCamSmoothRect(self._num_cams)
 
         self.gui = OnePerCamTrackerGui(gui, self, settings)
 
@@ -150,16 +148,6 @@ class OnePerCamTracker(Thread, BaseTracker):
             if tracklet.is_expired(self.timeout):
                 self.tracklet_manager.retire_tracklet(tracklet.id)
                 # print(f"Retiring expired tracklet {tracklet.id} at {time()}")
-
-        # Create metadata for each tracklet
-        for tracklet in self.tracklet_manager.all_tracklets():
-            if tracklet.needs_notification:
-                smooth_rect = self.smooth_rects.update(tracklet)
-                if smooth_rect is not None:
-                    metadata = OnePerCamMetadata(
-                        smooth_rect=smooth_rect
-                    )
-                    self.tracklet_manager.set_metadata(tracklet.id, metadata)
 
         # Notify callbacks
         callback_tracklets: TrackletDict = {}

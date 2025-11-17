@@ -15,14 +15,14 @@ from modules.gl.LayerBase import LayerBase, Rect
 from modules.render.meshes.PoseMesh import PoseMesh
 
 
-class CamPoseMeshLayer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, type: PoseDataTypes, pose_meshes: PoseMesh,
+class PoseMeshLayer(LayerBase):
+    def __init__(self, track_id: int, data: DataHub, type: PoseDataTypes, pose_meshes: PoseMesh,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         # for now make sure the pose meshes are for the correct data type
         self._data: DataHub = data
         self._pose_meshes: PoseMesh = pose_meshes
         self._fbo: Fbo = Fbo()
-        self._cam_id: int = cam_id
+        self._track_id: int = track_id
         self._type: PoseDataTypes = type
         self._bbox_color: tuple[float, float, float, float] = bbox_color
         self._p_cam_poses: set[Pose] = set()
@@ -37,8 +37,7 @@ class CamPoseMeshLayer(LayerBase):
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        cam_poses: set[Pose] = self._data.get_items_for_cam(DataType(self._type), self._cam_id)
-
+        cam_poses: set[Pose] = self._data.get_items_for_cam(DataType(self._type), self._track_id)
         if cam_poses is self._p_cam_poses:
             # Sets contain the same pose objects (by pointer), no update needed
             return
@@ -72,7 +71,7 @@ class CamPoseMeshLayer(LayerBase):
 
         if self._bbox_color[3] > 0.0:
             for bbox in cam_bboxes.values():
-                CamPoseMeshLayer.draw_bbox(bbox, self._bbox_color)
+                PoseMeshLayer.draw_bbox(bbox, self._bbox_color)
         self._fbo.end()
 
     @staticmethod

@@ -22,10 +22,10 @@ from modules.gl.shaders.PoseFeature import PoseFeature as PoseFeatureShader
 class PoseScalarBarLayer(LayerBase):
     pose_feature_shader = PoseFeatureShader()
 
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: DataType, feature_type: ScalarPoseField,
+    def __init__(self, track_id: int, data_hub: DataHub, data_type: DataType, feature_type: ScalarPoseField,
                 min_color=(0.0, 0.5, 1.0), max_color=(1.0, 0.2, 0.0),
                 draw_labels: bool = True, range_scale: float = 1.0) -> None:
-        self._cam_id: int = cam_id
+        self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._data_type: DataType = data_type
         self._fbo: Fbo = Fbo()
@@ -59,13 +59,12 @@ class PoseScalarBarLayer(LayerBase):
         if not PoseScalarBarLayer.pose_feature_shader.allocated:
             PoseScalarBarLayer.pose_feature_shader.allocate(monitor_file=True)
 
-        key: int = self._cam_id
+        key: int = self._track_id
 
         pose: Pose | None = self._data_hub.get_item(self._data_type, key)
 
         if pose is self._p_pose:
-            # no update needed
-            return
+            return # no update needed
 
         LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)

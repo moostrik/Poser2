@@ -8,17 +8,15 @@ from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose
 from modules.deprecated.PoseVertices import PoseVertexData, PoseVertexFactory
 from modules.deprecated.PoseVertices import POSE_VERTEX_INDICES
-from modules.DataHub import DataHub, DataType, POSE_ENUMS
+from modules.DataHub import DataHub, DataType, PoseDataTypes
 from modules.gl.LayerBase import LayerBase, Rect
 
 class PoseMesh(LayerBase):
     """Methods for updating meshes based on pose data."""
-    def __init__(self, amount: int, data: DataHub, type: DataType) -> None:
+    def __init__(self, amount: int, data: DataHub, type: PoseDataTypes) -> None:
         self._amount: int = amount
         self._data: DataHub = data
-        if type not in POSE_ENUMS:
-            raise ValueError(f"Invalid DataType for CamTrackPoseLayer: {type}")
-        self._type: DataType = type
+        self._type: PoseDataTypes = type
         self.meshes: dict[int, Mesh] = {}
 
         self._p_pose: dict[int, Pose] = {}
@@ -41,7 +39,7 @@ class PoseMesh(LayerBase):
 
     def update(self) -> None:
         for id in range(self._amount):
-            pose: Pose | None = self._data.get_item(self._type, id)
+            pose: Pose | None = self._data.get_item(DataType(self._type), id)
             if pose == self._p_pose.get(id, None):
                 continue
             pose_mesh: Mesh | None = self.meshes.get(id, None)
