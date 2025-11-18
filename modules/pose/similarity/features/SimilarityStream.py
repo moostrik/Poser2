@@ -7,9 +7,6 @@ import numpy as np
 from modules.pose.features import AggregationMethod
 from modules.pose.similarity.features.SimilarityBatch import SimilarityBatch
 
-# Local application imports
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 @dataclass(frozen=True)
 class SimilarityStreamData:
@@ -70,7 +67,6 @@ class SimilarityStream:
         self._pair_history: dict[tuple[int, int], tuple[np.ndarray, int]] = {}
         self._output_data: SimilarityStreamData | None = None
         self._snapshot_dirty: bool = True
-        self.hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def update(self, batch: SimilarityBatch ,
                statistic: AggregationMethod = AggregationMethod.GEOMETRIC_MEAN) -> None:

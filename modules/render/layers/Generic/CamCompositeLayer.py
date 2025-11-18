@@ -15,7 +15,8 @@ from modules.render.renderers import CamBBoxRenderer, CamDepthTrackRenderer, Cam
 
 
 class CamCompositeLayer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, type: PoseDataTypes, line_width: int = 2,
+    def __init__(self, cam_id: int, data: DataHub, type: PoseDataTypes, image_renderer: CamImageRenderer,
+                 line_width: int = 2,
                  mesh_color: tuple[float, float, float, float] | None = None,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._cam_id: int = cam_id
@@ -23,7 +24,7 @@ class CamCompositeLayer(LayerBase):
         self._type: PoseDataTypes = type
         self._line_width: int = int(line_width)
 
-        self._image_renderer: CamImageRenderer = CamImageRenderer(cam_id, data)
+        self._image_renderer: CamImageRenderer = image_renderer
         self._depth_track_renderer: CamDepthTrackRenderer = CamDepthTrackRenderer(cam_id, data)
         self._bbox_renderer: CamBBoxRenderer = CamBBoxRenderer(cam_id, data, type, line_width, bbox_color)
         self._mesh_renderer: CamMeshRenderer = CamMeshRenderer(cam_id, data, type, line_width, mesh_color)
@@ -74,7 +75,6 @@ class CamCompositeLayer(LayerBase):
 
     def update(self) -> None:
         # Update all layers
-        self._image_renderer.update()
         self._depth_track_renderer.update()
         self._bbox_renderer.update()
         self._mesh_renderer.update()

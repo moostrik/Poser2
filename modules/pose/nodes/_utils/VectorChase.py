@@ -31,9 +31,6 @@ from typing import Union
 import numpy as np
 import warnings
 
-# Local application imports
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 class VectorChase:
     """Chase interpolator for arbitrary vector data (positions, coordinates, etc.)."""
@@ -96,8 +93,6 @@ class VectorChase:
 
         self._v_curr: np.ndarray = np.zeros(vector_size)
         self._v_target: np.ndarray = np.zeros(vector_size)
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def reset(self) -> None:
         """Reset the interpolator's internal state."""

@@ -16,9 +16,6 @@ from mmengine.registry import init_default_scope
 import numpy as np
 import torch
 
-# Local application imports
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
@@ -105,8 +102,6 @@ class MMDetection(Thread):
         self._callbacks: set[PoseDetectionOutputCallback] = set()
         self._callback_queue: Queue[DetectionOutput | None] = Queue(maxsize=2)
         self._callback_thread: Thread = Thread(target=self._callback_worker_loop, daemon=True)
-
-        self._hot_reloader = HotReloadMethods(self.__class__)
 
     @property
     def is_ready(self) -> bool:

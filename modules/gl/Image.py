@@ -31,7 +31,7 @@ class Image(Texture):
         draw_quad(x, y, w, h, True)
         self.unbind()
 
-    def draw_roi(self, x: int, y: int, width: int, height: int,
+    def draw_roi(self, x: float, y: float, width: float, height: float,
              tex_x: float, tex_y: float, tex_width: float, tex_height: float) -> None:
         """ Draw a region of interest from the texture
             It is horizontally flipped by default
