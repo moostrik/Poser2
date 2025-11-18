@@ -116,7 +116,7 @@ class ProcessorNode(NodeBase, Generic[TInput, TOutput]):
         pass
 
     @abstractmethod
-    def process(self, pose: Pose) -> TOutput:
+    def process(self, pose: Pose) -> tuple[Pose, TOutput]:
         """Process pose using stored context to produce derived output."""
         pass
 

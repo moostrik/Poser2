@@ -39,19 +39,22 @@ class ProcessorTracker(TrackerBase, Generic[TInput, TOutput]):
     def process(self, poses: PoseDict) -> dict[int, TOutput]:
         """Process poses to produce derived outputs. """
 
+        outtput_pose_dict: dict[int, Pose] = {}
         output_data_dict: dict[int, TOutput] = {}
 
         for id, pose in poses.items():
             try:
                 processor = self._processors[id]
                 if processor.is_ready():
-                    output_data_dict[id] = processor.process(pose)
+                    output_pose, output_data = processor.process(pose)
+                    outtput_pose_dict[id] = output_pose
+                    output_data_dict[id] = output_data
             except Exception as e:
                 print(f"ProcessorTracker: Error processing pose {id}: {e}")
                 print_exc()
 
         self._notify_output_callbacks(output_data_dict)
-        self._notify_poses_callbacks(poses)
+        self._notify_poses_callbacks(outtput_pose_dict)
 
         return output_data_dict
 

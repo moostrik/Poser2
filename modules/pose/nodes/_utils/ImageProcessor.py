@@ -3,93 +3,83 @@ import cv2
 import numpy as np
 
 # Local application imports
-from modules.pose.features import BBox
-from modules.utils.PointsAndRects import Rect
+from modules.utils.PointsAndRects import Rect, Point2f
 
-
-# make undependent of BBoxFeature? and rect , then it is a proper algorithm utility
 
 class ImageProcessor:
     """Handles image cropping and processing for pose detection"""
 
-    def __init__(self, crop_expansion: float = 0.0, output_width: int = 192, output_height: int = 256):
-        self.crop_expansion: float = crop_expansion
+    def __init__(self, crop_scale: float = 1.1, output_width: int = 192, output_height: int = 256):
+        if output_width <= 0 or output_height <= 0:
+            raise ValueError(f"Output dimensions must be positive, got {output_width}x{output_height}")
+        if crop_scale <= 0:
+            raise ValueError(f"Crop scale must be positive, got {crop_scale}")
+        self.crop_scale: float = crop_scale
         self.output_width: int = output_width
         self.output_height: int = output_height
         self.aspect_ratio: float = output_width / output_height
 
-    def process_pose_image(self, bbox: BBox, image: np.ndarray) -> np.ndarray:
+    def process_pose_image(self, roi: Rect, image: np.ndarray) -> tuple[np.ndarray, Rect]:
+        """Process a pose image: extract region from normalised roi and resize to configured dimensions."""
+        image_rect = Rect(0.0, 0.0, float(image.shape[1]), float(image.shape[0]))
 
-        roi: Rect = bbox.to_rect()
+        roi = roi.zoom(self.crop_scale)
+        roi = roi.affine_transform(image_rect)
 
-        return self.get_cropped_image(image, roi, self.output_width, self.output_height)
+        # Determine extraction rectangle: scales to cover ROI while maintaining output aspect ratio
+        crop_roi: Rect = Rect(0, 0, self.output_width, self.output_height)
+        crop_roi = crop_roi.aspect_fill(roi)
 
-    @staticmethod
-    def get_crop_rect(image_width: int, image_height: int, roi: Rect, aspect_ratio: float, expansion: float = 0.0) -> Rect:
-        """Calculate the crop rectangle for pose detection"""
+        crop_image: np.ndarray = self.extract_region(image, crop_roi)
 
-        # Calculate the original ROI coordinates
-        img_x = int(roi.x * image_width)
-        img_y = int(roi.y * image_height)
-        img_w = int(roi.width * image_width)
-        img_h = int(roi.height * image_height)
+        # Auto-select interpolation based on scaling direction
+        src_h, src_w = crop_image.shape[:2]
+        downsample: bool = (self.output_width < src_w or self.output_height < src_h)
+        interpolation: int = cv2.INTER_AREA if downsample else cv2.INTER_CUBIC
 
-        # Calculate dimensions that maintain aspect_ratio while covering the entire ROI
-        roi_aspect: float = img_w / img_h
+        result_image: np.ndarray = cv2.resize(crop_image, (self.output_width, self.output_height), interpolation=interpolation)
+        normalized_crop_roi: Rect = crop_roi.scale(Point2f(1.0 / image_rect.width, 1.0 / image_rect.height))
 
-        if roi_aspect > aspect_ratio:
-            crop_w: int = int(img_w * (1 + expansion))
-            crop_h: int = int(crop_w // aspect_ratio)
-        else:
-            crop_h: int = int(img_h * (1 + expansion))
-            crop_w: int = int(crop_h * aspect_ratio)
-
-        # Calculate the new coordinates to center the square cutout around the original ROI
-        crop_center_x: int = img_x + img_w // 2
-        crop_center_y: int = img_y + img_h // 2
-        crop_x: int = crop_center_x - crop_w // 2
-        crop_y: int = crop_center_y - crop_h // 2
-
-        # convert back to normalized coordinates
-        norm_x: float = crop_x / image_width
-        norm_y: float = crop_y / image_height
-        norm_w: float = crop_w / image_width
-        norm_h: float = crop_h / image_height
-
-        return Rect(norm_x, norm_y, norm_w, norm_h)
+        return result_image, normalized_crop_roi
 
     @staticmethod
-    def get_cropped_image(image: np.ndarray, roi: Rect, output_width: int, output_height: int) -> np.ndarray:
-        """Extract and resize the cropped image from the ROI"""
-        image_height, image_width = image.shape[:2]
-        image_channels: int = image.shape[2] if len(image.shape) > 2 else 1
+    def extract_region(image: np.ndarray, pixel_roi: Rect, border_value: tuple[int, int, int] = (0, 0, 0)) -> np.ndarray:
+        """
+        Extract a region from an image with padding if needed.
 
-        # Calculate the original ROI coordinates
-        x: int = int(roi.x * image_width)
-        y: int = int(roi.y * image_height)
-        w: int = int(roi.width * image_width)
-        h: int = int(roi.height * image_height)
+        Args:
+            image: Source image (H, W, C) or (H, W)
+            pixel_roi: Rectangle in pixel coordinates
+            border_value: RGB color for padding
 
-        # Extract the roi without padding
-        img_x: int = max(0, x)
-        img_y: int = max(0, y)
-        img_w: int = min(w + min(0, x), image_width - img_x)
-        img_h: int = min(h + min(0, y), image_height - img_y)
+        Returns:
+            Cropped image with padding applied if needed
+        """
 
-        crop: np.ndarray = image[img_y:img_y + img_h, img_x:img_x + img_w]
+        img_rect = Rect(0.0, 0.0, float(image.shape[1]), float(image.shape[0]))
 
-        if image_channels == 1:
-            crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2RGB)
+        # Get valid extraction region
+        valid_region: Rect = img_rect.intersect(pixel_roi)
 
-        needs_padding = (x < 0 or y < 0 or x + w > image_width or y + h > image_height)
+        # Handle empty intersection
+        if valid_region.is_empty:
+            return np.zeros((int(pixel_roi.height), int(pixel_roi.width), 3), dtype=np.uint8)
 
-        if needs_padding:
-            top = max(0, -y)
-            bottom = max(0, y + h - image_height)
-            left = max(0, -x)
-            right = max(0, x + w - image_width)
-            crop = cv2.copyMakeBorder(crop, top, bottom, left, right, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+        # Convert to RGB if not already 3-channel
+        if len(image.shape) == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        elif len(image.shape) == 3 and image.shape[2] == 1:
+            image = image.squeeze()  # Remove channel dimension
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
-        interpolation = cv2.INTER_AREA if (output_width < w or output_height < h) else cv2.INTER_CUBIC
+        # Extract valid pixels
+        x, y = int(valid_region.x), int(valid_region.y)
+        w, h = int(valid_region.width), int(valid_region.height)
+        crop = image[y:y + h, x:x + w]
 
-        return cv2.resize(crop, (output_width, output_height), interpolation=interpolation)
+        # Apply padding if ROI extends beyond image
+        if not img_rect.contains_rect(pixel_roi):
+            left, top, right, bottom = pixel_roi.overflow(img_rect)
+            crop = cv2.copyMakeBorder(crop, top, bottom, left, right, cv2.BORDER_CONSTANT, value=border_value)
+
+        return crop

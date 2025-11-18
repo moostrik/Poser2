@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Generator
 
+
 @dataclass
 class Point2f:
     x: float
@@ -66,7 +67,7 @@ class Point2f:
     @property
     def is_zero(self) -> bool:
         """Check if either coordinate is zero."""
-        return self.x == 0 or self.y == 0
+        return self.x == 0 and self.y == 0
 
     def normalized(self) -> "Point2f":
         """Return a normalized (unit length) vector."""
@@ -255,13 +256,23 @@ class Rect:
                 self.x + self.width >= other.x + other.width and
                 self.y + self.height >= other.y + other.height)
 
-    def contains_point(self, point: Point2f | tuple[float, float]) -> bool:
+    def overflow(self, container: "Rect") -> tuple[int, int, int, int]:
+        """
+        Calculate how much this rectangle overflows beyond a container's bounds.
+
+        Returns:
+            Tuple of (left, top, right, bottom) overflow amounts.
+            Each value is positive if this rect extends beyond the container, 0 otherwise.
+        """
+        left = max(0, int(container.left - self.left))
+        top = max(0, int(container.top - self.top))
+        right = max(0, int(self.right - container.right))
+        bottom = max(0, int(self.bottom - container.bottom))
+        return (left, top, right, bottom)
+
+    def contains_point(self, point: Point2f) -> bool:
         """Check if the rectangle contains a given point."""
-        if isinstance(point, Point2f):
-            px, py = point.x, point.y
-        else:
-            px, py = point
-        return (self.x <= px <= self.x + self.width) and (self.y <= py <= self.y + self.height)
+        return (self.x <= point.x <= self.x + self.width) and (self.y <= point.y <= self.y + self.height)
 
     def expand(self, amount: float) -> "Rect":
         """Expand the rectangle by a given amount in all directions."""
@@ -281,12 +292,12 @@ class Rect:
             height=self.height - 2 * amount
         )
 
-    def move(self, delta: Point2f | tuple[float, float]) -> "Rect":
-        """Move the rectangle by a given delta Point2f or tuple."""
+    def move(self, delta: Point2f | float) -> "Rect":
+        """Move the rectangle by a delta (float moves equally in x and y)."""
         if isinstance(delta, Point2f):
             dx, dy = delta.x, delta.y
         else:
-            dx, dy = delta
+            dx, dy = delta, delta
         return Rect(
             x=self.x + dx,
             y=self.y + dy,
@@ -294,18 +305,33 @@ class Rect:
             height=self.height
         )
 
-    def scale(self, factor: Point2f | tuple[float, float]) -> "Rect":
-        """Scale the rectangle by given Point2f or tuple factors."""
+    def scale(self, factor: Point2f | float) -> "Rect":
+        """Scale the rectangle (float scales uniformly)."""
         if isinstance(factor, Point2f):
             sx, sy = factor.x, factor.y
         else:
-            sx, sy = factor
+            sx, sy = factor, factor
         return Rect(
             x=self.x * sx,
             y=self.y * sy,
             width=self.width * sx,
             height=self.height * sy
         )
+
+    def zoom(self, factor: Point2f | float) -> "Rect":
+        """Scale the rectangle from its center (float zooms uniformly)."""
+        if isinstance(factor, Point2f):
+            sx, sy = factor.x, factor.y
+        else:
+            sx, sy = factor, factor
+
+        center = self.center
+        new_width = self.width * sx
+        new_height = self.height * sy
+        new_x = center.x - new_width / 2
+        new_y = center.y - new_height / 2
+
+        return Rect(x=new_x, y=new_y, width=new_width, height=new_height)
 
     def inset(self, margins: "Rect") -> "Rect":
         """Shrink the rectangle by margins specified in another Rect."""
