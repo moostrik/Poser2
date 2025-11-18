@@ -6,8 +6,8 @@ import numpy as np
 # Local application imports
 from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose
-from modules.render.meshes.PoseVertices import PoseVertexData, PoseVertexFactory
-from modules.render.meshes.PoseVertices import POSE_VERTEX_INDICES
+from modules.render.renderers.PoseMeshUtils import PoseVertexData, PoseMeshUtils
+from modules.render.renderers.PoseMeshUtils import POSE_VERTEX_INDICES
 from modules.DataHub import DataHub, DataType, PoseDataTypes
 from modules.gl.LayerBase import LayerBase, Rect
 
@@ -44,7 +44,7 @@ class PoseMeshes(LayerBase):
                 continue
             pose_mesh: Mesh | None = self.meshes.get(id, None)
             if pose is not None and pose_mesh is not None:
-                vertex_data: PoseVertexData = PoseVertexFactory.compute_angled_vertices(pose.points, pose.angles)
+                vertex_data: PoseVertexData = PoseMeshUtils.compute_angled_vertices(pose.points, pose.angles)
                 if vertex_data is not None:
                     pose_mesh.set_vertices(vertex_data.vertices)
                     pose_mesh.set_colors(vertex_data.colors)

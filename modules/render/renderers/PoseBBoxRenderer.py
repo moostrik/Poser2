@@ -4,12 +4,13 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 
-from modules.pose.Pose import Pose
 from modules.DataHub import DataHub, DataType, PoseDataTypes
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.pose.Pose import Pose
+from modules.render.renderers.RendererBase import RendererBase
+from modules.utils.PointsAndRects import Rect
 
 
-class PoseBBoxLayer(LayerBase):
+class PoseBBoxRenderer(RendererBase):
     def __init__(self, track_id: int, data: DataHub, type: PoseDataTypes, line_width: float = 2.0,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._data: DataHub = data
@@ -20,7 +21,7 @@ class PoseBBoxLayer(LayerBase):
         self.bbox_color: tuple[float, float, float, float] = bbox_color
         self.line_width: float = line_width
 
-    def allocate(self, width: int, height: int, internal_format: int) -> None:
+    def allocate(self) -> None:
         pass
 
     def deallocate(self) -> None:

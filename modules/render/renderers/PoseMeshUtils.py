@@ -48,9 +48,6 @@ POSE_JOINT_COLORS: dict[PointLandmark, tuple[float, float, float]] = {
 }
 
 
-
-
-
 # DEFINITIONS
 POSE_VERTEX_LIST: list[list[PointLandmark]] = [
     [PointLandmark.nose,            PointLandmark.left_eye],
@@ -87,9 +84,9 @@ class PoseVertexData:
     vertices: np.ndarray
     colors: np.ndarray
 
-class PoseVertexFactory:
+class PoseMeshUtils:
     @staticmethod
-    def compute_vertices(points: Points2D) -> PoseVertexData:
+    def compute_vertices(points: Points2D, color: tuple[float, float, float] | None = None) -> PoseVertexData:
 
         vertices: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 2), dtype=np.float32)
         colors: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 4), dtype=np.float32)
@@ -98,7 +95,10 @@ class PoseVertexFactory:
             for j, joint in enumerate((p1, p2)):
                 idx: int = i * 2 + j
                 vertices[idx] = points.values[joint]
-                colors[idx] = [*POSE_JOINT_COLORS[joint], (points.scores[joint] + POSE_COLOR_ALPHA_BASE) / (1.0 + POSE_COLOR_ALPHA_BASE)]
+                if color is not None:
+                    colors[idx] = [*color, 1.0]
+                else:
+                    colors[idx] = [*POSE_JOINT_COLORS[joint], (points.scores[joint] + POSE_COLOR_ALPHA_BASE) / (1.0 + POSE_COLOR_ALPHA_BASE)]
 
         vertex_data: PoseVertexData = PoseVertexData(vertices, colors)
         return vertex_data
@@ -107,7 +107,7 @@ class PoseVertexFactory:
     def compute_angled_vertices(points: Points2D, angles: Angles) -> PoseVertexData:
 
 
-        vertex_data: Optional[PoseVertexData] = PoseVertexFactory.compute_vertices(points)
+        vertex_data: Optional[PoseVertexData] = PoseMeshUtils.compute_vertices(points)
         if vertex_data is None:
             return None
 

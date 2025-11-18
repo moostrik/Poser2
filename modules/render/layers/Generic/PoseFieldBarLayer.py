@@ -10,7 +10,7 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.pose.features import PoseFeature
 from modules.pose.Pose import Pose, PoseField, ScalarPoseField
 
-from modules.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
+from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
 from modules.DataHub import DataHub, DataType
 

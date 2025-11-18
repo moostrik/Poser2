@@ -12,7 +12,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.Pose import Pose
 
-from modules.deprecated.PoseVertices import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
+from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.Angles import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.pose.pd_stream.PDStream import PDStreamData
 

@@ -5,29 +5,29 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl.Fbo import Fbo
-from modules.DataHub import DataHub, DataType
+from modules.DataHub import DataHub, PoseDataTypes
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.render.meshes.PoseMeshes import PoseMeshes
 
-from modules.render.layers.Generic.CamImageLayer import CamImageLayer
+from modules.render.renderers.CamImageRenderer import CamImageRenderer
 from modules.render.layers.Generic.CamDepthTrackLayer import CamDepthTrackLayer
 from modules.render.layers.Generic.CamPoseMeshLayer import CamPoseMeshLayer
 
 
 class CamCompositeLayer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, type: DataType, pose_meshes: PoseMeshes,
+    def __init__(self, cam_id: int, data: DataHub, type: PoseDataTypes, pose_meshes: PoseMeshes,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._cam_id: int = cam_id
         self._fbo: Fbo = Fbo()
 
-        self._image_layer: CamImageLayer = CamImageLayer(cam_id, data)
+        self._image_layer: CamImageRenderer = CamImageRenderer(cam_id, data)
         self._depth_track_layer: CamDepthTrackLayer = CamDepthTrackLayer(cam_id, data)
         self._pose_layer: CamPoseMeshLayer = CamPoseMeshLayer(cam_id, data, type, pose_meshes, bbox_color)
 
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
-        self._image_layer.allocate(width, height, internal_format)
+        self._image_layer.allocate()
         self._depth_track_layer.allocate(width, height, internal_format)
         self._pose_layer.allocate(width, height, internal_format)
 

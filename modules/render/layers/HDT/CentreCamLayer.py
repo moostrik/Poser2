@@ -24,7 +24,6 @@ from modules.gl.Mesh import Mesh
 class CentreCamLayer(LayerBase):
     def __init__(self, data: DataHub, cam_id: int) -> None:
         self.data: DataHub = data
-        self.data_consumer_key: str = data.get_unique_consumer_key()
         self.cam_id: int = cam_id
         self.cam_fbo: Fbo = Fbo()
         self.cam_image: Image = Image()
