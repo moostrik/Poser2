@@ -167,6 +167,7 @@ from typing_extensions import Self
 
 from modules.pose.features.base.BaseFeature import NORMALIZED_RANGE
 from modules.pose.features.base.BaseVectorFeature import BaseVectorFeature
+from modules.utils.PointsAndRects import Point2f
 
 
 class PointLandmark(IntEnum):
@@ -244,6 +245,11 @@ class Points2D(BaseVectorFeature[PointLandmark]):
         x = self.get_x(element, fill=fill)
         y = self.get_y(element, fill=fill)
         return (x, y)
+
+    def get_point2f(self, element: PointLandmark | int, fill: float = 0.0) -> Point2f:
+        """Get a point as a Point2f object."""
+        coords = self.get(element, fill)
+        return Point2f(coords[0], coords[1])
 
     # ========== SPECIALIZED CONSTRUCTORS ==========
 

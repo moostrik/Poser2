@@ -18,7 +18,7 @@ from modules.utils.PointsAndRects import Rect
 
 class PoseMeshRenderer(RendererBase):
     def __init__(self, track_id: int, data: DataHub, type: PoseDataTypes, line_width: float = 2.0,
-                 color: tuple[float, float, float] | None = None) -> None:
+                 color: tuple[float, float, float, float] | None = None) -> None:
         self._track_id: int = track_id
         self._data: DataHub = data
         self._mesh: Mesh = Mesh()
@@ -27,7 +27,7 @@ class PoseMeshRenderer(RendererBase):
 
         self.type: PoseDataTypes = type
         self.line_width: float = line_width
-        self.color: tuple[float, float, float] | None = color
+        self.color: tuple[float, float, float, float] | None = color
 
     def allocate(self) -> None:
         self._mesh.allocate()
@@ -50,7 +50,7 @@ class PoseMeshRenderer(RendererBase):
         else:
             self._is_active = True
 
-        vertex_data: PoseVertexData = PoseMeshUtils.compute_vertices_and_colors(pose.points, self.color)
+        vertex_data: PoseVertexData = PoseMeshUtils.compute_vertices_and_colors(pose.points, color = self.color)
         self._mesh.set_vertices(vertex_data.vertices)
         self._mesh.set_colors(vertex_data.colors)
         self._mesh.update()

@@ -6,7 +6,7 @@ from OpenGL.GL import * # type: ignore
 
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.layers import CamCompositeLayer, PoseScalarBarLayer, SimilarityLineLayer, PDLineLayer, PoseCamLayer
+from modules.render.layers import CamCompositeLayer, PoseScalarBarLayer, SimilarityLineLayer, PDLineLayer, CentreCamLayer
 from modules.render.renderers import CamImageRenderer, PoseMeshRenderer
 # from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
 # from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
@@ -43,7 +43,7 @@ class HDTRenderManager(RenderBase):
 
         # layers
         self.cam_comps:             dict[int, CamCompositeLayer] = {}
-        self.centre_cam_layers:     dict[int, PoseCamLayer] = {}
+        self.centre_cam_layers:     dict[int, CentreCamLayer] = {}
         # self.centre_pose_layers:    dict[int, CentrePoseRender] = {}
         self.pd_angle_overlay:      dict[int, PDLineLayer] = {}
         self.field_bars:            dict[int, PoseScalarBarLayer] = {}
@@ -60,7 +60,7 @@ class HDTRenderManager(RenderBase):
             self.mesh_renderers_A[i] = PoseMeshRenderer(i, self.data_hub, PoseDataTypes.pose_R)
 
             self.cam_comps[i] = CamCompositeLayer(i, self.data_hub, PoseDataTypes.pose_R, self.cam_images[i], 2, None, (0.0, 0.0, 0.0, 0.5))
-            self.centre_cam_layers[i] = PoseCamLayer(i, self.data_hub, PoseDataTypes.pose_R, self.cam_images[i])
+            self.centre_cam_layers[i] = CentreCamLayer(i, self.data_hub, PoseDataTypes.pose_R, self.cam_images[i])
             # self.centre_pose_layers[i] = CentrePoseRender(self.data_hub, self.pose_meshes, i)
             # self.centre_pose_layers_fast[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes_fast, i)
             self.pd_angle_overlay[i] = PDLineLayer(i, self.data_hub)

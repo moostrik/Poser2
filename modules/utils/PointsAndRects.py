@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Generator
 
+import numpy as np
 
 @dataclass
 class Point2f:
@@ -126,6 +127,16 @@ class Point2f:
         """Return a zero point (0.0, 0.0)."""
         return Point2f(0.0, 0.0)
 
+    @staticmethod
+    def from_array(arr: np.ndarray) -> "Point2f":
+        """Create a Point2f from a numpy array [x, y]."""
+        return Point2f(float(arr[0]), float(arr[1]))
+
+    @staticmethod
+    def from_tuple(coords: tuple[float, float]) -> "Point2f":
+        """Create a Point2f from a tuple (x, y)."""
+        return Point2f(coords[0], coords[1])
+
 @dataclass
 class Rect:
     """Rectangle defined by top-left corner and dimensions"""
@@ -167,6 +178,16 @@ class Rect:
     def copy(self) -> "Rect":
         """Return a copy of this rectangle."""
         return Rect(x=self.x, y=self.y, width=self.width, height=self.height)
+
+    @property
+    def position(self) -> Point2f:
+        """Return the top-left corner as a Point2f."""
+        return Point2f(x=self.x, y=self.y)
+
+    @property
+    def size(self) -> Point2f:
+        """Return the size (width, height) as a Point2f."""
+        return Point2f(x=self.width, y=self.height)
 
     @property
     def top_left(self) -> Point2f:
@@ -213,6 +234,13 @@ class Rect:
     def area(self) -> float:
         """Return the area of the rectangle."""
         return self.width * self.height
+
+    @property
+    def aspect_ratio(self) -> float:
+        """Return the aspect ratio (width / height) of the rectangle."""
+        if self.height == 0:
+            return 0.0
+        return self.width / self.height
 
     @property
     def is_empty(self) -> bool:
