@@ -17,7 +17,7 @@ from modules.pose.pd_stream.PDStream import PDStreamData
 
 from modules.DataHub import DataHub
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.render.meshes.PoseMesh import PoseMesh
+from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -28,14 +28,14 @@ from modules.gl.shaders.StreamPose import StreamPose
 class PoseLayer(LayerBase):
     pose_stream_shader = StreamPose()
 
-    def __init__(self, data: DataHub, pose_meshes: PoseMesh, angle_meshes: AngleMeshes, cam_id: int) -> None:
+    def __init__(self, data: DataHub, pose_meshes: PoseMeshes, angle_meshes: AngleMeshes, cam_id: int) -> None:
         self.data: DataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.cam_id: int = cam_id
         self.pose_stream_image: Image = Image()
-        self.pose_meshes: PoseMesh = pose_meshes
+        self.pose_meshes: PoseMeshes = pose_meshes
         self.angle_meshes: AngleMeshes = angle_meshes
         text_init()
 

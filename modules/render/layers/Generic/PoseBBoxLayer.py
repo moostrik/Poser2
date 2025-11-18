@@ -12,7 +12,6 @@ from modules.gl.LayerBase import LayerBase, Rect
 class PoseBBoxLayer(LayerBase):
     def __init__(self, track_id: int, data: DataHub, type: PoseDataTypes, line_width: float = 2.0,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
-        # for now make sure the pose meshes are for the correct data type
         self._data: DataHub = data
         self._track_id: int = track_id
         self._bbox: Rect | None = None

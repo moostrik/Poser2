@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.layers import CamCompositeLayer, PoseScalarBarLayer, SimilarityLineLayer, PDLineLayer
-from modules.render.meshes import PoseMesh
+from modules.render.meshes import PoseMeshes
 # from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
 # from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
 # from modules.render.layers.HDT.LineFieldsLayer import LF as LineFieldLayer
@@ -38,7 +38,7 @@ class HDTRenderManager(RenderBase):
         # self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data_old, "localhost", 8000, 60.0)
 
         # meshes
-        self.pose_meshes =              PoseMesh(self.num_players, self.data_hub, PoseDataTypes.pose_R)
+        self.pose_meshes =              PoseMeshes(self.num_players, self.data_hub, PoseDataTypes.pose_R)
 
         # layers
         self.cam_comps:             dict[int, CamCompositeLayer] = {}
@@ -55,7 +55,7 @@ class HDTRenderManager(RenderBase):
 
         # populate
         for i in range(self.num_cams):
-            self.cam_comps[i] = CamCompositeLayer(i, self.data_hub, DataType.pose_R, self.pose_meshes, (0.0, 0.0, 0.0, 0.2))
+            self.cam_comps[i] = CamCompositeLayer(i, self.data_hub, DataType.pose_R, self.pose_meshes, (0.0, 0.0, 0.0, 0.5))
             # self.centre_cam_layers[i] = CentreCamLayer(self.data_hub, i)
             # self.centre_pose_layers[i] = CentrePoseRender(self.data_hub, self.pose_meshes, i)
             # self.centre_pose_layers_fast[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes_fast, i)
@@ -182,7 +182,7 @@ class HDTRenderManager(RenderBase):
             # self.field_bars[i].draw(self.subdivision.get_rect(PDLineLayer.__name__, i))
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        return
+        # return
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
         self.setView(width, height)
@@ -196,7 +196,7 @@ class HDTRenderManager(RenderBase):
         self.cam_comps[camera_id].draw(Rect(0, 0, width, height))
         # self.centre_cam_layers[camera_id].draw(Rect(0, 0, width, height))
         self.field_bars[camera_id].draw(Rect(0, 0, width, height))
-        self.pd_angle_overlay[camera_id].draw(Rect(0, 0, width, height))
+        # self.pd_angle_overlay[camera_id].draw(Rect(0, 0, width, height))
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
 
         if self.data_hub.has_item(DataType.pose_I, camera_id): # camera_id is pose id

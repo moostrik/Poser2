@@ -12,15 +12,15 @@ from modules.pose.Pose import Pose
 
 from modules.DataHub import DataHub, DataType, PoseDataTypes
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.render.meshes.PoseMesh import PoseMesh
+from modules.render.meshes.PoseMeshes import PoseMeshes
 
 
 class CamPoseMeshLayer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, type: PoseDataTypes, pose_meshes: PoseMesh,
+    def __init__(self, cam_id: int, data: DataHub, type: PoseDataTypes, pose_meshes: PoseMeshes,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         # for now make sure the pose meshes are for the correct data type
         self._data: DataHub = data
-        self._pose_meshes: PoseMesh = pose_meshes
+        self._pose_meshes: PoseMeshes = pose_meshes
         self._fbo: Fbo = Fbo()
         self._cam_id: int = cam_id
         self._type: PoseDataTypes = type

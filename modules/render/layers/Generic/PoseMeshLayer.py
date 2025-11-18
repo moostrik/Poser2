@@ -12,19 +12,17 @@ from modules.pose.Pose import Pose
 
 from modules.DataHub import DataHub, DataType, PoseDataTypes
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.render.meshes.PoseMesh import PoseMesh
+from modules.render.meshes.PoseMeshes import PoseMeshes
 
 
 class PoseMeshLayer(LayerBase):
-    def __init__(self, track_id: int, data: DataHub, type: PoseDataTypes, pose_meshes: PoseMesh,
-                 bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+    def __init__(self, track_id: int, data: DataHub, type: PoseDataTypes) -> None:
         # for now make sure the pose meshes are for the correct data type
         self._data: DataHub = data
-        self._pose_meshes: PoseMesh = pose_meshes
+        self._mesh: Mesh = Mesh()
         self._fbo: Fbo = Fbo()
         self._track_id: int = track_id
         self._type: PoseDataTypes = type
-        self._bbox_color: tuple[float, float, float, float] = bbox_color
         self._p_cam_poses: set[Pose] = set()
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
@@ -69,19 +67,4 @@ class PoseMeshLayer(LayerBase):
             if mesh.isInitialized():
                 mesh.draw(bbox.x, bbox.y, bbox.width, bbox.height)
 
-        if self._bbox_color[3] > 0.0:
-            for bbox in cam_bboxes.values():
-                PoseMeshLayer.draw_bbox(bbox, self._bbox_color)
         self._fbo.end()
-
-    @staticmethod
-    def draw_bbox(rect: Rect, color: tuple[float, float, float, float]) -> None:
-        glColor4f(*color)
-        glBegin(GL_LINE_LOOP)
-        glVertex2f(rect.x, rect.y)  # Bottom left
-        glVertex2f(rect.x + rect.width, rect.y)  # Bottom right
-        glVertex2f(rect.x + rect.width, rect.y + rect.height)  # Top right
-        glVertex2f(rect.x, rect.y + rect.height)  # Top left
-        glEnd()
-        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
-

@@ -16,16 +16,16 @@ from modules.tracker.Tracklet import Tracklet
 
 from modules.DataHub import DataHub
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.render.meshes.PoseMesh import PoseMesh
+from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class CamTrackPoseLayer(LayerBase):
-    def __init__(self, data: DataHub, pose_meshes: PoseMesh, cam_id: int) -> None:
+    def __init__(self, data: DataHub, pose_meshes: PoseMeshes, cam_id: int) -> None:
         self.data: DataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
-        self.pose_meshes: PoseMesh = pose_meshes
+        self.pose_meshes: PoseMeshes = pose_meshes
         self.fbo: Fbo = Fbo()
         self.image: Image = Image()
         self.cam_id: int = cam_id

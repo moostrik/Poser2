@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.DataHub import DataHub, DataType
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.render.meshes.PoseMesh import PoseMesh
+from modules.render.meshes.PoseMeshes import PoseMeshes
 
 from modules.render.layers.Generic.CamImageLayer import CamImageLayer
 from modules.render.layers.Generic.CamDepthTrackLayer import CamDepthTrackLayer
@@ -15,7 +15,7 @@ from modules.render.layers.Generic.CamPoseMeshLayer import CamPoseMeshLayer
 
 
 class CamCompositeLayer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, type: DataType, pose_meshes: PoseMesh,
+    def __init__(self, cam_id: int, data: DataHub, type: DataType, pose_meshes: PoseMeshes,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._cam_id: int = cam_id
         self._fbo: Fbo = Fbo()

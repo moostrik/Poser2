@@ -6,12 +6,12 @@ import numpy as np
 # Local application imports
 from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose
-from modules.deprecated.PoseVertices import PoseVertexData, PoseVertexFactory
-from modules.deprecated.PoseVertices import POSE_VERTEX_INDICES
+from modules.render.meshes.PoseVertices import PoseVertexData, PoseVertexFactory
+from modules.render.meshes.PoseVertices import POSE_VERTEX_INDICES
 from modules.DataHub import DataHub, DataType, PoseDataTypes
 from modules.gl.LayerBase import LayerBase, Rect
 
-class PoseMesh(LayerBase):
+class PoseMeshes(LayerBase):
     """Methods for updating meshes based on pose data."""
     def __init__(self, amount: int, data: DataHub, type: PoseDataTypes) -> None:
         self._amount: int = amount

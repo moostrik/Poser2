@@ -12,7 +12,7 @@ from modules.Settings import Settings
 
 from modules.DataHub import DataHub
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.meshes.PoseMesh import PoseMesh
+from modules.render.meshes.PoseMeshes import PoseMeshes
 from modules.render.meshes.AngleMeshes import AngleMeshes
 
 from modules.render.layers.Depricated.CamTrackPoseLayer import CamTrackPoseLayer
@@ -36,7 +36,7 @@ class WSRenderManager(RenderBase):
         self.ws_width: int =        settings.light_resolution
 
         # meshes
-        self.pose_meshes =          PoseMesh(self.data, self.max_players)
+        self.pose_meshes =          PoseMeshes(self.data, self.max_players)
         self.angle_meshes =         AngleMeshes(self.data, self.max_players)
 
         # drawers
