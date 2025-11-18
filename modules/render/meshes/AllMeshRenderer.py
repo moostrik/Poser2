@@ -6,12 +6,12 @@ import numpy as np
 # Local application imports
 from modules.gl.Mesh import Mesh
 from modules.pose.Pose import Pose
-from modules.render.renderers.PoseMeshUtils import PoseVertexData, PoseMeshUtils
-from modules.render.renderers.PoseMeshUtils import POSE_VERTEX_INDICES
+from modules.render.renderers.PoseMeshUtils import PoseVertexData, PoseMeshUtils, POSE_VERTEX_INDICES
 from modules.DataHub import DataHub, DataType, PoseDataTypes
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.renderers.RendererBase import RendererBase
+from modules.utils.PointsAndRects import Rect
 
-class PoseMeshes(LayerBase):
+class AllMeshRenderer(RendererBase):
     """Methods for updating meshes based on pose data."""
     def __init__(self, amount: int, data: DataHub, type: PoseDataTypes) -> None:
         self._amount: int = amount
@@ -34,7 +34,7 @@ class PoseMeshes(LayerBase):
             mesh.deallocate()
         self.meshes.clear()
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self, track_id: int, rect: Rect) -> None:
         pass
 
     def update(self) -> None:

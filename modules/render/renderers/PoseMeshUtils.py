@@ -9,6 +9,7 @@ import numpy as np
 from modules.pose.features import Angles, AngleLandmark
 from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.pose.nodes._utils.AngleUtils import ANGLE_KEYPOINTS
+from modules.utils.PointsAndRects import Rect
 
 # COLORS
 POSE_COLOR_ALPHA_BASE:      float = 0.2
@@ -85,29 +86,77 @@ class PoseVertexData:
     colors: np.ndarray
 
 class PoseMeshUtils:
-    @staticmethod
-    def compute_vertices(points: Points2D, color: tuple[float, float, float] | None = None) -> PoseVertexData:
 
-        vertices: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 2), dtype=np.float32)
-        colors: np.ndarray = np.zeros((len(POSE_VERTEX_ARRAY), 4), dtype=np.float32)
+    @staticmethod
+    def compute_vertices_and_colors(points: Points2D, rect: Rect | None = None, color: tuple[float, float, float, float] | None = None) -> PoseVertexData:
+        """
+        Compute vertex positions and colors from pose points.
+
+        Args:
+            points: 2D pose keypoints
+            rect: Optional rectangle for coordinate transformation
+            color: Optional uniform color (overrides per-joint colors)
+
+        Returns:
+            PoseVertexData with vertices and colors. Invalid lines (either endpoint invalid) have alpha=0.
+        """
+        n_vertices = len(POSE_VERTEX_ARRAY)
+        vertices = np.zeros((n_vertices, 2), dtype=np.float32)
+        colors = np.zeros((n_vertices, 4), dtype=np.float32)
 
         for i, (p1, p2) in enumerate(POSE_VERTEX_LIST):
-            for j, joint in enumerate((p1, p2)):
-                idx: int = i * 2 + j
-                vertices[idx] = points.values[joint]
-                if color is not None:
-                    colors[idx] = [*color, 1.0]
-                else:
-                    colors[idx] = [*POSE_JOINT_COLORS[joint], (points.scores[joint] + POSE_COLOR_ALPHA_BASE) / (1.0 + POSE_COLOR_ALPHA_BASE)]
+            base_idx = i * 2
 
-        vertex_data: PoseVertexData = PoseVertexData(vertices, colors)
-        return vertex_data
+            # Check if BOTH points are valid
+            p1_valid = points.get_valid(p1)
+            p2_valid = points.get_valid(p2)
+            line_valid = p1_valid and p2_valid
+
+            if line_valid:
+                # Get coordinates for both points
+                x1, y1 = points.get(p1)
+                x2, y2 = points.get(p2)
+                score1 = points.get_score(p1)
+                score2 = points.get_score(p2)
+
+                # Apply rectangle transformation
+                if rect is not None:
+                    x1 = x1 * rect.width + rect.x
+                    y1 = y1 * rect.height + rect.y
+                    x2 = x2 * rect.width + rect.x
+                    y2 = y2 * rect.height + rect.y
+
+                # Set vertices
+                vertices[base_idx] = [x1, y1]
+                vertices[base_idx + 1] = [x2, y2]
+
+                # Set colors for both vertices
+                for j, (joint, score) in enumerate([(p1, score1), (p2, score2)]):
+                    idx = base_idx + j
+                    alpha: float = (score + POSE_COLOR_ALPHA_BASE) / (1.0 + POSE_COLOR_ALPHA_BASE)
+
+                    if color is not None:
+                        colors[idx] = [*color[0:3], alpha * color[3]]
+                    else:
+                        rgb = POSE_JOINT_COLORS[joint]
+                        colors[idx] = [*rgb, alpha]
+            else:
+                # Invalid line: both vertices at origin, fully transparent
+                vertices[base_idx] = [0.0, 0.0]
+                vertices[base_idx + 1] = [0.0, 0.0]
+                colors[base_idx] = [0.0, 0.0, 0.0, 0.0]
+                colors[base_idx + 1] = [0.0, 0.0, 0.0, 0.0]
+
+        return PoseVertexData(vertices, colors)
+
+
+
 
     @staticmethod
     def compute_angled_vertices(points: Points2D, angles: Angles) -> PoseVertexData:
 
 
-        vertex_data: Optional[PoseVertexData] = PoseMeshUtils.compute_vertices(points)
+        vertex_data: Optional[PoseVertexData] = PoseMeshUtils.compute_vertices_and_colors(points)
         if vertex_data is None:
             return None
 

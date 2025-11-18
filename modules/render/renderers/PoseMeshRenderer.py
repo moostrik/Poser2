@@ -50,7 +50,7 @@ class PoseMeshRenderer(RendererBase):
         else:
             self._is_active = True
 
-        vertex_data: PoseVertexData = PoseMeshUtils.compute_vertices(pose.points, self.color)
+        vertex_data: PoseVertexData = PoseMeshUtils.compute_vertices_and_colors(pose.points, self.color)
         self._mesh.set_vertices(vertex_data.vertices)
         self._mesh.set_colors(vertex_data.colors)
         self._mesh.update()

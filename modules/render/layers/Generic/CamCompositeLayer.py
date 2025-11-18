@@ -7,36 +7,65 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.DataHub import DataHub, PoseDataTypes
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.render.meshes.PoseMeshes import PoseMeshes
+from modules.render.meshes.AllMeshRenderer import AllMeshRenderer
 
-from modules.render.renderers.CamImageRenderer import CamImageRenderer
-from modules.render.layers.Generic.CamDepthTrackLayer import CamDepthTrackLayer
-from modules.render.layers.Generic.CamPoseMeshLayer import CamPoseMeshLayer
+from modules.render.renderers import CamBBoxRenderer, CamDepthTrackRenderer, CamImageRenderer, CamMeshRenderer
+
+# from modules.render.layers.Generic.CamPoseMeshLayer import CamPoseMeshLayer
 
 
 class CamCompositeLayer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, type: PoseDataTypes, pose_meshes: PoseMeshes,
+    def __init__(self, cam_id: int, data: DataHub, type: PoseDataTypes, line_width: int = 2,
+                 mesh_color: tuple[float, float, float, float] | None = None,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._cam_id: int = cam_id
         self._fbo: Fbo = Fbo()
+        self._type: PoseDataTypes = type
+        self._line_width: int = int(line_width)
 
-        self._image_layer: CamImageRenderer = CamImageRenderer(cam_id, data)
-        self._depth_track_layer: CamDepthTrackLayer = CamDepthTrackLayer(cam_id, data)
-        self._pose_layer: CamPoseMeshLayer = CamPoseMeshLayer(cam_id, data, type, pose_meshes, bbox_color)
+        self._image_renderer: CamImageRenderer = CamImageRenderer(cam_id, data)
+        self._depth_track_renderer: CamDepthTrackRenderer = CamDepthTrackRenderer(cam_id, data)
+        self._bbox_renderer: CamBBoxRenderer = CamBBoxRenderer(cam_id, data, type, line_width, bbox_color)
+        self._mesh_renderer: CamMeshRenderer = CamMeshRenderer(cam_id, data, type, line_width, mesh_color)
 
+    @property
+    def type(self) -> PoseDataTypes:
+        return self._type
+    @type.setter
+    def type(self, value: PoseDataTypes) -> None:
+        self._type = value
+        self._bbox_renderer.type = value
+        self._mesh_renderer.type = value
+
+    @property
+    def line_width(self) -> int:
+        return self._line_width
+    @line_width.setter
+    def line_width(self, value: int) -> None:
+        self._line_width = value
+        self._bbox_renderer.line_width = value
+        self._mesh_renderer.line_width = value
+
+    @property
+    def bbox_color(self) -> tuple[float, float, float, float]:
+        return self._bbox_renderer.bbox_color
+    @bbox_color.setter
+    def bbox_color(self, value: tuple[float, float, float, float]) -> None:
+        self._bbox_renderer.bbox_color = value
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
-        self._image_layer.allocate()
-        self._depth_track_layer.allocate(width, height, internal_format)
-        self._pose_layer.allocate(width, height, internal_format)
-
+        self._image_renderer.allocate()
+        self._depth_track_renderer.allocate()
+        self._bbox_renderer.allocate()
+        self._mesh_renderer.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
-        self._image_layer.deallocate()
-        self._depth_track_layer.deallocate()
-        self._pose_layer.deallocate()
+        self._image_renderer.deallocate()
+        self._depth_track_renderer.deallocate()
+        self._bbox_renderer.deallocate()
+        self._mesh_renderer.deallocate()
 
 
     def draw(self, rect: Rect) -> None:
@@ -45,9 +74,10 @@ class CamCompositeLayer(LayerBase):
 
     def update(self) -> None:
         # Update all layers
-        self._image_layer.update()
-        self._depth_track_layer.update()
-        self._pose_layer.update()
+        self._image_renderer.update()
+        self._depth_track_renderer.update()
+        self._bbox_renderer.update()
+        self._mesh_renderer.update()
 
         # Composite them into the FBO
         LayerBase.setView(self._fbo.width, self._fbo.height)
@@ -57,8 +87,10 @@ class CamCompositeLayer(LayerBase):
         self._fbo.begin()
 
         full_rect = Rect(0, 0, self._fbo.width, self._fbo.height)
-        self._image_layer.draw(full_rect)
-        self._depth_track_layer.draw(full_rect)
-        self._pose_layer.draw(full_rect)
+        self._image_renderer.draw(full_rect)
+        self._depth_track_renderer.draw(full_rect)
+        self._bbox_renderer.draw(full_rect)
+        self._mesh_renderer.draw(full_rect)
+
 
         self._fbo.end()

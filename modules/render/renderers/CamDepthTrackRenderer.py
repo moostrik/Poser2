@@ -5,56 +5,37 @@ import numpy as np
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Fbo import Fbo
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 
 from modules.DataHub import DataHub, DataType
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.renderers.RendererBase import RendererBase
+from modules.utils.PointsAndRects import Rect
 
 
-class CamDepthTrackLayer(LayerBase):
+
+class CamDepthTrackRenderer(RendererBase):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._data: DataHub = data
-        self._fbo: Fbo = Fbo()
         self._cam_id: int = cam_id
-
-        self._p_tracklets: list[DepthTracklet] | None = None
+        self._tracklets: list[DepthTracklet] | None = None
         text_init()
 
-
-    def allocate(self, width: int, height: int, internal_format: int) -> None:
-        self._fbo.allocate(width, height, internal_format)
-
+    def allocate(self) -> None:
+        pass
 
     def deallocate(self) -> None:
-        self._fbo.deallocate()
-
+        pass
 
     def draw(self, rect: Rect) -> None:
-        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
-
+        if self._tracklets is None:
+            return
+        for depth_tracklet in self._tracklets or []:
+            CamDepthTrackRenderer.draw_depth_tracklet(depth_tracklet, rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        depth_tracklets: list[DepthTracklet] | None = self._data.get_item(DataType.depth_tracklet, self._cam_id)
-
-        LayerBase.setView(self._fbo.width, self._fbo.height)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        if depth_tracklets is None: # no tracklets available
-            self._fbo.clear(0.0, 0.0, 0.0, 0.0) # Clear with transparent color
-            return
-
-        if depth_tracklets is self._p_tracklets:
-            return  # no update needed
-        self._p_tracklets = depth_tracklets
-
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0) # Clear with transparent color
-        self._fbo.begin()
-        for depth_tracklet in depth_tracklets:
-            CamDepthTrackLayer.draw_depth_tracklet(depth_tracklet, 0, 0, self._fbo.width, self._fbo.height)
-        self._fbo.end()
+        self._tracklets: list[DepthTracklet] | None = self._data.get_item(DataType.depth_tracklet, self._cam_id)
 
     @staticmethod
     def draw_depth_tracklet(tracklet: DepthTracklet, x: float, y: float, width: float, height: float) -> None:

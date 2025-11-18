@@ -15,7 +15,7 @@ class PoseBBoxRenderer(RendererBase):
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._data: DataHub = data
         self._track_id: int = track_id
-        self._bbox: Rect | None = None
+        self._bbox_rect: Rect | None = None
 
         self.type: PoseDataTypes = type
         self.bbox_color: tuple[float, float, float, float] = bbox_color
@@ -28,12 +28,12 @@ class PoseBBoxRenderer(RendererBase):
         pass
 
     def draw(self, rect: Rect) -> None:
-        if self._bbox is None:
+        if self._bbox_rect is None:
             return
         glLineWidth(self.line_width)
         glColor4f(*self.bbox_color)
 
-        draw_rect: Rect = self._bbox.affine_transform(rect)
+        draw_rect: Rect = self._bbox_rect.affine_transform(rect)
 
         glBegin(GL_LINE_LOOP)
         glVertex2f(draw_rect.x, draw_rect.y)  # Bottom left
@@ -48,7 +48,7 @@ class PoseBBoxRenderer(RendererBase):
         pose: Pose | None = self._data.get_item(DataType(self.type), self._track_id)
 
         if pose is None:
-            self._bbox = None
+            self._bbox_rect = None
         else:
-            self._bbox = pose.bbox.to_rect()
+            self._bbox_rect = pose.bbox.to_rect()
 

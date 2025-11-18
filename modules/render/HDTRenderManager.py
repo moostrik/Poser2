@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.layers import CamCompositeLayer, PoseScalarBarLayer, SimilarityLineLayer, PDLineLayer
-from modules.render.meshes import PoseMeshes
+from modules.render.meshes import AllMeshRenderer
 from modules.render.renderers import PoseMeshRenderer
 # from modules.render.layers.HDT.CentreCamLayer import CentreCamLayer
 # from modules.render.layers.HDT.CentrePoseRender import CentrePoseRender
@@ -38,9 +38,6 @@ class HDTRenderManager(RenderBase):
         self.data_hub: DataHub = data_hub
         # self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data_old, "localhost", 8000, 60.0)
 
-        # meshes
-        self.pose_meshes =              PoseMeshes(self.num_players, self.data_hub, PoseDataTypes.pose_R)
-
         # layers
         self.cam_comps:             dict[int, CamCompositeLayer] = {}
         # self.centre_cam_layers:         dict[int, CentreCamLayer] = {}
@@ -57,7 +54,7 @@ class HDTRenderManager(RenderBase):
 
         # populate
         for i in range(self.num_cams):
-            self.cam_comps[i] = CamCompositeLayer(i, self.data_hub, PoseDataTypes.pose_R, self.pose_meshes, (0.0, 0.0, 0.0, 0.5))
+            self.cam_comps[i] = CamCompositeLayer(i, self.data_hub, PoseDataTypes.pose_R, 2, None, (0.0, 0.0, 0.0, 0.5))
             # self.centre_cam_layers[i] = CentreCamLayer(self.data_hub, i)
             # self.centre_pose_layers[i] = CentrePoseRender(self.data_hub, self.pose_meshes, i)
             # self.centre_pose_layers_fast[i] = CentrePoseRender(self.capture_data, self.render_data_old, self.pose_meshes_fast, i)
@@ -101,7 +98,6 @@ class HDTRenderManager(RenderBase):
             # self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
             self.mesh_layers_A[i].allocate()
 
-        self.pose_meshes.allocate()
         # self.pose_meshes_fast.allocate()
 
         self.allocate_window_renders()
@@ -119,7 +115,6 @@ class HDTRenderManager(RenderBase):
             self.pd_angle_overlay[i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
-        self.pose_meshes.deallocate()
         self.pose_sim_window.deallocate()
         # self.motion_corr_stream_layer.deallocate()
         for layer in self.cam_comps.values():
@@ -146,7 +141,6 @@ class HDTRenderManager(RenderBase):
         glEnable(GL_BLEND)
 
         self.data_hub.notify_update()
-        self.pose_meshes.update()
         # self.pose_meshes_fast.update()
 
         self.pose_sim_window.update()
