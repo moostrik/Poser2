@@ -60,7 +60,7 @@ class GeneratorNode(NodeBase, Generic[TInput]):
     """
 
     @abstractmethod
-    def set(self, input_data: TInput) -> None:
+    def set(self, input_data: TInput | None) -> None:
         """Set the input data for pose generation."""
         pass
 

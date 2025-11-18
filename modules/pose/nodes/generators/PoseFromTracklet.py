@@ -20,7 +20,7 @@ class PoseFromTracklet(GeneratorNode[Tracklet]):
     def __init__(self) -> None:
         self._tracklet: Tracklet | None = None
 
-    def set(self, input_data: Tracklet) -> None:
+    def set(self, input_data: Tracklet | None) -> None:
         """Set the tracklet for pose generation.
 
         Args:

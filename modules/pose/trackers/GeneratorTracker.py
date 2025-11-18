@@ -26,8 +26,13 @@ class GeneratorTracker(TrackerBase, Generic[TInput]):
     def set(self, input_data_dict: dict[int, TInput]) -> None:
         """Set input data for generators."""
 
-        for input_id, input_data in input_data_dict.items():
-            self._generators[input_id].set(input_data)
+        for input_id, generator in self._generators.items():
+            if input_id in input_data_dict:
+                generator.set(input_data_dict[input_id])
+            else:
+                generator.set(None)
+
+
 
     def generate(self) -> PoseDict:
         """Generate poses from all ready generators."""
