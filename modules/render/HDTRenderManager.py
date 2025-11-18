@@ -17,6 +17,8 @@ from modules.render.renderers import CamImageRenderer, PoseMeshRenderer
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.RenderBase import RenderBase
 from modules.gl.WindowManager import WindowManager
+
+from modules.pose.Pose import ScalarPoseField
 from modules.Settings import Settings
 from modules.utils.PointsAndRects import Rect, Point2f
 
@@ -24,7 +26,6 @@ from modules.gui.PyReallySimpleGui import Gui
 from modules.DataHub import DataHub, DataType, PoseDataTypes, SimilarityDataType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-from modules.pose.Pose import ScalarPoseField
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
@@ -201,20 +202,41 @@ class HDTRenderManager(RenderBase):
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
-        glBlendFunc(GL_ONE, GL_ONE)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
+        draw_rect = Rect(0, 0, width, height)
+
         # self.cam_comps[camera_id].draw(Rect(0, 0, width, height))
-        self.centre_cam_layers[camera_id].draw(Rect(0, 0, width, height))
+        self.centre_cam_layers[camera_id].draw(draw_rect)
         # self.field_bars[camera_id].draw(Rect(0, 0, width, height))
         # self.pd_angle_overlay[camera_id].draw(Rect(0, 0, width, height))
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
-        self.mesh_renderers_A[camera_id].draw(Rect(0, 0, width, height))
+        centre_rect: Rect = self.centre_cam_layers[camera_id].centre_rect
+        pose = self.data_hub.get_item(DataType(PoseDataTypes.pose_R), camera_id)
+        if pose is not None:
+            bbox = pose.bbox.to_rect()
 
-        if self.data_hub.has_item(DataType.pose_I, camera_id): # camera_id is pose id
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            # glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
-            # self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))
-            # self.centre_pose_layers_fast[camera_id].draw(Rect(0, 0, width, height))
-        glBlendFunc(GL_ONE, GL_ONE)
+            # Final transform: screen = ((v * bbox + bbox_pos) - crop_pos) / crop_size * screen_size
+            # Mesh does: screen = v * w + x
+            # So: w = bbox.size / crop.size * screen.size
+            #     x = (bbox.pos - crop.pos) / crop.size * screen.size
+            draw_mesh_rect = Rect(
+                x=(bbox.x - centre_rect.x) / centre_rect.width * draw_rect.width,
+                y=(bbox.y - centre_rect.y) / centre_rect.height * draw_rect.height,
+                width=bbox.width / centre_rect.width * draw_rect.width,
+                height=bbox.height / centre_rect.height * draw_rect.height
+            )
+        else:
+            draw_mesh_rect = draw_rect
+        self.mesh_renderers_A[camera_id].line_width = 10.0
+        self.mesh_renderers_A[camera_id].draw(draw_mesh_rect)
+
+        # if self.data_hub.has_item(DataType.pose_I, camera_id): # camera_id is pose id
+        #     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        #     # glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
+        #     # self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))
+        #     # self.centre_pose_layers_fast[camera_id].draw(Rect(0, 0, width, height))
+        # glBlendFunc(GL_ONE, GL_ONE)
 

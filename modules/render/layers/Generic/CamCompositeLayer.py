@@ -83,14 +83,12 @@ class CamCompositeLayer(LayerBase):
         LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
+        full_rect = Rect(0, 0, self._fbo.width, self._fbo.height)
+
         self._fbo.clear(0.0, 0.0, 0.0, 1.0)
         self._fbo.begin()
-
-        full_rect = Rect(0, 0, self._fbo.width, self._fbo.height)
         self._image_renderer.draw(full_rect)
         self._depth_track_renderer.draw(full_rect)
         self._bbox_renderer.draw(full_rect)
         self._mesh_renderer.draw(full_rect)
-
-
         self._fbo.end()

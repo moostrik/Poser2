@@ -32,6 +32,7 @@ class CentreCamLayer(LayerBase):
 
         self._safe_eye_midpoint: Point2f = Point2f(0.5, 0.5)
         self._safe_height: float = 0.5
+        self._centre_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
         self.data_type: PoseDataTypes = type
         self.target_x: float = 0.5
@@ -42,6 +43,11 @@ class CentreCamLayer(LayerBase):
 
         text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)
+
+    @property
+    def centre_rect(self) -> Rect:
+        return self._centre_rect
+
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
@@ -59,6 +65,7 @@ class CentreCamLayer(LayerBase):
 
         if pose is self._p_pose:
             return # no update needed
+        self._p_pose = pose
 
         LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -83,12 +90,24 @@ class CentreCamLayer(LayerBase):
             self._safe_height *= 2.0  # Rough estimate of full height
             self._safe_height *= self.target_height
 
-            print(pose.points.get_valid(PointLandmark.left_hip), pose.points.get_point2f(PointLandmark.left_hip), self._safe_height)
+        self._centre_rect = self._calculate_centre_rect(pose.bbox.to_rect(), self._safe_eye_midpoint, self._safe_height)
+        fbo_rect = Rect(0, 0, self._fbo.width, self._fbo.height)
 
-        centre_rect: Rect = self._calculate_centre_rect(pose.bbox.to_rect(), self._safe_eye_midpoint, self._safe_height)
+
+
+        # draw_rect
+        # print ("Centre rect:", self._centre_rect)
 
         self._fbo.begin()
-        self._image_renderer.draw_roi(Rect(0, 0, self._fbo.width, self._fbo.height), centre_rect)
+        self._image_renderer.draw_roi(fbo_rect, self._centre_rect)
+
+        # draw_rect = Rect(
+        #     x=fbo_rect.x - self._centre_rect.x * fbo_rect.width / self._centre_rect.width,
+        #     y=fbo_rect.y - self._centre_rect.y * fbo_rect.height / self._centre_rect.height,
+        #     width=fbo_rect.width / self._centre_rect.width,
+        #     height=fbo_rect.height / self._centre_rect.height
+        # )
+        # self._image_renderer.draw(draw_rect)
 
         self._fbo.end()
 

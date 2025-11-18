@@ -220,6 +220,7 @@ class MMDetection(Thread):
             if self.verbose:
                 print("Pose Detection Warning: No pending batch to process, this should not happen")
             return
+        output = DetectionOutput(batch_id=batch.batch_id, processed=True)
 
         # Run inference
         if batch.images:
@@ -243,11 +244,11 @@ class MMDetection(Thread):
                 inference_time_ms=inference_time_ms
             )
 
-            # Queue for callbacks
-            try:
-                self._callback_queue.put_nowait(output)
-            except Exception:
-                print("Pose Detection Warning: Callback queue full, dropping inference results")
+        # Queue for callbacks
+        try:
+            self._callback_queue.put_nowait(output)
+        except Exception:
+            print("Pose Detection Warning: Callback queue full, dropping inference results")
 
     # CALLBACK
     def _callback_worker_loop(self) -> None:

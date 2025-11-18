@@ -47,8 +47,7 @@ class GeneratorTracker(TrackerBase, Generic[TInput]):
                 print(f"GeneratorTracker: Error generating pose {input_id}: {e}")
                 print_exc()
 
-        if generated_poses:
-            self._notify_poses_callbacks(generated_poses)
+        self._notify_poses_callbacks(generated_poses)
 
         return generated_poses
 

@@ -46,7 +46,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
             poses: Dictionary of poses keyed by tracklet ID
             images: Pre-cropped/resized images (256x192) keyed by tracklet ID
         """
-        if not self._detection.is_ready or not poses:
+        if not self._detection.is_ready:
             return
 
         tracklet_ids: list[int] = []
@@ -56,9 +56,6 @@ class PointBatchExtractor(PoseDictCallbackMixin):
             if tracklet_id in self._images:
                 tracklet_ids.append(tracklet_id)
                 image_list.append(self._images[tracklet_id])
-
-        if not image_list:
-            return
 
         with self._lock:
             self._batch_counter += 1
