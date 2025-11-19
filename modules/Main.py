@@ -78,20 +78,24 @@ class Main():
         )
 
         # POSE CONFIGURATION
+        self.image_crop_config =    nodes.ImageCropProcessorConfig()
+        self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera_fps)
+
         self.b_box_smooth_config =  nodes.SmootherConfig()
         self.point_smooth_config =  nodes.SmootherConfig()
         self.angle_smooth_config =  nodes.SmootherConfig()
-        self.delta_smooth_config =  nodes.SmootherConfig()
-        self.image_crop_config =    nodes.ImageCropProcessorConfig()
-        self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera_fps)
-        self.interpolation_config = nodes.ChaseInterpolatorConfig()
 
-        self.b_box_smooth_gui =     gui.SmootherGui(self.b_box_smooth_config, self.gui, 'BBox Smoother')
-        self.point_smooth_gui =     gui.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
-        self.angle_smooth_gui =     gui.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
-        self.delta_smooth_gui =     gui.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
-        self.prediction_gui =       gui.PredictionGui(self.prediction_config, self.gui, 'Predictor')
-        self.interpolation_gui =    gui.InterpolatorGui(self.interpolation_config, self.gui, 'Interpolator')
+        self.b_box_interp_config =  nodes.ChaseInterpolatorConfig()
+        self.point_interp_config =  nodes.ChaseInterpolatorConfig()
+        self.angle_interp_config =  nodes.ChaseInterpolatorConfig()
+
+        self.b_box_smooth_gui =     gui.SmootherGui(self.b_box_smooth_config, self.gui, 'BBox')
+        self.point_smooth_gui =     gui.SmootherGui(self.point_smooth_config, self.gui, 'Point')
+        self.angle_smooth_gui =     gui.SmootherGui(self.angle_smooth_config, self.gui, 'Angle')
+
+        self.b_box_interp_gui =      gui.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBox')
+        self.point_interp_gui =     gui.InterpolatorGui(self.point_interp_config, self.gui, 'Point')
+        self.angle_interp_gui =     gui.InterpolatorGui(self.angle_interp_config, self.gui, 'Angle')
 
         # POSE PROCESSING PIPELINES
         self.pose_from_tracklet =   trackers.PoseFromTrackletGenerator(num_players)
@@ -136,7 +140,14 @@ class Main():
             ]
         )
 
-        self.interpolator = trackers.BPAChaseInterpolatorTracker(settings.num_players, self.interpolation_config)
+        self.interpolator = trackers.InterpolatorTracker(
+            settings.num_players,
+            [
+                lambda: nodes.BBoxChaseInterpolator(self.b_box_interp_config),
+                lambda: nodes.PointChaseInterpolator(self.point_interp_config),
+                lambda: nodes.AngleChaseInterpolator(self.angle_interp_config),
+            ]
+        )
 
         self.pose_interpolation_pipeline = trackers.FilterTracker(
             settings.num_players,
@@ -241,8 +252,9 @@ class Main():
         # if self.WS:
         #     self.gui.addFrame([self.WS.gui.get_gui_frame(), self.WS.gui.get_gui_test_frame()])
 
-        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(),self.point_smooth_gui.get_gui_frame()])
-        self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.interpolation_gui.get_gui_frame()])
+        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])

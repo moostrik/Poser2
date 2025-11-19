@@ -19,14 +19,20 @@ from modules.DataHub import DataHub
 from modules.gl.LayerBase import LayerBase
 from modules.utils.PointsAndRects import Rect, Point2f
 
+# Shaders
+from modules.gl.shaders.Blend import Blend
+
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class CentreCamLayer(LayerBase):
+    blend_shader = Blend()
+
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataTypes, image_renderer: CamImageRenderer,) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
-        self._fbo: Fbo = Fbo()
+        self._fbo: SwapFbo = SwapFbo()
+        self._crop_fbo: Fbo = Fbo()
         self._image_renderer: CamImageRenderer = image_renderer
         self._p_pose: Pose | None = None
 
@@ -56,14 +62,24 @@ class CentreCamLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
+        self._crop_fbo.allocate(width, height, internal_format)
+        if not CentreCamLayer.blend_shader.allocated:
+            CentreCamLayer.blend_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
+        self._crop_fbo.deallocate()
+        if CentreCamLayer.blend_shader.allocated:
+            CentreCamLayer.blend_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
+        # self._crop_fbo.draw(rect.x, rect.y, rect.width, rect.height)
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
+        if not CentreCamLayer.blend_shader.allocated:
+            CentreCamLayer.blend_shader.allocate(monitor_file=True)
+
         key: int = self._cam_id
 
         pose: Pose | None = self._data_hub.get_item(DataType(self.data_type), key)
@@ -75,8 +91,9 @@ class CentreCamLayer(LayerBase):
         LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
+        self._crop_fbo.clear(0.0, 0.0, 0.0, 0.0)
         if pose is None:
+            self._fbo.clear(0.0, 0.0, 0.0, 0.0)
             return
 
         if pose.points.get_valid(PointLandmark.left_eye) and pose.points.get_valid(PointLandmark.right_eye):
@@ -98,11 +115,16 @@ class CentreCamLayer(LayerBase):
         self._centre_rect = self._calculate_centre_rect(pose.bbox.to_rect(), self._safe_eye_midpoint, self._safe_height)
         fbo_rect = Rect(0, 0, self._fbo.width, self._fbo.height)
 
-        # draw_rect
-        # print ("Centre rect:", self._centre_rect)
 
-        self._fbo.begin()
+        self._crop_fbo.begin()
         self._image_renderer.draw_roi(fbo_rect, self._centre_rect)
+        self._crop_fbo.end()
+
+        self._fbo.swap()
+
+        CentreCamLayer.blend_shader.use(self._fbo.fbo_id, self._fbo.back_tex_id, self._crop_fbo.tex_id, 0.25)
+
+        self._screen_centre_rect = CentreCamLayer.calculate_screen_center_rect(pose.bbox.to_rect(), self._centre_rect)
 
         # draw_rect = Rect(
         #     x=fbo_rect.x - self._centre_rect.x * fbo_rect.width / self._centre_rect.width,
@@ -112,13 +134,6 @@ class CentreCamLayer(LayerBase):
         # )
         # self._image_renderer.draw(draw_rect)
 
-        self._fbo.end()
-
-        self._screen_centre_rect = CentreCamLayer.calculate_screen_center_rect(pose.bbox.to_rect(), self._centre_rect)
-
-
-    def get_fbo(self) -> Fbo:
-        return self._fbo
 
     def _calculate_centre_rect(self, pose_rect: Rect, centre: Point2f, height: float) -> Rect:
         """Calculate the centered crop rectangle around a pose's center point."""

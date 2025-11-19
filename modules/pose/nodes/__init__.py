@@ -11,6 +11,6 @@ from .filters.Smoothers import                  SmootherConfig, AngleSmoother, B
 from .filters.StickyFillers import              StickyFillerConfig, AngleStickyFiller, BBoxStickyFiller, DeltaStickyFiller, PointStickyFiller
 from .filters.Validators import                 ValidatorConfig, AngleValidator, BBoxValidator, DeltaValidator, PointValidator, SymmetryValidator, PoseValidator
 
-from .interpolators.ChaseInterpolators import   ChaseInterpolatorConfig, AngleChaseInterpolator, DeltaChaseInterpolator, PointChaseInterpolator
+from .interpolators.ChaseInterpolators import   ChaseInterpolatorConfig, AngleChaseInterpolator, BBoxChaseInterpolator, DeltaChaseInterpolator, PointChaseInterpolator
 
 from .processors.ImageCropProcessor import      ImageCropProcessor, ImageCropProcessorConfig

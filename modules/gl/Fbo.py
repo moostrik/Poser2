@@ -67,6 +67,14 @@ class SwapFbo():
         self.tex_id = self.fbos[self.swap_state].tex_id
         self.back_tex_id = self.fbos[not self.swap_state].tex_id
 
+    def deallocate(self) -> None :
+        self.fbos[0].deallocate()
+        self.fbos[1].deallocate()
+        self.allocated = False
+        self.fbo_id = 0
+        self.tex_id = 0
+        self.back_tex_id = 0
+
     def swap(self) -> None :
         self.swap_state = not self.swap_state
         self.fbo_id = self.fbos[self.swap_state].fbo_id
@@ -90,3 +98,7 @@ class SwapFbo():
 
     def draw_back(self, x, y, w, h) -> None :
         self.fbos[not self.swap_state].draw(x, y, w, h)
+
+    def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 1.0) -> None:
+        self.fbos[0].clear(r, g, b, a)
+        self.fbos[1].clear(r, g, b, a)
