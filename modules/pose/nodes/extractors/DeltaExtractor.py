@@ -1,6 +1,8 @@
 # Standard library imports
 from dataclasses import replace
 
+from numpy import pi
+
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features import Angles
@@ -36,7 +38,10 @@ class DeltaExtractor(FilterNode):
             # Convert to angular velocity (rad/s) by dividing by dt
             if dt > 0:
                 angular_velocity_values = angle_displacement.values / dt
+                # clamp at pi radians per second (already ridiculously high)
+                angular_velocity_values = angular_velocity_values.clip(-pi, pi)
                 deltas = Angles(values=angular_velocity_values, scores=angle_displacement.scores)
+                # clamp at pi radians per second
             else:
                 # Handle dt=0 case (same timestamp or clock issue)
                 deltas = Angles.create_dummy()

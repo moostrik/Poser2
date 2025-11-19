@@ -210,8 +210,8 @@ class HDTRenderManager(RenderBase):
 
             self.field_bar_layers_A[i].data_type = PoseDataTypes.pose_S
             self.field_bar_layers_B[i].data_type = PoseDataTypes.pose_I
-            # self.field_bar_layers_A[i].feature_type = ScalarPoseField.angles
-            # self.field_bar_layers_B[i].feature_type = ScalarPoseField.angles
+            self.field_bar_layers_A[i].feature_type = ScalarPoseField.angles
+            self.field_bar_layers_B[i].feature_type = ScalarPoseField.angles
             self.field_bar_layers_A[i].feature_type = ScalarPoseField.deltas
             self.field_bar_layers_B[i].feature_type = ScalarPoseField.deltas
             self.field_bar_layers_A[i].range_scale = 1.0 #0.1
