@@ -11,13 +11,13 @@ from modules.utils.PointsAndRects import Rect
 
 
 class PoseBBoxRenderer(RendererBase):
-    def __init__(self, track_id: int, data: DataHub, type: PoseDataTypes, line_width: float = 2.0,
+    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataTypes, line_width: float = 2.0,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._data: DataHub = data
         self._track_id: int = track_id
         self._bbox_rect: Rect | None = None
 
-        self.type: PoseDataTypes = type
+        self.data_type: PoseDataTypes = data_type
         self.bbox_color: tuple[float, float, float, float] = bbox_color
         self.line_width: float = line_width
 
@@ -45,7 +45,7 @@ class PoseBBoxRenderer(RendererBase):
 
 
     def update(self) -> None:
-        pose: Pose | None = self._data.get_item(DataType(self.type), self._track_id)
+        pose: Pose | None = self._data.get_item(DataType(self.data_type), self._track_id)
 
         if pose is None:
             self._bbox_rect = None

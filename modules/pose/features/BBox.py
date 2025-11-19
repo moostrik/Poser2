@@ -203,7 +203,8 @@ class BBox(BaseScalarFeature[BBoxElement]):
 
     @classmethod
     def default_range(cls) -> tuple[float, float]:
-        return (-np.inf, np.inf)
+        # return (-np.inf, np.inf)
+        return (-2.0, 2.0)
 
     # ========== RECT CONVERSION ==========
 

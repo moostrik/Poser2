@@ -17,7 +17,7 @@ from modules.utils.PointsAndRects import Rect
 
 
 class PoseMeshRenderer(RendererBase):
-    def __init__(self, track_id: int, data: DataHub, type: PoseDataTypes, line_width: float = 2.0,
+    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataTypes, line_width: float = 2.0,
                  color: tuple[float, float, float, float] | None = None) -> None:
         self._track_id: int = track_id
         self._data: DataHub = data
@@ -25,7 +25,7 @@ class PoseMeshRenderer(RendererBase):
         self._is_active: bool = False
         self._p_cam_poses: set[Pose] = set()
 
-        self.type: PoseDataTypes = type
+        self.data_type: PoseDataTypes = data_type
         self.line_width: float = line_width
         self.color: tuple[float, float, float, float] | None = color
 
@@ -42,7 +42,7 @@ class PoseMeshRenderer(RendererBase):
         self._mesh.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        pose: Pose | None = self._data.get_item(DataType(self.type), self._track_id)
+        pose: Pose | None = self._data.get_item(DataType(self.data_type), self._track_id)
 
         if pose is None:
             self._is_active = False

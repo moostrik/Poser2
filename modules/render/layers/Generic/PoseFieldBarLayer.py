@@ -12,7 +12,7 @@ from modules.pose.Pose import Pose, PoseField, ScalarPoseField
 
 from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
-from modules.DataHub import DataHub, DataType
+from modules.DataHub import DataHub, DataType, PoseDataTypes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,19 +22,19 @@ from modules.gl.shaders.PoseFeature import PoseFeature as PoseFeatureShader
 class PoseScalarBarLayer(LayerBase):
     pose_feature_shader = PoseFeatureShader()
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: DataType, feature_type: ScalarPoseField,
-                min_color=(0.0, 0.5, 1.0), max_color=(1.0, 0.2, 0.0),
+    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataTypes, feature_type: ScalarPoseField,
+                min_color=(0.0, 0.5, 1.0, 1.0), max_color=(1.0, 0.2, 0.0, 1.0),
                 draw_labels: bool = True, range_scale: float = 1.0) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
-        self._data_type: DataType = data_type
         self._fbo: Fbo = Fbo()
         self._p_pose: Pose | None = None
         self._labels: list[str] = []
 
+        self.data_type: PoseDataTypes = data_type
         self.feature_type: ScalarPoseField = feature_type
-        self.min_color: tuple[float, float, float] = min_color
-        self.max_color: tuple[float, float, float] = max_color
+        self.min_color: tuple[float, float, float, float] = min_color
+        self.max_color: tuple[float, float, float, float] = max_color
         self.draw_labels: bool = draw_labels
         self.range_scale: float = range_scale
 
@@ -64,7 +64,7 @@ class PoseScalarBarLayer(LayerBase):
 
         key: int = self._track_id
 
-        pose: Pose | None = self._data_hub.get_item(self._data_type, key)
+        pose: Pose | None = self._data_hub.get_item(DataType(self.data_type), key)
 
         if pose is self._p_pose:
             return # no update needed

@@ -7,8 +7,8 @@ uniform samplerBuffer values_buffer;
 uniform samplerBuffer scores_buffer;
 
 // Add these uniforms for color control
-uniform vec3 color_low;
-uniform vec3 color_high;
+uniform vec4 color_low;
+uniform vec4 color_high;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -41,7 +41,7 @@ void main() {
     // Draw vertical bar from bottom up to normalized_value height
     if (texCoord.y <= normalized_value) {
         // Color based on value (interpolate between color_low and color_high)
-        vec3 color = mix(color_low, color_high, normalized_value);
+        vec3 color = mix(color_low.xyz, color_high.xyz, normalized_value);
 
         // Dim color based on confidence score
         color *= score;

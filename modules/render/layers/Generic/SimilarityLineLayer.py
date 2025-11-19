@@ -22,14 +22,16 @@ from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 class SimilarityLineLayer(LayerBase):
     r_stream_shader = StreamCorrelation()
 
-    def __init__(self, num_streams: int, capacity: int, data: DataHub, type: SimilarityDataType) -> None:
+    def __init__(self, num_streams: int, capacity: int, data: DataHub, data_type: SimilarityDataType) -> None:
         self._num_streams: int = num_streams
         self._data: DataHub = data
-        self._type: SimilarityDataType = type
         self._fbo: Fbo = Fbo()
         self._image: Image = Image()
         self._correlation_stream: SimilarityStream = SimilarityStream(capacity)
         self._p_batch: SimilarityBatch | None = None
+
+        self.data_type: SimilarityDataType = data_type
+
         text_init()
 
         # hot reloader
@@ -64,7 +66,7 @@ class SimilarityLineLayer(LayerBase):
         if not SimilarityLineLayer.r_stream_shader.allocated:
             SimilarityLineLayer.r_stream_shader.allocate(monitor_file=True)
 
-        batch: SimilarityBatch  | None = self._data.get_item(DataType(self._type))
+        batch: SimilarityBatch  | None = self._data.get_item(DataType(self.data_type))
 
         # print("yes", batch)
         if batch is self._p_batch:

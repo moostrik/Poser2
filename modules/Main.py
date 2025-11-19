@@ -86,6 +86,7 @@ class Main():
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera_fps)
         self.interpolation_config = nodes.ChaseInterpolatorConfig()
 
+        self.b_box_smooth_gui =     gui.SmootherGui(self.b_box_smooth_config, self.gui, 'BBox Smoother')
         self.point_smooth_gui =     gui.SmootherGui(self.point_smooth_config, self.gui, 'Point Smoother')
         self.angle_smooth_gui =     gui.SmootherGui(self.angle_smooth_config, self.gui, 'Angle Smoother')
         self.delta_smooth_gui =     gui.SmootherGui(self.delta_smooth_config, self.gui, 'Delta Smoother')
@@ -135,7 +136,7 @@ class Main():
             ]
         )
 
-        self.interpolator = trackers.APChaseInterpolatorTracker(settings.num_players, self.interpolation_config)
+        self.interpolator = trackers.BPAChaseInterpolatorTracker(settings.num_players, self.interpolation_config)
 
         self.pose_interpolation_pipeline = trackers.FilterTracker(
             settings.num_players,
@@ -240,8 +241,8 @@ class Main():
         # if self.WS:
         #     self.gui.addFrame([self.WS.gui.get_gui_frame(), self.WS.gui.get_gui_test_frame()])
 
-        self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.angle_smooth_gui.get_gui_frame()])
-        self.gui.addFrame([self.prediction_gui.get_gui_frame(), self.interpolation_gui.get_gui_frame()])
+        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(),self.point_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.interpolation_gui.get_gui_frame()])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])

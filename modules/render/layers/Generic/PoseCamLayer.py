@@ -22,14 +22,14 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class PoseCamLayer(LayerBase):
-    def __init__(self, cam_id: int, data_hub: DataHub, type: PoseDataTypes, image_renderer: CamImageRenderer,) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataTypes, image_renderer: CamImageRenderer,) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
         self._image_renderer: CamImageRenderer = image_renderer
         self._p_pose: Pose | None = None
 
-        self.data_type: PoseDataTypes = type
+        self.data_type: PoseDataTypes = data_type
 
         text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)

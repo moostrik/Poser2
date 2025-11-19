@@ -13,7 +13,7 @@ class PoseFeature(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, feature: PoseFeatureUnion, range_scale: float = 1.0, color_low=(0.0, 0.5, 1.0), color_high=(1.0, 0.2, 0.0)) -> None:
+    def use(self, fbo: int, feature: PoseFeatureUnion, range_scale: float = 1.0, color_low=(0.0, 0.5, 1.0, 1.0), color_high=(1.0, 0.2, 0.0, 1.0)) -> None:
         super().use()
         if not self.allocated: return
         if not fbo: return
@@ -53,8 +53,8 @@ class PoseFeature(Shader):
         glUniform1f(glGetUniformLocation(s, "value_max"), max_range)
 
         # Pass color uniforms
-        glUniform3f(glGetUniformLocation(s, "color_low"), *color_low)
-        glUniform3f(glGetUniformLocation(s, "color_high"), *color_high)
+        glUniform4f(glGetUniformLocation(s, "color_low"), *color_low)
+        glUniform4f(glGetUniformLocation(s, "color_high"), *color_high)
 
         # Bind texture units
         glActiveTexture(GL_TEXTURE0)

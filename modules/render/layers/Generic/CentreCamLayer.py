@@ -23,7 +23,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class CentreCamLayer(LayerBase):
-    def __init__(self, cam_id: int, data_hub: DataHub, type: PoseDataTypes, image_renderer: CamImageRenderer,) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataTypes, image_renderer: CamImageRenderer,) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
@@ -35,10 +35,10 @@ class CentreCamLayer(LayerBase):
         self._centre_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
         self._screen_centre_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
-        self.data_type: PoseDataTypes = type
+        self.data_type: PoseDataTypes = data_type
         self.target_x: float = 0.5
         self.target_y: float = 0.25
-        self.target_height: float = 0.95
+        self.target_height: float = 1.25
         self.dst_aspectratio: float = 9/16
 
 
@@ -98,8 +98,6 @@ class CentreCamLayer(LayerBase):
         self._centre_rect = self._calculate_centre_rect(pose.bbox.to_rect(), self._safe_eye_midpoint, self._safe_height)
         fbo_rect = Rect(0, 0, self._fbo.width, self._fbo.height)
 
-
-
         # draw_rect
         # print ("Centre rect:", self._centre_rect)
 
@@ -125,6 +123,7 @@ class CentreCamLayer(LayerBase):
     def _calculate_centre_rect(self, pose_rect: Rect, centre: Point2f, height: float) -> Rect:
         """Calculate the centered crop rectangle around a pose's center point."""
         centre_world: Point2f = centre * pose_rect.size + pose_rect.position
+        height = height * pose_rect.height
         width: float = height * self.dst_aspectratio
 
         return Rect(

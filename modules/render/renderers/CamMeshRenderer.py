@@ -15,13 +15,14 @@ from modules.utils.PointsAndRects import Rect
 
 
 class CamMeshRenderer(RendererBase):
-    def __init__(self, cam_id: int, data: DataHub, type: PoseDataTypes, line_width: int = 2,
+    def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataTypes, line_width: int = 2,
                  mesh_color: tuple[float, float, float, float] | None = None) -> None:
         self._data: DataHub = data
         self._cam_id: int = cam_id
         self._cam_meshes: dict[int, Mesh] = {}  # Lazily initialized, track_ids 1-8
         self._active_track_ids: set[int] = set()
-        self.type: PoseDataTypes = type
+
+        self.data_type: PoseDataTypes = data_type
         self.line_width: int = int(line_width)
         self.mesh_color: tuple[float, float, float, float] | None = mesh_color
 
@@ -43,7 +44,7 @@ class CamMeshRenderer(RendererBase):
 
     def update(self) -> None:
         """Update meshes for active poses. Meshes are lazily initialized and cached (track_ids 1-8)."""
-        cam_poses: set[Pose] = self._data.get_items_for_cam(DataType(self.type), self._cam_id)
+        cam_poses: set[Pose] = self._data.get_items_for_cam(DataType(self.data_type), self._cam_id)
 
         self._active_track_ids = {pose.track_id for pose in cam_poses}
 
