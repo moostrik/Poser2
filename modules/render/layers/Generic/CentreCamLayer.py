@@ -33,6 +33,7 @@ class CentreCamLayer(LayerBase):
         self._safe_eye_midpoint: Point2f = Point2f(0.5, 0.5)
         self._safe_height: float = 0.5
         self._centre_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
+        self._screen_centre_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
         self.data_type: PoseDataTypes = type
         self.target_x: float = 0.5
@@ -47,6 +48,10 @@ class CentreCamLayer(LayerBase):
     @property
     def centre_rect(self) -> Rect:
         return self._centre_rect
+
+    @property
+    def screen_center_rect(self) -> Rect:
+        return self._screen_centre_rect
 
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
@@ -111,6 +116,8 @@ class CentreCamLayer(LayerBase):
 
         self._fbo.end()
 
+        self._screen_centre_rect = CentreCamLayer.calculate_screen_center_rect(pose.bbox.to_rect(), self._centre_rect)
+
 
     def get_fbo(self) -> Fbo:
         return self._fbo
@@ -125,4 +132,23 @@ class CentreCamLayer(LayerBase):
             y=centre_world.y - height * self.target_y,
             width=width,
             height=height
+        )
+
+    @staticmethod
+    def calculate_screen_center_rect(world_rect: Rect, centre_rect: Rect) -> Rect:
+        """
+        Calculate the normalized screen space rect for a world rect relative to the centre crop.
+
+        Args:
+            world_rect: Any rectangle in world coordinates (e.g., pose.bbox)
+            centre_rect: The crop region in world coordinates
+
+        Returns:
+            Rect in normalized [0,1] space relative to centre_rect
+        """
+        return Rect(
+            x=(world_rect.x - centre_rect.x) / centre_rect.width,
+            y=(world_rect.y - centre_rect.y) / centre_rect.height,
+            width=world_rect.width / centre_rect.width,
+            height=world_rect.height / centre_rect.height
         )

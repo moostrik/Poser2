@@ -94,6 +94,8 @@ class PoseScalarBarLayer(LayerBase):
     def draw_joint_labels(labels: list[str], draw_rect: Rect) -> None:
         """Draw joint names at the bottom of each bar."""
         num_labels: int = len(labels)
+        if num_labels == 0:
+            return
         step: float = draw_rect.width / num_labels
 
         # Alternate colors for readability
