@@ -214,9 +214,9 @@ class Main():
 
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
-        self.pose_smooth_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_S)) # smooth poses
-
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
+        self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_S)) # smooth poses
+
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
         self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_I)) # interpolated poses

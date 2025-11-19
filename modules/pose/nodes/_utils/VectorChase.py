@@ -31,6 +31,7 @@ from typing import Union
 import numpy as np
 import warnings
 
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 class VectorChase:
     """Chase interpolator for arbitrary vector data (positions, coordinates, etc.)."""
@@ -103,6 +104,9 @@ class VectorChase:
 
         self._v_curr = np.zeros(self._vector_size)
         self._v_target = np.zeros(self._vector_size)
+
+        # hot reloader
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def input_frequency(self) -> float:
@@ -226,7 +230,14 @@ class VectorChase:
         self._last_update_time = current_time
 
         # Calculate target velocity (PID Proportional term)
-        self._v_target = self._calculate_velocity(self._interpolated, self._target, self._input_interval)
+        # self._v_target = self._calculate_velocity(self._interpolated, self._target, self._input_interval)
+
+
+        # Calculate target velocity (PID Proportional term)
+        new_v_target = self._calculate_velocity(self._interpolated, self._target, self._input_interval)
+
+        # Smooth the v_target transition to prevent velocity jumps
+        self._v_target += (new_v_target - self._v_target) * self._responsiveness
 
         # Velocity steering (PID Derivative term)
         velocity_correction = (self._v_target - self._v_curr) * self._responsiveness
