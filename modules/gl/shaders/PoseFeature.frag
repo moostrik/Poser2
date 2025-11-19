@@ -30,7 +30,7 @@ void main() {
 
     // Check if value is valid (not NaN and has confidence)
     if (score <= 0.0) {
-        fragColor = vec4(0.2, 0.2, 0.2, 1.0); // Gray for invalid joints
+        fragColor = vec4(0.2, 0.2, 0.2, 0.0); // Gray for invalid joints
         return;
     }
 
@@ -46,10 +46,10 @@ void main() {
         // Dim color based on confidence score
         color *= score;
 
-        fragColor = vec4(color, 1.0);
+        fragColor = vec4(color, 0.8);
     } else {
         // Background
-        fragColor = vec4(0.1, 0.1, 0.1, 1.0);
+        fragColor = vec4(0.1, 0.1, 0.1, 0.0);
     }
 
     // Add thin white separator lines between bars

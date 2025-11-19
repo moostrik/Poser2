@@ -63,7 +63,7 @@ class PDLineLayer(LayerBase):
         LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        self._fbo.clear(0.0, 0.0, 0.0, 1.0)
+        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         if pd_stream is None:
             return
 
