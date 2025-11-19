@@ -88,7 +88,7 @@ class InterpolatorNode(NodeBase):
         pass
 
     @abstractmethod
-    def update(self, current_time: float | None = None) -> Pose | None:
+    def update(self, time_stamp: float | None = None) -> Pose | None:
         """Get interpolated pose. Called at render frequency (~60+ FPS). Returns None if not ready."""
         pass
 

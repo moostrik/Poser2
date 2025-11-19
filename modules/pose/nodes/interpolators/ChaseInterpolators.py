@@ -18,6 +18,7 @@ and makes sure the last_pose always corresponds to interpolator's last set targe
 # Standard library imports
 from dataclasses import replace
 from threading import Lock
+from time import monotonic
 
 # Third-party imports
 import numpy as np
@@ -99,7 +100,7 @@ class FeatureChaseInterpolator(InterpolatorNode):
             self._interpolator.set_target(feature_data.values)
             self._last_pose = pose
 
-    def update(self, current_time: float | None = None) -> Pose | None:
+    def update(self, time_stamp: float | None = None) -> Pose | None:
         """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS).
         Returns None if process() has not been called yet."""
 
@@ -108,12 +109,15 @@ class FeatureChaseInterpolator(InterpolatorNode):
                 return None
             last_pose = self._last_pose
 
-            self._interpolator.update(current_time)
+            if time_stamp is None:
+                time_stamp = monotonic()
+
+            self._interpolator.update(time_stamp)
             interpolated_values: np.ndarray = self._interpolator.value
 
         feature_data = getattr(last_pose, self._attr_name)
         interpolated_data = self._create_interpolated_data(feature_data, interpolated_values)
-        return replace(last_pose, **{self._attr_name: interpolated_data})
+        return replace(last_pose, **{self._attr_name: interpolated_data}, time_stamp=time_stamp)
 
     def _create_interpolated_data(self, original_data: PoseFeature, interpolated_values: np.ndarray) -> PoseFeature:
         """Create feature data with interpolated values and adjusted scores."""

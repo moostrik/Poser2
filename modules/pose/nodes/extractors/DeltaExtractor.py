@@ -25,7 +25,21 @@ class DeltaExtractor(FilterNode):
         if self._prev_pose is None:
             deltas: Angles = Angles.create_dummy()
         else:
-            deltas = pose.angles.subtract(self._prev_pose.angles)
+            # Compute time delta
+            dt = pose.time_stamp - self._prev_pose.time_stamp
+
+            # print(dt)
+
+            # Compute angular displacement
+            angle_displacement = pose.angles.subtract(self._prev_pose.angles)
+
+            # Convert to angular velocity (rad/s) by dividing by dt
+            if dt > 0:
+                angular_velocity_values = angle_displacement.values / dt
+                deltas = Angles(values=angular_velocity_values, scores=angle_displacement.scores)
+            else:
+                # Handle dt=0 case (same timestamp or clock issue)
+                deltas = Angles.create_dummy()
 
         # Update state for next frame
         self._prev_pose = pose

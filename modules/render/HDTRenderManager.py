@@ -207,8 +207,13 @@ class HDTRenderManager(RenderBase):
 
             self.cam_track_layers[i].bbox_color = (1.0, 0.0, 0.0, 1.0)
             self.cam_bbox_renderers[i].bbox_color = (0.0, 1.0, 0.0, 1.0)
-            self.field_bar_layers_B[i].feature_type = ScalarPoseField.bbox
-            self.field_bar_layers_A[i].feature_type = ScalarPoseField.bbox
+
+            self.field_bar_layers_A[i].data_type = PoseDataTypes.pose_S
+            self.field_bar_layers_B[i].data_type = PoseDataTypes.pose_I
+            self.field_bar_layers_A[i].feature_type = ScalarPoseField.deltas
+            self.field_bar_layers_B[i].feature_type = ScalarPoseField.deltas
+            self.field_bar_layers_A[i].range_scale = 1.0 #0.1
+            self.field_bar_layers_B[i].range_scale = 1.0
 
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
@@ -225,16 +230,23 @@ class HDTRenderManager(RenderBase):
         camera_id: int = self.secondary_order_list.index(monitor_id)
         draw_rect = Rect(0, 0, width, height)
 
-        self.pose_cam_layers[camera_id].draw(draw_rect)
-        self.centre_cam_layers[camera_id].draw(draw_rect)
-        # self.field_bar_layers_A[camera_id].draw(draw_rect)
-        # self.field_bar_layers_B[camera_id].draw(draw_rect)
-        # self.pd_line_layers[camera_id].draw(draw_rect)
 
-        screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
-        draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
-        # self.mesh_renderers_A[camera_id].draw(draw_mesh_rect)
-        self.mesh_renderers_B[camera_id].draw(draw_mesh_rect)
+        draw_centre: bool = True
+        if draw_centre:
+            self.centre_cam_layers[camera_id].draw(draw_rect)
+            screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
+            draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
+            # self.mesh_renderers_A[camera_id].draw(draw_mesh_rect)
+            self.mesh_renderers_B[camera_id].draw(draw_mesh_rect)
+        else:
+            self.pose_cam_layers[camera_id].draw(draw_rect)
+            # self.mesh_renderers_A[camera_id].draw(draw_rect)
+            self.mesh_renderers_B[camera_id].draw(draw_rect)
+
+
+        self.field_bar_layers_A[camera_id].draw(draw_rect)
+        self.field_bar_layers_B[camera_id].draw(draw_rect)
+        # self.pd_line_layers[camera_id].draw(draw_rect)
 
 
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))

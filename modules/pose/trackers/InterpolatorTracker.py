@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 from traceback import print_exc
+from time import monotonic
 from typing import Callable
 
 from modules.pose.Pose import Pose, PoseDict
@@ -46,10 +47,13 @@ class InterpolatorTracker(TrackerBase):
             print(f"InterpolatorTracker: Error submitting pose {id}: {e}")
             print_exc()
 
-    def update(self, current_time: float | None = None) -> PoseDict:
+    def update(self, time_stamp: float | None = None) -> PoseDict:
         """Get interpolated poses at current time."""
 
         interpolated_poses: PoseDict = {}
+
+        if time_stamp is None:
+            time_stamp = monotonic()
 
         try:
             for id, pipeline in self._interpolator_pipeline.items():
@@ -57,7 +61,7 @@ class InterpolatorTracker(TrackerBase):
                 # Here, we just use the first interpolator's output.
                 pose: Pose | None = None
                 for node in pipeline:
-                    interpolated_pose: Pose | None = node.update(current_time)
+                    interpolated_pose: Pose | None = node.update(time_stamp)
                     attractor: str = node.attr_name
                     if interpolated_pose is not None:
                         if pose is None:

@@ -85,15 +85,15 @@ class Main():
         self.point_smooth_config =  nodes.SmootherConfig()
         self.angle_smooth_config =  nodes.SmootherConfig()
 
-        self.b_box_interp_config =  nodes.ChaseInterpolatorConfig()
-        self.point_interp_config =  nodes.ChaseInterpolatorConfig()
-        self.angle_interp_config =  nodes.ChaseInterpolatorConfig()
+        self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera_fps)
+        self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera_fps)
+        self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera_fps)
 
         self.b_box_smooth_gui =     gui.SmootherGui(self.b_box_smooth_config, self.gui, 'BBox')
         self.point_smooth_gui =     gui.SmootherGui(self.point_smooth_config, self.gui, 'Point')
         self.angle_smooth_gui =     gui.SmootherGui(self.angle_smooth_config, self.gui, 'Angle')
 
-        self.b_box_interp_gui =      gui.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBox')
+        # self.b_box_interp_gui =     gui.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBox')
         self.point_interp_gui =     gui.InterpolatorGui(self.point_interp_config, self.gui, 'Point')
         self.angle_interp_gui =     gui.InterpolatorGui(self.angle_interp_config, self.gui, 'Angle')
 
@@ -116,6 +116,7 @@ class Main():
             [
                 lambda: nodes.PointConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose_conf_threshold)),
                 nodes.AngleExtractor,
+                nodes.DeltaExtractor,
             ]
         )
 
@@ -143,7 +144,7 @@ class Main():
         self.interpolator = trackers.InterpolatorTracker(
             settings.num_players,
             [
-                lambda: nodes.BBoxChaseInterpolator(self.b_box_interp_config),
+                lambda: nodes.BBoxLerpInterpolator(self.b_box_interp_config),
                 lambda: nodes.PointChaseInterpolator(self.point_interp_config),
                 lambda: nodes.AngleChaseInterpolator(self.angle_interp_config),
             ]
@@ -252,7 +253,7 @@ class Main():
         # if self.WS:
         #     self.gui.addFrame([self.WS.gui.get_gui_frame(), self.WS.gui.get_gui_test_frame()])
 
-        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
 
