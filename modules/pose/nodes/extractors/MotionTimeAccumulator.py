@@ -19,7 +19,8 @@ class MotionTimeAccumulator(FilterNode):
     def process(self, pose: Pose) -> Pose:
         """Compute deltas for all poses and emit enriched results."""
 
-        total_delta: float = np.nansum(np.abs(pose.deltas.values))
+        total_delta: float = np.nansum(np.abs(pose.deltas.values)) / len(pose.deltas)
+
         self.motion_time = self.motion_time + total_delta
 
         return replace(pose, motion_time=self.motion_time)
