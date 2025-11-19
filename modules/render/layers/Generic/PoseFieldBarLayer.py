@@ -30,6 +30,7 @@ class PoseScalarBarLayer(LayerBase):
         self._data_type: DataType = data_type
         self._fbo: Fbo = Fbo()
         self._p_pose: Pose | None = None
+        self._labels: list[str] = []
 
         self.feature_type: ScalarPoseField = feature_type
         self.min_color: tuple[float, float, float] = min_color
@@ -51,8 +52,10 @@ class PoseScalarBarLayer(LayerBase):
         if PoseScalarBarLayer.pose_feature_shader.allocated:
             PoseScalarBarLayer.pose_feature_shader.deallocate()
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self, rect: Rect, draw_labels: bool = True) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        if draw_labels:
+            self.draw_joint_labels(self._labels, rect)
 
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
@@ -73,26 +76,25 @@ class PoseScalarBarLayer(LayerBase):
         if pose is None:
             return
 
-        data = pose.get_feature(PoseField[self.feature_type.name])
-        if not isinstance(data, PoseFeature):
-            raise ValueError(f"PoseFeatureLayer expected feature of type PoseFeature, got {type(data)}")
+        feature = pose.get_feature(PoseField[self.feature_type.name])
+        if not isinstance(feature, PoseFeature):
+            raise ValueError(f"PoseFeatureLayer expected feature of type PoseFeature, got {type(feature)}")
 
-        PoseScalarBarLayer.pose_feature_shader.use(self._fbo.fbo_id, data, self.range_scale, self.min_color, self.max_color)
+        PoseScalarBarLayer.pose_feature_shader.use(self._fbo.fbo_id, feature, self.range_scale, self.min_color, self.max_color)
 
+        joint_enum_type = feature.__class__.feature_enum()
+        num_joints: int = len(feature)
+        self._labels = [joint_enum_type(i).name for i in range(num_joints)]
 
-        self.draw_joint_labels(self._fbo, data)
+        # self._fbo.begin()
+        # self.draw_joint_labels(self._labels, Rect(0, 0, self._fbo.width, self._fbo.height))
+        # self._fbo.end()
 
     @staticmethod
-    def draw_joint_labels(fbo: Fbo, feature: PoseFeature) -> None:
+    def draw_joint_labels(labels: list[str], draw_rect: Rect) -> None:
         """Draw joint names at the bottom of each bar."""
-        num_joints: int = len(feature)
-        step: float = fbo.width / num_joints
-
-        fbo.begin()
-
-        # Get joint names from the feature's enum
-        joint_enum_type = feature.__class__.feature_enum()
-        joint_names: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
+        num_labels: int = len(labels)
+        step: float = draw_rect.width / num_labels
 
         # Alternate colors for readability
         colors: list[tuple[float, float, float, float]] = [
@@ -100,12 +102,11 @@ class PoseScalarBarLayer(LayerBase):
             (*POSE_COLOR_RIGHT, 1.0)
         ]
 
-        for i in range(num_joints):
-            string: str = joint_names[i]
-            x: int = int((i + 0.1) * step)
-            y: int = int(fbo.height * 0.5 - 12)
+        for i in range(num_labels):
+            string: str = labels[i]
+            x: int = int(draw_rect.x + (i + 0.1) * step)
+            y: int = int(draw_rect.y + draw_rect.height * 0.5 - 9)
             clr: int = i % 2
 
-            draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
+            draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3), True) # type: ignore
 
-        fbo.end()

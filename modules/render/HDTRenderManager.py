@@ -29,10 +29,10 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
-        self.num_players: int =     settings.num_players
-        self.num_cams: int =        settings.camera_num
-        num_R_streams: int =   settings.render_R_num
-        R_stream_capacity: int = int(settings.camera_fps * 30)  # 10 seconds buffer
+        self.num_players: int = settings.num_players
+        self.num_cams: int =    settings.camera_num
+        num_R_streams: int =    settings.render_R_num
+        R_stream_capacity: int= int(settings.camera_fps * 30)  # 10 seconds buffer
 
         # data
         self.data_hub: DataHub = data_hub
@@ -79,7 +79,7 @@ class HDTRenderManager(RenderBase):
             settings.render_title, settings.render_fullscreen,
             settings.render_v_sync, settings.render_fps,
             settings.render_x, settings.render_y,
-            settings.render_monitor, settings.render_secondary_list # sorted(settings.render_secondary_list)
+            settings.render_monitor, settings.render_secondary_list
         )
 
         # hot reloader
@@ -96,7 +96,6 @@ class HDTRenderManager(RenderBase):
 
             self.centre_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.field_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
-            self.pd_line_layers[i].allocate(1080, 1920, GL_RGBA)
             # self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
 
         self.allocate_window_renders()
@@ -110,8 +109,8 @@ class HDTRenderManager(RenderBase):
         for i in range(self.num_cams):
             w, h = self.subdivision.get_allocation_size(CamCompositeLayer.__name__, i)
             self.cam_track_layers[i].allocate(w , h, GL_RGBA)
-            # w, h = self.subdivision.get_allocation_size(CentreCamLayer.__name__, i)
-            # self.pd_line_layers[i].allocate(w, h, GL_RGBA)
+            w, h = self.subdivision.get_allocation_size(CentreCamLayer.__name__, i)
+            self.pd_line_layers[i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         self.pose_sim_layer.deallocate()
@@ -153,6 +152,7 @@ class HDTRenderManager(RenderBase):
             self.centre_cam_layers[i].update()
             self.pd_line_layers[i].update()
             self.field_bar_layers[i].update()
+
             # self.line_field_layers[i].update()
 
         self.draw_composition(width, height)
@@ -160,7 +160,7 @@ class HDTRenderManager(RenderBase):
     def draw_composition(self, width:int, height: int) -> None:
         self.setView(width, height)
 
-        glClearColor(0.2, 0.2, 0.2, 1.0)
+        glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -171,10 +171,9 @@ class HDTRenderManager(RenderBase):
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             self.cam_track_layers[i].draw(self.subdivision.get_rect(CamCompositeLayer.__name__, i))
 
-            # glBlendFunc(GL_ONE, GL_ONE)
             preview_rect: Rect = self.subdivision.get_rect(CentreCamLayer.__name__, i)
             self.centre_cam_layers[i].draw(preview_rect)
-            self.field_bar_layers[i].draw(preview_rect)
+            self.field_bar_layers[i].draw(preview_rect, draw_labels=False)
             self.pd_line_layers[i].draw(preview_rect)
 
             # self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
@@ -190,15 +189,15 @@ class HDTRenderManager(RenderBase):
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-
         camera_id: int = self.secondary_order_list.index(monitor_id)
         draw_rect = Rect(0, 0, width, height)
 
-        # self.cam_comps[camera_id].draw(Rect(0, 0, width, height))
         self.centre_cam_layers[camera_id].draw(draw_rect)
-        # self.field_bars[camera_id].draw(Rect(0, 0, width, height))
-        # self.pd_angle_overlay[camera_id].draw(Rect(0, 0, width, height))
+        self.field_bar_layers[camera_id].draw(draw_rect)
+        # self.pd_line_layers[camera_id].draw(draw_rect)
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
+
+
         centre_rect: Rect = self.centre_cam_layers[camera_id].centre_rect
         pose = self.data_hub.get_item(DataType(PoseDataTypes.pose_R), camera_id)
         if pose is not None:
@@ -219,10 +218,4 @@ class HDTRenderManager(RenderBase):
         self.mesh_renderers_A[camera_id].line_width = 10.0
         self.mesh_renderers_A[camera_id].draw(draw_mesh_rect)
 
-        # if self.data_hub.has_item(DataType.pose_I, camera_id): # camera_id is pose id
-        #     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        #     # glBlendEquation(GL_FUNC_REVERSE_SUBTRACT)
-        #     # self.centre_pose_layers[camera_id].draw(Rect(0, 0, width, height))
-        #     # self.centre_pose_layers_fast[camera_id].draw(Rect(0, 0, width, height))
-        # glBlendFunc(GL_ONE, GL_ONE)
 

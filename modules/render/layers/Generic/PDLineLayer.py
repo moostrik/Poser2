@@ -46,8 +46,10 @@ class PDLineLayer(LayerBase):
         if PDLineLayer.pose_stream_shader.allocated:
             PDLineLayer.pose_stream_shader.deallocate()
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self, rect: Rect, draw_labels: bool = True) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        if draw_labels:
+            PDLineLayer.draw_labels(rect)
 
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
@@ -73,21 +75,18 @@ class PDLineLayer(LayerBase):
 
         PDLineLayer.pose_stream_shader.use(self._fbo.fbo_id, self._image.tex_id, self._image.width, self._image.height, line_width=1.5 / self._fbo.height)
 
-        # PDLineLayer.draw_strings(self._fbo)
 
     @staticmethod
-    def draw_strings(fbo: Fbo) -> None:
+    def draw_labels(rect: Rect) -> None:
         angle_num: int = ANGLE_NUM_LANDMARKS
-        step: float = fbo.height / angle_num
+        step: float = rect.height / angle_num
         # yellow and light blue
         colors: list[tuple[float, float, float, float]] = [(*POSE_COLOR_LEFT, 1.0), (*POSE_COLOR_RIGHT, 1.0)]
 
-        fbo.begin()
         for i in range(angle_num):
             string: str = ANGLE_LANDMARK_NAMES[i]
-            x: int = 10
-            y: int = fbo.height - (int(fbo.height - (i + 0.5) * step) - 12)
+            x: int = int(rect.x + 10)
+            y: int = int(rect.y + rect.height - (rect.height - (i + 0.5) * step) - 9)
             clr: int = i % 2
 
-            draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
-        fbo.end()
+            draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3), True) # type: ignore
