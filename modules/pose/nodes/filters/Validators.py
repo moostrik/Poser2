@@ -1,6 +1,6 @@
 """Pose validators for data integrity checks."""
 
-from dataclasses import replace
+from threading import Lock
 
 from modules.pose.features import Angles, Points2D, BBox, Symmetry
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
@@ -10,13 +10,14 @@ from modules.pose.Pose import Pose
 class ValidatorConfig(NodeConfigBase):
     """Configuration for pose validators."""
 
-    def __init__(self, check_ranges: bool = True) -> None:
+    def __init__(self, check_ranges: bool = True, name: str = "default") -> None:
         """
         Args:
             check_ranges: Whether to validate value ranges (default: True)
         """
         super().__init__()
         self.check_ranges: bool = check_ranges
+        self.name: str = name
 
 
 class FeatureValidator(FilterNode):
@@ -40,6 +41,11 @@ class FeatureValidator(FilterNode):
         self._feature_class = feature_class
         self._attr_name = attr_name
 
+        self._config_lock: Lock = Lock()
+        self._check_ranges: bool = config.check_ranges
+        self._name: str = config.name
+        self._config.add_listener(self.on_config_changed)
+
     @property
     def config(self) -> ValidatorConfig:
         return self._config
@@ -48,14 +54,24 @@ class FeatureValidator(FilterNode):
         """Validate feature data and print any errors."""
         feature_data = getattr(pose, self._attr_name)
 
+        with self._config_lock:
+            check_ranges: bool = self._check_ranges
+            name: str = self._name
+
         # Validate using feature's own validation method
-        is_valid, error_message = feature_data.validate(check_ranges=self._config.check_ranges)
+        is_valid, error_message = feature_data.validate(check_ranges=check_ranges)
 
         if not is_valid:
-            print(f"Validation error in '{self._attr_name}' of pose {pose.track_id}: {error_message}")
+            print(f"{name} validation error in '{self._attr_name}' of pose {pose.track_id}: {error_message}")
 
         # Always return original pose (no fixing, just validation)
         return pose
+
+    def on_config_changed(self) -> None:
+        """Handle configuration changes."""
+        with self._config_lock:
+            self._check_ranges = self._config.check_ranges
+            self._name = self._config.name
 
 
 # Convenience classes

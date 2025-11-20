@@ -117,6 +117,7 @@ class Main():
                 lambda: nodes.PointConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose_conf_threshold)),
                 nodes.AngleExtractor,
                 nodes.DeltaExtractor,
+                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
             ]
         )
 
@@ -128,7 +129,7 @@ class Main():
                 nodes.DeltaExtractor,
                 nodes.SymmetryExtractor,
                 nodes.MotionTimeAccumulator,
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig()),
+                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
             ]
         )
 
@@ -137,7 +138,7 @@ class Main():
             [
                 lambda: nodes.PointPredictor(self.prediction_config),
                 lambda: nodes.AnglePredictor(self.prediction_config),
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig()),
+                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
             ]
         )
 
@@ -156,7 +157,7 @@ class Main():
                 nodes.DeltaExtractor,
                 nodes.SymmetryExtractor,
                 nodes.MotionTimeAccumulator,
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig()),
+                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
             ]
         )
 
