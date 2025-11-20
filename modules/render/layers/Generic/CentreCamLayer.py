@@ -46,6 +46,7 @@ class CentreCamLayer(LayerBase):
         self.target_y: float = 0.25
         self.target_height: float = 1.25
         self.dst_aspectratio: float = 9/16
+        self.blend_factor: float = 0.25
 
 
         text_init()
@@ -122,7 +123,7 @@ class CentreCamLayer(LayerBase):
 
         self._fbo.swap()
 
-        CentreCamLayer.blend_shader.use(self._fbo.fbo_id, self._fbo.back_tex_id, self._crop_fbo.tex_id, 0.25)
+        CentreCamLayer.blend_shader.use(self._fbo.fbo_id, self._fbo.back_tex_id, self._crop_fbo.tex_id, self.blend_factor)
 
         self._screen_centre_rect = CentreCamLayer.calculate_screen_center_rect(pose.bbox.to_rect(), self._centre_rect)
 

@@ -14,47 +14,43 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 void main() {
-    // Calculate which joint we're rendering based on x coordinate
     float joint_width = 1.0 / float(num_joints);
     int joint_index = int(texCoord.x / joint_width);
 
-    // Clamp to valid range
     if (joint_index >= num_joints) {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
 
-    // Fetch value and score for this joint
     float value = texelFetch(values_buffer, joint_index).r;
     float score = texelFetch(scores_buffer, joint_index).r;
 
-    // Check if value is valid (not NaN and has confidence)
     if (score <= 0.0) {
-        fragColor = vec4(0.2, 0.2, 0.2, 0.0); // Gray for invalid joints
+        fragColor = vec4(0.2, 0.2, 0.2, 0.0);
         return;
     }
 
-    // Normalize value to [0, 1]
     float normalized_value = (value - value_min) / (value_max - value_min);
     normalized_value = clamp(normalized_value, 0.0, 1.0);
 
-    // Draw vertical bar from bottom up to normalized_value height
-    if (texCoord.y <= normalized_value) {
-        // Color based on value (interpolate between color_low and color_high)
+    // Draw a thick horizontal line at normalized_value with smooth edges inward
+    float line_thickness = 0.002; // Center thickness
+    float edge_smooth = 0.001;    // Smoothing range
+
+    float dist = abs(texCoord.y - normalized_value);
+    float alpha = 1.0 - smoothstep(line_thickness - edge_smooth, line_thickness, dist);
+
+    if (alpha > 0.01) {
         vec3 color = mix(color_low.xyz, color_high.xyz, normalized_value);
-
-        // Dim color based on confidence score
         color *= score;
-
-        fragColor = vec4(color, 0.8);
+        fragColor = vec4(color, alpha);
     } else {
-        // Background
         fragColor = vec4(0.1, 0.1, 0.1, 0.0);
     }
 
-    // Add thin white separator lines between bars
+    // Separator lines between bars
     float bar_x = mod(texCoord.x, joint_width) / joint_width;
-    if (bar_x < 0.02 || bar_x > 0.98) {
+    if (bar_x < 0.01 || bar_x > 0.99) {
         fragColor = vec4(0.5, 0.5, 0.5, 1.0);
     }
 }

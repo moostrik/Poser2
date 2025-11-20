@@ -40,8 +40,8 @@ class HDTRenderManager(RenderBase):
 
         # renderers
         self.cam_img_renderers: dict[int, CamImageRenderer] = {}
-        self.mesh_renderers_A:  dict[int, PoseMeshRenderer] = {}
-        self.mesh_renderers_B:  dict[int, PoseMeshRenderer] = {}
+        self.mesh_renderers_raw:  dict[int, PoseMeshRenderer] = {}
+        self.mesh_renderers:  dict[int, PoseMeshRenderer] = {}
         self.cam_bbox_renderers:dict[int, CamBBoxRenderer] = {}
 
         # layers
@@ -49,8 +49,8 @@ class HDTRenderManager(RenderBase):
         self.pose_cam_layers:   dict[int, PoseCamLayer] = {}
         self.centre_cam_layers: dict[int, CentreCamLayer] = {}
         self.pd_line_layers:    dict[int, PDLineLayer] = {}
-        self.field_bar_layers_A:dict[int, PoseScalarBarLayer] = {}
-        self.field_bar_layers_B:dict[int, PoseScalarBarLayer] = {}
+        self.field_bar_layers_raw:dict[int, PoseScalarBarLayer] = {}
+        self.field_bar_layers:dict[int, PoseScalarBarLayer] = {}
 
         # self.line_field_layers:     dict[int, LineFieldLayer] = {}
 
@@ -60,16 +60,16 @@ class HDTRenderManager(RenderBase):
         # populate
         for i in range(self.num_cams):
             self.cam_img_renderers[i] = CamImageRenderer(i, self.data_hub)
-            self.mesh_renderers_A[i] =  PoseMeshRenderer(i, self.data_hub,  PoseDataTypes.pose_R, 10.0, (1.0, 1.0, 1.0, 1.0))
-            self.mesh_renderers_B[i] =  PoseMeshRenderer(i, self.data_hub,  PoseDataTypes.pose_I, 10.0, None)
+            self.mesh_renderers_raw[i] =  PoseMeshRenderer(i, self.data_hub,  PoseDataTypes.pose_R, 10.0, (1.0, 1.0, 1.0, 1.0))
+            self.mesh_renderers[i] =  PoseMeshRenderer(i, self.data_hub,  PoseDataTypes.pose_I, 10.0, None)
             self.cam_bbox_renderers[i]= CamBBoxRenderer(i, self.data_hub,   PoseDataTypes.pose_I)
 
             self.cam_track_layers[i] =  CamCompositeLayer(i, self.data_hub, PoseDataTypes.pose_R, self.cam_img_renderers[i], 2, None, (0.0, 0.0, 0.0, 0.5))
             self.pose_cam_layers[i] =   PoseCamLayer(i, self.data_hub,      PoseDataTypes.pose_I, self.cam_img_renderers[i])
             self.centre_cam_layers[i] = CentreCamLayer(i, self.data_hub,    PoseDataTypes.pose_I, self.cam_img_renderers[i])
             self.pd_line_layers[i] =    PDLineLayer(i, self.data_hub)
-            self.field_bar_layers_A[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_R, ScalarPoseField.angles, (1.0, 1.0, 1.0, 1.0), (1.0, 1.0, 1.0, 1.0))
-            self.field_bar_layers_B[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_I, ScalarPoseField.angles)
+            self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_R, ScalarPoseField.angles, (1.0, 1.0, 1.0, 1.0), (1.0, 1.0, 1.0, 1.0))
+            self.field_bar_layers[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_I, ScalarPoseField.angles)
             # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
 
         # composition
@@ -100,13 +100,13 @@ class HDTRenderManager(RenderBase):
     def allocate(self) -> None:
         for i in range(self.num_cams):
             self.cam_img_renderers[i].allocate()
-            self.mesh_renderers_A[i].allocate()
-            self.mesh_renderers_B[i].allocate()
+            self.mesh_renderers_raw[i].allocate()
+            self.mesh_renderers[i].allocate()
 
             self.pose_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.centre_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
-            self.field_bar_layers_A[i].allocate(1080, 1920, GL_RGBA32F)
-            self.field_bar_layers_B[i].allocate(1080, 1920, GL_RGBA32F)
+            self.field_bar_layers_raw[i].allocate(1080, 1920, GL_RGBA32F)
+            self.field_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
             # self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
 
         self.allocate_window_renders()
@@ -138,9 +138,9 @@ class HDTRenderManager(RenderBase):
             layer.deallocate()
         for layer in self.pd_line_layers.values():
             layer.deallocate()
-        for layer in self.field_bar_layers_A.values():
+        for layer in self.field_bar_layers_raw.values():
             layer.deallocate()
-        for layer in self.field_bar_layers_B.values():
+        for layer in self.field_bar_layers.values():
             layer.deallocate()
 
         # renderers
@@ -148,9 +148,9 @@ class HDTRenderManager(RenderBase):
             layer.deallocate()
         for layer in self.cam_bbox_renderers.values():
             layer.deallocate()
-        for layer in self.mesh_renderers_A.values():
+        for layer in self.mesh_renderers_raw.values():
             layer.deallocate()
-        for layer in self.mesh_renderers_B.values():
+        for layer in self.mesh_renderers.values():
             layer.deallocate()
 
         # self.sound_osc.stop()
@@ -165,16 +165,16 @@ class HDTRenderManager(RenderBase):
 
         for i in range(self.num_cams):
             self.cam_img_renderers[i].update()
-            self.mesh_renderers_A[i].update()
-            self.mesh_renderers_B[i].update()
+            self.mesh_renderers_raw[i].update()
+            self.mesh_renderers[i].update()
             self.cam_bbox_renderers[i].update()
 
             self.cam_track_layers[i].update()
             self.pose_cam_layers[i].update()
             self.centre_cam_layers[i].update()
             self.pd_line_layers[i].update()
-            self.field_bar_layers_A[i].update()
-            self.field_bar_layers_B[i].update()
+            self.field_bar_layers_raw[i].update()
+            self.field_bar_layers[i].update()
 
             # self.line_field_layers[i].update()
 
@@ -197,25 +197,25 @@ class HDTRenderManager(RenderBase):
             self.cam_bbox_renderers[i].draw(track_rect)
 
             preview_rect: Rect = self.subdivision.get_rect(CentreCamLayer.__name__, i)
-            self.pose_cam_layers[i].draw(preview_rect)
-            # self.centre_cam_layers[i].draw(preview_rect)
+            # self.pose_cam_layers[i].draw(preview_rect)
+            self.centre_cam_layers[i].draw(preview_rect)
             # self.field_bar_layers_A[i].draw(preview_rect, draw_labels=False)
-            # self.field_bar_layers_B[i].draw(preview_rect, draw_labels=False)
-            self.pd_line_layers[i].draw(preview_rect)
+            self.field_bar_layers[i].draw(preview_rect, draw_labels=False)
+            # self.pd_line_layers[i].draw(preview_rect)
 
             # self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
 
-            self.cam_track_layers[i].bbox_color = (1.0, 0.0, 0.0, 1.0)
-            self.cam_bbox_renderers[i].bbox_color = (0.0, 1.0, 0.0, 1.0)
+            # self.cam_track_layers[i].bbox_color = (1.0, 0.0, 0.0, 1.0)
+            # self.cam_bbox_renderers[i].bbox_color = (0.0, 1.0, 0.0, 1.0)
 
-            self.field_bar_layers_A[i].data_type = PoseDataTypes.pose_S
-            self.field_bar_layers_B[i].data_type = PoseDataTypes.pose_I
-            self.field_bar_layers_A[i].feature_type = ScalarPoseField.angles
-            self.field_bar_layers_B[i].feature_type = ScalarPoseField.angles
-            self.field_bar_layers_A[i].feature_type = ScalarPoseField.deltas
-            self.field_bar_layers_B[i].feature_type = ScalarPoseField.deltas
-            self.field_bar_layers_A[i].range_scale = 1.0 #0.1
-            self.field_bar_layers_B[i].range_scale = 1.0
+            # self.field_bar_layers_raw[i].data_type = PoseDataTypes.pose_S
+            # self.field_bar_layers[i].data_type = PoseDataTypes.pose_I
+            # self.field_bar_layers_raw[i].feature_type = ScalarPoseField.angles
+            # self.field_bar_layers[i].feature_type = ScalarPoseField.angles
+            self.field_bar_layers[i].feature_type = ScalarPoseField.angles
+            # # self.field_bar_layers_B[i].feature_type = ScalarPoseField.deltas
+            # self.field_bar_layers_raw[i].range_scale = 1.0 #0.1
+            # self.field_bar_layers[i].range_scale = 1.0
 
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
@@ -232,22 +232,34 @@ class HDTRenderManager(RenderBase):
         camera_id: int = self.secondary_order_list.index(monitor_id)
         draw_rect = Rect(0, 0, width, height)
 
+        draw_raw: bool = False
 
-        draw_centre: bool = True
-        if draw_centre:
+        if draw_raw:
+            self.centre_cam_layers[camera_id].blend_factor = 1.0
+            self.centre_cam_layers[camera_id].data_type = PoseDataTypes.pose_R
             self.centre_cam_layers[camera_id].draw(draw_rect)
             screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
-            # self.mesh_renderers_A[camera_id].draw(draw_mesh_rect)
-            self.mesh_renderers_B[camera_id].draw(draw_mesh_rect)
+            self.mesh_renderers_raw[camera_id].draw(draw_mesh_rect)
+            self.field_bar_layers_raw[camera_id].draw(draw_rect)
+            return
+
+        draw_centre: bool = True
+        if draw_centre:
+            self.centre_cam_layers[camera_id].blend_factor = 0.25
+            self.centre_cam_layers[camera_id].data_type = PoseDataTypes.pose_I
+            # self.centre_cam_layers[camera_id].draw(draw_rect)
+            screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
+            draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
+            self.mesh_renderers[camera_id].draw(draw_mesh_rect)
+            # self.mesh_renderers_raw[camera_id].draw(draw_mesh_rect)
         else:
             self.pose_cam_layers[camera_id].draw(draw_rect)
-            # self.mesh_renderers_A[camera_id].draw(draw_rect)
-            self.mesh_renderers_B[camera_id].draw(draw_rect)
+            self.mesh_renderers[camera_id].draw(draw_rect)
+            # self.mesh_renderers_raw[camera_id].draw(draw_rect)
 
-
-        self.field_bar_layers_A[camera_id].draw(draw_rect)
-        self.field_bar_layers_B[camera_id].draw(draw_rect)
+        self.field_bar_layers[camera_id].draw(draw_rect)
+        # self.field_bar_layers_raw[camera_id].draw(draw_rect)
         # self.pd_line_layers[camera_id].draw(draw_rect)
 
 
