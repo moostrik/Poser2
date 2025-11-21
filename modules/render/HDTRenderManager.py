@@ -197,13 +197,13 @@ class HDTRenderManager(RenderBase):
             self.cam_bbox_renderers[i].draw(track_rect)
 
             preview_rect: Rect = self.subdivision.get_rect(CentreCamLayer.__name__, i)
-            # self.pose_cam_layers[i].draw(preview_rect)
-            self.centre_cam_layers[i].draw(preview_rect)
+            self.pose_cam_layers[i].draw(preview_rect)
+            # self.centre_cam_layers[i].draw(preview_rect)
             screen_center_rect: Rect = self.centre_cam_layers[i].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(preview_rect)
             self.mesh_renderers[i].draw(draw_mesh_rect)
             # self.field_bar_layers_A[i].draw(preview_rect)
-            self.field_bar_layers[i].draw(preview_rect)
+            # self.field_bar_layers[i].draw(preview_rect)
             # self.pd_line_layers[i].draw(preview_rect)
 
             # self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
@@ -211,14 +211,10 @@ class HDTRenderManager(RenderBase):
             # self.cam_track_layers[i].bbox_color = (1.0, 0.0, 0.0, 1.0)
             # self.cam_bbox_renderers[i].bbox_color = (0.0, 1.0, 0.0, 1.0)
 
-            # self.field_bar_layers_raw[i].data_type = PoseDataTypes.pose_S
-            # self.field_bar_layers[i].data_type = PoseDataTypes.pose_I
-            # self.field_bar_layers_raw[i].feature_type = ScalarPoseField.angles
-            # self.field_bar_layers[i].feature_type = ScalarPoseField.angles
+
             self.field_bar_layers[i].feature_type = ScalarPoseField.angles
-            # # self.field_bar_layers_B[i].feature_type = ScalarPoseField.deltas
-            # self.field_bar_layers_raw[i].range_scale = 1.0 #0.1
-            # self.field_bar_layers[i].range_scale = 1.0
+            self.centre_cam_layers[i].data_type = PoseDataTypes.pose_R
+            self.mesh_renderers[i].data_type = PoseDataTypes.pose_R
 
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
@@ -239,7 +235,6 @@ class HDTRenderManager(RenderBase):
 
         if draw_raw:
             self.centre_cam_layers[camera_id].blend_factor = 1.0
-            self.centre_cam_layers[camera_id].data_type = PoseDataTypes.pose_R
             self.centre_cam_layers[camera_id].draw(draw_rect)
             screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
@@ -247,14 +242,12 @@ class HDTRenderManager(RenderBase):
             self.field_bar_layers_raw[camera_id].draw(draw_rect)
             return
 
-        draw_centre: bool = True
+        draw_centre: bool = False
         if draw_centre:
             self.centre_cam_layers[camera_id].blend_factor = 0.25
-            self.centre_cam_layers[camera_id].data_type = PoseDataTypes.pose_I
             # self.centre_cam_layers[camera_id].draw(draw_rect)
             screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
-            self.mesh_renderers[camera_id].data_type = PoseDataTypes.pose_I
             self.mesh_renderers[camera_id].draw(draw_mesh_rect)
             # self.mesh_renderers_raw[camera_id].draw(draw_mesh_rect)
         else:

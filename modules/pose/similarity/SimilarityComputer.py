@@ -107,15 +107,15 @@ class SimilarityComputer:
             similarity_data: Angles = SimilarityUtils.compute_similarity(angles_1, angles_2, 1.0) # do exponent at retreival
 
             # Only include pairs with at least one valid joint
-            if similarity_data.valid_count > 0:
+            # if similarity_data.valid_count > 0:
                 # Normalize pair_id ordering
-                pair_id = (id1, id2) if id1 <= id2 else (id2, id1)
+            pair_id = (id1, id2) if id1 <= id2 else (id2, id1)
 
-                similarities.append(SimilarityFeature(
-                    pair_id=pair_id,
-                    values=similarity_data.values,
-                    scores=similarity_data.scores
-                ))
+            similarities.append(SimilarityFeature(
+                pair_id=pair_id,
+                values=similarity_data.values,
+                scores=similarity_data.scores
+            ))
 
         return SimilarityBatch(similarities=similarities)
 
