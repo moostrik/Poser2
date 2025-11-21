@@ -22,7 +22,8 @@ from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 class SimilarityLineLayer(LayerBase):
     r_stream_shader = StreamCorrelation()
 
-    def __init__(self, num_streams: int, capacity: int, data: DataHub, data_type: SimilarityDataType) -> None:
+    def __init__(self, num_streams: int, capacity: int, data: DataHub, data_type: SimilarityDataType,
+                 aggregation_method: AggregationMethod = AggregationMethod.HARMONIC_MEAN, exponent: float = 2.0) -> None:
         self._num_streams: int = num_streams
         self._data: DataHub = data
         self._fbo: Fbo = Fbo()
@@ -31,6 +32,8 @@ class SimilarityLineLayer(LayerBase):
         self._p_batch: SimilarityBatch | None = None
 
         self.data_type: SimilarityDataType = data_type
+        self.exponent: float = exponent
+        self.aggregation_method: AggregationMethod = AggregationMethod.GEOMETRIC_MEAN
 
         text_init()
 
@@ -81,7 +84,7 @@ class SimilarityLineLayer(LayerBase):
         if batch is None:
             return
 
-        self._correlation_stream.update(batch, AggregationMethod.GEOMETRIC_MEAN, )
+        self._correlation_stream.update(batch, self.aggregation_method, 0.0, self.exponent)
         stream_data: SimilarityStreamData = self._correlation_stream.get_stream_data()
         if stream_data.is_empty:
             return

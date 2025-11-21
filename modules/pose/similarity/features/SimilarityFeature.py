@@ -411,7 +411,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
     # ========== SIMILARITY-SPECIFIC CONVENIENCE METHODS ==========
 
     def aggregate_similarity(self, method: AggregationMethod = AggregationMethod.MEAN,
-                          min_confidence: float = 0.0) -> float:
+                          min_confidence: float = 0.0, exponent: float = 1.0) -> float:
         """Compute overall similarity score using specified aggregation method.
 
         Args:
@@ -443,11 +443,11 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
             ...     min_confidence=0.6
             ... )
         """
-        return self.aggregate(method, min_confidence)
+        return self.aggregate(method, min_confidence, exponent)
 
     def matches_pose(self, threshold: float = 0.8,
                      method: AggregationMethod = AggregationMethod.GEOMETRIC_MEAN,
-                     min_confidence: float = 0.0) -> bool:
+                     min_confidence: float = 0.0, exponent: float = 1.0) -> bool:
         """Check if poses match based on overall similarity threshold.
 
         Args:
@@ -471,7 +471,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
             >>> if similarity.matches_pose(0.7, AggregationMethod.MEAN):
             ...     print("Poses are somewhat similar")
         """
-        overall = self.aggregate_similarity(method, min_confidence)
+        overall = self.aggregate_similarity(method, min_confidence, exponent)
         return not np.isnan(overall) and overall >= threshold
 
 

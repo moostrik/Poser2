@@ -23,7 +23,7 @@ class PoseScalarBarLayer(LayerBase):
     pose_feature_shader = PoseFeatureShader()
 
     def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataTypes, feature_type: ScalarPoseField,
-                min_color=(0.0, 0.5, 1.0, 1.0), max_color=(1.0, 0.2, 0.0, 1.0), range_scale: float = 1.0) -> None:
+                color=(1.0, 1.0, 1.0, 1.0), range_scale: float = 1.0) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
@@ -33,8 +33,10 @@ class PoseScalarBarLayer(LayerBase):
 
         self.data_type: PoseDataTypes = data_type
         self.feature_type: ScalarPoseField = feature_type
-        self.min_color: tuple[float, float, float, float] = min_color
-        self.max_color: tuple[float, float, float, float] = max_color
+        self.color: tuple[float, float, float, float] = color
+        self.bg_alpha: float = 0.4
+        self.line_thickness: float = 1.0
+        self.line_smooth: float = 1.0
         self.range_scale: float = range_scale
         self.draw_labels: bool = True
 
@@ -83,7 +85,11 @@ class PoseScalarBarLayer(LayerBase):
         if not isinstance(feature, PoseFeature):
             raise ValueError(f"PoseFeatureLayer expected feature of type PoseFeature, got {type(feature)}")
 
-        PoseScalarBarLayer.pose_feature_shader.use(self._fbo.fbo_id, feature, self.range_scale, self.min_color, self.max_color)
+        line_thickness = 1.0 / self._fbo.height * self.line_thickness
+        line_smooth = 1.0 / self._fbo.height * self.line_smooth
+
+        PoseScalarBarLayer.pose_feature_shader.use(self._fbo.fbo_id, feature, self.range_scale, line_thickness, line_smooth,
+                                                   self.color, (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
 
         joint_enum_type = feature.__class__.feature_enum()
         num_joints: int = len(feature)

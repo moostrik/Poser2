@@ -69,7 +69,8 @@ class SimilarityStream:
         self._snapshot_dirty: bool = True
 
     def update(self, batch: SimilarityBatch ,
-               statistic: AggregationMethod = AggregationMethod.GEOMETRIC_MEAN) -> None:
+               statistic: AggregationMethod = AggregationMethod.GEOMETRIC_MEAN,
+               min_confidence: float = 0.0, exponent: float = 1.0) -> None:
         """Update stream with new correlation batch.
 
         Args:
@@ -83,7 +84,7 @@ class SimilarityStream:
             pair_id: tuple[int, int] = (min(pair_corr.pair_id), max(pair_corr.pair_id))
             current_pairs.add(pair_id)
 
-            similarity: float = pair_corr.aggregate_similarity(statistic)
+            similarity: float = pair_corr.aggregate_similarity(statistic, min_confidence, exponent)
 
             if pair_id in self._pair_history:
                 similarities, write_idx = self._pair_history[pair_id]

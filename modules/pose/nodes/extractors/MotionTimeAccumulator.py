@@ -14,12 +14,21 @@ class MotionTimeAccumulator(FilterNode):
 
     def __init__(self) -> None:
         self.motion_time: float = 0.0
+        self.prev_time_stamp: float | None = None
 
 
     def process(self, pose: Pose) -> Pose:
         """Compute deltas for all poses and emit enriched results."""
 
-        total_delta: float = np.nansum(np.abs(pose.deltas.values)) / len(pose.deltas)
+        if self.prev_time_stamp is None:
+            self.prev_time_stamp = pose.time_stamp
+            return pose
+
+        dt: float = pose.time_stamp - self.prev_time_stamp
+        self.prev_time_stamp = pose.time_stamp
+
+        total_delta: float = np.nansum(np.abs(pose.deltas.values)) / np.pi * dt
+        # total_delta: float = np.nansum(np.abs(pose.deltas.values)) / len(pose.deltas) * dt
 
         self.motion_time = self.motion_time + total_delta
 
@@ -27,3 +36,4 @@ class MotionTimeAccumulator(FilterNode):
 
     def reset(self) -> None:
         self.motion_time = 0.0
+        self.prev_time_stamp = None
