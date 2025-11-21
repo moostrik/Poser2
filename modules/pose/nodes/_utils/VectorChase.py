@@ -174,11 +174,20 @@ class VectorChase:
 
         self._target = values.copy()
 
-        # Handle newly valid values (including first initialization)
-        newly_valid = np.isnan(self._interpolated) & np.isfinite(values)
-        if np.any(newly_valid):
-            self._interpolated[newly_valid] = values[newly_valid]
-            self._v_curr[newly_valid] = 0.0
+        # # Handle newly valid values (including first initialization)
+        # newly_valid = np.isnan(self._interpolated) & np.isfinite(values)
+        # if np.any(newly_valid):
+        #     self._interpolated[newly_valid] = values[newly_valid]
+        #     self._v_curr[newly_valid] = 0.0
+        # return
+
+        # Handle state transitions: NaN->valid or valid->NaN
+        state_changed = np.isnan(self._interpolated) != np.isnan(values)
+
+        if np.any(state_changed):
+            # Copy values where they exist (handles both NaN->valid and valid->NaN)
+            self._interpolated[state_changed] = values[state_changed]
+            self._v_curr[state_changed] = 0.0
 
     def update(self, current_time: float | None = None) -> None:
         """Update the interpolated value for the current time.
