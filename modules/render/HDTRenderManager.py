@@ -191,30 +191,32 @@ class HDTRenderManager(RenderBase):
         # self.motion_corr_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__, 1))
 
         for i in range(self.num_cams):
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
             track_rect: Rect = self.subdivision.get_rect(CamCompositeLayer.__name__, i)
             self.cam_track_layers[i].draw(track_rect)
             self.cam_bbox_renderers[i].draw(track_rect)
 
+
+        for i in range(self.num_cams):
             preview_rect: Rect = self.subdivision.get_rect(CentreCamLayer.__name__, i)
-            self.pose_cam_layers[i].draw(preview_rect)
-            # self.centre_cam_layers[i].draw(preview_rect)
+            # self.pose_cam_layers[i].draw(preview_rect)
+            self.centre_cam_layers[i].draw(preview_rect)
+
+        for i in range(self.num_cams):
+
+            preview_rect: Rect = self.subdivision.get_rect(CentreCamLayer.__name__, i)
             screen_center_rect: Rect = self.centre_cam_layers[i].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(preview_rect)
             self.mesh_renderers[i].draw(draw_mesh_rect)
-            # self.field_bar_layers_A[i].draw(preview_rect)
             # self.field_bar_layers[i].draw(preview_rect)
             # self.pd_line_layers[i].draw(preview_rect)
 
             # self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
 
-            # self.cam_track_layers[i].bbox_color = (1.0, 0.0, 0.0, 1.0)
-            # self.cam_bbox_renderers[i].bbox_color = (0.0, 1.0, 0.0, 1.0)
 
 
             self.field_bar_layers[i].feature_type = ScalarPoseField.angles
-            self.centre_cam_layers[i].data_type = PoseDataTypes.pose_R
-            self.mesh_renderers[i].data_type = PoseDataTypes.pose_R
+            self.centre_cam_layers[i].data_type = PoseDataTypes.pose_I
+            self.mesh_renderers[i].data_type = PoseDataTypes.pose_I
 
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
@@ -242,10 +244,10 @@ class HDTRenderManager(RenderBase):
             self.field_bar_layers_raw[camera_id].draw(draw_rect)
             return
 
-        draw_centre: bool = False
+        draw_centre: bool = True
         if draw_centre:
             self.centre_cam_layers[camera_id].blend_factor = 0.25
-            # self.centre_cam_layers[camera_id].draw(draw_rect)
+            self.centre_cam_layers[camera_id].draw(draw_rect)
             screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
             self.mesh_renderers[camera_id].draw(draw_mesh_rect)

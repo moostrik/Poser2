@@ -85,8 +85,8 @@ class VectorPredict:
             raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
 
         # Shift samples
-        self.p_prev = self.p_curr
-        self.p_curr = values
+        self.p_prev = self.p_curr.copy()
+        self.p_curr = values.copy()
 
         newly_valid = np.isnan(self.p_prev) & np.isfinite(self.p_curr)
         if np.any(newly_valid):
@@ -184,7 +184,7 @@ class PointPredict(VectorPredict):
     @property
     def value(self) -> np.ndarray:
         """Get predicted points for the next frame."""
-        return super().value.reshape(self._num_points, 2)
+        return super().value.reshape(self._num_points, 2).copy()
 
 Predict = Union[
     VectorPredict,

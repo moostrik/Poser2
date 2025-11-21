@@ -172,7 +172,7 @@ class VectorChase:
         if values.shape[0] != self._vector_size:
             raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
 
-        self._target = values
+        self._target = values.copy()
 
         # Handle newly valid values (including first initialization)
         newly_valid = np.isnan(self._interpolated) & np.isfinite(values)
@@ -294,7 +294,7 @@ class PointChase(VectorChase):
     @property
     def value(self) -> np.ndarray:
         """Get the current interpolated points."""
-        return self._interpolated.reshape(self._num_points, 2)
+        return self._interpolated.reshape(self._num_points, 2).copy()
 
 
 Chase = Union[

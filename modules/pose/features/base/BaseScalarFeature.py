@@ -231,9 +231,31 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         """Get confidence scores for multiple elements."""
         return [float(self._scores[element]) for element in elements]
 
-    def get_valid(self, element: FeatureEnum | int) -> bool:
-        """Check if the value for an element is valid (not NaN)."""
-        return self._valid_mask[element]
+    def get_valid(self, element: FeatureEnum | int, validate: bool = False) -> bool:
+        """Check if the value for an element is valid (not NaN).
+
+        Args:
+            element: Element to check
+            validate: If True, performs extra validation checks on this element
+
+        Returns:
+            True if the element has a valid (non-NaN) value
+        """
+        is_valid = bool(self._valid_mask[element])
+
+        if validate:
+            # Check if mask matches actual data
+            actual_valid = not np.isnan(self._values[element])
+            if is_valid != actual_valid:
+                print(f"VALIDATION ERROR: {self.feature_enum()(element).name} mask={is_valid} but actual={actual_valid}")
+                print(f"  Value: {self._values[element]}")
+                print(f"  Score: {self._scores[element]}")
+
+            # Check if invalid values have score 0.0
+            if not is_valid and self._scores[element] != 0.0:
+                print(f"VALIDATION ERROR: {self.feature_enum()(element).name} is invalid but has non-zero score {self._scores[element]}")
+
+        return is_valid
 
     def are_valid(self, elements: list[FeatureEnum | int]) -> bool:
         """Check if ALL specified elements are valid (batch validation)."""
@@ -281,6 +303,8 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         - values length matches n_elements
         - scores array is 1D
         - scores length matches n_elements
+        - valid_mask matches actual NaN state (cached vs computed)
+        - valid_count matches actual count
         - NaN values must have score 0.0
         - Scores are in [0.0, 1.0] (if check_ranges=True)
         - Values are within default_range() (if check_ranges=True)
@@ -317,6 +341,20 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         # Early return for length errors (can't continue validation)
         if errors:
             return (False, "; ".join(errors))
+
+        # Check valid_mask consistency (cached vs actual)
+        actual_valid_mask = ~np.isnan(self._values)
+        if not np.array_equal(self._valid_mask, actual_valid_mask):
+            mismatches = np.where(self._valid_mask != actual_valid_mask)[0]
+            feature_enum = self.feature_enum()
+            mismatch_elements = [feature_enum(i).name for i in mismatches[:3]]
+            more = f" and {len(mismatches) - 3} more" if len(mismatches) > 3 else ""
+            errors.append(f"Cached valid_mask doesn't match actual NaN state at: {', '.join(mismatch_elements)}{more}")
+
+        # Check valid_count consistency
+        actual_valid_count = int(np.sum(actual_valid_mask))
+        if self._valid_count != actual_valid_count:
+            errors.append(f"Cached valid_count {self._valid_count} != actual {actual_valid_count}")
 
         # Check NaN/score consistency: NaN values MUST have score 0.0
         invalid_mask = ~self._valid_mask

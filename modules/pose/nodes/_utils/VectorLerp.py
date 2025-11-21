@@ -118,7 +118,7 @@ class VectorLerp:
 
         # Store current interpolated values as the start of the new lerp
         self._start_values = self._interpolated.copy()
-        self._target = values
+        self._target = values.copy()
 
         # Initialize newly valid values (first time setup)
         newly_valid = np.isnan(self._interpolated) & np.isfinite(values)
@@ -253,7 +253,7 @@ class PointLerp(VectorLerp):
     @property
     def value(self) -> np.ndarray:
         """Get the current interpolated points as (num_points, 2) array."""
-        return self._interpolated.reshape(self._num_points, 2)
+        return self._interpolated.reshape(self._num_points, 2).copy()
 
 
 Lerp = Union[VectorLerp, AngleLerp, PointLerp]
