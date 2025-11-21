@@ -86,7 +86,7 @@ class AngleUtils:
 
             # ✅ Batch score retrieval
             scores = points.get_scores(list(keypoints))
-            angle_scores[landmark] = min(scores)
+            angle_scores[landmark] = min(scores) if not np.isnan(angle) else 0.0
 
         return Angles(values=angle_values, scores=angle_scores)
 
@@ -117,8 +117,8 @@ class AngleUtils:
 
     @staticmethod
     def _calculate_head_yaw(left_eye: np.ndarray, right_eye: np.ndarray,
-                                   left_shoulder: np.ndarray, right_shoulder: np.ndarray,
-                                   rotate_by: float = 0) -> float:
+                            left_shoulder: np.ndarray, right_shoulder: np.ndarray,
+                            rotate_by: float = 0) -> float:
         """Calculate head yaw (assumes valid input).
 
         Args:
@@ -144,4 +144,5 @@ class AngleUtils:
 
             return float(yaw)
 
+        print (f"Warning: Eye width is zero when calculating head yaw. {left_eye}, {right_eye}, {left_shoulder}, {right_shoulder}")
         return np.nan  # Only case: eye_width == 0 (shouldn't happen with valid data)

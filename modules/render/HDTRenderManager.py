@@ -199,8 +199,8 @@ class HDTRenderManager(RenderBase):
             preview_rect: Rect = self.subdivision.get_rect(CentreCamLayer.__name__, i)
             # self.pose_cam_layers[i].draw(preview_rect)
             self.centre_cam_layers[i].draw(preview_rect)
-            # self.field_bar_layers_A[i].draw(preview_rect, draw_labels=False)
-            self.field_bar_layers[i].draw(preview_rect, draw_labels=False)
+            # self.field_bar_layers_A[i].draw(preview_rect)
+            self.field_bar_layers[i].draw(preview_rect)
             # self.pd_line_layers[i].draw(preview_rect)
 
             # self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))

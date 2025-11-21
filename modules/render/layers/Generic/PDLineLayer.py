@@ -30,26 +30,32 @@ class PDLineLayer(LayerBase):
         self._cam_id: int = cam_id
         self._data: DataHub = data
         self._fbo: Fbo = Fbo()
+        self._label_fbo: Fbo = Fbo()
         self._image: Image = Image()
         self._p_pd_stream: PDStreamData | None = None
-        text_init()
+
+        self.draw_labels: bool = True
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
+        self._label_fbo.allocate(width, height, internal_format)
+        PDLineLayer.render_labels(self._label_fbo)
         if not PDLineLayer.pose_stream_shader.allocated:
             PDLineLayer.pose_stream_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
+        self._label_fbo.deallocate()
+
         if PDLineLayer.pose_stream_shader.allocated:
             PDLineLayer.pose_stream_shader.deallocate()
 
-    def draw(self, rect: Rect, draw_labels: bool = True) -> None:
+    def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        if draw_labels:
-            PDLineLayer.draw_labels(rect)
+        if self.draw_labels:
+            self._label_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
@@ -77,7 +83,16 @@ class PDLineLayer(LayerBase):
 
 
     @staticmethod
-    def draw_labels(rect: Rect) -> None:
+    def render_labels(fbo: Fbo) -> None:
+        text_init()
+
+        rect = Rect(0, 0, fbo.width, fbo.height)
+
+        LayerBase.setView(fbo.width, fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        fbo.clear(0.0, 0.0, 0.0, 0.0)
+        fbo.begin()
+
         angle_num: int = ANGLE_NUM_LANDMARKS
         step: float = rect.height / angle_num
         # yellow and light blue
@@ -89,4 +104,6 @@ class PDLineLayer(LayerBase):
             y: int = int(rect.y + rect.height - (rect.height - (i + 0.5) * step) - 9)
             clr: int = i % 2
 
-            draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3), True) # type: ignore
+            draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
+
+        fbo.end()
