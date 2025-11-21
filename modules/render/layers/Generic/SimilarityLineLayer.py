@@ -33,7 +33,7 @@ class SimilarityLineLayer(LayerBase):
 
         self.data_type: SimilarityDataType = data_type
         self.exponent: float = exponent
-        self.aggregation_method: AggregationMethod = AggregationMethod.GEOMETRIC_MEAN
+        self.aggregation_method: AggregationMethod = aggregation_method
 
         text_init()
 
