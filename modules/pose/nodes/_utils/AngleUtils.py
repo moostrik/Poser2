@@ -144,5 +144,5 @@ class AngleUtils:
 
             return float(yaw)
 
-        print (f"Warning: Eye width is zero when calculating head yaw. {left_eye}, {right_eye}, {left_shoulder}, {right_shoulder}")
+        # print (f"Warning: Eye width is zero when calculating head yaw. {left_eye}, {right_eye}, {left_shoulder}, {right_shoulder}")
         return np.nan  # Only case: eye_width == 0 (shouldn't happen with valid data)

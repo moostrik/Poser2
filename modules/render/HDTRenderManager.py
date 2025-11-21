@@ -251,6 +251,7 @@ class HDTRenderManager(RenderBase):
             # self.centre_cam_layers[camera_id].draw(draw_rect)
             screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
+            self.mesh_renderers[camera_id].data_type = PoseDataTypes.pose_I
             self.mesh_renderers[camera_id].draw(draw_mesh_rect)
             # self.mesh_renderers_raw[camera_id].draw(draw_mesh_rect)
         else:

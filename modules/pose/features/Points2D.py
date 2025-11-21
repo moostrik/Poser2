@@ -222,7 +222,7 @@ class Points2D(BaseVectorFeature[PointLandmark]):
     @classmethod
     def default_range(cls) -> tuple[float, float]:
         """Returns normalized coordinate range"""
-        return NORMALIZED_RANGE
+        return (-2.0, 2.0)
 
     # ========== CONVENIENCE ACCESSORS ==========
 
@@ -246,7 +246,7 @@ class Points2D(BaseVectorFeature[PointLandmark]):
         y = self.get_y(element, fill=fill)
         return (x, y)
 
-    def get_point2f(self, element: PointLandmark | int, fill: float = 0.0) -> Point2f:
+    def get_point2f(self, element: PointLandmark | int, fill: float = np.nan) -> Point2f:
         """Get a point as a Point2f object."""
         coords = self.get(element, fill)
         return Point2f(coords[0], coords[1])

@@ -324,6 +324,17 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
                 more = f" and {len(bad_indices) - 3} more" if len(bad_indices) > 3 else ""
                 errors.append(f"Invalid values must have score 0.0, but found non-zero scores at: {', '.join(bad_elements)}{more}")
 
+        # Check for zero vectors with valid scores (likely invalid data)
+        if self._valid_count > 0:
+            valid_values = self._values[self._valid_mask]
+            zero_vectors = np.all(valid_values == 0.0, axis=1)
+            if np.any(zero_vectors):
+                zero_indices = np.where(self._valid_mask)[0][zero_vectors]
+                feature_enum = self.feature_enum()
+                zero_elements = [feature_enum(i).name for i in zero_indices[:3]]
+                more = f" and {len(zero_indices) - 3} more" if len(zero_indices) > 3 else ""
+                errors.append(f"Found all-zero vectors (likely invalid data) at: {', '.join(zero_elements)}{more}")
+
         # Range checks (expensive, only if requested)
         if check_ranges and self._valid_count > 0:
             # Validate score range

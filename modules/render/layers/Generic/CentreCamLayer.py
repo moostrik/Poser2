@@ -161,9 +161,13 @@ class CentreCamLayer(LayerBase):
         Returns:
             Rect in normalized [0,1] space relative to centre_rect
         """
-        return Rect(
-            x=(world_rect.x - centre_rect.x) / centre_rect.width,
-            y=(world_rect.y - centre_rect.y) / centre_rect.height,
-            width=world_rect.width / centre_rect.width,
-            height=world_rect.height / centre_rect.height
-        )
+        try:
+            return Rect(
+                x=(world_rect.x - centre_rect.x) / centre_rect.width,
+                y=(world_rect.y - centre_rect.y) / centre_rect.height,
+                width=world_rect.width / centre_rect.width,
+                height=world_rect.height / centre_rect.height
+            )
+        except ZeroDivisionError:
+            print(f"CentreCamLayer ZeroDivisionError, world_rect: {world_rect}, centre_rect: {centre_rect}")
+            return Rect(0.0, 0.0, 1.0, 1.0)
