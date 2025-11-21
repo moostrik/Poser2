@@ -161,6 +161,7 @@ class Main():
             ]
         )
 
+        self.debug_tracker = trackers.DebugTracker(num_players)
 
         self.pose_similator: SimilarityComputer = SimilarityComputer()
 
@@ -221,6 +222,7 @@ class Main():
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
         self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_I)) # interpolated poses
+        self.pose_interpolation_pipeline.add_poses_callback(self.debug_tracker.process)
 
         self.data_hub.add_update_callback(self.interpolator.update)
 

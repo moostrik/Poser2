@@ -1,6 +1,7 @@
 """Pose filter modules for processing and enriching pose data."""
 
 from .TrackerBase import            TrackerBase
+from .DebugTracker import           DebugTracker
 from .FilterTracker import          FilterTracker
 from .GeneratorTracker import       GeneratorTracker
 from .ProcessorTracker import       ProcessorTracker
