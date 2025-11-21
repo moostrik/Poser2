@@ -46,7 +46,7 @@ void main() {
     float alpha = 1.0 - smoothstep(line_thickness, line_thickness + line_smooth, dist);
 
     if (alpha > 0.01) {
-        vec3 line_color = color.rgb * score;
+        vec3 line_color = bg_color.rgb;
         // Blend line color and bg_color using alpha for smooth transition
         vec3 blended = mix(bg_color.rgb, line_color, alpha);
         fragColor = vec4(blended, mix(bg_color.a, color.a, alpha));

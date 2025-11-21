@@ -66,8 +66,8 @@ class HDTRenderManager(RenderBase):
             self.pose_cam_layers[i] =   PoseCamLayer(i, self.data_hub,      PoseDataTypes.pose_I, self.cam_img_renderers[i])
             self.centre_cam_layers[i] = CentreCamLayer(i, self.data_hub,    PoseDataTypes.pose_I, self.cam_img_renderers[i])
             self.pd_line_layers[i] =    PDLineLayer(i, self.data_hub)
-            self.field_bar_layers[i] =  PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_I, ScalarPoseField.angles)
-            self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_R, ScalarPoseField.angles)
+            self.field_bar_layers[i] =  PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_I, ScalarPoseField.angles, 2.0, 2.0)
+            self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_R, ScalarPoseField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
             # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
 
         # composition
@@ -214,6 +214,7 @@ class HDTRenderManager(RenderBase):
             self.field_bar_layers[i].feature_type = ScalarPoseField.angles
             self.centre_cam_layers[i].data_type = PoseDataTypes.pose_I
             self.mesh_renderers[i].data_type = PoseDataTypes.pose_I
+            self.mesh_renderers_raw[i].color = (0.66, 0.66, 0.66, 0.66)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         # return
@@ -246,8 +247,8 @@ class HDTRenderManager(RenderBase):
             self.centre_cam_layers[camera_id].draw(draw_rect)
             screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
+            self.mesh_renderers_raw[camera_id].draw(draw_mesh_rect)
             self.mesh_renderers[camera_id].draw(draw_mesh_rect)
-            # self.mesh_renderers_raw[camera_id].draw(draw_mesh_rect)
         else:
             self.pose_cam_layers[camera_id].draw(draw_rect)
             self.mesh_renderers[camera_id].draw(draw_rect)
@@ -255,15 +256,11 @@ class HDTRenderManager(RenderBase):
 
         self.field_bar_layers_raw[camera_id].draw(draw_rect)
         self.field_bar_layers[camera_id].draw(draw_rect)
-        self.field_bar_layers[camera_id].bg_alpha = 0.4
-        self.field_bar_layers[camera_id].line_thickness = 2.0
-        self.field_bar_layers[camera_id].line_smooth = 2.0
-        self.field_bar_layers[camera_id].color = (1.0, 1.0, 1.0, 1.0)
 
-        self.field_bar_layers_raw[camera_id].bg_alpha = 0.4
-        self.field_bar_layers_raw[camera_id].line_thickness = 4.0
-        self.field_bar_layers_raw[camera_id].line_smooth = 16.0
-        self.field_bar_layers_raw[camera_id].color = (0.0, 0.0, 0.0, 0.33)
+
+        self.field_bar_layers[camera_id].color = (0.0, 0.0, 0.0, 1.0)
+        self.field_bar_layers_raw[camera_id].color = (1.0, 1.0, 1.0, 0.6)
+
         # self.pd_line_layers[camera_id].draw(draw_rect)
 
 
