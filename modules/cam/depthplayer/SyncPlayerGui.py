@@ -53,6 +53,7 @@ class SyncPlayerGui(SyncPlayer):
         self.gui.updateElement('M_Chunk', num_chunks)
         self.gui.updateElement('C_R_0', str(0))
         self.gui.updateElement('C_R_1', str(num_chunks))
+        self.set_chunk_range(0, num_chunks)
 
     def set_start(self) -> None:
         if self.gui is None:
