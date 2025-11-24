@@ -4,15 +4,30 @@ from modules.pose.Pose import Pose
 
 
 class NodeConfigBase:
-    """Base class for node configurations with automatic change notification."""
+    """Base class for node configurations with automatic change notification and parameter validation."""
+
+    # Subclasses define parameter ranges as class attributes
+    _PARAM_RANGES: dict[str, tuple[float | None, float | None]] = {}
 
     def __init__(self) -> None:
         self._listeners: list[Callable[[], None]] = []
 
     def __setattr__(self, name: str, value: Any) -> None:
-        """Intercept attribute changes and notify listeners."""
+        """Intercept attribute changes to clamp values and notify listeners."""
+        # Don't process private attributes or _listeners itself
+        if not name.startswith('_'):
+            # Clamp numeric values to defined ranges
+            if name in self._PARAM_RANGES and isinstance(value, (int, float)):
+                min_val, max_val = self._PARAM_RANGES[name]
+                if min_val is not None:
+                    value = max(min_val, value)
+                if max_val is not None:
+                    value = min(max_val, value)
+
+        # Set the value
         super().__setattr__(name, value)
-        # Only notify after initialization is complete
+
+        # Notify listeners after initialization
         if name != '_listeners' and hasattr(self, '_listeners'):
             self._notify()
 
@@ -29,6 +44,14 @@ class NodeConfigBase:
         """Notify all listeners that config has changed."""
         for listener in self._listeners:
             listener()
+
+    def get_param_range(self, param_name: str) -> tuple[float | None, float | None]:
+        """Get the valid range for a parameter."""
+        return self._PARAM_RANGES.get(param_name, (None, None))
+
+    def get_all_param_ranges(self) -> dict[str, tuple[float | None, float | None]]:
+        """Get ranges for all parameters in this config."""
+        return self._PARAM_RANGES.copy()
 
 
 TInput = TypeVar('TInput')
@@ -63,7 +86,7 @@ class FilterNode(NodeBase):
 
     def is_ready(self) -> bool:
         """Filters are always ready."""
-        return True  # Default: always ready
+        return True
 
 
 class InterpolatorNode(NodeBase):
@@ -87,11 +110,7 @@ class InterpolatorNode(NodeBase):
 
 
 class GeneratorNode(NodeBase, Generic[TInput]):
-    """Base class for nodes that generate Pose objects from external data sources.
-
-    Converts non-pose data (tracklets, images, templates, etc.) into Pose objects
-    using a two-step pattern: set input data, then generate pose.
-    """
+    """Base class for nodes that generate Pose objects from external data sources."""
 
     @abstractmethod
     def submit(self, input_data: TInput | None) -> None:
@@ -105,11 +124,7 @@ class GeneratorNode(NodeBase, Generic[TInput]):
 
 
 class ProcessorNode(NodeBase, Generic[TInput, TOutput]):
-    """Base class for processor nodes that extract derived data from poses using stored context.
-
-    Stores data of TInput (i.e. images) via submit(), then processes poses to produce
-    derived outputs (i.e. cropped images) of type TOutput.
-    """
+    """Base class for processor nodes that extract derived data from poses using stored context."""
 
     @abstractmethod
     def submit(self, input_data: TInput | None) -> None:

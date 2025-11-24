@@ -8,7 +8,7 @@ from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.features import PoseFeature
-from modules.pose.Pose import Pose, PoseField, ScalarPoseField
+from modules.pose.Pose import Pose, PoseField
 
 from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
@@ -22,7 +22,7 @@ from modules.gl.shaders.PoseFeature import PoseFeature as PoseFeatureShader
 class PoseScalarBarLayer(LayerBase):
     pose_feature_shader = PoseFeatureShader()
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataTypes, feature_type: ScalarPoseField,
+    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataTypes, feature_type: PoseField,
                 line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0), range_scale: float = 1.0) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
@@ -32,7 +32,9 @@ class PoseScalarBarLayer(LayerBase):
         self._labels: list[str] = []
 
         self.data_type: PoseDataTypes = data_type
-        self.feature_type: ScalarPoseField = feature_type
+        if not feature_type.is_scalar_feature():
+            raise ValueError(f"PoseScalarBarLayer requires a scalar PoseField, got '{feature_type.name}'")
+        self.feature_type: PoseField = feature_type
         self.color: tuple[float, float, float, float] = color
         self.bg_alpha: float = 0.4
         self.line_thickness: float = line_thickness

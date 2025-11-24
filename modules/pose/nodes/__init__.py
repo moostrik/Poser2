@@ -9,6 +9,7 @@ from .filters.ConfidenceFilters import          ConfidenceFilterConfig, AngleCon
 from .filters.Predictors import                 PredictorConfig, AnglePredictor, BBoxPredictor, DeltaPredictor, PointPredictor
 from .filters.EuroSmoothers import              EuroSmootherConfig, AngleEuroSmoother, BBoxEuroSmoother, DeltaEuroSmoother, PointEuroSmoother, SymmetryEuroSmoother
 from .filters.StickyFillers import              StickyFillerConfig, AngleStickyFiller, BBoxStickyFiller, DeltaStickyFiller, PointStickyFiller
+from .filters.RateLimitSmoothers import         RateLimitSmootherConfig, AngleRateLimitSmoother, BBoxRateLimitSmoother, DeltaRateLimitSmoother, PointRateLimitSmoother
 from .filters.Validators import                 ValidatorConfig, AngleValidator, BBoxValidator, DeltaValidator, PointValidator, SymmetryValidator, PoseValidator
 
 from .interpolators.ChaseInterpolators import   ChaseInterpolatorConfig, AngleChaseInterpolator, BBoxChaseInterpolator, DeltaChaseInterpolator, PointChaseInterpolator

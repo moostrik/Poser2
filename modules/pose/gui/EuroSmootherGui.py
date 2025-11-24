@@ -4,7 +4,7 @@ from modules.pose.nodes.filters.EuroSmoothers import EuroSmootherConfig
 
 
 
-class SmootherGui:
+class EuroSmootherGui:
     def __init__(self, config: EuroSmootherConfig, gui: Gui, name: str) -> None:
         self.gui: Gui = gui
         self.config: EuroSmootherConfig = config
