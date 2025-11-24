@@ -1,0 +1,204 @@
+# Standard library imports
+from typing import Union
+from time import monotonic
+
+# Third-party imports
+import numpy as np
+
+class VectorRateLimit:
+    """Asymmetric rate limiter for vector data.
+
+    Limits the maximum allowed increase and decrease per step for each vector component.
+    Useful for post-processing velocities or other signals to prevent sudden jumps.
+    """
+
+    def __init__(self, vector_size: int, max_increase: float | np.ndarray, max_decrease: float | np.ndarray,
+                 clamp_range: tuple[float, float] | None = None) -> None:
+        """
+        Args:
+            vector_size: Number of vector components.
+            max_increase: Maximum allowed increase per second (units/s).
+            max_decrease: Maximum allowed decrease per second (units/s).
+            initial: Optional initial value (defaults to zeros).
+        """
+        if vector_size <= 0:
+            raise ValueError("vector_size must be positive")
+        self._vector_size = vector_size
+
+        # Broadcast max_increase and max_decrease to arrays
+        self._max_increase = np.broadcast_to(max_increase, (vector_size,))
+        self._max_decrease = np.broadcast_to(max_decrease, (vector_size,))
+
+        if np.any(self._max_increase < 0) or np.any(self._max_decrease < 0):
+            raise ValueError("max_increase and max_decrease must be non-negative")
+
+        self._clamp_range: tuple[float, float] | None = clamp_range
+
+        self._limited: np.ndarray = np.full(vector_size, np.nan)
+        self._target: np.ndarray = np.full(vector_size, np.nan)
+        self._last_update_time: float | None = None
+
+    def add_sample(self, values: np.ndarray) -> None:
+        """Apply rate limiting to the new input vector."""
+        if values.shape[0] != self._vector_size:
+            raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
+
+        self._target = values.copy()
+
+        was_nan = np.isnan(self._limited)
+        is_nan = np.isnan(self._target)
+        state_changed = was_nan != is_nan
+
+        # Where state changed, copy new value (handles NaN <-> valid)
+        self._limited[state_changed] = self._target[state_changed]
+
+    def update(self, current_time: float | None = None) -> None:
+
+        if current_time is None:
+            current_time = monotonic()
+
+        if self._last_update_time is None:
+            self._last_update_time = current_time
+            return
+
+        dt: float = current_time - self._last_update_time
+        self._last_update_time = current_time
+
+        # Only process where both are valid
+        valid = ~np.isnan(self._limited) & ~np.isnan(self._target)
+        if np.any(valid):
+            delta = self._target[valid] - self._limited[valid]
+            clamped_delta = np.where(
+                delta > 0,
+                np.minimum(delta, self._max_increase[valid] * dt),
+                np.maximum(delta, -self._max_decrease[valid] * dt),
+            )
+            self._limited[valid] += clamped_delta
+
+        # Apply constraints
+        self._apply_constraints()
+
+    def _apply_constraints(self) -> None:
+        """Apply value constraints (clamping for vectors, overridden for angles)."""
+        if self._clamp_range is not None:
+            np.clip(self._limited, self._clamp_range[0], self._clamp_range[1], out=self._limited)
+
+    def reset(self) -> None:
+        self._limited = np.full(self._vector_size, np.nan)
+        self._target = np.full(self._vector_size, np.nan)
+        self._last_update_time = None
+
+    @property
+    def value(self) -> np.ndarray:
+        """Get the current limited value (returns a copy)."""
+        return self._limited.copy()
+
+    @property
+    def target(self) -> np.ndarray:
+        """Get the current target value (returns a copy)."""
+        return self._target.copy()
+
+    @ property
+    def max_increase(self) -> np.ndarray:
+        """Get the maximum increase rates (returns a copy)."""
+        return self._max_increase.copy()
+    @ max_increase.setter
+    def max_increase(self, value: float | np.ndarray) -> None:
+        """Set the maximum increase rates."""
+        self._max_increase = np.broadcast_to(value, (self._vector_size,))
+        if np.any(self._max_increase < 0):
+            raise ValueError("max_increase must be non-negative")
+
+    @ property
+    def max_decrease(self) -> np.ndarray:
+        """Get the maximum decrease rates (returns a copy)."""
+        return self._max_decrease.copy()
+    @ max_decrease.setter
+    def max_decrease(self, value: float | np.ndarray) -> None:
+        """Set the maximum decrease rates."""
+        self._max_decrease = np.broadcast_to(value, (self._vector_size,))
+        if np.any(self._max_decrease < 0):
+            raise ValueError("max_decrease must be non-negative")
+
+    @ property
+    def clamp_range(self) -> tuple[float, float] | None:
+        """Get the clamp range."""
+        return self._clamp_range
+    @ clamp_range.setter
+    def clamp_range(self, value: tuple[float, float] | None) -> None:
+        """Set the clamp range."""
+        self._clamp_range = value
+
+class AngleRateLimit(VectorRateLimit):
+    """Asymmetric rate limiter for angular/circular data with proper wrapping.
+
+    Rate limits are applied to the shortest angular path between current and target values.
+    """
+
+    def __init__(self, vector_size: int, max_increase: float | np.ndarray, max_decrease: float | np.ndarray,
+                 clamp_range: tuple[float, float] | None = None) -> None:
+        """Initialize the angle rate limiter.
+
+        Args:
+            vector_size: Number of angles to limit
+            max_increase: Maximum allowed increase per second (radians/s)
+            max_decrease: Maximum allowed decrease per second (radians/s)
+            clamp_range: Ignored for angles (wrapping is always applied)
+        """
+        super().__init__(vector_size, max_increase, max_decrease, clamp_range=None)
+
+    def add_sample(self, values: np.ndarray) -> None:
+        """Add new target angles, calculating shortest angular path."""
+        if values.shape[0] != self._vector_size:
+            raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
+
+        target = values.copy()
+
+        # Only calculate shortest path where both current and new values are valid
+        valid = np.isfinite(self._limited) & np.isfinite(values)
+
+        if np.any(valid):
+            # Calculate shortest angular path for valid components only
+            delta = values[valid] - self._limited[valid]
+            delta = np.arctan2(np.sin(delta), np.cos(delta))
+            target[valid] = self._limited[valid] + delta
+
+        # For components where _limited is NaN but values is valid,
+        # target already contains the raw values (direct initialization)
+        super().add_sample(target)
+
+
+    def _apply_constraints(self) -> None:
+        """Apply angular wrapping to [-π, π]."""
+        self._limited = np.arctan2(np.sin(self._limited), np.cos(self._limited))
+
+
+class PointRateLimit(VectorRateLimit):
+    """Asymmetric rate limiter for 2D points with (x, y) coordinates."""
+
+    def __init__(self, vector_size: int, max_increase: float | np.ndarray, max_decrease: float | np.ndarray,
+                 clamp_range: tuple[float, float] | None = None) -> None:
+        """Initialize the point rate limiter.
+
+        Args:
+            vector_size: Number of points to limit
+            max_increase: Maximum allowed increase per second (units/s)
+            max_decrease: Maximum allowed decrease per second (units/s)
+            clamp_range: Optional (min, max) tuple to clamp point coordinates
+        """
+        super().__init__(vector_size * 2, max_increase, max_decrease, clamp_range)
+        self._num_points: int = vector_size
+
+    def add_sample(self, points: np.ndarray) -> None:
+        """Add new target points."""
+        if points.shape != (self._num_points, 2):
+            raise ValueError(f"Expected shape ({self._num_points}, 2), got {points.shape}")
+        super().add_sample(points.copy().flatten())
+
+    @property
+    def value(self) -> np.ndarray:
+        """Get the current limited points (returns a copy)."""
+        return self._limited.reshape(self._num_points, 2).copy()
+
+
+RateLimit = Union[VectorRateLimit, AngleRateLimit, PointRateLimit]

@@ -1,13 +1,13 @@
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
-from modules.pose.nodes.filters.Smoothers import SmootherConfig
+from modules.pose.nodes.filters.EuroSmoothers import EuroSmootherConfig
 
 
 
 class SmootherGui:
-    def __init__(self, config: SmootherConfig, gui: Gui, name: str) -> None:
+    def __init__(self, config: EuroSmootherConfig, gui: Gui, name: str) -> None:
         self.gui: Gui = gui
-        self.config: SmootherConfig = config
+        self.config: EuroSmootherConfig = config
 
         elm: list = []
         elm.append([E(eT.TEXT, 'SMOOTH   '),

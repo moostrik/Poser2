@@ -81,9 +81,9 @@ class Main():
         self.image_crop_config =    nodes.ImageCropProcessorConfig()
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera_fps)
 
-        self.b_box_smooth_config =  nodes.SmootherConfig()
-        self.point_smooth_config =  nodes.SmootherConfig()
-        self.angle_smooth_config =  nodes.SmootherConfig()
+        self.b_box_smooth_config =  nodes.EuroSmootherConfig()
+        self.point_smooth_config =  nodes.EuroSmootherConfig()
+        self.angle_smooth_config =  nodes.EuroSmootherConfig()
 
         self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera_fps)
         self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera_fps)
@@ -103,7 +103,7 @@ class Main():
         self.bbox_filters =      trackers.FilterTracker(
             settings.num_players,
             [
-                lambda: nodes.BBoxSmoother(self.b_box_smooth_config),
+                lambda: nodes.BBoxEuroSmoother(self.b_box_smooth_config),
                 lambda: nodes.BBoxPredictor(self.prediction_config),
             ]
         )
@@ -124,8 +124,8 @@ class Main():
         self.pose_smooth_filters = trackers.FilterTracker(
             settings.num_players,
             [
-                lambda: nodes.PointSmoother(self.point_smooth_config),
-                lambda: nodes.AngleSmoother(self.angle_smooth_config),
+                lambda: nodes.PointEuroSmoother(self.point_smooth_config),
+                lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
                 nodes.DeltaExtractor,
                 nodes.SymmetryExtractor,
                 nodes.MotionTimeAccumulator,
