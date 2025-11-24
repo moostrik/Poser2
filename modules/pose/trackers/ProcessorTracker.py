@@ -34,7 +34,7 @@ class ProcessorTracker(TrackerBase, Generic[TInput, TOutput]):
         """Set input data for processor(s)."""
 
         for id, input_data in input_data_dict.items():
-            self._processors[id].set(input_data)
+            self._processors[id].submit(input_data)
 
     def process(self, poses: PoseDict) -> dict[int, TOutput]:
         """Process poses to produce derived outputs. """

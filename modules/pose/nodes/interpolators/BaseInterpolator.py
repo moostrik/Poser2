@@ -123,6 +123,10 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
         """
         pass
 
+    def is_ready(self) -> bool:
+        """Check if the generator is ready to produce a pose."""
+        return self._last_pose is not None
+
     @property
     def config(self) -> ConfigType:
         """Get the configuration object."""

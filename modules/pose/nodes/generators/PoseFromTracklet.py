@@ -20,7 +20,7 @@ class PoseFromTracklet(GeneratorNode[Tracklet]):
     def __init__(self) -> None:
         self._tracklet: Tracklet | None = None
 
-    def set(self, input_data: Tracklet | None) -> None:
+    def submit(self, input_data: Tracklet | None) -> None:
         """Set the tracklet for pose generation.
 
         Args:
@@ -28,11 +28,7 @@ class PoseFromTracklet(GeneratorNode[Tracklet]):
         """
         self._tracklet = input_data
 
-    def is_ready(self) -> bool:
-        """Check if the generator is ready to produce a pose."""
-        return self._tracklet is not None
-
-    def generate(self, time_stamp: float | None = None) -> Pose:
+    def update(self, time_stamp: float | None = None) -> Pose:
         """Generate a basic Pose from stored tracklet.
 
         Args:
@@ -60,6 +56,10 @@ class PoseFromTracklet(GeneratorNode[Tracklet]):
 
             is_removed=self._tracklet.is_removed
         )
+
+    def is_ready(self) -> bool:
+        """Check if the generator is ready to produce a pose."""
+        return self._tracklet is not None
 
     def reset(self) -> None:
         """Reset internal state."""

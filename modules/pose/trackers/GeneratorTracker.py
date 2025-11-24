@@ -23,18 +23,18 @@ class GeneratorTracker(TrackerBase, Generic[TInput]):
             for input_id in range(num_tracks)
         }
 
-    def set(self, input_data_dict: dict[int, TInput]) -> None:
+    def submit(self, input_data_dict: dict[int, TInput]) -> None:
         """Set input data for generators."""
 
         for input_id, generator in self._generators.items():
             if input_id in input_data_dict:
-                generator.set(input_data_dict[input_id])
+                generator.submit(input_data_dict[input_id])
             else:
-                generator.set(None)
+                generator.submit(None)
 
 
 
-    def generate(self) -> PoseDict:
+    def update(self) -> PoseDict:
         """Generate poses from all ready generators."""
 
         generated_poses: PoseDict = {}
@@ -42,7 +42,7 @@ class GeneratorTracker(TrackerBase, Generic[TInput]):
         for input_id, generator in self._generators.items():
             try:
                 if generator.is_ready():
-                    generated_poses[input_id] = generator.generate()
+                    generated_poses[input_id] = generator.update()
             except Exception as e:
                 print(f"GeneratorTracker: Error generating pose {input_id}: {e}")
                 print_exc()

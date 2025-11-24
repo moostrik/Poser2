@@ -231,12 +231,12 @@ class Main():
         self.pose_detector.start()
 
         # TRACKER
-        self.tracker.add_tracklet_callback(self.pose_from_tracklet.set_tracklets)
+        self.tracker.add_tracklet_callback(self.pose_from_tracklet.submit_tracklets)
         self.tracker.add_tracklet_callback(self.data_hub.set_tracklets)
         self.tracker.start()
 
         self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
-        self.frame_sync_bang.add_callback(self.pose_from_tracklet.generate)
+        self.frame_sync_bang.add_callback(self.pose_from_tracklet.update)
 
         # if self.WS:
         #     self.pose_detection.add_callback(self.WS.add_poses)

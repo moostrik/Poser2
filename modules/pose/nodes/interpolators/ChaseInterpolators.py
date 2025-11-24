@@ -129,6 +129,10 @@ class FeatureChaseInterpolator(InterpolatorNode):
         interpolated_scores = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
         return type(original_data)(values=interpolated_values, scores=interpolated_scores)
 
+    def is_ready(self) -> bool:
+        """Check if the generator is ready to produce a pose."""
+        return self._last_pose is not None
+
     def reset(self) -> None:
         """Reset the interpolator's internal state."""
         with self._lock:

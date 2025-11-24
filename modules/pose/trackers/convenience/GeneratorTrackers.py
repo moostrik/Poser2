@@ -13,6 +13,6 @@ class PoseFromTrackletGenerator(GeneratorTracker):
             generator_factory=lambda: PoseFromTracklet()
         )
 
-    def set_tracklets(self, tracklet_dict: dict[int, Tracklet]) -> None:
+    def submit_tracklets(self, tracklet_dict: dict[int, Tracklet]) -> None:
         """Set tracklets for pose generation."""
-        self.set(tracklet_dict)
+        self.submit(tracklet_dict)

@@ -29,18 +29,17 @@ class ImageCropProcessor(ProcessorNode[np.ndarray, np.ndarray]):
         )
         self._image: np.ndarray | None = None
 
-    def set(self, input_data: np.ndarray) -> None:
+    def submit(self, input_data: np.ndarray | None) -> None:
         """Set the full camera image."""
         self._image = input_data
 
-    def process(self, pose: Pose) -> tuple[Pose, np.ndarray]:
+    def process(self, pose: Pose, time_stamp: float | None = None) -> tuple[Pose, np.ndarray]:
         """Crop image based on pose bbox."""
 
         if self._image is None:
             raise RuntimeError("ImageCropProcessor.process called before image was set.")
 
         result_image, result_roi = self._image_processor.process_pose_image(pose.bbox.to_rect(), self._image)
-
 
         return replace(pose, bbox=BBox.from_rect(result_roi)), result_image
 
