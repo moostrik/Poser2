@@ -38,7 +38,7 @@ class VectorRateLimit:
         self._target: np.ndarray = np.full(vector_size, np.nan)
         self._last_update_time: float | None = None
 
-    def add_sample(self, values: np.ndarray) -> None:
+    def set_target(self, values: np.ndarray) -> None:
         """Apply rate limiting to the new input vector."""
         if values.shape[0] != self._vector_size:
             raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
@@ -147,7 +147,7 @@ class AngleRateLimit(VectorRateLimit):
         """
         super().__init__(vector_size, max_increase, max_decrease, clamp_range=None)
 
-    def add_sample(self, values: np.ndarray) -> None:
+    def set_target(self, values: np.ndarray) -> None:
         """Add new target angles, calculating shortest angular path."""
         if values.shape[0] != self._vector_size:
             raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
@@ -165,7 +165,7 @@ class AngleRateLimit(VectorRateLimit):
 
         # For components where _limited is NaN but values is valid,
         # target already contains the raw values (direct initialization)
-        super().add_sample(target)
+        super().set_target(target)
 
 
     def _apply_constraints(self) -> None:
@@ -189,11 +189,11 @@ class PointRateLimit(VectorRateLimit):
         super().__init__(vector_size * 2, max_increase, max_decrease, clamp_range)
         self._num_points: int = vector_size
 
-    def add_sample(self, points: np.ndarray) -> None:
+    def set_target(self, points: np.ndarray) -> None:
         """Add new target points."""
         if points.shape != (self._num_points, 2):
             raise ValueError(f"Expected shape ({self._num_points}, 2), got {points.shape}")
-        super().add_sample(points.copy().flatten())
+        super().set_target(points.copy().flatten())
 
     @property
     def value(self) -> np.ndarray:
