@@ -4,6 +4,9 @@ uniform int num_joints;
 uniform float value_min;
 uniform float value_max;
 
+uniform float line_thickness = 0.001;
+uniform float line_smooth = 0.00;
+
 uniform samplerBuffer combined_buffer;
 uniform vec4 color = vec4(1.0);
 
@@ -21,7 +24,8 @@ void main() {
 
     vec3 data = texelFetch(combined_buffer, joint_index).rgb;
     float angle = data.r;
-    float delta = max(data.g - 0.2, 0.001);
+    float delta = data.g;
+    float thickness = max(abs(delta) * line_thickness * 10, line_thickness);
     float score = 1.0; //data.b;
 
     float normalized_value = (angle - value_min) / (value_max - value_min);
@@ -29,7 +33,7 @@ void main() {
 
     // Use delta for thickness, score for alpha
     float dist = abs(texCoord.y - normalized_value);
-    float alpha = (1.0 - smoothstep(delta, delta + 0.001, dist)) * score;
+    float alpha = (1.0 - smoothstep(thickness, thickness + line_smooth, dist)) * score;
 
     fragColor = vec4(color.rgb, color.a * alpha);
 }

@@ -3,7 +3,7 @@ from modules.gl.Shader import Shader, draw_quad
 
 import numpy as np
 
-from modules.pose.features import Angles
+from modules.pose.features import Angles, AngleVelocity
 
 class PoseAngleDeltaBar(Shader):
     def __init__(self) -> None:
@@ -13,7 +13,7 @@ class PoseAngleDeltaBar(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, angles: Angles, deltas: Angles) -> None:
+    def use(self, fbo: int, angles: Angles, deltas: AngleVelocity) -> None:
         super().use()
         if not self.allocated: return
         if not fbo: return
