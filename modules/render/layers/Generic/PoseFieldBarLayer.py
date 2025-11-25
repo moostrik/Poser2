@@ -23,7 +23,7 @@ class PoseScalarBarLayer(LayerBase):
     pose_feature_shader = PoseFeatureShader()
 
     def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataTypes, feature_type: FrameField,
-                line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0), range_scale: float = 1.0) -> None:
+                line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0)) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
@@ -32,14 +32,11 @@ class PoseScalarBarLayer(LayerBase):
         self._labels: list[str] = []
 
         self.data_type: PoseDataTypes = data_type
-        # if not feature_type.is_scalar_feature():
-        #     raise ValueError(f"PoseScalarBarLayer requires a scalar PoseField, got '{feature_type.name}'")
         self.feature_type: FrameField = feature_type
         self.color: tuple[float, float, float, float] = color
         self.bg_alpha: float = 0.4
         self.line_thickness: float = line_thickness
         self.line_smooth: float = line_smooth
-        self.range_scale: float = range_scale
         self.draw_labels: bool = True
 
         text_init()
@@ -75,6 +72,7 @@ class PoseScalarBarLayer(LayerBase):
 
         if pose is self._p_pose:
             return # no update needed
+        self._p_pose = pose
 
         LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -90,7 +88,7 @@ class PoseScalarBarLayer(LayerBase):
         line_thickness = 1.0 / self._fbo.height * self.line_thickness
         line_smooth = 1.0 / self._fbo.height * self.line_smooth
 
-        PoseScalarBarLayer.pose_feature_shader.use(self._fbo.fbo_id, feature, self.range_scale, line_thickness, line_smooth,
+        PoseScalarBarLayer.pose_feature_shader.use(self._fbo.fbo_id, feature, line_thickness, line_smooth,
                                                    self.color, (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
 
         joint_enum_type = feature.__class__.feature_enum()

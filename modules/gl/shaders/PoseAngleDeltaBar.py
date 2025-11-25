@@ -13,7 +13,8 @@ class PoseAngleDeltaBar(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, angles: Angles, deltas: AngleVelocity) -> None:
+    def use(self, fbo: int, angles: Angles, deltas: AngleVelocity, line_thickness: float = 0.1, line_smooth: float = 0.01,
+            color_odd=(1.0, 0.2, 0.0, 1.0), color_even=(1.0, 0.2, 0.0, 1.0)) -> None:
         super().use()
         if not self.allocated: return
         if not fbo: return
@@ -40,6 +41,10 @@ class PoseAngleDeltaBar(Shader):
         glUniform1i(glGetUniformLocation(s, "num_joints"), len(angles))
         glUniform1f(glGetUniformLocation(s, "value_min"), angles.default_range()[0])
         glUniform1f(glGetUniformLocation(s, "value_max"), angles.default_range()[1])
+        glUniform1f(glGetUniformLocation(s, "line_thickness"), line_thickness)
+        glUniform1f(glGetUniformLocation(s, "line_smooth"), line_smooth)
+        glUniform4f(glGetUniformLocation(s, "color_odd"), *color_odd)
+        glUniform4f(glGetUniformLocation(s, "color_even"), *color_even)
 
         # Bind the combined texture buffer to texture unit 0 and set uniform
         glActiveTexture(GL_TEXTURE0)

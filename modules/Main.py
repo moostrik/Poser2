@@ -84,8 +84,7 @@ class Main():
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
         self.point_smooth_config =  nodes.EuroSmootherConfig()
         self.angle_smooth_config =  nodes.EuroSmootherConfig()
-        self.vel_smooth_config =  nodes.EuroSmootherConfig()
-        # self.delta_smooth_config =  nodes.RateLimiterConfig()
+        self.a_vel_smooth_config =  nodes.EuroSmootherConfig()
 
         self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera_fps)
         self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera_fps)
@@ -94,7 +93,7 @@ class Main():
         self.b_box_smooth_gui =     gui.EuroSmootherGui(self.b_box_smooth_config, self.gui, 'BBox')
         self.point_smooth_gui =     gui.EuroSmootherGui(self.point_smooth_config, self.gui, 'Point')
         self.angle_smooth_gui =     gui.EuroSmootherGui(self.angle_smooth_config, self.gui, 'Angle')
-        self.vel_smooth_gui =       gui.EuroSmootherGui(self.vel_smooth_config, self.gui, 'Vel')
+        self.a_vel_smooth_gui =     gui.EuroSmootherGui(self.a_vel_smooth_config, self.gui, 'Vel')
 
         # self.b_box_interp_gui =     gui.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBox')
         self.point_interp_gui =     gui.InterpolatorGui(self.point_interp_config, self.gui, 'Point')
@@ -141,6 +140,7 @@ class Main():
             [
                 lambda: nodes.PointPredictor(self.prediction_config),
                 lambda: nodes.AnglePredictor(self.prediction_config),
+                lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(False, True)),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
             ]
         )
@@ -160,9 +160,8 @@ class Main():
                 nodes.AngleVelExtractor,
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeAccumulator,
-                lambda: nodes.AngleVelStickyFiller(nodes.StickyFillerConfig(True, True)),
-                # lambda: nodes.AngleVelRateLimiter(self.delta_smooth_config),
-                lambda: nodes.AngleVelEuroSmoother(self.vel_smooth_config),
+                lambda: nodes.AngleVelStickyFiller(nodes.StickyFillerConfig(False, False)),
+                lambda: nodes.AngleVelEuroSmoother(self.a_vel_smooth_config),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
             ]
         )
@@ -172,7 +171,7 @@ class Main():
         self.pose_similator: SimilarityComputer = SimilarityComputer()
 
         self.pd_pose_streamer = PDStreamManager(settings)
-        self.pd_stream_similator: Optional[PDStreamComputer] = None #PoseStreamCorrelator(settings)
+        self.pd_stream_similator: Optional[PDStreamComputer] = None
 
 
         # DATA
@@ -263,9 +262,10 @@ class Main():
         # if self.WS:
         #     self.gui.addFrame([self.WS.gui.get_gui_frame(), self.WS.gui.get_gui_test_frame()])
 
-        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.vel_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame()])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])

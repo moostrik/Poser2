@@ -11,8 +11,8 @@ uniform samplerBuffer scores_buffer;
 
 // Add these uniforms for color control
 uniform vec4 color;
-uniform vec4 bg_color_odd;
-uniform vec4 bg_color_even;
+uniform vec4 color_odd;
+uniform vec4 color_even;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -22,7 +22,7 @@ void main() {
     int joint_index = int(texCoord.x / joint_width);
 
     // Choose background color based on joint index
-    vec4 bg_color = (joint_index % 2 == 0) ? bg_color_even : bg_color_odd;
+    vec4 bg_color = (joint_index % 2 == 0) ? color_even : color_odd;
 
     if (joint_index >= num_joints) {
         fragColor = bg_color;

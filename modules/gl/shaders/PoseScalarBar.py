@@ -13,8 +13,8 @@ class PoseScalarBar(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo: int, feature: PoseFeatureUnion, range_scale: float = 1.0, line_thickness: float = 0.1, line_smooth: float = 0.01,
-            color=(0.0, 0.5, 1.0, 1.0), bg_color_odd=(1.0, 0.2, 0.0, 1.0), bg_color_even=(1.0, 0.2, 0.0, 1.0)) -> None:
+    def use(self, fbo: int, feature: PoseFeatureUnion, line_thickness: float = 0.1, line_smooth: float = 0.01,
+            color=(0.0, 0.5, 1.0, 1.0), color_odd=(1.0, 0.2, 0.0, 1.0), color_even=(1.0, 0.2, 0.0, 1.0)) -> None:
         super().use()
         if not self.allocated: return
         if not fbo: return
@@ -22,8 +22,8 @@ class PoseScalarBar(Shader):
         # Flatten values and scores to pass to shader
         values: np.ndarray = np.nan_to_num(feature.values.astype(np.float32), nan=0.0)
         scores: np.ndarray = feature.scores.astype(np.float32)
-        min_range: float = feature.default_range()[0] * range_scale
-        max_range: float = feature.default_range()[1] * range_scale
+        min_range: float = feature.default_range()[0]
+        max_range: float = feature.default_range()[1]
         min_range = max(min_range, -10.0)
         max_range = min(max_range, 10.0)
 
@@ -59,8 +59,8 @@ class PoseScalarBar(Shader):
 
         # Pass color uniforms
         glUniform4f(glGetUniformLocation(s, "color"), *color)
-        glUniform4f(glGetUniformLocation(s, "bg_color_odd"), *bg_color_odd)
-        glUniform4f(glGetUniformLocation(s, "bg_color_even"), *bg_color_even)
+        glUniform4f(glGetUniformLocation(s, "color_odd"), *color_odd)
+        glUniform4f(glGetUniformLocation(s, "color_even"), *color_even)
 
         # Bind texture units
         glActiveTexture(GL_TEXTURE0)
