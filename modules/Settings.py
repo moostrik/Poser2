@@ -48,6 +48,7 @@ class Settings():
         self.camera_color: bool                 = None # type: ignore
         self.camera_stereo: bool                = None # type: ignore
         self.camera_yolo: bool                  = None # type: ignore
+        self.camera_720p: bool                  = None # type: ignore
         self.camera_show_stereo: bool           = None # type: ignore
         self.camera_simulation: bool            = None # type: ignore
         self.camera_passthrough: bool           = None # type: ignore

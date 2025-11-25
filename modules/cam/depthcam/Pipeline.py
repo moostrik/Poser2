@@ -52,6 +52,7 @@ def setup_pipeline(
     do_color: bool = True,
     do_stereo: bool = True,
     do_yolo: bool = True,
+    do_720p: bool = False,
     show_stereo: bool = False,
     perspective: PerspectiveConfig = PerspectiveConfig(False, False, 0.0),
     simulate: bool = False
@@ -77,14 +78,14 @@ def setup_pipeline(
         if do_color:
             if do_stereo:
                 if do_yolo:
-                    SetupColorStereoYolo(pipeline, fps, show_stereo, nn_path)
+                    SetupColorStereoYolo(pipeline, fps, do_720p, show_stereo, nn_path)
                 else:
-                    SetupColorStereo(pipeline, fps, show_stereo = True)
+                    SetupColorStereo(pipeline, fps, do_720p, show_stereo = True)
             else:
                 if do_yolo:
-                    SetupColorYolo(pipeline, fps, square, perspective, nn_path)
+                    SetupColorYolo(pipeline, fps, do_720p, square, perspective, nn_path)
                 else:
-                    SetupColor(pipeline, fps, square, perspective)
+                    SetupColor(pipeline, fps, do_720p, square, perspective)
         else:
             if do_stereo:
                 if do_yolo:
@@ -100,14 +101,14 @@ def setup_pipeline(
         if do_color:
             if do_stereo:
                 if do_yolo:
-                    SimulationColorStereoYolo(pipeline, fps, show_stereo, nn_path)
+                    SimulationColorStereoYolo(pipeline, fps, do_720p, show_stereo, nn_path)
                 else:
-                    SimulationColorStereo(pipeline, fps, show_stereo)
+                    SimulationColorStereo(pipeline, fps, do_720p, show_stereo)
             else:
                 if do_yolo:
-                    SimulationColorYolo(pipeline, fps, square, nn_path)
+                    SimulationColorYolo(pipeline, fps, do_720p, square, nn_path)
                 else:
-                    SimulationColor(pipeline, fps, square)
+                    SimulationColor(pipeline, fps, do_720p, square)
         else:
             if do_stereo:
                 if do_yolo:
@@ -127,13 +128,19 @@ class Setup():
         self.fps: float = fps
 
 class SetupColor(Setup):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, perspective: PerspectiveConfig) -> None:
         super().__init__(pipeline, fps)
 
-        self.width, self.height = 1920, 1072 # for warping must be devisible by 16
-        self.data_size = self.width * self.height * 3
+        if do_720p:
+            self.width, self.height = 1280, 720 # for warping must be devisible by 16
+            self.resolution: dai.ColorCameraProperties.SensorResolution = dai.ColorCameraProperties.SensorResolution.THE_720_P
+        else:
+            self.width, self.height = 1920, 1072 # for warping must be devisible by 16
+            self.resolution: dai.ColorCameraProperties.SensorResolution = dai.ColorCameraProperties.SensorResolution.THE_1080_P
 
-        self.resolution: dai.ColorCameraProperties.SensorResolution = dai.ColorCameraProperties.SensorResolution.THE_1080_P
+        self.data_size: int = self.width * self.height * 3
+
+
         self.color: dai.node.ColorCamera = pipeline.create(dai.node.ColorCamera)
         self.color.setResolution(self.resolution)
         self.color.setFps(self.fps)
@@ -167,8 +174,8 @@ class SetupColor(Setup):
         self.color_control.out.link(self.color.inputControl)
 
 class SetupColorYolo(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, square, perspective)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, perspective: PerspectiveConfig, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, do_720p, square, perspective)
 
         self.detection_manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.detection_manip.initialConfig.setFrameType(dai.ImgFrame.Type.BGR888p)
@@ -205,7 +212,7 @@ class SetupColorYolo(SetupColor):
 
 
 class SetupColorStereo(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo:bool, lowres: bool = False) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, show_stereo:bool, lowres: bool = False) -> None:
         print("Pipeline: WARNING Color Stereo not implemented")
         return
         super().__init__(pipeline, fps, square = False)
@@ -264,10 +271,10 @@ class SetupColorStereo(SetupColor):
         self.stereo_control.out.link(self.stereo.inputConfig)
 
 class SetupColorStereoYolo(SetupColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool, nn_path: Path) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, show_stereo: bool, nn_path: Path) -> None:
         print("Pipeline: WARNING Color Stereo not implemented")
         return
-        super().__init__(pipeline, fps, show_stereo, lowres = True)
+        super().__init__(pipeline, fps, do_720p, show_stereo, lowres = True)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(640,352)
@@ -307,6 +314,7 @@ class SetupColorStereoYolo(SetupColorStereo):
 class SetupMono(Setup):
     def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, perspective: PerspectiveConfig) -> None:
         super().__init__(pipeline, fps)
+
 
         self.width, self.height = 1280, 720 # for warping must be devisible by 16
         self.data_size = self.width * self.height
@@ -466,8 +474,8 @@ class SetupMonoStereoYolo(SetupMonoStereo):
 
 
 class SimulationColor(SetupColor):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool) -> None:
-        super().__init__(pipeline, fps, square, PerspectiveConfig(False, False, 0.0))
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool) -> None:
+        super().__init__(pipeline, fps, do_720p, square, PerspectiveConfig(False, False, 0.0))
 
         pipeline.remove(self.color)
         pipeline.remove(self.color_warp)
@@ -479,8 +487,8 @@ class SimulationColor(SetupColor):
         self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorYolo(SetupColorYolo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, square: bool, nn_path: Path) -> None:
-        super().__init__(pipeline, fps, square, PerspectiveConfig(False, False, 0.0), nn_path)
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, square: bool, nn_path: Path) -> None:
+        super().__init__(pipeline, fps, do_720p, square, PerspectiveConfig(False, False, 0.0), nn_path)
 
         pipeline.remove(self.color)
         pipeline.remove(self.color_warp)
@@ -492,7 +500,7 @@ class SimulationColorYolo(SetupColorYolo):
         self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorStereo(SetupColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float,  show_stereo: bool) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float, do_720p: bool, show_stereo: bool) -> None:
         print("Pipeline: WARNING Color Stereo not implemented")
         return
         super().__init__(pipeline, fps, show_stereo)
@@ -540,10 +548,10 @@ class SimulationColorStereo(SetupColorStereo):
             self.stereo.disparity.link(self.output_stereo.input)
 
 class SimulationColorStereoYolo(SimulationColorStereo):
-    def __init__(self, pipeline : dai.Pipeline, fps: float, show_stereo: bool, nn_path: Path) -> None:
+    def __init__(self, pipeline : dai.Pipeline, fps: float,  do_720p: bool, show_stereo: bool, nn_path: Path) -> None:
         print("Pipeline: WARNING Color Stereo not implemented")
         return
-        super().__init__(pipeline, fps, show_stereo)
+        super().__init__(pipeline, fps, do_720p, show_stereo)
 
         self.manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
         self.manip.initialConfig.setResize(640,352)
