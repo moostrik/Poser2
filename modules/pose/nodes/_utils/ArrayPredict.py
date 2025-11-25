@@ -10,7 +10,7 @@ class PredictionMethod(IntEnum):
     LINEAR = 1
     QUADRATIC = 2
 
-class VectorPredict:
+class Predict:
     """Predictor for arbitrary vector data (positions, coordinates, etc.)."""
 
     def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod,
@@ -134,7 +134,7 @@ class VectorPredict:
         return p_curr + v_curr * interval + 0.5 * accel * (interval ** 2)
 
 
-class AnglePredict(VectorPredict):
+class AnglePredict(Predict):
     """Predictor for angular/circular data with proper wrapping."""
 
     def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod,
@@ -166,7 +166,7 @@ class AnglePredict(VectorPredict):
         return np.arctan2(np.sin(p_pred_raw), np.cos(p_pred_raw))  # Wrap to [-π, π]
 
 
-class PointPredict(VectorPredict):
+class PointPredict(Predict):
     """Predictor for 2D points with (x, y) coordinates."""
 
     def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod,
@@ -186,8 +186,4 @@ class PointPredict(VectorPredict):
         """Get predicted points for the next frame."""
         return super().value.reshape(self._num_points, 2).copy()
 
-Predict = Union[
-    VectorPredict,
-    AnglePredict,
-    PointPredict,
-]
+ArrayPredict = Union[Predict, AnglePredict, PointPredict]

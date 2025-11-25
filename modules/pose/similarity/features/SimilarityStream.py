@@ -33,6 +33,9 @@ class SimilarityStreamData:
         result: list[tuple[tuple[int, int], float]] = []
 
         for pair_id, similarities in self.pair_history.items():
+            if np.all(np.isnan(similarities)):
+                continue
+
             avg_similarity = float(np.nanmean(similarities))
             if not np.isnan(avg_similarity):
                 result.append((pair_id, avg_similarity))

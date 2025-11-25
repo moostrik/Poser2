@@ -7,8 +7,7 @@ from collections import defaultdict
 import numpy as np
 
 from modules.pose.features import PoseFeatureType
-from modules.pose.nodes._utils.VectorRateLimit import VectorRateLimit, AngleRateLimit, PointRateLimit, RateLimit
-from modules.pose.nodes._utils.FeatureTypeDispatch import dispatch_by_feature_type
+from modules.pose.nodes._utils.ArrayRateLimit import RateLimit, AngleRateLimit, PointRateLimit, ArrayRateLimit
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Frame import Frame, FrameField
 
@@ -30,8 +29,8 @@ class RateLimiterConfig(NodeConfigBase):
 class FeatureRateLimiter(FilterNode):
     """Generic pose feature smoother using asymmetric rate limiting."""
 
-    _FEATURE_LIMIT_MAP: defaultdict[FrameField, type[RateLimit]] = defaultdict(
-        lambda: VectorRateLimit,
+    _FEATURE_LIMIT_MAP: defaultdict[FrameField, type[ArrayRateLimit]] = defaultdict(
+        lambda: RateLimit,
         {
             FrameField.angles: AngleRateLimit,
             FrameField.points: PointRateLimit,
@@ -42,7 +41,7 @@ class FeatureRateLimiter(FilterNode):
         self._config: RateLimiterConfig = config
         self._pose_field: FrameField = pose_field
         limiter_cls = self._FEATURE_LIMIT_MAP[pose_field]
-        self._limiter: RateLimit = limiter_cls(
+        self._limiter: ArrayRateLimit = limiter_cls(
             vector_size=len(pose_field.get_type().feature_enum()),
             max_increase=config.max_increase,
             max_decrease=config.max_decrease,

@@ -24,6 +24,8 @@ class PoseScalarBar(Shader):
         scores: np.ndarray = feature.scores.astype(np.float32)
         min_range: float = feature.default_range()[0] * range_scale
         max_range: float = feature.default_range()[1] * range_scale
+        min_range = max(min_range, -10.0)
+        max_range = min(max_range, 10.0)
 
         # Create buffer objects
         vbo_values = glGenBuffers(1)

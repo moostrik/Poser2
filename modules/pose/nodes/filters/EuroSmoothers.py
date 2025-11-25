@@ -12,8 +12,7 @@ from collections import defaultdict
 import numpy as np
 
 # Pose imports
-from modules.pose.features import PoseFeatureType
-from modules.pose.nodes._utils.VectorSmooth import VectorSmooth, AngleSmooth, PointSmooth
+from modules.pose.nodes._utils.ArraySmooth import Smooth, AngleSmooth, PointSmooth
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Frame import Frame, FrameField
 
@@ -34,7 +33,7 @@ class FeatureEuroSmoother(FilterNode):
 
     # Registry mapping feature classes to smoother classes
     _SMOOTH_MAP = defaultdict(
-        lambda: VectorSmooth,
+        lambda: Smooth,
         {
             FrameField.angles: AngleSmooth,
             FrameField.points: PointSmooth,

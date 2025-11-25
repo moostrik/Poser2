@@ -6,7 +6,7 @@ import numpy as np
 from OneEuroFilter import OneEuroFilter
 
 
-class VectorSmooth:
+class Smooth:
     """Smoother for arbitrary vector data (positions, coordinates, etc.)."""
 
     def __init__(self, vector_size: int, frequency: float, min_cutoff: float, beta: float,
@@ -165,7 +165,7 @@ class VectorSmooth:
         self._clamp_range = value
 
 
-class AngleSmooth(VectorSmooth):
+class AngleSmooth(Smooth):
     """Smoother for angular/circular data with proper wrapping.
 
     Filters angles by decomposing into sin/cos components, filtering each
@@ -217,7 +217,7 @@ class AngleSmooth(VectorSmooth):
         pass
 
 
-class PointSmooth(VectorSmooth):
+class PointSmooth(Smooth):
     """Smoother for 2D points with (x, y) coordinates."""
 
     def __init__(self, vector_size: int, frequency: float, min_cutoff: float, beta: float,
@@ -238,8 +238,4 @@ class PointSmooth(VectorSmooth):
         return super().value.reshape(self._num_points, 2)
 
 
-Smooth = Union[
-    VectorSmooth,
-    AngleSmooth,
-    PointSmooth,
-]
+ArraySmooth = Union[Smooth, AngleSmooth, PointSmooth]

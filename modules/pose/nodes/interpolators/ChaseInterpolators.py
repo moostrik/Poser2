@@ -27,7 +27,7 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
-from modules.pose.nodes._utils.VectorChase import AngleChase, PointChase, VectorChase
+from modules.pose.nodes._utils.ArrayChase import AngleChase, PointChase, Chase
 from modules.pose.nodes.Nodes import InterpolatorNode, NodeConfigBase
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
 from modules.pose.Frame import Frame, FrameField
@@ -47,7 +47,7 @@ class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorConfig])
     """Generic pose feature chase interpolator."""
 
     _INTERP_MAP: defaultdict[FrameField, type] = defaultdict(
-        lambda: VectorChase,
+        lambda: Chase,
         {
             FrameField.angles: AngleChase,
             FrameField.points: PointChase,
@@ -72,9 +72,9 @@ class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorConfig])
     def _on_config_changed(self) -> None:
         """Handle configuration changes by updating interpolator parameters."""
         with self._lock:
-            cast(VectorChase, self._interpolator).input_frequency = self._config.input_frequency
-            cast(VectorChase, self._interpolator).responsiveness = self._config.responsiveness
-            cast(VectorChase, self._interpolator).friction = self._config.friction
+            cast(Chase, self._interpolator).input_frequency = self._config.input_frequency
+            cast(Chase, self._interpolator).responsiveness = self._config.responsiveness
+            cast(Chase, self._interpolator).friction = self._config.friction
 
 
 # Convenience classes

@@ -13,7 +13,7 @@ import numpy as np
 
 # Pose imports
 from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
-from modules.pose.nodes._utils.VectorPredict import AnglePredict, PointPredict, VectorPredict, PredictionMethod
+from modules.pose.nodes._utils.ArrayPredict import AnglePredict, PointPredict, Predict, PredictionMethod
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Frame import Frame, FrameField
 from modules.pose.nodes.filters.RateLimiters import RateLimiterConfig
@@ -32,7 +32,7 @@ class FeaturePredictor(FilterNode):
     """Generic pose feature predictor."""
 
     _PREDICT_MAP = defaultdict(
-        lambda: VectorPredict,
+        lambda: Predict,
         {
             FrameField.angles: AnglePredict,
             FrameField.points: PointPredict,

@@ -31,7 +31,7 @@ from typing import Union
 import numpy as np
 import warnings
 
-class VectorChase:
+class Chase:
     """Chase interpolator for arbitrary vector data (positions, coordinates, etc.)."""
 
     def __init__(self, vector_size: int, input_frequency: float = 30.0, responsiveness: float = 0.2,
@@ -264,7 +264,7 @@ class VectorChase:
         return np.nan_to_num(v, nan=0.0)
 
 
-class AngleChase(VectorChase):
+class AngleChase(Chase):
     """Chase interpolator for angular/circular data with proper wrapping."""
 
     def __init__(self, vector_size: int, input_frequency: float = 30.0, responsiveness: float = 0.2,
@@ -285,7 +285,7 @@ class AngleChase(VectorChase):
         return np.nan_to_num(v, nan=0.0)
 
 
-class PointChase(VectorChase):
+class PointChase(Chase):
     """Chase interpolator for 2D points with (x, y) coordinates."""
 
     def __init__(self, vector_size: int, input_frequency: float = 30.0, responsiveness: float = 0.2,
@@ -306,8 +306,4 @@ class PointChase(VectorChase):
         return self._interpolated.reshape(self._num_points, 2).copy()
 
 
-Chase = Union[
-    VectorChase,
-    AngleChase,
-    PointChase,
-]
+ArrayChase = Union[Chase, AngleChase, PointChase]

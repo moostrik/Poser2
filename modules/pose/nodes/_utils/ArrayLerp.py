@@ -20,7 +20,7 @@ import warnings
 import numpy as np
 
 
-class VectorLerp:
+class Lerp:
     """Linear interpolator for arbitrary vector data (positions, coordinates, etc.)."""
 
     def __init__(self, vector_size: int, input_frequency: float = 30.0,
@@ -175,7 +175,7 @@ class VectorLerp:
             np.clip(self._interpolated, self._clamp_range[0], self._clamp_range[1], out=self._interpolated)
 
 
-class AngleLerp(VectorLerp):
+class AngleLerp(Lerp):
     """Linear interpolator for angular/circular data with proper wrapping."""
 
     def __init__(self, vector_size: int, input_frequency: float = 30.0,
@@ -225,7 +225,7 @@ class AngleLerp(VectorLerp):
         self._interpolated = np.arctan2(np.sin(self._interpolated), np.cos(self._interpolated))
 
 
-class PointLerp(VectorLerp):
+class PointLerp(Lerp):
     """Linear interpolator for 2D points with (x, y) coordinates."""
 
     def __init__(self, vector_size: int, input_frequency: float = 30.0,
@@ -256,4 +256,4 @@ class PointLerp(VectorLerp):
         return self._interpolated.reshape(self._num_points, 2).copy()
 
 
-Lerp = Union[VectorLerp, AngleLerp, PointLerp]
+ArrayLerp = Union[Lerp, AngleLerp, PointLerp]

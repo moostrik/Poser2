@@ -18,7 +18,7 @@ from collections import defaultdict
 
 # Pose imports
 from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
-from modules.pose.nodes._utils.VectorRateLimit import VectorRateLimit, AngleRateLimit, PointRateLimit
+from modules.pose.nodes._utils.ArrayRateLimit import RateLimit, AngleRateLimit, PointRateLimit
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
 from modules.pose.nodes.Nodes import NodeConfigBase
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
@@ -43,7 +43,7 @@ class FeatureRateLimiter(FeatureInterpolatorBase[RateLimiterConfig]):
     """Generic pose feature rate limiter."""
 
     _INTERP_MAP: defaultdict[FrameField, type] = defaultdict(
-        lambda: VectorRateLimit,
+        lambda: RateLimit,
         {
             FrameField.angles: AngleRateLimit,
             FrameField.points: PointRateLimit,
@@ -65,8 +65,8 @@ class FeatureRateLimiter(FeatureInterpolatorBase[RateLimiterConfig]):
     def _on_config_changed(self) -> None:
         """Handle configuration changes by updating limiter parameters."""
         with self._lock:
-            cast(VectorRateLimit, self._interpolator).max_increase = self._config.max_increase
-            cast(VectorRateLimit, self._interpolator).max_decrease = self._config.max_decrease
+            cast(RateLimit, self._interpolator).max_increase = self._config.max_increase
+            cast(RateLimit, self._interpolator).max_decrease = self._config.max_decrease
 
 
 # Convenience classes

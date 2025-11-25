@@ -17,7 +17,7 @@ from collections import defaultdict
 
 # Pose imports
 from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
-from modules.pose.nodes._utils.VectorLerp import AngleLerp, PointLerp, VectorLerp
+from modules.pose.nodes._utils.ArrayLerp import AngleLerp, PointLerp, Lerp
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
 from modules.pose.nodes.Nodes import NodeConfigBase
 from modules.pose.Frame import Frame, FrameField
@@ -36,7 +36,7 @@ class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorConfig]):
     """Generic pose feature linear interpolator."""
 
     _INTERP_MAP: defaultdict[FrameField, type] = defaultdict(
-        lambda: VectorLerp,
+        lambda: Lerp,
         {
             FrameField.angles: AngleLerp,
             FrameField.points: PointLerp,
@@ -61,7 +61,7 @@ class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorConfig]):
         """Handle configuration changes by updating interpolator parameters."""
         with self._lock:
             # Cast to VectorLerp to access input_frequency property
-            cast(VectorLerp, self._interpolator).input_frequency = self._config.input_frequency
+            cast(Lerp, self._interpolator).input_frequency = self._config.input_frequency
 
 
 # Convenience classes

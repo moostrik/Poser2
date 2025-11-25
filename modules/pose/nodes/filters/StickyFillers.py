@@ -40,12 +40,10 @@ class FeatureStickyFiller(FilterNode):
     """Generic sticky filler for pose features."""
 
     def __init__(self, config: StickyFillerConfig, pose_field: FrameField) -> None:
-        if not pose_field.is_feature():
-            raise ValueError(f"PoseField '{pose_field.value}' is not a feature field")
 
         self._config: StickyFillerConfig = config
         self._pose_field: FrameField = pose_field
-        self._feature_class: PoseFeatureType = pose_field.get_type()
+        self._feature_class = pose_field.get_type()
         self._last_valid = self._initialize_last_valid()
 
     def _initialize_last_valid(self) -> PoseFeatureType:
