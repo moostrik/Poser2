@@ -7,14 +7,17 @@ when pose detection temporarily fails.
 
 # Standard library imports
 from dataclasses import replace
+from typing import TypeVar
 
 # Third-party imports
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Angles, Points2D, Symmetry, BBox, PoseFeature
+from modules.pose.features import BaseFeature, PoseFeatureType
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
-from modules.pose.Pose import Pose
+from modules.pose.Pose import Pose, PoseField
+
+TFeature = TypeVar('TFeature', bound=BaseFeature)
 
 
 class StickyFillerConfig(NodeConfigBase):
@@ -36,19 +39,22 @@ class StickyFillerConfig(NodeConfigBase):
 class FeatureStickyFiller(FilterNode):
     """Generic sticky filler for pose features."""
 
-    def __init__(self, config: StickyFillerConfig, feature_class: type, attr_name: str) -> None:
-        self._config = config
-        self._feature_class = feature_class
-        self._attr_name = attr_name
+    def __init__(self, config: StickyFillerConfig, pose_field: PoseField) -> None:
+        if not pose_field.is_feature():
+            raise ValueError(f"PoseField '{pose_field.value}' is not a feature field")
+
+        self._config: StickyFillerConfig = config
+        self._pose_field: PoseField = pose_field
+        self._feature_class: PoseFeatureType = pose_field.get_type()
         self._last_valid = self._initialize_last_valid()
 
-    def _initialize_last_valid(self) -> PoseFeature:
+    def _initialize_last_valid(self) -> PoseFeatureType:
         """Initialize last valid state based on config."""
         empty_data = self._feature_class.create_dummy()
         if self._config.init_to_zero:
             values = np.zeros_like(empty_data.values)
             scores = np.ones_like(empty_data.scores)
-            return self._feature_class(values=values, scores=scores)
+            return type(empty_data)(values=values, scores=scores)
         return empty_data
 
     @staticmethod
@@ -62,7 +68,7 @@ class FeatureStickyFiller(FilterNode):
 
     def process(self, pose: Pose) -> Pose:
         """Replace invalid values with last valid, update state with new valid values."""
-        feature_data = getattr(pose, self._attr_name)
+        feature_data: PoseFeatureType = pose.get_feature(self._pose_field)
         valid_mask = feature_data.valid_mask
         invalid_mask = ~valid_mask
 
@@ -82,7 +88,7 @@ class FeatureStickyFiller(FilterNode):
 
         # Return updated pose
         held_data = type(feature_data)(values=held_values, scores=held_scores)
-        return replace(pose, **{self._attr_name: held_data})
+        return replace(pose, **{self._pose_field.name: held_data})
 
     def reset(self) -> None:
         """Reset to initial state."""
@@ -90,28 +96,28 @@ class FeatureStickyFiller(FilterNode):
 
 
 # Convenience classes
-class AngleStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerConfig) -> None:
-        super().__init__(config, Angles, "angles")
-
-
 class BBoxStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerConfig) -> None:
-        super().__init__(config, BBox, "bbox")
-
-
-class DeltaStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerConfig) -> None:
-        super().__init__(config, Angles, "deltas")
+        super().__init__(config, PoseField.bbox)
 
 
 class PointStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerConfig) -> None:
-        super().__init__(config, Points2D, "points")
+        super().__init__(config, PoseField.points)
 
 
-class SymmetryStickyFiller(FeatureStickyFiller):
+class AngleStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerConfig) -> None:
-        super().__init__(config, Symmetry, "symmetry")
+        super().__init__(config, PoseField.angles)
+
+
+class AngleVelStickyFiller(FeatureStickyFiller):
+    def __init__(self, config: StickyFillerConfig) -> None:
+        super().__init__(config, PoseField.angle_vel)
+
+
+class AngleSymStickyFiller(FeatureStickyFiller):
+    def __init__(self, config: StickyFillerConfig) -> None:
+        super().__init__(config, PoseField.angle_sym)
 
 

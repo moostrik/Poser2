@@ -5,11 +5,11 @@ from numpy import pi
 
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.features import Angles
+from modules.pose.features import Angles, AngleVelocity
 from modules.pose.Pose import Pose
 
 
-class DeltaExtractor(FilterNode):
+class AngleVelExtractor(FilterNode):
     """Computes frame-to-frame changes (deltas) for a single pose.
 
     Calculates:
@@ -25,26 +25,22 @@ class DeltaExtractor(FilterNode):
     def process(self, pose: Pose) -> Pose:
         # Compute deltas (or empty if no previous pose)
         if self._prev_pose is None:
-            deltas: Angles = Angles.create_dummy()
+            angle_vel: AngleVelocity = AngleVelocity.create_dummy()
         else:
             # Compute time delta
-            dt = pose.time_stamp - self._prev_pose.time_stamp
+            dt: float = pose.time_stamp - self._prev_pose.time_stamp
 
             # print(dt)
 
             # Compute angular displacement
-            angle_displacement = pose.angles.subtract(self._prev_pose.angles)
+            angle_displacement: Angles = pose.angles.subtract(self._prev_pose.angles)
 
             # Convert to angular velocity (rad/s) by dividing by dt
             if dt > 0:
                 angular_velocity_values = angle_displacement.values / dt
-                # clamp at pi radians per second (already ridiculously high)
-                angular_velocity_values = angular_velocity_values.clip(-pi, pi)
-                deltas = Angles(values=angular_velocity_values, scores=angle_displacement.scores)
-                # clamp at pi radians per second
+                angle_vel = AngleVelocity(values=angular_velocity_values, scores=angle_displacement.scores)
             else:
-                # Handle dt=0 case (same timestamp or clock issue)
-                deltas = Angles.create_dummy()
+                angle_vel = AngleVelocity.create_dummy()
 
         # Update state for next frame
         self._prev_pose = pose
@@ -52,7 +48,7 @@ class DeltaExtractor(FilterNode):
         # Create enriched pose
         enriched_pose: Pose = replace(
             pose,
-            deltas=deltas
+            angle_vel=angle_vel
         )
 
         return enriched_pose

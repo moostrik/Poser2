@@ -3,15 +3,15 @@ from dataclasses import replace
 
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.features import Symmetry
+from modules.pose.features import AngleSymmetry
 from modules.pose.nodes._utils.SymmetryUtils import SymmetryUtils
 from modules.pose.Pose import Pose
 
 
-class SymmetryExtractor(FilterNode):
+class AngleSymExtractor(FilterNode):
     """Computes joint angles from pose keypoint data."""
 
     def process(self, pose: Pose) -> Pose:
         """Compute angles for all poses and emit enriched results."""
-        symmetry: Symmetry = SymmetryUtils.from_angles(pose.angles, 1.0) # this can be parameterized later
-        return replace(pose, symmetry=symmetry)
+        angle_sym: AngleSymmetry = SymmetryUtils.from_angles(pose.angles, 1.0) # this can be parameterized later
+        return replace(pose, angle_sym=angle_sym)

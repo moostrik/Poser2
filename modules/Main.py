@@ -84,7 +84,7 @@ class Main():
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
         self.point_smooth_config =  nodes.EuroSmootherConfig()
         self.angle_smooth_config =  nodes.EuroSmootherConfig()
-        self.delta_smooth_config =  nodes.RateLimitSmootherConfig()
+        self.delta_smooth_config =  nodes.RateLimiterConfig()
 
         self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera_fps)
         self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera_fps)
@@ -118,7 +118,7 @@ class Main():
             [
                 lambda: nodes.PointConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose_conf_threshold)),
                 nodes.AngleExtractor,
-                nodes.DeltaExtractor,
+                nodes.AngleVelExtractor,
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
             ]
         )
@@ -128,8 +128,8 @@ class Main():
             [
                 lambda: nodes.PointEuroSmoother(self.point_smooth_config),
                 lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
-                nodes.DeltaExtractor,
-                nodes.SymmetryExtractor,
+                nodes.AngleVelExtractor,
+                nodes.AngleSymExtractor,
                 nodes.MotionTimeAccumulator,
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
             ]
@@ -156,11 +156,11 @@ class Main():
         self.pose_interpolation_pipeline = trackers.FilterTracker(
             settings.num_players,
             [
-                nodes.DeltaExtractor,
-                nodes.SymmetryExtractor,
+                nodes.AngleVelExtractor,
+                nodes.AngleSymExtractor,
                 nodes.MotionTimeAccumulator,
-                lambda: nodes.DeltaStickyFiller(nodes.StickyFillerConfig(True, True)),
-                lambda: nodes.DeltaRateLimitSmoother(self.delta_smooth_config),
+                # lambda: nodes.AngleVelStickyFiller(nodes.StickyFillerConfig(True, True)),
+                lambda: nodes.AngleVelRateLimiter(self.delta_smooth_config),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
             ]
         )

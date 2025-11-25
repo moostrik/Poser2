@@ -237,7 +237,7 @@ _SYMMETRY_PAIRS: dict[SymmetryElement, tuple[AngleLandmark, AngleLandmark]] = {
 SYMMETRY_RANGE: tuple[float, float] = NORMALIZED_RANGE
 
 
-class Symmetry(NormalizedScalarFeature[SymmetryElement]):
+class AngleSymmetry(NormalizedScalarFeature[SymmetryElement]):
     """Symmetry scores for left/right landmark pairs (range [0, 1]).
 
     Measures how similar left/right landmark angles are after mirroring.

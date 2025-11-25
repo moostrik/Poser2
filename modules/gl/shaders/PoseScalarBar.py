@@ -3,9 +3,9 @@ from modules.gl.Shader import Shader, draw_quad
 
 import numpy as np
 
-from modules.pose.features import PoseFeature as PoseFeatureUnion
+from modules.pose.features import PoseFeatureType as PoseFeatureUnion
 
-class PoseFeature(Shader):
+class PoseScalarBar(Shader):
     def __init__(self) -> None:
         super().__init__()
         self.shader_name = self.__class__.__name__

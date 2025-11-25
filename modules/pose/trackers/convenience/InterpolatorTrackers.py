@@ -5,18 +5,8 @@ from modules.pose.nodes.interpolators.ChaseInterpolators import (
     AngleChaseInterpolator,
     BBoxChaseInterpolator,
     PointChaseInterpolator,
-    DeltaChaseInterpolator,
+    AngleVelChaseInterpolator,
 )
-
-class AngleChaseInterpolatorTracker(InterpolatorTracker):
-    """Convenience tracker for angle chase interpolation."""
-
-    def __init__(self, num_tracks: int, config: ChaseInterpolatorConfig) -> None:
-        super().__init__(
-            num_tracks=num_tracks,
-            interpolator_factory=lambda: AngleChaseInterpolator(config)
-        )
-
 class BBoxChaseInterpolatorTracker(InterpolatorTracker):
     """Convenience tracker for bounding box chase interpolation."""
 
@@ -37,13 +27,23 @@ class PointChaseInterpolatorTracker(InterpolatorTracker):
         )
 
 
-class DeltaChaseInterpolatorTracker(InterpolatorTracker):
+class AngleChaseInterpolatorTracker(InterpolatorTracker):
+    """Convenience tracker for angle chase interpolation."""
+
+    def __init__(self, num_tracks: int, config: ChaseInterpolatorConfig) -> None:
+        super().__init__(
+            num_tracks=num_tracks,
+            interpolator_factory=lambda: AngleChaseInterpolator(config)
+        )
+
+
+class AngleVelChaseInterpolatorTracker(InterpolatorTracker):
     """Convenience tracker for delta chase interpolation."""
 
     def __init__(self, num_tracks: int, config: ChaseInterpolatorConfig) -> None:
         super().__init__(
             num_tracks=num_tracks,
-            interpolator_factory=lambda: DeltaChaseInterpolator(config)
+            interpolator_factory=lambda: AngleVelChaseInterpolator(config)
         )
 
 
@@ -66,17 +66,8 @@ from modules.pose.nodes.interpolators.LerpInterpolators import (
     AngleLerpInterpolator,
     BBoxLerpInterpolator,
     PointLerpInterpolator,
-    DeltaLerpInterpolator,
+    AngleVelLerpInterpolator,
 )
-
-class AngleLerpInterpolatorTracker(InterpolatorTracker):
-    """Convenience tracker for angle lerp interpolation."""
-
-    def __init__(self, num_tracks: int, config: LerpInterpolatorConfig) -> None:
-        super().__init__(
-            num_tracks=num_tracks,
-            interpolator_factory=lambda: AngleLerpInterpolator(config)
-        )
 
 
 class BBoxLerpInterpolatorTracker(InterpolatorTracker):
@@ -99,11 +90,21 @@ class PointLerpInterpolatorTracker(InterpolatorTracker):
         )
 
 
+class AngleLerpInterpolatorTracker(InterpolatorTracker):
+    """Convenience tracker for angle lerp interpolation."""
+
+    def __init__(self, num_tracks: int, config: LerpInterpolatorConfig) -> None:
+        super().__init__(
+            num_tracks=num_tracks,
+            interpolator_factory=lambda: AngleLerpInterpolator(config)
+        )
+
+
 class DeltaLerpInterpolatorTracker(InterpolatorTracker):
     """Convenience tracker for delta lerp interpolation."""
 
     def __init__(self, num_tracks: int, config: LerpInterpolatorConfig) -> None:
         super().__init__(
             num_tracks=num_tracks,
-            interpolator_factory=lambda: DeltaLerpInterpolator(config)
+            interpolator_factory=lambda: AngleVelLerpInterpolator(config)
         )

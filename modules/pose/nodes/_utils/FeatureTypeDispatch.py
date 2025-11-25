@@ -2,14 +2,14 @@
 
 from typing import Type, TypeVar
 
-from modules.pose.features import Points2D, Angles
+from modules.pose.features import Points2D, Angles, PoseFeatureType
 from modules.pose.features.base import BaseFeature
 
 T = TypeVar('T')
 
 
 def dispatch_by_feature_type(
-    feature_class: Type[BaseFeature],
+    feature_class: PoseFeatureType,
     point_handler: Type[T],
     angle_handler: Type[T],
     scalar_handler: Type[T]
@@ -33,9 +33,10 @@ def dispatch_by_feature_type(
             VectorRateLimit
         )
     """
-    if issubclass(feature_class, Points2D):
+    feature_cls = feature_class if isinstance(feature_class, type) else type(feature_class)
+    if issubclass(feature_cls, Points2D):
         return point_handler
-    elif issubclass(feature_class, Angles):
+    elif issubclass(feature_cls, Angles):
         return angle_handler
     else:
         return scalar_handler

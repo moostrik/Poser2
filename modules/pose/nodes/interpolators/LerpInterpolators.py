@@ -13,12 +13,14 @@ Designed for multi-threaded operation:
 VectorLerp classes are NOT thread-safe. FeatureLerpInterpolator
 serializes all access using a lock to prevent concurrent set_target() and update() calls.
 """
+from collections import defaultdict
 
 # Pose imports
-from modules.pose.features import Angles, BBox, Points2D, Symmetry
+from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.VectorLerp import AngleLerp, PointLerp, VectorLerp
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
 from modules.pose.nodes.Nodes import NodeConfigBase
+from modules.pose.Pose import Pose, PoseField
 from typing import cast
 
 
@@ -33,21 +35,23 @@ class LerpInterpolatorConfig(NodeConfigBase):
 class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorConfig]):
     """Generic pose feature linear interpolator."""
 
-    # Registry mapping feature classes to interpolator classes
-    INTERPOLATOR_REGISTRY = {
-        Angles: AngleLerp,
-        BBox: VectorLerp,
-        Points2D: PointLerp,
-        Symmetry: VectorLerp,
-    }
+    _INTERP_MAP: defaultdict[PoseField, type] = defaultdict(
+        lambda: VectorLerp,
+        {
+            PoseField.angles: AngleLerp,
+            PoseField.points: PointLerp,
+        }
+    )
 
-    def __init__(self, config: LerpInterpolatorConfig, feature_class: type, attr_name: str):
-        super().__init__(config, feature_class, attr_name)
+    def __init__(self, config: LerpInterpolatorConfig, pose_field: PoseField):
+        super().__init__(config, pose_field)
 
-    def _create_interpolator(self, interpolator_cls: type, vector_size: int,
-                            clamp_range: tuple[float, float] | None):
+    def _create_interpolator(self):
         """Create the underlying lerp interpolator instance."""
-        return interpolator_cls(
+        interp_class: type = self._INTERP_MAP[self._pose_field]
+        vector_size = len(self._pose_field.get_type().feature_enum())
+        clamp_range = self._pose_field.get_type().default_range()
+        return interp_class(
             vector_size=vector_size,
             input_frequency=self._config.input_frequency,
             clamp_range=clamp_range
@@ -61,21 +65,26 @@ class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorConfig]):
 
 
 # Convenience classes
-class AngleLerpInterpolator(FeatureLerpInterpolator):
-    def __init__(self, config: LerpInterpolatorConfig) -> None:
-        super().__init__(config, Angles, "angles")
-
-
 class BBoxLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorConfig) -> None:
-        super().__init__(config, BBox, "bbox")
-
-
-class DeltaLerpInterpolator(FeatureLerpInterpolator):
-    def __init__(self, config: LerpInterpolatorConfig) -> None:
-        super().__init__(config, Angles, "deltas")
+        super().__init__(config, PoseField.bbox)
 
 
 class PointLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorConfig) -> None:
-        super().__init__(config, Points2D, "points")
+        super().__init__(config, PoseField.points)
+
+
+class AngleLerpInterpolator(FeatureLerpInterpolator):
+    def __init__(self, config: LerpInterpolatorConfig) -> None:
+        super().__init__(config, PoseField.angles)
+
+
+class AngleVelLerpInterpolator(FeatureLerpInterpolator):
+    def __init__(self, config: LerpInterpolatorConfig) -> None:
+        super().__init__(config, PoseField.angle_vel)
+
+
+class AngleSymLerpInterpolator(FeatureLerpInterpolator):
+    def __init__(self, config: LerpInterpolatorConfig) -> None:
+        super().__init__(config, PoseField.angle_sym)

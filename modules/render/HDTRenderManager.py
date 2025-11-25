@@ -16,7 +16,9 @@ from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.layers import CamCompositeLayer, PoseScalarBarLayer, SimilarityLineLayer, PDLineLayer, CentreCamLayer, PoseCamLayer, AggregationMethod
+from modules.render.layers import CamCompositeLayer, PoseCamLayer, CentreCamLayer
+from modules.render.layers import PoseAngleDeltaBarLayer, PoseScalarBarLayer, PDLineLayer
+from modules.render.layers import SimilarityLineLayer, AggregationMethod
 from modules.render.renderers import CamImageRenderer, PoseMeshRenderer, CamBBoxRenderer, PoseMotionTimeRenderer
 
 # from modules.render.HDTSoundOSC import HDTSoundOSC
@@ -35,19 +37,20 @@ class HDTRenderManager(RenderBase):
         # self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data_old, "localhost", 8000, 60.0)
 
         # renderers
-        self.cam_img_renderers: dict[int, CamImageRenderer] = {}
-        self.mesh_renderers_raw:  dict[int, PoseMeshRenderer] = {}
-        self.mesh_renderers:  dict[int, PoseMeshRenderer] = {}
-        self.cam_bbox_renderers:dict[int, CamBBoxRenderer] = {}
+        self.cam_img_renderers:     dict[int, CamImageRenderer] = {}
+        self.mesh_renderers_raw:    dict[int, PoseMeshRenderer] = {}
+        self.mesh_renderers:        dict[int, PoseMeshRenderer] = {}
+        self.cam_bbox_renderers:    dict[int, CamBBoxRenderer] = {}
         self.motion_time_renderers: dict[int, PoseMotionTimeRenderer] = {}
 
         # layers
-        self.cam_track_layers:  dict[int, CamCompositeLayer] = {}
-        self.pose_cam_layers:   dict[int, PoseCamLayer] = {}
-        self.centre_cam_layers: dict[int, CentreCamLayer] = {}
-        self.pd_line_layers:    dict[int, PDLineLayer] = {}
-        self.field_bar_layers_raw:dict[int, PoseScalarBarLayer] = {}
-        self.field_bar_layers:dict[int, PoseScalarBarLayer] = {}
+        self.cam_track_layers:      dict[int, CamCompositeLayer] = {}
+        self.pose_cam_layers:       dict[int, PoseCamLayer] = {}
+        self.centre_cam_layers:     dict[int, CentreCamLayer] = {}
+        self.pd_line_layers:        dict[int, PDLineLayer] = {}
+        self.field_bar_layers_raw:  dict[int, PoseScalarBarLayer] = {}
+        self.field_bar_layers:      dict[int, PoseScalarBarLayer] = {}
+        self.angle_bar_layers:      dict[int, PoseAngleDeltaBarLayer] = {}
 
         # self.line_field_layers:     dict[int, LineFieldLayer] = {}
 
@@ -68,6 +71,7 @@ class HDTRenderManager(RenderBase):
             self.pd_line_layers[i] =    PDLineLayer(i, self.data_hub)
             self.field_bar_layers[i] =  PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_I, PoseField.angles, 2.0, 2.0)
             self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_R, PoseField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
+            self.angle_bar_layers[i] =  PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataTypes.pose_I)
             # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
 
         # composition
@@ -105,6 +109,7 @@ class HDTRenderManager(RenderBase):
             self.centre_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.field_bar_layers_raw[i].allocate(1080, 1920, GL_RGBA32F)
             self.field_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
+            self.angle_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
             # self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
 
         self.allocate_window_renders()
@@ -139,6 +144,8 @@ class HDTRenderManager(RenderBase):
             layer.deallocate()
         for layer in self.field_bar_layers.values():
             layer.deallocate()
+        for layer in self.angle_bar_layers.values():
+            layer.deallocate()
 
         # renderers
         for layer in self.cam_img_renderers.values():
@@ -171,6 +178,7 @@ class HDTRenderManager(RenderBase):
             self.pd_line_layers[i].update()
             self.field_bar_layers_raw[i].update()
             self.field_bar_layers[i].update()
+            self.angle_bar_layers[i].update()
 
             # self.line_field_layers[i].update()
 
@@ -211,7 +219,7 @@ class HDTRenderManager(RenderBase):
 
 
 
-            self.field_bar_layers[i].feature_type = PoseField.deltas
+            self.field_bar_layers[i].feature_type = PoseField.angles
             self.centre_cam_layers[i].data_type = PoseDataTypes.pose_I
             self.mesh_renderers[i].data_type = PoseDataTypes.pose_I
             self.mesh_renderers_raw[i].color = (0.66, 0.66, 0.66, 0.66)
@@ -254,12 +262,14 @@ class HDTRenderManager(RenderBase):
             self.mesh_renderers[camera_id].draw(draw_rect)
             # self.mesh_renderers_raw[camera_id].draw(draw_rect)
 
-        self.field_bar_layers_raw[camera_id].draw(draw_rect)
-        self.field_bar_layers[camera_id].draw(draw_rect)
+        # self.field_bar_layers_raw[camera_id].draw(draw_rect)
+        # self.field_bar_layers[camera_id].draw(draw_rect)
 
 
         self.field_bar_layers[camera_id].color = (0.0, 0.0, 0.0, 1.0)
         self.field_bar_layers_raw[camera_id].color = (1.0, 1.0, 1.0, 0.6)
+
+        self.angle_bar_layers[camera_id].draw(draw_rect)
 
         # self.pd_line_layers[camera_id].draw(draw_rect)
 

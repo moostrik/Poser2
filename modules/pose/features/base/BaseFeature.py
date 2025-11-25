@@ -190,6 +190,16 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
         """
         pass
 
+    @classmethod
+    @abstractmethod
+    def create_dummy(cls) -> "BaseFeature":
+        """Create a dummy instance with NaN values and zero scores.
+
+        Returns:
+            Instance with NaN values and zero scores for initialization.
+        """
+        pass
+
     @abstractmethod
     def __len__(self) -> int:
         """Number of elements in this feature."""

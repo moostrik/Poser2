@@ -1,13 +1,13 @@
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
-from modules.pose.nodes.filters.RateLimitSmoothers import RateLimitSmootherConfig
+from modules.pose.nodes.filters.RateLimiters import RateLimiterConfig
 
 from numpy import pi
 
 class RateLimitSmootherGui:
-    def __init__(self, config: RateLimitSmootherConfig, gui: Gui, name: str) -> None:
+    def __init__(self, config: RateLimiterConfig, gui: Gui, name: str) -> None:
         self.gui: Gui = gui
-        self.config: RateLimitSmootherConfig = config
+        self.config: RateLimiterConfig = config
 
         elm: list = []
         elm.append([E(eT.TEXT, 'CHASE    '),

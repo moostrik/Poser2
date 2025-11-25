@@ -6,15 +6,17 @@ extrapolation with proper handling of circular values and coordinate clamping.
 
 # Standard library imports
 from dataclasses import replace
+from collections import defaultdict
 
 # Third-party imports
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Angles, BBox, Points2D, Symmetry
+from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.VectorPredict import AnglePredict, PointPredict, VectorPredict, PredictionMethod
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
-from modules.pose.Pose import Pose
+from modules.pose.Pose import Pose, PoseField
+from modules.pose.nodes.filters.RateLimiters import RateLimiterConfig
 
 
 class PredictorConfig(NodeConfigBase):
@@ -27,44 +29,25 @@ class PredictorConfig(NodeConfigBase):
 
 
 class FeaturePredictor(FilterNode):
-    """Generic pose feature predictor.
+    """Generic pose feature predictor."""
 
-    Args:
-        config: Predictor configuration
-        feature_class: Feature class type (e.g., AngleFeature, Point2DFeature)
-        attr_name: Name of the pose attribute to predict
+    _PREDICT_MAP = defaultdict(
+        lambda: VectorPredict,
+        {
+            PoseField.angles: AnglePredict,
+            PoseField.points: PointPredict,
+        }
+    )
 
-    Example:
-        predictor = FeaturePredictor(config, AngleFeature, "angles")
-        predictor = FeaturePredictor(config, Point2DFeature, "points")
-    """
-
-    # Registry mapping feature classes to predictor classes
-    PREDICTOR_REGISTRY = {
-        Angles: AnglePredict,
-        BBox: VectorPredict,
-        Points2D: PointPredict,
-        Symmetry: VectorPredict,
-    }
-
-    def __init__(self, config: PredictorConfig, feature_class: type, attr_name: str):
-        if feature_class not in self.PREDICTOR_REGISTRY:
-            valid_classes = [cls.__name__ for cls in self.PREDICTOR_REGISTRY.keys()]
-            raise ValueError(
-                f"Unknown feature class '{feature_class.__name__}'. "
-                f"Must be one of: {valid_classes}"
-            )
-
+    def __init__(self, config: PredictorConfig, pose_field: PoseField) -> None:
         self._config = config
-        self._attr_name = attr_name
-        self._feature_class = feature_class
-
-        predictor_cls = self.PREDICTOR_REGISTRY[feature_class]
+        self._pose_field = pose_field
+        predictor_cls = self._PREDICT_MAP[pose_field]
         self._predictor = predictor_cls(
-            vector_size=len(feature_class.feature_enum()),
+            vector_size=len(pose_field.get_type().feature_enum()),
             input_frequency=config.frequency,
             method=config.method,
-            clamp_range=feature_class.default_range()
+            clamp_range=pose_field.get_type().default_range()
         )
         self._config.add_listener(self._on_config_changed)
 
@@ -96,7 +79,7 @@ class FeaturePredictor(FilterNode):
 
     def process(self, pose: Pose) -> Pose:
         """Add current feature data to predictor and return pose with predicted values."""
-        feature_data = getattr(pose, self._attr_name)
+        feature_data = pose.get_feature(self._pose_field)
 
         # Add sample and get prediction
         self._predictor.add_sample(feature_data.values)
@@ -106,7 +89,7 @@ class FeaturePredictor(FilterNode):
         predicted_data = self._create_predicted_data(feature_data, predicted_values)
 
         # Return new pose with predicted feature
-        return replace(pose, **{self._attr_name: predicted_data})
+        return replace(pose, **{self._pose_field.name: predicted_data})
 
     def reset(self) -> None:
         """Reset the predictor's internal state (clear sample history)."""
@@ -119,26 +102,27 @@ class FeaturePredictor(FilterNode):
 
 
 # Convenience classes
-class AnglePredictor(FeaturePredictor):
-    def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, Angles, "angles")
-
 
 class BBoxPredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, BBox, "bbox")
-
-
-class DeltaPredictor(FeaturePredictor):
-    def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, Angles, "deltas")
+        super().__init__(config, PoseField.bbox)
 
 
 class PointPredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, Points2D, "points")
+        super().__init__(config, PoseField.points)
 
 
-class SymmetryPredictor(FeaturePredictor):
+class AnglePredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, Symmetry, "symmetry")
+        super().__init__(config, PoseField.angles)
+
+
+class AngleVelPredictor(FeaturePredictor):
+    def __init__(self, config: PredictorConfig) -> None:
+        super().__init__(config, PoseField.angle_vel)
+
+
+class AngleSymPredictor(FeaturePredictor):
+    def __init__(self, config: PredictorConfig) -> None:
+        super().__init__(config, PoseField.angle_sym)

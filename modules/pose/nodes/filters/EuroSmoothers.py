@@ -6,15 +6,16 @@ of circular values and coordinate clamping.
 
 # Standard library imports
 from dataclasses import replace
+from collections import defaultdict
 
 # Third-party imports
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Angles, BBox, Points2D, Symmetry
+from modules.pose.features import PoseFeatureType
 from modules.pose.nodes._utils.VectorSmooth import VectorSmooth, AngleSmooth, PointSmooth
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
-from modules.pose.Pose import Pose
+from modules.pose.Pose import Pose, PoseField
 
 
 class EuroSmootherConfig(NodeConfigBase):
@@ -29,46 +30,28 @@ class EuroSmootherConfig(NodeConfigBase):
 
 
 class FeatureEuroSmoother(FilterNode):
-    """Generic pose feature smoother using OneEuroFilter.
-
-    Args:
-        config: Smoother configuration
-        feature_class: Feature class type (e.g., AngleFeature, Point2DFeature)
-        attr_name: Name of the pose attribute to smooth
-
-    Example:
-        smoother = GenericSmoother(config, AngleFeature, "angles")
-        smoother = GenericSmoother(config, Point2DFeature, "points")
-    """
+    """Generic pose feature smoother using OneEuroFilter."""
 
     # Registry mapping feature classes to smoother classes
-    SMOOTHER_REGISTRY = {
-        Angles: AngleSmooth,
-        BBox: VectorSmooth,
-        Points2D: PointSmooth,
-        Symmetry: VectorSmooth,
-    }
+    _SMOOTH_MAP = defaultdict(
+        lambda: VectorSmooth,
+        {
+            PoseField.angles: AngleSmooth,
+            PoseField.points: PointSmooth,
+        }
+    )
 
-    def __init__(self, config: EuroSmootherConfig, feature_class: type, attr_name: str):
-        if feature_class not in self.SMOOTHER_REGISTRY:
-            valid_classes = [cls.__name__ for cls in self.SMOOTHER_REGISTRY.keys()]
-            raise ValueError(
-                f"Unknown feature class '{feature_class.__name__}'. "
-                f"Must be one of: {valid_classes}"
-            )
-
-        self._config = config
-        self._attr_name = attr_name
-        self._feature_class = feature_class
-
-        smoother_cls = self.SMOOTHER_REGISTRY[feature_class]
+    def __init__(self, config: EuroSmootherConfig, pose_field: PoseField) -> None:
+        self._config: EuroSmootherConfig = config
+        self._pose_field: PoseField = pose_field
+        smoother_cls = self._SMOOTH_MAP[pose_field]
         self._smoother = smoother_cls(
-            vector_size=len(feature_class.feature_enum()),
+            vector_size=len(pose_field.get_type().feature_enum()),
             frequency=config.frequency,
             min_cutoff=config.min_cutoff,
             beta=config.beta,
             d_cutoff=config.d_cutoff,
-            clamp_range=feature_class.default_range()
+            clamp_range=pose_field.get_type().default_range()
         )
         self._config.add_listener(self._on_config_changed)
 
@@ -90,37 +73,37 @@ class FeatureEuroSmoother(FilterNode):
         return self._config
 
     def process(self, pose: Pose) -> Pose:
-        feature_data = getattr(pose, self._attr_name)
+        feature_data = pose.get_feature(self._pose_field)
         self._smoother.add_sample(feature_data.values)
         smoothed_values: np.ndarray = self._smoother.value
         smoothed_data = type(feature_data)(values=smoothed_values, scores=feature_data.scores)
-        return replace(pose, **{self._attr_name: smoothed_data})
+        return replace(pose, **{self._pose_field.name: smoothed_data})
 
     def reset(self) -> None:
         self._smoother.reset()
 
 
 # Convenience classes
-class AngleEuroSmoother(FeatureEuroSmoother):
-    def __init__(self, config: EuroSmootherConfig) -> None:
-        super().__init__(config, Angles, "angles")
-
-
-class DeltaEuroSmoother(FeatureEuroSmoother):
-    def __init__(self, config: EuroSmootherConfig) -> None:
-        super().__init__(config, Angles, "deltas")
-
-
 class BBoxEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherConfig) -> None:
-        super().__init__(config, BBox, "bbox")
+        super().__init__(config, PoseField.bbox)
 
 
 class PointEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherConfig) -> None:
-        super().__init__(config, Points2D, "points")
+        super().__init__(config, PoseField.points)
 
 
-class SymmetryEuroSmoother(FeatureEuroSmoother):
+class AngleEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherConfig) -> None:
-        super().__init__(config, Symmetry, "symmetry")
+        super().__init__(config, PoseField.angles)
+
+
+class AngleVelEuroSmoother(FeatureEuroSmoother):
+    def __init__(self, config: EuroSmootherConfig) -> None:
+        super().__init__(config, PoseField.angle_vel)
+
+
+class AngleSymEuroSmoother(FeatureEuroSmoother):
+    def __init__(self, config: EuroSmootherConfig) -> None:
+        super().__init__(config, PoseField.angle_sym)

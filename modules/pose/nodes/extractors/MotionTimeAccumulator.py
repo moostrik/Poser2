@@ -27,7 +27,7 @@ class MotionTimeAccumulator(FilterNode):
         dt: float = pose.time_stamp - self.prev_time_stamp
         self.prev_time_stamp = pose.time_stamp
 
-        total_delta: float = np.nansum(np.abs(pose.deltas.values)) / np.pi * dt
+        total_delta: float = np.nansum(np.abs(pose.angle_vel.values)) / np.pi * dt
         # total_delta: float = np.nansum(np.abs(pose.deltas.values)) / len(pose.deltas) * dt
 
         self.motion_time = self.motion_time + total_delta

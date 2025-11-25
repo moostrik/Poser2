@@ -4,18 +4,9 @@ from modules.pose.nodes.filters.Predictors import (
     AnglePredictor,
     BBoxPredictor,
     PointPredictor,
-    DeltaPredictor,
-    SymmetryPredictor
+    AngleVelPredictor,
+    AngleSymPredictor
 )
-
-class AnglePredictorTracker(FilterTracker):
-    """Convenience tracker for angle prediction."""
-
-    def __init__(self, num_tracks: int, config: PredictorConfig) -> None:
-        super().__init__(
-            num_tracks=num_tracks,
-            filter_factory=lambda: AnglePredictor(config)
-        )
 
 
 class BBoxPredictorTracker(FilterTracker):
@@ -38,21 +29,31 @@ class PointPredictorTracker(FilterTracker):
         )
 
 
-class DeltaPredictorTracker(FilterTracker):
+class AnglePredictorTracker(FilterTracker):
+    """Convenience tracker for angle prediction."""
+
+    def __init__(self, num_tracks: int, config: PredictorConfig) -> None:
+        super().__init__(
+            num_tracks=num_tracks,
+            filter_factory=lambda: AnglePredictor(config)
+        )
+
+
+class AngleVelPredictorTracker(FilterTracker):
     """Convenience tracker for delta prediction."""
 
     def __init__(self, num_tracks: int, config: PredictorConfig) -> None:
         super().__init__(
             num_tracks=num_tracks,
-            filter_factory=lambda: DeltaPredictor(config)
+            filter_factory=lambda: AngleVelPredictor(config)
         )
 
 
-class SymmetryPredictorTracker(FilterTracker):
+class AngleSymPredictorTracker(FilterTracker):
     """Convenience tracker for symmetry prediction."""
 
     def __init__(self, num_tracks: int, config: PredictorConfig) -> None:
         super().__init__(
             num_tracks=num_tracks,
-            filter_factory=lambda: SymmetryPredictor(config)
+            filter_factory=lambda: AngleSymPredictor(config)
         )

@@ -14,12 +14,15 @@ serializes all access using a lock to prevent concurrent set_target() and update
 """
 
 from typing import cast
+from collections import defaultdict
 
 # Pose imports
-from modules.pose.features import Angles, BBox, Points2D, Symmetry
+from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.VectorRateLimit import VectorRateLimit, AngleRateLimit, PointRateLimit
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
 from modules.pose.nodes.Nodes import NodeConfigBase
+from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
+from modules.pose.Pose import Pose, PoseField
 
 
 class RateLimiterConfig(NodeConfigBase):
@@ -37,29 +40,21 @@ class RateLimiterConfig(NodeConfigBase):
 
 
 class FeatureRateLimiter(FeatureInterpolatorBase[RateLimiterConfig]):
-    """Generic pose feature rate limiter.
+    """Generic pose feature rate limiter."""
 
-    Args:
-        config: Rate limiter configuration
-        feature_class: Feature class type (e.g., Angles, Points2D)
-        attr_name: Name of the pose attribute to limit
+    _INTERP_MAP: defaultdict[PoseField, type] = defaultdict(
+        lambda: VectorRateLimit,
+        {
+            PoseField.angles: AngleRateLimit,
+            PoseField.points: PointRateLimit,
+        }
+    )
 
-    Example:
-        limiter = FeatureRateLimiter(config, Angles, "angles")
-        limiter = FeatureRateLimiter(config, Points2D, "points")
-    """
-
-    # Registry mapping feature classes to rate limiter classes
-    INTERPOLATOR_REGISTRY = {
-        Angles: AngleRateLimit,
-        BBox: VectorRateLimit,
-        Points2D: PointRateLimit,
-        Symmetry: VectorRateLimit,
-    }
-
-    def _create_interpolator(self, interpolator_cls: type, vector_size: int,
-                            clamp_range: tuple[float, float] | None):
+    def _create_interpolator(self):
         """Create the underlying rate limiter instance."""
+        interpolator_cls = self._INTERP_MAP[self._pose_field]
+        vector_size = len(self._pose_field.get_type().feature_enum())
+        clamp_range = self._pose_field.get_type().default_range()
         return interpolator_cls(
             vector_size=vector_size,
             max_increase=self._config.max_increase,
@@ -75,26 +70,26 @@ class FeatureRateLimiter(FeatureInterpolatorBase[RateLimiterConfig]):
 
 
 # Convenience classes
-class AngleRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterConfig) -> None:
-        super().__init__(config, Angles, "angles")
-
-
-class DeltaRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterConfig) -> None:
-        super().__init__(config, Angles, "deltas")
-
-
 class BBoxRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterConfig) -> None:
-        super().__init__(config, BBox, "bbox")
+        super().__init__(config, PoseField.bbox)
 
 
 class PointRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterConfig) -> None:
-        super().__init__(config, Points2D, "points")
+        super().__init__(config, PoseField.points)
 
 
-class SymmetryRateLimiter(FeatureRateLimiter):
+class AngleRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterConfig) -> None:
-        super().__init__(config, Symmetry, "symmetry")
+        super().__init__(config, PoseField.angles)
+
+
+class AngleVelRateLimiter(FeatureRateLimiter):
+    def __init__(self, config: RateLimiterConfig) -> None:
+        super().__init__(config, PoseField.angle_vel)
+
+
+class AngleSymRateLimiter(FeatureRateLimiter):
+    def __init__(self, config: RateLimiterConfig) -> None:
+        super().__init__(config, PoseField.angle_sym)

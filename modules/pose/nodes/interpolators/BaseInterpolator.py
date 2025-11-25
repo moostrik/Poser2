@@ -15,15 +15,16 @@ Uses a lock to serialize all access, preventing concurrent set_target() and upda
 from abc import ABC, abstractmethod
 from dataclasses import replace
 from threading import Lock
-from typing import Type, TypeVar, Generic, Protocol
+from typing import TypeVar, Generic, Protocol
+from collections import defaultdict
 
 # Third-party imports
 import numpy as np
 
 # Pose imports
-from modules.pose.features import PoseFeature, Angles, BBox, Points2D, Symmetry
+from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes.Nodes import InterpolatorNode, NodeConfigBase
-from modules.pose.Pose import Pose
+from modules.pose.Pose import Pose, PoseField
 
 # Generic type variable for config
 ConfigType = TypeVar('ConfigType', bound=NodeConfigBase)
@@ -55,40 +56,15 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
 
     # Registry mapping feature classes to interpolator classes
     # Subclasses must override this with their specific interpolator types
-    INTERPOLATOR_REGISTRY: dict[Type[PoseFeature], type] = {}
+    _INTERP_MAP: defaultdict[PoseField, type]
 
-    def __init__(self, config: ConfigType, feature_class: Type[PoseFeature], attr_name: str):
-        """Initialize the feature interpolator.
-
-        Args:
-            config: Configuration object with interpolation parameters
-            feature_class: The PoseFeature class to interpolate (e.g., Angles, Points2D)
-            attr_name: Attribute name on Pose object (e.g., "angles", "points")
-
-        Raises:
-            ValueError: If feature_class is not in INTERPOLATOR_REGISTRY
-        """
-        if feature_class not in self.INTERPOLATOR_REGISTRY:
-            valid_classes = [cls.__name__ for cls in self.INTERPOLATOR_REGISTRY.keys()]
-            raise ValueError(
-                f"Unknown feature class '{feature_class.__name__}'. "
-                f"Must be one of: {valid_classes}"
-            )
-
+    def __init__(self, config: ConfigType, pose_field: PoseField):
+        """Initialize the feature interpolator."""
         self._config: ConfigType = config
-        self._feature_class: Type[PoseFeature] = feature_class
-        self._attr_name: str = attr_name
+        self._pose_field: PoseField = pose_field
         self._lock: Lock = Lock()
         self._last_pose: Pose | None = None
-
-        # Create the appropriate interpolator for this feature type
-        interpolator_cls = self.INTERPOLATOR_REGISTRY[feature_class]
-        self._interpolator: InterpolatorProtocol = self._create_interpolator(
-            interpolator_cls,
-            len(feature_class.feature_enum()),
-            feature_class.default_range()
-        )
-
+        self._interpolator: InterpolatorProtocol = self._create_interpolator()
         self._config.add_listener(self._on_config_changed)
 
     def __del__(self):
@@ -99,28 +75,13 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
             pass
 
     @abstractmethod
-    def _create_interpolator(self, interpolator_cls: type, vector_size: int,
-                            clamp_range: tuple[float, float] | None) -> InterpolatorProtocol:
-        """Create the underlying interpolator instance.
-
-        Subclasses implement this to pass their specific parameters.
-
-        Args:
-            interpolator_cls: The interpolator class to instantiate
-            vector_size: Number of values to interpolate
-            clamp_range: Optional clamping range
-
-        Returns:
-            Interpolator instance
-        """
+    def _create_interpolator(self) -> InterpolatorProtocol:
+        """Create the underlying interpolator instance."""
         pass
 
     @abstractmethod
     def _on_config_changed(self) -> None:
-        """Handle configuration changes by updating interpolator parameters.
-
-        Subclasses implement this to update their specific parameters.
-        """
+        """Handle configuration changes by updating interpolator parameters."""
         pass
 
     def is_ready(self) -> bool:
@@ -135,11 +96,11 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
     @property
     def attr_name(self) -> str:
         """Return the attribute name this interpolator processes."""
-        return self._attr_name
+        return self._pose_field.name
 
     def submit(self, pose: Pose) -> None:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
-        feature_data = getattr(pose, self._attr_name)
+        feature_data = pose.get_feature(self._pose_field)
 
         with self._lock:
             self._interpolator.set_target(feature_data.values)
@@ -159,12 +120,12 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
             self._interpolator.update(time_stamp)
             interpolated_values: np.ndarray = self._interpolator.value
 
-        feature_data = getattr(last_pose, self._attr_name)
+        feature_data = last_pose.get_feature(self._pose_field)
         interpolated_data = self._create_interpolated_data(feature_data, interpolated_values)
-        return replace(last_pose, **{self._attr_name: interpolated_data}, time_stamp=time_stamp)
+        return replace(last_pose, **{self._pose_field.name: interpolated_data}, time_stamp=time_stamp)
 
-    def _create_interpolated_data(self, original_data: PoseFeature,
-                                 interpolated_values: np.ndarray) -> PoseFeature:
+    def _create_interpolated_data(self, original_data: PoseFeatureType,
+                                 interpolated_values: np.ndarray) -> PoseFeatureType:
         """Create feature data with interpolated values and adjusted scores."""
         if interpolated_values.ndim > 1:
             has_nan = np.any(np.isnan(interpolated_values), axis=-1)

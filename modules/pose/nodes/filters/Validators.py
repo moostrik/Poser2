@@ -1,10 +1,10 @@
 """Pose validators for data integrity checks."""
 
 from threading import Lock
+from modules.pose.features.base import BaseFeature
 
-from modules.pose.features import Angles, Points2D, BBox, Symmetry
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
-from modules.pose.Pose import Pose
+from modules.pose.Pose import Pose, PoseField
 
 
 class ValidatorConfig(NodeConfigBase):
@@ -28,18 +28,20 @@ class FeatureValidator(FilterNode):
 
     Args:
         config: Validator configuration
-        feature_class: Feature class type (e.g., AngleFeature, Point2DFeature)
-        attr_name: Name of the pose attribute to validate
+        pose_field: PoseField enum value indicating which feature to validate
 
     Example:
-        validator = FeatureValidator(config, AngleFeature, "angles")
-        validator = FeatureValidator(config, Point2DFeature, "points")
+        validator = FeatureValidator(config, PoseField.angles)
+        validator = FeatureValidator(config, PoseField.points)
     """
 
-    def __init__(self, config: ValidatorConfig, feature_class: type, attr_name: str):
+    def __init__(self, config: ValidatorConfig, pose_field: PoseField) -> None:
+        if not issubclass(pose_field.get_type(), BaseFeature):
+            raise ValueError(f"PoseField '{pose_field.value}' is not a feature field")
+
         self._config = config
-        self._feature_class = feature_class
-        self._attr_name = attr_name
+        self._pose_field = pose_field
+        self._feature_class = pose_field.get_type()
 
         self._config_lock: Lock = Lock()
         self._check_ranges: bool = config.check_ranges
@@ -52,7 +54,7 @@ class FeatureValidator(FilterNode):
 
     def process(self, pose: Pose) -> Pose:
         """Validate feature data and print any errors."""
-        feature_data = getattr(pose, self._attr_name)
+        feature_data = pose.get_feature(self._pose_field)
 
         with self._config_lock:
             check_ranges: bool = self._check_ranges
@@ -62,7 +64,7 @@ class FeatureValidator(FilterNode):
         is_valid, error_message = feature_data.validate(check_ranges=check_ranges)
 
         if not is_valid:
-            print(f"{name} validation error in '{self._attr_name}' of pose {pose.track_id}: {error_message}")
+            print(f"{name} validation error in '{self._pose_field.value}' of pose {pose.track_id}: {error_message}")
 
         # Always return original pose (no fixing, just validation)
         return pose
@@ -75,40 +77,40 @@ class FeatureValidator(FilterNode):
 
 
 # Convenience classes
-class AngleValidator(FeatureValidator):
-    """Validates angle feature data integrity."""
+class BBoxValidator(FeatureValidator):
+    """Validates bounding box feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, Angles, "angles")
+        super().__init__(config, PoseField.bbox)
 
 
 class PointValidator(FeatureValidator):
     """Validates point feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, Points2D, "points")
+        super().__init__(config, PoseField.points)
 
 
-class DeltaValidator(FeatureValidator):
-    """Validates delta feature data integrity."""
+class AngleValidator(FeatureValidator):
+    """Validates angle feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, Angles, "deltas")
+        super().__init__(config, PoseField.angles)
 
 
-class BBoxValidator(FeatureValidator):
-    """Validates bounding box feature data integrity."""
+class AngleVelValidator(FeatureValidator):
+    """Validates angle velocity feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, BBox, "bbox")
+        super().__init__(config, PoseField.angle_vel)
 
 
-class SymmetryValidator(FeatureValidator):
+class AngleSymValidator(FeatureValidator):
     """Validates symmetry feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, Symmetry, "symmetry")
+        super().__init__(config, PoseField.angle_sym)
 
 
 class PoseValidator(FilterNode):
     """Validates all pose features for data integrity.
 
-    Validates points, angles, deltas, and symmetry features.
+    Validates points, angles, angle velocities, bbox, and symmetry features.
     For independent control of each feature, use individual validators.
     """
 
@@ -118,9 +120,9 @@ class PoseValidator(FilterNode):
         # Create individual validators for each feature
         self._angle_validator = AngleValidator(config)
         self._point_validator = PointValidator(config)
-        self._delta_validator = DeltaValidator(config)
+        self._angle_vel_validator = AngleVelValidator(config)
         self._bbox_validator = BBoxValidator(config)
-        self._symmetry_validator = SymmetryValidator(config)
+        self._symmetry_validator = AngleSymValidator(config)
 
     @property
     def config(self) -> ValidatorConfig:
@@ -130,7 +132,7 @@ class PoseValidator(FilterNode):
         """Validate all features."""
         pose = self._angle_validator.process(pose)
         pose = self._point_validator.process(pose)
-        pose = self._delta_validator.process(pose)
+        pose = self._angle_vel_validator.process(pose)
         pose = self._bbox_validator.process(pose)
         pose = self._symmetry_validator.process(pose)
         return pose
