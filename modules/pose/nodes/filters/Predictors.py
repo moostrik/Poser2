@@ -15,7 +15,7 @@ import numpy as np
 from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.VectorPredict import AnglePredict, PointPredict, VectorPredict, PredictionMethod
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
-from modules.pose.Pose import Pose, PoseField
+from modules.pose.Frame import Frame, FrameField
 from modules.pose.nodes.filters.RateLimiters import RateLimiterConfig
 
 
@@ -34,12 +34,12 @@ class FeaturePredictor(FilterNode):
     _PREDICT_MAP = defaultdict(
         lambda: VectorPredict,
         {
-            PoseField.angles: AnglePredict,
-            PoseField.points: PointPredict,
+            FrameField.angles: AnglePredict,
+            FrameField.points: PointPredict,
         }
     )
 
-    def __init__(self, config: PredictorConfig, pose_field: PoseField) -> None:
+    def __init__(self, config: PredictorConfig, pose_field: FrameField) -> None:
         self._config = config
         self._pose_field = pose_field
         predictor_cls = self._PREDICT_MAP[pose_field]
@@ -77,7 +77,7 @@ class FeaturePredictor(FilterNode):
         interpolated_scores = np.where(has_nan, 0.0, original_data.scores).astype(np.float32)
         return type(original_data)(values=predicted_values, scores=interpolated_scores)
 
-    def process(self, pose: Pose) -> Pose:
+    def process(self, pose: Frame) -> Frame:
         """Add current feature data to predictor and return pose with predicted values."""
         feature_data = pose.get_feature(self._pose_field)
 
@@ -105,24 +105,24 @@ class FeaturePredictor(FilterNode):
 
 class BBoxPredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, PoseField.bbox)
+        super().__init__(config, FrameField.bbox)
 
 
 class PointPredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, PoseField.points)
+        super().__init__(config, FrameField.points)
 
 
 class AnglePredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, PoseField.angles)
+        super().__init__(config, FrameField.angles)
 
 
 class AngleVelPredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, PoseField.angle_vel)
+        super().__init__(config, FrameField.angle_vel)
 
 
 class AngleSymPredictor(FeaturePredictor):
     def __init__(self, config: PredictorConfig) -> None:
-        super().__init__(config, PoseField.angle_sym)
+        super().__init__(config, FrameField.angle_sym)

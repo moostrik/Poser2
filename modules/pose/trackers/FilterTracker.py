@@ -5,7 +5,7 @@ from typing import Callable
 
 from .TrackerBase import TrackerBase
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Pose import Pose, PoseDict
+from modules.pose.Frame import Frame, FrameDict
 
 
 class FilterTracker(TrackerBase):
@@ -32,7 +32,7 @@ class FilterTracker(TrackerBase):
             for id in range(num_tracks)
         }
 
-    def process(self, poses: PoseDict) -> PoseDict:
+    def process(self, poses: FrameDict) -> FrameDict:
         """Process poses through filters and emit callbacks."""
 
         # Reset interpolators for poses that are no longer present
@@ -40,11 +40,11 @@ class FilterTracker(TrackerBase):
             if id not in poses:
                 self.reset_at(id)
 
-        filtered_poses: PoseDict = {}
+        filtered_poses: FrameDict = {}
 
         for id, pose in poses.items():
             try:
-                filtered_pose: Pose = pose
+                filtered_pose: Frame = pose
                 for filter_node in self._filter_pipelines[id]:
                     filtered_pose = filter_node.process(filtered_pose)
                 filtered_poses[id] = filtered_pose

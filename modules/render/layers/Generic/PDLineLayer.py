@@ -10,7 +10,7 @@ from modules.gl.Image import Image
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 
 from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.Angles import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES

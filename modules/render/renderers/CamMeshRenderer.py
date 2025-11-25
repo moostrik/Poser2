@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Mesh import Mesh
 
 from modules.DataHub import DataHub, DataType, PoseDataTypes
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 from modules.render.renderers.PoseMeshUtils import PoseVertexData, PoseMeshUtils, POSE_VERTEX_INDICES
 from modules.render.renderers.RendererBase import RendererBase
 from modules.utils.PointsAndRects import Rect
@@ -44,7 +44,7 @@ class CamMeshRenderer(RendererBase):
 
     def update(self) -> None:
         """Update meshes for active poses. Meshes are lazily initialized and cached (track_ids 1-8)."""
-        cam_poses: set[Pose] = self._data.get_items_for_cam(DataType(self.data_type), self._cam_id)
+        cam_poses: set[Frame] = self._data.get_items_for_cam(DataType(self.data_type), self._cam_id)
 
         self._active_track_ids = {pose.track_id for pose in cam_poses}
 

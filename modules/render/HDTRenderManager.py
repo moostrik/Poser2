@@ -10,7 +10,7 @@ from modules.gl.WindowManager import WindowManager
 
 from modules.DataHub import DataHub, PoseDataTypes, SimilarityDataType
 from modules.gui.PyReallySimpleGui import Gui
-from modules.pose.Pose import PoseField
+from modules.pose.Frame import FrameField
 from modules.Settings import Settings
 from modules.utils.PointsAndRects import Rect, Point2f
 
@@ -69,8 +69,8 @@ class HDTRenderManager(RenderBase):
             self.pose_cam_layers[i] =   PoseCamLayer(i, self.data_hub,      PoseDataTypes.pose_I, self.cam_img_renderers[i])
             self.centre_cam_layers[i] = CentreCamLayer(i, self.data_hub,    PoseDataTypes.pose_I, self.cam_img_renderers[i])
             self.pd_line_layers[i] =    PDLineLayer(i, self.data_hub)
-            self.field_bar_layers[i] =  PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_I, PoseField.angles, 2.0, 2.0)
-            self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_R, PoseField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
+            self.field_bar_layers[i] =  PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_I, FrameField.angles, 2.0, 2.0)
+            self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
             self.angle_bar_layers[i] =  PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataTypes.pose_I)
             # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
 
@@ -219,7 +219,7 @@ class HDTRenderManager(RenderBase):
 
 
 
-            self.field_bar_layers[i].feature_type = PoseField.angles
+            self.field_bar_layers[i].feature_type = FrameField.angles
             self.centre_cam_layers[i].data_type = PoseDataTypes.pose_I
             self.mesh_renderers[i].data_type = PoseDataTypes.pose_I
             self.mesh_renderers_raw[i].color = (0.66, 0.66, 0.66, 0.66)

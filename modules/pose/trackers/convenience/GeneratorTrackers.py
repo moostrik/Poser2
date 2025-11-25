@@ -1,5 +1,4 @@
 from modules.pose.nodes.generators.PoseFromTracklet import PoseFromTracklet
-from modules.pose.Pose import PoseDict
 from ..GeneratorTracker import GeneratorTracker
 
 from modules.tracker.Tracklet import Tracklet

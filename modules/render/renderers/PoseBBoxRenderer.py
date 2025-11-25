@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 
 from modules.DataHub import DataHub, DataType, PoseDataTypes
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 from modules.render.renderers.RendererBase import RendererBase
 from modules.utils.PointsAndRects import Rect
 
@@ -45,7 +45,7 @@ class PoseBBoxRenderer(RendererBase):
 
 
     def update(self) -> None:
-        pose: Pose | None = self._data.get_item(DataType(self.data_type), self._track_id)
+        pose: Frame | None = self._data.get_item(DataType(self.data_type), self._track_id)
 
         if pose is None:
             self._bbox_rect = None

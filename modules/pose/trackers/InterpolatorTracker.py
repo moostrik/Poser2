@@ -5,7 +5,7 @@ from traceback import print_exc
 from time import monotonic
 from typing import Callable
 
-from modules.pose.Pose import Pose, PoseDict
+from modules.pose.Frame import Frame, FrameDict
 from modules.pose.nodes.Nodes import InterpolatorNode
 from .TrackerBase import TrackerBase
 
@@ -30,7 +30,7 @@ class InterpolatorTracker(TrackerBase):
             for id in range(num_tracks)
         }
 
-    def submit(self, poses: PoseDict) -> None:
+    def submit(self, poses: FrameDict) -> None:
         """Submit target poses for interpolation."""
 
         # Reset interpolators for poses that are no longer present
@@ -47,10 +47,10 @@ class InterpolatorTracker(TrackerBase):
             print(f"InterpolatorTracker: Error submitting pose {id}: {e}")
             print_exc()
 
-    def update(self, time_stamp: float | None = None) -> PoseDict:
+    def update(self, time_stamp: float | None = None) -> FrameDict:
         """Get interpolated poses at current time."""
 
-        interpolated_poses: PoseDict = {}
+        interpolated_poses: FrameDict = {}
 
         if time_stamp is None:
             time_stamp = monotonic()
@@ -59,9 +59,9 @@ class InterpolatorTracker(TrackerBase):
             for id, pipeline in self._interpolator_pipeline.items():
                 # If there are multiple interpolators per track, you may want to combine their outputs.
                 # Here, we just use the first interpolator's output.
-                pose: Pose | None = None
+                pose: Frame | None = None
                 for node in pipeline:
-                    interpolated_pose: Pose | None = node.update(time_stamp)
+                    interpolated_pose: Frame | None = node.update(time_stamp)
                     attractor: str = node.attr_name
                     if interpolated_pose is not None:
                         if pose is None:

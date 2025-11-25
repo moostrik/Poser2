@@ -7,7 +7,7 @@ from pythonosc import udp_client
 from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import PointLandmark
 from modules.pose.features.AngleSymmetry import SymmetryElement
 from modules.data.depricated.RenderDataHub_old import RenderDataHub_Old

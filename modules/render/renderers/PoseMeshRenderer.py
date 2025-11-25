@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.gl.Mesh import Mesh
 
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 
 from modules.DataHub import DataHub, DataType, PoseDataTypes
 from modules.render.renderers.PoseMeshUtils import PoseMeshUtils, POSE_VERTEX_INDICES, PoseVertexData
@@ -23,7 +23,7 @@ class PoseMeshRenderer(RendererBase):
         self._data: DataHub = data
         self._mesh: Mesh = Mesh()
         self._is_active: bool = False
-        self._p_cam_poses: set[Pose] = set()
+        self._p_cam_poses: set[Frame] = set()
 
         self.data_type: PoseDataTypes = data_type
         self.line_width: float = line_width
@@ -42,7 +42,7 @@ class PoseMeshRenderer(RendererBase):
         self._mesh.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        pose: Pose | None = self._data.get_item(DataType(self.data_type), self._track_id)
+        pose: Frame | None = self._data.get_item(DataType(self.data_type), self._track_id)
 
         if pose is None:
             self._is_active = False

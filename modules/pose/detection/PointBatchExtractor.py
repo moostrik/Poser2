@@ -6,7 +6,7 @@ import numpy as np
 from modules.pose.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput
 from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin
-from modules.pose.Pose import PoseDict
+from modules.pose.Frame import FrameDict
 
 
 class PointBatchExtractor(PoseDictCallbackMixin):
@@ -25,7 +25,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         self._detection = detection
         self._lock = Lock()
         self._batch_counter: int = 0
-        self._waiting_batches: dict[int, tuple[PoseDict, list[int]]] = {}
+        self._waiting_batches: dict[int, tuple[FrameDict, list[int]]] = {}
         self._images: dict[int, np.ndarray] = {}
 
         self._detection.register_callback(self._on_detection_result)
@@ -39,7 +39,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         with self._lock:
             self._images = images
 
-    def process(self, poses: PoseDict) -> None:
+    def process(self, poses: FrameDict) -> None:
         """Submit poses for async processing. Results broadcast via callbacks.
 
         Args:
@@ -71,14 +71,14 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         are silently ignored to prioritize real-time performance over completeness.
         """
         with self._lock:
-            batch_data: tuple[PoseDict, list[int]] | None = self._waiting_batches.pop(output.batch_id, None)
+            batch_data: tuple[FrameDict, list[int]] | None = self._waiting_batches.pop(output.batch_id, None)
 
         if not batch_data:
             print(f"Point2DExtractor Warning: No waiting batch for batch_id {output.batch_id} (possible reset during processing)")
             return
 
         original_poses, tracklet_ids = batch_data
-        result_poses: PoseDict = {}
+        result_poses: FrameDict = {}
 
         if output.processed:
             for idx, tracklet_id in enumerate(tracklet_ids):

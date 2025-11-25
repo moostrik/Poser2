@@ -4,7 +4,7 @@ from threading import Lock
 from modules.pose.features.base import BaseFeature
 
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
-from modules.pose.Pose import Pose, PoseField
+from modules.pose.Frame import Frame, FrameField
 
 
 class ValidatorConfig(NodeConfigBase):
@@ -35,7 +35,7 @@ class FeatureValidator(FilterNode):
         validator = FeatureValidator(config, PoseField.points)
     """
 
-    def __init__(self, config: ValidatorConfig, pose_field: PoseField) -> None:
+    def __init__(self, config: ValidatorConfig, pose_field: FrameField) -> None:
         if not issubclass(pose_field.get_type(), BaseFeature):
             raise ValueError(f"PoseField '{pose_field.value}' is not a feature field")
 
@@ -52,7 +52,7 @@ class FeatureValidator(FilterNode):
     def config(self) -> ValidatorConfig:
         return self._config
 
-    def process(self, pose: Pose) -> Pose:
+    def process(self, pose: Frame) -> Frame:
         """Validate feature data and print any errors."""
         feature_data = pose.get_feature(self._pose_field)
 
@@ -80,31 +80,31 @@ class FeatureValidator(FilterNode):
 class BBoxValidator(FeatureValidator):
     """Validates bounding box feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, PoseField.bbox)
+        super().__init__(config, FrameField.bbox)
 
 
 class PointValidator(FeatureValidator):
     """Validates point feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, PoseField.points)
+        super().__init__(config, FrameField.points)
 
 
 class AngleValidator(FeatureValidator):
     """Validates angle feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, PoseField.angles)
+        super().__init__(config, FrameField.angles)
 
 
 class AngleVelValidator(FeatureValidator):
     """Validates angle velocity feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, PoseField.angle_vel)
+        super().__init__(config, FrameField.angle_vel)
 
 
 class AngleSymValidator(FeatureValidator):
     """Validates symmetry feature data integrity."""
     def __init__(self, config: ValidatorConfig) -> None:
-        super().__init__(config, PoseField.angle_sym)
+        super().__init__(config, FrameField.angle_sym)
 
 
 class PoseValidator(FilterNode):
@@ -128,7 +128,7 @@ class PoseValidator(FilterNode):
     def config(self) -> ValidatorConfig:
         return self._config
 
-    def process(self, pose: Pose) -> Pose:
+    def process(self, pose: Frame) -> Frame:
         """Validate all features."""
         pose = self._angle_validator.process(pose)
         pose = self._point_validator.process(pose)

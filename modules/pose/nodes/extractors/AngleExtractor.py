@@ -5,7 +5,7 @@ from dataclasses import replace
 from modules.pose.features import Angles
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.nodes._utils.AngleUtils import AngleUtils
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 
 
 class AngleExtractor(FilterNode):
@@ -19,7 +19,7 @@ class AngleExtractor(FilterNode):
     rotation offsets and symmetric mirroring for right-side joints.
     """
 
-    def process(self, pose: Pose) -> Pose:
+    def process(self, pose: Frame) -> Frame:
         """Compute angles for all poses and emit enriched results."""
         angles: Angles = AngleUtils.from_points(pose.points)
         return replace(pose, angles=angles)

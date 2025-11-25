@@ -11,7 +11,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 
 from modules.DataHub import DataHub, DataType, PoseDataTypes
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import PointLandmark
 from modules.render.renderers import CamImageRenderer
 
@@ -34,7 +34,7 @@ class CentreCamLayer(LayerBase):
         self._fbo: SwapFbo = SwapFbo()
         self._crop_fbo: Fbo = Fbo()
         self._image_renderer: CamImageRenderer = image_renderer
-        self._p_pose: Pose | None = None
+        self._p_pose: Frame | None = None
 
         self._safe_eye_midpoint: Point2f = Point2f(0.5, 0.5)
         self._safe_height: float = 0.5
@@ -83,7 +83,7 @@ class CentreCamLayer(LayerBase):
 
         key: int = self._cam_id
 
-        pose: Pose | None = self._data_hub.get_item(DataType(self.data_type), key)
+        pose: Frame | None = self._data_hub.get_item(DataType(self.data_type), key)
 
         if pose is self._p_pose:
             return # no update needed

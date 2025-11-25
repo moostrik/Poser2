@@ -4,7 +4,7 @@ from threading import Lock
 from typing import Callable, Generic, TypeVar
 from traceback import print_exc
 
-from modules.pose.Pose import Pose, PoseDict, PoseCallback, PoseDictCallback
+from modules.pose.Frame import Frame, FrameDict, FrameCallback, FrameDictCallback
 
 T = TypeVar('T')
 Callback = Callable[[T], None]
@@ -55,10 +55,10 @@ class PoseCallbackMixin:
 
     def __init__(self):
         """Initialize callback system."""
-        self._pose_callbacks: set[PoseCallback] = set()
+        self._pose_callbacks: set[FrameCallback] = set()
         self._pose_callback_lock = Lock()
 
-    def _notify_pose_callbacks(self, pose: Pose) -> None:
+    def _notify_pose_callbacks(self, pose: Frame) -> None:
         """Emit callbacks with pose.
 
         Broadcasts pose to all registered callbacks in a thread-safe manner.
@@ -77,7 +77,7 @@ class PoseCallbackMixin:
                     print_exc()
 
 
-    def add_pose_callback(self, callback: PoseCallback) -> None:
+    def add_pose_callback(self, callback: FrameCallback) -> None:
         """Register output callback.
 
         Args:
@@ -86,7 +86,7 @@ class PoseCallbackMixin:
         with self._pose_callback_lock:
             self._pose_callbacks.add(callback)
 
-    def remove_pose_callback(self, callback: PoseCallback) -> None:
+    def remove_pose_callback(self, callback: FrameCallback) -> None:
         """Unregister output callback.
 
         Args:
@@ -115,10 +115,10 @@ class PoseDictCallbackMixin:
 
     def __init__(self):
         """Initialize callback system."""
-        self._poses_callbacks: set[PoseDictCallback] = set()
+        self._poses_callbacks: set[FrameDictCallback] = set()
         self._poses_callback_lock = Lock()
 
-    def _notify_poses_callbacks(self, poses: PoseDict) -> None:
+    def _notify_poses_callbacks(self, poses: FrameDict) -> None:
         """Emit callbacks with poses.
 
         Broadcasts poses to all registered callbacks in a thread-safe manner.
@@ -136,7 +136,7 @@ class PoseDictCallbackMixin:
                     print(f"{self.__class__.__name__}: Error in callback: {e}")
                     print_exc()
 
-    def add_poses_callback(self, callback: PoseDictCallback) -> None:
+    def add_poses_callback(self, callback: FrameDictCallback) -> None:
         """Register output callback.
 
         Args:
@@ -145,7 +145,7 @@ class PoseDictCallbackMixin:
         with self._poses_callback_lock:
             self._poses_callbacks.add(callback)
 
-    def remove_poses_callback(self, callback: PoseDictCallback) -> None:
+    def remove_poses_callback(self, callback: FrameDictCallback) -> None:
         """Unregister output callback.
 
         Args:

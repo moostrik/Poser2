@@ -4,7 +4,7 @@ from threading import Lock
 from traceback import print_exc
 from typing import Callable, Generic, TypeVar
 
-from modules.pose.Pose import Pose, PoseDict
+from modules.pose.Frame import Frame, FrameDict
 from modules.pose.nodes.Nodes import ProcessorNode
 from .TrackerBase import TrackerBase
 
@@ -36,10 +36,10 @@ class ProcessorTracker(TrackerBase, Generic[TInput, TOutput]):
         for id, input_data in input_data_dict.items():
             self._processors[id].submit(input_data)
 
-    def process(self, poses: PoseDict) -> dict[int, TOutput]:
+    def process(self, poses: FrameDict) -> dict[int, TOutput]:
         """Process poses to produce derived outputs. """
 
-        outtput_pose_dict: dict[int, Pose] = {}
+        outtput_pose_dict: dict[int, Frame] = {}
         output_data_dict: dict[int, TOutput] = {}
 
         for id, pose in poses.items():

@@ -12,7 +12,7 @@ from typing import Callable
 import pandas as pd
 import numpy as np
 
-from modules.pose.Pose import Pose, PoseDict
+from modules.pose.Frame import Frame, FrameDict
 from modules.pose.features.Angles import Angles, ANGLE_LANDMARK_NAMES, ANGLE_NUM_LANDMARKS
 
 # Local application imports
@@ -29,7 +29,7 @@ class PDStreamInput:
     is_removed: bool
 
     @classmethod
-    def from_pose(cls, pose: Pose) -> 'PDStreamInput':
+    def from_pose(cls, pose: Frame) -> 'PDStreamInput':
         return cls(
             track_id=pose.track_id,
             time_stamp=pose.time_stamp,  # Now a float
@@ -146,7 +146,7 @@ class PDStreamManager:
                 processor.terminate()
                 processor.join(timeout=1.0)
 
-    def submit(self, poses: PoseDict) -> None:
+    def submit(self, poses: FrameDict) -> None:
         """Add pose to the appropriate processor's queue based on pose id."""
         for pose in poses.values():
             try:

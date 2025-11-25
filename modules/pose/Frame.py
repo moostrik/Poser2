@@ -10,7 +10,7 @@ from enum import IntEnum
 
 
 @dataclass(frozen=True)
-class Pose: #Poseframe
+class Frame:
     """Immutable pose data structure"""
     track_id: int
     cam_id: int
@@ -25,7 +25,7 @@ class Pose: #Poseframe
     angle_sym: AngleSymmetry =  field(default_factory=AngleSymmetry.create_dummy)
     motion_time: float =        field(default=0.0)
 
-    def get_feature(self, feature: 'PoseField') -> Any:
+    def get_feature(self, feature: 'FrameField') -> Any:
         """Get a feature by its Enum value"""
         return getattr(self, feature.name)
 
@@ -33,12 +33,12 @@ class Pose: #Poseframe
         return (f"Pose(id={self.track_id}, points={self.points.valid_count}")
 
 
-PoseCallback = Callable[[Pose], Any]
-PoseDict = dict[int, Pose]
-PoseDictCallback = Callable[[PoseDict], Any]
+FrameCallback = Callable[[Frame], Any]
+FrameDict = dict[int, Frame]
+FrameDictCallback = Callable[[FrameDict], Any]
 
 
-class PoseField(IntEnum):
+class FrameField(IntEnum):
     track_id =      0
     cam_id =        1
     time_stamp =    2
@@ -51,7 +51,7 @@ class PoseField(IntEnum):
 
     def get_type(self) -> type:
         """Get the feature class for this pose field using Pose type hints."""
-        pose_type_hints = get_type_hints(Pose)
+        pose_type_hints = get_type_hints(Frame)
         if self.name not in pose_type_hints:
             raise ValueError(f"PoseField '{self.name}' is not a feature field")
         return pose_type_hints[self.name]
@@ -84,8 +84,8 @@ class PoseField(IntEnum):
 # Validation: Check that all enum values correspond to dataclass fields
 _DEPRECATED_FIELDS = {"is_removed"}  # Fields that don't need enum entries
 
-_pose_field_names: set[str] = {f.name for f in fields(Pose)} - _DEPRECATED_FIELDS
-_enum_names: set[str] = {member.name for member in PoseField}
+_pose_field_names: set[str] = {f.name for f in fields(Frame)} - _DEPRECATED_FIELDS
+_enum_names: set[str] = {member.name for member in FrameField}
 _missing_in_enum: set[str] = _pose_field_names - _enum_names
 _missing_in_dataclass: set[str] = _enum_names - _pose_field_names
 

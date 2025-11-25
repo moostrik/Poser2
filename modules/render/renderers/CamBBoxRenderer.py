@@ -6,7 +6,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataType, PoseDataTypes
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 from modules.render.renderers.RendererBase import RendererBase
 from modules.utils.PointsAndRects import Rect
 
@@ -47,7 +47,7 @@ class CamBBoxRenderer(RendererBase):
         glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
     def update(self) -> None:
-        cam_poses: set[Pose] = self._data.get_items_for_cam(DataType(self.data_type), self._cam_id)
+        cam_poses: set[Frame] = self._data.get_items_for_cam(DataType(self.data_type), self._cam_id)
         self._cam_bbox_rects = []
         for pose in cam_poses:
             self._cam_bbox_rects.append(pose.bbox.to_rect())

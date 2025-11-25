@@ -4,7 +4,7 @@ import time
 # Pose imports
 from modules.pose.nodes.Nodes import NodeBase
 from modules.pose.features import BBox
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 from modules.tracker.Tracklet import Tracklet
 
 
@@ -19,7 +19,7 @@ class TrackletExtractor(NodeBase):
     - bbox: Bounding box feature from tracklet rect
     """
 
-    def extract(self, tracklet: Tracklet) -> Pose:
+    def extract(self, tracklet: Tracklet) -> Frame:
         """Extract pose data from tracklet.
 
         Args:
@@ -31,7 +31,7 @@ class TrackletExtractor(NodeBase):
         # Extract bounding box from tracklet
         bbox = BBox.from_rect(tracklet.roi)
 
-        return Pose(
+        return Frame(
             track_id=tracklet.id,
             cam_id=tracklet.cam_id,
             time_stamp=time.time(),

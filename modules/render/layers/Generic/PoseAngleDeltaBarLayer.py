@@ -8,7 +8,7 @@ from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.features import PoseFeatureType
-from modules.pose.Pose import Pose, PoseField
+from modules.pose.Frame import Frame, FrameField
 
 from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
@@ -27,7 +27,7 @@ class PoseAngleDeltaBarLayer(LayerBase):
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
-        self._p_pose: Pose | None = None
+        self._p_pose: Frame | None = None
         self._labels: list[str] = []
 
         self.data_type: PoseDataTypes = data_type
@@ -63,7 +63,7 @@ class PoseAngleDeltaBarLayer(LayerBase):
 
         key: int = self._track_id
 
-        pose: Pose | None = self._data_hub.get_item(DataType(self.data_type), key)
+        pose: Frame | None = self._data_hub.get_item(DataType(self.data_type), key)
 
         if pose is self._p_pose:
             return # no update needed

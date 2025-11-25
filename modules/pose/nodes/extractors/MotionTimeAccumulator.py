@@ -6,7 +6,7 @@ import numpy as np
 
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 
 
 class MotionTimeAccumulator(FilterNode):
@@ -17,7 +17,7 @@ class MotionTimeAccumulator(FilterNode):
         self.prev_time_stamp: float | None = None
 
 
-    def process(self, pose: Pose) -> Pose:
+    def process(self, pose: Frame) -> Frame:
         """Compute deltas for all poses and emit enriched results."""
 
         if self.prev_time_stamp is None:

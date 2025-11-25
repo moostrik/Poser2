@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Generic, TypeVar
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 
 
 class NodeConfigBase:
@@ -76,7 +76,7 @@ class FilterNode(NodeBase):
     """Base class for filter extractor nodes that modify/transform poses."""
 
     @abstractmethod
-    def process(self, pose: Pose) -> Pose:
+    def process(self, pose: Frame) -> Frame:
         """Process a pose and return the result immediately."""
         pass
 
@@ -93,12 +93,12 @@ class InterpolatorNode(NodeBase):
     """Base class for interpolator nodes that smooth/blend poses."""
 
     @abstractmethod
-    def submit(self, pose: Pose | None) -> None:
+    def submit(self, pose: Frame | None) -> None:
         """Set interpolation target from input pose. Called at input frequency (~30 FPS)."""
         pass
 
     @abstractmethod
-    def update(self, time_stamp: float | None = None) -> Pose | None:
+    def update(self, time_stamp: float | None = None) -> Frame | None:
         """Get interpolated pose. Called at render frequency (~60+ FPS). Returns None if not ready."""
         pass
 
@@ -118,7 +118,7 @@ class GeneratorNode(NodeBase, Generic[TInput]):
         pass
 
     @abstractmethod
-    def update(self, time_stamp: float | None = None) -> Pose:
+    def update(self, time_stamp: float | None = None) -> Frame:
         """Generate a new pose."""
         pass
 
@@ -132,6 +132,6 @@ class ProcessorNode(NodeBase, Generic[TInput, TOutput]):
         pass
 
     @abstractmethod
-    def process(self, pose: Pose) -> tuple[Pose, TOutput]: # see if we can remove Pose from output
+    def process(self, pose: Frame) -> tuple[Frame, TOutput]: # see if we can remove Pose from output
         """Process pose using stored context to produce derived output."""
         pass

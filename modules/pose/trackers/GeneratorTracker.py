@@ -3,7 +3,7 @@
 from traceback import print_exc
 from typing import Callable, Generic, TypeVar
 
-from modules.pose.Pose import PoseDict
+from modules.pose.Frame import FrameDict
 from modules.pose.nodes.Nodes import GeneratorNode
 from .TrackerBase import TrackerBase
 
@@ -34,10 +34,10 @@ class GeneratorTracker(TrackerBase, Generic[TInput]):
 
 
 
-    def update(self) -> PoseDict:
+    def update(self) -> FrameDict:
         """Generate poses from all ready generators."""
 
-        generated_poses: PoseDict = {}
+        generated_poses: FrameDict = {}
 
         for input_id, generator in self._generators.items():
             try:

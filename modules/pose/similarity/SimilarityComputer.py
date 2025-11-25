@@ -14,7 +14,7 @@ from modules.pose.similarity.features.SimilarityBatch import SimilarityBatch, Si
 
 
 from modules.pose.similarity._utils.SimilarityUtils import SimilarityUtils
-from modules.pose.Pose import PoseDict
+from modules.pose.Frame import FrameDict
 
 # Local application imports
 from modules.Settings import Settings
@@ -36,7 +36,7 @@ class SimilarityComputer:
 
         # INPUTS - Just store the latest data with a lock
         self._input_lock = threading.Lock()
-        self._input_poses: PoseDict = {}
+        self._input_poses: FrameDict = {}
         self._update_event = threading.Event()
 
         # OUTPUT AND CALLBACKS
@@ -72,7 +72,7 @@ class SimilarityComputer:
 
                 # Get input data
                 with self._input_lock:
-                    poses: PoseDict = self._input_poses
+                    poses: FrameDict = self._input_poses
 
                 # Process correlations
                 batch: SimilarityBatch  = self._evaluate_pose_similarity(poses)
@@ -89,7 +89,7 @@ class SimilarityComputer:
                 print(f"PoseCorrelator: Processing error: {e}")
                 traceback.print_exc()
 
-    def _evaluate_pose_similarity(self, poses: PoseDict) -> SimilarityBatch :
+    def _evaluate_pose_similarity(self, poses: FrameDict) -> SimilarityBatch :
         """Process all pose pairs and compute their correlations."""
         # Extract angle data from actively tracked poses
         angles: dict[int, Angles] = {
@@ -119,7 +119,7 @@ class SimilarityComputer:
 
         return SimilarityBatch(similarities=similarities)
 
-    def submit(self, poses: PoseDict) -> None:
+    def submit(self, poses: FrameDict) -> None:
         """Update input poses and trigger correlation processing.
 
         Args:

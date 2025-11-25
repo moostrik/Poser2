@@ -22,7 +22,7 @@ from modules.pose.nodes._utils.VectorRateLimit import VectorRateLimit, AngleRate
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
 from modules.pose.nodes.Nodes import NodeConfigBase
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
-from modules.pose.Pose import Pose, PoseField
+from modules.pose.Frame import Frame, FrameField
 
 
 class RateLimiterConfig(NodeConfigBase):
@@ -42,11 +42,11 @@ class RateLimiterConfig(NodeConfigBase):
 class FeatureRateLimiter(FeatureInterpolatorBase[RateLimiterConfig]):
     """Generic pose feature rate limiter."""
 
-    _INTERP_MAP: defaultdict[PoseField, type] = defaultdict(
+    _INTERP_MAP: defaultdict[FrameField, type] = defaultdict(
         lambda: VectorRateLimit,
         {
-            PoseField.angles: AngleRateLimit,
-            PoseField.points: PointRateLimit,
+            FrameField.angles: AngleRateLimit,
+            FrameField.points: PointRateLimit,
         }
     )
 
@@ -72,24 +72,24 @@ class FeatureRateLimiter(FeatureInterpolatorBase[RateLimiterConfig]):
 # Convenience classes
 class BBoxRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterConfig) -> None:
-        super().__init__(config, PoseField.bbox)
+        super().__init__(config, FrameField.bbox)
 
 
 class PointRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterConfig) -> None:
-        super().__init__(config, PoseField.points)
+        super().__init__(config, FrameField.points)
 
 
 class AngleRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterConfig) -> None:
-        super().__init__(config, PoseField.angles)
+        super().__init__(config, FrameField.angles)
 
 
 class AngleVelRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterConfig) -> None:
-        super().__init__(config, PoseField.angle_vel)
+        super().__init__(config, FrameField.angle_vel)
 
 
 class AngleSymRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterConfig) -> None:
-        super().__init__(config, PoseField.angle_sym)
+        super().__init__(config, FrameField.angle_sym)

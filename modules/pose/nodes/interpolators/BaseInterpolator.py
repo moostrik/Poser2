@@ -24,7 +24,7 @@ import numpy as np
 # Pose imports
 from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes.Nodes import InterpolatorNode, NodeConfigBase
-from modules.pose.Pose import Pose, PoseField
+from modules.pose.Frame import Frame, FrameField
 
 # Generic type variable for config
 ConfigType = TypeVar('ConfigType', bound=NodeConfigBase)
@@ -56,14 +56,14 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
 
     # Registry mapping feature classes to interpolator classes
     # Subclasses must override this with their specific interpolator types
-    _INTERP_MAP: defaultdict[PoseField, type]
+    _INTERP_MAP: defaultdict[FrameField, type]
 
-    def __init__(self, config: ConfigType, pose_field: PoseField):
+    def __init__(self, config: ConfigType, pose_field: FrameField):
         """Initialize the feature interpolator."""
         self._config: ConfigType = config
-        self._pose_field: PoseField = pose_field
+        self._pose_field: FrameField = pose_field
         self._lock: Lock = Lock()
-        self._last_pose: Pose | None = None
+        self._last_pose: Frame | None = None
         self._interpolator: InterpolatorProtocol = self._create_interpolator()
         self._config.add_listener(self._on_config_changed)
 
@@ -98,7 +98,7 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
         """Return the attribute name this interpolator processes."""
         return self._pose_field.name
 
-    def submit(self, pose: Pose) -> None:
+    def submit(self, pose: Frame) -> None:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
         feature_data = pose.get_feature(self._pose_field)
 
@@ -106,7 +106,7 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
             self._interpolator.set_target(feature_data.values)
             self._last_pose = pose
 
-    def update(self, time_stamp: float | None = None) -> Pose | None:
+    def update(self, time_stamp: float | None = None) -> Frame | None:
         """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS).
 
         Returns:

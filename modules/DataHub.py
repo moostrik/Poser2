@@ -9,7 +9,7 @@ import numpy as np
 
 # Local application imports for setter types
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
-from modules.pose.Pose import PoseDict
+from modules.pose.Frame import FrameDict
 from modules.pose.pd_stream.PDStream import PDStreamData
 from modules.pose.similarity import SimilarityBatch
 from modules.tracker.Tracklet import TrackletDict
@@ -99,7 +99,7 @@ class DataHub:
     def set_tracklets(self, tracklets: TrackletDict) -> None:
         self.set_dict(DataType.tracklet, tracklets)
 
-    def set_poses(self, data_type: DataType, poses: PoseDict) -> None:
+    def set_poses(self, data_type: DataType, poses: FrameDict) -> None:
         self.set_dict(data_type, poses)
 
     def set_pd_stream(self, pd_stream: PDStreamData) -> None:

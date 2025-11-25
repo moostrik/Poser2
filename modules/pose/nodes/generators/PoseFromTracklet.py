@@ -1,7 +1,7 @@
 import time
 
 from modules.pose.nodes.Nodes import GeneratorNode
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 from modules.pose.features import BBox
 from modules.tracker.Tracklet import Tracklet
 
@@ -28,7 +28,7 @@ class PoseFromTracklet(GeneratorNode[Tracklet]):
         """
         self._tracklet = input_data
 
-    def update(self, time_stamp: float | None = None) -> Pose:
+    def update(self, time_stamp: float | None = None) -> Frame:
         """Generate a basic Pose from stored tracklet.
 
         Args:
@@ -48,7 +48,7 @@ class PoseFromTracklet(GeneratorNode[Tracklet]):
         if not time_stamp:
             time_stamp = self._tracklet.time_stamp
 
-        return Pose(
+        return Frame(
             track_id=self._tracklet.id,
             cam_id=self._tracklet.cam_id,
             bbox=bounding_box,

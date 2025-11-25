@@ -5,7 +5,7 @@ import numpy as np
 
 # Local application imports
 from modules.gl.Mesh import Mesh
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 from modules.render.renderers.PoseMeshUtils import PoseVertexData, PoseMeshUtils, POSE_VERTEX_INDICES
 from modules.DataHub import DataHub, DataType, PoseDataTypes
 from modules.render.renderers.RendererBase import RendererBase
@@ -19,7 +19,7 @@ class AllMeshRenderer(RendererBase):
         self._type: PoseDataTypes = type
         self.meshes: dict[int, Mesh] = {}
 
-        self._p_pose: dict[int, Pose] = {}
+        self._p_pose: dict[int, Frame] = {}
 
     def allocate(self) -> None:
         for i in range(self._amount):
@@ -39,7 +39,7 @@ class AllMeshRenderer(RendererBase):
 
     def update(self) -> None:
         for id in range(self._amount):
-            pose: Pose | None = self._data.get_item(DataType(self._type), id)
+            pose: Frame | None = self._data.get_item(DataType(self._type), id)
             if pose == self._p_pose.get(id, None):
                 continue
             pose_mesh: Mesh | None = self.meshes.get(id, None)

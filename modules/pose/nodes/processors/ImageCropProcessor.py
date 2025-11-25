@@ -6,7 +6,7 @@ import numpy as np
 from modules.pose.features import BBox
 from modules.pose.nodes._utils.ImageProcessor import ImageProcessor
 from modules.pose.nodes.Nodes import ProcessorNode, NodeConfigBase
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 
 class ImageCropProcessorConfig(NodeConfigBase):
     """Configuration for pose chase interpolation with automatic change notification."""
@@ -33,7 +33,7 @@ class ImageCropProcessor(ProcessorNode[np.ndarray, np.ndarray]):
         """Set the full camera image."""
         self._image = input_data
 
-    def process(self, pose: Pose, time_stamp: float | None = None) -> tuple[Pose, np.ndarray]:
+    def process(self, pose: Frame, time_stamp: float | None = None) -> tuple[Frame, np.ndarray]:
         """Crop image based on pose bbox."""
 
         if self._image is None:

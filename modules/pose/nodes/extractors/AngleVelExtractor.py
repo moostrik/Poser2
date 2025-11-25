@@ -6,7 +6,7 @@ from numpy import pi
 # Pose imports
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.features import Angles, AngleVelocity
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 
 
 class AngleVelExtractor(FilterNode):
@@ -20,9 +20,9 @@ class AngleVelExtractor(FilterNode):
 
     def __init__(self) -> None:
         super().__init__()
-        self._prev_pose: Pose | None = None
+        self._prev_pose: Frame | None = None
 
-    def process(self, pose: Pose) -> Pose:
+    def process(self, pose: Frame) -> Frame:
         # Compute deltas (or empty if no previous pose)
         if self._prev_pose is None:
             angle_vel: AngleVelocity = AngleVelocity.create_dummy()
@@ -46,7 +46,7 @@ class AngleVelExtractor(FilterNode):
         self._prev_pose = pose
 
         # Create enriched pose
-        enriched_pose: Pose = replace(
+        enriched_pose: Frame = replace(
             pose,
             angle_vel=angle_vel
         )

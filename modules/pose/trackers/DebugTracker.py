@@ -1,7 +1,7 @@
 """Tracker that logs pose lifecycle events (new, reset, updated)."""
 
 from .TrackerBase import TrackerBase
-from modules.pose.Pose import PoseDict
+from modules.pose.Frame import FrameDict
 
 
 class DebugTracker(TrackerBase):
@@ -25,7 +25,7 @@ class DebugTracker(TrackerBase):
         self._tracked_ids: set[int] = set()
         self._log_updates = log_updates
 
-    def process(self, poses: PoseDict) -> PoseDict:
+    def process(self, poses: FrameDict) -> FrameDict:
         """Track pose lifecycle and log events."""
         current_ids = set(poses.keys())
 

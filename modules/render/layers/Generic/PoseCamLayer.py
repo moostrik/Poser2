@@ -11,7 +11,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 
 from modules.DataHub import DataHub, DataType, PoseDataTypes
-from modules.pose.Pose import Pose
+from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import PointLandmark
 from modules.render.renderers import CamImageRenderer
 
@@ -27,7 +27,7 @@ class PoseCamLayer(LayerBase):
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
         self._image_renderer: CamImageRenderer = image_renderer
-        self._p_pose: Pose | None = None
+        self._p_pose: Frame | None = None
 
         self.data_type: PoseDataTypes = data_type
 
@@ -46,7 +46,7 @@ class PoseCamLayer(LayerBase):
     def update(self) -> None:
         key: int = self._cam_id
 
-        pose: Pose | None = self._data_hub.get_item(DataType(self.data_type), key)
+        pose: Frame | None = self._data_hub.get_item(DataType(self.data_type), key)
 
         if pose is self._p_pose:
             return # no update needed

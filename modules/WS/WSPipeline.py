@@ -15,7 +15,7 @@ from modules.WS.WSOutput import WSOutput, WSOutputCallback
 from modules.WS.WSUdpSender import WSUdpSender, WSUdpSenderSettings
 
 from modules.Settings import Settings
-from modules.pose.Pose import Pose, PoseDict
+from modules.pose.Frame import Frame, FrameDict
 from modules.pose.pd_stream.PDStream import PDStreamData
 
 from modules.gl.Utils import FpsCounter
@@ -30,7 +30,7 @@ class WSPipeline(Thread):
         super().__init__()
 
         self._stop_event = Event()
-        self.pose_input_queue: Queue[Pose] = Queue()
+        self.pose_input_queue: Queue[Frame] = Queue()
         self.pose_stream_input_queue: Queue[PDStreamData] = Queue()
 
         rate: int = general_settings.light_rate
@@ -102,7 +102,7 @@ class WSPipeline(Thread):
                 next_time = time()
 
     def _update(self) -> None:
-        poses: list[Pose] = self.get_poses()
+        poses: list[Frame] = self.get_poses()
         streams: list[PDStreamData] = self.get_pose_streams()
 
         self.data_manager.add_poses(poses)
@@ -126,15 +126,15 @@ class WSPipeline(Thread):
         self.gui.update_fps(self.FPS.get_fps())
 
     # SETTERS
-    def add_poses(self, poses: PoseDict) -> None:
+    def add_poses(self, poses: FrameDict) -> None:
         for pose in poses.values():
             self.pose_input_queue.put(pose)
 
-    def get_poses(self) -> list[Pose]:
-        poses: list[Pose] = []
+    def get_poses(self) -> list[Frame]:
+        poses: list[Frame] = []
         try:
             while True:
-                pose: Pose = self.pose_input_queue.get_nowait()
+                pose: Frame = self.pose_input_queue.get_nowait()
                 poses.append(pose)
         except Empty:
             pass

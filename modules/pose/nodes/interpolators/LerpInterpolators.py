@@ -20,7 +20,7 @@ from modules.pose.features import Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.VectorLerp import AngleLerp, PointLerp, VectorLerp
 from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
 from modules.pose.nodes.Nodes import NodeConfigBase
-from modules.pose.Pose import Pose, PoseField
+from modules.pose.Frame import Frame, FrameField
 from typing import cast
 
 
@@ -35,15 +35,15 @@ class LerpInterpolatorConfig(NodeConfigBase):
 class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorConfig]):
     """Generic pose feature linear interpolator."""
 
-    _INTERP_MAP: defaultdict[PoseField, type] = defaultdict(
+    _INTERP_MAP: defaultdict[FrameField, type] = defaultdict(
         lambda: VectorLerp,
         {
-            PoseField.angles: AngleLerp,
-            PoseField.points: PointLerp,
+            FrameField.angles: AngleLerp,
+            FrameField.points: PointLerp,
         }
     )
 
-    def __init__(self, config: LerpInterpolatorConfig, pose_field: PoseField):
+    def __init__(self, config: LerpInterpolatorConfig, pose_field: FrameField):
         super().__init__(config, pose_field)
 
     def _create_interpolator(self):
@@ -67,24 +67,24 @@ class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorConfig]):
 # Convenience classes
 class BBoxLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorConfig) -> None:
-        super().__init__(config, PoseField.bbox)
+        super().__init__(config, FrameField.bbox)
 
 
 class PointLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorConfig) -> None:
-        super().__init__(config, PoseField.points)
+        super().__init__(config, FrameField.points)
 
 
 class AngleLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorConfig) -> None:
-        super().__init__(config, PoseField.angles)
+        super().__init__(config, FrameField.angles)
 
 
 class AngleVelLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorConfig) -> None:
-        super().__init__(config, PoseField.angle_vel)
+        super().__init__(config, FrameField.angle_vel)
 
 
 class AngleSymLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, config: LerpInterpolatorConfig) -> None:
-        super().__init__(config, PoseField.angle_sym)
+        super().__init__(config, FrameField.angle_sym)

@@ -8,7 +8,7 @@ from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.features import PoseFeatureType
-from modules.pose.Pose import Pose, PoseField
+from modules.pose.Frame import Frame, FrameField
 
 from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
@@ -22,19 +22,19 @@ from modules.gl.shaders.PoseScalarBar import PoseScalarBar as PoseFeatureShader
 class PoseScalarBarLayer(LayerBase):
     pose_feature_shader = PoseFeatureShader()
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataTypes, feature_type: PoseField,
+    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataTypes, feature_type: FrameField,
                 line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0), range_scale: float = 1.0) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
-        self._p_pose: Pose | None = None
+        self._p_pose: Frame | None = None
         self._labels: list[str] = []
 
         self.data_type: PoseDataTypes = data_type
         # if not feature_type.is_scalar_feature():
         #     raise ValueError(f"PoseScalarBarLayer requires a scalar PoseField, got '{feature_type.name}'")
-        self.feature_type: PoseField = feature_type
+        self.feature_type: FrameField = feature_type
         self.color: tuple[float, float, float, float] = color
         self.bg_alpha: float = 0.4
         self.line_thickness: float = line_thickness
@@ -71,7 +71,7 @@ class PoseScalarBarLayer(LayerBase):
 
         key: int = self._track_id
 
-        pose: Pose | None = self._data_hub.get_item(DataType(self.data_type), key)
+        pose: Frame | None = self._data_hub.get_item(DataType(self.data_type), key)
 
         if pose is self._p_pose:
             return # no update needed
@@ -83,7 +83,7 @@ class PoseScalarBarLayer(LayerBase):
         if pose is None:
             return
 
-        feature = pose.get_feature(PoseField[self.feature_type.name])
+        feature = pose.get_feature(FrameField[self.feature_type.name])
         if not isinstance(feature, PoseFeatureType):
             raise ValueError(f"PoseFeatureLayer expected feature of type PoseFeature, got {type(feature)}")
 
