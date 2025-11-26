@@ -28,6 +28,7 @@ from modules.pose.pd_stream.PDStream import PDStreamManager
 from modules.pose.pd_stream.PDSimilarityComputer import PDStreamComputer
 
 from modules.DataHub import DataHub, DataType
+from modules.inout.SoundOSC import SoundOSC
 
 from modules.render.HDTRenderManager import HDTRenderManager
 
@@ -130,7 +131,8 @@ class Main():
                 lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
                 nodes.AngleVelExtractor,
                 nodes.AngleSymExtractor,
-                nodes.MotionTimeAccumulator,
+                nodes.MotionTimeExtractor,
+                nodes.AgeExtractor,
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
             ]
         )
@@ -159,7 +161,8 @@ class Main():
             [
                 nodes.AngleVelExtractor,
                 nodes.AngleSymExtractor,
-                nodes.MotionTimeAccumulator,
+                nodes.MotionTimeExtractor,
+                nodes.AgeExtractor,
                 lambda: nodes.AngleVelStickyFiller(nodes.StickyFillerConfig(False, False)),
                 lambda: nodes.AngleVelEuroSmoother(self.a_vel_smooth_config),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
@@ -176,6 +179,7 @@ class Main():
 
         # DATA
         self.data_hub = DataHub()
+        self.sound_osc = SoundOSC(self.data_hub, settings)
 
         # RENDER
         # self.WS: Optional[WSPipeline] = None
@@ -231,6 +235,10 @@ class Main():
         # self.pose_interpolation_pipeline.add_poses_callback(self.debug_tracker.process)
 
         self.data_hub.add_update_callback(self.interpolator.update)
+
+
+        self.sound_osc.start()
+        self.data_hub.add_update_callback(self.sound_osc.notify_update)
 
         # DETECTION
         self.pose_detector.start()

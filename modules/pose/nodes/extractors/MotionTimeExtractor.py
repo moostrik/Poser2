@@ -9,7 +9,7 @@ from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame
 
 
-class MotionTimeAccumulator(FilterNode):
+class MotionTimeExtractor(FilterNode):
     """Takes the absolute value of all deltas and adds them to the movement_time field."""
 
     def __init__(self) -> None:

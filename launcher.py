@@ -70,8 +70,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     if args.cameras < len(camera_list):
         camera_list = camera_list[:args.cameras]
 
-    udp_list_sound: list[str] = ['127.0.0.1','10.0.0.81']
-    udp_list_light: list[str] = []
 
     settings.num_players =          args.players
 
@@ -97,6 +95,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.camera_flip_h =        False
     settings.camera_flip_v =        False
     settings.camera_perspective =   0.1
+    settings.camera_720p =          True
 
     settings.video_chunk_length =   10 # in seconds
     settings.video_encoder =        Settings.CoderType.iGPU
@@ -130,8 +129,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.light_rate =           60
 
     settings.udp_port =             8888
-    settings.udp_ips_sound =        udp_list_sound
-    settings.udp_ips_light =        udp_list_light
+    settings.udp_ips_sound =        '127.0.0.1'
+    settings.udp_ips_light =        '127.0.0.1'
 
     settings.render_title =         'White Space'
     settings.render_x =             0

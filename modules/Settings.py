@@ -95,8 +95,8 @@ class Settings():
 
         # UDP SETTINGS
         self.udp_port: int                      = None # type: ignore
-        self.udp_ips_light: list[str]           = None # type: ignore
-        self.udp_ips_sound: list[str]           = None # type: ignore
+        self.udp_ips_light: str                 = None # type: ignore
+        self.udp_ips_sound: str                 = None # type: ignore
 
         # RENDER SETTINGS
         self.render_title: str                  = None # type: ignore

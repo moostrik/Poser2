@@ -24,6 +24,7 @@ class Frame:
     angle_vel: AngleVelocity =  field(default_factory=AngleVelocity.create_dummy)
     angle_sym: AngleSymmetry =  field(default_factory=AngleSymmetry.create_dummy)
     motion_time: float =        field(default=0.0)
+    age: float =                field(default=0.0)
 
     def get_feature(self, feature: 'FrameField') -> Any:
         """Get a feature by its Enum value"""
@@ -48,6 +49,7 @@ class FrameField(IntEnum):
     angle_vel =     6
     angle_sym =     7
     motion_time =   8
+    age =           9
 
     def get_type(self) -> type:
         """Get the feature class for this pose field using Pose type hints."""

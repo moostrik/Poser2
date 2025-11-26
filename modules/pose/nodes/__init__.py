@@ -1,9 +1,10 @@
 """Pose filter modules for processing and enriching pose data."""
 
 from .extractors.AngleExtractor import          AngleExtractor
-from .extractors.AngleVelExtractor import  AngleVelExtractor
-from .extractors.AngleSymExtractor import  AngleSymExtractor
-from .extractors.MotionTimeAccumulator import   MotionTimeAccumulator
+from .extractors.AngleVelExtractor import       AngleVelExtractor
+from .extractors.AngleSymExtractor import       AngleSymExtractor
+from .extractors.AgeExtractor import            AgeExtractor
+from .extractors.MotionTimeExtractor import     MotionTimeExtractor
 
 from .filters.ConfidenceFilters import          ConfidenceFilterConfig, BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfidenceFilter
 from .filters.Predictors import                 PredictorConfig,        BBoxPredictor,          PointPredictor,         AnglePredictor,         AngleVelPredictor,          AngleSymPredictor
