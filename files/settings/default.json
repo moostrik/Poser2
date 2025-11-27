@@ -7,16 +7,14 @@
     "ids": [
       "14442C101136D1D200",
       "14442C10F124D9D600",
-      "14442C10110AD3D200",
-      "14442C1031DDD2D200"
+      "14442C10110AD3D200"
     ],
-    "num": 3,
     "fps": 23.0,
     "yolo": true,
     "color": true,
     "square": true,
     "stereo": false,
-    "hd_ready": false,
+    "hd_ready": true,
     "show_stereo": false,
     "manual": false,
     "flip_h": false,

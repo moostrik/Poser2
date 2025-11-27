@@ -36,7 +36,7 @@ class CorePlayer(Core):
             super().run()
 
     def _setup_pipeline(self, pipeline: Pipeline) -> None: # override
-        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.show_stereo, simulate=True)
+        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, simulate=True)
 
 
     def _setup_queues(self) -> None: # override

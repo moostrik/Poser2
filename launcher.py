@@ -49,26 +49,19 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     if args.cameras < len(settings.camera.ids):
         settings.camera.ids = settings.camera.ids[:args.cameras]
 
-    cam_settings: CamSettings = CamSettings(
-        fps=args.fps,
-        sim_fps=args.fps,
-        sim_enabled=args.simulation,
-        yolo=not args.noyolo,
-        manual=args.cammanual,
-    )
+    settings.camera.fps = args.fps
+    settings.camera.sim_enabled = args.simulation
+    settings.camera.yolo = not args.noyolo
+    settings.camera.manual = args.cammanual
 
-    pose_settings = PoseSettings(
-        max_poses =     num_players,
-        active =        not args.nopose,
-        model_type =    ModelType.NONE if args.nopose else ModelType.SMALL,
-    )
+    settings.pose.active = not args.nopose
+    settings.pose.max_poses = num_players
+    settings.pose.model_type = ModelType.NONE if args.nopose else ModelType.SMALL
 
-    pd_stream_settings = PDStreamSettings(
-        max_poses =             num_players,
-        stream_capacity =       int(10 * args.fps),
-        corr_rate =             args.fps,
-        corr_buffer_duration =  int(3 * args.fps),
-    )
+    settings.pd_stream.max_poses = num_players
+    settings.pd_stream.stream_capacity = int(10 * args.fps)
+    settings.pd_stream.corr_rate = args.fps
+    settings.pd_stream.corr_buffer_duration = int(3 * args.fps)
 
     # Settings.make_paths_absolute(settings, path.dirname(__file__))
     # print(settings)
