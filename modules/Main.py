@@ -47,23 +47,23 @@ class Main():
         self.cameras: list[DepthCam | DepthSimulator] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
-        if settings.camera_simulation:
-            self.player = Player(self.gui, settings)
-            for cam_id in settings.camera_list:
-                self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, settings))
+        if settings.camera.sim_enabled:
+            self.player = Player(self.gui, settings.camera)
+            for cam_id in settings.camera.ids:
+                self.cameras.append(DepthSimulator(self.gui, self.player, cam_id, settings.camera))
         else:
-            self.recorder = Recorder(self.gui, settings)
-            for cam_id in settings.camera_list:
-                camera = DepthCam(self.gui, cam_id, settings)
+            self.recorder = Recorder(self.gui, settings.camera)
+            for cam_id in settings.camera.ids:
+                camera = DepthCam(self.gui, cam_id, settings.camera)
                 self.cameras.append(camera)
-        self.frame_sync_bang = FrameSyncBang(settings, False, 'frame_sync')
+        self.frame_sync_bang = FrameSyncBang(settings.camera, False, 'frame_sync')
 
         # TRACKER
         if settings.tracker_type == TrackerType.PANORAMIC:
             self.tracker = PanoramicTracker(self.gui, settings)
         else:
             self.tracker = OnePerCamTracker(self.gui, settings)
-        self.tracklet_sync_bang = FrameSyncBang(settings, False, 'tracklet_sync')
+        self.tracklet_sync_bang = FrameSyncBang(settings.camera, False, 'tracklet_sync')
 
         # TRACKER POSE BRIDGE
         # a bridge that gathers tracklets and images and "bangs" the pose processing pipeline
@@ -80,16 +80,16 @@ class Main():
 
         # POSE CONFIGURATION
         self.image_crop_config =    nodes.ImageCropProcessorConfig()
-        self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera_fps)
+        self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
         self.point_smooth_config =  nodes.EuroSmootherConfig()
         self.angle_smooth_config =  nodes.EuroSmootherConfig()
         self.a_vel_smooth_config =  nodes.EuroSmootherConfig()
 
-        self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera_fps)
-        self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera_fps)
-        self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera_fps)
+        self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera.fps)
+        self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
+        self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
 
         self.b_box_smooth_gui =     gui.EuroSmootherGui(self.b_box_smooth_config, self.gui, 'BBox')
         self.point_smooth_gui =     gui.EuroSmootherGui(self.point_smooth_config, self.gui, 'Point')

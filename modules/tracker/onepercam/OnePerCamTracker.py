@@ -35,7 +35,7 @@ class OnePerCamTracker(Thread, BaseTracker):
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
 
-        self._num_cams: int =               settings.camera_num
+        self._num_cams: int =               settings.camera.num
         self.tracklet_min_age: int =        settings.tracker_min_age
         self.timeout: float =               settings.tracker_timeout
 

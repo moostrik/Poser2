@@ -188,7 +188,7 @@ class StreamProcessor(Process):
 
         # Store settings values (not the settings object itself)
         self.buffer_capacity: int = settings.pose_stream_capacity
-        self.resample_interval: str = f"{int(1.0 / settings.camera_fps * 1000)}ms"
+        self.resample_interval: str = f"{int(1.0 / settings.camera.fps * 1000)}ms"
 
         # Initialize buffers (will be recreated in child process)
         self.empty_df: pd.DataFrame = pd.DataFrame(columns=ANGLE_LANDMARK_NAMES, dtype=float)

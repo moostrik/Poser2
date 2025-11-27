@@ -5,18 +5,18 @@ import time
 from collections import deque
 
 from modules.cam.depthcam.Definitions import FrameType
-from modules.Settings import Settings
+from modules.cam.Settings import Settings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class FrameSyncBang:
 
     def __init__(self, settings: Settings, verbose: bool = False, stream_name: str = '') -> None:
-        num_cams: int = settings.camera_num
+        num_cams: int = settings.num
         self.verbose: bool = verbose
         self.stream_name: str = stream_name
-        self.max_gap_s: float = 1.0 / settings.camera_fps
-        self.min_bang_interval_s: float = 0.75 / settings.camera_fps
+        self.max_gap_s: float = 1.0 / settings.fps
+        self.min_bang_interval_s: float = 0.75 / settings.fps
         self.last_bang_time_s: float = 0.0
 
         self._timestamp_history: deque[tuple[int, float]] = deque(maxlen=10 * num_cams)

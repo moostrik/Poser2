@@ -10,8 +10,8 @@ class CorePlayer(Core):
 
     def __init__(self, gui, syncplayer: SyncPlayer, device_id: str, settings:Settings) -> None:
 
-        if settings.camera_stereo and not settings.camera_yolo:
-            settings.camera_show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
+        if settings.stereo and not settings.yolo:
+            settings.show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
 
         super().__init__(gui, device_id, settings)
 
@@ -20,7 +20,7 @@ class CorePlayer(Core):
         self.ex_left:   dai.DataInputQueue
         self.ex_right:  dai.DataInputQueue
 
-        self.passthrough: bool = settings.camera_passthrough
+        self.passthrough: bool = settings.sim_passthrough
 
     def start(self) -> None: # override
         if self.passthrough:

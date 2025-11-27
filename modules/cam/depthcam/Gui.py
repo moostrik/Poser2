@@ -1,6 +1,6 @@
 import math
 
-from modules.Settings import Settings
+from modules.cam.Settings import Settings
 from modules.cam.depthcam.CoreSettings import CoreSettings
 from modules.cam.depthcam.Definitions import *
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
@@ -22,10 +22,10 @@ class Gui():
         self.settings: CoreSettings = settings
 
         self.id: str = self.settings.get_id_string()
-        self.simulation: bool = general_settings.camera_simulation
-        self.manual: bool = False if self.simulation else general_settings.camera_manual
-        self.color: bool = False if self.simulation else general_settings.camera_color
-        self.stereo: bool = general_settings.camera_stereo
+        self.simulation: bool = general_settings.sim_enabled
+        self.manual: bool = False if self.simulation else general_settings.manual
+        self.color: bool = False if self.simulation else general_settings.color
+        self.stereo: bool = general_settings.stereo
         self.ftn: list[str] = self.settings.get_frame_type_names()
 
         id: str = self.id

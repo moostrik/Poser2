@@ -9,7 +9,7 @@ from numpy import ndarray
 from typing import Set
 from threading import Thread, Event
 
-from modules.Settings import Settings
+from modules.cam.Settings import Settings
 from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
 from modules.cam.depthcam.Definitions import *
 from modules.cam.depthcam.CoreSettings import CoreSettings
@@ -32,20 +32,20 @@ class Core(Thread):
         self.device_id: str =           device_id
 
         # FIXED SETTINGS
-        self.model_path: str =          general_settings.path_model
-        self.fps: float =               general_settings.camera_fps
-        self.square: bool =             general_settings.camera_square
-        self.do_color: bool =           general_settings.camera_color
-        self.do_stereo: bool =          general_settings.camera_stereo
-        self.do_yolo: bool =            general_settings.camera_yolo
-        self.do_720p: bool =            general_settings.camera_720p
-        self.show_stereo: bool =        general_settings.camera_show_stereo
-        self.simulation: bool =         general_settings.camera_simulation
+        self.model_path: str =          general_settings.model_path
+        self.fps: float =               general_settings.fps
+        self.square: bool =             general_settings.square
+        self.do_color: bool =           general_settings.color
+        self.do_stereo: bool =          general_settings.stereo
+        self.do_yolo: bool =            general_settings.yolo
+        self.do_720p: bool =            general_settings.hd_ready
+        self.show_stereo: bool =        general_settings.show_stereo
+        self.simulation: bool =         general_settings.sim_enabled
 
         self.perspective: PerspectiveConfig = PerspectiveConfig(
-            general_settings.camera_flip_h,
-            general_settings.camera_flip_v,
-            general_settings.camera_perspective
+            general_settings.flip_h,
+            general_settings.flip_v,
+            general_settings.perspective
         )
 
         # DAI
@@ -59,7 +59,7 @@ class Core(Thread):
         self.tps_counter =              FPS(120)
 
         # FRAME TYPES
-        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo, general_settings.camera_simulation)
+        self.frame_types: list[FrameType] = get_frame_types(self.do_color, self.do_stereo, self.show_stereo, general_settings.sim_enabled)
         self.frame_types.sort(key=lambda x: x.value)
 
         # CALLBACKS
@@ -88,8 +88,9 @@ class Core(Thread):
 
     def _open(self) -> bool:
         device_list: list[str] = get_device_list(verbose=False)
+
         if self.device_id not in device_list:
-            print(f'Camera: {self.device_id} NOT AVAILABLE')
+            print(f'Camera: {self.device_id} NOT AVAILABLE in {device_list}')
             return False
 
         if Core._pipeline is None:

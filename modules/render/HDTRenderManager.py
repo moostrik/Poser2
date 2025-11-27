@@ -28,9 +28,9 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
         self.num_players: int = settings.num_players
-        self.num_cams: int =    settings.camera_num
+        self.num_cams: int =    settings.camera.num
         num_R_streams: int =    settings.render_R_num
-        R_stream_capacity: int= int(settings.camera_fps * 30)  # 10 seconds buffer
+        R_stream_capacity: int= int(settings.camera.fps * 30)  # 10 seconds buffer
 
         # data
         self.data_hub: DataHub = data_hub

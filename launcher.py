@@ -21,7 +21,7 @@ from signal import signal, SIGINT
 from time import sleep
 
 from modules.Main import Main
-from modules.Settings import Settings, ModelType, FrameType, TrackerType
+from modules.Settings import Settings, CamSettings,   ModelType, FrameType, TrackerType
 
 import multiprocessing as mp
 
@@ -34,7 +34,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     parser.add_argument('-ny',      '--noyolo',         action='store_true',        help='do not do yolo person detection')
     parser.add_argument('-np',      '--nopose',         action='store_true',        help='do not do pose detection')
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecored video with camera')
-    parser.add_argument('-simpt',   '--passthrough',    action='store_true',        help='use prerecored video without camera')
     parser.add_argument('-cm',      '--cammanual',      action='store_true',        help='camera manual settings')
 
     parser.add_argument('-hdt',     '--hdtrio',         action='store_true',        help='run in Harmonic Dissonance mode')
@@ -43,7 +42,14 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     args: Namespace = parser.parse_args()
 
 
-    currentPath: str = path.dirname(__file__)
+    current_path: str = path.dirname(__file__)
+
+
+    file_path: str =    path.join(current_path, 'files')
+    model_path: str =   path.join(current_path, 'models')
+    video_path: str =   path.join(current_path, 'recordings')
+    temp_path: str =    path.join(current_path, 'temp')
+
 
     settings: Settings =  Settings()
 
@@ -71,37 +77,33 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         camera_list = camera_list[:args.cameras]
 
 
+    cam_settings: CamSettings = CamSettings(
+        ids=camera_list,
+        model_path=model_path,
+        video_path=video_path,
+        temp_path=temp_path,
+
+        fps=args.fps,
+        sim_fps=args.fps,
+        sim_enabled=args.simulation,
+        yolo=not args.noyolo,
+        manual=args.cammanual,
+
+        perspective =   -0.22,
+        flip_h =        False,
+        flip_v =        True,
+    )
+
     settings.num_players =          args.players
+    settings.camera =         cam_settings
 
 
-    settings.path_root =            currentPath
-    settings.path_file =            path.join(currentPath, 'files')
-    settings.path_model =           path.join(currentPath, 'models')
-    settings.path_video =           path.join(currentPath, 'recordings')
-    settings.path_temp =            path.join(currentPath, 'temp')
+    settings.path_root =            current_path
+    settings.path_file =            file_path
+    settings.path_model =           model_path
+    settings.path_video =           video_path
+    settings.path_temp =            temp_path
 
-    settings.camera_list =          camera_list
-    settings.camera_num =           len(camera_list)
-    settings.camera_fps =           args.fps
-    settings.camera_player_fps =    settings.camera_fps
-    settings.camera_square =        False
-    settings.camera_color =         True
-    settings.camera_stereo =        False
-    settings.camera_yolo =      not args.noyolo
-    settings.camera_show_stereo =   False
-    settings.camera_simulation =    args.simulation or args.passthrough
-    settings.camera_passthrough =   args.passthrough
-    settings.camera_manual =        args.cammanual
-    settings.camera_flip_h =        False
-    settings.camera_flip_v =        False
-    settings.camera_perspective =   0.1
-    settings.camera_720p =          True
-
-    settings.video_chunk_length =   10 # in seconds
-    settings.video_encoder =        Settings.CoderType.iGPU
-    settings.video_decoder =        Settings.CoderType.iGPU
-    settings.video_format =         Settings.CoderFormat.H264
-    settings.video_frame_types =    [FrameType.VIDEO, FrameType.LEFT_, FrameType.RIGHT] if settings.camera_stereo else [FrameType.VIDEO]
 
     settings.tracker_type =         TrackerType.PANORAMIC
     settings.tracker_min_age =      3 # in frames
@@ -141,7 +143,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_fps =           0
     settings.render_v_sync =        True
     settings.render_cams_a_row =    2
-    settings.render_monitor =       1
+    settings.render_monitor =       0
     settings.render_R_num =         3
     settings.render_secondary_list =         [2]
 
@@ -151,44 +153,35 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.gui_default_file =     'default'
 
     if settings.art_type == Settings.ArtType.HDT:
-        # settings.camera_fps =       2
-        # settings.camera_player_fps= settings.camera_fps
         settings.render_title =     'Harmonic Dissonance'
         settings.num_players =      3
-        settings.camera_num =       settings.num_players
-        settings.camera_list =      camera_list[:settings.camera_num]
-        settings.camera_flip_h =        False
-        settings.camera_flip_v =        True
-        settings.camera_perspective =   -0.25
         settings.tracker_type =     TrackerType.ONEPERCAM
-        settings.render_monitor =   0
+        # settings.render_monitor =   1
         settings.render_secondary_list =     [1,2,3]
-        settings.render_x =         0
-        settings.render_y =         0#2600
-        settings.render_width =         1920
-        settings.render_height =        1080 #- settings.render_y
+        # settings.render_x =         0
+        # settings.render_y =         1500
+        # settings.render_width =     2160
+        # settings.render_height =    3000
         settings.render_fps =       60
-        settings.gui_location_x =   0 #2200
-        settings.gui_location_y =   0 #-700
-        settings.gui_on_top =       False
+        settings.gui_location_x =   1100 #2200
+        settings.gui_location_y =   -1100
+        settings.gui_on_top =       True
 
         settings.pose_model_type =  ModelType.NONE if args.nopose else ModelType.SMALL
         settings.pose_model_warmups =  settings.num_players
-        settings.pose_verbose =     False
-
-        settings.camera_color =     True
-        settings.camera_square =    True
+        settings.pose_verbose =     True
 
     if args.testminimal:
         settings.render_title =     'Minimal Test'
         settings.num_players =      2
-        settings.camera_num =       settings.num_players
-        settings.camera_list =      camera_list[:settings.camera_num]
         settings.tracker_type =     TrackerType.ONEPERCAM
         settings.pose_verbose =     True
 
     settings.check_values()
     settings.check_cameras()
+
+    settings.save("files/settings.json")
+    settings.load("files/settings.json")
 
     app = Main(settings)
     app.start()
