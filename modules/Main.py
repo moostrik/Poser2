@@ -201,15 +201,7 @@ class Main():
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
         self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_I)) # interpolated poses
 
-        # self.pose_interpolation_pipeline.add_poses_callback(self.debug_tracker.process)
-
         self.data_hub.add_update_callback(self.interpolator.update)
-
-
-        self.sound_osc.start()
-        self.data_hub.add_update_callback(self.sound_osc.notify_update)
-
-        # DETECTION
         self.pose_detector.start()
 
         # TRACKER
@@ -220,11 +212,9 @@ class Main():
         self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_callback(self.pose_from_tracklet.update)
 
-        # if self.WS:
-        #     self.pose_detection.add_callback(self.WS.add_poses)
-        #     self.pose_streamer.add_stream_callback(self.WS.add_pose_stream)
-        #     self.WS.add_output_callback(self.capture_data_hub.set_light_image)
-        #     self.WS.start()
+        # IN / OUT
+        self.sound_osc.start()
+        self.data_hub.add_update_callback(self.sound_osc.notify_update)
 
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
         self.gui.exit_callback = self.stop
@@ -266,23 +256,18 @@ class Main():
         self.render.window_manager.start()
 
     def stop(self) -> None:
-        # print("Stopping main application...")
         if not self.is_running:
             return
         self.is_running = False
 
-        # print("Stopping render...")
         self.render.window_manager.stop()
 
-        # print("Stopping player...")
         if self.player:
             self.player.stop()
 
-        # print('stop cameras')
         for camera in self.cameras:
             camera.stop()
 
-        # print('stop tracker')
         self.tracker.stop()
 
         if self.pose_detector:
@@ -291,25 +276,15 @@ class Main():
             self.pd_pose_streamer.stop()
         if self.pd_stream_similator:
             self.pd_stream_similator.stop()
-
-        # print('stop av')
-        # if self.WS:
-        #     self.WS.stop()
-
-        # print('stop recorder')
         if self.recorder:
             self.recorder.stop()
 
-        # print('stop gui')
         self.gui.stop()
 
-        # print('join cameras')
         for camera in self.cameras:
-            camera.join(timeout=8)
+            camera.join(timeout=10)
 
         self.is_finished = True
-        # print("Main application stopped.")
-
 
     def render_keyboard_callback(self, key, x, y) -> None:
         if not  self.is_running: return
