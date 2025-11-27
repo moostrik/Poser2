@@ -14,8 +14,8 @@ from modules.cam.Settings import Settings
 
 
 class SyncRecorderGui(SyncRecorder):
-    def __init__(self, gui: Gui | None, settings: Settings) -> None:
-        self.gui: Gui | None = gui
+    def __init__(self, gui: Gui, settings: Settings) -> None:
+        self.gui: Gui = gui
         super().__init__(settings)
 
         self.osc_client = SimpleUDPClient("10.0.0.148", 8600)

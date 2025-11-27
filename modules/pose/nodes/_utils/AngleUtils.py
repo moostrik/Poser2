@@ -42,7 +42,7 @@ _ANGLE_MIRRORED: set[AngleLandmark] = {
 class AngleUtils:
 
     @staticmethod
-    def from_points(points: Points2D) -> Angles:
+    def from_points(points: Points2D, min_dist: float = 0.02) -> Angles:
         """Create angle measurements from keypoint data.
 
         Computes joint angles from 2D keypoint positions, applies rotation offsets,
@@ -50,6 +50,8 @@ class AngleUtils:
 
         Args:
             points: Keypoint data
+            min_dist: Minimum distance between points to consider them valid
+                        0.02 is ~2% of image size or about 4 pixels in 192 x 256 image crops
 
         Returns:
             AngleFeature with computed angles and confidence scores
@@ -62,12 +64,14 @@ class AngleUtils:
 
         # Compute all angle measurements
         for landmark, keypoints in ANGLE_KEYPOINTS.items():
-            # ✅ NEW: Use are_valid() - cleaner batch validation
             if not points.are_valid(list(keypoints)):
                 continue  # Skip if any required keypoint is invalid
 
             # Extract points (guaranteed valid - no NaN)
             P = [points[kp] for kp in keypoints]
+            if AngleUtils._points_too_close(P, min_dist):
+                continue  # Skip if any points are too close
+
             rotate_by = _ANGLE_OFFSET[landmark]
 
             # Compute angle based on number of keypoints (no NaN checks needed)
@@ -84,11 +88,19 @@ class AngleUtils:
 
             angle_values[landmark] = angle
 
-            # ✅ Batch score retrieval
             scores = points.get_scores(list(keypoints))
             angle_scores[landmark] = min(scores) if not np.isnan(angle) else 0.0
 
         return Angles(values=angle_values, scores=angle_scores)
+
+    @staticmethod
+    def _points_too_close(points: list[np.ndarray], min_dist: float = 0.02) -> bool:
+        """Return True if any pair of points are closer than min_dist."""
+        for i in range(len(points)):
+            for j in range(i + 1, len(points)):
+                if np.linalg.norm(points[i] - points[j]) < min_dist:
+                    return True
+        return False
 
     @staticmethod
     def _calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, rotate_by: float = 0) -> float:
