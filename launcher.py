@@ -19,8 +19,7 @@ from os import path
 from signal import signal, SIGINT
 
 from modules.Main import Main
-from modules.Settings import Settings, CamSettings, PoseSettings, PDStreamSettings, GuiSettings, SoundOSCConfig, RenderSettings
-from modules.Settings import ModelType, TrackerType, DataType
+from modules.Settings import Settings, ModelType
 
 import multiprocessing as mp
 
@@ -44,8 +43,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     print(f"Loading settings from: {settings_path}")
     settings: Settings = Settings.load(settings_path)
 
-    num_players: int =  args.players
-
     if args.cameras < len(settings.camera.ids):
         settings.camera.ids = settings.camera.ids[:args.cameras]
 
@@ -54,14 +51,19 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.camera.yolo = not args.noyolo
     settings.camera.manual = args.cammanual
 
-    settings.pose.active = not args.nopose
-    settings.pose.max_poses = num_players
-    settings.pose.model_type = ModelType.NONE if args.nopose else ModelType.SMALL
+    settings.pose.max_poses = args.players
+    if args.nopose:
+        settings.pose.model_type = ModelType.NONE
 
-    settings.pd_stream.max_poses = num_players
-    settings.pd_stream.stream_capacity = int(10 * args.fps)
+    settings.pd_stream.max_poses = args.players
     settings.pd_stream.corr_rate = args.fps
+    settings.pd_stream.stream_capacity = int(10 * args.fps)
     settings.pd_stream.corr_buffer_duration = int(3 * args.fps)
+
+    settings.sound_osc.num_players = args.players
+
+    settings.render.num_players = args.players
+    settings.render.num_cams = args.cameras
 
     # Settings.make_paths_absolute(settings, path.dirname(__file__))
     # print(settings)

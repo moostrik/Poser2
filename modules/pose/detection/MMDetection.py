@@ -80,9 +80,11 @@ class MMDetection(Thread):
     def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
+        self.enabled: bool = settings.model_type is not ModelType.NONE
         if settings.model_type is ModelType.NONE:
             print('Pose Detection WARNING: ModelType is NONE')
 
+        self.model_type: ModelType = settings.model_type
         self.model_config_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_type.value][0]
         self.model_checkpoint_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_type.value][1]
         self.model_width: int = POSE_MODEL_WIDTH
@@ -115,10 +117,14 @@ class MMDetection(Thread):
         return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
 
     def start(self) -> None:
+        if not self.enabled:
+            return
         self._callback_thread.start()
         super().start()
 
     def stop(self) -> None:
+        if not self.enabled:
+            return
         """Stop both inference and callback threads gracefully"""
         self._shutdown_event.set()
 
@@ -155,7 +161,7 @@ class MMDetection(Thread):
         pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline) # pyright: ignore
         self._model_warmup(model, pipeline, self.model_num_warmups)
         self._model_ready.set()  # Signal model is ready
-        print("PoseDetection: Model warmup complete")
+        print(f"PoseDetection: {self.model_type.name} model ready")
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()
@@ -187,7 +193,7 @@ class MMDetection(Thread):
                 dropped_batch = self._pending_batch
                 if self.verbose:
                     lag = int((time.time() - self._input_timestamp) * 1000)
-                    print(f"Pose Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms, after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                    print(f"Pose Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
