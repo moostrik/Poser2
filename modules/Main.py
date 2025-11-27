@@ -9,11 +9,7 @@ from modules.Settings import Settings
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.gui import Gui
 from modules.inout import SoundOSC
-from modules.pose import nodes
-from modules.pose import trackers
-from modules.pose import gui
-from modules.pose.detection import PointBatchExtractor, MMDetection
-from modules.pose.similarity import SimilarityComputer
+from modules.pose import guis, nodes, trackers, PointBatchExtractor, SimilarityComputer
 from modules.pose.pd_stream import PDStreamManager, PDStreamComputer
 from modules.render.HDTRenderManager import HDTRenderManager
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
@@ -58,9 +54,6 @@ class Main():
         # RENDER
         self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
 
-        # POSE DETECTOR
-        self.pose_detector =        MMDetection(settings.pose)
-
         # POSE CONFIGURATION
         self.image_crop_config =    nodes.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion)
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
@@ -74,14 +67,14 @@ class Main():
         self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
         self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
 
-        self.b_box_smooth_gui =     gui.EuroSmootherGui(self.b_box_smooth_config, self.gui, 'BBox')
-        self.point_smooth_gui =     gui.EuroSmootherGui(self.point_smooth_config, self.gui, 'Point')
-        self.angle_smooth_gui =     gui.EuroSmootherGui(self.angle_smooth_config, self.gui, 'Angle')
-        self.a_vel_smooth_gui =     gui.EuroSmootherGui(self.a_vel_smooth_config, self.gui, 'Vel')
+        self.b_box_smooth_gui =     guis.EuroSmootherGui(self.b_box_smooth_config, self.gui, 'BBox')
+        self.point_smooth_gui =     guis.EuroSmootherGui(self.point_smooth_config, self.gui, 'Point')
+        self.angle_smooth_gui =     guis.EuroSmootherGui(self.angle_smooth_config, self.gui, 'Angle')
+        self.a_vel_smooth_gui =     guis.EuroSmootherGui(self.a_vel_smooth_config, self.gui, 'Vel')
 
-        # self.b_box_interp_gui =     gui.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBox')
-        self.point_interp_gui =     gui.InterpolatorGui(self.point_interp_config, self.gui, 'Point')
-        self.angle_interp_gui =     gui.InterpolatorGui(self.angle_interp_config, self.gui, 'Angle')
+        # self.b_box_interp_gui =   gui.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBox')
+        self.point_interp_gui =     guis.InterpolatorGui(self.point_interp_config, self.gui, 'Point')
+        self.angle_interp_gui =     guis.InterpolatorGui(self.angle_interp_config, self.gui, 'Angle')
 
         # POSE PROCESSING PIPELINES
         self.pose_from_tracklet =   trackers.PoseFromTrackletGenerator(num_players)
@@ -95,7 +88,7 @@ class Main():
         )
 
         self.image_crop_processor = trackers.ImageCropProcessorTracker(num_players, self.image_crop_config)
-        self.point_extractor =      PointBatchExtractor(self.pose_detector)
+        self.point_extractor =      PointBatchExtractor(settings.pose) # GPU-based 2D point extractor
 
         self.pose_raw_filters =     trackers.FilterTracker(
             settings.num_players,
@@ -202,7 +195,7 @@ class Main():
         self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_I)) # interpolated poses
 
         self.data_hub.add_update_callback(self.interpolator.update)
-        self.pose_detector.start()
+        self.point_extractor.start()
 
         # TRACKER
         self.tracker.add_tracklet_callback(self.pose_from_tracklet.submit_tracklets)
@@ -264,20 +257,19 @@ class Main():
 
         if self.player:
             self.player.stop()
-
         for camera in self.cameras:
             camera.stop()
-
-        self.tracker.stop()
-
-        if self.pose_detector:
-            self.pose_detector.stop()
-        if self.pd_pose_streamer:
-            self.pd_pose_streamer.stop()
-        if self.pd_stream_similator:
-            self.pd_stream_similator.stop()
         if self.recorder:
             self.recorder.stop()
+
+        self.tracker.stop()
+        self.sound_osc.stop()
+        self.point_extractor.stop()
+        self.pose_similator.stop()
+
+        self.pd_pose_streamer.stop()
+        if self.pd_stream_similator:
+            self.pd_stream_similator.stop()
 
         self.gui.stop()
 

@@ -7,6 +7,7 @@ from modules.pose.detection.MMDetection import MMDetection, DetectionInput, Dete
 from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin
 from modules.pose.Frame import FrameDict
+from modules.pose.Settings import Settings
 
 
 class PointBatchExtractor(PoseDictCallbackMixin):
@@ -20,15 +21,23 @@ class PointBatchExtractor(PoseDictCallbackMixin):
     for real-time visualization where recent data is more valuable than old data.
     """
 
-    def __init__(self, detection: MMDetection):
+    def __init__(self, settings: Settings):
         super().__init__()
-        self._detection = detection
+        self._detection = MMDetection(settings)
         self._lock = Lock()
         self._batch_counter: int = 0
         self._waiting_batches: dict[int, tuple[FrameDict, list[int]]] = {}
         self._images: dict[int, np.ndarray] = {}
 
         self._detection.register_callback(self._on_detection_result)
+
+    def start(self) -> None:
+        """Start the detection processing thread."""
+        self._detection.start()
+
+    def stop(self) -> None:
+        """Stop the detection processing thread."""
+        self._detection.stop()
 
     def set_images(self, images: dict[int, np.ndarray]) -> None:
         """Set images for processing.

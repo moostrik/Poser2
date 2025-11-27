@@ -14,7 +14,6 @@ class RenderBase(ABC):
     @abstractmethod
     def on_main_window_resize(self, width: int, height: int) -> None: ...
 
-
     def setView(self, width, height) -> None:
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
