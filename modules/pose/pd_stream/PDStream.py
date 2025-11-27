@@ -16,7 +16,7 @@ from modules.pose.Frame import Frame, FrameDict
 from modules.pose.features.Angles import Angles, ANGLE_LANDMARK_NAMES, ANGLE_NUM_LANDMARKS
 
 # Local application imports
-from modules.Settings import Settings
+from modules.pose.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -58,7 +58,7 @@ PDStreamDataDict = dict[int, PDStreamData]
 class PDStreamManager:
     def __init__(self, settings: Settings) -> None:
         self.settings: Settings = settings
-        num_players: int = settings.num_players
+        num_players: int = settings.max_poses
 
         self.processors: list[StreamProcessor] = []
         self.result_queues: list[Queue] = []
@@ -101,7 +101,7 @@ class PDStreamManager:
             self.result_threads.clear()
 
             # Recreate processors, queues, and threads
-            num_players = self.settings.num_players
+            num_players = self.settings.max_poses
             for i in range(num_players):
                 queue = Queue()
                 self.result_queues.append(queue)
@@ -187,8 +187,8 @@ class StreamProcessor(Process):
         self.result_queue: Queue[PDStreamData] = result_queue if result_queue else Queue()
 
         # Store settings values (not the settings object itself)
-        self.buffer_capacity: int = settings.pose.stream_capacity
-        self.resample_interval: str = f"{int(1.0 / settings.camera.fps * 1000)}ms"
+        self.buffer_capacity: int = settings.stream_capacity
+        self.resample_interval: str = f"{settings.stream_sample_interval}ms"
 
         # Initialize buffers (will be recreated in child process)
         self.empty_df: pd.DataFrame = pd.DataFrame(columns=ANGLE_LANDMARK_NAMES, dtype=float)

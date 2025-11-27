@@ -14,7 +14,6 @@ from modules.pose.features.AngleSymmetry import SymmetryElement
 from modules.pose.similarity import SimilarityBatch, SimilarityFeature, AggregationMethod
 
 from modules.DataHub import DataHub, DataType
-from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -25,21 +24,14 @@ class SoundOSCConfig:
     num_players: int = field(default=8)
     data_type: DataType = field(default=DataType.pose_I)
 
-    @classmethod
-    def from_settings(cls, settings: Settings) -> 'SoundOSCConfig':
-        return cls(
-            ip_addresses=settings.udp_ips_sound,
-            port=settings.udp_port,
-            num_players=settings.num_players
-        )
 
 class SoundOSC:
     """
     Sends smooth pose data over OSC at a configurable frame rate in its own thread.
     """
-    def __init__(self, data_hub: DataHub, settings: Settings) -> None:
+    def __init__(self, data_hub: DataHub, settings: SoundOSCConfig) -> None:
 
-        self._config: SoundOSCConfig = SoundOSCConfig.from_settings(settings)
+        self._config: SoundOSCConfig = settings
         self._data_hub: DataHub = data_hub
         self._client: SimpleUDPClient = SimpleUDPClient(self._config.ip_addresses, self._config.port)
 

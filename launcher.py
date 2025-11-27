@@ -21,8 +21,8 @@ from signal import signal, SIGINT
 from time import sleep
 
 from modules.Main import Main
-from modules.Settings import Settings, CamSettings, PoseSettings, GuiSettings
-from modules.Settings import ModelType, FrameType, TrackerType
+from modules.Settings import Settings, CamSettings, PoseSettings, GuiSettings, SoundOSCConfig, RenderSettings
+from modules.Settings import ModelType, FrameType, TrackerType, DataType
 
 import multiprocessing as mp
 
@@ -30,8 +30,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     mp.freeze_support()
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument('-fps',     '--fps',            type=float, default=23.0,   help='frames per second')
-    parser.add_argument('-pls',     '--players',        type=int,   default=8,      help='number of players')
-    parser.add_argument('-cms',     '--cameras',        type=int,   default=4,      help='number of cameras')
+    parser.add_argument('-pls',     '--players',        type=int,   default=3,      help='number of players')
+    parser.add_argument('-cms',     '--cameras',        type=int,   default=3,      help='number of cameras')
     parser.add_argument('-ny',      '--noyolo',         action='store_true',        help='do not do yolo person detection')
     parser.add_argument('-np',      '--nopose',         action='store_true',        help='do not do pose detection')
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecored video with camera')
@@ -78,6 +78,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         camera_list = camera_list[:args.cameras]
 
 
+
     cam_settings: CamSettings = CamSettings(
         ids=camera_list,
         model_path=model_path,
@@ -96,7 +97,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     )
 
     pose_settings = PoseSettings(
-        num_warmups =   num_players,
+        max_poses =     num_players,
         model_path =    model_path,
 
         active =        not args.nopose,
@@ -117,8 +118,34 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         default_file =  "default"
     )
 
+    sound_osc_config = SoundOSCConfig(
+        ip_addresses =  '127.0.0.1',
+        port =          8888,
+        num_players =   num_players,
+        data_type =     DataType.pose_I
+    )
+
+    render_settings = RenderSettings(
+        title =         app_name,
+        num_cams=       cam_settings.num,
+        num_players=    num_players,
+        monitor=        0,
+        width=          1920,
+        height=         1000,
+        x=              0,
+        y=              80,
+        fullscreen=     False,
+        fps=            60,
+        v_sync=         True,
+
+        secondary_list= [1,2,3]
+    )
+
+
+
     settings.num_players =          num_players
     settings.path_root =            current_path
+    settings.tracker_type =         TrackerType.ONEPERCAM
 
     settings.path_file =            file_path
     settings.path_model =           model_path
@@ -129,9 +156,8 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.camera =               cam_settings
     settings.pose =                 pose_settings
     settings.gui =                  gui_settings
-
-
-    settings.tracker_type =         TrackerType.PANORAMIC
+    settings.sound_osc =            sound_osc_config
+    settings.render =               render_settings
 
 
     settings.corr_rate_hz =         args.fps
@@ -143,35 +169,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.corr_similarity_exp =  4.0 # exponent for similarity calculation
     settings.corr_stream_capacity = int(10 * args.fps)
 
-
-    settings.udp_port =             8888
-    settings.udp_ips_sound =        '127.0.0.1'
-    settings.udp_ips_light =        '127.0.0.1'
-
-    settings.render_title =         'White Space'
-    settings.render_x =             0
-    settings.render_y =             100
-    settings.render_width =         1920 * 2
-    settings.render_height =        1080 * 2 - settings.render_y
-    settings.render_fullscreen =    False
-    settings.render_fps =           0
-    settings.render_v_sync =        True
-    settings.render_cams_a_row =    2
-    settings.render_monitor =       0
-    settings.render_R_num =         3
-    settings.render_secondary_list =         [2]
-
-    if settings.art_type == Settings.ArtType.HDT:
-        settings.render_title =     'Harmonic Dissonance'
-        settings.num_players =      3
-        settings.tracker_type =     TrackerType.ONEPERCAM
-        # settings.render_monitor =   1
-        settings.render_secondary_list =     [1,2,3]
-        # settings.render_x =         0
-        # settings.render_y =         1500
-        # settings.render_width =     2160
-        # settings.render_height =    3000
-        settings.render_fps =       60
 
     settings.check_values()
     settings.check_cameras()

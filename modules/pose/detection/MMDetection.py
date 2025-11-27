@@ -19,7 +19,10 @@ import torch
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
-# from modules.pose.Settings import Settings
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from modules.pose.Settings import Settings
 
 # DEFINITIONS
 POSE_MODEL_WIDTH = 192
@@ -74,7 +77,7 @@ class MMDetection(Thread):
     which may differ from batch_id order due to async processing.
     """
 
-    def __init__(self, settings) -> None:  # type: ignore
+    def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
         if settings.model_type is ModelType.NONE:
@@ -84,7 +87,7 @@ class MMDetection(Thread):
         self.model_checkpoint_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_type.value][1]
         self.model_width: int = POSE_MODEL_WIDTH
         self.model_height: int = POSE_MODEL_HEIGHT
-        self.model_num_warmups: int = settings.num_warmups
+        self.model_num_warmups: int = settings.max_poses
         self.confidence_threshold: float = settings.confidence_threshold
 
         self.verbose: bool = settings.verbose

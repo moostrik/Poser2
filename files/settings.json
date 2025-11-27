@@ -1,5 +1,12 @@
 {
+  "art_type": "HDT",
   "num_players": 3,
+  "tracker_type": "ONEPERCAM",
+  "path_root": "C:\\Developer\\Poser2",
+  "path_model": "C:\\Developer\\Poser2\\models",
+  "path_video": "C:\\Developer\\Poser2\\recordings",
+  "path_temp": "C:\\Developer\\Poser2\\temp",
+  "path_file": "C:\\Developer\\Poser2\\files",
   "camera": {
     "ids": [
       "14442C101136D1D200",
@@ -33,27 +40,52 @@
       "VIDEO"
     ]
   },
-  "art_type": "HDT",
-  "gui_location_x": 1100,
-  "gui_location_y": -1100,
-  "gui_on_top": true,
-  "gui_default_file": "default",
-  "path_root": "C:\\Developer\\Poser2",
-  "path_model": "C:\\Developer\\Poser2\\models",
-  "path_video": "C:\\Developer\\Poser2\\recordings",
-  "path_temp": "C:\\Developer\\Poser2\\temp",
-  "path_file": "C:\\Developer\\Poser2\\files",
-  "tracker_type": "ONEPERCAM",
-  "tracker_min_age": 3,
-  "tracker_min_height": 0.25,
-  "tracker_timeout": 2.0,
-  "pose_crop_expansion": 0.1,
-  "pose_model_type": "SMALL",
-  "pose_model_warmups": 3,
-  "pose_active": true,
-  "pose_stream_capacity": 230,
-  "pose_conf_threshold": 0.5,
-  "pose_verbose": true,
+  "pose": {
+    "active": true,
+    "max_poses": 3,
+    "model_type": "SMALL",
+    "model_path": "C:\\Developer\\Poser2\\models",
+    "confidence_threshold": 0.5,
+    "verbose": true,
+    "crop_expansion": 0.1,
+    "stream_capacity": 230,
+    "stream_sample_interval": 100
+  },
+  "gui": {
+    "title": "Poser",
+    "on_top": true,
+    "location_x": 1100,
+    "location_y": -900,
+    "file_path": "C:\\Developer\\Poser2\\files",
+    "default_file": "default"
+  },
+  "sound_osc": {
+    "ip_addresses": "127.0.0.1",
+    "port": 8888,
+    "num_players": 3,
+    "data_type": "pose_I"
+  },
+  "render": {
+    "title": "Poser",
+    "monitor": 0,
+    "width": 1920,
+    "height": 1000,
+    "x": 0,
+    "y": 80,
+    "fullscreen": false,
+    "fps": 60,
+    "v_sync": true,
+    "secondary_list": [
+      1,
+      2,
+      3
+    ],
+    "num_cams": 3,
+    "num_players": 3,
+    "cams_a_row": 3,
+    "num_R": 3,
+    "stream_capacity": 600
+  },
   "corr_rate_hz": 23.0,
   "corr_num_workers": 10,
   "corr_buffer_duration": 69,
@@ -61,26 +93,5 @@
   "corr_max_nan_ratio": 0.15,
   "corr_dtw_band": 10,
   "corr_similarity_exp": 4.0,
-  "corr_stream_capacity": 230,
-  "light_resolution": 3600,
-  "light_rate": 60,
-  "udp_port": 8888,
-  "udp_ips_light": "127.0.0.1",
-  "udp_ips_sound": "127.0.0.1",
-  "render_title": "Harmonic Dissonance",
-  "render_width": 3840,
-  "render_height": 2060,
-  "render_x": 0,
-  "render_y": 100,
-  "render_fullscreen": false,
-  "render_fps": 60,
-  "render_v_sync": true,
-  "render_cams_a_row": 2,
-  "render_monitor": 0,
-  "render_R_num": 3,
-  "render_secondary_list": [
-    1,
-    2,
-    3
-  ]
+  "corr_stream_capacity": 230
 }

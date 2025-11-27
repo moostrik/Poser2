@@ -1,4 +1,3 @@
-# from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, TypeVar, cast
 from typing_extensions import get_args, get_origin
@@ -14,6 +13,8 @@ from modules.tracker.TrackerBase import TrackerType
 from modules.cam.Settings import Settings as CamSettings
 from modules.pose.Settings import Settings as PoseSettings
 from modules.gui.PyReallySimpleGui import GuiSettings
+from modules.inout.SoundOSC import SoundOSCConfig, DataType
+from modules.render.Settings import Settings as RenderSettings
 
 T = TypeVar("T")
 
@@ -56,7 +57,13 @@ class Settings():
     # GUI SETTINGS
     gui: GuiSettings = GuiSettings()
 
-    # TRACKING SETTINGS
+    # INOUT SETTINGS
+    sound_osc: SoundOSCConfig = SoundOSCConfig()
+
+    # RENDER SETTINGS
+    render: RenderSettings = RenderSettings()
+
+
     # POSE CORRELATION SETTINGS
     corr_rate_hz: float                = None # type: ignore
     corr_num_workers: int              = None # type: ignore
@@ -66,25 +73,6 @@ class Settings():
     corr_dtw_band: int                 = None # type: ignore
     corr_similarity_exp: float         = None # type: ignore
     corr_stream_capacity: int          = None # type: ignore
-
-    # UDP SETTINGS
-    udp_port: int                      = None # type: ignore
-    udp_ips_light: str                 = None # type: ignore
-    udp_ips_sound: str                 = None # type: ignore
-
-    # RENDER SETTINGS
-    render_title: str                  = None # type: ignore
-    render_width: int                  = None # type: ignore
-    render_height: int                 = None # type: ignore
-    render_x: int                      = None # type: ignore
-    render_y: int                      = None # type: ignore
-    render_fullscreen: bool            = None # type: ignore
-    render_fps: int                    = None # type: ignore
-    render_v_sync: bool                = None # type: ignore
-    render_cams_a_row: int             = None # type: ignore
-    render_monitor: int                = None # type: ignore
-    render_R_num: int                  = None # type: ignore
-    render_secondary_list: list[int]   = None # type: ignore
 
     def check_values(self) -> None:
          for key, value in vars(self).items():

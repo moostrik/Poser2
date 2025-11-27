@@ -11,7 +11,7 @@ from modules.gl.WindowManager import WindowManager
 from modules.DataHub import DataHub, PoseDataTypes, SimilarityDataType
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.Frame import FrameField
-from modules.Settings import Settings
+from modules.render.Settings import Settings
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -28,9 +28,9 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
         self.num_players: int = settings.num_players
-        self.num_cams: int =    settings.camera.num
-        num_R_streams: int =    settings.render_R_num
-        R_stream_capacity: int= int(settings.camera.fps * 30)  # 10 seconds buffer
+        self.num_cams: int =    settings.num_cams
+        num_R_streams: int =    settings.num_R
+        R_stream_capacity: int= int(settings.stream_capacity)  # 10 seconds buffer
 
         # data
         self.data_hub: DataHub = data_hub
@@ -80,16 +80,16 @@ class HDTRenderManager(RenderBase):
             SubdivisionRow(name=CentreCamLayer.__name__,      columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name=SimilarityLineLayer.__name__, columns=1,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
         ]
-        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.render_width, settings.render_height, False)
+        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.width, settings.height, False)
 
         # window manager
-        self.secondary_order_list: list[int] = settings.render_secondary_list
+        self.secondary_order_list: list[int] = settings.secondary_list
         self.window_manager: WindowManager = WindowManager(
             self, self.subdivision.width, self.subdivision.height,
-            settings.render_title, settings.render_fullscreen,
-            settings.render_v_sync, settings.render_fps,
-            settings.render_x, settings.render_y,
-            settings.render_monitor, settings.render_secondary_list
+            settings.title, settings.fullscreen,
+            settings.v_sync, settings.fps,
+            settings.x, settings.y,
+            settings.monitor, settings.secondary_list
         )
 
         # hot reloader

@@ -16,9 +16,6 @@ from modules.pose.similarity.features.SimilarityBatch import SimilarityBatch, Si
 from modules.pose.similarity._utils.SimilarityUtils import SimilarityUtils
 from modules.pose.Frame import FrameDict
 
-# Local application imports
-from modules.Settings import Settings
-
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 

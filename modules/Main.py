@@ -70,7 +70,7 @@ class Main():
         # similar to or in concert with FrameSyncBang and TrackletSyncBang
 
         # POSE DETECTOR
-        self.pose_detector = MMDetection(settings.pose)
+        self.pose_detector =        MMDetection(settings.pose)
 
         # POSE CONFIGURATION
         self.image_crop_config =    nodes.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion)
@@ -167,13 +167,13 @@ class Main():
 
         self.pose_similator: SimilarityComputer = SimilarityComputer()
 
-        self.pd_pose_streamer = PDStreamManager(settings)
+        self.pd_pose_streamer = PDStreamManager(settings.pose)
         self.pd_stream_similator: Optional[PDStreamComputer] = None
 
 
         # DATA
         self.data_hub = DataHub()
-        self.sound_osc = SoundOSC(self.data_hub, settings)
+        self.sound_osc = SoundOSC(self.data_hub, settings.sound_osc)
 
         # RENDER
         # self.WS: Optional[WSPipeline] = None
@@ -181,7 +181,7 @@ class Main():
         #     self.WS = WSPipeline(self.gui, settings)
             # self.render = WSRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, settings)
         if settings.art_type == Settings.ArtType.HDT:
-            self.render = HDTRenderManager(self.gui, self.data_hub, settings)
+            self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
 
     def start(self) -> None:
 
