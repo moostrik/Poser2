@@ -1,1 +1,1 @@
-from .SoundOSC import SoundOSCConfig, SoundOSC
+from .SoundOsc import SoundOscConfig, SoundOsc

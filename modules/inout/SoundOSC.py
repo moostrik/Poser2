@@ -18,20 +18,20 @@ from modules.DataHub import DataHub, DataHubType
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 @dataclass
-class SoundOSCConfig:
+class SoundOscConfig:
     ip_addresses: str = field(default_factory=lambda: "127.0.0.1")
     port: int = field(default=9000)
     num_players: int = field(default=8)
     data_type: DataHubType = field(default=DataHubType.pose_I)
 
 
-class SoundOSC:
+class SoundOsc:
     """
     Sends smooth pose data over OSC at a configurable frame rate in its own thread.
     """
-    def __init__(self, data_hub: DataHub, settings: SoundOSCConfig) -> None:
+    def __init__(self, data_hub: DataHub, settings: SoundOscConfig) -> None:
 
-        self._config: SoundOSCConfig = settings
+        self._config: SoundOscConfig = settings
         self._data_hub: DataHub = data_hub
         self._client: SimpleUDPClient = SimpleUDPClient(self._config.ip_addresses, self._config.port)
 
@@ -87,13 +87,13 @@ class SoundOSC:
 
         for id in range(num_players):
             if id not in poses:
-                SoundOSC._build_inactive_message(id, bundle_builder)
+                SoundOsc._build_inactive_message(id, bundle_builder)
             else:
-                SoundOSC._build_active_message(poses[id], bundle_builder)
+                SoundOsc._build_active_message(poses[id], bundle_builder)
 
         similarity: SimilarityBatch | None = self._data_hub.get_item(DataHubType.sim_P)
         if similarity is not None:
-            SoundOSC._build_similarity_message(similarity, bundle_builder, num_players)
+            SoundOsc._build_similarity_message(similarity, bundle_builder, num_players)
 
         bundle: OscBundle = bundle_builder.build()
 

@@ -8,7 +8,7 @@ from modules.DataHub import DataHub, DataHubType
 from modules.Settings import Settings
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.gui import Gui
-from modules.inout import SoundOSC
+from modules.inout import SoundOsc
 from modules.pose import guis, nodes, trackers, PointBatchExtractor, SimilarityComputer
 from modules.pose.pd_stream import PDStreamManager, PDStreamComputer
 from modules.render.HDTRenderManager import HDTRenderManager
@@ -49,7 +49,7 @@ class Main():
 
         # DATA
         self.data_hub = DataHub()
-        self.sound_osc = SoundOSC(self.data_hub, settings.sound_osc)
+        self.sound_osc = SoundOsc(self.data_hub, settings.sound_osc)
 
         # RENDER
         self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
