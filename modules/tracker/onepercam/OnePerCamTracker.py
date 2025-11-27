@@ -26,7 +26,7 @@ class OnePerCamMetadata(TrackerMetadata):
         return TrackerType.ONEPERCAM
 
 class OnePerCamTracker(Thread, BaseTracker):
-    def __init__(self, gui, settings: Settings) -> None:
+    def __init__(self, gui, num_trackers: int) -> None:
         super().__init__()
 
         self._running: bool = False
@@ -35,20 +35,20 @@ class OnePerCamTracker(Thread, BaseTracker):
         self._callback_lock = Lock()
         self._tracklet_callbacks: set[TrackletDictCallback] = set()
 
-        self._num_cams: int =               settings.camera.num
-        self.tracklet_min_age: int =        settings.tracker_min_age
-        self.timeout: float =               settings.tracker_timeout
+        self._num_cams: int =                   num_trackers
+        self.tracklet_min_age: int =            3
+        self.timeout: float =                   2.0
 
-        self.update_centre_threshold: float =  0.3
-        self.update_height_treshold: float =   0.25
+        self.update_centre_threshold: float =   0.3
+        self.update_height_treshold: float =    0.25
 
-        self.add_centre_threshold: float =     0.15
-        self.add_height_threshold: float =     0.5
-        self.add_bottom_threshold: float =     0.2
+        self.add_centre_threshold: float =      0.15
+        self.add_height_threshold: float =      0.5
+        self.add_bottom_threshold: float =      0.2
 
         self.tracklet_manager: TrackletManager = TrackletManager(self._num_cams)
 
-        self.gui = OnePerCamTrackerGui(gui, self, settings)
+        self.gui = OnePerCamTrackerGui(gui, self)
 
         hot_reload = HotReloadMethods(self.__class__)
 

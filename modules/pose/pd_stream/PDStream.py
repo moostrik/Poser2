@@ -187,7 +187,7 @@ class StreamProcessor(Process):
         self.result_queue: Queue[PDStreamData] = result_queue if result_queue else Queue()
 
         # Store settings values (not the settings object itself)
-        self.buffer_capacity: int = settings.pose_stream_capacity
+        self.buffer_capacity: int = settings.pose.stream_capacity
         self.resample_interval: str = f"{int(1.0 / settings.camera.fps * 1000)}ms"
 
         # Initialize buffers (will be recreated in child process)

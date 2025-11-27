@@ -8,7 +8,7 @@ from modules.gui.PyReallySimpleGui import Gui as G, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame, BASEHEIGHT, ELEMHEIGHT
 
 class PanoramicTrackerGui():
-    def __init__(self, gui: G, manager, settings: Settings) -> None:
+    def __init__(self, gui: G, manager) -> None:
         self.gui: G = gui
         self.manager = manager
 

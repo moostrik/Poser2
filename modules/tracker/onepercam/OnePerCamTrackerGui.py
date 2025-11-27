@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
 
 class OnePerCamTrackerGui():
-    def __init__(self, gui: G, tracker: "OnePerCamTracker", settings: Settings) -> None:
+    def __init__(self, gui: G, tracker: "OnePerCamTracker") -> None:
         self.gui: G = gui
         self.tracker: OnePerCamTracker = tracker
 

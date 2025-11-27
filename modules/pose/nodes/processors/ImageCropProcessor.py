@@ -11,9 +11,9 @@ from modules.pose.Frame import Frame
 class ImageCropProcessorConfig(NodeConfigBase):
     """Configuration for pose chase interpolation with automatic change notification."""
 
-    def __init__(self, crop_scale: float = 1.1, output_width: int = 192, output_height: int = 256) -> None:
+    def __init__(self, expansion: float = 0.1, output_width: int = 192, output_height: int = 256) -> None:
         super().__init__()
-        self.crop_scale: float = crop_scale
+        self.crop_scale: float = 1.0 + expansion
         self.output_width: int = output_width
         self.output_height: int = output_height
 

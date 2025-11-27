@@ -21,7 +21,8 @@ from signal import signal, SIGINT
 from time import sleep
 
 from modules.Main import Main
-from modules.Settings import Settings, CamSettings,   ModelType, FrameType, TrackerType
+from modules.Settings import Settings, CamSettings, PoseSettings, GuiSettings
+from modules.Settings import ModelType, FrameType, TrackerType
 
 import multiprocessing as mp
 
@@ -42,14 +43,14 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     args: Namespace = parser.parse_args()
 
 
+    app_name: str = "Poser"
+    num_players: int =  args.players
+
     current_path: str = path.dirname(__file__)
-
-
     file_path: str =    path.join(current_path, 'files')
     model_path: str =   path.join(current_path, 'models')
     video_path: str =   path.join(current_path, 'recordings')
     temp_path: str =    path.join(current_path, 'temp')
-
 
     settings: Settings =  Settings()
 
@@ -94,41 +95,54 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         flip_v =        True,
     )
 
-    settings.num_players =          args.players
-    settings.camera =         cam_settings
+    pose_settings = PoseSettings(
+        num_warmups =   num_players,
+        model_path =    model_path,
 
+        active =        not args.nopose,
+        model_type =    ModelType.NONE if args.nopose else ModelType.SMALL,
+        stream_capacity = int(10 * args.fps),
 
+        confidence_threshold = 0.5,
+        crop_expansion = 0.1,
+        verbose =       True
+    )
+
+    gui_settings = GuiSettings(
+        title=          app_name,
+        file_path=      file_path,
+        on_top =        True,
+        location_x =    1100,
+        location_y =    -900,
+        default_file =  "default"
+    )
+
+    settings.num_players =          num_players
     settings.path_root =            current_path
+
     settings.path_file =            file_path
     settings.path_model =           model_path
     settings.path_video =           video_path
     settings.path_temp =            temp_path
 
 
-    settings.tracker_type =         TrackerType.PANORAMIC
-    settings.tracker_min_age =      3 # in frames
-    settings.tracker_min_height =   0.25 # * height of the camera
-    settings.tracker_timeout =      2.0 # in seconds
+    settings.camera =               cam_settings
+    settings.pose =                 pose_settings
+    settings.gui =                  gui_settings
 
-    settings.pose_active =      not args.nopose
-    settings.pose_model_type =      ModelType.NONE if args.nopose else ModelType.SMALL
-    settings.pose_model_warmups =    settings.num_players
-    settings.pose_conf_threshold =  0.5
-    settings.pose_crop_expansion =  0.1 # * height of the camera
-    settings.pose_stream_capacity = int(10 * args.fps)
-    settings.pose_verbose =         False
+
+    settings.tracker_type =         TrackerType.PANORAMIC
+
 
     settings.corr_rate_hz =         args.fps
     settings.corr_num_workers =     10
     settings.corr_buffer_duration = int(3 * args.fps)
-    settings.corr_stream_timeout =  settings.tracker_timeout # seconds
+    settings.corr_stream_timeout =  2.0 # seconds
     settings.corr_max_nan_ratio =   0.15 # maximum ratio of NaN values in a window
     settings.corr_dtw_band =        10 # maximum distance between two points in a window
     settings.corr_similarity_exp =  4.0 # exponent for similarity calculation
     settings.corr_stream_capacity = int(10 * args.fps)
 
-    settings.light_resolution =     3600
-    settings.light_rate =           60
 
     settings.udp_port =             8888
     settings.udp_ips_sound =        '127.0.0.1'
@@ -147,11 +161,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render_R_num =         3
     settings.render_secondary_list =         [2]
 
-    settings.gui_location_x =       2400
-    settings.gui_location_y =       -900
-    settings.gui_on_top =           False
-    settings.gui_default_file =     'default'
-
     if settings.art_type == Settings.ArtType.HDT:
         settings.render_title =     'Harmonic Dissonance'
         settings.num_players =      3
@@ -163,19 +172,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
         # settings.render_width =     2160
         # settings.render_height =    3000
         settings.render_fps =       60
-        settings.gui_location_x =   1100 #2200
-        settings.gui_location_y =   -1100
-        settings.gui_on_top =       True
-
-        settings.pose_model_type =  ModelType.NONE if args.nopose else ModelType.SMALL
-        settings.pose_model_warmups =  settings.num_players
-        settings.pose_verbose =     True
-
-    if args.testminimal:
-        settings.render_title =     'Minimal Test'
-        settings.num_players =      2
-        settings.tracker_type =     TrackerType.ONEPERCAM
-        settings.pose_verbose =     True
 
     settings.check_values()
     settings.check_cameras()

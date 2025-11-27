@@ -12,6 +12,8 @@ from modules.pose.detection.MMDetection import ModelType
 from modules.tracker.TrackerBase import TrackerType
 
 from modules.cam.Settings import Settings as CamSettings
+from modules.pose.Settings import Settings as PoseSettings
+from modules.gui.PyReallySimpleGui import GuiSettings
 
 T = TypeVar("T")
 
@@ -32,18 +34,11 @@ class Settings():
         HDT = 2
 
 
-    # GENERAL
-    num_players: int                   = None # type: ignore
-
-    camera: CamSettings = CamSettings()
-
     art_type: 'Settings.ArtType'         = None # type: ignore
 
-    #GUI
-    gui_location_x: int                = None # type: ignore
-    gui_location_y: int                = None # type: ignore
-    gui_on_top: bool                   = None # type: ignore
-    gui_default_file: str              = None # type: ignore
+    # GENERAL
+    num_players: int                   = None # type: ignore
+    tracker_type: TrackerType          = None # type: ignore
 
     # PATHS
     path_root: str                     = None # type: ignore
@@ -52,21 +47,16 @@ class Settings():
     path_temp: str                     = None # type: ignore
     path_file: str                     = None # type: ignore
 
+    # CAMERA SETTINGS
+    camera: CamSettings = CamSettings()
+
+    # POSE SETTINGS
+    pose: PoseSettings = PoseSettings()
+
+    # GUI SETTINGS
+    gui: GuiSettings = GuiSettings()
+
     # TRACKING SETTINGS
-    tracker_type: TrackerType          = None # type: ignore
-    tracker_min_age: int               = None # type: ignore
-    tracker_min_height: float          = None # type: ignore
-    tracker_timeout: float             = None # type: ignore
-
-    # POSE DETCTION SETTINGS
-    pose_crop_expansion: float         = None # type: ignore
-    pose_model_type: ModelType     = None # type: ignore
-    pose_model_warmups: int             = None # type: ignore
-    pose_active: bool                  = None # type: ignore
-    pose_stream_capacity: int          = None # type: ignore
-    pose_conf_threshold: float         = None # type: ignore
-    pose_verbose: bool                 = None # type: ignore
-
     # POSE CORRELATION SETTINGS
     corr_rate_hz: float                = None # type: ignore
     corr_num_workers: int              = None # type: ignore
@@ -76,10 +66,6 @@ class Settings():
     corr_dtw_band: int                 = None # type: ignore
     corr_similarity_exp: float         = None # type: ignore
     corr_stream_capacity: int          = None # type: ignore
-
-    # LIGHT SETTINGS
-    light_resolution: int              = None # type: ignore
-    light_rate: int                    = None # type: ignore
 
     # UDP SETTINGS
     udp_port: int                      = None # type: ignore

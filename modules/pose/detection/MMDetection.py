@@ -19,6 +19,8 @@ import torch
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
+# from modules.pose.Settings import Settings
+
 # DEFINITIONS
 POSE_MODEL_WIDTH = 192
 POSE_MODEL_HEIGHT = 256
@@ -72,20 +74,20 @@ class MMDetection(Thread):
     which may differ from batch_id order due to async processing.
     """
 
-    def __init__(self, path: str, model_type: ModelType, num_warmups: int, confidence_threshold: float = 0.3, verbose: bool = False) -> None:
+    def __init__(self, settings) -> None:  # type: ignore
         super().__init__()
 
-        if model_type is ModelType.NONE:
+        if settings.model_type is ModelType.NONE:
             print('Pose Detection WARNING: ModelType is NONE')
 
-        self.model_config_file: str = path + '/' + POSE_MODEL_FILE_NAMES[model_type.value][0]
-        self.model_checkpoint_file: str = path + '/' + POSE_MODEL_FILE_NAMES[model_type.value][1]
+        self.model_config_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_type.value][0]
+        self.model_checkpoint_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_type.value][1]
         self.model_width: int = POSE_MODEL_WIDTH
         self.model_height: int = POSE_MODEL_HEIGHT
-        self.model_num_warmups: int = num_warmups
-        self.confidence_threshold: float = confidence_threshold
+        self.model_num_warmups: int = settings.num_warmups
+        self.confidence_threshold: float = settings.confidence_threshold
 
-        self.verbose: bool = verbose
+        self.verbose: bool = settings.verbose
 
         # Thread coordination
         self._shutdown_event: Event = Event()

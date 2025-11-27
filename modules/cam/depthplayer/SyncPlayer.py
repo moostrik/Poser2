@@ -364,13 +364,10 @@ class SyncPlayer(Thread):
     @staticmethod
     def _get_video_folders(settings: Settings) -> FolderDict :
         folders: FolderDict = {}
-        suffix: str = settings.video_format.value
         video_path: Path = Path(settings.video_path)
-        print(f"Looking for video folders in {video_path}")
         for folder in video_path.iterdir():
             if folder.is_dir():
                 if not is_folder_for_settings(str(folder), settings):
-                    print(f"Folder {folder} does not match settings, skipping")
                     continue
                 max_chunk: int = -1
                 for file in folder.iterdir():

@@ -37,7 +37,7 @@ class Main():
     def __init__(self, settings: Settings) -> None:
 
         self.settings: Settings = settings
-        self.gui = Gui(settings)
+        self.gui = Gui(settings.gui)
         num_players: int = settings.num_players
 
         self.is_running: bool = False
@@ -60,9 +60,9 @@ class Main():
 
         # TRACKER
         if settings.tracker_type == TrackerType.PANORAMIC:
-            self.tracker = PanoramicTracker(self.gui, settings)
+            self.tracker = PanoramicTracker(self.gui, settings.num_players, settings.camera.num)
         else:
-            self.tracker = OnePerCamTracker(self.gui, settings)
+            self.tracker = OnePerCamTracker(self.gui, settings.num_players)
         self.tracklet_sync_bang = FrameSyncBang(settings.camera, False, 'tracklet_sync')
 
         # TRACKER POSE BRIDGE
@@ -70,16 +70,10 @@ class Main():
         # similar to or in concert with FrameSyncBang and TrackletSyncBang
 
         # POSE DETECTOR
-        self.pose_detector = MMDetection(
-            settings.path_model,
-            settings.pose_model_type,
-            settings.pose_model_warmups,
-            settings.pose_conf_threshold,
-            settings.pose_verbose
-        )
+        self.pose_detector = MMDetection(settings.pose)
 
         # POSE CONFIGURATION
-        self.image_crop_config =    nodes.ImageCropProcessorConfig()
+        self.image_crop_config =    nodes.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion)
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
@@ -117,7 +111,7 @@ class Main():
         self.pose_raw_filters =     trackers.FilterTracker(
             settings.num_players,
             [
-                lambda: nodes.PointConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose_conf_threshold)),
+                lambda: nodes.PointConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose.confidence_threshold)),
                 nodes.AngleExtractor,
                 nodes.AngleVelExtractor,
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),

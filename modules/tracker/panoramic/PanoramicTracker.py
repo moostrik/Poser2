@@ -14,7 +14,6 @@ from modules.tracker.panoramic.PanoramicTrackletManager import PanoramicTracklet
 from modules.tracker.panoramic.PanoramicTrackerGui import PanoramicTrackerGui
 from modules.tracker.panoramic.PanoramicGeometry import PanoramicGeometry
 from modules.tracker.panoramic.PanoramicDefinitions import *
-from modules.Settings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -37,30 +36,30 @@ class PanoramicOverlapInfo:
     reason: str
 
 class PanoramicTracker(Thread, BaseTracker):
-    def __init__(self, gui, settings: Settings) -> None:
+    def __init__(self, gui, num_players: int,  num_cameras: int) -> None:
         super().__init__()
 
         self.running: bool = False
         self.update_event: Event = Event()
 
-        self.max_players: int = settings.num_players
+        self.max_players: int = num_players
 
         self.input_queue: Queue[Tracklet] = Queue()
 
         self.tracklet_manager: PanoramicTrackletManager = PanoramicTrackletManager(self.max_players)
 
-        self.geometry: PanoramicGeometry = PanoramicGeometry(settings.camera_num, CAM_360_FOV, CAM_360_TARGET_FOV)
+        self.geometry: PanoramicGeometry = PanoramicGeometry(num_cameras, CAM_360_FOV, CAM_360_TARGET_FOV)
 
-        self.tracklet_min_age: int =            settings.tracker_min_age
-        self.tracklet_min_height: float =       settings.tracker_min_height
-        self.timeout: float =                   settings.tracker_timeout
+        self.tracklet_min_age: int =            5
+        self.tracklet_min_height: float =       0.25
+        self.timeout: float =                   2.0
         self.cam_360_edge_threshold: float =    CAM_360_EDGE_THRESHOLD
         self.cam_360_overlap_expansion: float = CAM_360_OVERLAP_EXPANSION
         self.cam_360_hysteresis_factor: float = CAM_360_HYSTERESIS_FACTOR
 
         self.callback_lock = Lock()
         self.tracklet_callbacks: set[TrackletDictCallback] = set()
-        self.gui = PanoramicTrackerGui(gui, self, settings)
+        self.gui = PanoramicTrackerGui(gui, self)
 
         hot_reload = HotReloadMethods(self.__class__)
 

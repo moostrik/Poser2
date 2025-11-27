@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from enum import Enum
 from threading import Thread, Lock, current_thread
 from modules.gui.PySimpleGui import PySimpleGui as sg
@@ -5,9 +6,6 @@ import os
 import glob
 from queue import Queue, Empty
 from time import sleep
-
-
-from modules.Settings import Settings
 
 BASEHEIGHT = 35
 ELEMHEIGHT = 44
@@ -41,6 +39,15 @@ class qMessage:
         self.value = value
         self.key = key
         self.useCallback = useCallback
+
+@dataclass
+class GuiSettings:
+    title: str = field(default="Unknown")
+    on_top: bool = field(default=True)
+    location_x: int = field(default=0)
+    location_y: int = field(default=0)
+    file_path: str = field(default="")
+    default_file: str = field(default="settings")
 
 def Element(type: eType, key: str, callback=None, value: bool| int | float | str = 1, range: tuple[int | float, int |float] | list=(0, 1), resolution: int | float =0.1, expand: bool = True , size=(None, None)):
     element = None
@@ -157,16 +164,16 @@ def PopUp(window: sg.Window, text: str, duration: float = 1) -> None:
         sg.popup(text, location=location)
 
 class Gui(Thread):
-    def __init__(self, settings: Settings, exitCallback = None) -> None:
+    def __init__(self, settings: GuiSettings, exitCallback = None) -> None:
         super().__init__()
         sg.theme('DarkBlack')
         sg.set_options(font=("consolas", 10))
-        self.windowName: str = settings.render_title + ' GUI'
-        self.defaultSettingsName = settings.gui_default_file
-        self.settings: sg.UserSettings = sg.UserSettings(path = settings.path_file, filename = self.defaultSettingsName + '.json')
-        self.on_top: bool = settings.gui_on_top
-        self.location_x: int = settings.gui_location_x
-        self.location_y: int = settings.gui_location_y
+        self.windowName: str = settings.title + ' GUI'
+        self.defaultSettingsName = settings.default_file
+        self.settings: sg.UserSettings = sg.UserSettings(path = settings.file_path, filename = self.defaultSettingsName + '.json')
+        self.on_top: bool = settings.on_top
+        self.location_x: int = settings.location_x
+        self.location_y: int = settings.location_y
         self.exit_lock = Lock()
         self.exit_callback = exitCallback
         self.messageQueue: Queue = Queue()
