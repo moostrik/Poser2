@@ -2,11 +2,6 @@
   "art_type": "HDT",
   "num_players": 3,
   "tracker_type": "ONEPERCAM",
-  "path_root": "C:\\Developer\\Poser2",
-  "path_model": "C:\\Developer\\Poser2\\models",
-  "path_video": "C:\\Developer\\Poser2\\recordings",
-  "path_temp": "C:\\Developer\\Poser2\\temp",
-  "path_file": "C:\\Developer\\Poser2\\files",
   "camera": {
     "ids": [
       "14442C101136D1D200",
@@ -47,9 +42,19 @@
     "model_path": "C:\\Developer\\Poser2\\models",
     "confidence_threshold": 0.5,
     "verbose": true,
-    "crop_expansion": 0.1,
-    "stream_capacity": 230,
-    "stream_sample_interval": 100
+    "crop_expansion": 0.1
+  },
+  "pd_stream": {
+    "max_poses": 1,
+    "stream_capacity": 300,
+    "stream_sample_rate": 100,
+    "corr_rate": 100,
+    "corr_num_workers": 8,
+    "corr_buffer_duration": 90,
+    "corr_stream_timeout": 2.0,
+    "corr_max_nan_ratio": 0.15,
+    "corr_dtw_band": 10,
+    "corr_similarity_exp": 2.0
   },
   "gui": {
     "title": "Poser",
@@ -85,13 +90,5 @@
     "cams_a_row": 3,
     "num_R": 3,
     "stream_capacity": 600
-  },
-  "corr_rate_hz": 23.0,
-  "corr_num_workers": 10,
-  "corr_buffer_duration": 69,
-  "corr_stream_timeout": 2.0,
-  "corr_max_nan_ratio": 0.15,
-  "corr_dtw_band": 10,
-  "corr_similarity_exp": 4.0,
-  "corr_stream_capacity": 230
+  }
 }

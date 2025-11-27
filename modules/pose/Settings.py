@@ -11,6 +11,3 @@ class Settings:
     confidence_threshold: float =   field(default=0.3)
     verbose: bool =                 field(default=False)
     crop_expansion: float =         field(default=0.0)
-
-    stream_capacity: int =          field(default=100)
-    stream_sample_interval: int =   field(default=100)  # in milliseconds

@@ -16,7 +16,7 @@ from modules.pose.Frame import Frame, FrameDict
 from modules.pose.features.Angles import Angles, ANGLE_LANDMARK_NAMES, ANGLE_NUM_LANDMARKS
 
 # Local application imports
-from modules.pose.Settings import Settings
+from .PDStreamSettings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -188,7 +188,7 @@ class StreamProcessor(Process):
 
         # Store settings values (not the settings object itself)
         self.buffer_capacity: int = settings.stream_capacity
-        self.resample_interval: str = f"{settings.stream_sample_interval}ms"
+        self.resample_interval: str = f"{settings.stream_sample_rate}ms"
 
         # Initialize buffers (will be recreated in child process)
         self.empty_df: pd.DataFrame = pd.DataFrame(columns=ANGLE_LANDMARK_NAMES, dtype=float)

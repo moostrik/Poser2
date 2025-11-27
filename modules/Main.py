@@ -65,9 +65,12 @@ class Main():
             self.tracker = OnePerCamTracker(self.gui, settings.num_players)
         self.tracklet_sync_bang = FrameSyncBang(settings.camera, False, 'tracklet_sync')
 
-        # TRACKER POSE BRIDGE
-        # a bridge that gathers tracklets and images and "bangs" the pose processing pipeline
-        # similar to or in concert with FrameSyncBang and TrackletSyncBang
+        # DATA
+        self.data_hub = DataHub()
+        self.sound_osc = SoundOSC(self.data_hub, settings.sound_osc)
+
+        # RENDER
+        self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
 
         # POSE DETECTOR
         self.pose_detector =        MMDetection(settings.pose)
@@ -167,24 +170,10 @@ class Main():
 
         self.pose_similator: SimilarityComputer = SimilarityComputer()
 
-        self.pd_pose_streamer = PDStreamManager(settings.pose)
+        self.pd_pose_streamer = PDStreamManager(settings.pd_stream)
         self.pd_stream_similator: Optional[PDStreamComputer] = None
 
-
-        # DATA
-        self.data_hub = DataHub()
-        self.sound_osc = SoundOSC(self.data_hub, settings.sound_osc)
-
-        # RENDER
-        # self.WS: Optional[WSPipeline] = None
-        # if settings.art_type == Settings.ArtType.WS:
-        #     self.WS = WSPipeline(self.gui, settings)
-            # self.render = WSRenderManager(self.gui, self.capture_data_hub, self.render_data_hub, settings)
-        if settings.art_type == Settings.ArtType.HDT:
-            self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
-
     def start(self) -> None:
-
         for camera in self.cameras:
 
             camera.add_preview_callback(self.data_hub.set_cam_image)
@@ -260,9 +249,6 @@ class Main():
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame(), self.cameras[c+1].gui.get_gui_frame()])
             else:
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
-
-        # if self.WS:
-        #     self.gui.addFrame([self.WS.gui.get_gui_frame(), self.WS.gui.get_gui_test_frame()])
 
         self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])

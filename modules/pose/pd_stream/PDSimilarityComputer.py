@@ -19,7 +19,7 @@ from modules.pose.similarity import SimilarityFeature, SimilarityBatch, Similari
 from modules.pose.pd_stream.PDStream import PDStreamData, PDStreamDataDict
 
 # Local application imports
-from modules.Settings import Settings
+from .PDStreamSettings import Settings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -110,9 +110,9 @@ def ignore_keyboard_interrupt() -> None:
 class PDStreamComputer():
     def __init__(self, settings: Settings) -> None:
 
-        self.interval: float = 1.0 / settings.corr_rate_hz
+        self.interval: float = 1.0 / settings.corr_rate
 
-        self.max_buffer_capacity: int = settings.pose_stream_capacity
+        self.max_buffer_capacity: int = settings.stream_capacity
         self.buffer_capacity: int = min(settings.corr_buffer_duration, self.max_buffer_capacity)
         self.stream_timeout: float = settings.corr_stream_timeout
 

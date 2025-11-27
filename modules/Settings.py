@@ -6,53 +6,30 @@ from enum import Enum
 import json
 import dataclasses
 
-from modules.cam.depthcam.Definitions import FrameType, get_device_list
-from modules.pose.detection.MMDetection import ModelType
+
 from modules.tracker.TrackerBase import TrackerType
 
 from modules.cam.Settings import Settings as CamSettings
-from modules.pose.Settings import Settings as PoseSettings
+from modules.pose.Settings import Settings as PoseSettings, ModelType
 from modules.gui.PyReallySimpleGui import GuiSettings
 from modules.inout.SoundOSC import SoundOSCConfig, DataType
 from modules.render.Settings import Settings as RenderSettings
+from modules.pose.pd_stream.PDStreamSettings import Settings as PDStreamSettings
 
 T = TypeVar("T")
 
 @dataclass
 class Settings():
-    class CoderType(Enum):
-        CPU =   0
-        GPU =   1
-        iGPU =  2
-
-    class CoderFormat(Enum):
-        H264 = '.mp4'
-        H265 = '.hevc'
-
-    class ArtType(Enum):
-        NONE = 0
-        WS = 1
-        HDT = 2
-
-
-    art_type: 'Settings.ArtType'         = None # type: ignore
-
     # GENERAL
-    num_players: int                   = None # type: ignore
-    tracker_type: TrackerType          = None # type: ignore
-
-    # PATHS
-    path_root: str                     = None # type: ignore
-    path_model: str                    = None # type: ignore
-    path_video: str                    = None # type: ignore
-    path_temp: str                     = None # type: ignore
-    path_file: str                     = None # type: ignore
+    num_players: int                   = 3
+    tracker_type: TrackerType          = TrackerType.ONEPERCAM
 
     # CAMERA SETTINGS
     camera: CamSettings = CamSettings()
 
     # POSE SETTINGS
     pose: PoseSettings = PoseSettings()
+    pd_stream: PDStreamSettings = PDStreamSettings()
 
     # GUI SETTINGS
     gui: GuiSettings = GuiSettings()
@@ -62,27 +39,6 @@ class Settings():
 
     # RENDER SETTINGS
     render: RenderSettings = RenderSettings()
-
-
-    # POSE CORRELATION SETTINGS
-    corr_rate_hz: float                = None # type: ignore
-    corr_num_workers: int              = None # type: ignore
-    corr_buffer_duration: int          = None # type: ignore
-    corr_stream_timeout: float         = None # type: ignore
-    corr_max_nan_ratio: float          = None # type: ignore
-    corr_dtw_band: int                 = None # type: ignore
-    corr_similarity_exp: float         = None # type: ignore
-    corr_stream_capacity: int          = None # type: ignore
-
-    def check_values(self) -> None:
-         for key, value in vars(self).items():
-            if value is None:
-                raise ValueError(f"'{key}' is not set")
-
-    def check_cameras(self) -> None:
-        available: list[str]  = get_device_list()
-        selected: list[str] = []
-        print(f"Available cameras: {available}")
 
 
     def save(self, path: str) -> None:
