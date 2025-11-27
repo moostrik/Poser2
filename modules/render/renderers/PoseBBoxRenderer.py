@@ -4,20 +4,20 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 
-from modules.DataHub import DataHub, DataType, PoseDataTypes
+from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.render.renderers.RendererBase import RendererBase
 from modules.utils.PointsAndRects import Rect
 
 
 class PoseBBoxRenderer(RendererBase):
-    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataTypes, line_width: float = 2.0,
+    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: float = 2.0,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._data: DataHub = data
         self._track_id: int = track_id
         self._bbox_rect: Rect | None = None
 
-        self.data_type: PoseDataTypes = data_type
+        self.data_type: PoseDataHubTypes = data_type
         self.bbox_color: tuple[float, float, float, float] = bbox_color
         self.line_width: float = line_width
 
@@ -45,7 +45,7 @@ class PoseBBoxRenderer(RendererBase):
 
 
     def update(self) -> None:
-        pose: Frame | None = self._data.get_item(DataType(self.data_type), self._track_id)
+        pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
 
         if pose is None:
             self._bbox_rect = None

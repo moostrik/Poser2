@@ -12,7 +12,7 @@ from modules.pose.Frame import Frame, FrameField
 
 from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
-from modules.DataHub import DataHub, DataType, PoseDataTypes
+from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,7 +22,7 @@ from modules.gl.shaders.PoseAngleDeltaBar import PoseAngleDeltaBar
 class PoseAngleDeltaBarLayer(LayerBase):
     pose_feature_shader = PoseAngleDeltaBar()
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataTypes,
+    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
                  line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0)) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
@@ -31,7 +31,7 @@ class PoseAngleDeltaBarLayer(LayerBase):
         self._p_pose: Frame | None = None
         self._labels: list[str] = []
 
-        self.data_type: PoseDataTypes = data_type
+        self.data_type: PoseDataHubTypes = data_type
         self.color: tuple[float, float, float, float] = color
         self.line_thickness: float = line_thickness
         self.line_smooth: float = line_smooth
@@ -67,7 +67,7 @@ class PoseAngleDeltaBarLayer(LayerBase):
 
         key: int = self._track_id
 
-        pose: Frame | None = self._data_hub.get_item(DataType(self.data_type), key)
+        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), key)
 
         if pose is self._p_pose:
             return # no update needed

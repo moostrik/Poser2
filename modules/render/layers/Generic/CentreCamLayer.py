@@ -10,7 +10,7 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Text import draw_box_string, text_init
 
 
-from modules.DataHub import DataHub, DataType, PoseDataTypes
+from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import PointLandmark
 from modules.render.renderers import CamImageRenderer
@@ -28,7 +28,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class CentreCamLayer(LayerBase):
     blend_shader = Blend()
 
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataTypes, image_renderer: CamImageRenderer,) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, image_renderer: CamImageRenderer,) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._fbo: SwapFbo = SwapFbo()
@@ -41,7 +41,7 @@ class CentreCamLayer(LayerBase):
         self._centre_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
         self._screen_centre_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
-        self.data_type: PoseDataTypes = data_type
+        self.data_type: PoseDataHubTypes = data_type
         self.target_x: float = 0.5
         self.target_y: float = 0.25
         self.target_height: float = 1.25
@@ -83,7 +83,7 @@ class CentreCamLayer(LayerBase):
 
         key: int = self._cam_id
 
-        pose: Frame | None = self._data_hub.get_item(DataType(self.data_type), key)
+        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), key)
 
         if pose is self._p_pose:
             return # no update needed

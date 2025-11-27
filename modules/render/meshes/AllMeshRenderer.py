@@ -7,16 +7,16 @@ import numpy as np
 from modules.gl.Mesh import Mesh
 from modules.pose.Frame import Frame
 from modules.render.renderers.PoseMeshUtils import PoseVertexData, PoseMeshUtils, POSE_VERTEX_INDICES
-from modules.DataHub import DataHub, DataType, PoseDataTypes
+from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.render.renderers.RendererBase import RendererBase
 from modules.utils.PointsAndRects import Rect
 
 class AllMeshRenderer(RendererBase):
     """Methods for updating meshes based on pose data."""
-    def __init__(self, amount: int, data: DataHub, type: PoseDataTypes) -> None:
+    def __init__(self, amount: int, data: DataHub, type: PoseDataHubTypes) -> None:
         self._amount: int = amount
         self._data: DataHub = data
-        self._type: PoseDataTypes = type
+        self._type: PoseDataHubTypes = type
         self.meshes: dict[int, Mesh] = {}
 
         self._p_pose: dict[int, Frame] = {}
@@ -39,7 +39,7 @@ class AllMeshRenderer(RendererBase):
 
     def update(self) -> None:
         for id in range(self._amount):
-            pose: Frame | None = self._data.get_item(DataType(self._type), id)
+            pose: Frame | None = self._data.get_item(DataHubType(self._type), id)
             if pose == self._p_pose.get(id, None):
                 continue
             pose_mesh: Mesh | None = self.meshes.get(id, None)

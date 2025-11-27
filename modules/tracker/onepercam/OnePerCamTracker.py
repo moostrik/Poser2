@@ -7,7 +7,6 @@ from typing import List, Optional
 
 # Local application imports
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
-from modules.Settings import Settings
 from modules.tracker.Tracklet import Tracklet, TrackletCallback, TrackingStatus, TrackletDict, TrackletDictCallback
 from modules.tracker.TrackerBase import BaseTracker, TrackerType, TrackerMetadata
 from modules.tracker.onepercam.OnePerCamTrackletManager import OnePerCamTrackletManager as TrackletManager

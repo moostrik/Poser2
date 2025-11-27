@@ -16,7 +16,7 @@ from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_R
 from modules.pose.features.Angles import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.pose.pd_stream.PDStream import PDStreamData
 
-from modules.DataHub import DataHub, DataType
+from modules.DataHub import DataHub, DataHubType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -62,7 +62,7 @@ class PDLineLayer(LayerBase):
         if not PDLineLayer.pose_stream_shader.allocated:
             PDLineLayer.pose_stream_shader.allocate(monitor_file=False)
 
-        pd_stream: PDStreamData | None = self._data.get_item(DataType.pd_stream, self._cam_id)
+        pd_stream: PDStreamData | None = self._data.get_item(DataHubType.pd_stream, self._cam_id)
 
         if pd_stream is self._p_pd_stream:
             return  # no update needed

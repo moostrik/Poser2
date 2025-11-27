@@ -13,7 +13,7 @@ from modules.pose.features.Angles import AngleLandmark
 from modules.pose.features.AngleSymmetry import SymmetryElement
 from modules.pose.similarity import SimilarityBatch, SimilarityFeature, AggregationMethod
 
-from modules.DataHub import DataHub, DataType
+from modules.DataHub import DataHub, DataHubType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,7 +22,7 @@ class SoundOSCConfig:
     ip_addresses: str = field(default_factory=lambda: "127.0.0.1")
     port: int = field(default=9000)
     num_players: int = field(default=8)
-    data_type: DataType = field(default=DataType.pose_I)
+    data_type: DataHubType = field(default=DataHubType.pose_I)
 
 
 class SoundOSC:
@@ -91,7 +91,7 @@ class SoundOSC:
             else:
                 SoundOSC._build_active_message(poses[id], bundle_builder)
 
-        similarity: SimilarityBatch | None = self._data_hub.get_item(DataType.sim_P)
+        similarity: SimilarityBatch | None = self._data_hub.get_item(DataHubType.sim_P)
         if similarity is not None:
             SoundOSC._build_similarity_message(similarity, bundle_builder, num_players)
 

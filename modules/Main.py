@@ -4,33 +4,19 @@ from typing import Optional
 from functools import partial
 
 # Local application imports
+from modules.DataHub import DataHub, DataHubType
 from modules.Settings import Settings
-from modules.gui.PyReallySimpleGui import Gui
-
-from modules.cam.DepthCam import DepthCam, DepthSimulator
-from modules.cam.recorder.SyncRecorderGui import SyncRecorderGui as Recorder
-from modules.cam.depthplayer.SyncPlayerGui import SyncPlayerGui as Player
-from modules.cam.FrameSyncBang import FrameSyncBang
-
-from modules.tracker.TrackerBase import TrackerType
-from modules.tracker.panoramic.PanoramicTracker import PanoramicTracker
-from modules.tracker.onepercam.OnePerCamTracker import OnePerCamTracker
-
-
-from modules.pose.detection import PointBatchExtractor, MMDetection
+from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
+from modules.gui import Gui
+from modules.inout import SoundOSC
 from modules.pose import nodes
 from modules.pose import trackers
 from modules.pose import gui
-
-from modules.pose.similarity.SimilarityComputer import SimilarityComputer
-
-from modules.pose.pd_stream.PDStream import PDStreamManager
-from modules.pose.pd_stream.PDSimilarityComputer import PDStreamComputer
-
-from modules.DataHub import DataHub, DataType
-from modules.inout.SoundOSC import SoundOSC
-
+from modules.pose.detection import PointBatchExtractor, MMDetection
+from modules.pose.similarity import SimilarityComputer
+from modules.pose.pd_stream import PDStreamManager, PDStreamComputer
 from modules.render.HDTRenderManager import HDTRenderManager
+from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 
 
 class Main():
@@ -204,16 +190,16 @@ class Main():
         self.image_crop_processor.add_poses_callback(self.point_extractor.process)
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
         self.pose_raw_filters.add_poses_callback(self.pd_pose_streamer.submit)
-        self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_R)) # raw poses
+        self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_R)) # raw poses
 
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_S)) # smooth poses
+        self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_S)) # smooth poses
 
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
-        self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataType.pose_I)) # interpolated poses
+        self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_I)) # interpolated poses
 
         # self.pose_interpolation_pipeline.add_poses_callback(self.debug_tracker.process)
 

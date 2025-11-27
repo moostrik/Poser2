@@ -1,7 +1,5 @@
 from dataclasses import dataclass, field
 
-from modules.pose.detection.MMDetection import ModelType
-
 @dataclass
 class Settings:
     max_poses: int =                field(default=1)

@@ -4,7 +4,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 
-from modules.DataHub import DataHub, DataType, PoseDataTypes
+from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.render.renderers.RendererBase import RendererBase
 from modules.utils.PointsAndRects import Rect
@@ -12,12 +12,12 @@ from modules.gl.Text import draw_box_string, text_init
 
 
 class PoseMotionTimeRenderer(RendererBase):
-    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataTypes) -> None:
+    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes) -> None:
         self._data: DataHub = data
         self._track_id: int = track_id
         self._motion_time: str | None = None
 
-        self.data_type: PoseDataTypes = data_type
+        self.data_type: PoseDataHubTypes = data_type
 
         text_init()
 
@@ -36,7 +36,7 @@ class PoseMotionTimeRenderer(RendererBase):
 
 
     def update(self) -> None:
-        pose: Frame | None = self._data.get_item(DataType(self.data_type), self._track_id)
+        pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
 
         if pose is None:
             self._motion_time = None

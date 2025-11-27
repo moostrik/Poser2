@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.RenderBase import RenderBase
 from modules.gl.WindowManager import WindowManager
 
-from modules.DataHub import DataHub, PoseDataTypes, SimilarityDataType
+from modules.DataHub import DataHub, PoseDataHubTypes, SimilarityDataHubType
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.Frame import FrameField
 from modules.render.Settings import Settings
@@ -54,24 +54,24 @@ class HDTRenderManager(RenderBase):
 
         # self.line_field_layers:     dict[int, LineFieldLayer] = {}
 
-        self.pose_sim_layer =   SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataType.sim_P, AggregationMethod.HARMONIC_MEAN, 2.0)
+        self.pose_sim_layer =   SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, AggregationMethod.HARMONIC_MEAN, 2.0)
         # self.motion_corr_stream_layer = CorrelationStreamLayer(self.data_hub, num_R_streams, R_stream_capacity, use_motion=True)
 
         # populate
         for i in range(self.num_cams):
             self.cam_img_renderers[i] = CamImageRenderer(i, self.data_hub)
-            self.mesh_renderers[i] =    PoseMeshRenderer(i, self.data_hub,  PoseDataTypes.pose_I, 10.0, None)
-            self.mesh_renderers_raw[i]= PoseMeshRenderer(i, self.data_hub,  PoseDataTypes.pose_R, 10.0, (1.0, 1.0, 1.0, 1.0))
-            self.cam_bbox_renderers[i]= CamBBoxRenderer(i, self.data_hub,   PoseDataTypes.pose_I)
-            self.motion_time_renderers[i] = PoseMotionTimeRenderer(i, self.data_hub, PoseDataTypes.pose_I)
+            self.mesh_renderers[i] =    PoseMeshRenderer(i, self.data_hub,  PoseDataHubTypes.pose_I, 10.0, None)
+            self.mesh_renderers_raw[i]= PoseMeshRenderer(i, self.data_hub,  PoseDataHubTypes.pose_R, 10.0, (1.0, 1.0, 1.0, 1.0))
+            self.cam_bbox_renderers[i]= CamBBoxRenderer(i, self.data_hub,   PoseDataHubTypes.pose_I)
+            self.motion_time_renderers[i] = PoseMotionTimeRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
 
-            self.cam_track_layers[i] =  CamCompositeLayer(i, self.data_hub, PoseDataTypes.pose_R, self.cam_img_renderers[i], 2, None, (1.0, 1.0, 1.0, 0.5))
-            self.pose_cam_layers[i] =   PoseCamLayer(i, self.data_hub,      PoseDataTypes.pose_I, self.cam_img_renderers[i])
-            self.centre_cam_layers[i] = CentreCamLayer(i, self.data_hub,    PoseDataTypes.pose_I, self.cam_img_renderers[i])
+            self.cam_track_layers[i] =  CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, self.cam_img_renderers[i], 2, None, (1.0, 1.0, 1.0, 0.5))
+            self.pose_cam_layers[i] =   PoseCamLayer(i, self.data_hub,      PoseDataHubTypes.pose_I, self.cam_img_renderers[i])
+            self.centre_cam_layers[i] = CentreCamLayer(i, self.data_hub,    PoseDataHubTypes.pose_I, self.cam_img_renderers[i])
             self.pd_line_layers[i] =    PDLineLayer(i, self.data_hub)
-            self.field_bar_layers[i] =  PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_I, FrameField.angles, 2.0, 2.0)
-            self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
-            self.angle_bar_layers[i] =  PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataTypes.pose_I)
+            self.field_bar_layers[i] =  PoseScalarBarLayer(i, self.data_hub,PoseDataHubTypes.pose_I, FrameField.angles, 2.0, 2.0)
+            self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataHubTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
+            self.angle_bar_layers[i] =  PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
             # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
 
         # composition
@@ -223,8 +223,8 @@ class HDTRenderManager(RenderBase):
             self.field_bar_layers_raw[i].feature_type = FrameField.angle_vel
 
 
-            self.centre_cam_layers[i].data_type = PoseDataTypes.pose_I
-            self.mesh_renderers[i].data_type = PoseDataTypes.pose_I
+            self.centre_cam_layers[i].data_type = PoseDataHubTypes.pose_I
+            self.mesh_renderers[i].data_type = PoseDataHubTypes.pose_I
             self.mesh_renderers_raw[i].color = (0.66, 0.66, 0.66, 0.66)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:

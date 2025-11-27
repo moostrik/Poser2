@@ -11,7 +11,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.similarity.features.SimilarityStream import SimilarityStream, SimilarityStreamData, SimilarityBatch , AggregationMethod
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.DataHub import DataHub, DataType, SimilarityDataType
+from modules.DataHub import DataHub, DataHubType, SimilarityDataHubType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,7 +22,7 @@ from modules.gl.shaders.StreamCorrelation import StreamCorrelation
 class SimilarityLineLayer(LayerBase):
     r_stream_shader = StreamCorrelation()
 
-    def __init__(self, num_streams: int, capacity: int, data: DataHub, data_type: SimilarityDataType,
+    def __init__(self, num_streams: int, capacity: int, data: DataHub, data_type: SimilarityDataHubType,
                  aggregation_method: AggregationMethod = AggregationMethod.HARMONIC_MEAN, exponent: float = 2.0) -> None:
         self._num_streams: int = num_streams
         self._data: DataHub = data
@@ -31,7 +31,7 @@ class SimilarityLineLayer(LayerBase):
         self._correlation_stream: SimilarityStream = SimilarityStream(capacity)
         self._p_batch: SimilarityBatch | None = None
 
-        self.data_type: SimilarityDataType = data_type
+        self.data_type: SimilarityDataHubType = data_type
         self.exponent: float = exponent
         self.aggregation_method: AggregationMethod = aggregation_method
 
@@ -69,7 +69,7 @@ class SimilarityLineLayer(LayerBase):
         if not SimilarityLineLayer.r_stream_shader.allocated:
             SimilarityLineLayer.r_stream_shader.allocate(monitor_file=True)
 
-        batch: SimilarityBatch  | None = self._data.get_item(DataType(self.data_type))
+        batch: SimilarityBatch  | None = self._data.get_item(DataHubType(self.data_type))
 
         # print("yes", batch)
         if batch is self._p_batch:

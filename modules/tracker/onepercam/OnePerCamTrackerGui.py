@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from modules.Settings import Settings
-
 from modules.tracker.panoramic.PanoramicDefinitions import *
 
 from modules.gui.PyReallySimpleGui import Gui as G, eType as eT

@@ -9,7 +9,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 
-from modules.DataHub import DataHub, DataType
+from modules.DataHub import DataHub, DataHubType
 from modules.render.renderers.RendererBase import RendererBase
 from modules.utils.PointsAndRects import Rect
 
@@ -35,7 +35,7 @@ class CamDepthTrackRenderer(RendererBase):
             CamDepthTrackRenderer.draw_depth_tracklet(depth_tracklet, rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        self._tracklets: list[DepthTracklet] | None = self._data.get_item(DataType.depth_tracklet, self._cam_id)
+        self._tracklets: list[DepthTracklet] | None = self._data.get_item(DataHubType.depth_tracklet, self._cam_id)
 
     @staticmethod
     def draw_depth_tracklet(tracklet: DepthTracklet, x: float, y: float, width: float, height: float) -> None:

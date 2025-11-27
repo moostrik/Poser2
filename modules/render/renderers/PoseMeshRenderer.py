@@ -10,14 +10,14 @@ from modules.gl.Mesh import Mesh
 
 from modules.pose.Frame import Frame
 
-from modules.DataHub import DataHub, DataType, PoseDataTypes
+from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.render.renderers.PoseMeshUtils import PoseMeshUtils, POSE_VERTEX_INDICES, PoseVertexData
 from modules.render.renderers.RendererBase import RendererBase
 from modules.utils.PointsAndRects import Rect
 
 
 class PoseMeshRenderer(RendererBase):
-    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataTypes, line_width: float = 2.0,
+    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: float = 2.0,
                  color: tuple[float, float, float, float] | None = None) -> None:
         self._track_id: int = track_id
         self._data: DataHub = data
@@ -25,7 +25,7 @@ class PoseMeshRenderer(RendererBase):
         self._is_active: bool = False
         self._p_cam_poses: set[Frame] = set()
 
-        self.data_type: PoseDataTypes = data_type
+        self.data_type: PoseDataHubTypes = data_type
         self.line_width: float = line_width
         self.color: tuple[float, float, float, float] | None = color
 
@@ -42,7 +42,7 @@ class PoseMeshRenderer(RendererBase):
         self._mesh.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        pose: Frame | None = self._data.get_item(DataType(self.data_type), self._track_id)
+        pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
 
         if pose is None:
             self._is_active = False

@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.gl.Image import Image
 
-from modules.DataHub import DataHub, DataType
+from modules.DataHub import DataHub, DataHubType
 from modules.render.renderers.RendererBase import RendererBase
 from modules.utils.PointsAndRects import Rect
 
@@ -36,7 +36,7 @@ class CamImageRenderer(RendererBase):
                                   text_rect.x, text_rect.y, text_rect.width, text_rect.height)
 
     def update(self) -> None:
-        frame: np.ndarray | None = self._data.get_item(DataType.cam_image, self._cam_id)
+        frame: np.ndarray | None = self._data.get_item(DataHubType.cam_image, self._cam_id)
 
         if frame is None: # frames not initialized yet
             return

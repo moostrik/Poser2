@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl.Fbo import Fbo
-from modules.DataHub import DataHub, PoseDataTypes
+from modules.DataHub import DataHub, PoseDataHubTypes
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.render.meshes.AllMeshRenderer import AllMeshRenderer
 
@@ -15,14 +15,14 @@ from modules.render.renderers import CamBBoxRenderer, CamDepthTrackRenderer, Cam
 
 
 class CamCompositeLayer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataTypes, image_renderer: CamImageRenderer,
+    def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataHubTypes, image_renderer: CamImageRenderer,
                  line_width: int = 2,
                  mesh_color: tuple[float, float, float, float] | None = None,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._cam_id: int = cam_id
         self._fbo: Fbo = Fbo()
         self._line_width: int = int(line_width)
-        self._data_type: PoseDataTypes = data_type
+        self._data_type: PoseDataHubTypes = data_type
 
         self._image_renderer: CamImageRenderer = image_renderer
         self._depth_track_renderer: CamDepthTrackRenderer = CamDepthTrackRenderer(cam_id, data)
@@ -30,10 +30,10 @@ class CamCompositeLayer(LayerBase):
         self._mesh_renderer: CamMeshRenderer = CamMeshRenderer(cam_id, data, data_type, line_width, mesh_color)
 
     @property
-    def data_type(self) -> PoseDataTypes:
+    def data_type(self) -> PoseDataHubTypes:
         return self._data_type
     @data_type.setter
-    def data_type(self, value: PoseDataTypes) -> None:
+    def data_type(self, value: PoseDataHubTypes) -> None:
         self._data_type = value
         self._bbox_renderer.data_type = value
         self._mesh_renderer.data_type = value
