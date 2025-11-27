@@ -16,7 +16,6 @@ class Settings():
 
     # CAMERA SETTINGS
     ids: list[str]          = field(default_factory=list)
-    num: int                = field(default=0, init=False)
     fps: float              = field(default=30.0)
     yolo: bool              = field(default=True)
     color: bool             = field(default=True)
@@ -45,8 +44,11 @@ class Settings():
     video_format: CoderFormat = field(default=CoderFormat.H264)
     video_frame_types: list[FrameType] = field(default_factory=lambda: [FrameType.VIDEO])
 
+    @property
+    def num(self) -> int:
+        return len(self.ids)
+
     def __post_init__(self) -> None:
-        self.num = len(self.ids)
         if self.sim_enabled:
             if self.rec_enabled:
                 print("Cam Settings: Warning - Both simulation and recording are enabled, disabling recording.")

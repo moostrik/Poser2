@@ -1,0 +1,101 @@
+{
+  "num_players": 3,
+
+  "tracker_type": "ONEPERCAM",
+
+  "camera": {
+    "ids": [
+      "14442C101136D1D200",
+      "14442C10F124D9D600",
+      "14442C10110AD3D200",
+      "14442C1031DDD2D200"
+    ],
+    "num": 3,
+    "fps": 23.0,
+    "yolo": true,
+    "color": true,
+    "square": true,
+    "stereo": false,
+    "hd_ready": false,
+    "show_stereo": false,
+    "manual": false,
+    "flip_h": false,
+    "flip_v": true,
+    "perspective": -0.22,
+    "model_path": "models",
+    "video_path": "recordings",
+    "temp_path": "temp",
+    "sim_enabled": true,
+    "sim_passthrough": false,
+    "sim_fps": 23.0,
+    "rec_enabled": false,
+    "video_chunk_length": 10.0,
+    "video_encoder": "iGPU",
+    "video_decoder": "iGPU",
+    "video_format": "H264",
+    "video_frame_types": [
+      "VIDEO"
+    ]
+  },
+
+  "pose": {
+    "active": true,
+    "max_poses": 3,
+    "model_type": "SMALL",
+    "model_path": "models",
+    "confidence_threshold": 0.5,
+    "verbose": true,
+    "crop_expansion": 0.1
+  },
+
+  "pd_stream": {
+    "max_poses": 1,
+    "stream_capacity": 300,
+    "stream_sample_rate": 100,
+    "corr_rate": 100,
+    "corr_num_workers": 8,
+    "corr_buffer_duration": 90,
+    "corr_stream_timeout": 2.0,
+    "corr_max_nan_ratio": 0.15,
+    "corr_dtw_band": 10,
+    "corr_similarity_exp": 2.0
+  },
+
+  "gui": {
+    "title": "Poser",
+    "on_top": true,
+    "location_x": 1100,
+    "location_y": -900,
+    "file_path": "files",
+    "default_file": "default"
+  },
+
+  "sound_osc": {
+    "ip_addresses": "127.0.0.1",
+    "port": 8888,
+    "num_players": 3,
+    "data_type": "pose_I"
+  },
+
+  "render": {
+    "title": "Poser",
+    "monitor": 0,
+    "width": 1920,
+    "height": 1000,
+    "x": 0,
+    "y": 80,
+    "fullscreen": false,
+    "fps": 60,
+    "v_sync": true,
+    "secondary_list": [
+      1,
+      2,
+      3
+    ],
+    "num_cams": 3,
+    "num_players": 3,
+    "cams_a_row": 3,
+    "num_R": 3,
+    "stream_capacity": 600
+  }
+}

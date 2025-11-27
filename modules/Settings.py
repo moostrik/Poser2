@@ -1,28 +1,28 @@
+import dataclasses
 from dataclasses import dataclass, field
+from enum import Enum
+import json
+import os
+from pathlib import Path
 from typing import Any, TypeVar, cast
 from typing_extensions import get_args, get_origin
 
-from enum import Enum
-import json
-import dataclasses
-
-
-from modules.tracker.TrackerBase import TrackerType
 
 from modules.cam.Settings import Settings as CamSettings
-from modules.pose.Settings import Settings as PoseSettings, ModelType
 from modules.gui.PyReallySimpleGui import GuiSettings
 from modules.inout.SoundOSC import SoundOSCConfig, DataType
 from modules.render.Settings import Settings as RenderSettings
+from modules.pose.Settings import Settings as PoseSettings, ModelType
 from modules.pose.pd_stream.PDStreamSettings import Settings as PDStreamSettings
+from modules.tracker.TrackerBase import TrackerType
 
 T = TypeVar("T")
 
 @dataclass
 class Settings():
     # GENERAL
-    num_players: int                   = 3
-    tracker_type: TrackerType          = TrackerType.ONEPERCAM
+    num_players: int =          field(default=3)
+    tracker_type: TrackerType = field(default=TrackerType.ONEPERCAM)
 
     # CAMERA SETTINGS
     camera: CamSettings = CamSettings()
@@ -41,14 +41,27 @@ class Settings():
     render: RenderSettings = RenderSettings()
 
 
-    def save(self, path: str) -> None:
+    def save(self, path: str, sort_keys: bool = False) -> None:
+        # Serialize with sorted keys
+        json_str = json.dumps(Settings.serialize(self), indent=2, sort_keys=sort_keys)
+        # Add a blank line between each root element
+        lines = json_str.splitlines()
+        new_lines = []
+        for i, line in enumerate(lines):
+            new_lines.append(line)
+            # Add a blank line after each top-level key (except the last and braces)
+            if (
+                line.endswith(',') and
+                lines[i + 1].startswith('  "')  # next line is another root key
+            ):
+                new_lines.append('')
         with open(path, "w") as f:
-            json.dump(Settings.serialize(self), f, indent=2)
+            f.write('\n'.join(new_lines))
 
-    @classmethod
-    def load(cls, path: str) -> 'Settings':
+    @staticmethod
+    def load(path: str) -> "Settings":
         with open(path, "r") as f:
-            data = json.load(f)
+            data: Any = json.load(f)
         return Settings.deserialize(data, Settings)
 
     @staticmethod
@@ -99,3 +112,49 @@ class Settings():
             return target_type[data]
 
         return cast(T, data)
+
+    @staticmethod
+    def make_paths_relative(obj, path_root: Path | str) -> None:
+        path_root = Path(path_root)
+        if not path_root.exists():
+            raise FileNotFoundError(f"path_root does not exist: {path_root}")
+        if dataclasses.is_dataclass(obj):
+            for field_ in dataclasses.fields(obj):
+                value = getattr(obj, field_.name)
+                if isinstance(value, str) and field_.name.endswith('_path'):
+                    abs_path = Path(value)
+                    try:
+                        rel_path = abs_path.relative_to(path_root)
+                        setattr(obj, field_.name, str(rel_path))
+                    except ValueError:
+                        pass
+                elif dataclasses.is_dataclass(value):
+                    Settings.make_paths_relative(value, path_root)
+                elif isinstance(value, list):
+                    for item in value:
+                        Settings.make_paths_relative(item, path_root)
+                elif isinstance(value, dict):
+                    for item in value.values():
+                        Settings.make_paths_relative(item, path_root)
+
+    @staticmethod
+    def make_paths_absolute(obj, path_root: Path | str) -> None:
+        path_root = Path(path_root)
+        if not path_root.exists():
+            raise FileNotFoundError(f"path_root does not exist: {path_root}")
+        if dataclasses.is_dataclass(obj):
+            for field_ in dataclasses.fields(obj):
+                value = getattr(obj, field_.name)
+                if isinstance(value, str) and field_.name.endswith('_path'):
+                    path = Path(value)
+                    if not path.is_absolute():
+                        abs_path = path_root / path
+                        setattr(obj, field_.name, str(abs_path))
+                elif dataclasses.is_dataclass(value):
+                    Settings.make_paths_absolute(value, path_root)
+                elif isinstance(value, list):
+                    for item in value:
+                        Settings.make_paths_absolute(item, path_root)
+                elif isinstance(value, dict):
+                    for item in value.values():
+                        Settings.make_paths_absolute(item, path_root)

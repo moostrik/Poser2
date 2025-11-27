@@ -1,12 +1,13 @@
 {
-  "art_type": "HDT",
   "num_players": 3,
+
   "tracker_type": "ONEPERCAM",
+
   "camera": {
     "ids": [
-      "14442C101136D1D200",
-      "14442C10F124D9D600",
-      "14442C10110AD3D200"
+      "19443010D153874800",
+      "19443010D1E4974800",
+      "19443010D14C874800"
     ],
     "num": 3,
     "fps": 23.0,
@@ -20,9 +21,9 @@
     "flip_h": false,
     "flip_v": true,
     "perspective": -0.22,
-    "model_path": "C:\\Developer\\Poser2\\models",
-    "video_path": "C:\\Developer\\Poser2\\recordings",
-    "temp_path": "C:\\Developer\\Poser2\\temp",
+    "model_path": "models",
+    "video_path": "recordings",
+    "temp_path": "temp",
     "sim_enabled": true,
     "sim_passthrough": false,
     "sim_fps": 23.0,
@@ -35,15 +36,17 @@
       "VIDEO"
     ]
   },
+
   "pose": {
     "active": true,
     "max_poses": 3,
     "model_type": "SMALL",
-    "model_path": "C:\\Developer\\Poser2\\models",
+    "model_path": "models",
     "confidence_threshold": 0.5,
     "verbose": true,
     "crop_expansion": 0.1
   },
+
   "pd_stream": {
     "max_poses": 1,
     "stream_capacity": 300,
@@ -56,20 +59,23 @@
     "corr_dtw_band": 10,
     "corr_similarity_exp": 2.0
   },
+
   "gui": {
     "title": "Poser",
     "on_top": true,
     "location_x": 1100,
     "location_y": -900,
-    "file_path": "C:\\Developer\\Poser2\\files",
+    "file_path": "files",
     "default_file": "default"
   },
+
   "sound_osc": {
     "ip_addresses": "127.0.0.1",
     "port": 8888,
     "num_players": 3,
     "data_type": "pose_I"
   },
+
   "render": {
     "title": "Poser",
     "monitor": 0,
