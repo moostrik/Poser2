@@ -1,12 +1,12 @@
 # Standard library imports
 from dataclasses import dataclass, field, fields
+from enum import IntEnum
 import time
 from typing import Callable, Any, get_type_hints
 
 # Pose imports
-from modules.pose.features import Points2D, Angles, AngleVelocity, AngleSymmetry, BBox, PoseFeatureType
-from modules.pose.features.base import BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature
-from enum import IntEnum
+from modules.pose.features import Points2D, Angles, AngleVelocity, AngleSymmetry, BBox
+from modules.pose.features.base import BaseFeature
 
 
 @dataclass(frozen=True)
@@ -83,8 +83,8 @@ class FrameField(IntEnum):
 
 
 
-# Validation: Check that all enum values correspond to dataclass fields
-_DEPRECATED_FIELDS = {"is_removed"}  # Fields that don't need enum entries
+# FRAME FIELD VALIDATION
+_DEPRECATED_FIELDS: set[str] = {"is_removed"}  # Fields that don't need enum entries
 
 _pose_field_names: set[str] = {f.name for f in fields(Frame)} - _DEPRECATED_FIELDS
 _enum_names: set[str] = {member.name for member in FrameField}

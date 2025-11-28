@@ -106,7 +106,7 @@ class SoundOsc:
     @ staticmethod
     def _build_inactive_message(id: int, bundle_builder: OscBundleBuilder) -> None:
         msg_builder = OscMessageBuilder(address=f"/pose/{id}/active")
-        msg_builder.add_arg(0)
+        msg_builder.add_arg(0, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(msg_builder.build()) # type: ignore
 
 
@@ -114,51 +114,58 @@ class SoundOsc:
     def _build_active_message(pose: Frame, bundle_builder: OscBundleBuilder) -> None:
         id: int = pose.track_id
         active_msg = OscMessageBuilder(address=f"/pose/{id}/active")
-        active_msg.add_arg(1)
+        active_msg.add_arg(1, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(active_msg.build()) # type: ignore
 
-        motion: float = pose.motion_time
+        # when there is normal motion, about 1 per second
+        motion_time: float = pose.motion_time
         change_msg = OscMessageBuilder(address=f"/pose/{id}/time/motion")
-        change_msg.add_arg(float(motion))
+        change_msg.add_arg(float(motion_time), OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(change_msg.build()) # type: ignore
 
-        motion: float = pose.age
+        # in seconds
+        age: float = pose.age
         change_msg = OscMessageBuilder(address=f"/pose/{id}/time/age")
-        change_msg.add_arg(float(motion))
+        change_msg.add_arg(float(age), OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(change_msg.build()) # type: ignore
 
-        angle_msg = OscMessageBuilder(address=f"/pose/{id}/angle")
-        for joint in AngleLandmark:
-            angle: float | None = pose.angles.get(joint)
-            angle_msg.add_arg(float(angle))
-        bundle_builder.add_content(angle_msg.build()) # type: ignore
+        # range [-pi, pi]
+        angle_rad_values: list[float] = pose.angles.values.tolist()
+        angle_rad_msg = OscMessageBuilder(address=f"/pose/{id}/angle/rad")
+        angle_rad_msg.add_arg(angle_rad_values, OscMessageBuilder.ARG_TYPE_FLOAT)
+        # for joint in AngleLandmark:
+        #     angle: float | None = pose.angles.get(joint)
+        #     angle_msg.add_arg(float(angle), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(angle_rad_msg.build()) # type: ignore
 
-        velocity_msg = OscMessageBuilder(address=f"/pose/{id}/delta")
-        for joint in AngleLandmark:
-            velocity: float | None = pose.angle_vel.get(joint)
-            velocity_msg.add_arg(float(velocity))
-        bundle_builder.add_content(velocity_msg.build()) # type: ignore
+        # range [-finite, finite] -> [-2pi, 2pi]
+        angle_vel_values: list[float] = pose.angle_vel.values.tolist()
+        angle_vel_msg = OscMessageBuilder(address=f"/pose/{id}/angle/vel")
+        angle_vel_msg.add_arg(angle_vel_values, OscMessageBuilder.ARG_TYPE_FLOAT)
+        # for joint in AngleLandmark:
+        #     velocity: float | None = pose.angle_vel.get(joint)
+        #     velocity_msg.add_arg(float(velocity))
+        bundle_builder.add_content(angle_vel_msg.build()) # type: ignore
 
-        mean_symmetry: float = pose.angle_sym.geometric_mean()
-        symmetry_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry/mean")
-        symmetry_msg.add_arg(float(mean_symmetry))
-        bundle_builder.add_content(symmetry_msg.build()) # type: ignore
-
-        sym_msg = OscMessageBuilder(address=f"/pose/{id}/symmetry")
-        for sym_type in SymmetryElement:
-            symmetry: float = pose.angle_sym[sym_type]
-            sym_msg.add_arg(float(symmetry))
-        bundle_builder.add_content(sym_msg.build()) # type: ignore
+        # range [0, 1]
+        mean_sym: float = pose.angle_sym.overall_symmetry()
+        mean_sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
+        mean_sym_msg.add_arg(float(mean_sym), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(mean_sym_msg.build()) # type: ignore
 
     @ staticmethod
     def _build_similarity_message(similarity_batch: SimilarityBatch, bundle_builder: OscBundleBuilder, num_players: int) -> None:
 
         for id in range(num_players):
+            similarity_values: list[float] = []
             for other_id in range(num_players):
                 if id == other_id:
-                    continue
-                feature: SimilarityFeature | None= similarity_batch.get_pair((id, other_id))
-                similarity = feature.aggregate_similarity(AggregationMethod.HARMONIC_MEAN, exponent=2.0) if feature is not None else 0.0
-                sync_msg = OscMessageBuilder(address=f"/similarity/motion/{id}/{other_id}")
-                sync_msg.add_arg(float(similarity))
-                bundle_builder.add_content(sync_msg.build()) # type: ignore
+                    similarity_values.append(1.0)
+                else:
+                    feature: SimilarityFeature | None= similarity_batch.get_pair((id, other_id))
+                    similarity = feature.aggregate_similarity(AggregationMethod.HARMONIC_MEAN, exponent=2.0) if feature is not None else 0.0
+                    similarity_values.append(float(similarity))
+                    # sync_msg = OscMessageBuilder(address=f"/similarity/motion/{id}/{other_id}")
+            sync_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
+            sync_msg.add_arg(similarity_values, OscMessageBuilder.ARG_TYPE_FLOAT)
+            bundle_builder.add_content(sync_msg.build()) # type: ignore

@@ -267,37 +267,6 @@ class AngleSymmetry(NormalizedScalarFeature[SymmetryElement]):
 
     # ========== SYMMETRY-SPECIFIC CONVENIENCE METHODS ==========
 
-    def overall_symmetry(self, method: AggregationMethod = AggregationMethod.MEAN,
-                        min_confidence: float = 0.0) -> float:
-        """Compute overall symmetry score using specified aggregation method.
-
-        Args:
-            method: Statistical aggregation method (default: MEAN)
-            min_confidence: Minimum confidence to include landmark (default: 0.0)
-
-        Returns:
-            Overall symmetry score [0, 1], or NaN if no landmarks meet criteria
-
-        Examples:
-            >>> # Mean symmetry (default, balanced)
-            >>> overall = symmetry.overall_symmetry()
-            >>>
-            >>> # Geometric mean (penalizes low symmetry more)
-            >>> overall = symmetry.overall_symmetry(AggregationMethod.GEOMETRIC_MEAN)
-            >>>
-            >>> # Harmonic mean (very strict - heavily penalizes asymmetry)
-            >>> overall = symmetry.overall_symmetry(AggregationMethod.HARMONIC_MEAN)
-            >>>
-            >>> # Only trust high-confidence measurements
-            >>> overall = symmetry.overall_symmetry(
-            ...     AggregationMethod.MEAN,
-            ...     min_confidence=0.7
-            ... )
-            >>>
-            >>> # For strict symmetric poses (all landmarks must be symmetric):
-            >>> overall = symmetry.overall_symmetry(
-            ...     AggregationMethod.HARMONIC_MEAN,
-            ...     min_confidence=0.6
-            ... )
-        """
-        return self.aggregate(method, min_confidence)
+    def overall_symmetry(self) -> float:
+        """Compute overall symmetry score using harmonic mean."""
+        return self.aggregate(method=AggregationMethod.HARMONIC_MEAN, min_confidence=0.0, exponent=2.0)
