@@ -211,7 +211,7 @@ class HDTRenderManager(RenderBase):
             screen_center_rect: Rect = self.centre_cam_layers[i].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(preview_rect)
             self.mesh_renderers[i].draw(draw_mesh_rect)
-            # self.field_bar_layers[i].draw(preview_rect)
+            self.field_bar_layers[i].draw(preview_rect)
             self.pd_line_layers[i].draw(preview_rect)
             self.motion_time_renderers[i].draw(preview_rect)
 
@@ -219,8 +219,9 @@ class HDTRenderManager(RenderBase):
 
 
 
-            self.field_bar_layers[i].feature_type = FrameField.angle_vel
-            self.field_bar_layers_raw[i].feature_type = FrameField.angle_vel
+            self.field_bar_layers[i].feature_type = FrameField.similarity
+            self.field_bar_layers_raw[i].data_type = PoseDataHubTypes.pose_S
+            self.field_bar_layers_raw[i].feature_type = FrameField.similarity
 
 
             self.centre_cam_layers[i].data_type = PoseDataHubTypes.pose_I
@@ -262,20 +263,13 @@ class HDTRenderManager(RenderBase):
             self.mesh_renderers[camera_id].draw(draw_mesh_rect)
         else:
             self.pose_cam_layers[camera_id].draw(draw_rect)
+            self.mesh_renderers_raw[camera_id].draw(draw_rect)
             self.mesh_renderers[camera_id].draw(draw_rect)
-            # self.mesh_renderers_raw[camera_id].draw(draw_rect)
 
         # self.field_bar_layers_raw[camera_id].draw(draw_rect)
-        # self.field_bar_layers[camera_id].draw(draw_rect)
-
-
-        # self.field_bar_layers[camera_id].color = (0.0, 0.0, 0.0, 1.0)
-        # self.field_bar_layers_raw[camera_id].color = (1.0, 1.0, 1.0, 0.6)
-
+        self.field_bar_layers[camera_id].draw(draw_rect)
         self.angle_bar_layers[camera_id].draw(draw_rect)
 
         # self.pd_line_layers[camera_id].draw(draw_rect)
-
-
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
 

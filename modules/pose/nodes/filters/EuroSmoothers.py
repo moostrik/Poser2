@@ -106,3 +106,8 @@ class AngleVelEuroSmoother(FeatureEuroSmoother):
 class AngleSymEuroSmoother(FeatureEuroSmoother):
     def __init__(self, config: EuroSmootherConfig) -> None:
         super().__init__(config, FrameField.angle_sym)
+
+
+class SimilarityEuroSmoother(FeatureEuroSmoother):
+    def __init__(self, config: EuroSmootherConfig) -> None:
+        super().__init__(config, FrameField.similarity)

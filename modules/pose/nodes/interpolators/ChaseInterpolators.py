@@ -100,4 +100,9 @@ class AngleVelChaseInterpolator(FeatureChaseInterpolator):
 
 class AngleSymChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, config: ChaseInterpolatorConfig) -> None:
-        super().__init__(config, FrameField.angle_vel)
+        super().__init__(config, FrameField.angle_sym)
+
+
+class SimilarityChaseInterpolator(FeatureChaseInterpolator):
+    def __init__(self, config: ChaseInterpolatorConfig) -> None:
+        super().__init__(config, FrameField.similarity)

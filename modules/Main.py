@@ -62,33 +62,46 @@ class Main():
         self.point_smooth_config =  nodes.EuroSmootherConfig()
         self.angle_smooth_config =  nodes.EuroSmootherConfig()
         self.a_vel_smooth_config =  nodes.EuroSmootherConfig()
-
-        self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera.fps)
-        self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
-        self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
+        self.simil_smooth_config =  nodes.EuroSmootherConfig()
 
         self.b_box_smooth_gui =     guis.EuroSmootherGui(self.b_box_smooth_config, self.gui, 'BBox')
         self.point_smooth_gui =     guis.EuroSmootherGui(self.point_smooth_config, self.gui, 'Point')
         self.angle_smooth_gui =     guis.EuroSmootherGui(self.angle_smooth_config, self.gui, 'Angle')
-        self.a_vel_smooth_gui =     guis.EuroSmootherGui(self.a_vel_smooth_config, self.gui, 'Vel')
+        self.a_vel_smooth_gui =     guis.EuroSmootherGui(self.a_vel_smooth_config, self.gui, 'Angle Vel')
+        self.simil_smooth_gui =     guis.EuroSmootherGui(self.simil_smooth_config, self.gui, 'Similarity')
+
+        self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera.fps)
+        self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
+        self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
+        self.simil_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
 
         # self.b_box_interp_gui =   gui.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBox')
         self.point_interp_gui =     guis.InterpolatorGui(self.point_interp_config, self.gui, 'Point')
         self.angle_interp_gui =     guis.InterpolatorGui(self.angle_interp_config, self.gui, 'Angle')
+        self.simil_interp_gui =     guis.InterpolatorGui(self.simil_interp_config, self.gui, 'Similarity')
 
         # POSE PROCESSING PIPELINES
         self.pose_from_tracklet =   PoseFromTrackletGenerator(num_players)
+
+        self.image_crop_processor = trackers.ImageCropProcessorTracker(num_players, self.image_crop_config)
+        self.point_extractor =      PointBatchExtractor(settings.pose) # GPU-based 2D point extractor
+
+        self.pose_similator:        SimilarityComputer = SimilarityComputer()
+        self.pose_similarity_extractor = nodes.SimilarityExtractor(nodes.SimilarityExtractorConfig(max_poses=settings.pose.max_poses,
+                                                                                                   method=nodes.AggregationMethod.HARMONIC_MEAN,
+                                                                                                   exponent=2.0))
+
+        self.debug_tracker =        trackers.DebugTracker(num_players)
+
 
         self.bbox_filters =      trackers.FilterTracker(
             settings.num_players,
             [
                 lambda: nodes.BBoxEuroSmoother(self.b_box_smooth_config),
                 lambda: nodes.BBoxPredictor(self.prediction_config),
+                #lambbda: nodes.BBoxARFilter(), # TODO: implement BBoxARFilter
             ]
         )
-
-        self.image_crop_processor = trackers.ImageCropProcessorTracker(num_players, self.image_crop_config)
-        self.point_extractor =      PointBatchExtractor(settings.pose) # GPU-based 2D point extractor
 
         self.pose_raw_filters =     trackers.FilterTracker(
             settings.num_players,
@@ -100,10 +113,6 @@ class Main():
             ]
         )
 
-        self.pose_similarity_extractor = nodes.SimilarityExtractor(nodes.SimilarityExtractorConfig(max_poses=settings.pose.max_poses,
-                                                                                                   method=nodes.AggregationMethod.HARMONIC_MEAN,
-                                                                                                   exponent=2.0))
-
         self.pose_smooth_filters = trackers.FilterTracker(
             settings.num_players,
             [
@@ -114,6 +123,7 @@ class Main():
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
                 lambda: self.pose_similarity_extractor,
+                lambda: nodes.SimilarityEuroSmoother(self.simil_smooth_config),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
             ]
         )
@@ -135,6 +145,7 @@ class Main():
                 lambda: nodes.BBoxLerpInterpolator(self.b_box_interp_config),
                 lambda: nodes.PointChaseInterpolator(self.point_interp_config),
                 lambda: nodes.AngleChaseInterpolator(self.angle_interp_config),
+                lambda: nodes.SimilarityChaseInterpolator(self.simil_interp_config),
             ]
         )
 
@@ -150,10 +161,6 @@ class Main():
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
             ]
         )
-
-        self.debug_tracker = trackers.DebugTracker(num_players)
-
-        self.pose_similator: SimilarityComputer = SimilarityComputer()
 
          # PD STREAM
 
@@ -191,6 +198,7 @@ class Main():
         self.image_crop_processor.add_image_callback(self.point_extractor.set_images)
         self.image_crop_processor.add_poses_callback(self.point_extractor.process)
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
+
         self.pose_raw_filters.add_poses_callback(self.pd_pose_streamer.submit)
         self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_R)) # raw poses
 
@@ -232,6 +240,7 @@ class Main():
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])

@@ -91,9 +91,9 @@ class SoundOsc:
             else:
                 SoundOsc._build_active_message(poses[id], bundle_builder)
 
-        similarity: SimilarityBatch | None = self._data_hub.get_item(DataHubType.sim_P)
-        if similarity is not None:
-            SoundOsc._build_similarity_message(similarity, bundle_builder, num_players)
+        # similarity: SimilarityBatch | None = self._data_hub.get_item(DataHubType.sim_P)
+        # if similarity is not None:
+        #     SoundOsc._build_similarity_message(similarity, bundle_builder, num_players)
 
         bundle: OscBundle = bundle_builder.build()
 
@@ -152,6 +152,11 @@ class SoundOsc:
         mean_sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
         mean_sym_msg.add_arg(float(mean_sym), OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(mean_sym_msg.build()) # type: ignore
+
+        similarity_values: list[float] = pose.similarity.values.tolist()
+        similarity_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
+        similarity_msg.add_arg(similarity_values)
+        bundle_builder.add_content(similarity_msg.build()) # type: ignore
 
     @ staticmethod
     def _build_similarity_message(similarity_batch: SimilarityBatch, bundle_builder: OscBundleBuilder, num_players: int) -> None:
