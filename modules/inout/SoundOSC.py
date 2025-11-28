@@ -132,7 +132,7 @@ class SoundOsc:
         # range [-pi, pi]
         angle_rad_values: list[float] = pose.angles.values.tolist()
         angle_rad_msg = OscMessageBuilder(address=f"/pose/{id}/angle/rad")
-        angle_rad_msg.add_arg(angle_rad_values, OscMessageBuilder.ARG_TYPE_FLOAT)
+        angle_rad_msg.add_arg(angle_rad_values)
         # for joint in AngleLandmark:
         #     angle: float | None = pose.angles.get(joint)
         #     angle_msg.add_arg(float(angle), OscMessageBuilder.ARG_TYPE_FLOAT)
@@ -141,7 +141,7 @@ class SoundOsc:
         # range [-finite, finite] -> [-2pi, 2pi]
         angle_vel_values: list[float] = pose.angle_vel.values.tolist()
         angle_vel_msg = OscMessageBuilder(address=f"/pose/{id}/angle/vel")
-        angle_vel_msg.add_arg(angle_vel_values, OscMessageBuilder.ARG_TYPE_FLOAT)
+        angle_vel_msg.add_arg(angle_vel_values)
         # for joint in AngleLandmark:
         #     velocity: float | None = pose.angle_vel.get(joint)
         #     velocity_msg.add_arg(float(velocity))
@@ -167,5 +167,5 @@ class SoundOsc:
                     similarity_values.append(float(similarity))
                     # sync_msg = OscMessageBuilder(address=f"/similarity/motion/{id}/{other_id}")
             sync_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
-            sync_msg.add_arg(similarity_values, OscMessageBuilder.ARG_TYPE_FLOAT)
+            sync_msg.add_arg(similarity_values)
             bundle_builder.add_content(sync_msg.build()) # type: ignore

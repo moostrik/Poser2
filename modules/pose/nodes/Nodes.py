@@ -57,12 +57,16 @@ class FilterNode(NodeBase):
         """Process a pose and return the result immediately."""
         pass
 
+    def submit(self, context: Any) -> None:
+        """Optional method to submit external context data. Override if filter needs context."""
+        pass
+
     def reset(self) -> None:
         """most filters have no internal state to reset."""
         pass
 
     def is_ready(self) -> bool:
-        """Filters are always ready."""
+        """most filters are always ready."""
         return True
 
 
@@ -86,18 +90,6 @@ class InterpolatorNode(NodeBase):
         pass
 
 
-class GeneratorNode(NodeBase, Generic[TInput]):
-    """Base class for nodes that generate Pose objects from external data sources."""
-
-    @abstractmethod
-    def submit(self, input_data: TInput | None) -> None:
-        """Set the input data for pose generation."""
-        pass
-
-    @abstractmethod
-    def update(self, time_stamp: float | None = None) -> Frame:
-        """Generate a new pose."""
-        pass
 
 
 class ProcessorNode(NodeBase, Generic[TInput, TOutput]):

@@ -3,8 +3,9 @@ from threading import Lock
 
 import numpy as np
 
-from modules.pose.nodes.processors.ImageCropProcessor import ImageCropProcessor, ImageCropProcessorConfig
+from ...nodes import ImageCropProcessor, ImageCropProcessorConfig, SimilarityExtractor, SimilarityExtractorConfig
 from ..ProcessorTracker import ProcessorTracker, TOutput_Callback
+from ...similarity import SimilarityBatch
 
 from modules.cam.depthcam.Definitions import FrameType
 
@@ -18,7 +19,7 @@ class ImageCropProcessorTracker(ProcessorTracker[np.ndarray, np.ndarray]):
             config: Configuration for the ImageCropProcessor.
         """
         self._image_lock = Lock()
-        self._images = dict[int, np.ndarray]()
+        self._images: dict[int, np.ndarray] = dict[int, np.ndarray]()
 
         super().__init__(num_tracks=num_tracks, processor_factory=lambda: ImageCropProcessor(config)
         )
@@ -42,3 +43,4 @@ class ImageCropProcessorTracker(ProcessorTracker[np.ndarray, np.ndarray]):
 
     def remove_image_callback(self, callback: TOutput_Callback) -> None:
         self.remove_output_callback(callback)
+

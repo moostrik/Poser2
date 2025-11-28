@@ -10,7 +10,7 @@ from typing_extensions import get_args, get_origin
 
 from modules.cam.Settings import Settings as CamSettings
 from modules.gui.PyReallySimpleGui import GuiSettings
-from modules.inout.SoundOSC import SoundOSCConfig
+from modules.inout import SoundOscConfig
 from modules.render.Settings import Settings as RenderSettings
 from modules.pose.Settings import Settings as PoseSettings, ModelType
 from modules.pose.pd_stream.PDStreamSettings import Settings as PDStreamSettings
@@ -35,7 +35,7 @@ class Settings():
     gui: GuiSettings = GuiSettings()
 
     # INOUT SETTINGS
-    sound_osc: SoundOSCConfig = SoundOSCConfig()
+    sound_osc: SoundOscConfig = SoundOscConfig()
 
     # RENDER SETTINGS
     render: RenderSettings = RenderSettings()

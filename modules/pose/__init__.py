@@ -1,3 +1,4 @@
 from .detection.MMDetection import MMDetection
 from .detection.PointBatchExtractor import PointBatchExtractor
+from .generators.PoseFromTrackletGenerator import PoseFromTrackletGenerator
 from .similarity import SimilarityComputer

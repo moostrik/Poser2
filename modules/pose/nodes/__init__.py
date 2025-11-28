@@ -5,15 +5,16 @@ from .extractors.AngleVelExtractor import       AngleVelExtractor
 from .extractors.AngleSymExtractor import       AngleSymExtractor
 from .extractors.AgeExtractor import            AgeExtractor
 from .extractors.MotionTimeExtractor import     MotionTimeExtractor
+from .extractors.SimilarityExtractor import     SimilarityExtractorConfig,  SimilarityExtractor,    AggregationMethod
 
-from .filters.ConfidenceFilters import          ConfidenceFilterConfig, BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfidenceFilter
-from .filters.Predictors import                 PredictorConfig,        BBoxPredictor,          PointPredictor,         AnglePredictor,         AngleVelPredictor,          AngleSymPredictor
-from .filters.EuroSmoothers import              EuroSmootherConfig,     BBoxEuroSmoother,       PointEuroSmoother,      AngleEuroSmoother,      AngleVelEuroSmoother,       AngleSymEuroSmoother
-from .filters.StickyFillers import              StickyFillerConfig,     BBoxStickyFiller,       PointStickyFiller,      AngleStickyFiller,      AngleVelStickyFiller,       AngleSymStickyFiller
-from .filters.RateLimiters import               RateLimiterConfig,      BBoxRateLimiter,        PointRateLimiter,       AngleRateLimiter,       AngleVelRateLimiter,        AngleSymRateLimiter
-from .filters.Validators import                 ValidatorConfig,        BBoxValidator,          PointValidator,         AngleValidator,         AngleVelValidator,          AngleSymValidator,          PoseValidator
+from .filters.ConfidenceFilters import          ConfidenceFilterConfig,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfidenceFilter
+from .filters.Predictors import                 PredictorConfig,            BBoxPredictor,          PointPredictor,         AnglePredictor,         AngleVelPredictor,          AngleSymPredictor
+from .filters.EuroSmoothers import              EuroSmootherConfig,         BBoxEuroSmoother,       PointEuroSmoother,      AngleEuroSmoother,      AngleVelEuroSmoother,       AngleSymEuroSmoother
+from .filters.StickyFillers import              StickyFillerConfig,         BBoxStickyFiller,       PointStickyFiller,      AngleStickyFiller,      AngleVelStickyFiller,       AngleSymStickyFiller
+from .filters.RateLimiters import               RateLimiterConfig,          BBoxRateLimiter,        PointRateLimiter,       AngleRateLimiter,       AngleVelRateLimiter,        AngleSymRateLimiter
+from .filters.Validators import                 ValidatorConfig,            BBoxValidator,          PointValidator,         AngleValidator,         AngleVelValidator,          AngleSymValidator,          PoseValidator
 
 from .interpolators.ChaseInterpolators import   ChaseInterpolatorConfig,    BBoxChaseInterpolator,  PointChaseInterpolator, AngleChaseInterpolator, AngleVelChaseInterpolator,  AngleSymChaseInterpolator
 from .interpolators.LerpInterpolators import    LerpInterpolatorConfig,     BBoxLerpInterpolator,   PointLerpInterpolator,  AngleLerpInterpolator,  AngleVelLerpInterpolator,   AngleSymLerpInterpolator
 
-from .processors.ImageCropProcessor import      ImageCropProcessor, ImageCropProcessorConfig
+from .processors.ImageCropProcessor import      ImageCropProcessorConfig,   ImageCropProcessor

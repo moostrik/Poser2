@@ -9,7 +9,7 @@ from modules.Settings import Settings
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.gui import Gui
 from modules.inout import SoundOsc
-from modules.pose import guis, nodes, trackers, PointBatchExtractor, SimilarityComputer
+from modules.pose import guis, nodes, trackers, PoseFromTrackletGenerator, PointBatchExtractor, SimilarityComputer
 from modules.pose.pd_stream import PDStreamManager, PDStreamComputer
 from modules.render.HDTRenderManager import HDTRenderManager
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
@@ -77,7 +77,7 @@ class Main():
         self.angle_interp_gui =     guis.InterpolatorGui(self.angle_interp_config, self.gui, 'Angle')
 
         # POSE PROCESSING PIPELINES
-        self.pose_from_tracklet =   trackers.PoseFromTrackletGenerator(num_players)
+        self.pose_from_tracklet =   PoseFromTrackletGenerator(num_players)
 
         self.bbox_filters =      trackers.FilterTracker(
             settings.num_players,
@@ -100,6 +100,10 @@ class Main():
             ]
         )
 
+        self.pose_similarity_extractor = nodes.SimilarityExtractor(nodes.SimilarityExtractorConfig(max_poses=settings.pose.max_poses,
+                                                                                                   method=nodes.AggregationMethod.HARMONIC_MEAN,
+                                                                                                   exponent=2.0))
+
         self.pose_smooth_filters = trackers.FilterTracker(
             settings.num_players,
             [
@@ -109,9 +113,11 @@ class Main():
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
+                lambda: self.pose_similarity_extractor,
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
             ]
         )
+
 
         self.pose_prediction_filters = trackers.FilterTracker(
             settings.num_players,
@@ -149,6 +155,8 @@ class Main():
 
         self.pose_similator: SimilarityComputer = SimilarityComputer()
 
+         # PD STREAM
+
         self.pd_pose_streamer = PDStreamManager(settings.pd_stream)
         self.pd_stream_similator: Optional[PDStreamComputer] = None
 
@@ -174,6 +182,7 @@ class Main():
         self.pd_pose_streamer.start()
 
         self.pose_similator.add_correlation_callback(self.data_hub.set_pose_similarity)
+        self.pose_similator.add_correlation_callback(self.pose_similarity_extractor.submit)
         self.pose_similator.start()
 
         # POSE PROCESSING PIPELINES
@@ -203,7 +212,7 @@ class Main():
         self.tracker.start()
 
         self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
-        self.frame_sync_bang.add_callback(self.pose_from_tracklet.update)
+        self.frame_sync_bang.add_callback(self.pose_from_tracklet.generate)
 
         # IN / OUT
         self.sound_osc.start()

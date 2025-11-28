@@ -44,7 +44,9 @@ class ImageCropProcessor(ProcessorNode[np.ndarray, np.ndarray]):
         return replace(pose, bbox=BBox.from_rect(result_roi)), result_image
 
     def is_ready(self) -> bool:
+        """Check if processor has an image to work with."""
         return  self._image is not None
 
     def reset(self) -> None:
+        """Clear the stored image."""
         self._image = None

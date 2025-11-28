@@ -1,11 +1,11 @@
 # Standard library imports
 from dataclasses import dataclass, field, fields
-from enum import IntEnum
+from enum import IntEnum, auto
 import time
 from typing import Callable, Any, get_type_hints
 
 # Pose imports
-from modules.pose.features import Points2D, Angles, AngleVelocity, AngleSymmetry, BBox
+from modules.pose.features import Points2D, Angles, AngleVelocity, AngleSymmetry, BBox, Similarity
 from modules.pose.features.base import BaseFeature
 
 
@@ -23,6 +23,7 @@ class Frame:
     angles: Angles =            field(default_factory=Angles.create_dummy)
     angle_vel: AngleVelocity =  field(default_factory=AngleVelocity.create_dummy)
     angle_sym: AngleSymmetry =  field(default_factory=AngleSymmetry.create_dummy)
+    similarity: Similarity =    field(default_factory=Similarity.create_dummy)
     motion_time: float =        field(default=0.0)
     age: float =                field(default=0.0)
 
@@ -41,15 +42,16 @@ FrameDictCallback = Callable[[FrameDict], Any]
 
 class FrameField(IntEnum):
     track_id =      0
-    cam_id =        1
-    time_stamp =    2
-    bbox =          3
-    points =        4
-    angles =        5
-    angle_vel =     6
-    angle_sym =     7
-    motion_time =   8
-    age =           9
+    cam_id =        auto()
+    time_stamp =    auto()
+    bbox =          auto()
+    points =        auto()
+    angles =        auto()
+    angle_vel =     auto()
+    angle_sym =     auto()
+    similarity =    auto()
+    motion_time =   auto()
+    age =           auto()
 
     def get_type(self) -> type:
         """Get the feature class for this pose field using Pose type hints."""

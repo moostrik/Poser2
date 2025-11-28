@@ -1,11 +1,11 @@
 """
 =============================================================================
-SYMMETRYFEATURE API REFERENCE
+SIMILARITYFEATURE API REFERENCE
 =============================================================================
 
-Concrete implementation of NormalizedScalarFeature for left/right body symmetry.
+Concrete implementation of NormalizedScalarFeature for pose similarity assessment.
 
-Use for: pose symmetry assessment, pose quality checking, symmetric pose detection.
+Use for: pose similarity scoring, pose quality checking, pose matching.
 
 Summary of BaseFeature Design Philosophy:
 ==========================================
@@ -27,8 +27,8 @@ Cached Properties:
   • Subclasses may add @cached_property (safe due to immutability)
 
 Construction:
-  • SymmetryFeature(values, scores)           → Direct (fast, no validation)
-  • SymmetryFeature.create_empty()            → All NaN values, zero scores
+  • Similarity(values, scores)           → Direct (fast, no validation)
+  • Similarity.create_empty()            → All NaN values, zero scores
 
 Validation:
   • Asserts in constructors (removed with -O flag for production)
@@ -46,7 +46,7 @@ Inherited from BaseScalarFeature:
 Structure:
 ----------
 Each element has:
-  • A scalar symmetry value (float) in [0.0, 1.0] - may be NaN for invalid/missing data
+  • A scalar similarity value (float) in [0.0, 1.0] - may be NaN for invalid/missing data
   • A confidence score [0.0, 1.0]
 
 Storage:
@@ -55,7 +55,7 @@ Storage:
 
 Properties:
 -----------
-  • values: np.ndarray                             All symmetry values (n_elements,)
+  • values: np.ndarray                             All similarity values (n_elements,)
   • scores: np.ndarray                             All confidence scores (n_elements,)
   • valid_mask: np.ndarray                         Boolean validity mask (n_elements,)
   • valid_count: int                               Number of valid values
@@ -63,21 +63,21 @@ Properties:
 
 Single Value Access:
 --------------------
-  • feature[element] -> float                      Get symmetry (supports enum or int)
-  • feature.get(element, fill=np.nan) -> float     Get symmetry with NaN handling
+  • feature[element] -> float                      Get similarity (supports enum or int)
+  • feature.get(element, fill=np.nan) -> float     Get similarity with NaN handling
   • feature.get_value(element, fill) -> float      Alias for get()
   • feature.get_score(element) -> float            Get confidence score
-  • feature.get_valid(element) -> bool             Check if symmetry is valid
+  • feature.get_valid(element) -> bool             Check if similarity is valid
 
 Batch Operations:
 -----------------
-  • feature.get_values(elements, fill) -> list[float]  Get multiple symmetries
+  • feature.get_values(elements, fill) -> list[float]  Get multiple similarities
   • feature.get_scores(elements) -> list[float]        Get multiple scores
   • feature.are_valid(elements) -> bool                Check if ALL valid
 
 Factory Methods:
 ----------------
-  • SymmetryFeature.create_empty() -> SymmetryFeature          All NaN values, zero scores
+  • Similarity.create_empty() -> Similarity          All NaN values, zero scores
 
 Validation:
 -----------
@@ -87,7 +87,7 @@ Validation:
 Implemented Methods (from NormalizedScalarFeature):
 ----------------------------------------------------
 Structure:
-  • feature_enum() -> type[SymmetryRegion]         Returns SymmetryRegion enum (IMPLEMENTED)
+  • feature_enum() -> type[PoseIndex]         Returns PoseIndex enum (IMPLEMENTED)
 
 Implemented Methods (do not override):
 ---------------------------------------
@@ -142,63 +142,63 @@ Aggregation Methods (Enum):
   • AggregationMethod.MEDIAN            Median value
   • AggregationMethod.STD               Standard deviation
 
-SymmetryFeature-Specific:
+SimilarityFeature-Specific:
 ==========================
 
-Symmetry Methods:
+Similarity Methods:
 -----------------
-  • feature.overall_symmetry(method=MEAN, min_confidence=0.0) -> float
-      Compute overall symmetry score using specified aggregation method
-      Convenience wrapper for aggregate() with symmetry-specific naming
+  • feature.overall_similarity(method=MEAN, min_confidence=0.0) -> float
+      Compute overall similarity score using specified aggregation method
+      Convenience wrapper for aggregate() with similarity-specific naming
 
-SymmetryRegion Enum (symmetric landmark pairs):
+PoseIndex Enum (tracked pose indices):
 ------------------------------------------------
-  • shoulder (0)  - Left/right shoulder pair symmetry
-  • elbow (1)     - Left/right elbow pair symmetry
-  • hip (2)       - Left/right hip pair symmetry
-  • knee (3)      - Left/right knee pair symmetry
+  • POSE_0 (0)  - First tracked pose
+  • POSE_1 (1)     - Second tracked pose
+  • POSE_2 (2)       - Third tracked pose
+  • POSE_3 (3)      - Fourth tracked pose
 
-Statistical Comparison for Symmetry:
+Statistical Comparison for Similarity:
 -------------------------------------
-Given symmetry values: [0.9, 0.9, 0.9, 0.3]
-(3 symmetric regions, 1 asymmetric)
+Given similarity values: [0.9, 0.9, 0.9, 0.3]
+(3 similar regions, 1 dissimilar)
 
-• Mean:          0.75  → "75% symmetric overall"
-• Geometric:     0.69  → "69% symmetric (penalizes asymmetry)"
-• Harmonic:      0.51  → "51% symmetric (very strict)"
+• Mean:          0.75  → "75% similar overall"
+• Geometric:     0.69  → "69% similar (penalizes dissimilarity)"
+• Harmonic:      0.51  → "51% similar (very strict)"
 
 Use case guidance:
-- Mean:      General symmetry assessment (balanced)
-- Geometric: Prefer symmetric poses, some tolerance for variation
-- Harmonic:  Require all regions symmetric (strict yoga/dance poses)
+- Mean:      General similarity assessment (balanced)
+- Geometric: Prefer similar poses, some tolerance for variation
+- Harmonic:  Require all regions similar (strict yoga/dance poses)
 
-Comparison with SimilarityFeature:
+Comparison with SymmetryFeature:
 ----------------------------------
+SimilarityFeature:
+  • Compares current pose with multiple tracked poses (inter-pose comparison)
+  • Has pair_id tracking which poses are compared
+  • Used for pose matching, tracking, quality assessment
+
 SymmetryFeature:
   • Compares left/right within one pose (intra-pose comparison)
   • No pair_id (single pose analysis)
   • Used for symmetry checking, pose quality
 
-SimilarityFeature:
-  • Compares two different poses (inter-pose comparison)
-  • Has pair_id tracking which poses are compared
-  • Used for pose matching, tracking, quality assessment
-
 Both use same statistical methods and interpretation.
 
 Notes:
 ------
-- Symmetry values are in range [0.0, 1.0]
-  * 1.0 = perfect symmetry (left/right angles identical after mirroring)
-  * 0.0 = maximum asymmetry (left/right angles maximally different)
+- Similarity values are in range [0.0, 1.0]
+  * 1.0 = perfect similarity (left/right angles identical after mirroring)
+  * 0.0 = maximum dissimilarity (left/right angles maximally different)
 - Invalid values are NaN with score 0.0
 - Geometric/harmonic means replace zeros with 1e-5 (numerical stability)
-- Zero values have semantic meaning (complete asymmetry) and penalize scores
+- Zero values have semantic meaning (complete dissimilarity) and penalize scores
 - Methods return NaN if no values meet min_confidence criteria
 - Confidence weighting improves reliability of aggregates
 - Arrays are read-only after construction (immutable)
 - Use validate() for debugging, not in production loops
-- Angles should already be mirrored (right-side negated) before computing symmetry
+- Angles should already be mirrored (right-side negated) before computing similarity
 - Confidence is minimum of the two angles being compared (conservative)
 =============================================================================
 """
@@ -206,24 +206,46 @@ Notes:
 from enum import IntEnum
 from typing import cast
 
+import numpy as np
+
 from modules.pose.features.base.NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod
 
 
-class Similarity(NormalizedScalarFeature):
-    _pose_enum: type[IntEnum] | None = None
-    _max_poses: int | None = None
+# Module-level configuration (set once at app startup)
+_PoseEnum: type[IntEnum] | None = None
 
-    def __init__(self, values, scores, max_poses: int) -> None:
-        if Similarity._pose_enum is None or Similarity._max_poses != max_poses:
-            Similarity._pose_enum = cast(type[IntEnum], IntEnum("PoseIndex", {f"POSE_{i}": i for i in range(max_poses)}))
-            Similarity._max_poses = max_poses
+
+def configure_similarity(max_poses: int) -> None:
+    """Configure Similarity feature with number of poses to track.
+
+    Must be called once at application initialization before creating any Frame instances.
+
+    Args:
+        max_poses: Maximum number of poses to compare similarities for
+    """
+    global _PoseEnum
+    if _PoseEnum is None:
+        _PoseEnum = cast(type[IntEnum], IntEnum("PoseIndex", {f"POSE_{i}": i for i in range(max_poses)}))
+
+
+class Similarity(NormalizedScalarFeature):
+    """Similarity scores between current pose and multiple tracked poses."""
+
+    def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
+        if _PoseEnum is None:
+            raise RuntimeError(
+                "Similarity not configured. Call configure_similarity(max_poses) at app startup."
+            )
         super().__init__(values, scores)
 
     @classmethod
     def feature_enum(cls) -> type[IntEnum]:
-        if cls._pose_enum is None:
-            raise RuntimeError("Must create at least one Similarity instance first")
-        return cls._pose_enum
+        if _PoseEnum is None:
+            raise RuntimeError(
+                "Similarity not configured. Call configure_similarity(max_poses) at app startup."
+            )
+        return _PoseEnum
 
     def overall_similarity(self) -> float:
+        """Compute overall similarity using harmonic mean (strict matching)."""
         return self.aggregate(method=AggregationMethod.HARMONIC_MEAN, min_confidence=0.0, exponent=2.0)
