@@ -10,7 +10,8 @@ class EuroSmootherGui:
         self.config: EuroSmootherConfig = config
 
         elm: list = []
-        elm.append([E(eT.TEXT, 'SMOOTH   '),
+        elm.append([
+            E(eT.TEXT, 'Smooth   '),
             E(eT.TEXT, 'minc'),
             E(eT.SLDR, name + 'min_cutoff', self.set_min_cutoff,    1.0,    [0.1,20.0], 0.1),
             E(eT.TEXT, 'beta'),

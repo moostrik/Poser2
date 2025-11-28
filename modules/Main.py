@@ -64,11 +64,11 @@ class Main():
         self.a_vel_smooth_config =  nodes.EuroSmootherConfig()
         self.simil_smooth_config =  nodes.EuroSmootherConfig()
 
-        self.b_box_smooth_gui =     guis.EuroSmootherGui(self.b_box_smooth_config, self.gui, 'BBox')
-        self.point_smooth_gui =     guis.EuroSmootherGui(self.point_smooth_config, self.gui, 'Point')
-        self.angle_smooth_gui =     guis.EuroSmootherGui(self.angle_smooth_config, self.gui, 'Angle')
-        self.a_vel_smooth_gui =     guis.EuroSmootherGui(self.a_vel_smooth_config, self.gui, 'Angle Vel')
-        self.simil_smooth_gui =     guis.EuroSmootherGui(self.simil_smooth_config, self.gui, 'Similarity')
+        self.b_box_smooth_gui =     guis.EuroSmootherGui(self.b_box_smooth_config, self.gui, 'BBOX')
+        self.point_smooth_gui =     guis.EuroSmootherGui(self.point_smooth_config, self.gui, 'POINT')
+        self.angle_smooth_gui =     guis.EuroSmootherGui(self.angle_smooth_config, self.gui, 'ANGLE')
+        self.a_vel_smooth_gui =     guis.EuroSmootherGui(self.a_vel_smooth_config, self.gui, 'ANGLE VEL')
+        self.simil_smooth_gui =     guis.EuroSmootherGui(self.simil_smooth_config, self.gui, 'SIMILARITY')
 
         self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera.fps)
         self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
@@ -76,9 +76,14 @@ class Main():
         self.simil_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
 
         # self.b_box_interp_gui =   gui.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBox')
-        self.point_interp_gui =     guis.InterpolatorGui(self.point_interp_config, self.gui, 'Point')
-        self.angle_interp_gui =     guis.InterpolatorGui(self.angle_interp_config, self.gui, 'Angle')
-        self.simil_interp_gui =     guis.InterpolatorGui(self.simil_interp_config, self.gui, 'Similarity')
+        self.point_interp_gui =     guis.InterpolatorGui(self.point_interp_config, self.gui, 'POINT')
+        self.angle_interp_gui =     guis.InterpolatorGui(self.angle_interp_config, self.gui, 'ANGLE')
+        self.simil_interp_gui =     guis.InterpolatorGui(self.simil_interp_config, self.gui, 'SIMILARITY')
+
+        self.simil_config =         nodes.SimilarityExtractorConfig(max_poses=settings.pose.max_poses,
+                                                                    method=nodes.AggregationMethod.HARMONIC_MEAN,
+                                                                    exponent=2.0)
+        self.simil_gui =            guis.SimilarityExtractorGui(self.simil_config, self.gui, 'SIMILARITY')
 
         # POSE PROCESSING PIPELINES
         self.pose_from_tracklet =   PoseFromTrackletGenerator(num_players)
@@ -87,9 +92,7 @@ class Main():
         self.point_extractor =      PointBatchExtractor(settings.pose) # GPU-based 2D point extractor
 
         self.pose_similator:        SimilarityComputer = SimilarityComputer()
-        self.pose_similarity_extractor = nodes.SimilarityExtractor(nodes.SimilarityExtractorConfig(max_poses=settings.pose.max_poses,
-                                                                                                   method=nodes.AggregationMethod.HARMONIC_MEAN,
-                                                                                                   exponent=2.0))
+        self.pose_similarity_extractor = nodes.SimilarityExtractor(self.simil_config)
 
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
@@ -240,6 +243,7 @@ class Main():
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.simil_gui.get_gui_frame()])
         self.gui.addFrame([self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
 
         if self.player:

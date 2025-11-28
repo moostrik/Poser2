@@ -268,7 +268,7 @@ class HDTRenderManager(RenderBase):
 
         # self.field_bar_layers_raw[camera_id].draw(draw_rect)
         self.field_bar_layers[camera_id].draw(draw_rect)
-        self.angle_bar_layers[camera_id].draw(draw_rect)
+        # self.angle_bar_layers[camera_id].draw(draw_rect)
 
         # self.pd_line_layers[camera_id].draw(draw_rect)
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))

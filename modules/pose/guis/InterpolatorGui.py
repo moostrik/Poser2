@@ -11,7 +11,8 @@ class InterpolatorGui:
 
 
         elm: list = []
-        elm.append([E(eT.TEXT, 'CHASE    '),
+        elm.append([
+            E(eT.TEXT, 'Chase    '),
             E(eT.TEXT, 'response'),
             E(eT.SLDR, name + 'responsiveness',     self.set_responsiveness,    0.2,   [0.01, 1.0],  0.01),
             E(eT.TEXT, 'friction'),

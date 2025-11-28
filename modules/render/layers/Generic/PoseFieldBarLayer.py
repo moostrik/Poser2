@@ -85,6 +85,8 @@ class PoseScalarBarLayer(LayerBase):
         if not isinstance(feature, PoseFeatureType):
             raise ValueError(f"PoseFeatureLayer expected feature of type PoseFeature, got {type(feature)}")
 
+        # print(feature.values)
+
         line_thickness = 1.0 / self._fbo.height * self.line_thickness
         line_smooth = 1.0 / self._fbo.height * self.line_smooth
 
