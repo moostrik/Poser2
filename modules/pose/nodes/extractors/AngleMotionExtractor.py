@@ -53,7 +53,12 @@ class AngleMotionExtractor(FilterNode):
         motion -= self.min_threshold
         motion *= self.normalisation_factors
         motion /=self.max_threshold
-        motion = np.clip(motion, 0, 1.0)
+        motion = np.clip(motion, 0, None)
+
+        max_motion = np.nanmax(motion)
+        max_motion_array = np.full_like(motion, max_motion)
+
+        # print(max_motion)
 
         angle_motion: AngleMotion = AngleMotion(values=motion, scores=pose.angle_vel.scores)
         enriched_pose: Frame = replace(
