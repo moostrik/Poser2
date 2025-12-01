@@ -17,11 +17,10 @@ from modules.utils.PointsAndRects import Rect, Point2f
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.layers import CamCompositeLayer, PoseCamLayer, CentreCamLayer
-from modules.render.layers import PoseAngleDeltaBarLayer, PoseScalarBarLayer, PDLineLayer
+from modules.render.layers import PoseAngleDeltaBarLayer, PoseScalarBarLayer, PoseMotionBarLayer, PDLineLayer
 from modules.render.layers import SimilarityLineLayer, AggregationMethod
 from modules.render.renderers import CamImageRenderer, PoseMeshRenderer, CamBBoxRenderer, PoseMotionTimeRenderer
 
-# from modules.render.HDTSoundOSC import HDTSoundOSC
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
@@ -34,7 +33,6 @@ class HDTRenderManager(RenderBase):
 
         # data
         self.data_hub: DataHub = data_hub
-        # self.sound_osc: HDTSoundOSC =       HDTSoundOSC(self.render_data_old, "localhost", 8000, 60.0)
 
         # renderers
         self.cam_img_renderers:     dict[int, CamImageRenderer] = {}
@@ -51,6 +49,7 @@ class HDTRenderManager(RenderBase):
         self.field_bar_layers_raw:  dict[int, PoseScalarBarLayer] = {}
         self.field_bar_layers:      dict[int, PoseScalarBarLayer] = {}
         self.angle_bar_layers:      dict[int, PoseAngleDeltaBarLayer] = {}
+        self.motion_bar_layers:     dict[int, PoseMotionBarLayer] = {}
 
         # self.line_field_layers:     dict[int, LineFieldLayer] = {}
 
@@ -72,6 +71,7 @@ class HDTRenderManager(RenderBase):
             self.field_bar_layers[i] =  PoseScalarBarLayer(i, self.data_hub,PoseDataHubTypes.pose_I, FrameField.angles, 2.0, 2.0)
             self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataHubTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
             self.angle_bar_layers[i] =  PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
+            self.motion_bar_layers[i] = PoseMotionBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angle_motion, 2.0, 2.0)
             # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
 
         # composition
@@ -110,6 +110,7 @@ class HDTRenderManager(RenderBase):
             self.field_bar_layers_raw[i].allocate(1080, 1920, GL_RGBA32F)
             self.field_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.angle_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
+            self.motion_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
             # self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
 
         self.allocate_window_renders()
@@ -146,6 +147,8 @@ class HDTRenderManager(RenderBase):
             layer.deallocate()
         for layer in self.angle_bar_layers.values():
             layer.deallocate()
+        for layer in self.motion_bar_layers.values():
+            layer.deallocate()
 
         # renderers
         for layer in self.cam_img_renderers.values():
@@ -179,6 +182,7 @@ class HDTRenderManager(RenderBase):
             self.field_bar_layers_raw[i].update()
             self.field_bar_layers[i].update()
             self.angle_bar_layers[i].update()
+            self.motion_bar_layers[i].update()
 
             # self.line_field_layers[i].update()
 
@@ -219,8 +223,8 @@ class HDTRenderManager(RenderBase):
 
 
 
-            self.field_bar_layers[i].feature_type = FrameField.similarity
-            self.field_bar_layers_raw[i].data_type = PoseDataHubTypes.pose_S
+            self.field_bar_layers[i].feature_type = FrameField.angle_motion
+            self.field_bar_layers_raw[i].data_type = PoseDataHubTypes.pose_I
             self.field_bar_layers_raw[i].feature_type = FrameField.similarity
 
 
@@ -267,8 +271,10 @@ class HDTRenderManager(RenderBase):
             self.mesh_renderers[camera_id].draw(draw_rect)
 
         # self.field_bar_layers_raw[camera_id].draw(draw_rect)
-        self.field_bar_layers[camera_id].draw(draw_rect)
-        # self.angle_bar_layers[camera_id].draw(draw_rect)
+        # self.field_bar_layers[camera_id].draw(draw_rect)
+        self.motion_bar_layers[camera_id].draw(draw_rect)
+        self.angle_bar_layers[camera_id].draw(draw_rect)
+
 
         # self.pd_line_layers[camera_id].draw(draw_rect)
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))

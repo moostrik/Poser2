@@ -62,6 +62,7 @@ POSE_VERTEX_LIST: list[list[PointLandmark]] = [
     [PointLandmark.right_elbow,     PointLandmark.right_wrist],
     [PointLandmark.left_shoulder,   PointLandmark.left_hip],
     [PointLandmark.right_shoulder,  PointLandmark.right_hip],
+    [PointLandmark.left_hip,        PointLandmark.right_hip],
     [PointLandmark.left_hip,        PointLandmark.left_knee],
     [PointLandmark.right_hip,       PointLandmark.right_knee],
     [PointLandmark.left_knee,       PointLandmark.left_ankle],

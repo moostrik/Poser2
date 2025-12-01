@@ -63,7 +63,7 @@
     "title": "Poser",
     "on_top": true,
     "location_x": 1100,
-    "location_y": -900,
+    "location_y": -1100,
     "file_path": "files",
     "default_file": "default"
   },

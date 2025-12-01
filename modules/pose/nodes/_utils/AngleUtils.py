@@ -15,7 +15,7 @@ ANGLE_KEYPOINTS: dict[AngleLandmark, tuple[PointLandmark, ...]] = {
     AngleLandmark.left_knee:      (PointLandmark.left_hip,       PointLandmark.left_knee,      PointLandmark.left_ankle),
     AngleLandmark.right_knee:     (PointLandmark.right_hip,      PointLandmark.right_knee,     PointLandmark.right_ankle),
     # Special 4-point measurements
-    AngleLandmark.head:           (PointLandmark.left_eye,       PointLandmark.right_eye,      PointLandmark.left_shoulder, PointLandmark.right_shoulder),
+    AngleLandmark.head:           (PointLandmark.left_eye,       PointLandmark.right_eye,      PointLandmark.nose),
 }
 
 """Rotation offsets to normalize angles to neutral body position"""
@@ -75,12 +75,10 @@ class AngleUtils:
             rotate_by = _ANGLE_OFFSET[landmark]
 
             # Compute angle based on number of keypoints (no NaN checks needed)
-            if len(keypoints) == 3:
-                angle = AngleUtils._calculate_angle(P[0], P[1], P[2], rotate_by)
-            elif landmark == AngleLandmark.head:
-                angle = AngleUtils._calculate_head_yaw(P[0], P[1], P[2], P[3], rotate_by)
+            if landmark == AngleLandmark.head:
+                angle = AngleUtils._calculate_head_yaw(P[0], P[1], P[2], rotate_by)
             else:
-                continue
+                angle = AngleUtils._calculate_angle(P[0], P[1], P[2], rotate_by)
 
             # Mirror right-side angles for symmetric representation
             if landmark in _ANGLE_MIRRORED:
@@ -129,26 +127,24 @@ class AngleUtils:
 
     @staticmethod
     def _calculate_head_yaw(left_eye: np.ndarray, right_eye: np.ndarray,
-                            left_shoulder: np.ndarray, right_shoulder: np.ndarray,
+                            nose: np.ndarray,
                             rotate_by: float = 0) -> float:
-        """Calculate head yaw (assumes valid input).
+        """Calculate head yaw using eyes and nose (assumes valid input).
 
         Args:
             left_eye: Left eye coordinates [x, y] (must be valid)
             right_eye: Right eye coordinates [x, y] (must be valid)
-            left_shoulder: Left shoulder coordinates [x, y] (must be valid)
-            right_shoulder: Right shoulder coordinates [x, y] (must be valid)
+            nose: Nose coordinates [x, y] (must be valid)
             rotate_by: Rotation offset in radians
 
         Returns:
             Yaw angle in radians [-π, π), or NaN if eye_width is 0
         """
         eye_midpoint = (left_eye + right_eye) / 2
-        shoulder_midpoint = (left_shoulder + right_shoulder) / 2
         eye_width = float(np.linalg.norm(right_eye - left_eye))
 
         if eye_width > 0:
-            offset_x = (eye_midpoint[0] - shoulder_midpoint[0]) / eye_width
+            offset_x = (nose[0] - eye_midpoint[0]) / eye_width
             yaw = np.arctan(offset_x)
 
             yaw += rotate_by
@@ -156,5 +152,4 @@ class AngleUtils:
 
             return float(yaw)
 
-        # print (f"Warning: Eye width is zero when calculating head yaw. {left_eye}, {right_eye}, {left_shoulder}, {right_shoulder}")
         return np.nan  # Only case: eye_width == 0 (shouldn't happen with valid data)

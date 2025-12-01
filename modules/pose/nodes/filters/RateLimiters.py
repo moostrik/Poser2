@@ -65,8 +65,7 @@ class FeatureRateLimiter(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         feature_data = pose.get_feature(self._pose_field)
-        self._limiter.set_target(feature_data.values)
-        self._limiter.update()
+        self._limiter.update(feature_data.values)
         limited_values: np.ndarray = self._limiter.value
         limited_data = type(feature_data)(values=limited_values, scores=feature_data.scores)
         return replace(pose, **{self._pose_field.name: limited_data})
@@ -99,3 +98,8 @@ class AngleVelRateLimiter(FeatureRateLimiter):
 class AngleSymRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterConfig) -> None:
         super().__init__(config, FrameField.angle_sym)
+
+
+class AngleMotionRateLimiter(FeatureRateLimiter):
+    def __init__(self, config: RateLimiterConfig) -> None:
+        super().__init__(config, FrameField.angle_motion)

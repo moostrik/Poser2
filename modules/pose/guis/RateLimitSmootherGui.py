@@ -13,9 +13,9 @@ class RateLimitSmootherGui:
         elm.append([
             E(eT.TEXT, 'Rate    '),
             E(eT.TEXT, 'increase'),
-            E(eT.SLDR, name + 'max_increase',   self.set_max_increase,  pi, [0, pi],    0.1),
+            E(eT.SLDR, name + 'max_increase',   self.set_max_increase,  1.0, [0, 3.0],    0.01),
             E(eT.TEXT, 'decrease'),
-            E(eT.SLDR, name + 'max_decrease',   self.set_max_decrease,  pi, [0, pi],    0.1)])
+            E(eT.SLDR, name + 'max_decrease',   self.set_max_decrease,  1.0, [0, 3.0],    0.01)])
 
         gui_height: int = len(elm) * ELEMHEIGHT + BASEHEIGHT
         self.frame = Frame(name, elm, gui_height)
