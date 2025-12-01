@@ -86,11 +86,11 @@ Validation:
 
 Abstract Methods (must implement in subclasses):
 -------------------------------------------------
-  • feature_enum() -> type[IntEnum]                Feature element enum
+  • enum() -> type[IntEnum]                Feature element enum
 
 Implemented Methods (do not override):
 ---------------------------------------
-  • default_range() -> tuple[float, float]         Always returns (0.0, 1.0)
+  • range() -> tuple[float, float]         Always returns (0.0, 1.0)
 
 
 NormalizedScalarFeature-Specific:
@@ -205,8 +205,8 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
     - Filtering by minimum confidence threshold
 
     Subclasses must implement:
-    - feature_enum(): Define the element structure (which IntEnum to use)
-    - default_range(): Must return (0.0, 1.0) for normalized features
+    - enum(): Define the element structure (which IntEnum to use)
+    - range(): Must return (0.0, 1.0) for normalized features
 
     Design rationale:
     - Separates normalized features (where stats make sense) from
@@ -219,12 +219,12 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
 
     @classmethod
     @abstractmethod
-    def feature_enum(cls) -> type[FeatureEnum]:
-        """Returns the enum type for elements in this feature."""
+    def enum(cls) -> type[FeatureEnum]:
+        """Feature enum defining the elements of this feature."""
         pass
 
     @classmethod
-    def default_range(cls) -> tuple[float, float]:
+    def range(cls) -> tuple[float, float]:
         """Returns (0.0, 1.0) for normalized features.
 
         All subclasses must have values in [0, 1] range.

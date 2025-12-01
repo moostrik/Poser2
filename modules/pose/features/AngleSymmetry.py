@@ -87,11 +87,11 @@ Validation:
 Implemented Methods (from NormalizedScalarFeature):
 ----------------------------------------------------
 Structure:
-  • feature_enum() -> type[SymmetryRegion]         Returns SymmetryRegion enum (IMPLEMENTED)
+  • enum() -> type[SymmetryRegion]         Returns SymmetryRegion enum (IMPLEMENTED)
 
 Implemented Methods (do not override):
 ---------------------------------------
-  • default_range() -> tuple[float, float]         Always returns (0.0, 1.0)
+  • range() -> tuple[float, float]         Always returns (0.0, 1.0)
                                                    (Already implemented in NormalizedScalarFeature)
 
 Inherited from NormalizedScalarFeature:
@@ -261,7 +261,7 @@ class AngleSymmetry(NormalizedScalarFeature[SymmetryElement]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def feature_enum(cls) -> type[SymmetryElement]:
+    def enum(cls) -> type[IntEnum]:
         """Returns SymmetricRegion enum."""
         return SymmetryElement
 

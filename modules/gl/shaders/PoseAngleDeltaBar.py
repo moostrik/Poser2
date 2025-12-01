@@ -39,8 +39,8 @@ class PoseAngleDeltaBar(Shader):
 
         # Pass uniforms to shader
         glUniform1i(glGetUniformLocation(s, "num_joints"), len(angles))
-        glUniform1f(glGetUniformLocation(s, "value_min"), angles.default_range()[0])
-        glUniform1f(glGetUniformLocation(s, "value_max"), angles.default_range()[1])
+        glUniform1f(glGetUniformLocation(s, "value_min"), angles.range()[0])
+        glUniform1f(glGetUniformLocation(s, "value_max"), angles.range()[1])
         glUniform1f(glGetUniformLocation(s, "line_thickness"), line_thickness)
         glUniform1f(glGetUniformLocation(s, "line_smooth"), line_smooth)
         glUniform4f(glGetUniformLocation(s, "color_odd"), *color_odd)

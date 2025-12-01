@@ -64,7 +64,7 @@ class FrameField(IntEnum):
         """Get the valid range for this feature, if applicable."""
         feature_type: type = self.get_type()
         if issubclass(feature_type, BaseFeature):
-            return feature_type.default_range()
+            return feature_type.range()
         raise ValueError(
             f"PoseField '{self.name}' of type '{feature_type.__name__}' does not have a defined range"
         )
@@ -73,11 +73,11 @@ class FrameField(IntEnum):
         """Get the length of this feature, if applicable."""
         feature_type: type = self.get_type()
         if issubclass(feature_type, BaseFeature):
-            enum_cls = feature_type.feature_enum()
+            enum_cls = feature_type.enum()
             if enum_cls is not None and isinstance(enum_cls, type) and issubclass(enum_cls, IntEnum):
                 return len(enum_cls)
             raise ValueError(
-                f"{feature_type.__name__}.feature_enum() did not return an IntEnum class"
+                f"{feature_type.__name__}.enum() did not return an IntEnum class"
             )
         raise ValueError(
             f"PoseField '{self.name}' of type '{feature_type.__name__}' does not have a defined length"

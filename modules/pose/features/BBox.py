@@ -89,8 +89,8 @@ Validation:
 Implemented Methods (from BaseScalarFeature):
 ----------------------------------------------
 Structure:
-  • feature_enum() -> type[BBoxProperty]           Returns BBoxProperty enum (IMPLEMENTED)
-  • default_range() -> tuple[float, float]         Returns (-inf, inf) (IMPLEMENTED)
+  • enum() -> type[BBoxProperty]           Returns BBoxProperty enum (IMPLEMENTED)
+  • range() -> tuple[float, float]         Returns (-inf, inf) (IMPLEMENTED)
 
 BBoxFeature-Specific:
 =====================
@@ -198,11 +198,11 @@ class BBox(BaseScalarFeature[BBoxElement]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def feature_enum(cls) -> type[BBoxElement]:
+    def enum(cls) -> type[IntEnum]:
         return BBoxElement
 
     @classmethod
-    def default_range(cls) -> tuple[float, float]:
+    def range(cls) -> tuple[float, float]:
         # return (-np.inf, np.inf)
         return (-2.0, 2.0)
 
@@ -256,8 +256,8 @@ class BBox(BaseScalarFeature[BBoxElement]):
     @classmethod
     def create_dummy(cls) -> 'BBox':
         """Create empty feature with all NaN values and zero scores."""
-        values = np.full(len(cls.feature_enum()), np.nan, dtype=np.float32)
-        scores = np.zeros(len(cls.feature_enum()), dtype=np.float32)
+        values = np.full(len(cls.enum()), np.nan, dtype=np.float32)
+        scores = np.zeros(len(cls.enum()), dtype=np.float32)
         return cls(values, scores)
 
 

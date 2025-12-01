@@ -86,8 +86,8 @@ Validation:
 
 Abstract Methods (must implement in subclasses):
 -------------------------------------------------
-  • feature_enum() -> type[IntEnum]                Feature element enum
-  • default_range() -> tuple[float, float]         Valid value range
+  • enum() -> type[IntEnum]                Feature element enum
+  • range() -> tuple[float, float]         Valid value range
       Optional convenience constants: NORMALIZED_RANGE, POSITIVE_RANGE, UNBOUNDED_RANGE,
                                       PI_RANGE, TWO_PI_RANGE, SYMMETRIC_PI_RANGE
 
@@ -121,7 +121,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
 
         PERFORMANCE NOTE: No validation performed. Caller must ensure:
         - Both arrays are 1D
-        - Arrays match feature_enum() length
+        - Arrays match length()
         - Scores are in range [0.0, 1.0]
 
         Use create_validated() for untrusted input or validate() to check.
@@ -129,17 +129,17 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         Note: Takes ownership of arrays - caller must not modify after passing.
 
         Args:
-            values: Feature values array (1D, float32), length = len(feature_enum())
-            scores: Confidence scores (1D, float32, range [0.0, 1.0]), length = len(feature_enum())
+            values: Feature values array (1D, float32), length = length()
+            scores: Confidence scores (1D, float32, range [0.0, 1.0]), length = length()
         """
-        # Get the length from the enum (the source of truth)
-        length = len(self.feature_enum())
+        # Use length() as source of truth (works for both enum and runtime-configured)
+        length = self.length()
 
         # Optional: Keep assertions for development (removed with -O flag)
         assert values.ndim == 1, f"values must be 1D, got {values.ndim}D"
         assert scores.ndim == 1, f"scores must be 1D, got {scores.ndim}D"
-        assert len(values) == length, f"values length {len(values)} != enum length {length}"
-        assert len(scores) == length, f"scores length {len(scores)} != enum length {length}"
+        assert len(values) == length, f"values length {len(values)} != expected length {length}"
+        assert len(scores) == length, f"scores length {len(scores)} != expected length {length}"
 
         self._values = values
         self._scores = scores
@@ -157,21 +157,26 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
 
     @classmethod
     @abstractmethod
-    def feature_enum(cls) -> type[FeatureEnum]:
-        """Get the feature enum type for this class. Must be implemented by subclasses."""
+    def enum(cls) -> type[FeatureEnum]:
+        """Feature enum defining the elements of this feature."""
         pass
 
     @classmethod
+    def length(cls) -> int:
+        """Number of elements. Override to return len(enum()) or configured value."""
+        return len(cls.enum())
+
+    @classmethod
     @abstractmethod
-    def default_range(cls) -> tuple[float, float]:
+    def range(cls) -> tuple[float, float]:
         """Define valid range for scalar values. Must be implemented by subclasses."""
         pass
 
     # ========== BASEFEATURE ==========
 
     def __len__(self) -> int:
-        """Number of features in this feature."""
-        return len(self.feature_enum())
+        """Number of elements in this feature."""
+        return self.length()
 
     # ========== RAW DATA ACCESS ==========
 
@@ -247,13 +252,13 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
             # Check if mask matches actual data
             actual_valid = not np.isnan(self._values[element])
             if is_valid != actual_valid:
-                print(f"VALIDATION ERROR: {self.feature_enum()(element).name} mask={is_valid} but actual={actual_valid}")
+                print(f"VALIDATION ERROR: {self.enum()(element).name} mask={is_valid} but actual={actual_valid}")
                 print(f"  Value: {self._values[element]}")
                 print(f"  Score: {self._scores[element]}")
 
             # Check if invalid values have score 0.0
             if not is_valid and self._scores[element] != 0.0:
-                print(f"VALIDATION ERROR: {self.feature_enum()(element).name} is invalid but has non-zero score {self._scores[element]}")
+                print(f"VALIDATION ERROR: {self.enum()(element).name} is invalid but has non-zero score {self._scores[element]}")
 
         return is_valid
 
@@ -278,8 +283,8 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         Uses a class-level cache to ensure the empty instance is created only once per class.
         """
         if cls._empty_instance is None:
-            values = np.full(len(cls.feature_enum()), np.nan, dtype=np.float32)
-            scores = np.zeros(len(cls.feature_enum()), dtype=np.float32)
+            values = np.full(cls.length(), np.nan, dtype=np.float32)
+            scores = np.zeros(cls.length(), dtype=np.float32)
             cls._empty_instance = cls(values=values, scores=scores)
         return cls._empty_instance
 
@@ -307,7 +312,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         - valid_count matches actual count
         - NaN values must have score 0.0
         - Scores are in [0.0, 1.0] (if check_ranges=True)
-        - Values are within default_range() (if check_ranges=True)
+        - Values are within range() (if check_ranges=True)
             * Infinite bounds (±inf) are automatically skipped during validation
 
         Args:
@@ -329,14 +334,14 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         if errors:
             return (False, "; ".join(errors))
 
-        # Check shape match
-        length = len(self.feature_enum())
+        # Check shape match - use length() as source of truth
+        length = self.length()
 
         if len(self._values) != length:
-            errors.append(f"values length {len(self._values)} != {self.feature_enum().__name__} length {length}")
+            errors.append(f"values length {len(self._values)} != expected length {length}")
 
         if len(self._scores) != length:
-            errors.append(f"scores length {len(self._scores)} != {self.feature_enum().__name__} length {length}")
+            errors.append(f"scores length {len(self._scores)} != expected length {length}")
 
         # Early return for length errors (can't continue validation)
         if errors:
@@ -346,7 +351,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         actual_valid_mask = ~np.isnan(self._values)
         if not np.array_equal(self._valid_mask, actual_valid_mask):
             mismatches = np.where(self._valid_mask != actual_valid_mask)[0]
-            feature_enum = self.feature_enum()
+            feature_enum = self.enum()
             mismatch_elements = [feature_enum(i).name for i in mismatches[:3]]
             more = f" and {len(mismatches) - 3} more" if len(mismatches) > 3 else ""
             errors.append(f"Cached valid_mask doesn't match actual NaN state at: {', '.join(mismatch_elements)}{more}")
@@ -363,7 +368,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
             bad_scores = self._scores[invalid_mask] != 0.0
             if np.any(bad_scores):
                 bad_indices = invalid_indices[bad_scores]
-                feature_enum = self.feature_enum()
+                feature_enum = self.enum()
                 bad_elements = [feature_enum(i).name for i in bad_indices[:3]]
                 more = f" and {len(bad_indices) - 3} more" if len(bad_indices) > 3 else ""
                 errors.append(f"NaN values must have score 0.0, but found non-zero scores at: {', '.join(bad_elements)}{more}")
@@ -376,7 +381,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
                 errors.append(f"Scores outside [0.0, 1.0]: min={valid_scores.min():.3f}, max={valid_scores.max():.3f}")
 
             # Validate value range
-            min_val, max_val = self.default_range()
+            min_val, max_val = self.range()
             valid_values = self._values[self._valid_mask]
 
             # Check lower bound (only if not -inf)

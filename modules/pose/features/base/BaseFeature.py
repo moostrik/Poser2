@@ -111,8 +111,8 @@ Validation Philosophy:
 Abstract Methods (must implement in subclasses):
 -------------------------------------------------
 Structure:
-  • feature_enum() -> type[IntEnum]        Feature element enum
-  • default_range() -> tuple[float, float] Valid value range
+  • enum() -> type[IntEnum]        Feature element enum
+  • range() -> tuple[float, float] Valid value range
   • __len__() -> int                       Number of elements
 
 Data Access:
@@ -131,7 +131,7 @@ Utilities:
 
 Range Constants:
 ----------------
-Convenience constants for common ranges (optional, can be used in default_range()):
+Convenience constants for common ranges (optional, can be used in range()):
 
 • NORMALIZED_RANGE = (0.0, 1.0)           For normalized values (probabilities, ratios)
 • POSITIVE_RANGE = (0.0, np.inf)          For non-negative values (distances, heights)
@@ -172,17 +172,32 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
 
     @classmethod
     @abstractmethod
-    def feature_enum(cls) -> type[FeatureEnum]:
-        """Feature enum defining the structure (source of truth for length).
+    def enum(cls) -> type[FeatureEnum]:
+        """Feature enum defining the elements of this feature.
 
         Returns:
             IntEnum subclass defining elements for this feature type.
+
+        Note: For runtime-configured features, generate the enum at
+              configuration time (see Similarity for example).
         """
         pass
 
     @classmethod
     @abstractmethod
-    def default_range(cls) -> tuple[float, float]:
+    def length(cls) -> int:
+        """Number of elements in this feature type.
+
+        Returns:
+            Fixed length for this feature type.
+
+        Standard implementation: return len(cls.enum())
+        """
+        pass
+
+    @classmethod
+    @abstractmethod
+    def range(cls) -> tuple[float, float]:
         """Define valid value range for this feature type.
 
         Returns:

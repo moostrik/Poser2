@@ -49,8 +49,8 @@ class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorConfig]):
     def _create_interpolator(self):
         """Create the underlying lerp interpolator instance."""
         interp_class: type = self._INTERP_MAP[self._pose_field]
-        vector_size = len(self._pose_field.get_type().feature_enum())
-        clamp_range = self._pose_field.get_type().default_range()
+        vector_size = len(self._pose_field.get_type().enum())
+        clamp_range = self._pose_field.get_type().range()
         return interp_class(
             vector_size=vector_size,
             input_frequency=self._config.input_frequency,

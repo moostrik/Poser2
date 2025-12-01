@@ -44,10 +44,10 @@ class FeaturePredictor(FilterNode):
         self._pose_field = pose_field
         predictor_cls = self._PREDICT_MAP[pose_field]
         self._predictor = predictor_cls(
-            vector_size=len(pose_field.get_type().feature_enum()),
+            vector_size=len(pose_field.get_type().enum()),
             input_frequency=config.frequency,
             method=config.method,
-            clamp_range=pose_field.get_type().default_range()
+            clamp_range=pose_field.get_type().range()
         )
         self._config.add_listener(self._on_config_changed)
 

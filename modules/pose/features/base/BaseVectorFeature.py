@@ -85,9 +85,9 @@ Validation:
 
 Abstract Methods (must implement in subclasses):
 -------------------------------------------------
-  • feature_enum() -> type[IntEnum]                Feature element enum
+  • enum() -> type[IntEnum]                Feature element enum
   • dimensions() -> int                            Number of dimensions (2 for 2D, 3 for 3D)
-  • default_range() -> tuple[float, float]         Valid value range (applies to ALL dimensions)
+  • range() -> tuple[float, float]         Valid value range (applies to ALL dimensions)
       Optional convenience constants: NORMALIZED_RANGE, POSITIVE_RANGE, UNBOUNDED_RANGE,
                                       PI_RANGE, TWO_PI_RANGE, SYMMETRIC_PI_RANGE
 
@@ -96,7 +96,7 @@ Notes:
 - All vectors have the same number of dimensions (2D, 3D, etc.)
 - A vector is INVALID if ANY component is NaN (entire vector marked invalid)
 - Invalid vectors must have score 0.0
-- default_range() applies to ALL dimensions (x, y, z all use same range)
+- range() applies to ALL dimensions (x, y, z all use same range)
 - Arrays are read-only after construction (immutable)
 - Use validate() for debugging, not in production loops
 - Constructor takes ownership - caller must not modify arrays after passing
@@ -125,9 +125,9 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
     A vector is considered invalid if ANY of its components is NaN.
 
     Subclasses must implement:
-    - feature_enum(): Define the element structure (which IntEnum to use)
+    - enum(): Define the element structure (which IntEnum to use)
     - dimensions(): Number of dimensions per vector (2 for 2D, 3 for 3D)
-    - default_range(): Define valid value range for ALL dimensions
+    - range(): Define valid value range for ALL dimensions
     """
 
     def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
@@ -143,8 +143,8 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
 
         Note: Takes ownership of arrays - caller must not modify after passing.
         """
-        # Get expected dimensions from the enum and subclass
-        length = len(self.feature_enum())
+        # Use length() and dimensions() as source of truth
+        length = self.length()
         n_dims = self.dimensions()
 
         # Optional: Keep assertions for development (removed with -O flag)
@@ -152,7 +152,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         assert values.shape == (length, n_dims), \
             f"values shape {values.shape} != expected ({length}, {n_dims})"
         assert scores.ndim == 1, f"scores must be 1D, got {scores.ndim}D"
-        assert len(scores) == length, f"scores length {len(scores)} != enum length {length}"
+        assert len(scores) == length, f"scores length {len(scores)} != expected length {length}"
 
         self._values = values
         self._scores = scores
@@ -162,7 +162,6 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         self._scores.flags.writeable = False
 
         # Compute derived values once
-        # A vector is valid only if ALL its components are non-NaN
         self._valid_mask = ~np.any(np.isnan(self._values), axis=1)
         self._valid_count = int(np.sum(self._valid_mask))
 
@@ -170,27 +169,32 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
 
     @classmethod
     @abstractmethod
-    def feature_enum(cls) -> type[FeatureEnum]:
-        """Get the feature enum type for this class. Must be implemented by subclasses."""
+    def enum(cls) -> type[FeatureEnum]:
+        """Feature enum defining the elements of this feature."""
+        pass
+
+    @classmethod
+    def length(cls) -> int:
+        """Number of elements. Override to return len(enum()) or configured value."""
+        return len(cls.enum())
+
+    @classmethod
+    @abstractmethod
+    def range(cls) -> tuple[float, float]:
+        """Define valid value range. Must be implemented by subclasses."""
         pass
 
     @classmethod
     @abstractmethod
     def dimensions(cls) -> int:
-        """Number of dimensions per vector (2 for 2D, 3 for 3D, etc.). Must be implemented by subclasses."""
-        pass
-
-    @classmethod
-    @abstractmethod
-    def default_range(cls) -> tuple[float, float]:
-        """Define valid value range. Must be implemented by subclasses."""
+        """Number of dimensions per vector (2 for 2D, 3 for 3D, etc.)."""
         pass
 
     # ========== BASEFEATURE ==========
 
     def __len__(self) -> int:
         """Number of elements in this feature."""
-        return len(self.feature_enum())
+        return self.length()
 
     # ========== RAW DATA ACCESS ==========
 
@@ -244,13 +248,13 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
             # Check if mask matches actual data
             actual_valid = not np.any(np.isnan(self._values[element]))
             if is_valid != actual_valid:
-                print(f"VALIDATION ERROR: {self.feature_enum()(element).name} mask={is_valid} but actual={actual_valid}")
+                print(f"VALIDATION ERROR: {self.enum()(element).name} mask={is_valid} but actual={actual_valid}")
                 print(f"  Value: {self._values[element]}")
                 print(f"  Score: {self._scores[element]}")
 
             # Check if invalid vectors have score 0.0
             if not is_valid and self._scores[element] != 0.0:
-                print(f"VALIDATION ERROR: {self.feature_enum()(element).name} is invalid but has non-zero score {self._scores[element]}")
+                print(f"VALIDATION ERROR: {self.enum()(element).name} is invalid but has non-zero score {self._scores[element]}")
 
         return is_valid
 
@@ -271,14 +275,12 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
     @classmethod
     def create_dummy(cls) -> Self:
         """Create an empty instance with all NaN values and zero scores."""
-
         if cls._empty_instance is None:
-            length = len(cls.feature_enum())
+            length = cls.length()  # Use length() instead of len(enum())
             n_dims = cls.dimensions()
             values = np.full((length, n_dims), np.nan, dtype=np.float32)
             scores = np.zeros(length, dtype=np.float32)
             cls._empty_instance = cls(values=values, scores=scores)
-
         return cls._empty_instance
 
     # ========= VALIDATION ==========
@@ -296,7 +298,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         - scores length matches n_elements
         - Vectors with any NaN component must have score 0.0
         - Scores are in [0.0, 1.0] (if check_ranges=True)
-        - ALL components are within default_range() (if check_ranges=True)
+        - ALL components are within range() (if check_ranges=True)
             * Same range applies to all dimensions (x, y, z, ...)
             * Infinite bounds (±inf) are automatically skipped during validation
 
@@ -320,7 +322,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
             return (False, "; ".join(errors))
 
         # Check shape match
-        length = len(self.feature_enum())
+        length = len(self.enum())
         n_dims = self.dimensions()
         expected_shape = (length, n_dims)
 
@@ -328,7 +330,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
             errors.append(f"values shape {self._values.shape} != expected {expected_shape}")
 
         if len(self._scores) != length:
-            errors.append(f"scores length {len(self._scores)} != {self.feature_enum().__name__} length {length}")
+            errors.append(f"scores length {len(self._scores)} != {self.enum().__name__} length {length}")
 
         # Early return for length errors (can't continue validation)
         if errors:
@@ -338,7 +340,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         actual_valid_mask = ~np.any(np.isnan(self._values), axis=1)
         if not np.array_equal(self._valid_mask, actual_valid_mask):
             mismatches = np.where(self._valid_mask != actual_valid_mask)[0]
-            feature_enum = self.feature_enum()
+            feature_enum = self.enum()
             mismatch_elements = [feature_enum(i).name for i in mismatches[:3]]
             more = f" and {len(mismatches) - 3} more" if len(mismatches) > 3 else ""
             errors.append(f"Cached valid_mask doesn't match actual NaN state at: {', '.join(mismatch_elements)}{more}")
@@ -355,7 +357,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
             bad_scores = self._scores[invalid_mask] != 0.0
             if np.any(bad_scores):
                 bad_indices = invalid_indices[bad_scores]
-                feature_enum = self.feature_enum()
+                feature_enum = self.enum()
                 bad_elements = [feature_enum(i).name for i in bad_indices[:3]]
                 more = f" and {len(bad_indices) - 3} more" if len(bad_indices) > 3 else ""
                 errors.append(f"Invalid values must have score 0.0, but found non-zero scores at: {', '.join(bad_elements)}{more}")
@@ -368,7 +370,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
                 errors.append(f"Scores outside [0.0, 1.0]: min={valid_scores.min():.3f}, max={valid_scores.max():.3f}")
 
             # Validate component ranges (same range for ALL dimensions)
-            min_val, max_val = self.default_range()  # Single tuple applies to all dimensions
+            min_val, max_val = self.range()  # Single tuple applies to all dimensions
             valid_values = self._values[self._valid_mask]  # Shape: (n_valid, n_dims), all components
 
             # Check ALL components against the same range

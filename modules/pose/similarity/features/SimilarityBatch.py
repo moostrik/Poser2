@@ -87,11 +87,11 @@ Validation:
 Implemented Methods (from NormalizedScalarFeature):
 ----------------------------------------------------
 Structure:
-  • feature_enum() -> type[AngleLandmark]          Returns AngleLandmark enum (IMPLEMENTED)
+  • enum() -> type[AngleLandmark]          Returns AngleLandmark enum (IMPLEMENTED)
 
 Implemented Methods (do not override):
 ---------------------------------------
-  • default_range() -> tuple[float, float]         Always returns (0.0, 1.0)
+  • range() -> tuple[float, float]         Always returns (0.0, 1.0)
                                                    (Already implemented in NormalizedScalarFeature)
 
 Inherited from NormalizedScalarFeature:

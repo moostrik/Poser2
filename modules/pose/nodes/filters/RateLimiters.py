@@ -42,10 +42,10 @@ class FeatureRateLimiter(FilterNode):
         self._pose_field: FrameField = pose_field
         limiter_cls = self._FEATURE_LIMIT_MAP[pose_field]
         self._limiter: ArrayRateLimit = limiter_cls(
-            vector_size=len(pose_field.get_type().feature_enum()),
+            vector_size=len(pose_field.get_type().enum()),
             max_increase=config.max_increase,
             max_decrease=config.max_decrease,
-            clamp_range= pose_field.get_type().default_range()
+            clamp_range= pose_field.get_type().range()
         )
         self._config.add_listener(self._on_config_changed)
 

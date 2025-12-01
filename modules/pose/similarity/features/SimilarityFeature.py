@@ -87,11 +87,11 @@ Validation:
 Implemented Methods (from NormalizedScalarFeature):
 ----------------------------------------------------
 Structure:
-  • feature_enum() -> type[AngleLandmark]          Returns AngleLandmark enum (IMPLEMENTED)
+  • enum() -> type[AngleLandmark]          Returns AngleLandmark enum (IMPLEMENTED)
 
 Implemented Methods (do not override):
 ---------------------------------------
-  • default_range() -> tuple[float, float]         Always returns (0.0, 1.0)
+  • range() -> tuple[float, float]         Always returns (0.0, 1.0)
                                                    (Already implemented in NormalizedScalarFeature)
 
 Inherited from NormalizedScalarFeature:
@@ -322,7 +322,7 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def feature_enum(cls) -> type[AngleLandmark]:
+    def enum(cls) -> type[AngleLandmark]:
         """Returns AngleLandmark enum."""
         return AngleLandmark
 
@@ -341,8 +341,8 @@ class SimilarityFeature(NormalizedScalarFeature[AngleLandmark]):
         """
         # Normalize to (smaller, larger)
         pair_id = (min(pair_id), max(pair_id))
-        values = np.full(len(cls.feature_enum()), np.nan, dtype=np.float32)
-        scores = np.zeros(len(cls.feature_enum()), dtype=np.float32)
+        values = np.full(len(cls.enum()), np.nan, dtype=np.float32)
+        scores = np.zeros(len(cls.enum()), dtype=np.float32)
         # Call base class factory method with pair_id as kwarg
         return cls(values, scores, pair_id=pair_id)
 

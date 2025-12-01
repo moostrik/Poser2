@@ -87,7 +87,7 @@ class PoseAngleDeltaBarLayer(LayerBase):
                                                        line_thickness, line_smooth,
                                                        (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
 
-        joint_enum_type = pose.angles.__class__.feature_enum()
+        joint_enum_type = pose.angles.__class__.enum()
         num_joints: int = len(pose.angles)
         labels: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
         if labels != self._labels:

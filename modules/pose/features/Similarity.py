@@ -87,11 +87,11 @@ Validation:
 Implemented Methods (from NormalizedScalarFeature):
 ----------------------------------------------------
 Structure:
-  • feature_enum() -> type[PoseIndex]         Returns PoseIndex enum (IMPLEMENTED)
+  • enum() -> type[PoseIndex]         Returns PoseIndex enum (IMPLEMENTED)
 
 Implemented Methods (do not override):
 ---------------------------------------
-  • default_range() -> tuple[float, float]         Always returns (0.0, 1.0)
+  • range() -> tuple[float, float]         Always returns (0.0, 1.0)
                                                    (Already implemented in NormalizedScalarFeature)
 
 Inherited from NormalizedScalarFeature:
@@ -239,7 +239,7 @@ class Similarity(NormalizedScalarFeature):
         super().__init__(values, scores)
 
     @classmethod
-    def feature_enum(cls) -> type[IntEnum]:
+    def enum(cls) -> type[IntEnum]:
         if _PoseEnum is None:
             raise RuntimeError(
                 "Similarity not configured. Call configure_similarity(max_poses) at app startup."

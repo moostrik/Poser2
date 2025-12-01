@@ -53,8 +53,8 @@ class FeatureRateLimiter(FeatureInterpolatorBase[RateLimiterConfig]):
     def _create_interpolator(self):
         """Create the underlying rate limiter instance."""
         interpolator_cls = self._INTERP_MAP[self._pose_field]
-        vector_size = len(self._pose_field.get_type().feature_enum())
-        clamp_range = self._pose_field.get_type().default_range()
+        vector_size = len(self._pose_field.get_type().enum())
+        clamp_range = self._pose_field.get_type().range()
         return interpolator_cls(
             vector_size=vector_size,
             max_increase=self._config.max_increase,

@@ -22,8 +22,8 @@ class PoseScalarBar(Shader):
         # Flatten values and scores to pass to shader
         values: np.ndarray = np.nan_to_num(feature.values.astype(np.float32), nan=0.0)
         scores: np.ndarray = feature.scores.astype(np.float32)
-        min_range: float = feature.default_range()[0]
-        max_range: float = feature.default_range()[1]
+        min_range: float = feature.range()[0]
+        max_range: float = feature.range()[1]
         min_range = max(min_range, -10.0)
         max_range = min(max_range, 10.0)
 

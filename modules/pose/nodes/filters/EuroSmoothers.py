@@ -45,12 +45,12 @@ class FeatureEuroSmoother(FilterNode):
         self._pose_field: FrameField = pose_field
         smoother_cls = self._SMOOTH_MAP[pose_field]
         self._smoother = smoother_cls(
-            vector_size=len(pose_field.get_type().feature_enum()),
+            vector_size=len(pose_field.get_type().enum()),
             frequency=config.frequency,
             min_cutoff=config.min_cutoff,
             beta=config.beta,
             d_cutoff=config.d_cutoff,
-            clamp_range=pose_field.get_type().default_range()
+            clamp_range=pose_field.get_type().range()
         )
         self._config.add_listener(self._on_config_changed)
 

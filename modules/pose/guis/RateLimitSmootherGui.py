@@ -10,7 +10,8 @@ class RateLimitSmootherGui:
         self.config: RateLimiterConfig = config
 
         elm: list = []
-        elm.append([E(eT.TEXT, 'Rate    '),
+        elm.append([
+            E(eT.TEXT, 'Rate    '),
             E(eT.TEXT, 'increase'),
             E(eT.SLDR, name + 'max_increase',   self.set_max_increase,  pi, [0, pi],    0.1),
             E(eT.TEXT, 'decrease'),

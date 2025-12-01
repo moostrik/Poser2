@@ -110,8 +110,8 @@ Validation:
 
 Implemented Methods (from BaseScalarFeature):
 ----------------------------------------------
-  • feature_enum() -> type[AngleLandmark]          Returns AngleLandmark enum
-  • default_range() -> tuple[float, float]         Returns SYMMETRIC_PI_RANGE (-π, π)
+  • enum() -> type[AngleLandmark]          Returns AngleLandmark enum
+  • range() -> tuple[float, float]         Returns SYMMETRIC_PI_RANGE (-π, π)
 
 AngleFeature-Specific:
 ======================
@@ -202,12 +202,11 @@ class Angles(BaseScalarFeature[AngleLandmark]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def feature_enum(cls) -> type[AngleLandmark]:
-        """Returns AngleLandmark enum."""
+    def enum(cls) -> type[IntEnum]:
         return AngleLandmark
 
     @classmethod
-    def default_range(cls) -> tuple[float, float]:
+    def range(cls) -> tuple[float, float]:
         """Returns angle range in radians [-π, π]."""
         return ANGLE_RANGE
 

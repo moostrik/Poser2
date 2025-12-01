@@ -10,7 +10,8 @@ class PredictionGui:
         self.config: PredictorConfig = config
 
         elm: list = []
-        elm.append([E(eT.TEXT, 'predict   '),
+        elm.append([
+            E(eT.TEXT, 'Predict  '),
             E(eT.TEXT, 'method'),
             E(eT.SLDR, name + 'method', self.set_method,    2,    [0,2], 1)])
 

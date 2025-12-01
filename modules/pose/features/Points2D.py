@@ -85,9 +85,9 @@ Validation:
 
 Implemented Methods (from BaseVectorFeature):
 ----------------------------------------------
-  • feature_enum() -> type[PointLandmark]          Returns PointLandmark enum
+  • enum() -> type[PointLandmark]          Returns PointLandmark enum
   • dimensions() -> int                            Returns 2 for 2D points
-  • default_range() -> tuple[float, float]         Returns NORMALIZED_RANGE (0.0, 1.0)
+  • range() -> tuple[float, float]         Returns NORMALIZED_RANGE (0.0, 1.0)
 
 Point2DFeature-Specific:
 ========================
@@ -153,7 +153,7 @@ Notes:
 - Coordinates are normalized to [0.0, 1.0] range
 - A point is INVALID if ANY component (x or y) is NaN (entire vector marked invalid)
 - Invalid vectors must have score 0.0
-- default_range() applies to BOTH dimensions (x and y use same range)
+- range() applies to BOTH dimensions (x and y use same range)
 - Arrays are read-only after construction (immutable)
 - Use validate() for debugging, not in production loops
 - Constructor takes ownership - caller must not modify arrays after passing
@@ -210,19 +210,19 @@ class Points2D(BaseVectorFeature[PointLandmark]):
     # ========== ABSTRACT METHOD IMPLEMENTATIONS ==========
 
     @classmethod
-    def feature_enum(cls) -> type[PointLandmark]:
+    def enum(cls) -> type[IntEnum]:
         """Returns PointLandmark enum."""
         return PointLandmark
+
+    @classmethod
+    def range(cls) -> tuple[float, float]:
+        """Returns normalized coordinate range"""
+        return (-2.0, 2.0)
 
     @classmethod
     def dimensions(cls) -> int:
         """Returns 2 for 2D points (x, y)."""
         return 2
-
-    @classmethod
-    def default_range(cls) -> tuple[float, float]:
-        """Returns normalized coordinate range"""
-        return (-2.0, 2.0)
 
     # ========== CONVENIENCE ACCESSORS ==========
 
@@ -291,7 +291,7 @@ class Points2D(BaseVectorFeature[PointLandmark]):
             >>> feature = Point2DFeature.from_flat_array(flat)
         """
         # Reshape to (n_elements, 2)
-        n_elements = len(cls.feature_enum())
+        n_elements = len(cls.enum())
         values = flat.reshape(n_elements, 2).astype(np.float32)
         return cls(values, scores)
 

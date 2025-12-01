@@ -93,7 +93,7 @@ class PoseScalarBarLayer(LayerBase):
         PoseScalarBarLayer.pose_feature_shader.use(self._fbo.fbo_id, feature, line_thickness, line_smooth,
                                                    self.color, (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
 
-        joint_enum_type = feature.__class__.feature_enum()
+        joint_enum_type = feature.__class__.enum()
         num_joints: int = len(feature)
         labels: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
         if labels != self._labels:
