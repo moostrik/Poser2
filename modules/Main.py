@@ -140,7 +140,8 @@ class Main():
             [
                 lambda: nodes.PointPredictor(self.prediction_config),
                 lambda: nodes.AnglePredictor(self.prediction_config),
-                lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(False, True)),
+                lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=True)),
+                lambda: nodes.SimilarityStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
             ]
         )
@@ -162,7 +163,7 @@ class Main():
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
-                lambda: nodes.AngleVelStickyFiller(nodes.StickyFillerConfig(False, False)),
+                lambda: nodes.AngleVelStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
                 lambda: nodes.AngleVelEuroSmoother(self.a_vel_smooth_config),
                 nodes.AngleMotionExtractor,
                 lambda: nodes.AngleMotionRateLimiter(self.motion_rate_config),

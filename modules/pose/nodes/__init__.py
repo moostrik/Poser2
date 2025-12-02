@@ -11,7 +11,7 @@ from .extractors.SimilarityExtractor import     SimilarityExtractorConfig,  Simi
 from .filters.ConfidenceFilters import          ConfidenceFilterConfig,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfidenceFilter
 from .filters.Predictors import                 PredictorConfig,            BBoxPredictor,          PointPredictor,         AnglePredictor,         AngleVelPredictor,          AngleSymPredictor
 from .filters.EuroSmoothers import              EuroSmootherConfig,         BBoxEuroSmoother,       PointEuroSmoother,      AngleEuroSmoother,      AngleVelEuroSmoother,       AngleSymEuroSmoother,       SimilarityEuroSmoother
-from .filters.StickyFillers import              StickyFillerConfig,         BBoxStickyFiller,       PointStickyFiller,      AngleStickyFiller,      AngleVelStickyFiller,       AngleSymStickyFiller
+from .filters.StickyFillers import              StickyFillerConfig,         BBoxStickyFiller,       PointStickyFiller,      AngleStickyFiller,      AngleVelStickyFiller,       AngleSymStickyFiller,       SimilarityStickyFiller
 from .filters.RateLimiters import               RateLimiterConfig,          BBoxRateLimiter,        PointRateLimiter,       AngleRateLimiter,       AngleVelRateLimiter,        AngleSymRateLimiter,        AngleMotionRateLimiter
 from .filters.Validators import                 ValidatorConfig,            BBoxValidator,          PointValidator,         AngleValidator,         AngleVelValidator,          AngleSymValidator,          PoseValidator
 

@@ -132,19 +132,15 @@ class SoundOsc:
         # range [-pi, pi]
         angle_rad_values: list[float] = pose.angles.values.tolist()
         angle_rad_msg = OscMessageBuilder(address=f"/pose/{id}/angle/rad")
-        angle_rad_msg.add_arg(angle_rad_values)
-        # for joint in AngleLandmark:
-        #     angle: float | None = pose.angles.get(joint)
-        #     angle_msg.add_arg(float(angle), OscMessageBuilder.ARG_TYPE_FLOAT)
+        for angle in angle_rad_values:
+            angle_rad_msg.add_arg(angle, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(angle_rad_msg.build()) # type: ignore
 
         # range [-finite, finite] -> [-2pi, 2pi]
         angle_vel_values: list[float] = pose.angle_vel.values.tolist()
         angle_vel_msg = OscMessageBuilder(address=f"/pose/{id}/angle/vel")
-        angle_vel_msg.add_arg(angle_vel_values)
-        # for joint in AngleLandmark:
-        #     velocity: float | None = pose.angle_vel.get(joint)
-        #     velocity_msg.add_arg(float(velocity))
+        for angle_vel in angle_vel_values:
+            angle_vel_msg.add_arg(angle_vel, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(angle_vel_msg.build()) # type: ignore
 
         # range [0, 1]
@@ -153,24 +149,9 @@ class SoundOsc:
         mean_sym_msg.add_arg(float(mean_sym), OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(mean_sym_msg.build()) # type: ignore
 
+        # range [0, 1]
         similarity_values: list[float] = pose.similarity.values.tolist()
         similarity_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
-        similarity_msg.add_arg(similarity_values)
+        for similarity in similarity_values:
+            similarity_msg.add_arg(similarity, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(similarity_msg.build()) # type: ignore
-
-    @ staticmethod
-    def _build_similarity_message(similarity_batch: SimilarityBatch, bundle_builder: OscBundleBuilder, num_players: int) -> None:
-
-        for id in range(num_players):
-            similarity_values: list[float] = []
-            for other_id in range(num_players):
-                if id == other_id:
-                    similarity_values.append(1.0)
-                else:
-                    feature: SimilarityFeature | None= similarity_batch.get_pair((id, other_id))
-                    similarity = feature.aggregate_similarity(AggregationMethod.HARMONIC_MEAN, exponent=2.0) if feature is not None else 0.0
-                    similarity_values.append(float(similarity))
-                    # sync_msg = OscMessageBuilder(address=f"/similarity/motion/{id}/{other_id}")
-            sync_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
-            sync_msg.add_arg(similarity_values)
-            bundle_builder.add_content(sync_msg.build()) # type: ignore

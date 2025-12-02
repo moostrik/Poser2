@@ -55,7 +55,11 @@ class AngleMotionExtractor(FilterNode):
         motion /=self.max_threshold
         motion = np.clip(motion, 0, None)
 
-        max_motion = np.nanmax(motion)
+
+        if np.isnan(motion).all():
+            max_motion = np.nan
+        else:
+            max_motion = np.nanmax(motion)
         max_motion_array = np.full_like(motion, max_motion)
 
         # print(max_motion)
@@ -70,7 +74,3 @@ class AngleMotionExtractor(FilterNode):
 
     def reset(self) -> None:
         self._prev_pose = None
-
-
-
-

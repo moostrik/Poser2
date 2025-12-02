@@ -1,0 +1,100 @@
+{
+  "num_players": 3,
+
+  "tracker_type": "ONEPERCAM",
+
+  "camera": {
+    "ids": [
+      "19443010D153874800",
+      "19443010D1E4974800",
+      "19443010D14C874800"
+    ],
+    "num": 3,
+    "fps": 23.0,
+    "yolo": true,
+    "color": true,
+    "square": true,
+    "stereo": false,
+    "hd_ready": false,
+    "show_stereo": false,
+    "manual": false,
+    "flip_h": false,
+    "flip_v": true,
+    "perspective": -0.22,
+    "model_path": "models",
+    "video_path": "recordings",
+    "temp_path": "temp",
+    "sim_enabled": true,
+    "sim_passthrough": false,
+    "sim_fps": 23.0,
+    "rec_enabled": false,
+    "video_chunk_length": 10.0,
+    "video_encoder": "iGPU",
+    "video_decoder": "iGPU",
+    "video_format": "H264",
+    "video_frame_types": [
+      "VIDEO"
+    ]
+  },
+
+  "pose": {
+    "active": true,
+    "max_poses": 3,
+    "model_type": "SMALL",
+    "model_path": "models",
+    "confidence_threshold": 0.5,
+    "verbose": true,
+    "crop_expansion": 0.1
+  },
+
+  "pd_stream": {
+    "max_poses": 1,
+    "stream_capacity": 300,
+    "stream_sample_rate": 100,
+    "corr_rate": 100,
+    "corr_num_workers": 8,
+    "corr_buffer_duration": 90,
+    "corr_stream_timeout": 2.0,
+    "corr_max_nan_ratio": 0.15,
+    "corr_dtw_band": 10,
+    "corr_similarity_exp": 2.0
+  },
+
+  "gui": {
+    "title": "Poser",
+    "on_top": false,
+    "location_x": 600,
+    "location_y": 20,
+    "file_path": "files",
+    "default_file": "default"
+  },
+
+  "sound_osc": {
+    "ip_addresses": "10.0.0.65",
+    "port": 8000,
+    "num_players": 3,
+    "data_type": "pose_I"
+  },
+
+  "render": {
+    "title": "Poser",
+    "monitor": 0,
+    "width": 1920,
+    "height": 900,
+    "x": 0,
+    "y": 20,
+    "fullscreen": false,
+    "fps": 60,
+    "v_sync": true,
+    "secondary_list": [
+      1,
+      2,
+      3
+    ],
+    "num_cams": 3,
+    "num_players": 3,
+    "cams_a_row": 3,
+    "num_R": 3,
+    "stream_capacity": 600
+  }
+}
