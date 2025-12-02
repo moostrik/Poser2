@@ -75,6 +75,8 @@ class SimilarityBlend(LayerBase):
         blend_1 = pose.similarity.get_value(other_1_index, fill=0.0)
         blend_2 = pose.similarity.get_value(other_2_index, fill=0.0)
 
+        # print(f"SimilarityBlend Layer {self._cam_id}: blend_1={blend_1}, blend_2={blend_2}")
+
         tex_0 = self._layers[self._cam_id]._fbo.tex_id
         tex_1 = self._layers[other_1_index]._fbo.tex_id
         tex_2 = self._layers[other_2_index]._fbo.tex_id
