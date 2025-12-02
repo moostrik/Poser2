@@ -50,6 +50,7 @@ class PoseCamLayer(LayerBase):
 
         if pose is self._p_pose:
             return # no update needed
+        self._p_pose = pose
 
         LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)

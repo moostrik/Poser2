@@ -18,7 +18,7 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.layers import CamCompositeLayer, PoseCamLayer, CentreCamLayer
 from modules.render.layers import PoseAngleDeltaBarLayer, PoseScalarBarLayer, PoseMotionBarLayer, PDLineLayer
-from modules.render.layers import SimilarityLineLayer, AggregationMethod
+from modules.render.layers import SimilarityLineLayer, AggregationMethod, SimilarityBlend
 from modules.render.renderers import CamImageRenderer, PoseMeshRenderer, CamBBoxRenderer, PoseMotionTimeRenderer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -45,11 +45,13 @@ class HDTRenderManager(RenderBase):
         self.cam_track_layers:      dict[int, CamCompositeLayer] = {}
         self.pose_cam_layers:       dict[int, PoseCamLayer] = {}
         self.centre_cam_layers:     dict[int, CentreCamLayer] = {}
+        self.sim_blend_layers:      dict[int, SimilarityBlend] = {}
         self.pd_line_layers:        dict[int, PDLineLayer] = {}
         self.field_bar_layers_raw:  dict[int, PoseScalarBarLayer] = {}
         self.field_bar_layers:      dict[int, PoseScalarBarLayer] = {}
         self.angle_bar_layers:      dict[int, PoseAngleDeltaBarLayer] = {}
         self.motion_bar_layers:     dict[int, PoseMotionBarLayer] = {}
+        self.sim_blend_layers:      dict[int, SimilarityBlend] = {}
 
         # self.line_field_layers:     dict[int, LineFieldLayer] = {}
 
@@ -67,6 +69,7 @@ class HDTRenderManager(RenderBase):
             self.cam_track_layers[i] =  CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, self.cam_img_renderers[i], 2, None, (1.0, 1.0, 1.0, 0.5))
             self.pose_cam_layers[i] =   PoseCamLayer(i, self.data_hub,      PoseDataHubTypes.pose_I, self.cam_img_renderers[i])
             self.centre_cam_layers[i] = CentreCamLayer(i, self.data_hub,    PoseDataHubTypes.pose_I, self.cam_img_renderers[i])
+            self.sim_blend_layers[i] =  SimilarityBlend(i, self.data_hub,   PoseDataHubTypes.pose_I, self.centre_cam_layers)
             self.pd_line_layers[i] =    PDLineLayer(i, self.data_hub)
             self.field_bar_layers[i] =  PoseScalarBarLayer(i, self.data_hub,PoseDataHubTypes.pose_I, FrameField.angles, 2.0, 2.0)
             self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataHubTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
@@ -107,6 +110,7 @@ class HDTRenderManager(RenderBase):
 
             self.pose_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.centre_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
+            self.sim_blend_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.field_bar_layers_raw[i].allocate(1080, 1920, GL_RGBA32F)
             self.field_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.angle_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
@@ -136,6 +140,8 @@ class HDTRenderManager(RenderBase):
         for layer in self.cam_track_layers.values():
             layer.deallocate()
         for layer in self.centre_cam_layers.values():
+            layer.deallocate()
+        for layer in self.sim_blend_layers.values():
             layer.deallocate()
         for layer in self.pose_cam_layers.values():
             layer.deallocate()
@@ -178,6 +184,7 @@ class HDTRenderManager(RenderBase):
             self.cam_track_layers[i].update()
             self.pose_cam_layers[i].update()
             self.centre_cam_layers[i].update()
+            self.sim_blend_layers[i].update()
             self.pd_line_layers[i].update()
             self.field_bar_layers_raw[i].update()
             self.field_bar_layers[i].update()
@@ -207,7 +214,8 @@ class HDTRenderManager(RenderBase):
         for i in range(self.num_cams):
             preview_rect: Rect = self.subdivision.get_rect(CentreCamLayer.__name__, i)
             # self.pose_cam_layers[i].draw(preview_rect)
-            self.centre_cam_layers[i].draw(preview_rect)
+            # self.centre_cam_layers[i].draw(preview_rect)
+            self.sim_blend_layers[i].draw(preview_rect)
 
         for i in range(self.num_cams):
 
@@ -260,7 +268,9 @@ class HDTRenderManager(RenderBase):
         draw_centre: bool = True
         if draw_centre:
             self.centre_cam_layers[camera_id].blend_factor = 0.25
-            self.centre_cam_layers[camera_id].draw(draw_rect)
+            # self.centre_cam_layers[camera_id].draw(draw_rect)
+
+            self.sim_blend_layers[camera_id].draw(draw_rect)
             screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
             self.mesh_renderers_raw[camera_id].draw(draw_mesh_rect)
@@ -278,4 +288,3 @@ class HDTRenderManager(RenderBase):
 
         # self.pd_line_layers[camera_id].draw(draw_rect)
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
-

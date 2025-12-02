@@ -129,4 +129,3 @@ class PoseAngleDeltaBarLayer(LayerBase):
             draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
 
         fbo.end()
-

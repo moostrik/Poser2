@@ -5,6 +5,5 @@ from .Generic.PoseAngleDeltaBarLayer import PoseAngleDeltaBarLayer
 from .Generic.PoseMotionBarLayer import     PoseMotionBarLayer
 from .Generic.PoseFieldBarLayer import      PoseScalarBarLayer
 from .Generic.PoseCamLayer import           PoseCamLayer
+from .Generic.SimilarityBlend import        SimilarityBlend
 from .Generic.SimilarityLineLayer import    SimilarityLineLayer, AggregationMethod
-
-
