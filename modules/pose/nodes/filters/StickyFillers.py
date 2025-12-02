@@ -118,4 +118,6 @@ class AngleSymStickyFiller(FeatureStickyFiller):
     def __init__(self, config: StickyFillerConfig) -> None:
         super().__init__(config, FrameField.angle_sym)
 
-
+class SimilarityStickyFiller(FeatureStickyFiller):
+    def __init__(self, config: StickyFillerConfig) -> None:
+        super().__init__(config, FrameField.similarity)
