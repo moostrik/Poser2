@@ -18,7 +18,7 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render.layers import CamCompositeLayer, PoseCamLayer, CentreCamLayer
 from modules.render.layers import PoseAngleDeltaBarLayer, PoseScalarBarLayer, PoseMotionBarLayer, PDLineLayer
-from modules.render.layers import SimilarityLineLayer, AggregationMethod, SimilarityBlend
+from modules.render.layers import SimilarityLineLayer, AggregationMethod, SimilarityBlend, PoseMotionSimLayer
 from modules.render.renderers import CamImageRenderer, PoseMeshRenderer, CamBBoxRenderer, PoseMotionTimeRenderer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -51,7 +51,7 @@ class HDTRenderManager(RenderBase):
         self.field_bar_layers:      dict[int, PoseScalarBarLayer] = {}
         self.angle_bar_layers:      dict[int, PoseAngleDeltaBarLayer] = {}
         self.motion_bar_layers:     dict[int, PoseMotionBarLayer] = {}
-        self.sim_blend_layers:      dict[int, SimilarityBlend] = {}
+        self.pose_motion_sim_layers:dict[int, PoseMotionSimLayer] = {}
 
         # self.line_field_layers:     dict[int, LineFieldLayer] = {}
 
@@ -75,6 +75,7 @@ class HDTRenderManager(RenderBase):
             self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataHubTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
             self.angle_bar_layers[i] =  PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
             self.motion_bar_layers[i] = PoseMotionBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angle_motion, 2.0, 2.0)
+            self.pose_motion_sim_layers[i] = PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
             # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
 
         # composition
@@ -115,6 +116,7 @@ class HDTRenderManager(RenderBase):
             self.field_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.angle_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
             self.motion_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
+            self.pose_motion_sim_layers[i].allocate(1080, 1920, GL_RGBA32F)
             # self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
 
         self.allocate_window_renders()
@@ -155,6 +157,8 @@ class HDTRenderManager(RenderBase):
             layer.deallocate()
         for layer in self.motion_bar_layers.values():
             layer.deallocate()
+        for layer in self.pose_motion_sim_layers.values():
+            layer.deallocate()
 
         # renderers
         for layer in self.cam_img_renderers.values():
@@ -190,6 +194,7 @@ class HDTRenderManager(RenderBase):
             self.field_bar_layers[i].update()
             self.angle_bar_layers[i].update()
             self.motion_bar_layers[i].update()
+            self.pose_motion_sim_layers[i].update()
 
             # self.line_field_layers[i].update()
 
@@ -223,9 +228,12 @@ class HDTRenderManager(RenderBase):
             screen_center_rect: Rect = self.centre_cam_layers[i].screen_center_rect
             draw_mesh_rect: Rect = screen_center_rect.affine_transform(preview_rect)
             self.mesh_renderers[i].draw(draw_mesh_rect)
-            self.field_bar_layers[i].draw(preview_rect)
-            self.pd_line_layers[i].draw(preview_rect)
+            # self.field_bar_layers[i].draw(preview_rect)
+            # self.pd_line_layers[i].draw(preview_rect)
             self.motion_time_renderers[i].draw(preview_rect)
+
+
+            self.pose_motion_sim_layers[i].draw(preview_rect)
 
             # self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
 
@@ -282,9 +290,10 @@ class HDTRenderManager(RenderBase):
 
         # self.field_bar_layers_raw[camera_id].draw(draw_rect)
         # self.field_bar_layers[camera_id].draw(draw_rect)
-        self.motion_bar_layers[camera_id].draw(draw_rect)
+        # self.motion_bar_layers[camera_id].draw(draw_rect)
         self.angle_bar_layers[camera_id].draw(draw_rect)
-        self.motion_bar_layers[camera_id].line_smooth = 10.0
+        # self.motion_bar_layers[camera_id].line_smooth = 10.0
+        self.pose_motion_sim_layers[camera_id].draw(draw_rect)
 
         # self.pd_line_layers[camera_id].draw(draw_rect)
         # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))

@@ -8,7 +8,7 @@ class SingleElement(IntEnum):
     VALUE = 0
 
 
-class SingleValueFeature(NormalizedScalarFeature[SingleElement]):
+class SingleValue(NormalizedScalarFeature[SingleElement]):
     """Base for single normalized value features."""
 
     @classmethod
@@ -26,7 +26,7 @@ class SingleValueFeature(NormalizedScalarFeature[SingleElement]):
         return float(self._scores[0])
 
     @classmethod
-    def create_dummy(cls) -> 'SingleValueFeature':
+    def create_dummy(cls) -> 'SingleValue':
         """Create from a single value and score."""
         return cls(
             values=np.array([np.nan], dtype=np.float32),

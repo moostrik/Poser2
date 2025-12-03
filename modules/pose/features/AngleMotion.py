@@ -1,7 +1,7 @@
 from enum import IntEnum
 import numpy as np
 from modules.pose.features.Angles import AngleLandmark
-from modules.pose.features.base.BaseScalarFeature import BaseScalarFeature
+from modules.pose.features import NormalizedScalarFeature
 
 
 ANGLE_MOTION_NORMALISATION: dict[AngleLandmark, float] = {
@@ -18,14 +18,9 @@ ANGLE_MOTION_NORMALISATION: dict[AngleLandmark, float] = {
 
 
 
-class AngleMotion(BaseScalarFeature[AngleLandmark]):
+class AngleMotion(NormalizedScalarFeature[AngleLandmark]):
     """Angular velocities for body landmarks (radians/sec, unbounded)."""
 
     @classmethod
     def enum(cls) -> type[IntEnum]:
         return AngleLandmark
-
-    @classmethod
-    def range(cls) -> tuple[float, float]:
-        # Unbounded range for velocities
-        return (0, 1)

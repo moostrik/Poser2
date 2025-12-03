@@ -2,12 +2,14 @@
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
+import numpy as np
+
 # Local application imports
 from modules.gl.Fbo import Fbo
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 
-from modules.pose.features import PoseFeatureType
+from modules.pose.features import PoseFeatureType, AngleMotion, AggregationMethod, SingleValue
 from modules.pose.Frame import Frame, FrameField
 
 from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
@@ -17,13 +19,12 @@ from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
-from modules.gl.shaders.PoseScalarBar import PoseScalarBar as shader
+from modules.gl.shaders.ValuesBar import ValuesBar as shader
 
-class PoseScalarBarLayer(LayerBase):
-    pose_feature_shader = shader()
+class PoseMotionSimLayer(LayerBase):
+    _shader = shader()
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, feature_type: FrameField,
-                line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0)) -> None:
+    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
@@ -32,11 +33,6 @@ class PoseScalarBarLayer(LayerBase):
         self._labels: list[str] = []
 
         self.data_type: PoseDataHubTypes = data_type
-        self.feature_type: FrameField = feature_type
-        self.color: tuple[float, float, float, float] = color
-        self.bg_alpha: float = 0.4
-        self.line_thickness: float = line_thickness
-        self.line_smooth: float = line_smooth
         self.draw_labels: bool = True
 
         text_init()
@@ -48,27 +44,25 @@ class PoseScalarBarLayer(LayerBase):
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
 
-        if not PoseScalarBarLayer.pose_feature_shader.allocated:
-            PoseScalarBarLayer.pose_feature_shader.allocate(monitor_file=True)
+        if not PoseMotionSimLayer._shader.allocated:
+            PoseMotionSimLayer._shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
-        if PoseScalarBarLayer.pose_feature_shader.allocated:
-            PoseScalarBarLayer.pose_feature_shader.deallocate()
+        if PoseMotionSimLayer._shader.allocated:
+            PoseMotionSimLayer._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        if self.draw_labels:
-            self._label_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        # if self.draw_labels:
+        #     self._label_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
-        if not PoseScalarBarLayer.pose_feature_shader.allocated:
-            PoseScalarBarLayer.pose_feature_shader.allocate(monitor_file=True)
+        if not PoseMotionSimLayer._shader.allocated:
+            PoseMotionSimLayer._shader.allocate(monitor_file=True)
 
-        key: int = self._track_id
-
-        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), key)
+        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._track_id)
 
         if pose is self._p_pose:
             return # no update needed
@@ -81,23 +75,46 @@ class PoseScalarBarLayer(LayerBase):
         if pose is None:
             return
 
-        feature = pose.get_feature(FrameField[self.feature_type.name])
-        if not isinstance(feature, PoseFeatureType):
-            raise ValueError(f"PoseFeatureLayer expected feature of type PoseFeature, got {type(feature)}")
+        similarity = pose.similarity.values
+        sim_colors = np.array([
+            [1.0, 0.0, 0.0, 0.5],  # Red
+            [1.0, 1.0, 0.0, 0.5],  # Yellow
+            [0.0, 1.0, 0.0, 0.5]   # Green
+        ], dtype=np.float32)
+        motion = pose.angle_motion.aggregate(AggregationMethod.MAX)
+        motion_array = np.array([motion], dtype=np.float32)
+        motion_colors = np.array([[1.0, 1.0, 1.0, 1.0]], dtype=np.float32)
+        motion_sim = similarity * motion
+        motion_sim_colors = np.array([
+            [1.0, 0.0, 0.0, 1.0],  # Red
+            [1.0, 1.0, 0.0, 1.0],  # Yellow
+            [0.0, 1.0, 0.0, 1.0],  # Green
+        ], dtype=np.float32)
+
 
         # print(feature.values)
 
-        line_thickness = 1.0 / self._fbo.height * self.line_thickness
-        line_smooth = 1.0 / self._fbo.height * self.line_smooth
+        line_thickness = 1.0 / self._fbo.height * 1.0
+        line_smooth = 1.0 / self._fbo.height * 4.0
 
-        PoseScalarBarLayer.pose_feature_shader.use(self._fbo.fbo_id, feature, line_thickness, line_smooth,
-                                                   self.color, (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
+        PoseMotionSimLayer._shader.use(self._fbo.fbo_id, similarity, sim_colors, line_thickness, line_smooth * 10)
+        PoseMotionSimLayer._shader.use(self._fbo.fbo_id, motion_array, motion_colors, line_thickness, line_smooth)
+        PoseMotionSimLayer._shader.use(self._fbo.fbo_id, motion_sim, motion_sim_colors, line_thickness, line_smooth)
+        # PoseMotionSimLayer._shader.use(self._fbo.fbo_id, motion_sim, line_thickness, line_smooth,
+        #                                            color, (*POSE_COLOR_RIGHT, 1.0), (*POSE_COLOR_LEFT, 1.0))
+        # PoseMotionSimLayer._shader.use(self._fbo.fbo_id, motion_feature, line_thickness, line_smooth,
+        #                                            color, color, color)
+
+
+
+        return
+
 
         joint_enum_type = feature.__class__.enum()
         num_joints: int = len(feature)
         labels: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
         if labels != self._labels:
-            PoseScalarBarLayer.render_labels(self._label_fbo, labels)
+            PoseMotionSimLayer.render_labels(self._label_fbo, labels)
         self._labels = [joint_enum_type(i).name for i in range(num_joints)]
 
 

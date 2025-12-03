@@ -9,6 +9,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
+from modules.pose.features import AggregationMethod
 from modules.pose.Frame import Frame
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
@@ -69,11 +70,25 @@ class SimilarityBlend(LayerBase):
         if pose is None:
             return
 
+        motion = pose.angle_motion.aggregate(AggregationMethod.MAX)
+        motion_exponent = 1.0
+        motion = pow(motion, motion_exponent)
+
         other_1_index = (self._cam_id + 1) % 3
         other_2_index = (self._cam_id + 2) % 3
 
-        blend_1 = pose.similarity.get_value(other_1_index, fill=0.0)
-        blend_2 = pose.similarity.get_value(other_2_index, fill=0.0)
+        similarity = np.nan_to_num(pose.similarity.values)
+        threshold = 0.33
+        similarity = np.clip((similarity - threshold) / (1.0 - threshold), 0.0, 1.0)
+        exponent =1.5
+        similarity = np.power(similarity, exponent)
+        similarity *= motion
+
+        blend_1 = similarity[other_1_index]
+        blend_2 = similarity[other_2_index]
+
+        # blend_1 = pow(pose.similarity.get_value(other_1_index, fill=0.0), 2.0) * pow(motion, 1.0)
+        # blend_2 = pow(pose.similarity.get_value(other_2_index, fill=0.0), 2.0) * pow(motion, 1.0)
 
         # print(f"SimilarityBlend Layer {self._cam_id}: blend_1={blend_1}, blend_2={blend_2}")
 
