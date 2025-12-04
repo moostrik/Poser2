@@ -34,6 +34,7 @@ class Layers(IntEnum):
 
     pose_cam_L =        auto()
     centre_cam_L =      auto()
+    centre_pose_L =     auto()
     sim_blend_L =       auto()
     pd_line_L =         auto()
     field_bar_raw_L =   auto()
@@ -41,20 +42,26 @@ class Layers(IntEnum):
     angle_bar_L =       auto()
     motion_bar_L =      auto()
     pose_motion_sim_L = auto()
-    pose_dot_L =        auto()
 
 BOX_LAYERS: list[Layers] = [
     Layers.pose_cam_L,
-    Layers.cam_mesh_R,
     Layers.cam_mesh_raw_R,
+    Layers.cam_mesh_R,
 ]
 
 FINAL_LAYERS: list[Layers] = [
     Layers.centre_cam_L,
-    Layers.sim_blend_L,
-    Layers.angle_bar_L,
+    # Layers.sim_blend_L,
+    # Layers.centre_pose_L,
+    # Layers.angle_bar_L,
+    # Layers.pose_motion_sim_L,
 ]
 
+COLORS: list[tuple[float, float, float, float]] = [
+    (1.0, 0.0, 0.0, 0.85),
+    (0.0, 1.0, 1.0, 0.85),
+    (0.0, 1.0, 0.0, 0.85),
+]
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
@@ -78,13 +85,15 @@ class HDTRenderManager(RenderBase):
         for i in range(self.num_cams):
             self.L[Layers.cam_image_R][i] =     layers.CamImageRenderer(i, self.data_hub)
             self.L[Layers.cam_bbox_R][i] =      layers.CamBBoxRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
-            self.L[Layers.cam_mesh_R][i] =      layers.PoseMeshRenderer(i, self.data_hub, PoseDataHubTypes.pose_I, 10.0, None)
-            self.L[Layers.cam_mesh_raw_R][i] =  layers.PoseMeshRenderer(i, self.data_hub, PoseDataHubTypes.pose_R, 10.0, (1.0, 1.0, 1.0, 1.0))
+            self.L[Layers.cam_mesh_R][i] =      layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 1.0, 0.0, True, False)
+            self.L[Layers.cam_mesh_raw_R][i] =  layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_R, 0.5, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
             self.L[Layers.cam_track_L][i] =     layers.CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]))
             self.L[Layers.motion_time_R][i] =   layers.PoseMotionTimeRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
 
             self.L[Layers.pose_cam_L][i] =      layers.PoseCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]))
             self.L[Layers.centre_cam_L][i] =    layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]))
+            self.L[Layers.centre_pose_L][i] =   layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
+            cast(layers.CentreCamLayer, self.L[Layers.centre_cam_L][i]).set_points_callback(cast(layers.CentrePoseLayer, self.L[Layers.centre_pose_L][i]).setCentrePoints)
             self.L[Layers.sim_blend_L][i] =     layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.CentreCamLayer], self.L[Layers.centre_cam_L]))
             self.L[Layers.pd_line_L][i] =       layers.PDLineLayer(i, self.data_hub)
             self.L[Layers.field_bar_raw_L][i] = layers.PoseScalarBarLayer(i, self.data_hub, PoseDataHubTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
@@ -92,7 +101,6 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.angle_bar_L][i] =     layers.PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
             self.L[Layers.motion_bar_L][i] =    layers.PoseMotionBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angle_motion, 2.0, 2.0)
             self.L[Layers.pose_motion_sim_L][i]=layers.PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
-            self.L[Layers.pose_dot_L][i] =      layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 4.0, 2.0, True)
 
         # global layers
         self.pose_sim_layer =   layers.SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, layers.AggregationMethod.HARMONIC_MEAN, 2.0)
@@ -194,6 +202,9 @@ class HDTRenderManager(RenderBase):
 
         for layer_type in self._draw_layers:
             self.L[layer_type][camera_id].draw(draw_rect)
+            # cast(layers.PoseLineLayer, self.L[Layers.centre_pose_L][camera_id]).line_width = 50.0
+            # cast(layers.PoseLineLayer, self.L[Layers.centre_pose_L][camera_id]).line_smooth = 25.0
+            # cast(layers.PoseLineLayer, self.L[Layers.centre_pose_L][camera_id]).color = (1.0, 1.0, 0.0, 0.85)
 
-        self._draw_layers = [Layers.centre_cam_L, Layers.angle_bar_L,]
+        self._draw_layers = FINAL_LAYERS
         # self._draw_layers = BOX_LAYERS

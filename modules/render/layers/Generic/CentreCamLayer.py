@@ -46,7 +46,6 @@ class CentreCamLayer(LayerBase):
         self._safe_height: float = 0.3
         self._safe_rotation: float = 0.0
         self._crop_roi: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # ROI in texture coordinates
-        self._screen_centre_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
         self.data_type: PoseDataHubTypes = data_type
         self.target_x: float = 0.5
@@ -55,20 +54,15 @@ class CentreCamLayer(LayerBase):
         self.dst_aspectratio: float = 9/16
         self.blend_factor: float = 0.25
 
-        self.transformed_points: Points2D = Points2D.create_dummy()
+        self._on_points_updated = None  # Callback
 
 
         text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
-    @property
-    def centre_rect(self) -> Rect:
-        """Returns the crop ROI in texture coordinates [0,1]"""
-        return self._crop_roi
-
-    @property
-    def screen_center_rect(self) -> Rect:
-        return self._screen_centre_rect
+    def set_points_callback(self, callback) -> None:
+        """Set callback to be called when transformed_points are updated"""
+        self._on_points_updated = callback
 
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
@@ -93,10 +87,32 @@ class CentreCamLayer(LayerBase):
         if CentreCamLayer._point_shader.allocated:
             CentreCamLayer._point_shader.deallocate()
 
+
     def draw(self, rect: Rect) -> None:
         # self._crop_fbo.draw(rect.x, rect.y, rect.width, rect.height)
         self._blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
         self.draw_points(rect)
+
+        # draw a point at target_x, target_y for debugging (eye midpoint)
+        glPointSize(10.0)
+        glBegin(GL_POINTS)
+        glColor4f(1.0, 0.0, 0.0, 1.0)
+        glVertex2f(
+            rect.x + self.target_x * rect.width,
+            rect.y + self.target_y * rect.height
+        )
+        
+        # draw a point at hip midpoint for debugging
+        glColor4f(0.0, 1.0, 0.0, 1.0)
+        hip_target_y = self.target_y + (self.target_height / 2.0)
+        glVertex2f(
+            rect.x + self.target_x * rect.width,
+            rect.y + hip_target_y * rect.height
+        )
+        glEnd()
+
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+
 
     def draw_points(self, rect: Rect) -> None:
         self._point_fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -168,12 +184,11 @@ class CentreCamLayer(LayerBase):
         CentreCamLayer._blend_shader.use(self._blend_fbo.fbo_id, self._blend_fbo.back_tex_id, self._crop_fbo.tex_id, self.blend_factor)
 
 
-        self._screen_centre_rect = CentreCamLayer.calculate_screen_center_rect(pose.bbox.to_rect(), self._crop_roi)
 
         # Calculate actual texture aspect ratio
         texture_aspect = self._image_renderer._image.width / self._image_renderer._image.height
 
-        self.transformed_points = self.transform_points_to_crop_space(
+        self._transformed_points = self.transform_points_to_crop_space(
             pose.points,
             bbox_texture,
             self._safe_eye_midpoint,
@@ -182,12 +197,16 @@ class CentreCamLayer(LayerBase):
             texture_aspect  # Use actual texture aspect, not dst_aspectratio
         )
 
-        line_width: float = 1.0 / self._point_fbo.height * 80
-        line_smooth: float = 1.0 / self._point_fbo.height * 2
+        if self._on_points_updated is not None:
+            self._on_points_updated(self._transformed_points)
+        # return
+
+        line_width: float = 1.0 / self._point_fbo.height * 50
+        line_smooth: float = 1.0 / self._point_fbo.height * 25
 
 
         self._point_fbo.clear(0.0, 0.0, 0.0, 0.0)
-        CentreCamLayer._point_shader.use(self._point_fbo.fbo_id, self.transformed_points , line_width=line_width, line_smooth=line_smooth)
+        CentreCamLayer._point_shader.use(self._point_fbo.fbo_id, self._transformed_points , line_width=line_width, line_smooth=line_smooth)
 
 
     def _calculate_crop_roi(self, bbox_texture: Rect, eye_bbox_relative: Point2f, height_bbox_relative: float) -> Rect:
@@ -202,30 +221,6 @@ class CentreCamLayer(LayerBase):
             width=width_texture,
             height=height_texture
         )
-
-    @staticmethod
-    def calculate_screen_center_rect(world_rect: Rect, centre_rect: Rect) -> Rect:
-        """
-        Calculate the normalized screen space rect for a world rect relative to the centre crop.
-
-        Args:
-            world_rect: Any rectangle in world coordinates (e.g., pose.bbox)
-            centre_rect: The crop region in world coordinates
-
-        Returns:
-            Rect in normalized [0,1] space relative to centre_rect
-        """
-        try:
-            return Rect(
-                x=(world_rect.x - centre_rect.x) / centre_rect.width,
-                y=(world_rect.y - centre_rect.y) / centre_rect.height,
-                width=world_rect.width / centre_rect.width,
-                height=world_rect.height / centre_rect.height
-            )
-        except ZeroDivisionError:
-            print(f"CentreCamLayer ZeroDivisionError, world_rect: {world_rect}, centre_rect: {centre_rect}")
-            return Rect(0.0, 0.0, 1.0, 1.0)
-
 
 
     @staticmethod

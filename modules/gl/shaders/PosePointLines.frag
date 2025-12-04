@@ -77,8 +77,8 @@ void main() {
 
         vec2 pos_a = point_a.xy;
         vec2 pos_b = point_b.xy;
-        float score_a = point_a.z;
-        float score_b = point_b.z;
+        float score_a = point_a.z * 0.5 + 0.5;
+        float score_b = point_b.z * 0.5 + 0.5;
         float vis_a = point_a.w;
         float vis_b = point_b.w;
 
@@ -98,9 +98,9 @@ void main() {
         // Create smooth line
         float alpha = 1.0 - smoothstep(line_width - line_smooth, line_width + line_smooth, dist);
 
-        // Apply average score-based alpha
-        float avg_score = (score_a + score_b) * 0.5;
-        alpha *= avg_score;
+        // Apply interpolated score-based alpha (score varies along the segment)
+        float interpolated_score = mix(score_a, score_b, t);
+        alpha *= interpolated_score;
 
         // Interpolate between joint colors based on position along segment
         vec3 gradientColor = mix(joint_colors[idx_a], joint_colors[idx_b], t);
