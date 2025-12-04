@@ -118,6 +118,7 @@ class CentreCamLayer(LayerBase):
         self._crop_fbo.clear(0.0, 0.0, 0.0, 0.0)
         if pose is None:
             self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
+            self._point_fbo.clear(0.0, 0.0, 0.0, 0.0)
             return
 
         # Update eye midpoint
