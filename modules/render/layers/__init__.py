@@ -8,3 +8,5 @@ from .Generic.PoseCamLayer import           PoseCamLayer
 from .Generic.SimilarityBlend import        SimilarityBlend
 from .Generic.SimilarityLineLayer import    SimilarityLineLayer, AggregationMethod
 from .Generic.PoseMotionSimLayer import     PoseMotionSimLayer
+from .Generic.PoseDotLayer import           PoseDotLayer
+from .Generic.PoseLineLayer import          PoseLineLayer

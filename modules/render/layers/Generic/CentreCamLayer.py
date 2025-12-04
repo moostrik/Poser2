@@ -1,5 +1,6 @@
 # Standard library imports
 import numpy as np
+import math
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -12,7 +13,7 @@ from modules.gl.Text import draw_box_string, text_init
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.pose.features.Points2D import PointLandmark
+from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.render.renderers import CamImageRenderer
 
 from modules.DataHub import DataHub
@@ -21,24 +22,30 @@ from modules.utils.PointsAndRects import Rect, Point2f
 
 # Shaders
 from modules.gl.shaders.Blend import Blend
+from modules.gl.shaders.DrawRoi import DrawRoi
+from modules.gl.shaders.PosePointLines import PosePointLines
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class CentreCamLayer(LayerBase):
-    blend_shader = Blend()
+    _blend_shader = Blend()
+    _roi_shader = DrawRoi()
+    _point_shader = PosePointLines()
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, image_renderer: CamImageRenderer,) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
-        self._fbo: SwapFbo = SwapFbo()
         self._crop_fbo: Fbo = Fbo()
+        self._blend_fbo: SwapFbo = SwapFbo()
+        self._point_fbo: Fbo = Fbo()
         self._image_renderer: CamImageRenderer = image_renderer
         self._p_pose: Frame | None = None
 
         self._safe_eye_midpoint: Point2f = Point2f(0.5, 0.5)
-        self._safe_height: float = 0.5
-        self._centre_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
+        self._safe_height: float = 0.3
+        self._safe_rotation: float = 0.0
+        self._crop_roi: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # ROI in texture coordinates
         self._screen_centre_rect: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
         self.data_type: PoseDataHubTypes = data_type
@@ -48,13 +55,16 @@ class CentreCamLayer(LayerBase):
         self.dst_aspectratio: float = 9/16
         self.blend_factor: float = 0.25
 
+        self.transformed_points: Points2D = Points2D.create_dummy()
+
 
         text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def centre_rect(self) -> Rect:
-        return self._centre_rect
+        """Returns the crop ROI in texture coordinates [0,1]"""
+        return self._crop_roi
 
     @property
     def screen_center_rect(self) -> Rect:
@@ -62,24 +72,42 @@ class CentreCamLayer(LayerBase):
 
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
-        self._fbo.allocate(width, height, internal_format)
+        self._blend_fbo.allocate(width, height, internal_format)
         self._crop_fbo.allocate(width, height, internal_format)
-        if not CentreCamLayer.blend_shader.allocated:
-            CentreCamLayer.blend_shader.allocate(monitor_file=True)
+        self._point_fbo.allocate(width, height, internal_format)
+        if not CentreCamLayer._blend_shader.allocated:
+            CentreCamLayer._blend_shader.allocate(monitor_file=True)
+        if not CentreCamLayer._roi_shader.allocated:
+            CentreCamLayer._roi_shader.allocate(monitor_file=True)
+        if not CentreCamLayer._point_shader.allocated:
+            CentreCamLayer._point_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
-        self._fbo.deallocate()
+        self._blend_fbo.deallocate()
         self._crop_fbo.deallocate()
-        if CentreCamLayer.blend_shader.allocated:
-            CentreCamLayer.blend_shader.deallocate()
+        self._point_fbo.deallocate()
+        if CentreCamLayer._blend_shader.allocated:
+            CentreCamLayer._blend_shader.deallocate()
+        if CentreCamLayer._roi_shader.allocated:
+            CentreCamLayer._roi_shader.deallocate()
+        if CentreCamLayer._point_shader.allocated:
+            CentreCamLayer._point_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         # self._crop_fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        self._blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        self.draw_points(rect)
+
+    def draw_points(self, rect: Rect) -> None:
+        self._point_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        if not CentreCamLayer.blend_shader.allocated:
-            CentreCamLayer.blend_shader.allocate(monitor_file=True)
+        if not CentreCamLayer._blend_shader.allocated:
+            CentreCamLayer._blend_shader.allocate(monitor_file=True)
+        if not CentreCamLayer._roi_shader.allocated:
+            CentreCamLayer._roi_shader.allocate(monitor_file=True)
+        if not CentreCamLayer._point_shader.allocated:
+            CentreCamLayer._point_shader.allocate(monitor_file=True)
 
         key: int = self._cam_id
 
@@ -89,12 +117,12 @@ class CentreCamLayer(LayerBase):
             return # no update needed
         self._p_pose = pose
 
-        LayerBase.setView(self._fbo.width, self._fbo.height)
+        LayerBase.setView(self._blend_fbo.width, self._blend_fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self._crop_fbo.clear(0.0, 0.0, 0.0, 0.0)
         if pose is None:
-            self._fbo.clear(0.0, 0.0, 0.0, 0.0)
+            self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             return
 
         if pose.points.get_valid(PointLandmark.left_eye) and pose.points.get_valid(PointLandmark.right_eye):
@@ -113,40 +141,66 @@ class CentreCamLayer(LayerBase):
             self._safe_height *= 2.0  # Rough estimate of full height
             self._safe_height *= self.target_height
 
-        self._centre_rect = self._calculate_centre_rect(pose.bbox.to_rect(), self._safe_eye_midpoint, self._safe_height)
-        fbo_rect = Rect(0, 0, self._fbo.width, self._fbo.height)
+            # Calculate rotation angle from eye to hip midpoint
+            delta: Point2f = hip_midpoint - self._safe_eye_midpoint
+            self._safe_rotation = math.atan2(delta.x, delta.y)  # Note: x, y order for vertical reference
+
+        self._crop_roi = self._calculate_crop_roi(pose.bbox.to_rect(), self._safe_eye_midpoint, self._safe_height)
+
+        # Convert eye position from bbox-relative to texture-absolute coordinates
+        bbox_texture = pose.bbox.to_rect()
+        eye_texture_coords = Point2f(
+            self._safe_eye_midpoint.x * bbox_texture.width + bbox_texture.x,
+            self._safe_eye_midpoint.y * bbox_texture.height + bbox_texture.y
+        )
+
+        CentreCamLayer._roi_shader.use(
+            self._crop_fbo.fbo_id,
+            self._image_renderer._image.tex_id,
+            self._crop_roi,
+            self._safe_rotation,
+            eye_texture_coords,
+            False,
+            True
+        )
+
+        self._blend_fbo.swap()
+        CentreCamLayer._blend_shader.use(self._blend_fbo.fbo_id, self._blend_fbo.back_tex_id, self._crop_fbo.tex_id, self.blend_factor)
 
 
-        self._crop_fbo.begin()
-        self._image_renderer.draw_roi(fbo_rect, self._centre_rect)
-        self._crop_fbo.end()
+        self._screen_centre_rect = CentreCamLayer.calculate_screen_center_rect(pose.bbox.to_rect(), self._crop_roi)
 
-        self._fbo.swap()
+        # Calculate actual texture aspect ratio
+        texture_aspect = self._image_renderer._image.width / self._image_renderer._image.height
 
-        CentreCamLayer.blend_shader.use(self._fbo.fbo_id, self._fbo.back_tex_id, self._crop_fbo.tex_id, self.blend_factor)
+        self.transformed_points = self.transform_points_to_crop_space(
+            pose.points,
+            bbox_texture,
+            self._safe_eye_midpoint,
+            self._safe_rotation,
+            self._crop_roi,
+            texture_aspect  # Use actual texture aspect, not dst_aspectratio
+        )
 
-        self._screen_centre_rect = CentreCamLayer.calculate_screen_center_rect(pose.bbox.to_rect(), self._centre_rect)
-
-        # draw_rect = Rect(
-        #     x=fbo_rect.x - self._centre_rect.x * fbo_rect.width / self._centre_rect.width,
-        #     y=fbo_rect.y - self._centre_rect.y * fbo_rect.height / self._centre_rect.height,
-        #     width=fbo_rect.width / self._centre_rect.width,
-        #     height=fbo_rect.height / self._centre_rect.height
-        # )
-        # self._image_renderer.draw(draw_rect)
+        line_width: float = 1.0 / self._point_fbo.height * 80
+        line_smooth: float = 1.0 / self._point_fbo.height * 2
 
 
-    def _calculate_centre_rect(self, pose_rect: Rect, centre: Point2f, height: float) -> Rect:
-        """Calculate the centered crop rectangle around a pose's center point."""
-        centre_world: Point2f = centre * pose_rect.size + pose_rect.position
-        height = height * pose_rect.height
-        width: float = height * self.dst_aspectratio
+        self._point_fbo.clear(0.0, 0.0, 0.0, 0.0)
+        CentreCamLayer._point_shader.use(self._point_fbo.fbo_id, self.transformed_points , line_width=line_width, line_smooth=line_smooth)
+
+
+    def _calculate_crop_roi(self, bbox_texture: Rect, eye_bbox_relative: Point2f, height_bbox_relative: float) -> Rect:
+        """Calculate the crop ROI in texture coordinates [0,1], centered on the eye position."""
+        eye_texture_coords: Point2f = eye_bbox_relative * bbox_texture.size + bbox_texture.position
+        height_texture = height_bbox_relative * bbox_texture.height
+        width_texture: float = height_texture * self.dst_aspectratio
 
         return Rect(
-            x=centre_world.x - width * self.target_x,
-            y=centre_world.y - height * self.target_y,
-            width=width,
-            height=height
+            x=eye_texture_coords.x - width_texture * self.target_x,
+            y=eye_texture_coords.y - height_texture * self.target_y,
+            width=width_texture,
+            height=height_texture
         )
 
     @staticmethod
@@ -171,3 +225,63 @@ class CentreCamLayer(LayerBase):
         except ZeroDivisionError:
             print(f"CentreCamLayer ZeroDivisionError, world_rect: {world_rect}, centre_rect: {centre_rect}")
             return Rect(0.0, 0.0, 1.0, 1.0)
+
+
+
+    @staticmethod
+    def transform_points_to_crop_space(points: Points2D, bbox_texture: Rect, safe_eye_midpoint: Point2f,
+                                       safe_rotation: float, crop_roi: Rect, texture_aspect: float) -> Points2D:
+        """
+        Transform all pose points to crop-space coordinates [0,1].
+        Applies the same rotation and translation as the shader.
+
+        Args:
+            points: Points2D in bbox-relative coordinates [0,1]
+            bbox_texture: The pose bbox in texture coordinates [0,1]
+            safe_eye_midpoint: Eye midpoint in bbox-relative coordinates [0,1]
+            safe_rotation: Rotation angle in radians
+            crop_roi: The crop region in texture coordinates [0,1]
+            texture_aspect: Texture aspect ratio (width / height)
+
+        Returns:
+            New Points2D in crop ROI space [0,1], accounting for rotation
+        """
+        # Get rotation center (eye position) in texture coordinates
+        eye_texture_coords = Point2f(
+            safe_eye_midpoint.x * bbox_texture.width + bbox_texture.x,
+            safe_eye_midpoint.y * bbox_texture.height + bbox_texture.y
+        )
+
+        # Get x, y arrays from points
+        x_bbox, y_bbox = points.get_xy_arrays()
+
+        # 1. Convert from bbox-relative to texture-absolute coordinates
+        x_texture = x_bbox * bbox_texture.width + bbox_texture.x
+        y_texture = y_bbox * bbox_texture.height + bbox_texture.y
+
+        # 2. Translate to rotation center
+        offset_x = x_texture - eye_texture_coords.x
+        offset_y = y_texture - eye_texture_coords.y
+
+        # 3. Apply aspect ratio correction
+        offset_x *= texture_aspect
+
+        # 4. Apply rotation (same as shader)
+        cos_a = np.cos(safe_rotation)
+        sin_a = np.sin(safe_rotation)
+        rotated_x = cos_a * offset_x - sin_a * offset_y
+        rotated_y = sin_a * offset_x + cos_a * offset_y
+
+        # 5. Remove aspect ratio correction
+        rotated_x /= texture_aspect
+
+        # 6. Translate back from rotation center
+        x_rotated_texture = rotated_x + eye_texture_coords.x
+        y_rotated_texture = rotated_y + eye_texture_coords.y
+
+        # 7. Convert from texture coordinates to crop ROI space [0,1]
+        x_crop = (x_rotated_texture - crop_roi.x) / crop_roi.width
+        y_crop = (y_rotated_texture - crop_roi.y) / crop_roi.height
+
+        # Create new Points2D with transformed coordinates
+        return Points2D.from_xy_arrays(x_crop, y_crop, points.scores)

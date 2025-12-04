@@ -18,9 +18,9 @@ class ValuesBar(Shader):
         self.tex_colors = glGenTextures(1)
 
     def deallocate(self):
-        return super().deallocate()
         glDeleteTextures(2, [self.tex_values, self.tex_colors])
         glDeleteBuffers(2, [self.vbo_values, self.vbo_colors])
+        return super().deallocate()
 
     def use(self, fbo: int, norm_values: np.ndarray, colors: np.ndarray, line_thickness: float = 0.1, line_smooth: float = 0.01) -> None:
         super().use()
