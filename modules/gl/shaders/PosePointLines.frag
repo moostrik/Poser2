@@ -54,6 +54,9 @@ void distanceToSegment(vec2 p, vec2 a, vec2 b, out float dist, out float t) {
 }
 
 void main() {
+    vec3 totalColor = vec3(0.0);
+    float totalAlpha = 0.0;
+
     // Apply aspect ratio correction to texture coordinates
     vec2 correctedTexCoord = texCoord;
     correctedTexCoord.x *= aspect_ratio;
@@ -61,10 +64,7 @@ void main() {
     // Check if custom color is set
     bool useCustomColor = line_color.a >= 0.0;
 
-    // Additive color, max alpha
-    vec3 colorAccum = vec3(0.0);
-    float maxAlpha = 0.0;
-
+    // Iterate through all line segments
     for (int i = 0; i < NUM_SEGMENTS; i++) {
         ivec2 segment = segments[i];
         int idx_a = segment.x;
@@ -73,16 +73,15 @@ void main() {
         vec4 point_a = points[idx_a];
         vec4 point_b = points[idx_b];
 
+        vec2 pos_a = point_a.xy;
+        vec2 pos_b = point_b.xy;
+        float score_a = point_a.z * 0.5 + 0.5;
+        float score_b = point_b.z * 0.5 + 0.5;
         float vis_a = point_a.w;
         float vis_b = point_b.w;
 
         // Skip invalid segments
         if (vis_a < 0.5 || vis_b < 0.5) continue;
-
-        vec2 pos_a = point_a.xy;
-        vec2 pos_b = point_b.xy;
-        float score_a = point_a.z * 0.5 + 0.5;
-        float score_b = point_b.z * 0.5 + 0.5;
 
         // Apply aspect ratio correction to positions
         vec2 corrected_a = vec2(pos_a.x * aspect_ratio, pos_a.y);
@@ -92,22 +91,25 @@ void main() {
         float dist, t;
         distanceToSegment(correctedTexCoord, corrected_a, corrected_b, dist, t);
 
-        // Calculate alpha for this segment
-        float segmentAlpha = 1.0 - smoothstep(line_width - line_smooth, line_width + line_smooth, dist);
-        float score = mix(score_a, score_b, t);
-        segmentAlpha *= score;
+        // Create smooth line
+        float alpha = 1.0 - smoothstep(line_width - line_smooth, line_width + line_smooth, dist);
+
+        // Apply interpolated score
+        float interpolated_score = mix(score_a, score_b, t);
+        alpha *= interpolated_score;
 
         // Get segment color
         vec3 segmentColor = mix(joint_colors[idx_a], joint_colors[idx_b], t);
+        segmentColor = mix(segmentColor, line_color.rgb, float(useCustomColor));
+        alpha *= mix(1.0, line_color.a, float(useCustomColor));
 
-        // Additive color, max alpha
-        colorAccum += segmentColor * segmentAlpha;
-        maxAlpha = max(maxAlpha, segmentAlpha);
+        // Additive color blending with "over" alpha
+        totalColor += segmentColor * alpha;
+        totalAlpha = totalAlpha + alpha * (1.0 - totalAlpha);
     }
 
-    // Apply custom color if set
-    vec3 finalColor = mix(colorAccum, line_color.rgb * maxAlpha, float(useCustomColor));
-    float finalAlpha = maxAlpha * mix(1.0, line_color.a, float(useCustomColor));
+    // Un-premultiply: divide color by alpha to get clean edges
+    vec3 finalColor = totalAlpha > 0.001 ? totalColor / totalAlpha : vec3(0.0);
 
-    fragColor = vec4(finalColor, finalAlpha);
+    fragColor = vec4(finalColor, totalAlpha);
 }
