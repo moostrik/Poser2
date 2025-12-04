@@ -9,25 +9,25 @@ from modules.DataHub import DataHub, PoseDataHubTypes
 from modules.gl.LayerBase import LayerBase, Rect
 
 from modules.render.layers.renderers import CamBBoxRenderer, CamDepthTrackRenderer, CamImageRenderer
-from modules.render.layers.meshes.CamMeshRenderer import CamMeshRenderer
+from modules.render.layers.generic.PoseLineLayer import PoseLineLayer
 
-# from modules.render.layers.Generic.CamPoseMeshLayer import CamPoseMeshLayer
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class CamCompositeLayer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataHubTypes, image_renderer: CamImageRenderer,
-                 line_width: int = 2,
-                 mesh_color: tuple[float, float, float, float] | None = None,
-                 bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+                 line_width: float = 1.0) -> None:
         self._cam_id: int = cam_id
         self._fbo: Fbo = Fbo()
-        self._line_width: int = int(line_width)
+        self._line_width: float = line_width
         self._data_type: PoseDataHubTypes = data_type
 
         self._image_renderer: CamImageRenderer = image_renderer
         self._depth_track_renderer: CamDepthTrackRenderer = CamDepthTrackRenderer(cam_id, data)
-        self._bbox_renderer: CamBBoxRenderer = CamBBoxRenderer(cam_id, data, data_type, line_width, bbox_color)
-        self._mesh_renderer: CamMeshRenderer = CamMeshRenderer(cam_id, data, data_type, line_width, mesh_color)
+        self._pose_points_layer: PoseLineLayer = PoseLineLayer(cam_id, data, data_type, line_width, 0.0, False, True, None)
+        self._bbox_renderer: CamBBoxRenderer = CamBBoxRenderer(cam_id, data, data_type, int(line_width), (1.0, 1.0, 1.0, 1.0))
+
+        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def data_type(self) -> PoseDataHubTypes:
@@ -36,16 +36,15 @@ class CamCompositeLayer(LayerBase):
     def data_type(self, value: PoseDataHubTypes) -> None:
         self._data_type = value
         self._bbox_renderer.data_type = value
-        self._mesh_renderer.data_type = value
 
     @property
-    def line_width(self) -> int:
+    def line_width(self) -> float:
         return self._line_width
     @line_width.setter
-    def line_width(self, value: int) -> None:
+    def line_width(self, value: float) -> None:
         self._line_width = value
-        self._bbox_renderer.line_width = value
-        self._mesh_renderer.line_width = value
+        self._pose_points_layer.line_width = value
+        self._bbox_renderer.line_width = int(value)
 
     @property
     def bbox_color(self) -> tuple[float, float, float, float]:
@@ -59,14 +58,14 @@ class CamCompositeLayer(LayerBase):
         self._image_renderer.allocate()
         self._depth_track_renderer.allocate()
         self._bbox_renderer.allocate()
-        self._mesh_renderer.allocate()
+        self._pose_points_layer.allocate(width, height, internal_format)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._image_renderer.deallocate()
         self._depth_track_renderer.deallocate()
         self._bbox_renderer.deallocate()
-        self._mesh_renderer.deallocate()
+        self._pose_points_layer.deallocate()
 
 
     def draw(self, rect: Rect) -> None:
@@ -77,7 +76,8 @@ class CamCompositeLayer(LayerBase):
         # Update all layers
         self._depth_track_renderer.update()
         self._bbox_renderer.update()
-        self._mesh_renderer.update()
+        self._pose_points_layer.update()
+        self._bbox_renderer.bbox_color = (1.0, 1.0, 1.0, 1.0)  # Example: set bbox color to red
 
         # Composite them into the FBO
         LayerBase.setView(self._fbo.width, self._fbo.height)
@@ -90,5 +90,5 @@ class CamCompositeLayer(LayerBase):
         self._image_renderer.draw(full_rect)
         self._depth_track_renderer.draw(full_rect)
         self._bbox_renderer.draw(full_rect)
-        self._mesh_renderer.draw(full_rect)
+        self._pose_points_layer.draw(full_rect)
         self._fbo.end()

@@ -67,7 +67,7 @@ class HDTRenderManager(RenderBase):
         self.data_hub: DataHub = data_hub
 
         # layers
-        self._update_layers: list[Layers] = [Layers.cam_image_R, Layers.cam_mesh_R, Layers.cam_mesh_raw_R]
+        self._update_layers: list[Layers] = [Layers.cam_image_R]
         self._interface_layers: list[Layers] = [Layers.cam_track_L, Layers.cam_bbox_R, Layers.motion_time_R]
         self._preview_layers: list[Layers] = FINAL_LAYERS
         self._draw_layers: list[Layers] = FINAL_LAYERS
@@ -80,7 +80,7 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.cam_bbox_R][i] =      layers.CamBBoxRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
             self.L[Layers.cam_mesh_R][i] =      layers.PoseMeshRenderer(i, self.data_hub, PoseDataHubTypes.pose_I, 10.0, None)
             self.L[Layers.cam_mesh_raw_R][i] =  layers.PoseMeshRenderer(i, self.data_hub, PoseDataHubTypes.pose_R, 10.0, (1.0, 1.0, 1.0, 1.0))
-            self.L[Layers.cam_track_L][i] =     layers.CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]), 2, None, (0.66, 0.66, 0.66, 0.66))
+            self.L[Layers.cam_track_L][i] =     layers.CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]))
             self.L[Layers.motion_time_R][i] =   layers.PoseMotionTimeRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
 
             self.L[Layers.pose_cam_L][i] =      layers.PoseCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]))
@@ -92,7 +92,7 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.angle_bar_L][i] =     layers.PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
             self.L[Layers.motion_bar_L][i] =    layers.PoseMotionBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angle_motion, 2.0, 2.0)
             self.L[Layers.pose_motion_sim_L][i]=layers.PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
-            self.L[Layers.pose_dot_L][i] =      layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 4.0, 2.0, None)
+            self.L[Layers.pose_dot_L][i] =      layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 4.0, 2.0, True)
 
         # global layers
         self.pose_sim_layer =   layers.SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, layers.AggregationMethod.HARMONIC_MEAN, 2.0)
