@@ -42,15 +42,17 @@ class CentreCamLayer(LayerBase):
         self._image_renderer: CamImageRenderer = image_renderer
         self._p_pose: Frame | None = None
 
-        self._safe_eye_midpoint: Point2f = Point2f(0.5, 0.5)
+        self._safe_eye_midpoint: Point2f = Point2f(0.5, 0.25)
+        self._safe_hip_midpoint: Point2f = Point2f(0.5, 0.66)
+
         self._safe_height: float = 0.3
         self._safe_rotation: float = 0.0
         self._crop_roi: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # ROI in texture coordinates
 
         self.data_type: PoseDataHubTypes = data_type
-        self.target_x: float = 0.5
-        self.target_y: float = 0.25
-        self.target_height: float = 1.25
+        self.eye_midpoint_target: Point2f = Point2f(0.5, 0.25)
+        self.hip_midpoint_target: Point2f = Point2f(0.5, 0.66)
+
         self.dst_aspectratio: float = 9/16
         self.blend_factor: float = 0.25
 
@@ -93,22 +95,24 @@ class CentreCamLayer(LayerBase):
         self._blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
         self.draw_points(rect)
 
-        # draw a point at target_x, target_y for debugging (eye midpoint)
+        # draw points at target positions for debugging
         glPointSize(10.0)
         glBegin(GL_POINTS)
+
+        # Eye midpoint target (red)
         glColor4f(1.0, 0.0, 0.0, 1.0)
         glVertex2f(
-            rect.x + self.target_x * rect.width,
-            rect.y + self.target_y * rect.height
+            rect.x + self.eye_midpoint_target.x * rect.width,
+            rect.y + self.eye_midpoint_target.y * rect.height
         )
-        
-        # draw a point at hip midpoint for debugging
+
+        # Hip midpoint target (green)
         glColor4f(0.0, 1.0, 0.0, 1.0)
-        hip_target_y = self.target_y + (self.target_height / 2.0)
         glVertex2f(
-            rect.x + self.target_x * rect.width,
-            rect.y + hip_target_y * rect.height
+            rect.x + self.hip_midpoint_target.x * rect.width,
+            rect.y + self.hip_midpoint_target.y * rect.height
         )
+
         glEnd()
 
         glColor4f(1.0, 1.0, 1.0, 1.0)
@@ -144,24 +148,43 @@ class CentreCamLayer(LayerBase):
         if pose.points.get_valid(PointLandmark.left_eye) and pose.points.get_valid(PointLandmark.right_eye):
             left_eye: Point2f = pose.points.get_point2f(PointLandmark.left_eye)
             right_eye: Point2f = pose.points.get_point2f(PointLandmark.right_eye)
-            eye_midpoint: Point2f = (left_eye + right_eye) / 2
-
-            self._safe_eye_midpoint = eye_midpoint
+            self._safe_eye_midpoint = (left_eye + right_eye) / 2
 
         if pose.points.get_valid(PointLandmark.left_hip) and pose.points.get_valid(PointLandmark.right_hip):
             left_hip: Point2f = pose.points.get_point2f(PointLandmark.left_hip)
             right_hip: Point2f = pose.points.get_point2f(PointLandmark.right_hip)
-            hip_midpoint: Point2f = (left_hip + right_hip) / 2
+            self._safe_hip_midpoint = (left_hip + right_hip) / 2
 
-            self._safe_height = (hip_midpoint.y - self._safe_eye_midpoint.y)
-            self._safe_height *= 2.0  # Rough estimate of full height
-            self._safe_height *= self.target_height
+        # Calculate texture aspect ratio first (needed for rotation calculation)
+        texture_aspect = self._image_renderer._image.width / self._image_renderer._image.height
 
-            # Calculate rotation angle from eye to hip midpoint
-            delta: Point2f = hip_midpoint - self._safe_eye_midpoint
-            self._safe_rotation = math.atan2(delta.x, delta.y)  # Note: x, y order for vertical reference
+        # Convert eye and hip from bbox-relative to texture coordinates
+        bbox_texture = pose.bbox.to_rect()
+        eye_texture = Point2f(
+            self._safe_eye_midpoint.x * bbox_texture.width + bbox_texture.x,
+            self._safe_eye_midpoint.y * bbox_texture.height + bbox_texture.y
+        )
+        hip_texture = Point2f(
+            self._safe_hip_midpoint.x * bbox_texture.width + bbox_texture.x,
+            self._safe_hip_midpoint.y * bbox_texture.height + bbox_texture.y
+        )
 
-        self._crop_roi = self._calculate_crop_roi(pose.bbox.to_rect(), self._safe_eye_midpoint, self._safe_height)
+        # Calculate rotation angle in aspect-corrected space (same as shader)
+        delta_x = (hip_texture.x - eye_texture.x) * texture_aspect
+        delta_y = hip_texture.y - eye_texture.y
+        self._safe_rotation = math.atan2(delta_x, delta_y)
+
+        # self._crop_roi = self._calculate_crop_roi(pose.bbox.to_rect(), self._safe_eye_midpoint, self._safe_height)
+        self._crop_roi = self._calculate_crop_roi_new(
+            pose.bbox.to_rect(),
+            self._safe_eye_midpoint,
+            self._safe_hip_midpoint,
+            self.eye_midpoint_target,
+            self.hip_midpoint_target,
+            self.dst_aspectratio,
+            self._safe_rotation,
+            texture_aspect
+        )
 
         # Convert eye position from bbox-relative to texture-absolute coordinates
         bbox_texture = pose.bbox.to_rect()
@@ -182,7 +205,6 @@ class CentreCamLayer(LayerBase):
 
         self._blend_fbo.swap()
         CentreCamLayer._blend_shader.use(self._blend_fbo.fbo_id, self._blend_fbo.back_tex_id, self._crop_fbo.tex_id, self.blend_factor)
-
 
 
         # Calculate actual texture aspect ratio
@@ -209,15 +231,42 @@ class CentreCamLayer(LayerBase):
         CentreCamLayer._point_shader.use(self._point_fbo.fbo_id, self._transformed_points , line_width=line_width, line_smooth=line_smooth)
 
 
-    def _calculate_crop_roi(self, bbox_texture: Rect, eye_bbox_relative: Point2f, height_bbox_relative: float) -> Rect:
-        """Calculate the crop ROI in texture coordinates [0,1], centered on the eye position."""
+    @staticmethod
+    def _calculate_crop_roi_new(bbox_texture: Rect, eye_bbox_relative: Point2f, hip_bbox_relative: Point2f,
+                           eye_midpoint_target: Point2f, hip_midpoint_target: Point2f, dst_aspectratio: float,
+                           rotation: float = 0.0, texture_aspect: float = 1.0) -> Rect:
+        """Calculate the crop ROI in texture coordinates [0,1], based on eye and hip positions."""
         eye_texture_coords: Point2f = eye_bbox_relative * bbox_texture.size + bbox_texture.position
-        height_texture = height_bbox_relative * bbox_texture.height
-        width_texture: float = height_texture * self.dst_aspectratio
+        hip_texture_coords: Point2f = hip_bbox_relative * bbox_texture.size + bbox_texture.position
 
+        # Calculate the original distance between eye and hip (in aspect-corrected space)
+        offset_x = hip_texture_coords.x - eye_texture_coords.x
+        offset_y = hip_texture_coords.y - eye_texture_coords.y
+
+        # The distance in aspect-corrected space
+        offset_x_corrected = offset_x * texture_aspect
+        original_distance = math.sqrt(offset_x_corrected * offset_x_corrected + offset_y * offset_y)
+
+        # After rotation, hip is directly below eye at distance = original_distance
+        # In non-aspect-corrected texture coords, the y-offset is the full distance
+        # (because rotation aligns hip vertically below eye)
+        actual_eye_hip_distance_y = original_distance
+
+        # Calculate the target distance in crop space
+        target_eye_hip_distance = hip_midpoint_target.y - eye_midpoint_target.y
+
+        # Scale the crop height so that actual_eye_hip_distance maps to target_eye_hip_distance
+        height_texture = actual_eye_hip_distance_y / target_eye_hip_distance
+
+        # Width based on aspect ratio
+        width_texture: float = height_texture * dst_aspectratio
+
+        # After rotation, eye stays at eye_texture_coords
+        # Hip moves to be directly below eye (same x, different y)
+        # So crop position is based on eye position
         return Rect(
-            x=eye_texture_coords.x - width_texture * self.target_x,
-            y=eye_texture_coords.y - height_texture * self.target_y,
+            x=eye_texture_coords.x - width_texture * eye_midpoint_target.x,
+            y=eye_texture_coords.y - height_texture * eye_midpoint_target.y,
             width=width_texture,
             height=height_texture
         )
