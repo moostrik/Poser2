@@ -6,21 +6,15 @@ import math
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Image import Image
-from modules.gl.Fbo import Fbo, SwapFbo
-from modules.gl.Text import draw_box_string, text_init
-
-
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.render.layers.renderers import CamImageRenderer
-
-from modules.DataHub import DataHub
-from modules.gl.LayerBase import LayerBase
 from modules.utils.PointsAndRects import Rect, Point2f
 
-# Shaders
+# GL
+from modules.gl.Fbo import Fbo, SwapFbo
+from modules.gl.LayerBase import LayerBase
 from modules.gl.shaders.Blend import Blend
 from modules.gl.shaders.DrawRoi import DrawRoi
 from modules.gl.shaders.PosePointLines import PosePointLines
@@ -33,7 +27,7 @@ class CentreCamLayer(LayerBase):
     _roi_shader = DrawRoi()
     _point_shader = PosePointLines()
 
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, image_renderer: CamImageRenderer,) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, image_renderer: CamImageRenderer) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._crop_fbo: Fbo = Fbo()
@@ -42,30 +36,24 @@ class CentreCamLayer(LayerBase):
         self._image_renderer: CamImageRenderer = image_renderer
         self._p_pose: Frame | None = None
 
-        self._safe_eye_midpoint: Point2f = Point2f(0.5, 0.25)
-        self._safe_hip_midpoint: Point2f = Point2f(0.5, 0.66)
-
-        self._safe_height: float = 0.3
-        self._safe_rotation: float = 0.0
-        self._crop_roi: Rect = Rect(0.0, 0.0, 1.0, 1.0)  # ROI in texture coordinates
+        self._eye_midpoint: Point2f = Point2f(0.5, 0.25)
+        self._hip_midpoint: Point2f = Point2f(0.5, 0.6)
+        self._rotation: float = 0.0
+        self._crop_roi: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
         self.data_type: PoseDataHubTypes = data_type
-        self.eye_midpoint_target: Point2f = Point2f(0.5, 0.25)
-        self.hip_midpoint_target: Point2f = Point2f(0.5, 0.66)
+        self.target_eye: Point2f = Point2f(0.5, 0.25)
+        self.target_hip: Point2f = Point2f(0.5, 0.6)
 
         self.dst_aspectratio: float = 9/16
         self.blend_factor: float = 0.25
 
-        self._on_points_updated = None  # Callback
+        self._on_points_updated = None
 
-
-        text_init()
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        HotReloadMethods(self.__class__, True, True)
 
     def set_points_callback(self, callback) -> None:
-        """Set callback to be called when transformed_points are updated"""
         self._on_points_updated = callback
-
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._blend_fbo.allocate(width, height, internal_format)
@@ -89,34 +77,23 @@ class CentreCamLayer(LayerBase):
         if CentreCamLayer._point_shader.allocated:
             CentreCamLayer._point_shader.deallocate()
 
-
     def draw(self, rect: Rect) -> None:
-        # self._crop_fbo.draw(rect.x, rect.y, rect.width, rect.height)
         self._blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+
+        # return
         self.draw_points(rect)
 
-        # draw points at target positions for debugging
+        # Debug: draw target positions
         glPointSize(10.0)
         glBegin(GL_POINTS)
-
-        # Eye midpoint target (red)
         glColor4f(1.0, 0.0, 0.0, 1.0)
-        glVertex2f(
-            rect.x + self.eye_midpoint_target.x * rect.width,
-            rect.y + self.eye_midpoint_target.y * rect.height
-        )
-
-        # Hip midpoint target (green)
+        glVertex2f(rect.x + self.target_eye.x * rect.width,
+                   rect.y + self.target_eye.y * rect.height)
         glColor4f(0.0, 1.0, 0.0, 1.0)
-        glVertex2f(
-            rect.x + self.hip_midpoint_target.x * rect.width,
-            rect.y + self.hip_midpoint_target.y * rect.height
-        )
-
+        glVertex2f(rect.x + self.target_hip.x * rect.width,
+                   rect.y + self.target_hip.y * rect.height)
         glEnd()
-
         glColor4f(1.0, 1.0, 1.0, 1.0)
-
 
     def draw_points(self, rect: Rect) -> None:
         self._point_fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -129,12 +106,10 @@ class CentreCamLayer(LayerBase):
         if not CentreCamLayer._point_shader.allocated:
             CentreCamLayer._point_shader.allocate(monitor_file=True)
 
-        key: int = self._cam_id
-
-        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), key)
+        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
 
         if pose is self._p_pose:
-            return # no update needed
+            return
         self._p_pose = pose
 
         LayerBase.setView(self._blend_fbo.width, self._blend_fbo.height)
@@ -145,187 +120,97 @@ class CentreCamLayer(LayerBase):
             self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             return
 
+        # Update eye midpoint
         if pose.points.get_valid(PointLandmark.left_eye) and pose.points.get_valid(PointLandmark.right_eye):
-            left_eye: Point2f = pose.points.get_point2f(PointLandmark.left_eye)
-            right_eye: Point2f = pose.points.get_point2f(PointLandmark.right_eye)
-            self._safe_eye_midpoint = (left_eye + right_eye) / 2
+            left_eye = pose.points.get_point2f(PointLandmark.left_eye)
+            right_eye = pose.points.get_point2f(PointLandmark.right_eye)
+            self._eye_midpoint = (left_eye + right_eye) / 2
 
+        # Update hip midpoint
         if pose.points.get_valid(PointLandmark.left_hip) and pose.points.get_valid(PointLandmark.right_hip):
-            left_hip: Point2f = pose.points.get_point2f(PointLandmark.left_hip)
-            right_hip: Point2f = pose.points.get_point2f(PointLandmark.right_hip)
-            self._safe_hip_midpoint = (left_hip + right_hip) / 2
+            left_hip = pose.points.get_point2f(PointLandmark.left_hip)
+            right_hip = pose.points.get_point2f(PointLandmark.right_hip)
+            self._hip_midpoint = (left_hip + right_hip) / 2
 
-        # Calculate texture aspect ratio first (needed for rotation calculation)
-        texture_aspect = self._image_renderer._image.width / self._image_renderer._image.height
+        aspect = self._image_renderer._image.width / self._image_renderer._image.height
+        bbox = pose.bbox.to_rect()
 
-        # Convert eye and hip from bbox-relative to texture coordinates
-        bbox_texture = pose.bbox.to_rect()
-        eye_texture = Point2f(
-            self._safe_eye_midpoint.x * bbox_texture.width + bbox_texture.x,
-            self._safe_eye_midpoint.y * bbox_texture.height + bbox_texture.y
-        )
-        hip_texture = Point2f(
-            self._safe_hip_midpoint.x * bbox_texture.width + bbox_texture.x,
-            self._safe_hip_midpoint.y * bbox_texture.height + bbox_texture.y
-        )
+        # Convert from bbox-relative to texture coordinates
+        eye = self._eye_midpoint * bbox.size + bbox.position
+        hip = self._hip_midpoint * bbox.size + bbox.position
 
-        # Calculate rotation angle in aspect-corrected space (same as shader)
-        delta_x = (hip_texture.x - eye_texture.x) * texture_aspect
-        delta_y = hip_texture.y - eye_texture.y
-        self._safe_rotation = math.atan2(delta_x, delta_y)
+        # Calculate rotation (with aspect correction to match shader)
+        delta = hip - eye
+        self._rotation = math.atan2(delta.x * aspect, delta.y)
 
-        # self._crop_roi = self._calculate_crop_roi(pose.bbox.to_rect(), self._safe_eye_midpoint, self._safe_height)
-        self._crop_roi = self._calculate_crop_roi_new(
-            pose.bbox.to_rect(),
-            self._safe_eye_midpoint,
-            self._safe_hip_midpoint,
-            self.eye_midpoint_target,
-            self.hip_midpoint_target,
-            self.dst_aspectratio,
-            self._safe_rotation,
-            texture_aspect
+        # Calculate crop ROI
+        distance = math.hypot(delta.x * aspect, delta.y)
+        target_distance = self.target_hip.y - self.target_eye.y
+        height = distance / target_distance
+        width = height * self.dst_aspectratio
+
+        self._crop_roi = Rect(
+            x=eye.x - width * self.target_eye.x,
+            y=eye.y - height * self.target_eye.y,
+            width=width,
+            height=height
         )
 
-        # Convert eye position from bbox-relative to texture-absolute coordinates
-        bbox_texture = pose.bbox.to_rect()
-        eye_texture_coords = Point2f(
-            self._safe_eye_midpoint.x * bbox_texture.width + bbox_texture.x,
-            self._safe_eye_midpoint.y * bbox_texture.height + bbox_texture.y
-        )
-
+        # Render cropped/rotated image
         CentreCamLayer._roi_shader.use(
             self._crop_fbo.fbo_id,
             self._image_renderer._image.tex_id,
             self._crop_roi,
-            self._safe_rotation,
-            eye_texture_coords,
-            False,
-            True
+            self._rotation,
+            eye,
+            False, True
         )
 
+        # Blend with previous frame
         self._blend_fbo.swap()
-        CentreCamLayer._blend_shader.use(self._blend_fbo.fbo_id, self._blend_fbo.back_tex_id, self._crop_fbo.tex_id, self.blend_factor)
+        CentreCamLayer._blend_shader.use(
+            self._blend_fbo.fbo_id, self._blend_fbo.back_tex_id,
+            self._crop_fbo.tex_id, self.blend_factor
+        )
 
-
-        # Calculate actual texture aspect ratio
-        texture_aspect = self._image_renderer._image.width / self._image_renderer._image.height
-
-        self._transformed_points = self.transform_points_to_crop_space(
-            pose.points,
-            bbox_texture,
-            self._safe_eye_midpoint,
-            self._safe_rotation,
-            self._crop_roi,
-            texture_aspect  # Use actual texture aspect, not dst_aspectratio
+        # Transform points
+        self._transformed_points = CentreCamLayer._transform_points(
+            pose.points, bbox, eye, aspect, self._rotation, self._crop_roi
         )
 
         if self._on_points_updated is not None:
             self._on_points_updated(self._transformed_points)
+
         # return
-
-        line_width: float = 1.0 / self._point_fbo.height * 50
-        line_smooth: float = 1.0 / self._point_fbo.height * 25
-
-
+        # Render points
+        line_width = 50.0 / self._point_fbo.height
+        line_smooth = 25.0 / self._point_fbo.height
         self._point_fbo.clear(0.0, 0.0, 0.0, 0.0)
-        CentreCamLayer._point_shader.use(self._point_fbo.fbo_id, self._transformed_points , line_width=line_width, line_smooth=line_smooth)
-
-
-    @staticmethod
-    def _calculate_crop_roi_new(bbox_texture: Rect, eye_bbox_relative: Point2f, hip_bbox_relative: Point2f,
-                           eye_midpoint_target: Point2f, hip_midpoint_target: Point2f, dst_aspectratio: float,
-                           rotation: float = 0.0, texture_aspect: float = 1.0) -> Rect:
-        """Calculate the crop ROI in texture coordinates [0,1], based on eye and hip positions."""
-        eye_texture_coords: Point2f = eye_bbox_relative * bbox_texture.size + bbox_texture.position
-        hip_texture_coords: Point2f = hip_bbox_relative * bbox_texture.size + bbox_texture.position
-
-        # Calculate the original distance between eye and hip (in aspect-corrected space)
-        offset_x = hip_texture_coords.x - eye_texture_coords.x
-        offset_y = hip_texture_coords.y - eye_texture_coords.y
-
-        # The distance in aspect-corrected space
-        offset_x_corrected = offset_x * texture_aspect
-        original_distance = math.sqrt(offset_x_corrected * offset_x_corrected + offset_y * offset_y)
-
-        # After rotation, hip is directly below eye at distance = original_distance
-        # In non-aspect-corrected texture coords, the y-offset is the full distance
-        # (because rotation aligns hip vertically below eye)
-        actual_eye_hip_distance_y = original_distance
-
-        # Calculate the target distance in crop space
-        target_eye_hip_distance = hip_midpoint_target.y - eye_midpoint_target.y
-
-        # Scale the crop height so that actual_eye_hip_distance maps to target_eye_hip_distance
-        height_texture = actual_eye_hip_distance_y / target_eye_hip_distance
-
-        # Width based on aspect ratio
-        width_texture: float = height_texture * dst_aspectratio
-
-        # After rotation, eye stays at eye_texture_coords
-        # Hip moves to be directly below eye (same x, different y)
-        # So crop position is based on eye position
-        return Rect(
-            x=eye_texture_coords.x - width_texture * eye_midpoint_target.x,
-            y=eye_texture_coords.y - height_texture * eye_midpoint_target.y,
-            width=width_texture,
-            height=height_texture
+        CentreCamLayer._point_shader.use(
+            self._point_fbo.fbo_id, self._transformed_points,
+            line_width=line_width, line_smooth=line_smooth
         )
 
-
     @staticmethod
-    def transform_points_to_crop_space(points: Points2D, bbox_texture: Rect, safe_eye_midpoint: Point2f,
-                                       safe_rotation: float, crop_roi: Rect, texture_aspect: float) -> Points2D:
-        """
-        Transform all pose points to crop-space coordinates [0,1].
-        Applies the same rotation and translation as the shader.
-
-        Args:
-            points: Points2D in bbox-relative coordinates [0,1]
-            bbox_texture: The pose bbox in texture coordinates [0,1]
-            safe_eye_midpoint: Eye midpoint in bbox-relative coordinates [0,1]
-            safe_rotation: Rotation angle in radians
-            crop_roi: The crop region in texture coordinates [0,1]
-            texture_aspect: Texture aspect ratio (width / height)
-
-        Returns:
-            New Points2D in crop ROI space [0,1], accounting for rotation
-        """
-        # Get rotation center (eye position) in texture coordinates
-        eye_texture_coords = Point2f(
-            safe_eye_midpoint.x * bbox_texture.width + bbox_texture.x,
-            safe_eye_midpoint.y * bbox_texture.height + bbox_texture.y
-        )
-
-        # Get x, y arrays from points
+    def _transform_points(points: Points2D, bbox: Rect, eye: Point2f,
+                          aspect: float, rotation: float, crop_roi: Rect) -> Points2D:
+        """Transform pose points to crop-space coordinates [0,1]."""
         x_bbox, y_bbox = points.get_xy_arrays()
 
-        # 1. Convert from bbox-relative to texture-absolute coordinates
-        x_texture = x_bbox * bbox_texture.width + bbox_texture.x
-        y_texture = y_bbox * bbox_texture.height + bbox_texture.y
+        # Convert from bbox-relative to texture coordinates
+        x = x_bbox * bbox.width + bbox.x
+        y = y_bbox * bbox.height + bbox.y
 
-        # 2. Translate to rotation center
-        offset_x = x_texture - eye_texture_coords.x
-        offset_y = y_texture - eye_texture_coords.y
+        # Rotate around eye with aspect correction (matches shader)
+        dx = (x - eye.x) * aspect
+        dy = y - eye.y
 
-        # 3. Apply aspect ratio correction
-        offset_x *= texture_aspect
+        cos_a, sin_a = np.cos(rotation), np.sin(rotation)
+        x_rot = (cos_a * dx - sin_a * dy) / aspect + eye.x
+        y_rot = sin_a * dx + cos_a * dy + eye.y
 
-        # 4. Apply rotation (same as shader)
-        cos_a = np.cos(safe_rotation)
-        sin_a = np.sin(safe_rotation)
-        rotated_x = cos_a * offset_x - sin_a * offset_y
-        rotated_y = sin_a * offset_x + cos_a * offset_y
+        # Convert to crop ROI space
+        x_crop = (x_rot - crop_roi.x) / crop_roi.width
+        y_crop = (y_rot - crop_roi.y) / crop_roi.height
 
-        # 5. Remove aspect ratio correction
-        rotated_x /= texture_aspect
-
-        # 6. Translate back from rotation center
-        x_rotated_texture = rotated_x + eye_texture_coords.x
-        y_rotated_texture = rotated_y + eye_texture_coords.y
-
-        # 7. Convert from texture coordinates to crop ROI space [0,1]
-        x_crop = (x_rotated_texture - crop_roi.x) / crop_roi.width
-        y_crop = (y_rotated_texture - crop_roi.y) / crop_roi.height
-
-        # Create new Points2D with transformed coordinates
         return Points2D.from_xy_arrays(x_crop, y_crop, points.scores)
