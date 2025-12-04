@@ -9,12 +9,11 @@ from modules.gl.Mesh import Mesh
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.render.renderers.PoseMeshUtils import PoseVertexData, PoseMeshUtils, POSE_VERTEX_INDICES
-from modules.render.renderers.RendererBase import RendererBase
-from modules.utils.PointsAndRects import Rect
+from modules.render.layers.meshes.PoseMeshUtils import PoseVertexData, PoseMeshUtils, POSE_VERTEX_INDICES
+from modules.gl.LayerBase import LayerBase, Rect
 
 
-class CamMeshRenderer(RendererBase):
+class CamMeshRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: int = 2,
                  mesh_color: tuple[float, float, float, float] | None = None) -> None:
         self._data: DataHub = data
@@ -25,9 +24,6 @@ class CamMeshRenderer(RendererBase):
         self.data_type: PoseDataHubTypes = data_type
         self.line_width: int = int(line_width)
         self.mesh_color: tuple[float, float, float, float] | None = mesh_color
-
-    def allocate(self) -> None:
-        pass
 
     def deallocate(self) -> None:
         """Deallocate all meshes when renderer is destroyed."""

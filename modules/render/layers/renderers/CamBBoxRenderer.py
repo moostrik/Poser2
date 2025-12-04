@@ -7,11 +7,10 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.render.renderers.RendererBase import RendererBase
-from modules.utils.PointsAndRects import Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
 
-class CamBBoxRenderer(RendererBase):
+class CamBBoxRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: int = 2,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         # for now make sure the pose meshes are for the correct data type
@@ -22,9 +21,6 @@ class CamBBoxRenderer(RendererBase):
         self.data_type: PoseDataHubTypes = data_type
         self.line_width: int = int(line_width)
         self.bbox_color: tuple[float, float, float, float] = bbox_color
-
-    def allocate(self) -> None:
-        pass
 
     def deallocate(self) -> None:
         pass

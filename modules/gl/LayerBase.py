@@ -8,8 +8,8 @@ from OpenGL.GL import * # type: ignore
 from modules.utils.PointsAndRects import Rect
 
 class LayerBase(ABC):
-    @abstractmethod
-    def allocate(self, width: int, height: int, internal_format: int) -> None: ...
+    def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
+        pass
     @abstractmethod
     def deallocate(self) -> None: ...
     @abstractmethod

@@ -14,7 +14,7 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
-from modules.render.renderers import CamImageRenderer
+from modules.render.layers.renderers import CamImageRenderer
 
 from modules.DataHub import DataHub
 from modules.gl.LayerBase import LayerBase

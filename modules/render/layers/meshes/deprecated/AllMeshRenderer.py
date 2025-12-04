@@ -6,12 +6,11 @@ import numpy as np
 # Local application imports
 from modules.gl.Mesh import Mesh
 from modules.pose.Frame import Frame
-from modules.render.renderers.PoseMeshUtils import PoseVertexData, PoseMeshUtils, POSE_VERTEX_INDICES
+from ..PoseMeshUtils import PoseVertexData, PoseMeshUtils, POSE_VERTEX_INDICES
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.render.renderers.RendererBase import RendererBase
-from modules.utils.PointsAndRects import Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
-class AllMeshRenderer(RendererBase):
+class AllMeshRenderer(LayerBase):
     """Methods for updating meshes based on pose data."""
     def __init__(self, amount: int, data: DataHub, type: PoseDataHubTypes) -> None:
         self._amount: int = amount

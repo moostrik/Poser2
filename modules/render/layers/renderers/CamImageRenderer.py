@@ -8,19 +8,15 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Image import Image
 
 from modules.DataHub import DataHub, DataHubType
-from modules.render.renderers.RendererBase import RendererBase
-from modules.utils.PointsAndRects import Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
 
-class CamImageRenderer(RendererBase):
+class CamImageRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._cam_id: int = cam_id
         self._data: DataHub = data
         self._image: Image = Image()
         self._p_frame: np.ndarray | None = None
-
-    def allocate(self) -> None:
-        pass
 
     def deallocate(self) -> None:
         if self._image.allocated:

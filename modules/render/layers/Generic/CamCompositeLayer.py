@@ -7,9 +7,9 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.DataHub import DataHub, PoseDataHubTypes
 from modules.gl.LayerBase import LayerBase, Rect
-from modules.render.meshes.AllMeshRenderer import AllMeshRenderer
 
-from modules.render.renderers import CamBBoxRenderer, CamDepthTrackRenderer, CamImageRenderer, CamMeshRenderer
+from modules.render.layers.renderers import CamBBoxRenderer, CamDepthTrackRenderer, CamImageRenderer
+from modules.render.layers.meshes.CamMeshRenderer import CamMeshRenderer
 
 # from modules.render.layers.Generic.CamPoseMeshLayer import CamPoseMeshLayer
 

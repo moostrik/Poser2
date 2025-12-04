@@ -12,7 +12,7 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.pose.features import PoseFeatureType, AngleMotion, AggregationMethod, SingleValue
 from modules.pose.Frame import Frame, FrameField
 
-from modules.render.renderers.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
+from modules.render.layers.meshes.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 

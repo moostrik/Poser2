@@ -1,5 +1,7 @@
 # Standard library imports
+from enum import IntEnum, auto
 from time import perf_counter
+from typing import cast
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -7,6 +9,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.gl.RenderBase import RenderBase
 from modules.gl.WindowManager import WindowManager
+from modules.gl.LayerBase import LayerBase
 
 from modules.DataHub import DataHub, PoseDataHubTypes, SimilarityDataHubType
 from modules.gui.PyReallySimpleGui import Gui
@@ -16,12 +19,41 @@ from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.layers import CamCompositeLayer, PoseCamLayer, CentreCamLayer
-from modules.render.layers import PoseAngleDeltaBarLayer, PoseScalarBarLayer, PoseMotionBarLayer, PDLineLayer
-from modules.render.layers import SimilarityLineLayer, AggregationMethod, SimilarityBlend, PoseMotionSimLayer, PoseDotLayer, PoseLineLayer
-from modules.render.renderers import CamImageRenderer, PoseMeshRenderer, CamBBoxRenderer, PoseMotionTimeRenderer
+from modules.render import layers
 
 from modules.utils.HotReloadMethods import HotReloadMethods
+
+
+class Layers(IntEnum):
+    cam_image_R =       0
+    cam_bbox_R =        auto()
+    cam_mesh_R =        auto()
+    cam_mesh_raw_R =    auto()
+    cam_track_L =       auto()
+    motion_time_R =     auto()
+
+    pose_cam_L =        auto()
+    centre_cam_L =      auto()
+    sim_blend_L =       auto()
+    pd_line_L =         auto()
+    field_bar_raw_L =   auto()
+    field_bar_L =       auto()
+    angle_bar_L =       auto()
+    motion_bar_L =      auto()
+    pose_motion_sim_L = auto()
+    pose_dot_L =        auto()
+
+BOX_LAYERS: list[Layers] = [
+    Layers.pose_cam_L,
+    Layers.cam_mesh_R,
+    Layers.cam_mesh_raw_R,
+]
+
+FINAL_LAYERS: list[Layers] = [
+    Layers.centre_cam_L,
+    Layers.sim_blend_L,
+    Layers.angle_bar_L,
+]
 
 
 class HDTRenderManager(RenderBase):
@@ -34,57 +66,42 @@ class HDTRenderManager(RenderBase):
         # data
         self.data_hub: DataHub = data_hub
 
-        # renderers
-        self.cam_img_renderers:     dict[int, CamImageRenderer] = {}
-        self.mesh_renderers_raw:    dict[int, PoseMeshRenderer] = {}
-        self.mesh_renderers:        dict[int, PoseMeshRenderer] = {}
-        self.cam_bbox_renderers:    dict[int, CamBBoxRenderer] = {}
-        self.motion_time_renderers: dict[int, PoseMotionTimeRenderer] = {}
-
         # layers
-        self.cam_track_layers:      dict[int, CamCompositeLayer] = {}
-        self.pose_cam_layers:       dict[int, PoseCamLayer] = {}
-        self.centre_cam_layers:     dict[int, CentreCamLayer] = {}
-        self.sim_blend_layers:      dict[int, SimilarityBlend] = {}
-        self.pd_line_layers:        dict[int, PDLineLayer] = {}
-        self.field_bar_layers_raw:  dict[int, PoseScalarBarLayer] = {}
-        self.field_bar_layers:      dict[int, PoseScalarBarLayer] = {}
-        self.angle_bar_layers:      dict[int, PoseAngleDeltaBarLayer] = {}
-        self.motion_bar_layers:     dict[int, PoseMotionBarLayer] = {}
-        self.pose_motion_sim_layers:dict[int, PoseMotionSimLayer] = {}
-        self.pose_dot_layers:       dict[int, PoseLineLayer] = {}
+        self._update_layers: list[Layers] = [Layers.cam_image_R, Layers.cam_mesh_R, Layers.cam_mesh_raw_R]
+        self._interface_layers: list[Layers] = [Layers.cam_track_L, Layers.cam_bbox_R, Layers.motion_time_R]
+        self._preview_layers: list[Layers] = FINAL_LAYERS
+        self._draw_layers: list[Layers] = FINAL_LAYERS
 
-        # self.line_field_layers:     dict[int, LineFieldLayer] = {}
+        # camera layers
+        self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
-        self.pose_sim_layer =   SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, AggregationMethod.HARMONIC_MEAN, 2.0)
-        # self.motion_corr_stream_layer = CorrelationStreamLayer(self.data_hub, num_R_streams, R_stream_capacity, use_motion=True)
-
-        # populate
         for i in range(self.num_cams):
-            self.cam_img_renderers[i] = CamImageRenderer(i, self.data_hub)
-            self.mesh_renderers[i] =    PoseMeshRenderer(i, self.data_hub,  PoseDataHubTypes.pose_I, 10.0, None)
-            self.mesh_renderers_raw[i]= PoseMeshRenderer(i, self.data_hub,  PoseDataHubTypes.pose_R, 10.0, (1.0, 1.0, 1.0, 1.0))
-            self.cam_bbox_renderers[i]= CamBBoxRenderer(i, self.data_hub,   PoseDataHubTypes.pose_I)
-            self.motion_time_renderers[i] = PoseMotionTimeRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
+            self.L[Layers.cam_image_R][i] =     layers.CamImageRenderer(i, self.data_hub)
+            self.L[Layers.cam_bbox_R][i] =      layers.CamBBoxRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
+            self.L[Layers.cam_mesh_R][i] =      layers.PoseMeshRenderer(i, self.data_hub, PoseDataHubTypes.pose_I, 10.0, None)
+            self.L[Layers.cam_mesh_raw_R][i] =  layers.PoseMeshRenderer(i, self.data_hub, PoseDataHubTypes.pose_R, 10.0, (1.0, 1.0, 1.0, 1.0))
+            self.L[Layers.cam_track_L][i] =     layers.CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]), 2, None, (0.66, 0.66, 0.66, 0.66))
+            self.L[Layers.motion_time_R][i] =   layers.PoseMotionTimeRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
 
-            self.cam_track_layers[i] =  CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, self.cam_img_renderers[i], 2, None, (1.0, 1.0, 1.0, 0.5))
-            self.pose_cam_layers[i] =   PoseCamLayer(i, self.data_hub,      PoseDataHubTypes.pose_I, self.cam_img_renderers[i])
-            self.centre_cam_layers[i] = CentreCamLayer(i, self.data_hub,    PoseDataHubTypes.pose_I, self.cam_img_renderers[i])
-            self.sim_blend_layers[i] =  SimilarityBlend(i, self.data_hub,   PoseDataHubTypes.pose_I, self.centre_cam_layers)
-            self.pd_line_layers[i] =    PDLineLayer(i, self.data_hub)
-            self.field_bar_layers[i] =  PoseScalarBarLayer(i, self.data_hub,PoseDataHubTypes.pose_I, FrameField.angles, 2.0, 2.0)
-            self.field_bar_layers_raw[i]= PoseScalarBarLayer(i, self.data_hub,PoseDataHubTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
-            self.angle_bar_layers[i] =  PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
-            self.motion_bar_layers[i] = PoseMotionBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angle_motion, 2.0, 2.0)
-            self.pose_motion_sim_layers[i] = PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
-            self.pose_dot_layers[i] =   PoseLineLayer(i, self.data_hub,    PoseDataHubTypes.pose_I, 4.0, 2.0, None)
-            # self.line_field_layers[i] = LineFieldLayer(self.render_data_old, self.cam_fbos, i)
+            self.L[Layers.pose_cam_L][i] =      layers.PoseCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]))
+            self.L[Layers.centre_cam_L][i] =    layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]))
+            self.L[Layers.sim_blend_L][i] =     layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.CentreCamLayer], self.L[Layers.centre_cam_L]))
+            self.L[Layers.pd_line_L][i] =       layers.PDLineLayer(i, self.data_hub)
+            self.L[Layers.field_bar_raw_L][i] = layers.PoseScalarBarLayer(i, self.data_hub, PoseDataHubTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
+            self.L[Layers.field_bar_L][i] =     layers.PoseScalarBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angles, 2.0, 2.0)
+            self.L[Layers.angle_bar_L][i] =     layers.PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
+            self.L[Layers.motion_bar_L][i] =    layers.PoseMotionBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angle_motion, 2.0, 2.0)
+            self.L[Layers.pose_motion_sim_L][i]=layers.PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
+            self.L[Layers.pose_dot_L][i] =      layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 4.0, 2.0, None)
+
+        # global layers
+        self.pose_sim_layer =   layers.SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, layers.AggregationMethod.HARMONIC_MEAN, 2.0)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name=CamCompositeLayer.__name__,   columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=CentreCamLayer.__name__,      columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name=SimilarityLineLayer.__name__, columns=1,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
+            SubdivisionRow(name='track',   columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='preview',      columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='similarity', columns=1,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.width, settings.height, False)
 
@@ -106,202 +123,77 @@ class HDTRenderManager(RenderBase):
         self.allocate_window_renders()
 
     def allocate(self) -> None:
-        for i in range(self.num_cams):
-            self.cam_img_renderers[i].allocate()
-            self.mesh_renderers_raw[i].allocate()
-            self.mesh_renderers[i].allocate()
-
-            self.pose_cam_layers[i].allocate(1080, 1920, GL_RGBA32F)
-            self.centre_cam_layers[i].allocate(1080 * 2, 1920 * 2, GL_RGBA32F)
-            self.sim_blend_layers[i].allocate(1080 * 2, 1920 * 2, GL_RGBA32F)
-            self.field_bar_layers_raw[i].allocate(1080, 1920, GL_RGBA32F)
-            self.field_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
-            self.angle_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
-            self.motion_bar_layers[i].allocate(1080, 1920, GL_RGBA32F)
-            self.pose_motion_sim_layers[i].allocate(1080, 1920, GL_RGBA32F)
-            self.pose_dot_layers[i].allocate(1080, 1920, GL_RGBA32F)
-            # self.line_field_layers[i].allocate(2160, 3840, GL_RGBA32F)
-
+        for layer_type, cam_dict in self.L.items():
+            for layer in cam_dict.values():
+                if layer_type in FINAL_LAYERS:
+                    layer.allocate(1080 * 2, 1920 * 2, GL_RGBA32F)
+                else:
+                    layer.allocate(1080, 1920, GL_RGBA32F)
         self.allocate_window_renders()
-        # self.sound_osc.start()
 
     def allocate_window_renders(self) -> None:
-        w, h = self.subdivision.get_allocation_size(SimilarityLineLayer.__name__, 0)
+        w, h = self.subdivision.get_allocation_size('similarity', 0)
         self.pose_sim_layer.allocate(w, h, GL_RGBA)
-        # self.motion_corr_stream_layer.allocate(w, h, GL_RGBA)
 
         for i in range(self.num_cams):
-            w, h = self.subdivision.get_allocation_size(CamCompositeLayer.__name__, i)
-            self.cam_track_layers[i].allocate(w , h, GL_RGBA)
-            w, h = self.subdivision.get_allocation_size(CentreCamLayer.__name__, i)
-            self.pd_line_layers[i].allocate(w, h, GL_RGBA)
+            w, h = self.subdivision.get_allocation_size('track', i)
+            self.L[Layers.cam_track_L][i].allocate(w , h, GL_RGBA)
+            w, h = self.subdivision.get_allocation_size('preview', i)
+            self.L[Layers.pd_line_L][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         self.pose_sim_layer.deallocate()
-        # self.motion_corr_stream_layer.deallocate()
-
-        # for layer in self.line_field_layers.values():
-        #     layer.deallocate()
-        for layer in self.cam_track_layers.values():
-            layer.deallocate()
-        for layer in self.centre_cam_layers.values():
-            layer.deallocate()
-        for layer in self.sim_blend_layers.values():
-            layer.deallocate()
-        for layer in self.pose_cam_layers.values():
-            layer.deallocate()
-        for layer in self.pd_line_layers.values():
-            layer.deallocate()
-        for layer in self.field_bar_layers_raw.values():
-            layer.deallocate()
-        for layer in self.field_bar_layers.values():
-            layer.deallocate()
-        for layer in self.angle_bar_layers.values():
-            layer.deallocate()
-        for layer in self.motion_bar_layers.values():
-            layer.deallocate()
-        for layer in self.pose_motion_sim_layers.values():
-            layer.deallocate()
-        for layer in self.pose_dot_layers.values():
-            layer.deallocate()
-
-        # renderers
-        for layer in self.cam_img_renderers.values():
-            layer.deallocate()
-        for layer in self.mesh_renderers_raw.values():
-            layer.deallocate()
-        for layer in self.mesh_renderers.values():
-            layer.deallocate()
-
-        # self.sound_osc.stop()
+        for cam_dict in self.L.values():
+            for layer in cam_dict.values():
+                layer.deallocate()
 
     def draw_main(self, width: int, height: int) -> None:
-        glEnable(GL_TEXTURE_2D)
-        glEnable(GL_BLEND)
 
         self.data_hub.notify_update()
 
         self.pose_sim_layer.update()
+        seen: set[Layers] = set()
+        for layer_type in self._update_layers + self._interface_layers + self._draw_layers + self._preview_layers:
+            if layer_type not in seen:
+                seen.add(layer_type)
+                for layer in self.L[layer_type].values():
+                    layer.update()
 
-        for i in range(self.num_cams):
-            self.cam_img_renderers[i].update()
-            self.mesh_renderers_raw[i].update()
-            self.mesh_renderers[i].update()
-            self.cam_bbox_renderers[i].update()
-            self.motion_time_renderers[i].update()
-
-            self.cam_track_layers[i].update()
-            self.pose_cam_layers[i].update()
-            self.centre_cam_layers[i].update()
-            self.sim_blend_layers[i].update()
-            self.pd_line_layers[i].update()
-            self.field_bar_layers_raw[i].update()
-            self.field_bar_layers[i].update()
-            self.angle_bar_layers[i].update()
-            self.motion_bar_layers[i].update()
-            self.pose_motion_sim_layers[i].update()
-            self.pose_dot_layers[i].update()
-
-            # self.line_field_layers[i].update()
-
-        self.draw_composition(width, height)
-
-    def draw_composition(self, width:int, height: int) -> None:
-        self.setView(width, height)
-
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT)
-
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        self.pose_sim_layer.draw(self.subdivision.get_rect(SimilarityLineLayer.__name__, 0))
-        # self.motion_corr_stream_layer.draw(self.subdivision.get_rect(CorrelationStreamLayer.__name__, 1))
-
-        for i in range(self.num_cams):
-            track_rect: Rect = self.subdivision.get_rect(CamCompositeLayer.__name__, i)
-            self.cam_track_layers[i].draw(track_rect)
-            self.cam_bbox_renderers[i].draw(track_rect)
-
-
-        for i in range(self.num_cams):
-            preview_rect: Rect = self.subdivision.get_rect(CentreCamLayer.__name__, i)
-            # self.pose_cam_layers[i].draw(preview_rect)
-            self.centre_cam_layers[i].draw(preview_rect)
-            # self.sim_blend_layers[i].draw(preview_rect)
-
-        for i in range(self.num_cams):
-
-            preview_rect: Rect = self.subdivision.get_rect(CentreCamLayer.__name__, i)
-            screen_center_rect: Rect = self.centre_cam_layers[i].screen_center_rect
-            draw_mesh_rect: Rect = screen_center_rect.affine_transform(preview_rect)
-            self.mesh_renderers[i].draw(draw_mesh_rect)
-            # self.field_bar_layers[i].draw(preview_rect)
-            # self.pd_line_layers[i].draw(preview_rect)
-            self.motion_time_renderers[i].draw(preview_rect)
-            # self.pose_dot_layers[i].draw(preview_rect)
-
-
-            self.pose_motion_sim_layers[i].draw(preview_rect)
-
-            # self.line_field_layers[i].draw(self.subdivision.get_rect(PoseStreamLayer.__name__, i))
-
-
-
-            self.field_bar_layers[i].feature_type = FrameField.angle_motion
-            self.field_bar_layers_raw[i].data_type = PoseDataHubTypes.pose_I
-            self.field_bar_layers_raw[i].feature_type = FrameField.similarity
-
-
-            self.centre_cam_layers[i].data_type = PoseDataHubTypes.pose_I
-            self.mesh_renderers[i].data_type = PoseDataHubTypes.pose_I
-            self.mesh_renderers_raw[i].color = (0.66, 0.66, 0.66, 0.66)
-
-    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        # return
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
         self.setView(width, height)
-
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
+        # Global layer
+        self.pose_sim_layer.draw(self.subdivision.get_rect('similarity', 0))
+
+        # Interface layers
+        for i in range(self.num_cams):
+            track_rect: Rect = self.subdivision.get_rect('track', i)
+            for layer_type in self._interface_layers:
+                self.L[layer_type][i].draw(track_rect)
+
+        # Draw layers
+        for i in range(self.num_cams):
+            preview_rect: Rect = self.subdivision.get_rect('preview', i)
+            for layer_type in self._preview_layers:
+                self.L[layer_type][i].draw(preview_rect)
+
+    def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
+        glEnable(GL_TEXTURE_2D)
+        glEnable(GL_BLEND)
+        self.setView(width, height)
+        glClearColor(0.0, 0.0, 0.0, 1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
         draw_rect = Rect(0, 0, width, height)
 
-        draw_raw: bool = False
+        for layer_type in self._draw_layers:
+            self.L[layer_type][camera_id].draw(draw_rect)
 
-        if draw_raw:
-            self.centre_cam_layers[camera_id].blend_factor = 1.0
-            self.centre_cam_layers[camera_id].draw(draw_rect)
-            screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
-            draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
-            self.mesh_renderers_raw[camera_id].draw(draw_mesh_rect)
-            self.field_bar_layers_raw[camera_id].draw(draw_rect)
-            return
-
-        draw_centre: bool = True
-        if draw_centre:
-            self.centre_cam_layers[camera_id].blend_factor = 0.25
-            self.centre_cam_layers[camera_id].draw(draw_rect)
-
-            # self.sim_blend_layers[camera_id].draw(draw_rect)
-            screen_center_rect: Rect = self.centre_cam_layers[camera_id].screen_center_rect
-            draw_mesh_rect: Rect = screen_center_rect.affine_transform(draw_rect)
-            # self.mesh_renderers_raw[camera_id].draw(draw_mesh_rect)
-            # self.mesh_renderers[camera_id].draw(draw_mesh_rect)
-        else:
-            self.pose_cam_layers[camera_id].draw(draw_rect)
-            self.mesh_renderers_raw[camera_id].draw(draw_rect)
-            self.mesh_renderers[camera_id].draw(draw_rect)
-
-        # self.field_bar_layers_raw[camera_id].draw(draw_rect)
-        # self.field_bar_layers[camera_id].draw(draw_rect)
-        # self.motion_bar_layers[camera_id].draw(draw_rect)
-        self.angle_bar_layers[camera_id].draw(draw_rect)
-        # self.motion_bar_layers[camera_id].line_smooth = 10.0
-        self.pose_motion_sim_layers[camera_id].draw(draw_rect)
-        # self.pose_dot_layers[camera_id].draw(draw_rect)
-
-        # self.pd_line_layers[camera_id].draw(draw_rect)
-        # self.line_field_layers[camera_id].draw(Rect(0, 0, width, height))
+        self._draw_layers = [Layers.centre_cam_L, Layers.angle_bar_L,]
+        # self._draw_layers = BOX_LAYERS

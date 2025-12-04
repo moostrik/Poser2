@@ -6,11 +6,10 @@ from OpenGL.GL import * # type: ignore
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.render.renderers.RendererBase import RendererBase
-from modules.utils.PointsAndRects import Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
 
-class PoseBBoxRenderer(RendererBase):
+class PoseBBoxRenderer(LayerBase):
     def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: float = 2.0,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._data: DataHub = data
@@ -20,9 +19,6 @@ class PoseBBoxRenderer(RendererBase):
         self.data_type: PoseDataHubTypes = data_type
         self.bbox_color: tuple[float, float, float, float] = bbox_color
         self.line_width: float = line_width
-
-    def allocate(self) -> None:
-        pass
 
     def deallocate(self) -> None:
         pass

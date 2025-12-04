@@ -49,7 +49,7 @@ void main() {
         float vis_b = point_b.w;
 
         // Skip invalid segments
-        if (vis_a < 0.5 || vis_b < 0.5 || pos_a.x < 0.0 || pos_b.x < 0.0) continue;
+        if (vis_a < 0.5 || vis_b < 0.5) continue;
 
         // Apply aspect ratio correction to positions
         vec2 corrected_a = pos_a;

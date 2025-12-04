@@ -16,7 +16,7 @@ from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from modules.render.layers.Generic.CentreCamLayer import CentreCamLayer
+from modules.render.layers.generic.CentreCamLayer import CentreCamLayer
 
 # Shaders
 from modules.gl.shaders.TripleBlend import TripleBlend as shader
@@ -57,7 +57,7 @@ class SimilarityBlend(LayerBase):
         if not SimilarityBlend._shader.allocated:
             SimilarityBlend._shader.allocate(monitor_file=True)
 
-        pose: Frame = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
+        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
 
         if pose is self._p_pose:
             return # no update needed

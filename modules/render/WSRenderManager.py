@@ -12,8 +12,8 @@ from modules.Settings import Settings
 
 from modules.DataHub import DataHub
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
-from modules.render.meshes.AllMeshRenderer import AllMeshRenderer
-from modules.render.meshes.AngleMeshes import AngleMeshes
+from modules.render.layers.meshes.deprecated.AllMeshRenderer import AllMeshRenderer
+from modules.render.layers.meshes.deprecated.AngleMeshes import AngleMeshes
 
 from modules.render.layers.Depricated.CamTrackPoseLayer import CamTrackPoseLayer
 from modules.render.layers.Depricated.PoseLayer import PoseLayer

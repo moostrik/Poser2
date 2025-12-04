@@ -10,20 +10,16 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 
 from modules.DataHub import DataHub, DataHubType
-from modules.render.renderers.RendererBase import RendererBase
-from modules.utils.PointsAndRects import Rect
+from modules.gl.LayerBase import LayerBase, Rect
 
 
 
-class CamDepthTrackRenderer(RendererBase):
+class CamDepthTrackRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._data: DataHub = data
         self._cam_id: int = cam_id
         self._tracklets: list[DepthTracklet] | None = None
         text_init()
-
-    def allocate(self) -> None:
-        pass
 
     def deallocate(self) -> None:
         pass

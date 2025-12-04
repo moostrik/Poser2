@@ -11,13 +11,12 @@ from modules.gl.Mesh import Mesh
 from modules.pose.Frame import Frame
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.render.renderers.PoseMeshUtils import PoseMeshUtils, POSE_VERTEX_INDICES, PoseVertexData
-from modules.render.renderers.RendererBase import RendererBase
-from modules.utils.PointsAndRects import Rect
+from modules.render.layers.meshes.PoseMeshUtils import PoseMeshUtils, POSE_VERTEX_INDICES, PoseVertexData
+from modules.gl.LayerBase import LayerBase, Rect
 
 
-class PoseMeshRenderer(RendererBase):
-    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: float = 2.0,
+class PoseMeshRenderer(LayerBase):
+    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: float = 10.0,
                  color: tuple[float, float, float, float] | None = None) -> None:
         self._track_id: int = track_id
         self._data: DataHub = data
@@ -29,7 +28,7 @@ class PoseMeshRenderer(RendererBase):
         self.line_width: float = line_width
         self.color: tuple[float, float, float, float] | None = color
 
-    def allocate(self) -> None:
+    def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         self._mesh.allocate()
         self._mesh.set_indices(POSE_VERTEX_INDICES)
 
@@ -43,6 +42,9 @@ class PoseMeshRenderer(RendererBase):
 
     def update(self) -> None:
         pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
+
+        if not self._mesh.allocated:
+            return
 
         if pose is None:
             self._is_active = False

@@ -6,12 +6,11 @@ from OpenGL.GL import * # type: ignore
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.render.renderers.RendererBase import RendererBase
-from modules.utils.PointsAndRects import Rect
+from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 
 
-class PoseMotionTimeRenderer(RendererBase):
+class PoseMotionTimeRenderer(LayerBase):
     def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes) -> None:
         self._data: DataHub = data
         self._track_id: int = track_id
@@ -21,10 +20,6 @@ class PoseMotionTimeRenderer(RendererBase):
 
         text_init()
 
-
-    def allocate(self) -> None:
-        pass
-
     def deallocate(self) -> None:
         pass
 
@@ -33,7 +28,6 @@ class PoseMotionTimeRenderer(RendererBase):
             return
 
         draw_box_string(rect.x + 20, rect.y + rect.height - 20, self._motion_time, (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.3), True) # type: ignore
-
 
     def update(self) -> None:
         pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
