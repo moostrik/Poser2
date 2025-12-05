@@ -5,25 +5,29 @@ uniform vec2 resolution;
 uniform float time;
 
 const int N_JOINTS = 17;
-const int N_CONN = 16;
-const int NUM_ARCS = 1;  // Number of arcs per connection
+const int N_CONN = 15;
+const int NUM_ARCS = 20;  // Number of arcs per connection
 
-const float CURVE_SPEED = 3.0;  // Speed of curve oscillation
-const float CURVE_OFFSET = 10.0; // Control point offset in pixels
+const float CURVE_SPEED = 1.0;  // Speed of curve oscillation
+const float CURVE_OFFSET = 40.0; // Control point offset in pixels
 
 const float WAVE_SPEED = 2.0;   // Speed of traveling waves
-const float WAVE_DENSITY = 0.01; // Waves per pixel of segment length
-const float WAVE_AMPLITUDE = 20.0; // Wave offset amplitude in pixels
+const float WAVE_DENSITY = 0.008; // Waves per pixel of segment length
+const float WAVE_AMPLITUDE = 30.0;      // Wave offset amplitude in pixels
+const float CURVE_THICKNESS = 10;      // Extra thickness at curved parts (pixels)
 
-const float BOLT_SPEED = 10000.0;     // Bolt travel speed in pixels per second
-const float BOLT_INTERVAL = 2;    // Base interval between bolts in seconds
-const float BOLT_FADE = .8;        // Time for each point to fade after bolt passes (seconds)
+const float BOLT_SPEED = 5000.0;     // Bolt travel speed in pixels per second
+const float BOLT_INTERVAL = 1.5;      // Base interval between bolts in seconds
+const float BOLT_HOLD = 0.2;          // Time bolt stays fully visible before fading (seconds)
+const float BOLT_FADE = 0.3;          // Time for bolt to fade out (seconds)
+
+const float MIN_BRIGHTNESS = 0;//1.1;    // Minimum arc brightness (0.0 = invisible, 1.0 = full)
 
 // Connectivity pairs (COCO 17)
 const ivec2 CONN[N_CONN] = ivec2[](
     ivec2(0,1), ivec2(0,2), ivec2(1,3), ivec2(2,4),
     ivec2(5,6), ivec2(5,7), ivec2(7,9), ivec2(6,8),
-    ivec2(8,10), ivec2(11,12), ivec2(5,11), ivec2(6,12),
+    ivec2(8,10),  ivec2(5,11), ivec2(6,12),
     ivec2(11,13), ivec2(13,15), ivec2(12,14), ivec2(14,16)
 );
 
@@ -208,28 +212,67 @@ void main(){
             // Multiple wave frequencies traveling along curve
             float baseWaveCount = seglen * WAVE_DENSITY;
 
-            // Add noise-based amplitude modulation along the curve to break repetition
-            float noiseModulation = 0.6 + 0.4 * noise(vec2(bestT * 8.0 + arcSeed, time * 0.5));
-            float waveAmp = WAVE_AMPLITUDE * (0.5 + 0.5 * sin(bestT * 3.14159)) * noiseModulation;
-
             // Randomize wave direction per arc (some go A->B, others B->A)
             float waveDir = (hash21(vec2(arcSeed * 2.1, float(i) * 1.7)) > 0.5) ? 1.0 : -1.0;
 
-            // Three independent sinusoids with irrational frequency ratios to avoid repetition
-            float freq1 = baseWaveCount * (0.7 + hash21(vec2(arcSeed, 4.56)) * 0.6);
-            float freq2 = baseWaveCount * (1.2 + hash21(vec2(arcSeed, 7.89)) * 0.8);
-            float freq3 = baseWaveCount * 1.618 * (0.5 + hash21(vec2(arcSeed, 3.14)) * 0.5);  // Golden ratio
-            float speed1 = (hash21(vec2(arcSeed, 1.23)) * 2.0 + 2.0) * WAVE_SPEED;
-            float speed2 = (hash21(vec2(arcSeed, 2.34)) * 3.0 + 4.0) * WAVE_SPEED;
-            float speed3 = (hash21(vec2(arcSeed, 9.87)) * 1.5 + 1.0) * WAVE_SPEED;
+            // Time-varying amplitude with noise modulation
+            float noiseModT = noise(vec2(bestT * 5.0 + arcSeed, time * 0.3));
+            float noiseModTime = noise(vec2(arcSeed * 3.0, time * 0.7));
+            float taper = sin(bestT * 3.14159);  // Taper at endpoints
+            float waveAmp = WAVE_AMPLITUDE * taper * (0.4 + 0.6 * noiseModT) * (0.7 + 0.3 * noiseModTime);
+
+            // Five independent sinusoids with varying frequencies and speeds
+            float freq1 = baseWaveCount * (0.5 + hash21(vec2(arcSeed, 4.56)) * 0.5);
+            float freq2 = baseWaveCount * (1.0 + hash21(vec2(arcSeed, 7.89)) * 1.0);
+            float freq3 = baseWaveCount * (1.5 + hash21(vec2(arcSeed, 3.14)) * 1.0);
+            float freq4 = baseWaveCount * (2.5 + hash21(vec2(arcSeed, 1.41)) * 1.5);
+            float freq5 = baseWaveCount * (0.3 + hash21(vec2(arcSeed, 2.71)) * 0.4);  // Slow bend
+
+            float speed1 = (1.5 + hash21(vec2(arcSeed, 1.23)) * 2.0) * WAVE_SPEED;
+            float speed2 = (3.0 + hash21(vec2(arcSeed, 2.34)) * 3.0) * WAVE_SPEED;
+            float speed3 = (2.0 + hash21(vec2(arcSeed, 9.87)) * 2.5) * WAVE_SPEED;
+            float speed4 = (4.0 + hash21(vec2(arcSeed, 5.55)) * 4.0) * WAVE_SPEED;
+            float speed5 = (0.3 + hash21(vec2(arcSeed, 6.66)) * 0.4) * WAVE_SPEED;  // Slow
+
             float phase1 = hash21(vec2(arcSeed, 5.67)) * 6.28;
             float phase2 = hash21(vec2(arcSeed, 8.90)) * 6.28;
             float phase3 = hash21(vec2(arcSeed, 6.54)) * 6.28;
+            float phase4 = hash21(vec2(arcSeed, 7.77)) * 6.28;
+            float phase5 = hash21(vec2(arcSeed, 4.44)) * 6.28;
 
-            float wave1 = sin(bestT * freq1 * 6.28 - time * speed1 * waveDir + phase1 + waveDrift) * waveAmp * 0.5;
-            float wave2 = sin(bestT * freq2 * 6.28 - time * speed2 * waveDir + phase2 + waveDrift) * waveAmp * 0.3;
-            float wave3 = sin(bestT * freq3 * 6.28 - time * speed3 * waveDir + phase3) * waveAmp * 0.2;
-            float totalWave = wave1 + wave2 + wave3;
+            // Noise-modulated frequency variation over time
+            float freqMod = 1.0 + 0.3 * noise(vec2(arcSeed * 2.0, time * 0.2));
+
+            // Wave arguments (reused for derivative calculation)
+            float arg1 = bestT * freq1 * freqMod * 6.28 - time * speed1 * waveDir + phase1 + waveDrift;
+            float arg2 = bestT * freq2 * freqMod * 6.28 - time * speed2 * waveDir + phase2 + waveDrift;
+            float arg3 = bestT * freq3 * 6.28 - time * speed3 * waveDir + phase3;
+            float arg4 = bestT * freq4 * 6.28 - time * speed4 * waveDir + phase4;
+            float arg5 = bestT * freq5 * 6.28 - time * speed5 * waveDir + phase5;
+
+            float wave1 = sin(arg1) * 0.35;
+            float wave2 = sin(arg2) * 0.25;
+            float wave3 = sin(arg3) * 0.15;
+            float wave4 = sin(arg4) * 0.1;
+            float wave5 = sin(arg5) * 0.15;  // Slow bend
+
+            // Second derivative (curvature) - negative sin gives bending intensity
+            // Only count where wave is at peak/valley (where it actually bends)
+            float bend1 = abs(sin(arg1)) * 0.35;
+            float bend2 = abs(sin(arg2)) * 0.25;
+            float bend3 = abs(sin(arg3)) * 0.15;
+            float bend4 = abs(sin(arg4)) * 0.1;
+            float bend5 = abs(sin(arg5)) * 0.15;
+            // Curvature is high only near peaks (sin close to ±1)
+            float curvature = max(0.0, (bend1 + bend2 + bend3 + bend4 + bend5) - 0.5);
+
+            // Add FBM noise for organic variation
+            float noiseWave = (fbm(vec2(bestT * 3.0 + arcSeed, time * 0.5 * waveDir)) - 0.5) * 0.2;
+
+            float totalWave = (wave1 + wave2 + wave3 + wave4 + wave5 + noiseWave) * waveAmp;
+
+            // Thickness increases with curvature (only at sharp bends)
+            float curveThickness = thickness_px + CURVE_THICKNESS * clamp(curvature, 0.0, 1.0);
 
             // Offset the distance check by the wave
             vec2 waveOffset = wavePerp * totalWave;
@@ -238,42 +281,49 @@ void main(){
             // Early out if too far
             if(d_px > maxDist) continue;
 
-            // Lightning bolt system
-            // Distance along curve in pixels
-            float distAlongCurve = bestT * seglen;
-            if(waveDir < 0.0) distAlongCurve = seglen - distAlongCurve;
+            // Lightning bolt system (branch-free)
+            // Normalize position along curve (0 to 1)
+            float t = bestT;
+            float tDir = mix(t, 1.0 - t, step(waveDir, 0.0));  // Flip if waveDir < 0
 
-            // Time it takes for bolt to travel the full segment + fade
-            float travelTime = seglen / BOLT_SPEED;
-            float activeDuration = travelTime + BOLT_FADE;
-
-            // Bolt timing: random interval per arc (must be longer than active duration)
-            float minInterval = activeDuration + 0.1;  // At least 0.1s gap between bolts
-            float boltInterval = max(minInterval, BOLT_INTERVAL * (0.5 + hash21(vec2(arcSeed, 0.99)) * 1.0));
+            // Random interval per arc (70-130% of base)
+            float boltInterval = BOLT_INTERVAL * (0.7 + hash21(vec2(arcSeed, 0.99)) * 0.6);
             float boltPhase = hash21(vec2(arcSeed, 0.88)) * boltInterval;
 
-            // Time since last bolt started
-            float timeSinceBolt = mod(time + boltPhase, boltInterval);
+            // Time within current cycle
+            float cycleT = mod(time + boltPhase, boltInterval);
 
-            // Bolt front position in pixels (travels at constant speed)
-            float boltFrontPx = timeSinceBolt * BOLT_SPEED;
+            // Bolt front position (0 to 1+, normalized to segment)
+            float travelTime = seglen / BOLT_SPEED;
+            float boltFront = cycleT / travelTime;  // Can exceed 1.0
 
-            float boltVisible = 0.0;
+            // Time since arc was fully filled
+            float timeSinceFull = max(0.0, cycleT - travelTime);
 
-            // Only show bolt during active duration (travel + fade)
-            if(timeSinceBolt < activeDuration) {
-                // Phase 1: Bolt is traveling - show everything behind the front
-                if(timeSinceBolt < travelTime) {
-                    boltVisible = step(distAlongCurve, boltFrontPx);
-                }
-                // Phase 2: Bolt has filled the arc - whole arc visible, then fade
-                else {
-                    float timeSinceFull = timeSinceBolt - travelTime;
-                    boltVisible = 1.0 - smoothstep(0.0, BOLT_FADE, timeSinceFull);
-                }
-            }
+            // Phase detection
+            float isTraveling = step(cycleT, travelTime);  // 1 during travel, 0 after
+            float isHolding = step(travelTime, cycleT) * step(timeSinceFull, BOLT_HOLD);  // 1 during hold
+            float isFading = step(travelTime + BOLT_HOLD, cycleT);  // 1 during fade
 
-            float core = smoothstep(thickness_px, 0.0, d_px);
+            // Traveling phase: pixel visible if behind the front
+            float behindFront = step(tDir, boltFront);
+            float travelVisible = behindFront * isTraveling;
+
+            // Hold phase: full brightness
+            float holdVisible = isHolding;
+
+            // Fade phase: exponential decay
+            float fadeTime = max(0.0, timeSinceFull - BOLT_HOLD);
+            float fadeVisible = isFading * exp(-fadeTime * 3.0 / BOLT_FADE);
+
+            // Combine all phases
+            float boltVisible = travelVisible + holdVisible + fadeVisible;
+
+            // Zero out if we're past the active phase (in dark/wait period)
+            float activeEnd = travelTime + BOLT_HOLD + BOLT_FADE * 2.0;
+            boltVisible *= step(cycleT, activeEnd);
+
+            float core = smoothstep(curveThickness, 0.0, d_px);
             float g = smoothstep(maxDist, 0.0, d_px) - core;
 
             float flick = 0.5 + 0.5 * sin(time * 20.0 + arcSeed * 3.14 + bestT * 20.0);
@@ -282,10 +332,11 @@ void main(){
             vec3 baseCol = vec3(0.15, 0.85, 1.0);
             vec3 innerCol = vec3(1.0, 1.0, 1.0);
 
-            // Apply bolt visibility to brightness
-            float brightness = boltVisible * (0.8 + 0.5 * noiseAmp * flick);
+            // Apply bolt visibility to brightness (with minimum)
+            float effectiveVisible = mix(MIN_BRIGHTNESS, 1.0, boltVisible);
+            float brightness = effectiveVisible * (0.8 + 0.5 * noiseAmp * flick);
             vec3 contrib = innerCol * core * brightness
-                         + baseCol * g * boltVisible * (0.5 + 0.5 * noiseAmp);
+                         + baseCol * g * effectiveVisible * (0.5 + 0.5 * noiseAmp);
 
             // Spark branches - brighter at bolt front
             float branchNoise = hash21(vec2(arcSeed * 7.0 + bestT * 50.0, time * 5.0));
