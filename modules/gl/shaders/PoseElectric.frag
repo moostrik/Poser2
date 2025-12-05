@@ -6,9 +6,14 @@ uniform float time;
 
 const int N_JOINTS = 17;
 const int N_CONN = 16;
-const int NUM_ARCS = 6;  // Number of arcs per connection
+const int NUM_ARCS = 1;  // Number of arcs per connection
+
 const float CURVE_SPEED = 3.0;  // Speed of curve oscillation
-const float WAVE_SPEED = 3.0;   // Speed of traveling waves
+const float CURVE_OFFSET = 20.0; // Control point offset in pixels
+
+const float WAVE_SPEED = 2.0;   // Speed of traveling waves
+const float WAVE_DENSITY = 0.01; // Waves per pixel of segment length
+const float WAVE_AMPLITUDE = 20.0; // Wave offset amplitude in pixels
 
 // Connectivity pairs (COCO 17)
 const ivec2 CONN[N_CONN] = ivec2[](
@@ -148,12 +153,12 @@ void main(){
         vec2 mid = (A + C) * 0.5;
 
         // Early bounding box culling - skip if pixel is too far from segment
-        float halfLen = seglen * 0.5 + seglen * 0.4 + maxDist; // segment + max curve offset + glow
+        float halfLen = seglen * 0.5 + CURVE_OFFSET + maxDist; // segment + max curve offset + glow
         if(abs(p.x - mid.x) > halfLen || abs(p.y - mid.y) > halfLen) continue;
 
         vec2 dir = normalize(C - A);
         vec2 perp = vec2(-dir.y, dir.x);
-        float baseOff = seglen * 0.25;
+        float baseOff = CURVE_OFFSET;
 
         // Pre-compute shared noise for this connection (slow-moving)
         float connNoise = noise((mid / resolution + float(i) * 0.13 + time * 0.3) * 2.0);
@@ -197,16 +202,30 @@ void main(){
             float waveDrift = 0.25 * sin(time * 0.04 * WAVE_SPEED + waveDriftPhase);
 
             // Multiple wave frequencies traveling along curve
-            float waveSpd = (hash21(vec2(arcSeed, 1.23)) * 2.0 + 3.0) * WAVE_SPEED;  // 3-5 speed variation
-            float waveFreq = 4.0 + hash21(vec2(arcSeed, 4.56)) * 3.0;   // 4-7 frequency variation
-            float waveAmp = seglen * 0.02 * (0.5 + 0.5 * sin(bestT * 3.14159));  // Amplitude peaks in middle
+            float baseWaveCount = seglen * WAVE_DENSITY;
+
+            // Add noise-based amplitude modulation along the curve to break repetition
+            float noiseModulation = 0.6 + 0.4 * noise(vec2(bestT * 8.0 + arcSeed, time * 0.5));
+            float waveAmp = WAVE_AMPLITUDE * (0.5 + 0.5 * sin(bestT * 3.14159)) * noiseModulation;
 
             // Randomize wave direction per arc (some go A->B, others B->A)
             float waveDir = (hash21(vec2(arcSeed * 2.1, float(i) * 1.7)) > 0.5) ? 1.0 : -1.0;
 
-            float wave1 = sin(bestT * waveFreq * 6.28 - time * waveSpd * waveDir + waveDrift) * waveAmp;
-            float wave2 = sin(bestT * waveFreq * 1.5 * 6.28 - time * waveSpd * 1.3 * waveDir + waveDrift + 1.0) * waveAmp * 0.5;
-            float totalWave = wave1 + wave2;
+            // Three independent sinusoids with irrational frequency ratios to avoid repetition
+            float freq1 = baseWaveCount * (0.7 + hash21(vec2(arcSeed, 4.56)) * 0.6);
+            float freq2 = baseWaveCount * (1.2 + hash21(vec2(arcSeed, 7.89)) * 0.8);
+            float freq3 = baseWaveCount * 1.618 * (0.5 + hash21(vec2(arcSeed, 3.14)) * 0.5);  // Golden ratio
+            float speed1 = (hash21(vec2(arcSeed, 1.23)) * 2.0 + 2.0) * WAVE_SPEED;
+            float speed2 = (hash21(vec2(arcSeed, 2.34)) * 3.0 + 4.0) * WAVE_SPEED;
+            float speed3 = (hash21(vec2(arcSeed, 9.87)) * 1.5 + 1.0) * WAVE_SPEED;
+            float phase1 = hash21(vec2(arcSeed, 5.67)) * 6.28;
+            float phase2 = hash21(vec2(arcSeed, 8.90)) * 6.28;
+            float phase3 = hash21(vec2(arcSeed, 6.54)) * 6.28;
+
+            float wave1 = sin(bestT * freq1 * 6.28 - time * speed1 * waveDir + phase1 + waveDrift) * waveAmp * 0.5;
+            float wave2 = sin(bestT * freq2 * 6.28 - time * speed2 * waveDir + phase2 + waveDrift) * waveAmp * 0.3;
+            float wave3 = sin(bestT * freq3 * 6.28 - time * speed3 * waveDir + phase3) * waveAmp * 0.2;
+            float totalWave = wave1 + wave2 + wave3;
 
             // Offset the distance check by the wave
             vec2 waveOffset = wavePerp * totalWave;
