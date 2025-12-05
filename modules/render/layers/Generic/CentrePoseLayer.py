@@ -37,9 +37,6 @@ class CentrePoseLayer(PoseLineLayer):
 
         pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
 
-        if pose is not None:
-            pose = replace(pose, points=self._points)
-
         if pose is self._p_pose:
             return # no update needed
         self._p_pose = pose
@@ -54,4 +51,4 @@ class CentrePoseLayer(PoseLineLayer):
         line_width: float = 1.0 / self._fbo.height * self.line_width
         line_smooth: float = 1.0 / self._fbo.height * self.line_smooth
 
-        PoseLineLayer._shader.use(self._fbo.fbo_id, pose.points, line_width=line_width, line_smooth=line_smooth, color=self.color, use_scores=self.use_scores)
+        PoseLineLayer._shader.use(self._fbo.fbo_id, self._points, line_width=line_width, line_smooth=line_smooth, color=self.color, use_scores=self.use_scores)

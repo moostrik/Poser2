@@ -25,42 +25,59 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class Layers(IntEnum):
-    cam_image_R =       0
-    cam_bbox_R =        auto()
-    cam_mesh_R =        auto()
-    cam_mesh_raw_R =    auto()
-    cam_track_L =       auto()
-    motion_time_R =     auto()
+    cam_image =     0
+    cam_bbox =      auto()
+    cam_track =     auto()
+    prev_angles =   auto()
+    prev_mt =       auto()
+    box_cam =       auto()
+    box_pose_I =    auto()
+    box_pose_R =    auto()
+    centre_cam =    auto()
+    centre_pose =   auto()
+    sim_blend =     auto()
+    field_bar_R =   auto()
+    field_bar_I =   auto()
+    angle_bar =     auto()
+    motion_bar =    auto()
+    motion_sim =    auto()
 
-    pose_cam_L =        auto()
-    centre_cam_L =      auto()
-    centre_pose_L =     auto()
-    sim_blend_L =       auto()
-    pd_line_L =         auto()
-    field_bar_raw_L =   auto()
-    field_bar_L =       auto()
-    angle_bar_L =       auto()
-    motion_bar_L =      auto()
-    pose_motion_sim_L = auto()
+PREVIEW_LAYERS: list[Layers] = [
+    Layers.centre_cam,
+    # Layers.sim_blend,
+    # Layers.centre_pose,
+    Layers.prev_angles,
+    Layers.prev_mt,
+]
 
 BOX_LAYERS: list[Layers] = [
-    Layers.pose_cam_L,
-    Layers.cam_mesh_raw_R,
-    Layers.cam_mesh_R,
+    Layers.box_cam,
+    Layers.box_pose_R,
+    Layers.box_pose_I,
 ]
 
 FINAL_LAYERS: list[Layers] = [
-    Layers.centre_cam_L,
-    # Layers.sim_blend_L,
-    # Layers.centre_pose_L,
-    # Layers.angle_bar_L,
-    # Layers.pose_motion_sim_L,
+    Layers.centre_cam,
+    Layers.sim_blend,
+    Layers.centre_pose,
+    # Layers.angle_bar,
+    # Layers.motion_sim,
+]
+
+LARGE_LAYERS: list[Layers] = [
+    Layers.centre_cam,
+    Layers.sim_blend,
+    Layers.centre_pose,
+]
+
+DYNAMIC_LAYERS: list[Layers] = [
+    Layers.prev_angles,
 ]
 
 COLORS: list[tuple[float, float, float, float]] = [
-    (1.0, 0.0, 0.0, 0.85),
-    (0.0, 1.0, 1.0, 0.85),
-    (0.0, 1.0, 0.0, 0.85),
+    (1.0, 0.0, 0.0, 1.85),
+    (0.0, 1.0, 1.0, 1.85),
+    (0.0, 1.0, 0.0, 1.85),
 ]
 
 class HDTRenderManager(RenderBase):
@@ -74,42 +91,43 @@ class HDTRenderManager(RenderBase):
         self.data_hub: DataHub = data_hub
 
         # layers
-        self._update_layers: list[Layers] = [Layers.cam_image_R]
-        self._interface_layers: list[Layers] = [Layers.cam_track_L, Layers.cam_bbox_R, Layers.motion_time_R]
-        self._preview_layers: list[Layers] = FINAL_LAYERS
-        self._draw_layers: list[Layers] = FINAL_LAYERS
+        self._update_layers: list[Layers] =     [Layers.cam_image, Layers.centre_cam]
+        self._interface_layers: list[Layers] =  [Layers.cam_track, Layers.cam_bbox]
+        self._preview_layers: list[Layers] =    PREVIEW_LAYERS
+        self._draw_layers: list[Layers] =       FINAL_LAYERS
 
         # camera layers
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
         for i in range(self.num_cams):
-            self.L[Layers.cam_image_R][i] =     layers.CamImageRenderer(i, self.data_hub)
-            self.L[Layers.cam_bbox_R][i] =      layers.CamBBoxRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
-            self.L[Layers.cam_mesh_R][i] =      layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 1.0, 0.0, True, False)
-            self.L[Layers.cam_mesh_raw_R][i] =  layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_R, 0.5, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
-            self.L[Layers.cam_track_L][i] =     layers.CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]))
-            self.L[Layers.motion_time_R][i] =   layers.PoseMotionTimeRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
+            self.L[Layers.cam_image][i] =   layers.CamImageRenderer(i, self.data_hub)
+            self.L[Layers.cam_bbox][i] =    layers.CamBBoxRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
+            self.L[Layers.cam_track][i] =   layers.CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
+            self.L[Layers.prev_angles][i] = layers.PDLineLayer(i, self.data_hub)
+            self.L[Layers.prev_mt][i] =     layers.PoseMotionTimeRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
+            self.L[Layers.box_cam][i] =     layers.PoseCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
+            self.L[Layers.box_pose_I][i] =  layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 1.0, 0.0, True, False)
+            self.L[Layers.box_pose_R][i] =  layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_R, 0.5, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
 
-            self.L[Layers.pose_cam_L][i] =      layers.PoseCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]))
-            self.L[Layers.centre_cam_L][i] =    layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image_R][i]))
-            self.L[Layers.centre_pose_L][i] =   layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
-            cast(layers.CentreCamLayer, self.L[Layers.centre_cam_L][i]).set_points_callback(cast(layers.CentrePoseLayer, self.L[Layers.centre_pose_L][i]).setCentrePoints)
-            self.L[Layers.sim_blend_L][i] =     layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.CentreCamLayer], self.L[Layers.centre_cam_L]))
-            self.L[Layers.pd_line_L][i] =       layers.PDLineLayer(i, self.data_hub)
-            self.L[Layers.field_bar_raw_L][i] = layers.PoseScalarBarLayer(i, self.data_hub, PoseDataHubTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
-            self.L[Layers.field_bar_L][i] =     layers.PoseScalarBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angles, 2.0, 2.0)
-            self.L[Layers.angle_bar_L][i] =     layers.PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
-            self.L[Layers.motion_bar_L][i] =    layers.PoseMotionBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angle_motion, 2.0, 2.0)
-            self.L[Layers.pose_motion_sim_L][i]=layers.PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
+            self.L[Layers.field_bar_R][i] = layers.PoseScalarBarLayer(i, self.data_hub, PoseDataHubTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
+            self.L[Layers.field_bar_I][i] = layers.PoseScalarBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angles, 2.0, 2.0)
+            self.L[Layers.angle_bar][i] =   layers.PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
+            self.L[Layers.motion_bar][i] =  layers.PoseMotionBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angle_motion, 2.0, 2.0)
+            self.L[Layers.motion_sim][i]=   layers.PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
+
+            self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.CentreCamLayer], self.L[Layers.centre_cam]))
+            self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
+            self.L[Layers.centre_pose][i] = layers.ElectricLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
+            cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]).set_points_callback(cast(layers.ElectricLayer, self.L[Layers.centre_pose][i]).setCentrePoints)
 
         # global layers
         self.pose_sim_layer =   layers.SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, layers.AggregationMethod.HARMONIC_MEAN, 2.0)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name='track',   columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='track',        columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name='preview',      columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name='similarity', columns=1,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
+            SubdivisionRow(name='similarity',   columns=1,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.width, settings.height, False)
 
@@ -133,7 +151,7 @@ class HDTRenderManager(RenderBase):
     def allocate(self) -> None:
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
-                if layer_type in FINAL_LAYERS:
+                if layer_type in LARGE_LAYERS:
                     layer.allocate(1080 * 2, 1920 * 2, GL_RGBA32F)
                 else:
                     layer.allocate(1080, 1920, GL_RGBA32F)
@@ -145,9 +163,9 @@ class HDTRenderManager(RenderBase):
 
         for i in range(self.num_cams):
             w, h = self.subdivision.get_allocation_size('track', i)
-            self.L[Layers.cam_track_L][i].allocate(w , h, GL_RGBA)
+            self.L[Layers.cam_track][i].allocate(w , h, GL_RGBA)
             w, h = self.subdivision.get_allocation_size('preview', i)
-            self.L[Layers.pd_line_L][i].allocate(w, h, GL_RGBA)
+            self.L[Layers.prev_angles][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         self.pose_sim_layer.deallocate()
@@ -207,4 +225,5 @@ class HDTRenderManager(RenderBase):
             # cast(layers.PoseLineLayer, self.L[Layers.centre_pose_L][camera_id]).color = (1.0, 1.0, 0.0, 0.85)
 
         self._draw_layers = FINAL_LAYERS
+        self._preview_layers = PREVIEW_LAYERS
         # self._draw_layers = BOX_LAYERS

@@ -11,6 +11,7 @@ from .generic.SimilarityLineLayer import        SimilarityLineLayer, Aggregation
 from .generic.PoseMotionSimLayer import         PoseMotionSimLayer
 from .generic.PoseDotLayer import               PoseDotLayer
 from .generic.PoseLineLayer import              PoseLineLayer
+from .generic.ElectricLayer import              ElectricLayer
 
 from .renderers.CamBBoxRenderer import          CamBBoxRenderer
 from .renderers.CamDepthTrackRenderer import    CamDepthTrackRenderer
