@@ -9,11 +9,15 @@ const int N_CONN = 16;
 const int NUM_ARCS = 1;  // Number of arcs per connection
 
 const float CURVE_SPEED = 3.0;  // Speed of curve oscillation
-const float CURVE_OFFSET = 20.0; // Control point offset in pixels
+const float CURVE_OFFSET = 10.0; // Control point offset in pixels
 
 const float WAVE_SPEED = 2.0;   // Speed of traveling waves
 const float WAVE_DENSITY = 0.01; // Waves per pixel of segment length
 const float WAVE_AMPLITUDE = 20.0; // Wave offset amplitude in pixels
+
+const float BOLT_SPEED = 10000.0;     // Bolt travel speed in pixels per second
+const float BOLT_INTERVAL = 2;    // Base interval between bolts in seconds
+const float BOLT_FADE = .8;        // Time for each point to fade after bolt passes (seconds)
 
 // Connectivity pairs (COCO 17)
 const ivec2 CONN[N_CONN] = ivec2[](
@@ -234,6 +238,41 @@ void main(){
             // Early out if too far
             if(d_px > maxDist) continue;
 
+            // Lightning bolt system
+            // Distance along curve in pixels
+            float distAlongCurve = bestT * seglen;
+            if(waveDir < 0.0) distAlongCurve = seglen - distAlongCurve;
+
+            // Time it takes for bolt to travel the full segment + fade
+            float travelTime = seglen / BOLT_SPEED;
+            float activeDuration = travelTime + BOLT_FADE;
+
+            // Bolt timing: random interval per arc (must be longer than active duration)
+            float minInterval = activeDuration + 0.1;  // At least 0.1s gap between bolts
+            float boltInterval = max(minInterval, BOLT_INTERVAL * (0.5 + hash21(vec2(arcSeed, 0.99)) * 1.0));
+            float boltPhase = hash21(vec2(arcSeed, 0.88)) * boltInterval;
+
+            // Time since last bolt started
+            float timeSinceBolt = mod(time + boltPhase, boltInterval);
+
+            // Bolt front position in pixels (travels at constant speed)
+            float boltFrontPx = timeSinceBolt * BOLT_SPEED;
+
+            float boltVisible = 0.0;
+
+            // Only show bolt during active duration (travel + fade)
+            if(timeSinceBolt < activeDuration) {
+                // Phase 1: Bolt is traveling - show everything behind the front
+                if(timeSinceBolt < travelTime) {
+                    boltVisible = step(distAlongCurve, boltFrontPx);
+                }
+                // Phase 2: Bolt has filled the arc - whole arc visible, then fade
+                else {
+                    float timeSinceFull = timeSinceBolt - travelTime;
+                    boltVisible = 1.0 - smoothstep(0.0, BOLT_FADE, timeSinceFull);
+                }
+            }
+
             float core = smoothstep(thickness_px, 0.0, d_px);
             float g = smoothstep(maxDist, 0.0, d_px) - core;
 
@@ -243,12 +282,14 @@ void main(){
             vec3 baseCol = vec3(0.15, 0.85, 1.0);
             vec3 innerCol = vec3(1.0, 1.0, 1.0);
 
-            vec3 contrib = innerCol * core * (0.8 + 0.5 * noiseAmp * flick)
-                         + baseCol * g * (0.5 + 0.5 * noiseAmp);
+            // Apply bolt visibility to brightness
+            float brightness = boltVisible * (0.8 + 0.5 * noiseAmp * flick);
+            vec3 contrib = innerCol * core * brightness
+                         + baseCol * g * boltVisible * (0.5 + 0.5 * noiseAmp);
 
-            // Spark branches
+            // Spark branches - brighter at bolt front
             float branchNoise = hash21(vec2(arcSeed * 7.0 + bestT * 50.0, time * 5.0));
-            float spike = pow(branchNoise, 6.0) * core * 0.6;
+            float spike = pow(branchNoise, 6.0) * core * boltVisible * 0.8;
             contrib += vec3(1.0, 0.9, 0.7) * spike;
 
             col += contrib;
