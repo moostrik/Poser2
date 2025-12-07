@@ -4,6 +4,7 @@ from threading import Lock
 import numpy as np
 
 from modules.pose.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput
+from modules.pose.detection.ONNXDetection import ONNXDetection
 from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin
 from modules.pose.Frame import FrameDict
@@ -23,7 +24,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
 
     def __init__(self, settings: Settings):
         super().__init__()
-        self._detection = MMDetection(settings)
+        self._detection = ONNXDetection(settings)
         self._lock = Lock()
         self._batch_counter: int = 0
         self._waiting_batches: dict[int, tuple[FrameDict, list[int]]] = {}
