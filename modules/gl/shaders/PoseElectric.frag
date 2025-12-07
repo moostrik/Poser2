@@ -5,28 +5,28 @@ uniform vec2 resolution;
 uniform float time;
 
 const int N_JOINTS = 17;
-const int N_CONN = 15;
-const int NUM_ARCS = 20;  // Number of arcs per connection
+const int N_CONN = 16;
+const int NUM_ARCS = 15;                // Number of arcs per connection
 
-const float CURVE_SPEED = 1.0;  // Speed of curve oscillation
-const float CURVE_OFFSET = 40.0; // Control point offset in pixels
+const float CURVE_SPEED = 1.0;          // Speed of curve oscillation
+const float CURVE_OFFSET = 80.0;        // Control point offset in pixels
 
-const float WAVE_SPEED = 2.0;   // Speed of traveling waves
-const float WAVE_DENSITY = 0.008; // Waves per pixel of segment length
-const float WAVE_AMPLITUDE = 30.0;      // Wave offset amplitude in pixels
-const float CURVE_THICKNESS = 10;      // Extra thickness at curved parts (pixels)
+const float WAVE_SPEED = 6.0;           // Speed of traveling waves
+const float WAVE_DENSITY = 0.008;       // Waves per pixel of segment length
+const float WAVE_AMPLITUDE = 15.0;      // Wave offset amplitude in pixels
+const float CURVE_THICKNESS = 10;       // Extra thickness at curved parts (pixels)
 
-const float BOLT_SPEED = 5000.0;     // Bolt travel speed in pixels per second
-const float BOLT_INTERVAL = 1.5;      // Base interval between bolts in seconds
-const float BOLT_HOLD = 0.2;          // Time bolt stays fully visible before fading (seconds)
-const float BOLT_FADE = 0.3;          // Time for bolt to fade out (seconds)
+const float BOLT_SPEED = 5000.0;        // Bolt travel speed in pixels per second
+const float BOLT_INTERVAL = 1.5;        // Base interval between bolts in seconds
+const float BOLT_HOLD = 0.2;            // Time bolt stays fully visible before fading (seconds)
+const float BOLT_FADE = 0.3;            // Time for bolt to fade out (seconds)
 
-const float MIN_BRIGHTNESS = 0;//1.1;    // Minimum arc brightness (0.0 = invisible, 1.0 = full)
+const float MIN_BRIGHTNESS = 0.81;      // Minimum arc brightness (0.0 = invisible, 1.0 = full)
 
 // Connectivity pairs (COCO 17)
 const ivec2 CONN[N_CONN] = ivec2[](
     ivec2(0,1), ivec2(0,2), ivec2(1,3), ivec2(2,4),
-    ivec2(5,6), ivec2(5,7), ivec2(7,9), ivec2(6,8),
+    ivec2(5,6), ivec2(6,5), ivec2(5,7), ivec2(7,9), ivec2(6,8),
     ivec2(8,10),  ivec2(5,11), ivec2(6,12),
     ivec2(11,13), ivec2(13,15), ivec2(12,14), ivec2(14,16)
 );
@@ -212,8 +212,8 @@ void main(){
             // Multiple wave frequencies traveling along curve
             float baseWaveCount = seglen * WAVE_DENSITY;
 
-            // Randomize wave direction per arc (some go A->B, others B->A)
-            float waveDir = (hash21(vec2(arcSeed * 2.1, float(i) * 1.7)) > 0.5) ? 1.0 : -1.0;
+            // Wave direction: always A->B
+            float waveDir = 1.0;
 
             // Time-varying amplitude with noise modulation
             float noiseModT = noise(vec2(bestT * 5.0 + arcSeed, time * 0.3));
@@ -284,7 +284,7 @@ void main(){
             // Lightning bolt system (branch-free)
             // Normalize position along curve (0 to 1)
             float t = bestT;
-            float tDir = mix(t, 1.0 - t, step(waveDir, 0.0));  // Flip if waveDir < 0
+            float tDir = t;  // Always A->B direction
 
             // Random interval per arc (70-130% of base)
             float boltInterval = BOLT_INTERVAL * (0.7 + hash21(vec2(arcSeed, 0.99)) * 0.6);
@@ -305,8 +305,9 @@ void main(){
             float isHolding = step(travelTime, cycleT) * step(timeSinceFull, BOLT_HOLD);  // 1 during hold
             float isFading = step(travelTime + BOLT_HOLD, cycleT);  // 1 during fade
 
-            // Traveling phase: pixel visible if behind the front
-            float behindFront = step(tDir, boltFront);
+            // Traveling phase: pixel visible if behind the front, with soft leading edge
+            float softEdge = 0.1;  // Softness of leading edge (fraction of segment)
+            float behindFront = smoothstep(boltFront + softEdge, boltFront - softEdge, tDir);
             float travelVisible = behindFront * isTraveling;
 
             // Hold phase: full brightness
