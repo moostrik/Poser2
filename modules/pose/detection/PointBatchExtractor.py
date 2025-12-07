@@ -90,6 +90,8 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         original_poses, tracklet_ids = batch_data
         result_poses: FrameDict = {}
 
+        # print(output.inference_time_ms)
+
         if output.processed:
             for idx, tracklet_id in enumerate(tracklet_ids):
                 if idx < len(output.point_batch) and tracklet_id in original_poses:

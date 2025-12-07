@@ -39,7 +39,7 @@
   "pose": {
     "active": true,
     "max_poses": 3,
-    "model_type": "SMALL",
+    "model_type": "LARGE",
     "model_path": "models",
     "confidence_threshold": 0.5,
     "verbose": true,

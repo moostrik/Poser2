@@ -28,15 +28,29 @@ def export_rtmpose_onnx(config_file: str, checkpoint_file: str, output_file: str
         simplify: Whether to simplify ONNX graph (requires onnx-simplifier)
     """
     print(f"Loading model: {config_file}")
-    model = init_model(config_file, checkpoint_file, device='cuda:0')
-    model.eval()
+    full_model = init_model(config_file, checkpoint_file, device='cuda:0')
 
-    # Create dummy input matching expected format: uint8 BGR image [0-255]
-    # Model's data_preprocessor will handle BGR->RGB and normalization
-    dummy_input = torch.randint(0, 256, (1, 3, 256, 192), dtype=torch.uint8, device='cuda:0').float()
+    # Wrapper to call backbone -> head properly (not Sequential)
+    class InferenceModel(torch.nn.Module):
+        def __init__(self, model):
+            super().__init__()
+            self.backbone = model.backbone
+            self.head = model.head
+
+        def forward(self, x):
+            # Proper forward pass: backbone features -> head
+            feats = self.backbone(x)
+            outputs = self.head(feats)
+            return outputs
+
+    model = InferenceModel(full_model).eval()
+    print(f"Wrapped model for proper forward pass (backbone -> head)")
+
+    # Create dummy input: normalized RGB FP32 (after ImageNet normalization)
+    dummy_input = torch.randn(1, 3, 256, 192, device='cuda:0')
 
     print(f"Exporting to ONNX: {output_file}")
-    print(f"  Dummy input: shape={dummy_input.shape}, dtype={dummy_input.dtype}, range=[{dummy_input.min():.1f}, {dummy_input.max():.1f}]")
+    print(f"  Input expects: normalized RGB FP32 (after ImageNet norm)")
     torch.onnx.export(
         model,
         dummy_input,
@@ -87,9 +101,9 @@ def export_rtmpose_onnx(config_file: str, checkpoint_file: str, output_file: str
 def export_all_models(models_dir: str = "models"):
     """Export all RTMPose models to ONNX."""
     models = [
-        # ('rtmpose-l_8xb256-420e_aic-coco-256x192.py',
-        #  'rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth',
-        #  'rtmpose-l_256x192.onnx'),
+        ('rtmpose-l_8xb256-420e_aic-coco-256x192.py',
+         'rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth',
+         'rtmpose-l_256x192.onnx'),
 
         ('rtmpose-m_8xb256-420e_aic-coco-256x192.py',
          'rtmpose-m_simcc-aic-coco_pt-aic-coco_420e-256x192-63eb25f7_20230126.pth',

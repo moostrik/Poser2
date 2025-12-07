@@ -260,16 +260,13 @@ class ONNXDetection(Thread):
     # STATIC METHODS
 
     @staticmethod
-    def _preprocess_batch(imgs: list[np.ndarray], debug: bool = False) -> np.ndarray:
+    def _preprocess_batch(imgs: list[np.ndarray]) -> np.ndarray:
         """Convert BGR uint8 images to normalized RGB FP32 batch (B, 3, H, W)."""
         if not imgs:
             return np.empty((0, 3, POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH), dtype=np.float32)
 
         # Stack and convert to float32
         batch_hwc = np.stack(imgs, axis=0).astype(np.float32)  # (B, H, W, 3)
-
-        if debug:
-            print(f"  Input images: shape={batch_hwc.shape}, dtype={batch_hwc.dtype}, range=[{batch_hwc.min():.1f}, {batch_hwc.max():.1f}]")
 
         # BGR to RGB
         batch_rgb = batch_hwc[:, :, :, ::-1]
@@ -280,43 +277,40 @@ class ONNXDetection(Thread):
         # Normalize with ImageNet stats
         batch_norm = (batch_chw - IMAGENET_MEAN) / IMAGENET_STD
 
-        if debug:
-            print(f"  Normalized: shape={batch_norm.shape}, range=[{batch_norm.min():.2f}, {batch_norm.max():.2f}]")
-
         return batch_norm
 
     @staticmethod
     def _decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float) -> tuple[np.ndarray, np.ndarray]:
-        """Decode SimCC coordinate classifications to keypoints.
+        """Decode SimCC using MMPose's exact method from get_simcc_maximum.
 
-        Args:
-            simcc_x: (B, num_keypoints, W_bins) X-coordinate logits
-            simcc_y: (B, num_keypoints, H_bins) Y-coordinate logits
-            split_ratio: Coordinate upsampling factor
-
-        Returns:
-            keypoints: (B, num_keypoints, 2) pixel coordinates
-            scores: (B, num_keypoints) confidence scores
+        Reference: mmpose/codecs/utils/post_processing.py::get_simcc_maximum
+        Reference: projects/rtmpose/examples/onnxruntime/main.py
+        Reference: rtmpose.cpp line 150: score = MAX(score_x, score_y)
         """
-        # Apply softmax along the bins dimension
-        exp_x = np.exp(simcc_x - np.max(simcc_x, axis=-1, keepdims=True))
-        exp_y = np.exp(simcc_y - np.max(simcc_y, axis=-1, keepdims=True))
+        # Get coordinates from argmax of raw logits
+        x_locs = np.argmax(simcc_x, axis=-1)
+        y_locs = np.argmax(simcc_y, axis=-1)
 
-        prob_x = exp_x / np.sum(exp_x, axis=-1, keepdims=True)
-        prob_y = exp_y / np.sum(exp_y, axis=-1, keepdims=True)
+        # Convert bin indices to normalized coordinates
+        x_coords = x_locs.astype(np.float32) / split_ratio
+        y_coords = y_locs.astype(np.float32) / split_ratio
 
-        # Get coordinates from argmax
-        x_locs = np.argmax(prob_x, axis=-1)  # (B, num_keypoints)
-        y_locs = np.argmax(prob_y, axis=-1)  # (B, num_keypoints)
+        # Get max logit values at predicted locations
+        batch_size, num_keypoints = simcc_x.shape[:2]
+        x_scores = np.zeros((batch_size, num_keypoints), dtype=np.float32)
+        y_scores = np.zeros((batch_size, num_keypoints), dtype=np.float32)
 
-        # Convert bin indices to pixel coordinates
-        x_coords = x_locs / split_ratio
-        y_coords = y_locs / split_ratio
+        for b in range(batch_size):
+            for k in range(num_keypoints):
+                x_scores[b, k] = simcc_x[b, k, x_locs[b, k]]
+                y_scores[b, k] = simcc_y[b, k, y_locs[b, k]]
 
-        # Confidence = max probability (not product, that's too strict)
-        x_scores = np.max(prob_x, axis=-1)
-        y_scores = np.max(prob_y, axis=-1)
-        scores = (x_scores + y_scores) / 2.0  # Average instead of product
+        # MMPose uses element-wise MAX not product!
+        # C++ implementation: score = MAX(score_x, score_y)
+        scores = np.maximum(x_scores, y_scores)
+
+        # Clip scores to [0, 1] range
+        scores = np.clip(scores, 0.0, 1.0)
 
         # Stack coordinates
         keypoints = np.stack([x_coords, y_coords], axis=-1)
@@ -329,8 +323,7 @@ class ONNXDetection(Thread):
             return np.empty((0, 17, 2)), np.empty((0, 17))
 
         # Preprocess
-        debug = self.verbose and not hasattr(self, '_onnx_debug')
-        batch = self._preprocess_batch(imgs, debug=debug)
+        batch = self._preprocess_batch(imgs)
 
         # Run inference
         input_name = session.get_inputs()[0].name
@@ -338,17 +331,7 @@ class ONNXDetection(Thread):
 
         # Decode SimCC outputs
         simcc_x, simcc_y = outputs[0], outputs[1]  # (B, 17, 384), (B, 17, 512)
-        keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
-
-        # Debug first batch
-        if self.verbose and not hasattr(self, '_onnx_debug'):
-            self._onnx_debug = True
-            print(f"\nONNX Detection Debug:")
-            print(f"  SimCC outputs: x={simcc_x.shape} y={simcc_y.shape}")
-            print(f"  Decoded: keypoints={keypoints.shape} scores={scores.shape}")
-            if keypoints.shape[0] > 0:
-                print(f"  Sample keypoint 0 (nose): x={keypoints[0,0,0]:.1f} y={keypoints[0,0,1]:.1f} score={scores[0,0]:.3f}")
-                print(f"  All scores: {scores[0]}")
+        keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)  # type: ignore
 
         return keypoints, scores
 
