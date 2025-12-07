@@ -9,7 +9,7 @@ from modules.Settings import Settings
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.gui import Gui
 from modules.inout import SoundOsc
-from modules.pose import guis, nodes, trackers, PoseFromTrackletGenerator, PointBatchExtractor, SimilarityComputer
+from modules.pose import guis, nodes, trackers, PoseFromTrackletGenerator, PointBatchExtractor, SimilarityComputer, MaskBatchExtractor
 from modules.pose.pd_stream import PDStreamManager, PDStreamComputer
 from modules.render.HDTRenderManager import HDTRenderManager
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
@@ -93,6 +93,8 @@ class Main():
 
         self.image_crop_processor = trackers.ImageCropProcessorTracker(num_players, self.image_crop_config)
         self.point_extractor =      PointBatchExtractor(settings.pose) # GPU-based 2D point extractor
+
+        self.mask_extractor =       MaskBatchExtractor(settings.pose)
 
         self.pose_similator:        SimilarityComputer = SimilarityComputer()
         self.pose_similarity_extractor = nodes.SimilarityExtractor(self.simil_config)
@@ -222,6 +224,12 @@ class Main():
 
         self.data_hub.add_update_callback(self.interpolator.update)
         self.point_extractor.start()
+
+        # SEGMENTATION
+        self.image_crop_processor.add_image_callback(self.mask_extractor.set_images)
+        self.image_crop_processor.add_poses_callback(self.mask_extractor.process)
+        self.mask_extractor.add_callback(self.data_hub.set_mask_tensors)
+        self.mask_extractor.start()
 
         # TRACKER
         self.tracker.add_tracklet_callback(self.pose_from_tracklet.submit_tracklets)

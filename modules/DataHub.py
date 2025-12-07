@@ -6,6 +6,7 @@ from typing import Callable, Any
 
 # Third party imports
 import numpy as np
+from torch import Tensor
 
 # Local application imports for setter types
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
@@ -27,6 +28,7 @@ class DataHubType(IntEnum):
     sim_P =             7   # single SimilarityBatch
     sim_M =             8   # single SimilarityBatch
     light_image =       9   # single image
+    mask_tensor =      10   # sorted by track_id, GPU tensors (H, W) FP16
 
 
 class PoseDataHubTypes(IntEnum):
@@ -101,6 +103,9 @@ class DataHub:
 
     def set_poses(self, data_type: DataHubType, poses: FrameDict) -> None:
         self.set_dict(data_type, poses)
+
+    def set_mask_tensors(self, masks: dict[int, Tensor]) -> None:
+        self.set_dict(DataHubType.mask_tensor, masks)
 
     def set_pd_stream(self, pd_stream: PDStreamData) -> None:
         self.set_item(DataHubType.pd_stream, pd_stream.track_id, pd_stream)

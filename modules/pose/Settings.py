@@ -10,3 +10,7 @@ class Settings:
     confidence_threshold: float =   field(default=0.3)
     verbose: bool =                 field(default=False)
     crop_expansion: float =         field(default=0.0)
+
+    # Segmentation settings
+    segmentation_enabled: bool =    field(default=True)
+    segmentation_model_name: str =  field(default="modnet_webcam_portrait_matting.ckpt")

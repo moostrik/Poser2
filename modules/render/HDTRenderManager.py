@@ -42,6 +42,8 @@ class Layers(IntEnum):
     motion_bar =    auto()
     motion_sim =    auto()
 
+    mask = auto()
+
 PREVIEW_LAYERS: list[Layers] = [
     Layers.centre_cam,
     # Layers.sim_blend,
@@ -62,6 +64,7 @@ FINAL_LAYERS: list[Layers] = [
     Layers.centre_pose,
     # Layers.angle_bar,
     # Layers.motion_sim,
+    # Layers.mask,
 ]
 
 LARGE_LAYERS: list[Layers] = [
@@ -117,8 +120,10 @@ class HDTRenderManager(RenderBase):
 
             self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.CentreCamLayer], self.L[Layers.centre_cam]))
             self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
-            self.L[Layers.centre_pose][i] = layers.ElectricLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
+            self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
             cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]).set_points_callback(cast(layers.ElectricLayer, self.L[Layers.centre_pose][i]).setCentrePoints)
+
+            self.L[Layers.mask][i] =        layers.MaskRenderer(i, self.data_hub)
 
         # global layers
         self.pose_sim_layer =   layers.SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, layers.AggregationMethod.HARMONIC_MEAN, 2.0)
