@@ -1,6 +1,6 @@
 # Standard library imports
 from dataclasses import dataclass, field
-from enum import IntEnum
+from enum import IntEnum, auto
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
@@ -29,11 +29,14 @@ POSE_MODEL_WIDTH = 192
 POSE_MODEL_HEIGHT = 256
 
 class ModelType(IntEnum):
-    NONE =   0
-    LARGE =  1
-    MEDIUM = 2
-    SMALL =  3
-    TINY =   4
+    NONE =      0
+    LARGE =     auto()
+    MEDIUM =    auto()
+    SMALL =     auto()
+    TINY =      auto()
+    W_L =       auto()
+    W_M =       auto()
+    W_S =       auto()
 POSE_MODEL_TYPE_NAMES: list[str] = [e.name for e in ModelType]
 
 POSE_MODEL_FILE_NAMES: list[tuple[str, str]] = [
@@ -41,7 +44,11 @@ POSE_MODEL_FILE_NAMES: list[tuple[str, str]] = [
     ('rtmpose-l_8xb256-420e_aic-coco-256x192.py', 'rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth'),
     ('rtmpose-m_8xb256-420e_aic-coco-256x192.py', 'rtmpose-m_simcc-aic-coco_pt-aic-coco_420e-256x192-63eb25f7_20230126.pth'),
     ('rtmpose-s_8xb256-420e_aic-coco-256x192.py', 'rtmpose-s_simcc-aic-coco_pt-aic-coco_420e-256x192-fcb2599b_20230126.pth'),
-    ('rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth')
+    ('rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth'),
+    ('wb_rtmpose-l_8xb64-270e_coco-wholebody-256x192.py', 'wb_rtmpose-l_simcc-ucoco_dw-ucoco_270e-256x192-4d6dfc62_20230728.pth'),
+    ('wb_rtmpose-m_8xb64-270e_coco-wholebody-256x192.py', 'wb_rtmpose-m_simcc-ucoco_dw-ucoco_270e-256x192-c8b76419_20230728.pth'),
+    ('wb_rtmpose-s_8xb64-270e_coco-wholebody-256x192.py', 'wb_rtmpose-s_simcc-ucoco_dw-ucoco_270e-256x192-3fd922c8_20230728.pth'),
+
 ]
 
 @dataclass

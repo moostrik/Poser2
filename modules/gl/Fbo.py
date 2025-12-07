@@ -33,7 +33,7 @@ class Fbo(Texture):
         # glPopMatrix()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-    def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 1.0) -> None:
+    def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
         self.begin()
         glClearColor(r, g, b, a)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # type: ignore

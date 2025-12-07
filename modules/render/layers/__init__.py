@@ -16,7 +16,7 @@ from .generic.ElectricLayer import              ElectricLayer
 from .renderers.CamBBoxRenderer import          CamBBoxRenderer
 from .renderers.CamDepthTrackRenderer import    CamDepthTrackRenderer
 from .renderers.CamImageRenderer import         CamImageRenderer
-from .renderers.MaskRenderer import             MaskRenderer
+from .generic.MaskLayer import                  MaskLayer
 from .renderers.PoseBBoxRenderer import         PoseBBoxRenderer
 from .renderers.PoseMotionTimeRenderer import   PoseMotionTimeRenderer
 

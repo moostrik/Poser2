@@ -7,12 +7,14 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
 from modules.gl.LayerBase import LayerBase, Rect
+from modules.gl.Fbo import SwapFbo
 from modules.gl.Texture import Texture, draw_quad
+from modules.gl.shaders.Blend import Blend as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class MaskRenderer(LayerBase):
+class MaskLayer(LayerBase):
     """Renders segmentation masks directly from GPU tensors using Pixel Buffer Objects.
 
     Uses PBO (GL_PIXEL_UNPACK_BUFFER) to transfer PyTorch CUDA tensors to OpenGL textures
@@ -20,11 +22,12 @@ class MaskRenderer(LayerBase):
     Falls back to CPU transfer if PBO mapping fails.
     """
 
+    _shader = shader()
+
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
-
-        # OpenGL texture managed by Texture class
+        self._fbo: SwapFbo = SwapFbo()
         self._texture: Texture = Texture()
 
         # PBO for GPU-to-GPU texture updates
@@ -32,60 +35,75 @@ class MaskRenderer(LayerBase):
         self._pbo_size: int = 0
         self._prev_tensor: torch.Tensor | None = None
 
+
+        self.blend_factor: float = 0.25
+
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         """Allocate OpenGL texture and PBO for GPU-to-GPU updates."""
-        if self._texture.allocated:
-            self.deallocate()
+
+        self._fbo.allocate(192, 256, GL_R32F)
+        self._fbo.clear()
 
         # Allocate texture using Texture class
-        self._texture.allocate(width, height, GL_R32F)
+        self._texture.allocate(192, 256, GL_R32F)
 
         # Allocate PBO for async GPU transfers
         if self._texture.allocated:
-            self._pbo_size = width * height * 4  # float32 = 4 bytes
+            self._pbo_size = 192 * 256 * 4  # float32 = 4 bytes
             self._pbo = glGenBuffers(1)
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._pbo)
             glBufferData(GL_PIXEL_UNPACK_BUFFER, self._pbo_size, None, GL_STREAM_DRAW)
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
 
+        if not MaskLayer._shader.allocated:
+            MaskLayer._shader.allocate(monitor_file=True)
+
     def deallocate(self) -> None:
         """Delete PBO and OpenGL texture."""
+        self._fbo.deallocate()
+        self._texture.deallocate()
         if self._pbo > 0:
             glDeleteBuffers(1, [self._pbo])
             self._pbo = 0
             self._pbo_size = 0
-
-        if self._texture.allocated:
-            self._texture.deallocate()
+        if self._shader.allocated:
+            MaskLayer._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
-        if self._texture.allocated:
-            self._texture.draw(rect.x, rect.y, rect.width, rect.height)
+        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         """Update texture from GPU tensor using CUDA-OpenGL interop or CPU fallback."""
-        mask_dict: dict[int, torch.Tensor] = self._data_hub.get_dict(DataHubType.mask_tensor)
 
-        if self._track_id not in mask_dict:
-            return
+        if not MaskLayer._shader.allocated:
+            MaskLayer._shader.allocate(monitor_file=True)
 
-        mask_tensor = mask_dict[self._track_id]  # (H, W) FP16 on CUDA
+        mask_tensor: torch.Tensor | None = self._data_hub.get_item(DataHubType.mask_tensor, self._track_id)
 
         # Only update if tensor changed
         if mask_tensor is self._prev_tensor:
             return
+        self._prev_tensor = mask_tensor
 
-        # Allocate if needed
-        if not self._texture.allocated or self._texture.height != mask_tensor.shape[0] or self._texture.width != mask_tensor.shape[1]:
-            self.allocate(mask_tensor.shape[1], mask_tensor.shape[0], GL_R32F)  # width, height
+
+        LayerBase.setView(self._fbo.width, self._fbo.height)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        if mask_tensor is None:
+            self._fbo.clear()
+            return
 
         # GPU-to-GPU copy using PBO
         self._update_with_pbo(mask_tensor)
 
-        self._prev_tensor = mask_tensor
+        self.blend_factor = 0.1
+
+        self._fbo.swap()
+        MaskLayer._shader.use(self._fbo.fbo_id, self._fbo.back_tex_id,self._texture.tex_id, self.blend_factor)
+
 
     def _update_with_pbo(self, mask_tensor: torch.Tensor) -> None:
         """GPU-to-GPU copy using Pixel Buffer Object.
