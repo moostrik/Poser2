@@ -60,8 +60,8 @@ BOX_LAYERS: list[Layers] = [
 
 FINAL_LAYERS: list[Layers] = [
     Layers.centre_cam,
-    Layers.sim_blend,
-    Layers.centre_pose,
+    # Layers.sim_blend,
+    # Layers.centre_pose,
     # Layers.angle_bar,
     # Layers.motion_sim,
     # Layers.cam_mask,

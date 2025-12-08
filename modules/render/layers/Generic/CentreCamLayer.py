@@ -93,10 +93,10 @@ class CentreCamLayer(LayerBase):
         # Debug: draw target positions
         glPointSize(10.0)
         glBegin(GL_POINTS)
-        glColor4f(1.0, 0.0, 0.0, 1.0)
+        glColor4f(0.0, 0.0, 0.0, 1.0)
         glVertex2f(rect.x + self.target_eye.x * rect.width,
                    rect.y + self.target_eye.y * rect.height)
-        glColor4f(0.0, 1.0, 0.0, 1.0)
+        glColor4f(0.0, 0.0, 0.0, 1.0)
         glVertex2f(rect.x + self.target_hip.x * rect.width,
                    rect.y + self.target_hip.y * rect.height)
         glEnd()
@@ -147,7 +147,7 @@ class CentreCamLayer(LayerBase):
         eye: Point2f = self._eye_midpoint * bbox.size + bbox.position
         hip: Point2f = self._hip_midpoint * bbox.size + bbox.position
 
-        # Calculate rotation (with aspect correction to match shader)
+        # Calculate rotation angle with aspect correction
         delta: Point2f = hip - eye
         self._rotation = math.atan2(delta.x * aspect, delta.y)
 
@@ -167,12 +167,11 @@ class CentreCamLayer(LayerBase):
         # Render cropped/rotated image
         CentreCamLayer._roi_shader.use(self._crop_fbo.fbo_id, self._cam_image.tex_id, self._crop_roi, self._rotation, eye, False, True)
 
-        # Calculate mask ROI (mask is in bbox-space [0,1], which is square)
-        # We need to account for bbox aspect ratio to match the texture space
+        # Calculate mask ROI in bbox-relative space
+        # Apply bbox aspect correction to rotation angle calculation
         bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
 
         mask_delta = self._hip_midpoint - self._eye_midpoint
-        # Apply bbox aspect correction to match what shader will do with mask texture
         mask_rotation = math.atan2(mask_delta.x * bbox_aspect, mask_delta.y)
         mask_distance = math.hypot(mask_delta.x * bbox_aspect, mask_delta.y)
         mask_height = mask_distance / target_distance
@@ -192,7 +191,7 @@ class CentreCamLayer(LayerBase):
 
         # Blend with previous frame
         self._blend_fbo.swap()
-        CentreCamLayer._blend_shader.use(self._blend_fbo.fbo_id, self._blend_fbo.back_tex_id,self._mask_fbo.tex_id, self.blend_factor)
+        CentreCamLayer._blend_shader.use(self._blend_fbo.fbo_id, self._blend_fbo.back_tex_id,self._crop_fbo.tex_id, self.blend_factor)
 
         # Transform points
         self._transformed_points: Points2D = CentreCamLayer._transform_points(pose.points, bbox, eye, aspect, self._rotation, self._crop_roi)
@@ -217,7 +216,7 @@ class CentreCamLayer(LayerBase):
         x = x_bbox * bbox.width + bbox.x
         y = y_bbox * bbox.height + bbox.y
 
-        # Rotate around eye with aspect correction (matches shader)
+        # Rotate around eye in texture space (aspect correction handled by shader logic)
         dx = (x - eye.x) * aspect
         dy = y - eye.y
 
