@@ -11,7 +11,7 @@ from modules.gl.TensorTexture import TensorTexture
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class MaskRenderer(LayerBase):
+class CamMaskRenderer(LayerBase):
 
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id

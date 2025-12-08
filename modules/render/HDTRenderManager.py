@@ -42,7 +42,7 @@ class Layers(IntEnum):
     motion_bar =    auto()
     motion_sim =    auto()
 
-    mask = auto()
+    cam_mask = auto()
 
 PREVIEW_LAYERS: list[Layers] = [
     Layers.centre_cam,
@@ -64,7 +64,8 @@ FINAL_LAYERS: list[Layers] = [
     Layers.centre_pose,
     # Layers.angle_bar,
     # Layers.motion_sim,
-    Layers.mask,
+    # Layers.cam_mask,
+    # Layers.cam_image,
 ]
 
 LARGE_LAYERS: list[Layers] = [
@@ -94,7 +95,7 @@ class HDTRenderManager(RenderBase):
         self.data_hub: DataHub = data_hub
 
         # layers
-        self._update_layers: list[Layers] =     [Layers.cam_image, Layers.centre_cam]
+        self._update_layers: list[Layers] =     [Layers.cam_image, Layers.cam_mask, Layers.centre_cam]
         self._interface_layers: list[Layers] =  [Layers.cam_track, Layers.cam_bbox]
         self._preview_layers: list[Layers] =    PREVIEW_LAYERS
         self._draw_layers: list[Layers] =       FINAL_LAYERS
@@ -104,6 +105,7 @@ class HDTRenderManager(RenderBase):
 
         for i in range(self.num_cams):
             self.L[Layers.cam_image][i] =   layers.CamImageRenderer(i, self.data_hub)
+            self.L[Layers.cam_mask][i] =    layers.CamMaskRenderer(i, self.data_hub)
             self.L[Layers.cam_bbox][i] =    layers.CamBBoxRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
             self.L[Layers.cam_track][i] =   layers.CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
             self.L[Layers.prev_angles][i] = layers.PDLineLayer(i, self.data_hub)
@@ -119,11 +121,10 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.motion_sim][i]=   layers.PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
 
             self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.CentreCamLayer], self.L[Layers.centre_cam]))
-            self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
+            self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]), cast(layers.CamMaskRenderer, self.L[Layers.cam_mask][i]))
             self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
             cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]).set_points_callback(cast(layers.ElectricLayer, self.L[Layers.centre_pose][i]).setCentrePoints)
 
-            self.L[Layers.mask][i] =        layers.MaskRenderer(i, self.data_hub)
 
         # global layers
         self.pose_sim_layer =   layers.SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, layers.AggregationMethod.HARMONIC_MEAN, 2.0)
