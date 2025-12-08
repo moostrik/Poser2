@@ -15,4 +15,5 @@ class Settings:
 
     # Segmentation settings
     segmentation_enabled: bool =    field(default=True)
-    segmentation_model_name: str =  field(default="modnet_webcam_portrait_matting.ckpt")
+    # segmentation_model_name: str =  field(default="modnet_webcam_portrait_matting.ckpt")
+    segmentation_model_name: str =  field(default="rvm_mobilenetv3_fp32.onnx")

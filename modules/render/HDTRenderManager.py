@@ -64,7 +64,7 @@ FINAL_LAYERS: list[Layers] = [
     Layers.centre_pose,
     # Layers.angle_bar,
     # Layers.motion_sim,
-    # Layers.mask,
+    Layers.mask,
 ]
 
 LARGE_LAYERS: list[Layers] = [

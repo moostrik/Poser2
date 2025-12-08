@@ -44,15 +44,15 @@ class MaskLayer(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         """Allocate OpenGL texture and PBO for GPU-to-GPU updates."""
 
-        self._fbo.allocate(192, 256, GL_R32F)
+        self._fbo.allocate(width, height, GL_R32F)
         self._fbo.clear()
 
         # Allocate texture using Texture class
-        self._texture.allocate(192, 256, GL_R32F)
+        self._texture.allocate(width, height, GL_R32F)
 
         # Allocate PBO for async GPU transfers
         if self._texture.allocated:
-            self._pbo_size = 192 * 256 * 4  # float32 = 4 bytes
+            self._pbo_size = width * height * 4  # float32 = 4 bytes
             self._pbo = glGenBuffers(1)
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._pbo)
             glBufferData(GL_PIXEL_UNPACK_BUFFER, self._pbo_size, None, GL_STREAM_DRAW)
@@ -88,6 +88,10 @@ class MaskLayer(LayerBase):
             return
         self._prev_tensor = mask_tensor
 
+        if mask_tensor is not None:
+            if mask_tensor.shape[0] != self._texture.height or mask_tensor.shape[1] != self._texture.width:
+                # Resize texture and FBO
+                self.allocate(mask_tensor.shape[1], mask_tensor.shape[0], GL_R32F)
 
         LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -99,7 +103,7 @@ class MaskLayer(LayerBase):
         # GPU-to-GPU copy using PBO
         self._update_with_pbo(mask_tensor)
 
-        self.blend_factor = 0.1
+        self.blend_factor = 0.25
 
         self._fbo.swap()
         MaskLayer._shader.use(self._fbo.fbo_id, self._fbo.back_tex_id,self._texture.tex_id, self.blend_factor)
@@ -135,7 +139,7 @@ class MaskLayer(LayerBase):
         except Exception as e:
             print(f"MaskRenderer: PBO copy failed ({e}), using CPU")
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
-            self._update_with_cpu(mask_tensor.flip(0))  # Already flipped, flip back
+            self._update_with_pbo(mask_tensor.flip(0))  # Already flipped, flip back
             return
 
         # Upload PBO to texture (GPU-to-GPU via OpenGL driver)

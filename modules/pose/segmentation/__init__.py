@@ -1,2 +1,3 @@
-from .MODNetSegmentation import MODNetSegmentation
 from .MaskBatchExtractor import MaskBatchExtractor
+from .MODNetSegmentation import MODNetSegmentation
+from .RVMSegmentation import RVMSegmentation

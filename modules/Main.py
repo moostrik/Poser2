@@ -185,6 +185,7 @@ class Main():
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.image_crop_processor.set_image)
+            # camera.add_frame_callback(self.mask_extractor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.data_hub.set_depth_tracklets)

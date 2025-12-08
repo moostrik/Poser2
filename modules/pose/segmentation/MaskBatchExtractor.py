@@ -5,8 +5,10 @@ import torch
 
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameDict
-from modules.pose.segmentation.MODNetSegmentation import MODNetSegmentation, SegmentationInput, SegmentationOutput
+# from modules.pose.segmentation.MODNetSegmentation import MODNetSegmentation, SegmentationInput, SegmentationOutput
+from modules.pose.segmentation.RVMSegmentation import RVMSegmentation, SegmentationInput, SegmentationOutput
 from modules.pose.Settings import Settings
+from modules.cam.depthcam.Definitions import FrameType
 
 
 class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
@@ -24,7 +26,7 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
 
     def __init__(self, settings: Settings):
         super().__init__()
-        self._segmentation = MODNetSegmentation(settings)
+        self._segmentation = RVMSegmentation(settings)
         self._lock = Lock()
         self._batch_counter: int = 0
         self._images: dict[int, np.ndarray] = {}
@@ -47,6 +49,13 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         """
         with self._lock:
             self._images = images
+
+    def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None:
+        """Update the camera image for a specific camera ID"""
+        if frame_type != FrameType.VIDEO:
+            return
+        with self._lock:
+            self._images[id] = image
 
     def process(self, poses: FrameDict) -> None:
         """Submit batch for async processing. Results broadcast via callbacks.
@@ -85,6 +94,8 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         """
         if not output.processed or output.mask_tensor is None:
             return
+
+        # print(output.inference_time_ms)
 
         # Create dict mapping tracklet_id -> GPU tensor (H, W)
         mask_dict: dict[int, torch.Tensor] = {}
