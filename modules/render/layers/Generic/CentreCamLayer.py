@@ -15,8 +15,10 @@ from modules.utils.PointsAndRects import Rect, Point2f
 # GL
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.LayerBase import LayerBase
-from modules.gl.shaders.Blend import Blend
 from modules.gl.shaders.DrawRoi import DrawRoi
+from modules.gl.shaders.Blend import Blend
+from modules.gl.shaders.BlendWithMask import BlendWithMask
+from modules.gl.shaders.Mask import Mask
 from modules.gl.shaders.PosePointLines import PosePointLines
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -24,6 +26,8 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class CentreCamLayer(LayerBase):
     _blend_shader = Blend()
+    _blend_mask_shader = BlendWithMask()
+    _mask_shader = Mask()
     _roi_shader = DrawRoi()
     _point_shader = PosePointLines()
 
@@ -31,22 +35,24 @@ class CentreCamLayer(LayerBase):
                  cam_image: CamImageRenderer, cam_mask: CamMaskRenderer) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
-        self._crop_fbo: Fbo = Fbo()
+        self._fbo = Fbo()
+        self._cam_fbo: Fbo = Fbo()
         self._mask_fbo: Fbo = Fbo()
-        self._blend_fbo: SwapFbo = SwapFbo()
+        self._cam_blend_fbo: SwapFbo = SwapFbo()
+        self._mask_blend_fbo: SwapFbo = SwapFbo()
         self._point_fbo: Fbo = Fbo()
         self._cam_image: CamImageRenderer = cam_image
         self._cam_mask: CamMaskRenderer = cam_mask
         self._p_pose: Frame | None = None
 
-        self._eye_midpoint: Point2f = Point2f(0.5, 0.25)
+        self._shoulder_midpoint: Point2f = Point2f(0.5, 0.3)
         self._hip_midpoint: Point2f = Point2f(0.5, 0.6)
         self._rotation: float = 0.0
         self._crop_roi: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
         self.data_type: PoseDataHubTypes = data_type
-        self.target_eye: Point2f = Point2f(0.5, 0.25)
-        self.target_hip: Point2f = Point2f(0.5, 0.6)
+        self.target_top: Point2f = Point2f(0.5, 0.3)
+        self.target_bottom: Point2f = Point2f(0.5, 0.6)
 
         self.dst_aspectratio: float = 9/16
         self.blend_factor: float = 0.25
@@ -61,9 +67,12 @@ class CentreCamLayer(LayerBase):
         self._on_points_updated = callback
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
-        self._crop_fbo.allocate(width, height, internal_format)
+        self._fbo.allocate(width, height, internal_format)
+        self._cam_fbo.allocate(width, height, internal_format)
         self._mask_fbo.allocate(width, height, internal_format)
-        self._blend_fbo.allocate(width, height, internal_format)
+        self._cam_blend_fbo.allocate(width, height, internal_format)
+        self._mask_blend_fbo.allocate(width, height, internal_format)
+
         self._point_fbo.allocate(width, height, internal_format)
         if not CentreCamLayer._blend_shader.allocated:
             CentreCamLayer._blend_shader.allocate(monitor_file=True)
@@ -73,9 +82,11 @@ class CentreCamLayer(LayerBase):
             CentreCamLayer._point_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
-        self._crop_fbo.deallocate()
+        self._fbo.deallocate()
+        self._cam_fbo.deallocate()
         self._mask_fbo.deallocate()
-        self._blend_fbo.deallocate()
+        self._cam_blend_fbo.deallocate()
+        self._mask_blend_fbo.deallocate()
         self._point_fbo.deallocate()
         if CentreCamLayer._blend_shader.allocated:
             CentreCamLayer._blend_shader.deallocate()
@@ -85,7 +96,10 @@ class CentreCamLayer(LayerBase):
             CentreCamLayer._point_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
-        self._blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        # Enable blending for drawing to screen with straight alpha
+
+        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        # self._mask_blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
         # return
         self.draw_points(rect)
@@ -94,11 +108,11 @@ class CentreCamLayer(LayerBase):
         glPointSize(10.0)
         glBegin(GL_POINTS)
         glColor4f(0.0, 0.0, 0.0, 1.0)
-        glVertex2f(rect.x + self.target_eye.x * rect.width,
-                   rect.y + self.target_eye.y * rect.height)
+        glVertex2f(rect.x + self.target_top.x * rect.width,
+                   rect.y + self.target_top.y * rect.height)
         glColor4f(0.0, 0.0, 0.0, 1.0)
-        glVertex2f(rect.x + self.target_hip.x * rect.width,
-                   rect.y + self.target_hip.y * rect.height)
+        glVertex2f(rect.x + self.target_bottom.x * rect.width,
+                   rect.y + self.target_bottom.y * rect.height)
         glEnd()
         glColor4f(1.0, 1.0, 1.0, 1.0)
 
@@ -106,108 +120,152 @@ class CentreCamLayer(LayerBase):
         self._point_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
+        # Ensure shaders are allocated
         if not CentreCamLayer._blend_shader.allocated:
             CentreCamLayer._blend_shader.allocate(monitor_file=True)
         if not CentreCamLayer._roi_shader.allocated:
             CentreCamLayer._roi_shader.allocate(monitor_file=True)
         if not CentreCamLayer._point_shader.allocated:
             CentreCamLayer._point_shader.allocate(monitor_file=True)
+        if not CentreCamLayer._blend_mask_shader.allocated:
+            CentreCamLayer._blend_mask_shader.allocate(monitor_file=True)
+        if not CentreCamLayer._mask_shader.allocated:
+            CentreCamLayer._mask_shader.allocate(monitor_file=True)
 
+        # Get pose data
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
-
         if pose is self._p_pose:
             return
         self._p_pose = pose
 
-        LayerBase.setView(self._blend_fbo.width, self._blend_fbo.height)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # Setup GL state
+        LayerBase.setView(self._cam_blend_fbo.width, self._cam_blend_fbo.height)
+        # Disable blending during FBO rendering - shaders handle all compositing
+        glDisable(GL_BLEND)
+        glColor4f(0.0, 0.0, 0.0, 0.0)
+        self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
+        self._mask_fbo.clear(0.0, 0.0, 0.0, 0.0)
+        self._fbo.clear(1.0, 1.0, 1.0, 1.0)
 
-        self._crop_fbo.clear(0.0, 0.0, 0.0, 0.0)
         if pose is None:
-            self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
+            self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
+            self._cam_blend_fbo.swap()
+            self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
+
+            self._mask_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
+            self._mask_blend_fbo.swap()
+            self._mask_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
+
             self._point_fbo.clear(0.0, 0.0, 0.0, 0.0)
             return
 
-        # Update eye midpoint
-        if pose.points.get_valid(PointLandmark.left_eye) and pose.points.get_valid(PointLandmark.right_eye):
-            left_eye: Point2f = pose.points.get_point2f(PointLandmark.left_eye)
-            right_eye: Point2f = pose.points.get_point2f(PointLandmark.right_eye)
-            self._eye_midpoint = (left_eye + right_eye) / 2
+        # Update body landmarks
+        shoulder_mid = CentreCamLayer._get_midpoint(pose.points, PointLandmark.left_shoulder, PointLandmark.right_shoulder)
+        if shoulder_mid:
+            self._shoulder_midpoint = shoulder_mid
+        hip_mid = CentreCamLayer._get_midpoint(pose.points, PointLandmark.left_hip, PointLandmark.right_hip)
+        if hip_mid:
+            self._hip_midpoint = hip_mid
 
-        # Update hip midpoint
-        if pose.points.get_valid(PointLandmark.left_hip) and pose.points.get_valid(PointLandmark.right_hip):
-            left_hip: Point2f = pose.points.get_point2f(PointLandmark.left_hip)
-            right_hip: Point2f = pose.points.get_point2f(PointLandmark.right_hip)
-            self._hip_midpoint = (left_hip + right_hip) / 2
-
-        aspect: float = self._cam_image.width / self._cam_image.height
         bbox: Rect = pose.bbox.to_rect()
+        target_distance: float = self.target_bottom.y - self.target_top.y
 
-        # Convert from bbox-relative to texture coordinates
-        eye: Point2f = self._eye_midpoint * bbox.size + bbox.position
-        hip: Point2f = self._hip_midpoint * bbox.size + bbox.position
+        # Render camera image with ROI
+        cam_top: Point2f = self._shoulder_midpoint * bbox.size + bbox.position
+        cam_bot: Point2f = self._hip_midpoint * bbox.size + bbox.position
+        cam_aspect: float = self._cam_image.width / self._cam_image.height
 
-        # Calculate rotation angle with aspect correction
-        delta: Point2f = hip - eye
-        self._rotation = math.atan2(delta.x * aspect, delta.y)
+        self._rotation, _, self._crop_roi = CentreCamLayer._calculate_roi(
+            cam_top, cam_bot, self.target_top, target_distance, self.dst_aspectratio
+        )
+        CentreCamLayer._roi_shader.use(self._cam_fbo.fbo_id, self._cam_image.tex_id,
+                                      self._crop_roi, self._rotation, cam_top, cam_aspect, False, True)
 
-        # Calculate crop ROI
-        distance: float = math.hypot(delta.x * aspect, delta.y)
-        target_distance: float = self.target_hip.y - self.target_eye.y
-        height: float = distance / target_distance
-        width: float = height * self.dst_aspectratio
 
-        self._crop_roi = Rect(
-            x=eye.x - width * self.target_eye.x,
-            y=eye.y - height * self.target_eye.y,
+        self.blend_factor = 0.5
+        self._cam_blend_fbo.swap()
+        CentreCamLayer._blend_shader.use(self._cam_blend_fbo.fbo_id, self._cam_blend_fbo.back_tex_id,self._cam_fbo.tex_id, self.blend_factor)
+
+
+        # Render mask with ROI
+        bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
+        mask_rotation, _, mask_crop_roi = CentreCamLayer._calculate_roi(
+            self._shoulder_midpoint, self._hip_midpoint,
+            self.target_top, target_distance, bbox_aspect
+        )
+        CentreCamLayer._roi_shader.use(self._mask_fbo.fbo_id, self._cam_mask.tex_id,
+                                      mask_crop_roi, mask_rotation, self._shoulder_midpoint, bbox_aspect, False, True)
+
+        # Blend frames with mask upscaling and blur
+        self.blend_factor = 0.66
+        self._mask_blend_fbo.swap()
+        # self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
+        texel_size = (1.0 / self._mask_fbo.width, 1.0 / self._mask_fbo.height)
+        blur_radius = 0.0  # Adjust this value to control blur amount
+        CentreCamLayer._blend_mask_shader.use(
+            self._mask_blend_fbo.fbo_id,
+            self._mask_blend_fbo.back_tex_id,
+            self._mask_fbo.tex_id,
+            self.blend_factor,
+            texel_size,
+            blur_radius
+        )
+
+        CentreCamLayer._mask_shader.use(self._fbo.fbo_id, self._cam_blend_fbo.tex_id, self._mask_blend_fbo.tex_id)
+
+
+
+        # Transform and render pose points
+        self._transformed_points = CentreCamLayer._transform_points(
+            pose.points, bbox, cam_top, cam_aspect, self._rotation, self._crop_roi
+        )
+        if self._on_points_updated is not None:
+            self._on_points_updated(self._transformed_points)
+
+        line_width: float = 50.0 / self._point_fbo.height
+        line_smooth: float = 25.0 / self._point_fbo.height
+        self._point_fbo.clear(0.0, 0.0, 0.0, 0.0)
+        CentreCamLayer._point_shader.use(self._point_fbo.fbo_id, self._transformed_points,
+                                        line_width=line_width, line_smooth=line_smooth)
+
+    @staticmethod
+    def _get_midpoint(points: Points2D, left_landmark: PointLandmark, right_landmark: PointLandmark) -> Point2f | None:
+        """Get midpoint between two landmarks if both are valid.
+
+        Returns: Midpoint or None if either landmark is invalid
+        """
+        if points.get_valid(left_landmark) and points.get_valid(right_landmark):
+            left = points.get_point2f(left_landmark)
+            right = points.get_point2f(right_landmark)
+            return (left + right) / 2
+        return None
+
+    @staticmethod
+    def _calculate_roi(top_point: Point2f, bottom_point: Point2f,
+                      target_top: Point2f, target_distance: float,
+                      output_aspect: float) -> tuple[float, float, Rect]:
+        """Calculate rotation angle and ROI for cropping.
+
+        Returns: (rotation_angle, distance, roi_rect)
+        """
+        delta = bottom_point - top_point
+        rotation = math.atan2(delta.x, delta.y)
+        distance = math.hypot(delta.x, delta.y)
+
+        height = distance / target_distance
+        width = height * output_aspect
+
+        roi = Rect(
+            x=top_point.x - width * target_top.x,
+            y=top_point.y - height * target_top.y,
             width=width,
             height=height
         )
 
-        # Render cropped/rotated image
-        CentreCamLayer._roi_shader.use(self._crop_fbo.fbo_id, self._cam_image.tex_id, self._crop_roi, self._rotation, eye, False, True)
-
-        # Calculate mask ROI in bbox-relative space
-        # Apply bbox aspect correction to rotation angle calculation
-        bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
-
-        mask_delta = self._hip_midpoint - self._eye_midpoint
-        mask_rotation = math.atan2(mask_delta.x * bbox_aspect, mask_delta.y)
-        mask_distance = math.hypot(mask_delta.x * bbox_aspect, mask_delta.y)
-        mask_height = mask_distance / target_distance
-        mask_width = mask_height * bbox_aspect
-
-        mask_crop_roi = Rect(
-            x=self._eye_midpoint.x - mask_width * self.target_eye.x,
-            y=self._eye_midpoint.y - mask_height * self.target_eye.y,
-            width=mask_width,
-            height=mask_height
-        )
-
-        # Render mask to separate FBO
-        CentreCamLayer._roi_shader.use(self._mask_fbo.fbo_id, self._cam_mask.tex_id, mask_crop_roi, mask_rotation, self._eye_midpoint, False, True)
-
-
-
-        # Blend with previous frame
-        self._blend_fbo.swap()
-        CentreCamLayer._blend_shader.use(self._blend_fbo.fbo_id, self._blend_fbo.back_tex_id,self._crop_fbo.tex_id, self.blend_factor)
-
-        # Transform points
-        self._transformed_points: Points2D = CentreCamLayer._transform_points(pose.points, bbox, eye, aspect, self._rotation, self._crop_roi)
-
-        if self._on_points_updated is not None:
-            self._on_points_updated(self._transformed_points)
-
-        # return
-        # Render points
-        line_width: float = 50.0 / self._point_fbo.height
-        line_smooth: float = 25.0 / self._point_fbo.height
-        self._point_fbo.clear(0.0, 0.0, 0.0, 0.0)
-        CentreCamLayer._point_shader.use(self._point_fbo.fbo_id, self._transformed_points, line_width=line_width, line_smooth=line_smooth)
+        return rotation, distance, roi
 
     @staticmethod
-    def _transform_points(points: Points2D, bbox: Rect, eye: Point2f,
+    def _transform_points(points: Points2D, bbox: Rect, top: Point2f,
                           aspect: float, rotation: float, crop_roi: Rect) -> Points2D:
         """Transform pose points to crop-space coordinates [0,1]."""
         x_bbox, y_bbox = points.get_xy_arrays()
@@ -216,13 +274,13 @@ class CentreCamLayer(LayerBase):
         x = x_bbox * bbox.width + bbox.x
         y = y_bbox * bbox.height + bbox.y
 
-        # Rotate around eye in texture space (aspect correction handled by shader logic)
-        dx = (x - eye.x) * aspect
-        dy = y - eye.y
+        # Rotate around point with aspect correction (matches shader behavior)
+        dx = (x - top.x) * aspect
+        dy = y - top.y
 
         cos_a, sin_a = np.cos(rotation), np.sin(rotation)
-        x_rot = (cos_a * dx - sin_a * dy) / aspect + eye.x
-        y_rot = sin_a * dx + cos_a * dy + eye.y
+        x_rot = (cos_a * dx - sin_a * dy) / aspect + top.x
+        y_rot = sin_a * dx + cos_a * dy + top.y
 
         # Convert to crop ROI space
         x_crop = (x_rot - crop_roi.x) / crop_roi.width

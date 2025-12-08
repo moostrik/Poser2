@@ -100,5 +100,5 @@ class SwapFbo():
         self.fbos[not self.swap_state].draw(x, y, w, h)
 
     def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 1.0) -> None:
-        self.fbos[0].clear(r, g, b, a)
-        self.fbos[1].clear(r, g, b, a)
+        self.fbos[self.swap_state].clear(r, g, b, a)
+        # self.fbos[1].clear(r, g, b, a)

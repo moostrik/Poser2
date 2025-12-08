@@ -92,8 +92,8 @@ class SimilarityBlend(LayerBase):
 
         # print(f"SimilarityBlend Layer {self._cam_id}: blend_1={blend_1}, blend_2={blend_2}")
 
-        tex_0 = self._layers[self._cam_id]._blend_fbo.tex_id
-        tex_1 = self._layers[other_1_index]._blend_fbo.tex_id
-        tex_2 = self._layers[other_2_index]._blend_fbo.tex_id
+        tex_0 = self._layers[self._cam_id]._cam_blend_fbo.tex_id
+        tex_1 = self._layers[other_1_index]._cam_blend_fbo.tex_id
+        tex_2 = self._layers[other_2_index]._cam_blend_fbo.tex_id
 
         SimilarityBlend._shader.use(self._fbo.fbo_id, tex_0, tex_1, tex_2, blend_1, blend_2)
