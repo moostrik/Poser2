@@ -10,6 +10,7 @@ from typing import Callable
 import numpy as np
 import torch
 import onnxruntime as ort
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from typing import TYPE_CHECKING
 
@@ -99,6 +100,10 @@ class RVMSegmentation(Thread):
         # ONNX session (initialized in run thread)
         self._session: ort.InferenceSession | None = None
 
+        # Thread pool for parallel inference
+        self._executor: ThreadPoolExecutor | None = None
+        self._max_workers: int = min(settings.max_poses, 4)  # Limit concurrent inferences
+
     @property
     def is_ready(self) -> bool:
         """Check if model is loaded and system is ready to process segmentation"""
@@ -115,6 +120,10 @@ class RVMSegmentation(Thread):
             return
         """Stop both inference and callback threads gracefully"""
         self._shutdown_event.set()
+
+        # Shutdown thread pool
+        if self._executor is not None:
+            self._executor.shutdown(wait=True, cancel_futures=True)
 
         # Wake up inference thread
         self._notify_update_event.set()
@@ -172,8 +181,11 @@ class RVMSegmentation(Thread):
             # Warmup: initialize CUDA kernels with dummy inference
             self._model_warmup(self._session)
 
+            # Create thread pool for parallel inference
+            self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="RVM-Worker")
+
             self._model_ready.set()  # Signal model is ready
-            print(f"RVM Segmentation: Model '{self.model_name}' loaded successfully ({providers_used[0]})")
+            print(f"RVM Segmentation: Model '{self.model_name}' loaded successfully ({providers_used[0]}) with {self._max_workers} workers")
 
         except Exception as e:
             print(f"RVM Segmentation Error: Failed to load model - {str(e)}")
@@ -260,15 +272,26 @@ class RVMSegmentation(Thread):
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 
         # Run inference
-        if batch.images and self._session is not None:
+        if batch.images and self._session is not None and self._executor is not None:
             batch_start = time.perf_counter()
 
-            # Process each tracklet sequentially to maintain per-tracklet recurrent states
-            mask_list: list[torch.Tensor] = []
-
+            # Process tracklets in parallel using thread pool
+            futures = []
             for img, tracklet_id in zip(batch.images, batch.tracklet_ids):
-                mask = self._infer_single_image(img, tracklet_id)
-                mask_list.append(mask)
+                future = self._executor.submit(self._infer_single_image, img, tracklet_id)
+                futures.append((future, tracklet_id))
+
+            # Collect results in original order
+            mask_list: list[torch.Tensor] = []
+            for future, tracklet_id in futures:
+                try:
+                    mask = future.result()
+                    mask_list.append(mask)
+                except Exception as e:
+                    print(f"RVM Segmentation Error: Inference failed for tracklet {tracklet_id}: {str(e)}")
+                    # Create empty mask on error
+                    h, w = batch.images[0].shape[:2]
+                    mask_list.append(torch.zeros((h, w), dtype=torch.float16, device='cuda'))
 
             # Stack into batch tensor
             if mask_list:
