@@ -31,6 +31,9 @@ class CamImageRenderer(LayerBase):
              self._image.draw_roi(draw_rect.x, draw_rect.y, draw_rect.width, draw_rect.height,
                                   text_rect.x, text_rect.y, text_rect.width, text_rect.height)
 
+    def get_image(self) -> Image:
+        return self._image
+
     def update(self) -> None:
         frame: np.ndarray | None = self._data.get_item(DataHubType.cam_image, self._cam_id)
 

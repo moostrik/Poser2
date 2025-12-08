@@ -123,7 +123,7 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
             cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]).set_points_callback(cast(layers.ElectricLayer, self.L[Layers.centre_pose][i]).setCentrePoints)
 
-            self.L[Layers.mask][i] =        layers.MaskLayer(i, self.data_hub)
+            self.L[Layers.mask][i] =        layers.MaskRenderer(i, self.data_hub)
 
         # global layers
         self.pose_sim_layer =   layers.SimilarityLineLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, layers.AggregationMethod.HARMONIC_MEAN, 2.0)
