@@ -120,9 +120,16 @@ class MotionMultiply(LayerBase):
 
         motion = pose.angle_motion.aggregate(AggregationMethod.MAX)
 
+        motion = 1.0
 
-        self.low_threshold: float = 0.01   # Turn off below this
-        self.high_threshold: float = 0.3  # Turn on above this
+        # print(motion, pow(motion, 2.0))
+
+        # motion = pow(motion, 2.0)  # Adjust sensitivity
+
+        self.fade_in_duration = 0.4  # Time to fade in (seconds)
+        self.fade_out_duration = 0.75  # Time to fade out (seconds)
+        self.low_threshold = 0.01   # Turn off below this
+        self.high_threshold = 0.3  # Turn on above this
 
         # Determine target alpha based on motion thresholds
         new_target = None
