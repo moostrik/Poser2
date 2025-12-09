@@ -81,6 +81,9 @@ class CamCompositeLayer(LayerBase):
 
         # Composite them into the FBO
         LayerBase.setView(self._fbo.width, self._fbo.height)
+
+        glEnable(GL_BLEND)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         full_rect = Rect(0, 0, self._fbo.width, self._fbo.height)

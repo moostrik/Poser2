@@ -1,7 +1,7 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
-class Mask(Shader):
+class ApplyMask(Shader):
     def __init__(self) -> None:
         super().__init__()
         self.shader_name = self.__class__.__name__

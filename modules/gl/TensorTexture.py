@@ -130,6 +130,7 @@ class TensorTexture(Texture):
 
         # Ensure contiguous memory for GPU copy
         tensor = tensor.contiguous()
+        # tensor = tensor.flip(0).contiguous()
 
         # Map graphics resource to get CUDA device pointer
         (err,) = runtime.cudaGraphicsMapResources(1, self._cuda_gl_resource, torch.cuda.current_stream().cuda_stream)
@@ -174,7 +175,7 @@ class TensorTexture(Texture):
     def draw(self, x, y, w, h) -> None:
         """Draw the texture with vertical flip (matching Image behavior)."""
         self.bind()
-        draw_quad(x, y, w, h, True)
+        draw_quad(x, y, w, h)
         self.unbind()
 
     def clear(self) -> None:

@@ -17,8 +17,10 @@ from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.LayerBase import LayerBase
 from modules.gl.shaders.DrawRoi import DrawRoi
 from modules.gl.shaders.Blend import Blend
-from modules.gl.shaders.BlendWithMask import BlendWithMask
-from modules.gl.shaders.Mask import Mask
+from modules.gl.shaders.MaskBlend import MaskBlend
+from modules.gl.shaders.MaskAA import MaskAA
+from modules.gl.shaders.MaskBlur import MaskBlur
+from modules.gl.shaders.ApplyMask import ApplyMask
 from modules.gl.shaders.PosePointLines import PosePointLines
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -26,8 +28,13 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class CentreCamLayer(LayerBase):
     _blend_shader = Blend()
-    _blend_mask_shader = BlendWithMask()
-    _mask_shader = Mask()
+
+    _mask_blur_shader = MaskBlur()
+    _mask_blend_shader = MaskBlend()
+    _mask_AA_shader = MaskAA()
+
+    _mask_shader = ApplyMask()
+
     _roi_shader = DrawRoi()
     _point_shader = PosePointLines()
 
@@ -40,6 +47,8 @@ class CentreCamLayer(LayerBase):
         self._mask_fbo: Fbo = Fbo()
         self._cam_blend_fbo: SwapFbo = SwapFbo()
         self._mask_blend_fbo: SwapFbo = SwapFbo()
+        self._mask_AA_fbo: Fbo = Fbo()
+        self._mask_blur_fbo: SwapFbo = SwapFbo()
         self._point_fbo: Fbo = Fbo()
         self._cam_image: CamImageRenderer = cam_image
         self._cam_mask: CamMaskRenderer = cam_mask
@@ -69,9 +78,11 @@ class CentreCamLayer(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._cam_fbo.allocate(width, height, internal_format)
-        self._mask_fbo.allocate(width, height, internal_format)
         self._cam_blend_fbo.allocate(width, height, internal_format)
-        self._mask_blend_fbo.allocate(width, height, internal_format)
+        self._mask_fbo.allocate(width, height, GL_R32F)
+        self._mask_blend_fbo.allocate(width, height, GL_R32F)
+        self._mask_AA_fbo.allocate(width, height, GL_R32F)
+        self._mask_blur_fbo.allocate(width, height, GL_R32F)
 
         self._point_fbo.allocate(width, height, internal_format)
         if not CentreCamLayer._blend_shader.allocated:
@@ -84,9 +95,13 @@ class CentreCamLayer(LayerBase):
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._cam_fbo.deallocate()
-        self._mask_fbo.deallocate()
         self._cam_blend_fbo.deallocate()
+
+        self._mask_fbo.deallocate()
         self._mask_blend_fbo.deallocate()
+        self._mask_AA_fbo.deallocate()
+        self._mask_blur_fbo.deallocate()
+
         self._point_fbo.deallocate()
         if CentreCamLayer._blend_shader.allocated:
             CentreCamLayer._blend_shader.deallocate()
@@ -99,7 +114,9 @@ class CentreCamLayer(LayerBase):
         # Enable blending for drawing to screen with straight alpha
 
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        # self._mask_fbo.draw(rect.x, rect.y, rect.width, rect.height)
         # self._mask_blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        # self._mask_AA_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
         # return
         self.draw_points(rect)
@@ -127,10 +144,14 @@ class CentreCamLayer(LayerBase):
             CentreCamLayer._roi_shader.allocate(monitor_file=True)
         if not CentreCamLayer._point_shader.allocated:
             CentreCamLayer._point_shader.allocate(monitor_file=True)
-        if not CentreCamLayer._blend_mask_shader.allocated:
-            CentreCamLayer._blend_mask_shader.allocate(monitor_file=True)
+        if not CentreCamLayer._mask_blend_shader.allocated:
+            CentreCamLayer._mask_blend_shader.allocate(monitor_file=True)
         if not CentreCamLayer._mask_shader.allocated:
             CentreCamLayer._mask_shader.allocate(monitor_file=True)
+        if not CentreCamLayer._mask_AA_shader.allocated:
+            CentreCamLayer._mask_AA_shader.allocate(monitor_file=True)
+        if not CentreCamLayer._mask_blur_shader.allocated:
+            CentreCamLayer._mask_blur_shader.allocate(monitor_file=True)
 
         # Get pose data
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
@@ -142,7 +163,8 @@ class CentreCamLayer(LayerBase):
         LayerBase.setView(self._cam_blend_fbo.width, self._cam_blend_fbo.height)
         # Disable blending during FBO rendering - shaders handle all compositing
         glDisable(GL_BLEND)
-        glColor4f(0.0, 0.0, 0.0, 0.0)
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+
         self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._mask_fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._fbo.clear(1.0, 1.0, 1.0, 1.0)
@@ -197,21 +219,24 @@ class CentreCamLayer(LayerBase):
                                       mask_crop_roi, mask_rotation, self._shoulder_midpoint, bbox_aspect, False, True)
 
         # Blend frames with mask upscaling and blur
-        self.blend_factor = 0.66
+        self.blend_factor = 0.33
         self._mask_blend_fbo.swap()
-        # self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
-        texel_size = (1.0 / self._mask_fbo.width, 1.0 / self._mask_fbo.height)
-        blur_radius = 0.0  # Adjust this value to control blur amount
-        CentreCamLayer._blend_mask_shader.use(
-            self._mask_blend_fbo.fbo_id,
-            self._mask_blend_fbo.back_tex_id,
-            self._mask_fbo.tex_id,
-            self.blend_factor,
-            texel_size,
-            blur_radius
-        )
+        CentreCamLayer._mask_blend_shader.use(self._mask_blend_fbo.fbo_id, self._mask_blend_fbo.back_tex_id, self._mask_fbo.tex_id, self.blend_factor)
+        CentreCamLayer._mask_AA_shader.use(self._mask_AA_fbo.fbo_id, self._mask_blend_fbo.tex_id)
 
-        CentreCamLayer._mask_shader.use(self._fbo.fbo_id, self._cam_blend_fbo.tex_id, self._mask_blend_fbo.tex_id)
+        self._mask_blur_fbo.begin()
+        self._mask_AA_fbo.draw(0, 0, self._mask_blur_fbo.width, self._mask_blur_fbo.height)
+        self._mask_blur_fbo.end()
+
+        blur_steps = 0
+        blur_radius = 8.0
+        for i in range(blur_steps):
+            self._mask_blur_fbo.swap()
+            CentreCamLayer._mask_blur_shader.use(self._mask_blur_fbo.fbo_id, self._mask_blur_fbo.back_tex_id, True, blur_radius)
+            self._mask_blur_fbo.swap()
+            CentreCamLayer._mask_blur_shader.use(self._mask_blur_fbo.fbo_id, self._mask_blur_fbo.back_tex_id, False, blur_radius)
+
+        CentreCamLayer._mask_shader.use(self._fbo.fbo_id, self._cam_blend_fbo.tex_id, self._mask_blur_fbo.tex_id)
 
 
 
@@ -227,6 +252,9 @@ class CentreCamLayer(LayerBase):
         self._point_fbo.clear(0.0, 0.0, 0.0, 0.0)
         CentreCamLayer._point_shader.use(self._point_fbo.fbo_id, self._transformed_points,
                                         line_width=line_width, line_smooth=line_smooth)
+
+
+        glEnable(GL_BLEND)
 
     @staticmethod
     def _get_midpoint(points: Points2D, left_landmark: PointLandmark, right_landmark: PointLandmark) -> Point2f | None:

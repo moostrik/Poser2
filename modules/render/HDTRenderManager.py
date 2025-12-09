@@ -217,7 +217,7 @@ class HDTRenderManager(RenderBase):
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
         self.setView(width, height)
-        glClearColor(1.0, 0.0, 0.0, 0.0)
+        glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
