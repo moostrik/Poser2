@@ -224,10 +224,21 @@ class CentreCamLayer(LayerBase):
 
         # Render mask with ROI
         bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
-        mask_rotation, _, mask_crop_roi = CentreCamLayer._calculate_roi(
-            self._shoulder_midpoint, self._hip_midpoint,
-            self.target_top, target_distance, bbox_aspect
+
+        # Calculate mask rotation with aspect correction (matching old working version)
+        mask_delta = self._hip_midpoint - self._shoulder_midpoint
+        mask_rotation = math.atan2(mask_delta.x * bbox_aspect, mask_delta.y)
+        mask_distance = math.hypot(mask_delta.x * bbox_aspect, mask_delta.y)
+        mask_height = mask_distance / target_distance
+        mask_width = mask_height * bbox_aspect
+
+        mask_crop_roi = Rect(
+            x=self._shoulder_midpoint.x - mask_width * self.target_top.x,
+            y=self._shoulder_midpoint.y - mask_height * self.target_top.y,
+            width=mask_width,
+            height=mask_height
         )
+
         CentreCamLayer._roi_shader.use(self._mask_fbo.fbo_id, self._cam_mask.tex_id,
                                       mask_crop_roi, mask_rotation, self._shoulder_midpoint, bbox_aspect, False, True)
 
