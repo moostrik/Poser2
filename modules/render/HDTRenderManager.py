@@ -42,6 +42,8 @@ class Layers(IntEnum):
     motion_bar =    auto()
     motion_sim =    auto()
 
+    motion =        auto()
+
     cam_mask = auto()
 
 PREVIEW_LAYERS: list[Layers] = [
@@ -59,9 +61,9 @@ BOX_LAYERS: list[Layers] = [
 ]
 
 FINAL_LAYERS: list[Layers] = [
-    Layers.centre_cam,
-    # Layers.sim_blend,
-    # Layers.centre_pose,
+    # Layers.centre_cam,
+    Layers.centre_pose,
+    Layers.motion,
     # Layers.angle_bar,
     # Layers.motion_sim,
     # Layers.cam_mask,
@@ -122,6 +124,7 @@ class HDTRenderManager(RenderBase):
 
             self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.CentreCamLayer], self.L[Layers.centre_cam]))
             self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]), cast(layers.CamMaskRenderer, self.L[Layers.cam_mask][i]))
+            self.L[Layers.motion][i] =      layers.MotionMultiply(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]))
             self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
             cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]).set_points_callback(cast(layers.ElectricLayer, self.L[Layers.centre_pose][i]).setCentrePoints)
 
@@ -226,8 +229,8 @@ class HDTRenderManager(RenderBase):
 
         for layer_type in self._draw_layers:
             self.L[layer_type][camera_id].draw(draw_rect)
-            # cast(layers.PoseLineLayer, self.L[Layers.centre_pose_L][camera_id]).line_width = 50.0
-            # cast(layers.PoseLineLayer, self.L[Layers.centre_pose_L][camera_id]).line_smooth = 25.0
+            cast(layers.PoseLineLayer, self.L[Layers.centre_pose][camera_id]).line_width = 1.0
+            cast(layers.PoseLineLayer, self.L[Layers.centre_pose][camera_id]).line_smooth = 0.0
             # cast(layers.PoseLineLayer, self.L[Layers.centre_pose_L][camera_id]).color = (1.0, 1.0, 0.0, 0.85)
 
         self._draw_layers = FINAL_LAYERS

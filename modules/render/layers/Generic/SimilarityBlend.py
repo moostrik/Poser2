@@ -6,8 +6,6 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl.Fbo import Fbo
-from modules.gl.Image import Image
-from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.features import AggregationMethod
 from modules.pose.Frame import Frame
@@ -18,11 +16,21 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 from modules.render.layers.generic.CentreCamLayer import CentreCamLayer
 
+
 # Shaders
+from modules.gl.shaders.ApplyMask import ApplyMask
 from modules.gl.shaders.TripleBlend import TripleBlend as shader
 
 
+def smoothstep(edge0: float, edge1: float, x: float) -> float:
+    """Smooth Hermite interpolation between 0 and 1"""
+    # Clamp x to range [edge0, edge1]
+    t = max(0.0, min(1.0, (x - edge0) / (edge1 - edge0)))
+    # Evaluate polynomial
+    return t * t * (3.0 - 2.0 * t)
+
 class SimilarityBlend(LayerBase):
+    _mask_shader: ApplyMask = ApplyMask()
     _shader = shader()
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, layers: dict[int, CentreCamLayer]) -> None:
@@ -34,7 +42,11 @@ class SimilarityBlend(LayerBase):
 
         self.data_type: PoseDataHubTypes = data_type
 
-        text_init()
+        # Hysteresis for motion visibility
+        self._is_visible: bool = False
+        self._motion_low_threshold: float = 0.1   # Turn off below this
+        self._motion_high_threshold: float = 0.7  # Turn on above this
+        self._smoothstep_margin: float = 0.15     # Smoothstep range around thresholds
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -56,6 +68,8 @@ class SimilarityBlend(LayerBase):
         # reallocate shader if needed if hot-reloaded
         if not SimilarityBlend._shader.allocated:
             SimilarityBlend._shader.allocate(monitor_file=True)
+        if not SimilarityBlend._mask_shader.allocated:
+            SimilarityBlend._mask_shader.allocate(monitor_file=True)
 
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
 
@@ -70,19 +84,61 @@ class SimilarityBlend(LayerBase):
         if pose is None:
             return
 
-        motion = pose.angle_motion.aggregate(AggregationMethod.MAX)
-        motion_exponent = 1.0
-        motion = pow(motion, motion_exponent)
-
         other_1_index = (self._cam_id + 1) % 3
         other_2_index = (self._cam_id + 2) % 3
+
+        cam = self._layers[self._cam_id].cam_texture
+        mask = self._layers[self._cam_id].mask_texture
+
+        other_1 = self._layers[other_1_index].cam_texture
+        other_2 = self._layers[other_2_index].cam_texture
+
+        raw_motion = pose.angle_motion.aggregate(AggregationMethod.MAX)
+        # motion *= 1.3
+        # motion_exponent = 0.5
+        # motion = pow(motion, motion_exponent)
+        # motion = np.clip(motion, 0.0, 1.0)
+
+        # Hysteresis: different thresholds for turning on vs off
+        if raw_motion > self._motion_high_threshold:
+            self._is_visible = True
+        elif raw_motion < self._motion_low_threshold:
+            self._is_visible = False
+        # else: maintain current state (prevents flickering)
+
+        # Apply smoothstep transition based on current state
+        if self._is_visible:
+            # Visible: smoothstep around LOW threshold (so it fades out smoothly when going down)
+            motion = smoothstep(
+                self._motion_low_threshold - self._smoothstep_margin,
+                self._motion_low_threshold + self._smoothstep_margin,
+                raw_motion
+            )
+        else:
+            # Hidden: smoothstep around HIGH threshold (so it fades in smoothly when going up)
+            motion = smoothstep(
+                self._motion_high_threshold - self._smoothstep_margin,
+                self._motion_high_threshold + self._smoothstep_margin,
+                raw_motion
+            )
+
+        # SimilarityBlend._mask_shader.use(self._fbo.fbo_id, cam.tex_id, mask.tex_id, motion)
+
+        self._fbo.begin()
+        glColor4f(1.0, 1.0, 1.0, motion)
+        cam.draw(0, 0, self._fbo.width, self._fbo.height)
+        self._fbo.end()
+
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+
+        # return
 
         similarity = np.nan_to_num(pose.similarity.values)
         threshold = 0.33
         similarity = np.clip((similarity - threshold) / (1.0 - threshold), 0.0, 1.0)
         exponent =1.5
         similarity = np.power(similarity, exponent)
-        similarity *= motion
+        # similarity *= motion
 
         blend_1 = similarity[other_1_index]
         blend_2 = similarity[other_2_index]
@@ -92,8 +148,13 @@ class SimilarityBlend(LayerBase):
 
         # print(f"SimilarityBlend Layer {self._cam_id}: blend_1={blend_1}, blend_2={blend_2}")
 
-        tex_0 = self._layers[self._cam_id]._cam_blend_fbo.tex_id
-        tex_1 = self._layers[other_1_index]._cam_blend_fbo.tex_id
-        tex_2 = self._layers[other_2_index]._cam_blend_fbo.tex_id
 
-        SimilarityBlend._shader.use(self._fbo.fbo_id, tex_0, tex_1, tex_2, blend_1, blend_2)
+        # SimilarityBlend._shader.use(self._fbo.fbo_id, cam.tex_id, other_1.tex_id, other_2.tex_id, blend_1, blend_2)
+
+        # self._fbo.begin()
+        # glColor4f(1.0, 1.0, 1.0, motion)
+        # self._fbo.draw(0, 0, self._fbo.width, self._fbo.height)
+        # self._fbo.end()
+        # glColor4f(1.0, 1.0, 1.0, 1.0)
+
+

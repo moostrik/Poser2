@@ -53,6 +53,10 @@ class SwapFbo():
         self.tex_id = 0
         self.back_tex_id = 0
 
+    @ property
+    def texture(self) -> Texture:
+        return self.fbos[self.swap_state]
+
     def allocate(self, width: int, height: int, internal_format) -> None :
         self.width = width
         self.height = height

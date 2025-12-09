@@ -9,7 +9,7 @@ class ApplyMask(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo, color, mask) -> None :
+    def use(self, fbo, color, mask, multiply: float = 1.0) -> None :
         super().use()
         if not self.allocated: return
         if not fbo or not color or not mask: return
@@ -23,6 +23,7 @@ class ApplyMask(Shader):
         glUseProgram(s)
         glUniform1i(glGetUniformLocation(s, "color"), 0)
         glUniform1i(glGetUniformLocation(s, "mask"), 1)
+        glUniform1f(glGetUniformLocation(s, "multiply"), multiply)
 
         glBindFramebuffer(GL_FRAMEBUFFER, fbo)
         draw_quad()

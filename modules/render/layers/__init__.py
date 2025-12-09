@@ -1,6 +1,7 @@
 from .generic.CamCompositeLayer import          CamCompositeLayer
 from .generic.CentreCamLayer import             CentreCamLayer
 from .generic.CentrePoseLayer import            CentrePoseLayer
+from .generic.MotionMultiply import             MotionMultiply
 from .generic.PDLineLayer import                PDLineLayer
 from .generic.PoseAngleDeltaBarLayer import     PoseAngleDeltaBarLayer
 from .generic.PoseMotionBarLayer import         PoseMotionBarLayer
@@ -16,7 +17,7 @@ from .generic.ElectricLayer import              ElectricLayer
 from .renderers.CamBBoxRenderer import          CamBBoxRenderer
 from .renderers.CamDepthTrackRenderer import    CamDepthTrackRenderer
 from .renderers.CamImageRenderer import         CamImageRenderer
-from .renderers.CamMaskRenderer import             CamMaskRenderer
+from .renderers.CamMaskRenderer import          CamMaskRenderer
 from .renderers.PoseBBoxRenderer import         PoseBBoxRenderer
 from .renderers.PoseMotionTimeRenderer import   PoseMotionTimeRenderer
 

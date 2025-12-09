@@ -14,6 +14,7 @@ from modules.utils.PointsAndRects import Rect, Point2f
 
 # GL
 from modules.gl.Fbo import Fbo, SwapFbo
+from modules.gl.Texture import Texture
 from modules.gl.LayerBase import LayerBase
 from modules.gl.shaders.DrawRoi import DrawRoi
 from modules.gl.shaders.Blend import Blend
@@ -71,6 +72,18 @@ class CentreCamLayer(LayerBase):
         self._on_points_updated = None
 
         HotReloadMethods(self.__class__, True, True)
+
+    @property
+    def texture(self) -> Texture:
+        return self._fbo
+
+    @property
+    def cam_texture(self) -> Texture:
+        return self._cam_blend_fbo.texture
+
+    @property
+    def mask_texture(self) -> Texture:
+        return self._mask_blur_fbo.texture
 
     def set_points_callback(self, callback) -> None:
         self._on_points_updated = callback
@@ -167,7 +180,7 @@ class CentreCamLayer(LayerBase):
 
         self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._mask_fbo.clear(0.0, 0.0, 0.0, 0.0)
-        self._fbo.clear(1.0, 1.0, 1.0, 1.0)
+        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
 
         if pose is None:
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
