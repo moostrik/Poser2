@@ -94,7 +94,7 @@ class CamMaskRenderer(LayerBase):
             self._cuda_image.draw(0, 0, w, h)
             self._fbo.end()
 
-            for i in range(0):
+            for i in range(1):
                 self._fbo.swap()
                 CamMaskRenderer._dilate_shader.use(self._fbo.fbo_id, self._fbo.back_tex_id, 1.0)
 

@@ -127,6 +127,7 @@ class CentreCamLayer(LayerBase):
         # Enable blending for drawing to screen with straight alpha
 
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        # self._cam_blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
         # self._mask_fbo.draw(rect.x, rect.y, rect.width, rect.height)
         # self._mask_blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
         # self._mask_AA_fbo.draw(rect.x, rect.y, rect.width, rect.height)

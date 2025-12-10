@@ -24,8 +24,8 @@ void main() {
     vec4 c2 = color2 * texel2;
 
     c0.a*= 1.0;
-    c1.a*= blend1;
-    c2.a*= blend2;
+    c1.a*= blend1 * texel0;
+    c2.a*= blend2 * texel0;
 
     fragColor = c0 + c1 + c2;
 

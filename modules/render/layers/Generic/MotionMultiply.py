@@ -111,6 +111,7 @@ class MotionMultiply(LayerBase):
         # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
+        self._mask_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
         if pose is None:
             return
