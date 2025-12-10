@@ -120,7 +120,7 @@ class MotionMultiply(LayerBase):
 
         motion = pose.angle_motion.aggregate(AggregationMethod.MAX)
 
-        motion = 1.0
+        # motion = 1.0
 
         # print(motion, pow(motion, 2.0))
 

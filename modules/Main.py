@@ -227,7 +227,7 @@ class Main():
         self.point_extractor.start()
 
         # SEGMENTATION
-        self.image_crop_processor.add_image_callback(self.mask_extractor.set_images)
+        self.image_crop_processor.add_image_callback(self.mask_extractor.set_crop_images)
         self.image_crop_processor.add_poses_callback(self.mask_extractor.process)
         self.mask_extractor.add_callback(self.data_hub.set_mask_tensors)
         self.mask_extractor.start()

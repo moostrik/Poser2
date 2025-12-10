@@ -20,13 +20,13 @@ from modules.render.layers.generic.MotionMultiply import MotionMultiply
 # Shaders
 from modules.gl.shaders.ApplyMask import ApplyMask
 from modules.gl.shaders.MaskMultiply import MaskMultiply
-from modules.gl.shaders.TripleBlend import TripleBlend as shader
+from modules.gl.shaders.TripleBlendColor import TripleBlendColor as shader
 
 
 class SimilarityBlend(LayerBase):
     _mask_shader: ApplyMask = ApplyMask()
     _mask_multiply_shader: MaskMultiply = MaskMultiply()
-    _shader = shader()
+    _blend_shader: shader = shader()
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, layers: dict[int, MotionMultiply]) -> None:
         self._cam_id: int = cam_id
@@ -64,8 +64,8 @@ class SimilarityBlend(LayerBase):
         self._mask_other_1_fbo.allocate(width, height, GL_R32F)
         self._mask_other_2_fbo.allocate(width, height, GL_R32F)
 
-        if not SimilarityBlend._shader.allocated:
-            SimilarityBlend._shader.allocate(monitor_file=True)
+        if not SimilarityBlend._blend_shader.allocated:
+            SimilarityBlend._blend_shader.allocate(monitor_file=True)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -75,16 +75,16 @@ class SimilarityBlend(LayerBase):
         self._mask_other_1_fbo.deallocate()
         self._mask_other_2_fbo.deallocate()
 
-        if SimilarityBlend._shader.allocated:
-            SimilarityBlend._shader.deallocate()
+        if SimilarityBlend._blend_shader.allocated:
+            SimilarityBlend._blend_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
-        self._mask_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         # reallocate shader if needed if hot-reloaded
-        if not SimilarityBlend._shader.allocated:
-            SimilarityBlend._shader.allocate(monitor_file=True)
+        if not SimilarityBlend._blend_shader.allocated:
+            SimilarityBlend._blend_shader.allocate(monitor_file=True)
         if not SimilarityBlend._mask_shader.allocated:
             SimilarityBlend._mask_shader.allocate(monitor_file=True)
         if not SimilarityBlend._mask_multiply_shader.allocated:
@@ -122,6 +122,36 @@ class SimilarityBlend(LayerBase):
 
         alpha_1 = similarity[other_1_index]
         alpha_2 = similarity[other_2_index]
+
+        colors: list[tuple[float, float, float, float]] = [
+            (1.0, 0.0, 0.0, 1.0),
+            (0.0, 1.0, 0.0, 1.0),
+            (0.0, 0.0, 1.0, 1.0)
+        ]
+
+        SimilarityBlend._blend_shader.use(self._fbo.fbo_id,
+                                          mask.tex_id, mask_other_1.tex_id, mask_other_2.tex_id,
+                                          alpha_1, alpha_2,
+                                          colors[self._cam_id], colors[other_1_index], colors[other_2_index]
+                                        )
+
+        return
+
+        glEnable(GL_BLEND)
+        # set to add
+        glBlendFunc(GL_ONE, GL_ONE)
+
+        self._fbo.begin()
+        glColor4f(*colors[self._cam_id], 1.0)
+        mask.draw(0, 0, self._fbo.width, self._fbo.height)
+        glColor4f(*colors[other_1_index], alpha_1)
+        mask_other_1.draw(0, 0, self._fbo.width, self._fbo.height)
+        glColor4f(*colors[other_2_index], alpha_2)
+        mask_other_2.draw(0, 0, self._fbo.width, self._fbo.height)
+        self._fbo.end()
+
+        return
+
 
         self._mask_other_1_fbo.begin()
         glColor4f(alpha_1, 0.0, 0.0, 0.0)

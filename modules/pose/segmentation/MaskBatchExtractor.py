@@ -41,7 +41,7 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         """Stop the segmentation processing thread."""
         self._segmentation.stop()
 
-    def set_images(self, images: dict[int, np.ndarray]) -> None:
+    def set_crop_images(self, images: dict[int, np.ndarray]) -> None:
         """Set images for processing.
 
         Args:

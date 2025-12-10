@@ -42,7 +42,7 @@ class Layers(IntEnum):
     motion_bar =    auto()
     motion_sim =    auto()
 
-    motion =        auto()
+    centre_motion =        auto()
 
     cam_mask = auto()
 
@@ -50,7 +50,7 @@ PREVIEW_LAYERS: list[Layers] = [
     Layers.centre_cam,
     # Layers.sim_blend,
     # Layers.centre_pose,
-    Layers.prev_angles,
+    # Layers.prev_angles,
     Layers.prev_mt,
 ]
 
@@ -62,9 +62,9 @@ BOX_LAYERS: list[Layers] = [
 
 FINAL_LAYERS: list[Layers] = [
     # Layers.centre_cam,
-    Layers.centre_pose,
-    Layers.motion,
-    # Layers.sim_blend,
+    # Layers.centre_pose,
+    # Layers.centre_motion,
+    Layers.sim_blend,
     # Layers.angle_bar,
     # Layers.motion_sim,
     # Layers.cam_mask,
@@ -98,7 +98,7 @@ class HDTRenderManager(RenderBase):
         self.data_hub: DataHub = data_hub
 
         # layers
-        self._update_layers: list[Layers] =     [Layers.cam_image, Layers.cam_mask, Layers.centre_cam]
+        self._update_layers: list[Layers] =     [Layers.cam_image, Layers.cam_mask, Layers.centre_cam, Layers.centre_motion]
         self._interface_layers: list[Layers] =  [Layers.cam_track, Layers.cam_bbox]
         self._preview_layers: list[Layers] =    PREVIEW_LAYERS
         self._draw_layers: list[Layers] =       FINAL_LAYERS
@@ -124,8 +124,8 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.motion_sim][i]=   layers.PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
 
             self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]), cast(layers.CamMaskRenderer, self.L[Layers.cam_mask][i]))
-            self.L[Layers.motion][i] =      layers.MotionMultiply(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]))
-            self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.MotionMultiply], self.L[Layers.motion]))
+            self.L[Layers.centre_motion][i] =      layers.MotionMultiply(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]))
+            self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.MotionMultiply], self.L[Layers.centre_motion]))
             self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
             cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]).set_points_callback(cast(layers.ElectricLayer, self.L[Layers.centre_pose][i]).setCentrePoints)
 
