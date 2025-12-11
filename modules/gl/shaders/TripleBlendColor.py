@@ -9,7 +9,10 @@ class TripleBlendColor(Shader):
     def allocate(self, monitor_file = False) -> None:
         super().allocate(self.shader_name, monitor_file)
 
-    def use(self, fbo, tex0, tex1, tex2, blend1: float, blend2: float,
+    def use(self, fbo,
+            tex0, tex1, tex2,
+            mask0, mask1, mask2,
+            blend1: float, blend2: float,
             c1, c2, c3) -> None :
         super().use()
         if not self.allocated: return
@@ -21,12 +24,21 @@ class TripleBlendColor(Shader):
         glBindTexture(GL_TEXTURE_2D, tex1)
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, tex2)
+        glActiveTexture(GL_TEXTURE3)
+        glBindTexture(GL_TEXTURE_2D, mask0)
+        glActiveTexture(GL_TEXTURE4)
+        glBindTexture(GL_TEXTURE_2D, mask1)
+        glActiveTexture(GL_TEXTURE5)
+        glBindTexture(GL_TEXTURE_2D, mask2)
 
         s = self.shader_program
         glUseProgram(s)
         glUniform1i(glGetUniformLocation(s, "tex0"), 0)
         glUniform1i(glGetUniformLocation(s, "tex1"), 1)
         glUniform1i(glGetUniformLocation(s, "tex2"), 2)
+        glUniform1i(glGetUniformLocation(s, "mask0"), 3)
+        glUniform1i(glGetUniformLocation(s, "mask1"), 4)
+        glUniform1i(glGetUniformLocation(s, "mask2"), 5)
         glUniform1f(glGetUniformLocation(s, "blend1"), blend1)
         glUniform1f(glGetUniformLocation(s, "blend2"), blend2)
         glUniform4f(glGetUniformLocation(s, "color0"), *c1)
@@ -39,6 +51,12 @@ class TripleBlendColor(Shader):
 
         glUseProgram(0)
 
+        glActiveTexture(GL_TEXTURE5)
+        glBindTexture(GL_TEXTURE_2D, 0)
+        glActiveTexture(GL_TEXTURE4)
+        glBindTexture(GL_TEXTURE_2D, 0)
+        glActiveTexture(GL_TEXTURE3)
+        glBindTexture(GL_TEXTURE_2D, 0)
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, 0)
         glActiveTexture(GL_TEXTURE1)

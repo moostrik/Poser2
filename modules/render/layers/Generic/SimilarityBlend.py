@@ -34,6 +34,7 @@ class SimilarityBlend(LayerBase):
         self._layers: dict[int, MotionMultiply] = layers
         self._fbo: Fbo = Fbo()
 
+        self._cam_fbo: Fbo = Fbo()
         self._cam_other_1_fbo: Fbo = Fbo()
         self._cam_other_2_fbo: Fbo = Fbo()
 
@@ -57,6 +58,7 @@ class SimilarityBlend(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
 
+        self._cam_fbo.allocate(width, height, internal_format)
         self._cam_other_1_fbo.allocate(width, height, internal_format)
         self._cam_other_2_fbo.allocate(width, height, internal_format)
 
@@ -103,12 +105,23 @@ class SimilarityBlend(LayerBase):
         if pose is None:
             return
 
+        colors: list[tuple[float, float, float, float]] = [
+            (1.0, 0.0, 0.0, 1.0),
+            (0.0, 0.0, 1.0, 1.0),
+            (0.0, 1.0, 0.0, 1.0)
+        ]
+
+        index = self._cam_id
         other_1_index = (self._cam_id + 1) % 3
         other_2_index = (self._cam_id + 2) % 3
 
         cam = self._layers[self._cam_id].cam_texture
         cam_other_1 = self._layers[other_1_index].cam_texture
         cam_other_2 = self._layers[other_2_index].cam_texture
+
+        self._cam_fbo.clear(*colors[index])
+        self._cam_other_1_fbo.clear(*colors[other_1_index])
+        self._cam_other_1_fbo.clear(*colors[other_2_index])
 
         mask = self._layers[self._cam_id].mask_texture
         mask_other_1 = self._layers[other_1_index].mask_texture
@@ -130,11 +143,14 @@ class SimilarityBlend(LayerBase):
         ]
 
         SimilarityBlend._blend_shader.use(self._fbo.fbo_id,
+                                          self._cam_fbo.tex_id, self._cam_other_1_fbo.tex_id, self._cam_other_2_fbo.tex_id,
                                           mask.tex_id, mask_other_1.tex_id, mask_other_2.tex_id,
                                           alpha_1, alpha_2,
                                           colors[self._cam_id], colors[other_1_index], colors[other_2_index]
                                         )
 
+
+        glEnable(GL_BLEND)
         return
 
         glEnable(GL_BLEND)
@@ -160,6 +176,3 @@ class SimilarityBlend(LayerBase):
 
         SimilarityBlend._mask_multiply_shader.use(
             self._mask_fbo.fbo_id, mask_other_1.tex_id, mask.tex_id)
-
-
-

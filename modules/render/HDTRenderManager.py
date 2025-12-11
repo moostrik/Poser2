@@ -47,9 +47,9 @@ class Layers(IntEnum):
     cam_mask = auto()
 
 PREVIEW_LAYERS: list[Layers] = [
-    Layers.centre_cam,
-    # Layers.sim_blend,
-    # Layers.centre_pose,
+    # Layers.centre_cam,
+    Layers.centre_pose,
+    Layers.sim_blend,
     # Layers.prev_angles,
     Layers.prev_mt,
 ]
@@ -65,7 +65,7 @@ FINAL_LAYERS: list[Layers] = [
     Layers.centre_pose,
     # Layers.centre_motion,
     Layers.sim_blend,
-    Layers.angle_bar,
+    # Layers.angle_bar,
     Layers.motion_sim,
     # Layers.cam_mask,
     # Layers.cam_image,
