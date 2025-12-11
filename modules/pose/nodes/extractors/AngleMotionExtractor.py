@@ -46,7 +46,7 @@ class AngleMotionExtractor(FilterNode):
         self.normalisation_factors[7] = 2.0
         self.normalisation_factors[8] = 3.0
 
-        self.noise_threshold: float = 0.1  # Noise floor - ignore motion below this
+        self.noise_threshold: float = 0.3  # Noise floor - ignore motion below this
         self.max_threshold: float = np.pi  # Upper limit for normalization
 
         motion: np.ndarray = np.abs(pose.angle_vel.values)

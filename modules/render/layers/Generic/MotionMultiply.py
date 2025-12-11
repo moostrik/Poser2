@@ -14,6 +14,7 @@ from modules.pose.Frame import Frame
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
+from modules.utils.Smoothing import EMAFilterAttackRelease
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from modules.render.layers.generic.CentreCamLayer import CentreCamLayer
@@ -45,8 +46,8 @@ class MotionMultiply(LayerBase):
 
         self.data_type: PoseDataHubTypes = data_type
 
-        self.low_threshold: float = 0.1   # Turn off below this
-        self.high_threshold: float = 0.5  # Turn on above this
+        self.low_threshold: float = 0.0   # Turn off below this
+        self.high_threshold: float = 0.1  # Turn on above this
 
         # Time-based fade parameters
         self.fade_in_duration: float = 1.0   # Time to fade in (seconds)
@@ -55,6 +56,8 @@ class MotionMultiply(LayerBase):
         self._fade_progress: float = 0.0  # Progress through current fade (0-1)
         self._target_alpha: float = 0.0
         self._last_update_time: float | None = None
+
+        self.filter = EMAFilterAttackRelease(freq=60, attack=0.1, release=0.5)
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -121,6 +124,16 @@ class MotionMultiply(LayerBase):
 
         motion = pose.angle_motion.aggregate(AggregationMethod.MAX)
 
+        t = 0.05
+        self.filter.setAttack(t)
+        self.filter.setRelease(t / 2.0)
+
+        m = motion * 1.5
+        m = min(1.0, m)
+        alpha = self.filter(m)
+        alpha = easeInOutQuad(alpha)
+
+
         # motion = 1.0
 
         # print(motion, pow(motion, 2.0))
@@ -130,7 +143,7 @@ class MotionMultiply(LayerBase):
         self.fade_in_duration = 0.4  # Time to fade in (seconds)
         self.fade_out_duration = 0.75  # Time to fade out (seconds)
         self.low_threshold = 0.01   # Turn off below this
-        self.high_threshold = 0.3  # Turn on above this
+        self.high_threshold = 0.1  # Turn on above this
 
         # Determine target alpha based on motion thresholds
         new_target = None
@@ -162,6 +175,8 @@ class MotionMultiply(LayerBase):
             start_alpha = 1.0 if self._target_alpha == 0.0 else 0.0
             self._current_alpha = start_alpha + (self._target_alpha - start_alpha) * eased_progress
 
+        self._current_alpha = alpha
+
         self._cam_fbo.begin()
         glColor4f(1.0, 1.0, 1.0, self._current_alpha)
         cam.draw(0, 0, self._cam_fbo.width, self._cam_fbo.height)
@@ -176,6 +191,3 @@ class MotionMultiply(LayerBase):
 
         glEnable(GL_BLEND)
         glColor4f(1.0, 1.0, 1.0, 1.0)
-
-
-

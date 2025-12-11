@@ -168,7 +168,7 @@ class Main():
                 lambda: nodes.AngleVelStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
                 lambda: nodes.AngleVelEuroSmoother(self.a_vel_smooth_config),
                 nodes.AngleMotionExtractor,
-                lambda: nodes.AngleMotionRateLimiter(self.motion_rate_config),
+                # lambda: nodes.AngleMotionRateLimiter(self.motion_rate_config),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
             ]
         )
