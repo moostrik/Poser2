@@ -13,7 +13,7 @@ class EMASmooth:
     Uses exponential smoothing that approaches target asymptotically.
     """
 
-    def __init__(self, vector_size: int, attack: float = 0.5, release: float = 0.2,
+    def __init__(self, vector_size: int, attack: float = 0.8, release: float = 0.5,
                  clamp_range: tuple[float, float] | None = None) -> None:
         """
         Args:
@@ -24,9 +24,9 @@ class EMASmooth:
         """
         if vector_size <= 0:
             raise ValueError("vector_size must be positive")
-        if attack <= 0 or attack > 1.0:
+        if attack < 0 or attack > 1.0:
             raise ValueError("attack must be in (0.0, 1.0]")
-        if release <= 0 or release > 1.0:
+        if release < 0 or release > 1.0:
             raise ValueError("release must be in (0.0, 1.0]")
 
         self._vector_size = vector_size
@@ -114,7 +114,7 @@ class EMASmooth:
     @attack.setter
     def attack(self, value: float) -> None:
         """Set the attack smoothing factor."""
-        if value <= 0 or value > 1.0:
+        if value < 0 or value > 1.0:
             raise ValueError("attack must be in (0.0, 1.0]")
         self._attack = float(value)
 
@@ -125,7 +125,7 @@ class EMASmooth:
     @release.setter
     def release(self, value: float) -> None:
         """Set the release smoothing factor."""
-        if value <= 0 or value > 1.0:
+        if value < 0 or value > 1.0:
             raise ValueError("release must be in (0.0, 1.0]")
         self._release = float(value)
 
@@ -138,7 +138,7 @@ class EMASmooth:
         """Set the clamp range."""
         self._clamp_range = value
 
-    def setParameters(self, attack: float = 0.5, release: float = 0.2) -> None:
+    def setParameters(self, attack: float = 0.8, release: float = 0.5) -> None:
         """Set all parameters at once.
 
         Args:
@@ -155,7 +155,7 @@ class AngleEMASmooth(EMASmooth):
     Smoothing is applied to the shortest angular path between current and target values.
     """
 
-    def __init__(self, vector_size: int, attack: float = 0.5, release: float = 0.2,
+    def __init__(self, vector_size: int, attack: float = 0.8, release: float = 0.5,
                  clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the angle EMA smoother.
 

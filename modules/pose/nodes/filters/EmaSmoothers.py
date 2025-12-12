@@ -20,20 +20,10 @@ from modules.pose.Frame import Frame, FrameField
 class EmaSmootherConfig(NodeConfigBase):
     """Configuration for EMA smoothing with automatic change notification."""
 
-    def __init__(self, attack_halflife: float = 0.5, release_halflife: float = 1.0) -> None:
+    def __init__(self, attack: float = 0.95, release: float = 0.8) -> None:
         super().__init__()
-        self.attack_halflife: float = attack_halflife
-        self.release_halflife: float = release_halflife
-
-    @property
-    def attack(self) -> float:
-        """Convert attack half-life to alpha value."""
-        return 1.0 - np.exp(-np.log(2) / self.attack_halflife)
-
-    @property
-    def release(self) -> float:
-        """Convert release half-life to alpha value."""
-        return 1.0 - np.exp(-np.log(2) / self.release_halflife)
+        self.attack: float = attack
+        self.release: float = release
 
 
 class FeatureEmaSmoother(FilterNode):

@@ -80,7 +80,7 @@ class Main():
         self.angle_interp_gui =     guis.InterpolatorGui(self.angle_interp_config, self.gui, 'ANGLE')
         self.simil_interp_gui =     guis.InterpolatorGui(self.simil_interp_config, self.gui, 'SIMILARITY')
 
-        self.motion_smooth_config = nodes.EmaSmootherConfig(attack_halflife=0.45, release_halflife=0.25)
+        self.motion_smooth_config = nodes.EmaSmootherConfig(attack=0.95, release=0.8)
         self.motion_smooth_gui =    guis.EmaSmootherGui(self.motion_smooth_config, self.gui, 'MOTION')
 
         self.simil_config =         nodes.SimilarityExtractorConfig(max_poses=settings.pose.max_poses,
