@@ -20,11 +20,20 @@ from modules.pose.Frame import Frame, FrameField
 class EmaSmootherConfig(NodeConfigBase):
     """Configuration for EMA smoothing with automatic change notification."""
 
-    def __init__(self, frequency: float = 30.0, attack: float = 0.5, release: float = 0.2) -> None:
+    def __init__(self, attack_halflife: float = 0.5, release_halflife: float = 1.0) -> None:
         super().__init__()
-        self.frequency: float = frequency
-        self.attack: float = attack
-        self.release: float = release
+        self.attack_halflife: float = attack_halflife
+        self.release_halflife: float = release_halflife
+
+    @property
+    def attack(self) -> float:
+        """Convert attack half-life to alpha value."""
+        return 1.0 - np.exp(-np.log(2) / self.attack_halflife)
+
+    @property
+    def release(self) -> float:
+        """Convert release half-life to alpha value."""
+        return 1.0 - np.exp(-np.log(2) / self.release_halflife)
 
 
 class FeatureEmaSmoother(FilterNode):
@@ -45,7 +54,6 @@ class FeatureEmaSmoother(FilterNode):
         smoother_cls = self._SMOOTH_MAP[pose_field]
         self._smoother = smoother_cls(
             vector_size=len(pose_field.get_type().enum()),
-            freq=config.frequency,
             attack=config.attack,
             release=config.release,
             clamp_range=pose_field.get_type().range()
@@ -60,9 +68,9 @@ class FeatureEmaSmoother(FilterNode):
             pass  # Config already cleaned up or listener not found
 
     def _on_config_changed(self) -> None:
-        self._smoother.freq = self._config.frequency
         self._smoother.attack = self._config.attack
         self._smoother.release = self._config.release
+        print(f"[EmaSmoother] Updated parameters: attack={self._smoother.attack:.4f}, release={self._smoother.release:.4f}")
 
     @property
     def config(self) -> EmaSmootherConfig:

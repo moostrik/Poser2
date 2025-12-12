@@ -13,9 +13,9 @@ class EmaSmootherGui:
         elm.append([
             E(eT.TEXT, 'Smooth   '),
             E(eT.TEXT, 'attack'),
-            E(eT.SLDR, name + 'attack',     self.set_attack,    0.05,    [0.0, 1.0],    0.01),
+            E(eT.SLDR, name + 'attack',     self.set_attack,    0.25,   [0.05, 1.0],    0.05),
             E(eT.TEXT, 'release'),
-            E(eT.SLDR, name + 'release',    self.set_release,   0.025,   [0.0, 1.0],    0.01)])
+            E(eT.SLDR, name + 'release',    self.set_release,   0.45,   [0.05, 1.0],    0.05)])
 
         gui_height: int = len(elm) * ELEMHEIGHT + BASEHEIGHT
         self.frame = Frame(name, elm, gui_height)
@@ -24,7 +24,7 @@ class EmaSmootherGui:
           return self.frame
 
     def set_attack(self, value: float) -> None:
-        self.config.attack = value
+        self.config.attack_halflife = value
 
     def set_release(self, value: float) -> None:
-        self.config.release = value
+        self.config.release_halflife = value

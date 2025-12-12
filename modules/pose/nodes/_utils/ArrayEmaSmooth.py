@@ -13,27 +13,23 @@ class EMASmooth:
     Uses exponential smoothing that approaches target asymptotically.
     """
 
-    def __init__(self, vector_size: int, freq: float, attack: float = 0.5, release: float = 0.2,
+    def __init__(self, vector_size: int, attack: float = 0.5, release: float = 0.2,
                  clamp_range: tuple[float, float] | None = None) -> None:
         """
         Args:
             vector_size: Number of vector components.
-            freq: Update frequency in Hz (for time correction).
-            attack: Smoothing factor for rising values (0-1). Higher = more responsive.
-            release: Smoothing factor for falling values (0-1). Higher = more responsive.
+            attack: Smoothing factor per second for rising values (0-1). Higher = more responsive.
+            release: Smoothing factor per second for falling values (0-1). Higher = more responsive.
             clamp_range: Optional (min, max) tuple to clamp values after smoothing.
         """
         if vector_size <= 0:
             raise ValueError("vector_size must be positive")
-        if freq <= 0:
-            raise ValueError("freq must be positive")
         if attack <= 0 or attack > 1.0:
             raise ValueError("attack must be in (0.0, 1.0]")
         if release <= 0 or release > 1.0:
             raise ValueError("release must be in (0.0, 1.0]")
 
         self._vector_size = vector_size
-        self._freq = float(freq)
         self._attack = float(attack)
         self._release = float(release)
         self._clamp_range: tuple[float, float] | None = clamp_range
@@ -80,8 +76,8 @@ class EMASmooth:
             # Create alpha array with attack/release values
             alpha = np.where(increasing, self._attack, self._release)
 
-            # Apply time correction
-            time_corrected_alpha = 1.0 - np.power(1.0 - alpha, dt * self._freq)
+            # Apply time correction (alpha is now per-second, dt converts to actual time)
+            time_corrected_alpha = 1.0 - np.power(1.0 - alpha, dt)
 
             # Apply EMA smoothing: value += (target - value) * alpha
             error = self._target[valid] - self._smoothed[valid]
@@ -134,17 +130,6 @@ class EMASmooth:
         self._release = float(value)
 
     @property
-    def freq(self) -> float:
-        """Get the update frequency."""
-        return self._freq
-    @freq.setter
-    def freq(self, value: float) -> None:
-        """Set the update frequency."""
-        if value <= 0:
-            raise ValueError("freq must be positive")
-        self._freq = float(value)
-
-    @property
     def clamp_range(self) -> tuple[float, float] | None:
         """Get the clamp range."""
         return self._clamp_range
@@ -153,15 +138,13 @@ class EMASmooth:
         """Set the clamp range."""
         self._clamp_range = value
 
-    def setParameters(self, freq: float, attack: float = 0.5, release: float = 0.2) -> None:
+    def setParameters(self, attack: float = 0.5, release: float = 0.2) -> None:
         """Set all parameters at once.
 
         Args:
-            freq: Update frequency in Hz (> 0)
-            attack: Smoothing factor for rising values (0-1)
-            release: Smoothing factor for falling values (0-1)
+            attack: Smoothing factor per second for rising values (0-1)
+            release: Smoothing factor per second for falling values (0-1)
         """
-        self.freq = freq
         self.attack = attack
         self.release = release
 
@@ -172,18 +155,17 @@ class AngleEMASmooth(EMASmooth):
     Smoothing is applied to the shortest angular path between current and target values.
     """
 
-    def __init__(self, vector_size: int, freq: float, attack: float = 0.5, release: float = 0.2,
+    def __init__(self, vector_size: int, attack: float = 0.5, release: float = 0.2,
                  clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the angle EMA smoother.
 
         Args:
             vector_size: Number of angles to smooth
-            freq: Update frequency in Hz (for time correction)
-            attack: Smoothing factor for rising values (0-1). Higher = more responsive.
-            release: Smoothing factor for falling values (0-1). Higher = more responsive.
+            attack: Smoothing factor per second for rising values (0-1). Higher = more responsive.
+            release: Smoothing factor per second for falling values (0-1). Higher = more responsive.
             clamp_range: Ignored for angles (wrapping is always applied)
         """
-        super().__init__(vector_size, freq, attack, release, clamp_range=None)
+        super().__init__(vector_size, attack, release, clamp_range=None)
 
     def update(self, values: np.ndarray, current_time: float | None = None) -> None:
         """Apply EMA smoothing to angles, calculating shortest angular path."""
@@ -213,18 +195,17 @@ class AngleEMASmooth(EMASmooth):
 class PointEMASmooth(EMASmooth):
     """EMA smoothing for 2D points with (x, y) coordinates."""
 
-    def __init__(self, vector_size: int, freq: float, attack: float = 0.5, release: float = 0.2,
+    def __init__(self, vector_size: int, attack: float = 0.5, release: float = 0.2,
                  clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the point EMA smoother.
 
         Args:
             vector_size: Number of points to smooth
-            freq: Update frequency in Hz (for time correction)
-            attack: Smoothing factor for rising values (0-1). Higher = more responsive.
-            release: Smoothing factor for falling values (0-1). Higher = more responsive.
+            attack: Smoothing factor per second for rising values (0-1). Higher = more responsive.
+            release: Smoothing factor per second for falling values (0-1). Higher = more responsive.
             clamp_range: Optional (min, max) tuple to clamp point coordinates
         """
-        super().__init__(vector_size * 2, freq, attack, release, clamp_range)
+        super().__init__(vector_size * 2, attack, release, clamp_range)
         self._num_points: int = vector_size
 
     def update(self, points: np.ndarray, current_time: float | None = None) -> None:

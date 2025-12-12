@@ -284,8 +284,8 @@ class SpringFilterAngular(SpringFilter):
 class EMAFilter:
     """Simple exponential smoothing (EMA/LERP).
 
-    :freq: Update frequency in Hz (for timestamp support)
-    :alpha: Smoothing factor (0-1). Higher = more responsive.
+    :freq: Update frequency in Hz (fallback when timestamp not provided)
+    :alpha: Smoothing factor per second (0-1). Higher = more responsive.
             Typical: 0.1-0.3 for smooth, 0.5-0.8 for responsive
     :initial_value: Starting value
     """
@@ -328,7 +328,7 @@ class EMAFilter:
         self.__lasttime = timestamp
         self.__lastvalue = x
 
-        time_corrected_alpha = 1.0 - pow(1.0 - self.__alpha, dt * self.__freq)
+        time_corrected_alpha = 1.0 - pow(1.0 - self.__alpha, dt)
 
         self.__value += (x - self.__value) * time_corrected_alpha
         return self.__value
@@ -356,7 +356,7 @@ class EMAFilter:
     def setAlpha(self, alpha: float) -> None:
         """Sets the smoothing factor.
 
-        :param alpha: Smoothing factor (0-1). Higher = more responsive.
+        :param alpha: Smoothing factor per second (0-1). Higher = more responsive.
         :raises ValueError: If alpha is not in (0, 1]
         """
         if alpha <= 0 or alpha > 1.0:
@@ -368,7 +368,7 @@ class EMAFilter:
         """Sets all parameters.
 
         :param freq: Update frequency in Hz (> 0)
-        :param alpha: Smoothing factor (0-1)
+        :param alpha: Smoothing factor per second (0-1)
         :raises ValueError: If any parameter is invalid
         """
         self.setFrequency(freq)
@@ -386,8 +386,8 @@ class EMAFilter:
 class EMAFilterAngular(EMAFilter):
     """Angular version of ExponentialSmoothing, handles angle wrapping.
 
-    :freq: Update frequency in Hz (for timestamp support)
-    :alpha: Smoothing factor (0-1). Higher = more responsive.
+    :freq: Update frequency in Hz (fallback when timestamp not provided)
+    :alpha: Smoothing factor per second (0-1). Higher = more responsive.
             Typical: 0.1-0.3 for smooth, 0.5-0.8 for responsive
     :initial_value: Starting angle in radians
     """
@@ -448,9 +448,9 @@ class EMAFilterAttackRelease(EMAFilter):
     """Exponential smoothing with separate attack and release rates.
     Inherits from EMAFilter and overrides direction-based alpha selection.
 
-    :freq: Update frequency in Hz (for timestamp support)
-    :attack: Smoothing factor when value is increasing (0-1). Higher = more responsive.
-    :release: Smoothing factor when value is decreasing (0-1). Higher = more responsive.
+    :freq: Update frequency in Hz (fallback when timestamp not provided)
+    :attack: Smoothing factor per second when value is increasing (0-1). Higher = more responsive.
+    :release: Smoothing factor per second when value is decreasing (0-1). Higher = more responsive.
     :initial_value: Starting value
     """
 
@@ -482,7 +482,7 @@ class EMAFilterAttackRelease(EMAFilter):
     def setAttack(self, attack: float) -> None:
         """Sets the attack smoothing factor.
 
-        :param attack: Smoothing factor for rising values (0-1). Higher = more responsive.
+        :param attack: Smoothing factor per second for rising values (0-1). Higher = more responsive.
         :raises ValueError: If attack is not in (0, 1]
         """
         if attack <= 0 or attack > 1.0:
@@ -495,7 +495,7 @@ class EMAFilterAttackRelease(EMAFilter):
     def setRelease(self, release: float) -> None:
         """Sets the release smoothing factor.
 
-        :param release: Smoothing factor for falling values (0-1). Higher = more responsive.
+        :param release: Smoothing factor per second for falling values (0-1). Higher = more responsive.
         :raises ValueError: If release is not in (0, 1]
         """
         if release <= 0 or release > 1.0:
@@ -506,7 +506,7 @@ class EMAFilterAttackRelease(EMAFilter):
     def setAlpha(self, alpha: float) -> None:
         """Sets both attack and release to the same value.
 
-        :param alpha: Smoothing factor (0-1). Higher = more responsive.
+        :param alpha: Smoothing factor per second (0-1). Higher = more responsive.
         :raises ValueError: If alpha is not in (0, 1]
         """
         self.setAttack(alpha)
@@ -516,8 +516,8 @@ class EMAFilterAttackRelease(EMAFilter):
         """Sets all parameters.
 
         :param freq: Update frequency in Hz (> 0)
-        :param attack: Smoothing factor for rising values (0-1)
-        :param release: Smoothing factor for falling values (0-1)
+        :param attack: Smoothing factor per second for rising values (0-1)
+        :param release: Smoothing factor per second for falling values (0-1)
         :raises ValueError: If any parameter is invalid
         """
         self.setFrequency(freq)
@@ -527,9 +527,9 @@ class EMAFilterAttackRelease(EMAFilter):
 class EMAFilterAttackReleaseAngular(EMAFilterAttackRelease):
     """Angular version of EMAFilterAttackRelease, handles angle wrapping.
 
-    :freq: Update frequency in Hz (for timestamp support)
-    :attack: Smoothing factor when angle is increasing (0-1). Higher = more responsive.
-    :release: Smoothing factor when angle is decreasing (0-1). Higher = more responsive.
+    :freq: Update frequency in Hz (fallback when timestamp not provided)
+    :attack: Smoothing factor per second when angle is increasing (0-1). Higher = more responsive.
+    :release: Smoothing factor per second when angle is decreasing (0-1). Higher = more responsive.
     :initial_value: Starting angle in radians
     """
 
