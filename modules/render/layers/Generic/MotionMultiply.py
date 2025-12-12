@@ -134,47 +134,6 @@ class MotionMultiply(LayerBase):
         alpha = easeInOutQuad(alpha)
 
 
-        # motion = 1.0
-
-        # print(motion, pow(motion, 2.0))
-
-        # motion = pow(motion, 2.0)  # Adjust sensitivity
-
-        self.fade_in_duration = 0.4  # Time to fade in (seconds)
-        self.fade_out_duration = 0.75  # Time to fade out (seconds)
-        self.low_threshold = 0.01   # Turn off below this
-        self.high_threshold = 0.1  # Turn on above this
-
-        # Determine target alpha based on motion thresholds
-        new_target = None
-        fade_duration = self.fade_in_duration  # Default
-        if motion >= self.high_threshold:
-            new_target = 1.0
-            fade_duration = self.fade_in_duration
-        elif motion <= self.low_threshold:
-            new_target = 0.0
-            fade_duration = self.fade_out_duration
-
-        # If target changed, reset fade progress
-        if new_target is not None and new_target != self._target_alpha:
-            self._target_alpha = new_target
-            self._fade_progress = 0.0
-
-        # Update fade progress - determine which duration to use based on target
-        if self._current_alpha != self._target_alpha:
-            fade_duration = self.fade_in_duration if self._target_alpha > self._current_alpha else self.fade_out_duration
-            if fade_duration > 0:
-                self._fade_progress = min(1.0, self._fade_progress + (dt / fade_duration))
-            else:
-                self._fade_progress = 1.0
-
-            # Apply easing to the progress
-            eased_progress = easeInOutQuad(self._fade_progress)
-
-            # Interpolate between current and target using eased progress
-            start_alpha = 1.0 if self._target_alpha == 0.0 else 0.0
-            self._current_alpha = start_alpha + (self._target_alpha - start_alpha) * eased_progress
-
         self._current_alpha = alpha
 
         self._cam_fbo.begin()

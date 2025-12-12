@@ -5,6 +5,7 @@ from time import monotonic
 # Third-party imports
 import numpy as np
 
+
 class RateLimit:
     """Asymmetric rate limiter for vector data.
 
@@ -22,15 +23,12 @@ class RateLimit:
         """
         if vector_size <= 0:
             raise ValueError("vector_size must be positive")
-        self._vector_size = vector_size
-
-        # Broadcast max_increase and max_decrease to arrays
-        self._max_increase = max_increase
-        self._max_decrease = max_decrease
-
-        if self._max_increase < 0 or self._max_decrease < 0:
+        if max_increase < 0 or max_decrease < 0:
             raise ValueError("max_increase and max_decrease must be non-negative")
 
+        self._vector_size = vector_size
+        self._max_increase = max_increase
+        self._max_decrease = max_decrease
         self._clamp_range: tuple[float, float] | None = clamp_range
 
         self._limited: np.ndarray = np.full(vector_size, np.nan)
@@ -210,6 +208,5 @@ class PointRateLimit(RateLimit):
     def value(self) -> np.ndarray:
         """Get the current limited points (returns a copy)."""
         return self._limited.reshape(self._num_points, 2).copy()
-
 
 ArrayRateLimit = Union[RateLimit, AngleRateLimit, PointRateLimit]
