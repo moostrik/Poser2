@@ -12,7 +12,7 @@ class TripleBlendColor(Shader):
     def use(self, fbo,
             tex0, tex1, tex2,
             mask0, mask1, mask2,
-            blend1: float, blend2: float,
+            blend0: float, blend1: float, blend2: float,
             c1, c2, c3) -> None :
         super().use()
         if not self.allocated: return
@@ -39,6 +39,7 @@ class TripleBlendColor(Shader):
         glUniform1i(glGetUniformLocation(s, "mask0"), 3)
         glUniform1i(glGetUniformLocation(s, "mask1"), 4)
         glUniform1i(glGetUniformLocation(s, "mask2"), 5)
+        glUniform1f(glGetUniformLocation(s, "blend0"), blend0)
         glUniform1f(glGetUniformLocation(s, "blend1"), blend1)
         glUniform1f(glGetUniformLocation(s, "blend2"), blend2)
         glUniform4f(glGetUniformLocation(s, "color0"), *c1)

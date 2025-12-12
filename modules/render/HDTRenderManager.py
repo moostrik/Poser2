@@ -124,8 +124,8 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.motion_sim][i]=   layers.PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
 
             self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]), cast(layers.CamMaskRenderer, self.L[Layers.cam_mask][i]))
-            self.L[Layers.centre_motion][i] =      layers.MotionMultiply(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]))
-            self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.MotionMultiply], self.L[Layers.centre_motion]))
+            self.L[Layers.centre_motion][i]=layers.MotionMultiply(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]))
+            self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.CentreCamLayer], self.L[Layers.centre_cam]))
             self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
             cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]).set_points_callback(cast(layers.ElectricLayer, self.L[Layers.centre_pose][i]).setCentrePoints)
 
@@ -217,6 +217,11 @@ class HDTRenderManager(RenderBase):
             for layer_type in self._preview_layers:
                 self.L[layer_type][i].draw(preview_rect)
 
+
+            cast(layers.PoseLineLayer, self.L[Layers.centre_pose][i]).line_width = 1.0
+            cast(layers.PoseLineLayer, self.L[Layers.centre_pose][i]).line_smooth = 0.0
+
+
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
@@ -230,10 +235,3 @@ class HDTRenderManager(RenderBase):
 
         for layer_type in self._draw_layers:
             self.L[layer_type][camera_id].draw(draw_rect)
-            cast(layers.PoseLineLayer, self.L[Layers.centre_pose][camera_id]).line_width = 1.0
-            cast(layers.PoseLineLayer, self.L[Layers.centre_pose][camera_id]).line_smooth = 0.0
-            # cast(layers.PoseLineLayer, self.L[Layers.centre_pose_L][camera_id]).color = (1.0, 1.0, 0.0, 0.85)
-
-        self._draw_layers = FINAL_LAYERS
-        self._preview_layers = PREVIEW_LAYERS
-        # self._draw_layers = BOX_LAYERS

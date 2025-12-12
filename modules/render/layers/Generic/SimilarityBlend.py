@@ -3,6 +3,7 @@ import numpy as np
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
+from pytweening import *    # type: ignore
 
 # Local application imports
 from modules.gl.Fbo import Fbo
@@ -14,7 +15,7 @@ from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-from modules.render.layers.generic.MotionMultiply import MotionMultiply
+from modules.render.layers.generic.CentreCamLayer import CentreCamLayer
 
 
 # Shaders
@@ -28,11 +29,13 @@ class SimilarityBlend(LayerBase):
     _mask_multiply_shader: MaskMultiply = MaskMultiply()
     _blend_shader: shader = shader()
 
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, layers: dict[int, MotionMultiply]) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, layers: dict[int, CentreCamLayer]) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
-        self._layers: dict[int, MotionMultiply] = layers
+        self._layers: dict[int, CentreCamLayer] = layers
         self._fbo: Fbo = Fbo()
+
+        self.motions: dict[int, float] = {i: 0.0 for i in range(3)}
 
         self._cam_fbo: Fbo = Fbo()
         self._cam_other_1_fbo: Fbo = Fbo()
@@ -112,42 +115,49 @@ class SimilarityBlend(LayerBase):
         ]
 
         index = self._cam_id
-        other_1_index = (self._cam_id + 1) % 3
-        other_2_index = (self._cam_id + 2) % 3
+        other_indices = [i for i in range(3) if i != self._cam_id]
+        other_1_index, other_2_index = other_indices[0], other_indices[1]
 
-        cam = self._layers[self._cam_id].cam_texture
+        # print(f"{self._layers[index].motion:.2f}, {self._layers[other_1_index].motion:.2f}, {self._layers[other_2_index].motion:.2f}")
+
+        for i in range(3):
+            motion: float = pose.angle_motion.aggregate(AggregationMethod.MAX)
+            motion = min(1.0, motion * 1.5)
+            motion = easeInOutQuad(motion)
+            self.motions[i] = motion
+
+        similarities = np.nan_to_num(pose.similarity.values)
+        threshold = 0.33
+        similarities = np.clip((similarities - threshold) / (1.0 - threshold), 0.0, 1.0)
+        exponent = 1.5
+        similarities = np.power(similarities, exponent)
+
+
+
+        cam = self._layers[index].cam_texture
         cam_other_1 = self._layers[other_1_index].cam_texture
         cam_other_2 = self._layers[other_2_index].cam_texture
 
         self._cam_fbo.clear(*colors[index])
         self._cam_other_1_fbo.clear(*colors[other_1_index])
-        self._cam_other_1_fbo.clear(*colors[other_2_index])
+        self._cam_other_2_fbo.clear(*colors[other_2_index])
 
-        mask = self._layers[self._cam_id].mask_texture
+        mask = self._layers[index].mask_texture
         mask_other_1 = self._layers[other_1_index].mask_texture
         mask_other_2 = self._layers[other_2_index].mask_texture
 
-        similarity = np.nan_to_num(pose.similarity.values)
-        threshold = 0.33
-        similarity = np.clip((similarity - threshold) / (1.0 - threshold), 0.0, 1.0)
-        exponent = 1.5
-        similarity = np.power(similarity, exponent)
 
-        alpha_1 = similarity[other_1_index]
-        alpha_2 = similarity[other_2_index]
 
-        colors: list[tuple[float, float, float, float]] = [
-            (1.0, 0.0, 0.0, 1.0),
-            (0.0, 1.0, 0.0, 1.0),
-            (0.0, 0.0, 1.0, 1.0)
-        ]
+        alpha: float =      self.motions[index]
+        alpha_1: float =    float(similarities[other_1_index]) * self.motions[other_1_index]
+        alpha_2: float =    float(similarities[other_2_index]) * self.motions[other_2_index]
 
         SimilarityBlend._blend_shader.use(self._fbo.fbo_id,
-                                          self._cam_fbo.tex_id, self._cam_other_1_fbo.tex_id, self._cam_other_2_fbo.tex_id,
-                                          mask.tex_id, mask_other_1.tex_id, mask_other_2.tex_id,
-                                          alpha_1, alpha_2,
-                                          colors[self._cam_id], colors[other_1_index], colors[other_2_index]
-                                        )
+                                          self._cam_fbo.tex_id,     self._cam_other_1_fbo.tex_id,   self._cam_other_2_fbo.tex_id,
+                                          mask.tex_id,              mask_other_1.tex_id,            mask_other_2.tex_id,
+                                          alpha,                    alpha_1,                        alpha_2,
+                                          colors[self._cam_id],     colors[other_1_index],          colors[other_2_index]
+                                          )
 
 
         glEnable(GL_BLEND)

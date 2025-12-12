@@ -60,7 +60,6 @@ class FeatureEmaSmoother(FilterNode):
     def _on_config_changed(self) -> None:
         self._smoother.attack = self._config.attack
         self._smoother.release = self._config.release
-        print(f"[EmaSmoother] Updated parameters: attack={self._smoother.attack:.4f}, release={self._smoother.release:.4f}")
 
     @property
     def config(self) -> EmaSmootherConfig:
