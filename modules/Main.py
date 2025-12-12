@@ -80,8 +80,8 @@ class Main():
         self.angle_interp_gui =     guis.InterpolatorGui(self.angle_interp_config, self.gui, 'ANGLE')
         self.simil_interp_gui =     guis.InterpolatorGui(self.simil_interp_config, self.gui, 'SIMILARITY')
 
-        self.motion_rate_config =   nodes.RateLimiterConfig(max_increase=0.5, max_decrease=0.5)
-        self.motion_rate_gui =      guis.RateLimitSmootherGui(self.motion_rate_config, self.gui, 'MOTION')
+        self.motion_smooth_config = nodes.EmaSmootherConfig(frequency=60, attack=0.05, release=0.025)
+        self.motion_smooth_gui =    guis.EmaSmootherGui(self.motion_smooth_config, self.gui, 'MOTION')
 
         self.simil_config =         nodes.SimilarityExtractorConfig(max_poses=settings.pose.max_poses,
                                                                     method=nodes.AggregationMethod.HARMONIC_MEAN,
@@ -168,7 +168,7 @@ class Main():
                 lambda: nodes.AngleVelStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
                 lambda: nodes.AngleVelEuroSmoother(self.a_vel_smooth_config),
                 nodes.AngleMotionExtractor,
-                # lambda: nodes.AngleMotionRateLimiter(self.motion_rate_config),
+                lambda: nodes.AngleMotionEmaSmoother(self.motion_smooth_config),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
             ]
         )
@@ -257,7 +257,7 @@ class Main():
         self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
-        self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame(), self.motion_rate_gui.get_gui_frame()])
+        self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame(), self.motion_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.simil_gui.get_gui_frame()])
         self.gui.addFrame([self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
 

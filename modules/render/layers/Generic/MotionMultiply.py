@@ -130,7 +130,7 @@ class MotionMultiply(LayerBase):
 
         m = motion * 1.5
         m = min(1.0, m)
-        alpha = self.filter(m)
+        alpha = m # self.filter(m)
         alpha = easeInOutQuad(alpha)
 
 

@@ -100,6 +100,10 @@ class AngleSymRateLimiter(FeatureRateLimiter):
         super().__init__(config, FrameField.angle_sym)
 
 
+class SimilarityRateLimiter(FeatureRateLimiter):
+    def __init__(self, config: RateLimiterConfig) -> None:
+        super().__init__(config, FrameField.similarity)
+
 class AngleMotionRateLimiter(FeatureRateLimiter):
     def __init__(self, config: RateLimiterConfig) -> None:
         super().__init__(config, FrameField.angle_motion)

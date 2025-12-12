@@ -1,3 +1,4 @@
+from .EmaSmootherGui import         EmaSmootherGui
 from .EuroSmootherGui import        EuroSmootherGui
 from .PredictionGui import          PredictionGui
 from .InterpolatorGui import        InterpolatorGui

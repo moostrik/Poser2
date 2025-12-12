@@ -108,3 +108,8 @@ class AngleSymEmaSmoother(FeatureEmaSmoother):
 class SimilarityEmaSmoother(FeatureEmaSmoother):
     def __init__(self, config: EmaSmootherConfig) -> None:
         super().__init__(config, FrameField.similarity)
+
+
+class AngleMotionEmaSmoother(FeatureEmaSmoother):
+    def __init__(self, config: EmaSmootherConfig) -> None:
+        super().__init__(config, FrameField.angle_motion)
