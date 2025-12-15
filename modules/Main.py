@@ -125,6 +125,7 @@ class Main():
             settings.num_players,
             [
                 lambda: nodes.PointEuroSmoother(self.point_smooth_config),
+                nodes.AngleExtractor,
                 lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
                 nodes.AngleVelExtractor,
                 nodes.AngleSymExtractor,

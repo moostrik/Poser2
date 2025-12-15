@@ -75,9 +75,9 @@ class MotionMultiply(LayerBase):
             MotionMultiply._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
-        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        # self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
         # self._cam_fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        # self._mask_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        self._mask_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         # reallocate shader if needed if hot-reloaded
@@ -104,9 +104,12 @@ class MotionMultiply(LayerBase):
         cam = self._centre_cam.cam_texture
         mask = self._centre_cam.mask_texture
 
+
+
         motion: float = pose.angle_motion.aggregate(AggregationMethod.MAX)
+        # motion = max(0.0, motion - 0.25)
         motion = min(1.0, motion * 1.5)
-        motion = easeInOutQuad(motion)
+        motion = easeInOutSine(motion)
         self._motion = motion
 
         self._cam_fbo.begin()

@@ -62,11 +62,12 @@ BOX_LAYERS: list[Layers] = [
 
 FINAL_LAYERS: list[Layers] = [
     # Layers.centre_cam,
+    # Layers.centre_pose,
+    Layers.centre_motion,
     Layers.centre_pose,
-    # Layers.centre_motion,
-    Layers.sim_blend,
+    # Layers.sim_blend,
     # Layers.angle_bar,
-    Layers.motion_sim,
+    # Layers.motion_sim,
     # Layers.cam_mask,
     # Layers.cam_image,
 ]
@@ -125,7 +126,7 @@ class HDTRenderManager(RenderBase):
 
             self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]), cast(layers.CamMaskRenderer, self.L[Layers.cam_mask][i]))
             self.L[Layers.centre_motion][i]=layers.MotionMultiply(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]))
-            self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.CentreCamLayer], self.L[Layers.centre_cam]))
+            self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.MotionMultiply], self.L[Layers.centre_motion]))
             self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
             cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]).set_points_callback(cast(layers.ElectricLayer, self.L[Layers.centre_pose][i]).setCentrePoints)
 
@@ -220,6 +221,10 @@ class HDTRenderManager(RenderBase):
 
             cast(layers.PoseLineLayer, self.L[Layers.centre_pose][i]).line_width = 1.0
             cast(layers.PoseLineLayer, self.L[Layers.centre_pose][i]).line_smooth = 0.0
+
+        self._draw_layers = FINAL_LAYERS
+        # self._draw_layers = BOX_LAYERS
+        self._preview_layers = PREVIEW_LAYERS
 
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
