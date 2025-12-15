@@ -6,10 +6,10 @@ import torch
 
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameDict
-# from modules.pose.segmentation.MODNetSegmentation import MODNetSegmentation, SegmentationInput, SegmentationOutput
 from modules.pose.segmentation.RVMSegmentation import RVMSegmentation, SegmentationInput, SegmentationOutput
 from modules.pose.Settings import Settings
 from modules.cam.depthcam.Definitions import FrameType
+from modules.utils.PerformanceTimer import PerformanceTimer
 
 
 class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
@@ -33,7 +33,7 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         self._images: dict[int, np.ndarray] = {}
 
         # Track inference times
-        self._inference_times: deque[float] = deque(maxlen=100)
+        self._timer = PerformanceTimer(name="RVM Segmentation", sample_count=100, report_interval=100)
 
         self._segmentation.register_callback(self._on_segmentation_result)
 
@@ -100,10 +100,7 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
             return
 
         # Track inference time
-        # self._inference_times.append(output.inference_time_ms)
-        # if len(self._inference_times) == 100:
-        #     avg_time = sum(self._inference_times) / len(self._inference_times)
-        #     print(f"Average inference time (last 100): {avg_time:.2f} ms")
+        self._timer.add_time(output.inference_time_ms)
 
         # Create dict mapping tracklet_id -> GPU tensor (H, W)
         mask_dict: dict[int, torch.Tensor] = {}

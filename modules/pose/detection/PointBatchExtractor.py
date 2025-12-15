@@ -9,6 +9,7 @@ from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin
 from modules.pose.Frame import FrameDict
 from modules.pose.Settings import Settings
+from modules.utils.PerformanceTimer import PerformanceTimer
 
 
 class PointBatchExtractor(PoseDictCallbackMixin):
@@ -29,6 +30,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         self._batch_counter: int = 0
         self._waiting_batches: dict[int, tuple[FrameDict, list[int]]] = {}
         self._images: dict[int, np.ndarray] = {}
+        self._timer = PerformanceTimer(name="RTM Pose", sample_count=100, report_interval=100)
 
         self._detection.register_callback(self._on_detection_result)
 
@@ -91,6 +93,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         result_poses: FrameDict = {}
 
         # print(output.inference_time_ms)
+        self._timer.add_time(output.inference_time_ms)
 
         if output.processed:
             for idx, tracklet_id in enumerate(tracklet_ids):
