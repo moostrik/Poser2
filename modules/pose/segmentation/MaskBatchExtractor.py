@@ -1,3 +1,4 @@
+from collections import deque
 from threading import Lock
 
 import numpy as np
@@ -30,6 +31,9 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         self._lock = Lock()
         self._batch_counter: int = 0
         self._images: dict[int, np.ndarray] = {}
+
+        # Track inference times
+        self._inference_times: deque[float] = deque(maxlen=100)
 
         self._segmentation.register_callback(self._on_segmentation_result)
 
@@ -95,7 +99,11 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         if not output.processed or output.mask_tensor is None:
             return
 
-        # print(output.inference_time_ms)
+        # Track inference time
+        # self._inference_times.append(output.inference_time_ms)
+        # if len(self._inference_times) == 100:
+        #     avg_time = sum(self._inference_times) / len(self._inference_times)
+        #     print(f"Average inference time (last 100): {avg_time:.2f} ms")
 
         # Create dict mapping tracklet_id -> GPU tensor (H, W)
         mask_dict: dict[int, torch.Tensor] = {}

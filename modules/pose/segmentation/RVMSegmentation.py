@@ -330,10 +330,10 @@ class RVMSegmentation(Thread):
             return torch.zeros((img.shape[0], img.shape[1]), dtype=torch.float16, device='cuda')
 
         # Preprocess: BGR -> RGB, normalize to [0, 1], HWC -> NCHW
-        img_rgb = img[:, :, ::-1].astype(np.float32)  # BGR to RGB
+        img_rgb = img[:, :, ::-1].astype(np.float16)  # BGR to RGB
         img_norm = img_rgb / 255.0  # Normalize to [0, 1]
         img_chw = np.transpose(img_norm, (2, 0, 1))  # (H, W, 3) -> (3, H, W)
-        img_nchw = np.expand_dims(img_chw, axis=0).astype(np.float32)  # (1, 3, H, W)
+        img_nchw = np.expand_dims(img_chw, axis=0).astype(np.float16)  # (1, 3, H, W) FP16
 
         # Get or initialize recurrent state for this tracklet
         with self._state_lock:
@@ -356,20 +356,20 @@ class RVMSegmentation(Thread):
         # For first frame: use (1,1,1,1) shape - RVM model expands internally
         # For subsequent frames: reuse previous output states at full resolution
         if state is not None:
-            # Use existing states from previous frame
-            onnx_inputs[input_names[1]] = state.r1
-            onnx_inputs[input_names[2]] = state.r2
-            onnx_inputs[input_names[3]] = state.r3
-            onnx_inputs[input_names[4]] = state.r4
+            # Use existing states from previous frame - convert to FP16 if needed
+            onnx_inputs[input_names[1]] = state.r1.astype(np.float16) if state.r1.dtype != np.float16 else state.r1
+            onnx_inputs[input_names[2]] = state.r2.astype(np.float16) if state.r2.dtype != np.float16 else state.r2
+            onnx_inputs[input_names[3]] = state.r3.astype(np.float16) if state.r3.dtype != np.float16 else state.r3
+            onnx_inputs[input_names[4]] = state.r4.astype(np.float16) if state.r4.dtype != np.float16 else state.r4
         else:
             # Initialize as (1,1,1,1) for first frame per RVM ONNX specification
-            onnx_inputs[input_names[1]] = np.zeros((1, 1, 1, 1), dtype=np.float32)
-            onnx_inputs[input_names[2]] = np.zeros((1, 1, 1, 1), dtype=np.float32)
-            onnx_inputs[input_names[3]] = np.zeros((1, 1, 1, 1), dtype=np.float32)
-            onnx_inputs[input_names[4]] = np.zeros((1, 1, 1, 1), dtype=np.float32)
+            onnx_inputs[input_names[1]] = np.zeros((1, 1, 1, 1), dtype=np.float16)
+            onnx_inputs[input_names[2]] = np.zeros((1, 1, 1, 1), dtype=np.float16)
+            onnx_inputs[input_names[3]] = np.zeros((1, 1, 1, 1), dtype=np.float16)
+            onnx_inputs[input_names[4]] = np.zeros((1, 1, 1, 1), dtype=np.float16)
 
-        # Add downsample_ratio (required input)
-        onnx_inputs[input_names[5]] = np.array([self.downsample_ratio], dtype=np.float32)
+        # Add downsample_ratio (required input) - FP32 only!
+        onnx_inputs[input_names[5]] = np.array([self.downsample_ratio], dtype=np.float32)  # type: ignore
 
         # Run ONNX inference
         outputs = self._session.run(None, onnx_inputs)
@@ -385,9 +385,8 @@ class RVMSegmentation(Thread):
                 self._recurrent_states[tracklet_id] = new_state
 
         # Convert numpy to PyTorch CUDA tensor for OpenGL compatibility
-        pha_tensor = torch.from_numpy(pha_np).cuda()  # (1, 1, H, W) FP32
+        pha_tensor = torch.from_numpy(pha_np).cuda()  # (1, 1, H, W) FP16
         pha_tensor = pha_tensor.squeeze(0).squeeze(0)  # (H, W)
-        pha_tensor = pha_tensor.half()  # Convert to FP16
 
         return pha_tensor
 
