@@ -106,7 +106,9 @@ class MotionMultiply(LayerBase):
 
 
 
-        motion: float = pose.angle_motion.aggregate(AggregationMethod.MAX)
+        # motion: float = pose.angle_motion.aggregate(AggregationMethod.MAX)
+        motion = float(np.nansum(pose.angle_motion.values))
+
         # motion = max(0.0, motion - 0.25)
         motion = min(1.0, motion * 1.5)
         motion = easeInOutSine(motion)

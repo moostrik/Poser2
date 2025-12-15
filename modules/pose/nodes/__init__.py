@@ -8,12 +8,14 @@ from .extractors.AgeExtractor import            AgeExtractor
 from .extractors.MotionTimeExtractor import     MotionTimeExtractor
 from .extractors.SimilarityExtractor import     SimilarityExtractorConfig,  SimilarityExtractor,    AggregationMethod
 
-from .filters.ConfidenceFilters import          ConfidenceFilterConfig,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfidenceFilter
+from .filters.ConfidenceFilters import          ConfidenceFilterConfig,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfFilter
+from .filters.DualConfidenceFilters import      DualConfFilterConfig,       BBoxDualConfFilter,     PointDualConfFilter,    AngleDualConfFilter,    AngleVelDualConfFilter,     AngleSymDualConfidenceFilter
 from .filters.Predictors import                 PredictorConfig,    BBoxPredictor,      PointPredictor,     AnglePredictor,     AngleVelPredictor,      AngleSymPredictor
 from .filters.EmaSmoothers import               EmaSmootherConfig,  BBoxEmaSmoother,    PointEmaSmoother,   AngleEmaSmoother,   AngleVelEmaSmoother,    AngleSymEmaSmoother,    SimilarityEmaSmoother,  AngleMotionEmaSmoother
 from .filters.EuroSmoothers import              EuroSmootherConfig, BBoxEuroSmoother,   PointEuroSmoother,  AngleEuroSmoother,  AngleVelEuroSmoother,   AngleSymEuroSmoother,   SimilarityEuroSmoother
 from .filters.StickyFillers import              StickyFillerConfig, BBoxStickyFiller,   PointStickyFiller,  AngleStickyFiller,  AngleVelStickyFiller,   AngleSymStickyFiller,   SimilarityStickyFiller
 from .filters.RateLimiters import               RateLimiterConfig,  BBoxRateLimiter,    PointRateLimiter,   AngleRateLimiter,   AngleVelRateLimiter,    AngleSymRateLimiter,    SimilarityRateLimiter,  AngleMotionRateLimiter
+from .filters.TemporalFilters import            TemporalStabilizerConfig,   BBoxTemporalStabilizer, PointTemporalStabilizer,    AngleTemporalStabilizer,    AngleVelTemporalStabilizer, AngleSymTemporalStabilizer
 from .filters.Validators import                 ValidatorConfig,    BBoxValidator,      PointValidator,     AngleValidator,     AngleVelValidator,      AngleSymValidator,      PoseValidator
 
 from .interpolators.ChaseInterpolators import   ChaseInterpolatorConfig,    BBoxChaseInterpolator,  PointChaseInterpolator, AngleChaseInterpolator, AngleVelChaseInterpolator,  AngleSymChaseInterpolator,  SimilarityChaseInterpolator

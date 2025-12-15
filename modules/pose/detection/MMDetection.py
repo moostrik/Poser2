@@ -97,7 +97,6 @@ class MMDetection(Thread):
         self.model_width: int = POSE_MODEL_WIDTH
         self.model_height: int = POSE_MODEL_HEIGHT
         self.model_num_warmups: int = settings.max_poses
-        self.confidence_threshold: float = settings.confidence_threshold
 
         self.verbose: bool = settings.verbose
 
@@ -248,7 +247,7 @@ class MMDetection(Thread):
 
             with torch.cuda.stream(stream):
                 data_samples: list[list[PoseDataSample]] = MMDetection._infer_batch(model, pipeline, batch.images)
-                point_list, score_list = MMDetection._extract_pose_points(data_samples, self.model_width, self.model_height, self.confidence_threshold)
+                point_list, score_list = MMDetection._extract_pose_points(data_samples, self.model_width, self.model_height)
                 stream.synchronize()
 
             inference_time_ms: float = (time.perf_counter() - batch_start) * 1000.0
@@ -359,7 +358,7 @@ class MMDetection(Thread):
             return results_by_image
 
     @staticmethod
-    def _extract_pose_points(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int, confidence_threshold: float) -> tuple[list[np.ndarray], list[np.ndarray]]:
+    def _extract_pose_points(data_samples: list[list[PoseDataSample]], model_width: int, model_height: int) -> tuple[list[np.ndarray], list[np.ndarray]]:
         """Extract normalized keypoints and scores from inference results. Returns first person per image."""
         keypoints_list: list[np.ndarray] = []
         scores_list: list[np.ndarray] = []

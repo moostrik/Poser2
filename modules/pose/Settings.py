@@ -9,7 +9,8 @@ class Settings:
     model_path: str =               field(default="models")
 
 
-    confidence_threshold: float =   field(default=0.3)
+    confidence_low: float =         field(default=0.5)
+    confidence_high: float =        field(default=0.7)
     verbose: bool =                 field(default=False)
     crop_expansion: float =         field(default=0.0)
 

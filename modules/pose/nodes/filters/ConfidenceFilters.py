@@ -10,7 +10,6 @@ from dataclasses import replace
 import numpy as np
 
 # Pose imports
-from modules.pose.features import Angles, Points2D, BBox, AngleSymmetry
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Frame import Frame, FrameField
 
@@ -32,7 +31,7 @@ class ConfidenceFilterConfig(NodeConfigBase):
         self.rescale_scores: bool = rescale_scores
 
 
-class FeatureConfidenceFilter(FilterNode):
+class ConfidenceFilter(FilterNode):
     """Generic confidence filter for pose features.
 
     Filters low-confidence values by:
@@ -101,26 +100,26 @@ class FeatureConfidenceFilter(FilterNode):
 
 
 # Convenience classes
-class BBoxConfidenceFilter(FeatureConfidenceFilter):
+class BBoxConfidenceFilter(ConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
         super().__init__(config, FrameField.bbox)
 
 
-class PointConfidenceFilter(FeatureConfidenceFilter):
+class PointConfidenceFilter(ConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
         super().__init__(config, FrameField.points)
 
 
-class AngleConfidenceFilter(FeatureConfidenceFilter):
+class AngleConfidenceFilter(ConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
         super().__init__(config, FrameField.angles)
 
 
-class AngleVelConfidenceFilter(FeatureConfidenceFilter):
+class AngleVelConfidenceFilter(ConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
         super().__init__(config, FrameField.angle_vel)
 
 
-class AngleSymConfidenceFilter(FeatureConfidenceFilter):
+class AngleSymConfFilter(ConfidenceFilter):
     def __init__(self, config: ConfidenceFilterConfig) -> None:
         super().__init__(config, FrameField.angle_sym)

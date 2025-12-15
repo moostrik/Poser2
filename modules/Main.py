@@ -114,7 +114,8 @@ class Main():
         self.pose_raw_filters =     trackers.FilterTracker(
             settings.num_players,
             [
-                lambda: nodes.PointConfidenceFilter(nodes.ConfidenceFilterConfig(settings.pose.confidence_threshold)),
+                lambda: nodes.PointDualConfFilter(nodes.DualConfFilterConfig(settings.pose.confidence_low, settings.pose.confidence_high)),
+                # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerConfig()),
                 nodes.AngleExtractor,
                 nodes.AngleVelExtractor,
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
@@ -143,7 +144,7 @@ class Main():
             [
                 lambda: nodes.PointPredictor(self.prediction_config),
                 lambda: nodes.AnglePredictor(self.prediction_config),
-                lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=True)),
+                # lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=True)),
                 # lambda: nodes.SimilarityStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
             ]

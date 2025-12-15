@@ -66,8 +66,8 @@ FINAL_LAYERS: list[Layers] = [
     Layers.centre_motion,
     Layers.centre_pose,
     # Layers.sim_blend,
-    # Layers.angle_bar,
-    # Layers.motion_sim,
+    Layers.angle_bar,
+    Layers.motion_sim,
     # Layers.cam_mask,
     # Layers.cam_image,
 ]

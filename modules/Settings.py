@@ -62,7 +62,7 @@ class Settings():
     def load(path: str) -> "Settings":
         with open(path, "r") as f:
             data: Any = json.load(f)
-        return Settings.deserialize(data, Settings)
+        return Settings.deserialize(data, Settings, validate=True)
 
     @staticmethod
     def serialize(obj) -> Any:
@@ -77,10 +77,24 @@ class Settings():
         return obj
 
     @staticmethod
-    def deserialize(data: Any, target_type: type[T]) -> T:
+    def deserialize(data: Any, target_type: type[T], validate: bool = False, path: str = "") -> T:
         if dataclasses.is_dataclass(target_type):
             fields: tuple[dataclasses.Field[Any], ...] = dataclasses.fields(target_type)
             field_types: dict[str, Any] = {f.name: f.type for f in fields if f.init}
+
+            if validate:
+                # Check for extra keys in data
+                extra_keys = set(data.keys()) - set(field_types.keys())
+                if extra_keys:
+                    location = f" at '{path}'" if path else ""
+                    print(f"SETTINGS WARNING: Extra keys in config{location}: {', '.join(sorted(extra_keys))}")
+
+                # Check for missing keys in data (even those with defaults)
+                missing_keys = set(field_types.keys()) - set(data.keys())
+                if missing_keys:
+                    location = f" at '{path}'" if path else ""
+                    print(f"SETTINGS WARNING: Missing keys in config{location}: {', '.join(sorted(missing_keys))}")
+
             kwargs: dict[str, Any] = {}
             for key, value in data.items():
                 if key in field_types:
@@ -88,7 +102,8 @@ class Settings():
                     if isinstance(field_type, str):
                         kwargs[key] = value
                     else:
-                        kwargs[key] = Settings.deserialize(value, field_type)
+                        new_path = f"{path}.{key}" if path else key
+                        kwargs[key] = Settings.deserialize(value, field_type, validate, new_path)
             # Create instance with only init fields
             instance = target_type(**kwargs)
             # Set non-init fields if present in data
@@ -106,7 +121,7 @@ class Settings():
             args: tuple[Any, ...] = get_args(target_type)
             if args:
                 item_type: Any = args[0]
-                return cast(T, [Settings.deserialize(item, item_type) for item in data])
+                return cast(T, [Settings.deserialize(item, item_type, validate, path) for item in data])
 
         if isinstance(target_type, type) and issubclass(target_type, Enum):
             return target_type[data]

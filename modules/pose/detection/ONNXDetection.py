@@ -67,7 +67,6 @@ class ONNXDetection(Thread):
         self.model_width: int = POSE_MODEL_WIDTH
         self.model_height: int = POSE_MODEL_HEIGHT
         self.model_num_warmups: int = settings.max_poses
-        self.confidence_threshold: float = settings.confidence_threshold
         self.simcc_split_ratio: float = 2.0  # From RTMPose config
 
         self.verbose: bool = settings.verbose
