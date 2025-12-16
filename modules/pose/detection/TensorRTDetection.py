@@ -15,23 +15,17 @@ import cupy as cp
 from modules.pose.detection.MMDetection import (
     DetectionInput,
     DetectionOutput,
-    PoseDetectionOutputCallback,
-    ModelType,
-    POSE_MODEL_WIDTH,
-    POSE_MODEL_HEIGHT
+    PoseDetectionOutputCallback
 )
 
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from modules.pose.Settings import Settings
+from modules.pose.Settings import Settings, ModelSize
 
 # TensorRT model file names and keypoint counts
-TENSORRT_MODEL_CONFIG: dict[ModelType, tuple[str, int]] = {
-    ModelType.NONE: ('', 17),
-    ModelType.LARGE: ('rtmpose-l_256x192.trt', 17),
-    ModelType.MEDIUM: ('rtmpose-m_256x192.trt', 17),
-    ModelType.SMALL: ('rtmpose-s_256x192.trt', 17),
-    ModelType.TINY: ('rtmpose-t_256x192.trt', 17),
+TENSORRT_MODEL_CONFIG: dict[ModelSize, tuple[str, int]] = {
+    ModelSize.LARGE: ('rtmpose-l_256x192_3.trt', 17),
+    ModelSize.MEDIUM: ('rtmpose-m_256x192.trt', 17),
+    ModelSize.SMALL: ('rtmpose-s_256x192.trt', 17),
+    ModelSize.TINY: ('rtmpose-t_256x192.trt', 17),
 }
 
 # ImageNet normalization (RGB order)
@@ -49,15 +43,11 @@ class TensorRTDetection(Thread):
     def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
-        self.enabled: bool = settings.model_type is not ModelType.NONE
-        if settings.model_type is ModelType.NONE:
-            print('TensorRT Detection WARNING: ModelType is NONE')
-
-        self.model_type: ModelType = settings.model_type
-        model_filename, self.num_keypoints = TENSORRT_MODEL_CONFIG[settings.model_type]
+        self.model_size: ModelSize = settings.model_size
+        model_filename, self.num_keypoints = TENSORRT_MODEL_CONFIG[settings.model_size]
         self.model_file: str = settings.model_path + '/' + model_filename
-        self.model_width: int = POSE_MODEL_WIDTH
-        self.model_height: int = POSE_MODEL_HEIGHT
+        self.model_width: int = settings.model_width
+        self.model_height: int = settings.model_height
         self.simcc_split_ratio: float = 2.0  # From RTMPose config
 
         self.verbose: bool = settings.verbose
@@ -92,14 +82,10 @@ class TensorRTDetection(Thread):
         return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
 
     def start(self) -> None:
-        if not self.enabled:
-            return
         self._callback_thread.start()
         super().start()
 
     def stop(self) -> None:
-        if not self.enabled:
-            return
         self._shutdown_event.set()
         self._notify_update_event.set()
         self.join(timeout=2.0)
@@ -139,13 +125,12 @@ class TensorRTDetection(Thread):
         self.output_names = []
 
         # Print tensor information
-        print("TensorRT Engine Tensors:")
         for i in range(self.engine.num_io_tensors):
             name = self.engine.get_tensor_name(i)
             mode = self.engine.get_tensor_mode(name)
             shape = self.engine.get_tensor_shape(name)
             dtype = self.engine.get_tensor_dtype(name)
-            print(f"  {name}: mode={mode}, shape={shape}, dtype={dtype}")
+            # print(f"  {name}: mode={mode}, shape={shape}, dtype={dtype}")
 
             if mode == trt.TensorIOMode.INPUT: # type: ignore
                 self.input_name = name
@@ -153,7 +138,7 @@ class TensorRTDetection(Thread):
                 self.output_names.append(name)
 
         self._model_ready.set()
-        print(f"TensorRT Detection: {self.model_type.name} model ready")
+        print(f"TensorRT Detection: {self.model_size.name} model ready")
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()
@@ -179,9 +164,9 @@ class TensorRTDetection(Thread):
         with self._input_lock:
             if self._pending_batch is not None:
                 dropped_batch = self._pending_batch
-                if self.verbose:
-                    lag = int((time.time() - self._input_timestamp) * 1000)
-                    print(f"TensorRT Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
+                # if self.verbose:
+                lag = int((time.time() - self._input_timestamp) * 1000)
+                print(f"TensorRT Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -213,7 +198,7 @@ class TensorRTDetection(Thread):
             batch_start = time.perf_counter()
 
             # Preprocess and run inference
-            keypoints, scores = self._infer_batch(batch.images)
+            keypoints, scores = self._infer_batch(batch.images, self.model_width, self.model_height)
 
             # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
@@ -271,10 +256,10 @@ class TensorRTDetection(Thread):
     # STATIC METHODS
 
     @staticmethod
-    def _preprocess_batch(imgs: list[np.ndarray]) -> np.ndarray:
+    def _preprocess_batch(imgs: list[np.ndarray], width: int, height: int) -> np.ndarray:
         """Convert BGR uint8 images to normalized RGB FP32 batch (B, 3, H, W)."""
         if not imgs:
-            return np.empty((0, 3, POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH), dtype=np.float32)
+            return np.empty((0, 3, height, width), dtype=np.float32)
 
         batch_hwc = np.stack(imgs, axis=0).astype(np.float32)
         batch_rgb = batch_hwc[:, :, :, ::-1]
@@ -308,16 +293,20 @@ class TensorRTDetection(Thread):
 
         return keypoints, scores
 
-    def _infer_batch(self, imgs: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray]:
         """Run TensorRT inference on batch of images."""
         if not imgs:
             return np.empty((0, 17, 2)), np.empty((0, 17))
 
         # Preprocess
-        batch = self._preprocess_batch(imgs)
+        batch = self._preprocess_batch(imgs, width, height)
+
 
         # Use CuPy for GPU arrays
         batch_gpu = cp.asarray(batch)
+
+        # Set input shape for current batch
+        self.context.set_input_shape(self.input_name, batch_gpu.shape)
 
         # Get output shapes from engine
         output0_shape = self.context.get_tensor_shape(self.output_names[0])

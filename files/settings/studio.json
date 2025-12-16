@@ -38,7 +38,8 @@
 
   "pose": {
     "max_poses": 3,
-    "model_type": "LARGE",
+    "model_type": "TENSORRT",
+    "model_size": "LARGE",
     "model_path": "models",
     "confidence_high": 0.7,
     "confidence_low": 0.5,

@@ -22,7 +22,7 @@ class PerformanceTimer:
         self.count: int = 0
         self.mutex = threading.Lock()
 
-    def add_time(self, time_ms: float) -> None:
+    def add_time(self, time_ms: float, report: bool = True) -> None:
         """Add timing sample and optionally print report.
 
         Args:
@@ -36,7 +36,7 @@ class PerformanceTimer:
             should_report = self.count % self.report_interval == 0
 
         # Print report OUTSIDE the lock to avoid deadlock
-        if should_report:
+        if report and should_report:
             self._print_report()
 
     def get_average(self) -> float:

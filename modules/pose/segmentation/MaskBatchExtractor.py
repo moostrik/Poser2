@@ -31,6 +31,7 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         self._lock = Lock()
         self._batch_counter: int = 0
         self._images: dict[int, np.ndarray] = {}
+        self._verbose: bool = settings.verbose
 
         # Track inference times
         self._timer = PerformanceTimer(name="RVM Segmentation", sample_count=100, report_interval=100)
@@ -100,7 +101,7 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
             return
 
         # Track inference time
-        self._timer.add_time(output.inference_time_ms)
+        self._timer.add_time(output.inference_time_ms, report=self._verbose)
 
         # Create dict mapping tracklet_id -> GPU tensor (H, W)
         mask_dict: dict[int, torch.Tensor] = {}

@@ -8,6 +8,12 @@ print("Starting RTMPose ONNX to TensorRT conversion...")
 
 # Parse ONNX model
 onnx_path = "models/rtmpose-l_256x192.onnx"
+output_path = "models/rtmpose-l_256x192_.trt"
+min_batch_size = 1
+opt_batch_size = 3
+max_batch_size = 4
+output_path: str = "models/rtmpose-l_256x192_" + str(opt_batch_size) + ".trt"
+
 
 # Check if file exists
 if not os.path.exists(onnx_path):
@@ -45,7 +51,7 @@ config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 4 << 30)  # 4GB works
 
 # RTMPose input: (batch, 3, height, width) = (1, 3, 256, 192)
 profile = builder.create_optimization_profile()
-profile.set_shape("input", (1, 3, 256, 192), (1, 3, 256, 192), (1, 3, 256, 192))
+profile.set_shape("input", (min_batch_size, 3, 256, 192), (opt_batch_size, 3, 256, 192), (max_batch_size, 3, 256, 192))
 config.add_optimization_profile(profile)
 
 # Enable FP16 for faster inference
@@ -63,7 +69,6 @@ if serialized_engine is None:
 print("Engine built successfully")
 
 # Save engine
-output_path = "models/rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.trt"
 print(f"Saving engine to {output_path}...")
 with open(output_path, "wb") as f:
     f.write(serialized_engine)

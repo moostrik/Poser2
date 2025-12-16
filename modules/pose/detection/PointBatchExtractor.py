@@ -1,16 +1,19 @@
 from dataclasses import replace
 from threading import Lock
+from typing import Union
 
 import numpy as np
 
 from modules.pose.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput
 from modules.pose.detection.ONNXDetection import ONNXDetection
+from modules.pose.detection.TensorRTDetection import TensorRTDetection
 from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin
 from modules.pose.Frame import FrameDict
-from modules.pose.Settings import Settings
+from modules.pose.Settings import Settings, ModelType
 from modules.utils.PerformanceTimer import PerformanceTimer
 
+Detection = Union[MMDetection, ONNXDetection, TensorRTDetection]
 
 class PointBatchExtractor(PoseDictCallbackMixin):
     """GPU-based batch extractor for 2D pose points using RTMPose detection.
@@ -25,12 +28,20 @@ class PointBatchExtractor(PoseDictCallbackMixin):
 
     def __init__(self, settings: Settings):
         super().__init__()
-        self._detection = ONNXDetection(settings)
+        self._detection: Detection = TensorRTDetection(settings)
+        if settings.model_type is ModelType.MM:
+            self._detection = MMDetection(settings)
+        elif settings.model_type is ModelType.ONNX:
+            self._detection = ONNXDetection(settings)
+        elif settings.model_type is ModelType.TENSORRT:
+            self._detection = TensorRTDetection(settings)
+
         self._lock = Lock()
         self._batch_counter: int = 0
         self._waiting_batches: dict[int, tuple[FrameDict, list[int]]] = {}
         self._images: dict[int, np.ndarray] = {}
         self._timer = PerformanceTimer(name="RTM Pose", sample_count=100, report_interval=100)
+        self._verbose: bool = settings.verbose
 
         self._detection.register_callback(self._on_detection_result)
 
@@ -93,7 +104,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         result_poses: FrameDict = {}
 
         # print(output.inference_time_ms)
-        self._timer.add_time(output.inference_time_ms)
+        self._timer.add_time(output.inference_time_ms, report=self._verbose)
 
         if output.processed:
             for idx, tracklet_id in enumerate(tracklet_ids):

@@ -19,35 +19,15 @@ import torch
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
-from typing import TYPE_CHECKING
+from modules.pose.Settings import Settings, ModelSize
 
-if TYPE_CHECKING:
-    from modules.pose.Settings import Settings
-
-# DEFINITIONS
-POSE_MODEL_WIDTH = 192
-POSE_MODEL_HEIGHT = 256
-
-class ModelType(IntEnum):
-    NONE =      0
-    LARGE =     auto()
-    MEDIUM =    auto()
-    SMALL =     auto()
-    TINY =      auto()
-    W_L =       auto()
-    W_M =       auto()
-    W_S =       auto()
-POSE_MODEL_TYPE_NAMES: list[str] = [e.name for e in ModelType]
 
 POSE_MODEL_FILE_NAMES: list[tuple[str, str]] = [
     ('none', ''),
     ('rtmpose-l_8xb256-420e_aic-coco-256x192.py', 'rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth'),
     ('rtmpose-m_8xb256-420e_aic-coco-256x192.py', 'rtmpose-m_simcc-aic-coco_pt-aic-coco_420e-256x192-63eb25f7_20230126.pth'),
     ('rtmpose-s_8xb256-420e_aic-coco-256x192.py', 'rtmpose-s_simcc-aic-coco_pt-aic-coco_420e-256x192-fcb2599b_20230126.pth'),
-    ('rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth'),
-    ('wb_rtmpose-l_8xb64-270e_coco-wholebody-256x192.py', 'wb_rtmpose-l_simcc-ucoco_dw-ucoco_270e-256x192-4d6dfc62_20230728.pth'),
-    ('wb_rtmpose-m_8xb64-270e_coco-wholebody-256x192.py', 'wb_rtmpose-m_simcc-ucoco_dw-ucoco_270e-256x192-c8b76419_20230728.pth'),
-    ('wb_rtmpose-s_8xb64-270e_coco-wholebody-256x192.py', 'wb_rtmpose-s_simcc-ucoco_dw-ucoco_270e-256x192-3fd922c8_20230728.pth'),
+    ('rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth')
 
 ]
 
@@ -56,12 +36,6 @@ class DetectionInput:
     """Batch of images for pose detection. Images must be 192x256 (HxW)."""
     batch_id: int
     images: list[np.ndarray]
-
-    def __post_init__(self) -> None:
-        """Validate image dimensions (debug builds only)."""
-        for i, img in enumerate(self.images):
-            assert img.shape[:2] == (POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH), \
-                f"Image {i} has incorrect shape {img.shape}, expected (256, 192)"
 
 @dataclass
 class DetectionOutput:
@@ -87,15 +61,11 @@ class MMDetection(Thread):
     def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
-        self.enabled: bool = settings.model_type is not ModelType.NONE
-        if settings.model_type is ModelType.NONE:
-            print('Pose Detection WARNING: ModelType is NONE')
-
-        self.model_type: ModelType = settings.model_type
-        self.model_config_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_type.value][0]
-        self.model_checkpoint_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_type.value][1]
-        self.model_width: int = POSE_MODEL_WIDTH
-        self.model_height: int = POSE_MODEL_HEIGHT
+        self.model_size: ModelSize = settings.model_size
+        self.model_config_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_size.value][0]
+        self.model_checkpoint_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_size.value][1]
+        self.model_width: int = settings.model_width
+        self.model_height: int = settings.model_height
         self.model_num_warmups: int = settings.max_poses
 
         self.verbose: bool = settings.verbose
@@ -123,14 +93,10 @@ class MMDetection(Thread):
         return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
 
     def start(self) -> None:
-        if not self.enabled:
-            return
         self._callback_thread.start()
         super().start()
 
     def stop(self) -> None:
-        if not self.enabled:
-            return
         """Stop both inference and callback threads gracefully"""
         self._shutdown_event.set()
 
@@ -165,9 +131,9 @@ class MMDetection(Thread):
         if scope is not None:
             init_default_scope(scope)
         pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline) # pyright: ignore
-        self._model_warmup(model, pipeline, self.model_num_warmups)
+        self._model_warmup(model, pipeline, self.model_width, self.model_height, self.model_num_warmups)
         self._model_ready.set()  # Signal model is ready
-        print(f"PoseDetection: {self.model_type.name} model ready")
+        print(f"PoseDetection: {self.model_size.name} model ready")
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()
@@ -303,7 +269,7 @@ class MMDetection(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _model_warmup(model: torch.nn.Module, pipeline: Compose, num_imgs: int) -> None:
+    def _model_warmup(model: torch.nn.Module, pipeline: Compose, width: int, height: int, num_imgs: int) -> None:
         """Initialize CUDA kernels with dummy batches of increasing sizes."""
         if num_imgs <= 0:
             return
@@ -313,7 +279,7 @@ class MMDetection(Thread):
         dummy_sizes: list[int] = [i for i in range(1, num_imgs + 1)]
         for batch_size in dummy_sizes:
             # Create batch of dummy images
-            dummy_imgs: list[np.ndarray] = [np.zeros((POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH, 3), dtype=np.uint8) for _ in range(batch_size)]
+            dummy_imgs: list[np.ndarray] = [np.zeros((height, width, 3), dtype=np.uint8) for _ in range(batch_size)]
             _: list[list[PoseDataSample]] = MMDetection._infer_batch(model, pipeline, dummy_imgs)
 
             # Ensure GPU operations are complete

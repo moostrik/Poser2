@@ -16,27 +16,18 @@ import onnxruntime as ort
 from modules.pose.detection.MMDetection import (
     DetectionInput,
     DetectionOutput,
-    PoseDetectionOutputCallback,
-    ModelType,
-    POSE_MODEL_WIDTH,
-    POSE_MODEL_HEIGHT
+    PoseDetectionOutputCallback
 )
 
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from modules.pose.Settings import Settings
+from modules.pose.Settings import Settings, ModelSize
 
 # ONNX model file names and keypoint counts
 # Format: (filename, num_keypoints)
-ONNX_MODEL_CONFIG: dict[ModelType, tuple[str, int]] = {
-    ModelType.NONE: ('', 17),
-    ModelType.LARGE: ('rtmpose-l_256x192.onnx', 17),
-    ModelType.MEDIUM: ('rtmpose-m_256x192.onnx', 17),
-    ModelType.SMALL: ('rtmpose-s_256x192.onnx', 17),
-    ModelType.TINY: ('rtmpose-t_256x192.onnx', 17),
-    ModelType.W_L: ('wb_rtmpose-l_256x192.onnx', 133),  # Wholebody: 133 keypoints
-    ModelType.W_M: ('wb_rtmpose-m_256x192.onnx', 133),
-    ModelType.W_S: ('wb_rtmpose-s_256x192.onnx', 133),
+ONNX_MODEL_CONFIG: dict[ModelSize, tuple[str, int]] = {
+    ModelSize.LARGE: ('rtmpose-l_256x192.onnx', 17),
+    ModelSize.MEDIUM: ('rtmpose-m_256x192.onnx', 17),
+    ModelSize.SMALL: ('rtmpose-s_256x192.onnx', 17),
+    ModelSize.TINY: ('rtmpose-t_256x192.onnx', 17),
 }
 
 # For Body8 models, add your specific model type or override:
@@ -57,15 +48,11 @@ class ONNXDetection(Thread):
     def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
-        self.enabled: bool = settings.model_type is not ModelType.NONE
-        if settings.model_type is ModelType.NONE:
-            print('ONNX Detection WARNING: ModelType is NONE')
-
-        self.model_type: ModelType = settings.model_type
-        model_filename, self.num_keypoints = ONNX_MODEL_CONFIG[settings.model_type]
+        self.model_type: ModelSize = settings.model_size
+        model_filename, self.num_keypoints = ONNX_MODEL_CONFIG[settings.model_size]
         self.model_file: str = settings.model_path + '/' + model_filename
-        self.model_width: int = POSE_MODEL_WIDTH
-        self.model_height: int = POSE_MODEL_HEIGHT
+        self.model_width: int = settings.model_width
+        self.model_height: int = settings.model_height
         self.model_num_warmups: int = settings.max_poses
         self.simcc_split_ratio: float = 2.0  # From RTMPose config
 
@@ -94,14 +81,10 @@ class ONNXDetection(Thread):
         return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
 
     def start(self) -> None:
-        if not self.enabled:
-            return
         self._callback_thread.start()
         super().start()
 
     def stop(self) -> None:
-        if not self.enabled:
-            return
         self._shutdown_event.set()
         self._notify_update_event.set()
         self.join(timeout=2.0)
@@ -139,7 +122,7 @@ class ONNXDetection(Thread):
         if 'CUDAExecutionProvider' not in session.get_providers():
             print("ONNX Detection WARNING: CUDA not available, using CPU")
 
-        self._model_warmup(session, self.model_num_warmups)
+        self._model_warmup(session, self.model_width, self.model_height, self.model_num_warmups)
         self._model_ready.set()
         print(f"ONNX Detection: {self.model_type.name} model ready")
 
@@ -259,10 +242,10 @@ class ONNXDetection(Thread):
     # STATIC METHODS
 
     @staticmethod
-    def _preprocess_batch(imgs: list[np.ndarray]) -> np.ndarray:
+    def _preprocess_batch(imgs: list[np.ndarray], width: int, height: int) -> np.ndarray:
         """Convert BGR uint8 images to normalized RGB FP32 batch (B, 3, H, W)."""
         if not imgs:
-            return np.empty((0, 3, POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH), dtype=np.float32)
+            return np.empty((0, 3, height, width), dtype=np.float32)
 
         # Stack and convert to float32
         batch_hwc = np.stack(imgs, axis=0).astype(np.float32)  # (B, H, W, 3)
@@ -322,7 +305,7 @@ class ONNXDetection(Thread):
             return np.empty((0, 17, 2)), np.empty((0, 17))
 
         # Preprocess
-        batch = self._preprocess_batch(imgs)
+        batch = self._preprocess_batch(imgs, self.model_width, self.model_height)
 
         # Run inference
         input_name = session.get_inputs()[0].name
@@ -335,7 +318,7 @@ class ONNXDetection(Thread):
         return keypoints, scores
 
     @staticmethod
-    def _model_warmup(session: ort.InferenceSession, num_imgs: int) -> None:
+    def _model_warmup(session: ort.InferenceSession, width: int, height: int, num_imgs: int) -> None:
         """Initialize CUDA kernels with dummy batches."""
         if num_imgs <= 0:
             return
@@ -345,7 +328,7 @@ class ONNXDetection(Thread):
         input_name = session.get_inputs()[0].name
 
         for batch_size in range(1, num_imgs + 1):
-            dummy = np.zeros((batch_size, 3, POSE_MODEL_HEIGHT, POSE_MODEL_WIDTH), dtype=np.float32)
+            dummy = np.zeros((batch_size, 3, height, width), dtype=np.float32)
             _ = session.run(None, {input_name: dummy})
 
         print("ONNX Detection: Warmup complete")

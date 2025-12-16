@@ -224,9 +224,9 @@ class RVMSegmentation(Thread):
         with self._input_lock:
             if self._pending_batch is not None:
                 dropped_batch = self._pending_batch
-                if self.verbose:
-                    lag = int((time.time() - self._input_timestamp) * 1000)
-                    print(f"RVM Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                # if self.verbose:
+                lag = int((time.time() - self._input_timestamp) * 1000)
+                print(f"RVM Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
