@@ -8,7 +8,7 @@ from modules.pose.features.Similarity import Similarity, configure_similarity, A
 from modules.pose.similarity import SimilarityBatch
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Frame import Frame
-from modules.pose.similarity.features.SimilarityFeature import SimilarityFeature
+from modules.pose.similarity.features.SimilarityFeature import SimilarityFeature, AngleLandmark
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -68,10 +68,26 @@ class SimilarityExtractor(FilterNode):
             pair_id: tuple[int, int] = (min(pose_id, other_idx), max(pose_id, other_idx))
 
             similarity_feature: SimilarityFeature | None = batch.get_pair(pair_id)
+            # print(similarity_feature)
 
             if similarity_feature is not None:
+                total_deviation: float = 0.0
+                deviation_threshold: float = 0.3
+
+                for landmark in AngleLandmark:
+                    similarity = similarity_feature.get_value(landmark, 0.0)
+                    deviation = max(0.0, 1.0 - similarity - deviation_threshold)
+                    total_deviation += deviation
+
+
+
                 # Aggregate the per-landmark similarities into overall similarity
                 overall_sim: float = similarity_feature.aggregate(config.method, 0.0, config.exponent)
+
+
+
+                # overall_sim *= 0.05
+                # overall_sim = max(0.0, 1.0 - total_deviation)
 
                 if not np.isnan(overall_sim):
                     values[other_idx] = overall_sim

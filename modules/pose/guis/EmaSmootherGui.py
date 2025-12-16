@@ -15,9 +15,9 @@ class EmaSmootherGui:
         elm.append([
             E(eT.TEXT, 'Smooth   '),
             E(eT.TEXT, 'attack'),
-            E(eT.SLDR, name + 'attack',     self.set_attack,    500,    [0, 1000],    100),
+            E(eT.SLDR, name + 'attack',     self.set_attack,    3,    [0, 3],    0.1),
             E(eT.TEXT, 'release'),
-            E(eT.SLDR, name + 'release',    self.set_release,   800,    [0, 1000],    100)])
+            E(eT.SLDR, name + 'release',    self.set_release,   5,    [0, 5],    0.1)])
 
         gui_height: int = len(elm) * ELEMHEIGHT + BASEHEIGHT
         self.frame = Frame(name, elm, gui_height)
@@ -32,18 +32,18 @@ class EmaSmootherGui:
         self.config.release = self._time_to_alpha(value)
 
 
-    def _time_to_alpha(self, time_ms: float) -> float:
-        """Convert settling time to per-second alpha.
+    def _time_to_alpha(self, time_s: float) -> float:
+        """Convert settling time (seconds) to per-second alpha.
 
         Args:
-            time_ms: Time (milliseconds) to reach 95% of target value.
+            time_s: Time (seconds) to reach 95% of target value.
 
         Frame-rate independent.
         """
-        if time_ms <= 0:
+        if time_s <= 0:
             return 1.0  # Instant
         # 95% settling time ≈ 3 * tau
-        tau_seconds = time_ms / 3000.0
+        tau_seconds = time_s / 3.0
         alpha = 1.0 - math.exp(-1.0 / tau_seconds)
         return alpha
 
@@ -55,4 +55,4 @@ class EmaSmootherGui:
             return float('inf')
         tau_seconds = -1.0 / math.log(1.0 - alpha)
         # 95% settling time ≈ 3 * tau
-        return tau_seconds * 3000.0
+        return tau_seconds * 3.0

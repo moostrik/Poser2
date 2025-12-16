@@ -189,6 +189,7 @@ class AggregationMethod(Enum):
     MAX = 'max'
     MEDIAN = 'median'
     STD = 'std'
+    CUMULATIVE = 'cumulative'
 
 
 _TINY: float = 1e-5  # Tiny value to replace zeros in geometric/harmonic means
@@ -308,6 +309,10 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
             weighted_mean = np.average(confident_values)
             variance = np.average((confident_values - weighted_mean) ** 2,)
             return float(np.sqrt(variance))
+
+        elif method == AggregationMethod.CUMULATIVE:
+            # Cumulative sum of values
+            return float(np.sum(confident_values))
 
         else:
             raise ValueError(f"Unknown aggregation method: {method}")

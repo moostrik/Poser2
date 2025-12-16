@@ -81,8 +81,8 @@ class PoseMotionSimLayer(LayerBase):
             [1.0, 1.0, 0.0, 0.5],  # Yellow
             [0.0, 1.0, 0.0, 0.5]   # Green
         ], dtype=np.float32)
-        # motion = pose.angle_motion.aggregate(AggregationMethod.MAX)
-        motion: float = np.nansum(pose.angle_motion.values)
+        motion = pose.angle_motion.aggregate(AggregationMethod.MAX)
+        # motion: float = np.nansum(pose.angle_motion.values)
         motion_array = np.array([motion], dtype=np.float32)
         motion_colors = np.array([[1.0, 1.0, 1.0, 1.0]], dtype=np.float32)
         motion_sim = similarity * motion

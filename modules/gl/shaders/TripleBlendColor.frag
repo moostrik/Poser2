@@ -28,7 +28,7 @@ void main() {
     float m1 = texture(mask1, texCoord).r;
     float m2 = texture(mask2, texCoord).r;
 
-    vec4 f0 = c0 * m0 * blend0;
+    vec4 f0 = c0 * m0;
     vec4 f1 = c1 * m1 * blend1 * blend0;
     vec4 f2 = c2 * m2 * blend2 * blend0;
 

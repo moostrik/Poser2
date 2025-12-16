@@ -43,7 +43,7 @@
     "model_path": "models",
     "confidence_high": 0.7,
     "confidence_low": 0.5,
-    "verbose": true,
+    "verbose": false,
     "crop_expansion": 0.1,
     "segmentation_enabled": true
   },

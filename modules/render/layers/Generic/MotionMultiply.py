@@ -13,7 +13,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.LayerBase import LayerBase, Rect
 from modules.gl.Texture import Texture
 
-from modules.pose.features import AggregationMethod
+from modules.pose.features import AggregationMethod, AngleMotion, AngleLandmark
 from modules.pose.Frame import Frame
 
 from modules.render.layers.generic.CentreCamLayer import CentreCamLayer
@@ -106,8 +106,18 @@ class MotionMultiply(LayerBase):
 
 
 
-        # motion: float = pose.angle_motion.aggregate(AggregationMethod.MAX)
-        motion = float(np.nansum(pose.angle_motion.values))
+        motion: float = pose.angle_motion.aggregate(AggregationMethod.MAX)
+        # motion = float(np.nansum(pose.angle_motion.values))
+        m_values = pose.angle_motion.values
+        # for i in AngleLandmark:
+        #     if m_values[i] >= 1.0:
+        #         print(AngleLandmark(i).name, m_values[i])
+                # motion -= m_values.values[i]
+
+        # print(f"Motion value: {motion:.4f}")
+
+
+        # print(pose.angle_motion.values)
 
         # motion = max(0.0, motion - 0.25)
         motion = min(1.0, motion * 1.5)
