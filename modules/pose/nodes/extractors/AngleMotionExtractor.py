@@ -50,6 +50,7 @@ class AngleMotionExtractor(FilterNode):
         self.max_threshold: float = 0.75 #np.pi  # Upper limit for normalization
 
         motion: np.ndarray = np.abs(pose.angle_vel.values)
+        # print(motion)
 
         # Remove noise: subtract threshold and clip negative values to 0
         motion = np.maximum(motion - self.noise_threshold, 0.0)
@@ -59,7 +60,7 @@ class AngleMotionExtractor(FilterNode):
 
         # Scale to [0, 1] range based on max_threshold
         motion /= self.max_threshold
-        motion = np.clip(motion, 1.0, 1.0)
+        motion = np.clip(motion, 0.0, 1.0)
 
         angle_motion: AngleMotion = AngleMotion(values=motion, scores=pose.angle_vel.scores)
         enriched_pose: Frame = replace(

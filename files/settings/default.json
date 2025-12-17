@@ -9,7 +9,6 @@
       "19443010D1E4974800",
       "19443010D14C874800"
     ],
-    "num": 3,
     "fps": 23.0,
     "yolo": true,
     "color": true,
@@ -38,12 +37,13 @@
   },
 
   "pose": {
-    "active": true,
     "max_poses": 3,
-    "model_type": "LARGE",
+    "model_type": "ONNX",
+    "model_size": "LARGE",
     "model_path": "models",
-    "confidence_threshold": 0.5,
-    "verbose": true,
+    "confidence_high": 0.7,
+    "confidence_low": 0.5,
+    "verbose": false,
     "crop_expansion": 0.1,
     "segmentation_enabled": true
   },

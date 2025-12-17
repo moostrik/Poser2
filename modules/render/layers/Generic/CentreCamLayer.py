@@ -281,6 +281,10 @@ class CentreCamLayer(LayerBase):
 
         glEnable(GL_BLEND)
 
+
+        self.target_top: Point2f = Point2f(0.5, 0.33)
+        self.target_bottom: Point2f = Point2f(0.5, 0.6)
+
     @staticmethod
     def _get_midpoint(points: Points2D, left_landmark: PointLandmark, right_landmark: PointLandmark) -> Point2f | None:
         """Get midpoint between two landmarks if both are valid.

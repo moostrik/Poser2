@@ -28,9 +28,27 @@ void main() {
     float m1 = texture(mask1, texCoord).r;
     float m2 = texture(mask2, texCoord).r;
 
-    vec4 f0 = c0 * m0;
-    vec4 f1 = c1 * m1 * blend1 * blend0;
-    vec4 f2 = c2 * m2 * blend2 * blend0;
+    vec4 f0 = color0 * m0;
+    vec4 f1 = color1 * m1 * blend1 * blend0;
+    vec4 f2 = color2 * m2 * blend2 * blend0;
 
-    fragColor = f0 + f1 + f2;
+    vec4 triple_mask = f0 + f1 + f2;
+
+    // Compute how close triple_mask is to white
+    float mask_white = min(min(triple_mask.r, triple_mask.g), triple_mask.b);
+    float blend_in = smoothstep(0.33, 0.8, mask_white);
+
+    // Compute brightness of c0
+    float brightness = dot(c0.rgb, vec3(0.299, 0.587, 0.114));
+    vec4 bright_color0 = vec4(color0.rgb * brightness, color0.a);
+
+    // Crank up contrast for the blend-in color
+    float contrast = 6.0; // Increase for more contrast
+    vec3 contrasted = clamp((bright_color0.rgb - 0.5) * contrast + 0.5, 0.0, 1.0);
+    vec4 high_contrast_color = vec4(contrasted, bright_color0.a);
+
+    vec4 baseColor = f0 + f1 + f2;
+    baseColor = mix(baseColor, high_contrast_color, blend_in);
+
+    fragColor = baseColor;
 }

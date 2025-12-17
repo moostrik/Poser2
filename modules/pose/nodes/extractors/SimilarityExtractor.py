@@ -55,8 +55,6 @@ class SimilarityExtractor(FilterNode):
         values: np.ndarray = np.full(config.max_poses, np.nan, dtype=np.float32)
         scores: np.ndarray = np.zeros(config.max_poses, dtype=np.float32)
 
-
-
         # For each possible other pose
         for other_idx in range(config.max_poses):
 
@@ -71,23 +69,7 @@ class SimilarityExtractor(FilterNode):
             # print(similarity_feature)
 
             if similarity_feature is not None:
-                total_deviation: float = 0.0
-                deviation_threshold: float = 0.3
-
-                for landmark in AngleLandmark:
-                    similarity = similarity_feature.get_value(landmark, 0.0)
-                    deviation = max(0.0, 1.0 - similarity - deviation_threshold)
-                    total_deviation += deviation
-
-
-
-                # Aggregate the per-landmark similarities into overall similarity
                 overall_sim: float = similarity_feature.aggregate(config.method, 0.0, config.exponent)
-
-
-
-                # overall_sim *= 0.05
-                # overall_sim = max(0.0, 1.0 - total_deviation)
 
                 if not np.isnan(overall_sim):
                     values[other_idx] = overall_sim

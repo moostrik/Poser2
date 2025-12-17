@@ -67,7 +67,7 @@ FINAL_LAYERS: list[Layers] = [
     Layers.centre_pose,
     Layers.sim_blend,
     # Layers.angle_bar,
-    Layers.motion_sim,
+    # Layers.motion_sim,
     # Layers.cam_mask,
     # Layers.cam_image,
 ]
@@ -84,7 +84,7 @@ DYNAMIC_LAYERS: list[Layers] = [
 
 COLORS: list[tuple[float, float, float, float]] = [
     (1.0, 0.0, 0.0, 1.85),
-    (0.0, 1.0, 1.0, 1.85),
+    (0.0, 0.0, 1.0, 1.85),
     (0.0, 1.0, 0.0, 1.85),
 ]
 
@@ -219,7 +219,7 @@ class HDTRenderManager(RenderBase):
                 self.L[layer_type][i].draw(preview_rect)
 
 
-            cast(layers.PoseLineLayer, self.L[Layers.centre_pose][i]).line_width = 1.0
+            cast(layers.PoseLineLayer, self.L[Layers.centre_pose][i]).line_width = 3.0
             cast(layers.PoseLineLayer, self.L[Layers.centre_pose][i]).line_smooth = 0.0
 
         self._draw_layers = FINAL_LAYERS

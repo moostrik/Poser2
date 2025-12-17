@@ -10,7 +10,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.Frame import Frame
 from modules.pose.features.Angles import AngleLandmark
-from modules.pose.features.AngleSymmetry import SymmetryElement
+from modules.pose.features.AngleSymmetry import SymmetryElement, AggregationMethod
 from modules.pose.similarity import SimilarityBatch, SimilarityFeature, AggregationMethod
 
 from modules.DataHub import DataHub, DataHubType
@@ -75,7 +75,10 @@ class SoundOsc:
             self._update_event.clear()
             if self._running:
 
-                self._send_data()
+                try:
+                    self._send_data()
+                except Exception as e:
+                    print(f"Error sending OSC data: {e}")
 
     def _send_data(self) -> None:
         t = perf_counter()
@@ -85,11 +88,32 @@ class SoundOsc:
         poses: dict[int, Frame] = self._data_hub.get_dict(self._config.data_type)
         num_players = self._config.num_players
 
+        motions: dict[int, float] = {}
+        for id in range(num_players):
+            if id not in poses:
+                motions[id] = 0
+            else:
+                motion = poses[id].angle_motion.aggregate(AggregationMethod.MAX)
+                motion = min(1.0, motion * 1.5)
+                motions[id] = motion
+
+        motion_similarities: dict[int, list[float]] = {}
+
+        for id in range(num_players):
+            if id in poses:
+                similarity_values: list[float] = poses[id].similarity.values.tolist()
+                other_ids = [i for i in range(3) if i != id]
+
+                for o_id in other_ids:
+                    similarity_values[o_id] *= min(motions[id], motions[o_id])
+
+                motion_similarities[id] = similarity_values
+
         for id in range(num_players):
             if id not in poses:
                 SoundOsc._build_inactive_message(id, bundle_builder)
             else:
-                SoundOsc._build_active_message(poses[id], bundle_builder)
+                SoundOsc._build_active_message(poses[id], bundle_builder, motion_similarities[id])
 
         # similarity: SimilarityBatch | None = self._data_hub.get_item(DataHubType.sim_P)
         # if similarity is not None:
@@ -111,7 +135,7 @@ class SoundOsc:
 
 
     @ staticmethod
-    def _build_active_message(pose: Frame, bundle_builder: OscBundleBuilder) -> None:
+    def _build_active_message(pose: Frame, bundle_builder: OscBundleBuilder, m_s: list[float] ) -> None:
         id: int = pose.track_id
         active_msg = OscMessageBuilder(address=f"/pose/{id}/active")
         active_msg.add_arg(1, OscMessageBuilder.ARG_TYPE_INT)
@@ -150,7 +174,7 @@ class SoundOsc:
         bundle_builder.add_content(mean_sym_msg.build()) # type: ignore
 
         # range [0, 1]
-        similarity_values: list[float] = pose.similarity.values.tolist()
+        similarity_values: list[float] = m_s #pose.similarity.values.tolist()
         similarity_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
         for similarity in similarity_values:
             similarity_msg.add_arg(similarity, OscMessageBuilder.ARG_TYPE_FLOAT)

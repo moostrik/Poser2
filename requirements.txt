@@ -1,6 +1,6 @@
 cuda-python==12.9.4
 cupy-cuda12x==13.6.0
-# tensorrt-cu12
+tensorrt-cu12
 
 depthai==2.30.0                 # latest version
 ffmpeg-python==0.2.0            # latest version
