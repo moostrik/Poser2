@@ -110,13 +110,17 @@ class SoundOsc:
 
         for id in range(num_players):
             if id in poses:
-                similarity_values: list[float] = poses[id].similarity.values.tolist()
+                values = poses[id].similarity.values
+
+                similarity_values: list[float] = np.nan_to_num(values, nan=0.0).tolist()
                 other_ids = [i for i in range(3) if i != id]
 
                 for o_id in other_ids:
                     similarity_values[o_id] *= min(motions[id], motions[o_id])
 
                 motion_similarities[id] = similarity_values
+        # if motion_similarities:
+        #     print(motion_similarities)
 
         for id in range(num_players):
             if id not in poses:
