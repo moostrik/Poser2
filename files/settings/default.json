@@ -64,7 +64,7 @@
   "gui": {
     "title": "Poser",
     "on_top": false,
-    "location_x": 600,
+    "location_x": 400,
     "location_y": 20,
     "file_path": "files",
     "default_file": "default"

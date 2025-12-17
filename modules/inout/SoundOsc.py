@@ -40,6 +40,15 @@ class SoundOsc:
         self._running = False
         self._update_event: Event = Event()
         self._thread: Thread | None = None
+        # Initialize inactive message counts for all players
+        self._inactive_message_counts: dict[int, int] = {id: 0 for id in range(self._config.num_players)}
+
+        # Pre-build inactive messages for all players
+        self._inactive_messages: dict[int, list[OscBundle]] = {}
+        for id in range(self._config.num_players):
+            bundle_builder = OscBundleBuilder(IMMEDIATELY)  # type: ignore
+            SoundOsc._build_inactive_message(id, bundle_builder, self._config.num_players)
+            self._inactive_messages[id] = bundle_builder._contents
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -111,8 +120,15 @@ class SoundOsc:
 
         for id in range(num_players):
             if id not in poses:
-                SoundOsc._build_inactive_message(id, bundle_builder)
+                # Only send inactive messages twice
+                if self._inactive_message_counts[id] < 2:
+                    self._inactive_message_counts[id] += 1
+                    # Add pre-built inactive messages to bundle
+                    for msg in self._inactive_messages[id]:
+                        bundle_builder.add_content(msg)
             else:
+                # Reset inactive count when pose becomes active
+                self._inactive_message_counts[id] = 0
                 SoundOsc._build_active_message(poses[id], bundle_builder, motion_similarities[id])
 
         # similarity: SimilarityBatch | None = self._data_hub.get_item(DataHubType.sim_P)
@@ -127,11 +143,45 @@ class SoundOsc:
 
         # print(f"SoundOSC: Sent OSC with {len(bundle_builder._contents)} messages in {perf_counter() - t:.4f} seconds")
 
-    @ staticmethod
-    def _build_inactive_message(id: int, bundle_builder: OscBundleBuilder) -> None:
+    @staticmethod
+    def _build_inactive_message(id: int, bundle_builder: OscBundleBuilder, num_players: int) -> None:
+        # Send active=0 message
         msg_builder = OscMessageBuilder(address=f"/pose/{id}/active")
         msg_builder.add_arg(0, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(msg_builder.build()) # type: ignore
+
+        # Reset time/motion to 0
+        motion_msg = OscMessageBuilder(address=f"/pose/{id}/time/motion")
+        motion_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(motion_msg.build()) # type: ignore
+
+        # Reset time/age to 0
+        age_msg = OscMessageBuilder(address=f"/pose/{id}/time/age")
+        age_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(age_msg.build()) # type: ignore
+
+        # Reset angle/rad values to 0
+        angle_reset_msg = OscMessageBuilder(address=f"/pose/{id}/angle/rad")
+        for _ in range(17):  # 17 angle values based on AngleLandmark
+            angle_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(angle_reset_msg.build()) # type: ignore
+
+        # Reset angle/vel values to 0
+        vel_reset_msg = OscMessageBuilder(address=f"/pose/{id}/angle/vel")
+        for _ in range(17):
+            vel_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(vel_reset_msg.build()) # type: ignore
+
+        # Reset angle/sym to 0
+        sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
+        sym_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(sym_msg.build()) # type: ignore
+
+        # Reset similarity values to 0
+        similarity_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
+        for _ in range(num_players):
+            similarity_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(similarity_reset_msg.build()) # type: ignore
 
 
     @ staticmethod
