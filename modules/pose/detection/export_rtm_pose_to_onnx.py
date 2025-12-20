@@ -1,3 +1,4 @@
+# type: ignore
 """Export RTMPose PyTorch models to ONNX format."""
 
 import torch

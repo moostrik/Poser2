@@ -56,6 +56,10 @@ class SimilarityBlend(LayerBase):
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
+    @property
+    def tex_id(self) -> int:
+        return self._fbo.tex_id
+
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
 

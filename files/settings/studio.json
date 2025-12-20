@@ -72,7 +72,7 @@
 
   "sound_osc": {
     "ip_addresses": "127.0.0.1",
-    "port": 8888,
+    "port": 8000,
     "num_players": 3,
     "data_type": "pose_I"
   },

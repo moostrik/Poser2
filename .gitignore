@@ -5,6 +5,7 @@ BACKUP/
 checkpoints/*
 models/*
 recordings/*
+files/audio/UMU*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
