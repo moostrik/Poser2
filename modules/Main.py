@@ -9,7 +9,7 @@ from modules.Settings import Settings
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.gui import Gui
 from modules.inout import SoundOsc
-from modules.pose import guis, nodes, trackers, PoseFromTrackletGenerator, PointBatchExtractor, SimilarityComputer, MaskBatchExtractor
+from modules.pose import guis, nodes, trackers, PoseFromTrackletGenerator, PointBatchExtractor, SimilarityComputer, MaskBatchExtractor, FlowBatchExtractor
 from modules.pose.pd_stream import PDStreamManager, PDStreamComputer
 from modules.render.HDTRenderManager import HDTRenderManager
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
@@ -92,9 +92,10 @@ class Main():
         self.pose_from_tracklet =   PoseFromTrackletGenerator(num_players)
 
         self.image_crop_processor = trackers.ImageCropProcessorTracker(num_players, self.image_crop_config)
-        self.point_extractor =      PointBatchExtractor(settings.pose) # GPU-based 2D point extractor
 
-        self.mask_extractor =       MaskBatchExtractor(settings.pose)
+        self.point_extractor =      PointBatchExtractor(settings.pose)  # GPU-based 2D point extractor
+        self.mask_extractor =       MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
+        self.flow_extractor =       FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
 
         self.pose_similator:        SimilarityComputer = SimilarityComputer()
         self.pose_similarity_extractor = nodes.SimilarityExtractor(self.simil_config)
@@ -233,6 +234,12 @@ class Main():
         self.image_crop_processor.add_poses_callback(self.mask_extractor.process)
         self.mask_extractor.add_callback(self.data_hub.set_mask_tensors)
         self.mask_extractor.start()
+
+        # FLOW
+        self.image_crop_processor.add_image_callback(self.flow_extractor.set_crop_images)
+        self.image_crop_processor.add_poses_callback(self.flow_extractor.process)
+        # self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
+        self.flow_extractor.start()
 
         # TRACKER
         self.tracker.add_tracklet_callback(self.pose_from_tracklet.submit_tracklets)

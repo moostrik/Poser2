@@ -19,10 +19,11 @@ from modules.pose.detection.MMDetection import (
 )
 
 from modules.pose.Settings import Settings, ModelSize
+from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
 # TensorRT model file names and keypoint counts
 TENSORRT_MODEL_CONFIG: dict[ModelSize, tuple[str, int]] = {
-    ModelSize.LARGE: ('rtmpose-l_256x192_3.trt', 17),
+    ModelSize.LARGE: ('rtmpose-l_256x192_batch3.trt', 17),
     ModelSize.MEDIUM: ('rtmpose-m_256x192.trt', 17),
     ModelSize.SMALL: ('rtmpose-s_256x192.trt', 17),
     ModelSize.TINY: ('rtmpose-t_256x192.trt', 17),
@@ -103,24 +104,25 @@ class TensorRTDetection(Thread):
             print("Warning: TensorRT callback thread did not stop cleanly")
 
     def run(self) -> None:
-        # Load TensorRT engine
-        logger = trt.Logger(trt.Logger.WARNING) # type: ignore
-        runtime = trt.Runtime(logger) # type: ignore
+        # Acquire global lock to prevent concurrent Myelin graph loading
+        with get_init_lock():
+            runtime = get_tensorrt_runtime()
 
-        print(f"TensorRT Detection: Loading engine from {self.model_file}")
-        with open(self.model_file, 'rb') as f:
-            engine_data = f.read()
+            print(f"TensorRT Detection: Loading engine from {self.model_file}")
+            with open(self.model_file, 'rb') as f:
+                engine_data = f.read()
 
-        self.engine = runtime.deserialize_cuda_engine(engine_data)
-        if self.engine is None:
-            print("TensorRT Detection ERROR: Failed to load engine")
-            return
+            self.engine = runtime.deserialize_cuda_engine(engine_data)
+            if self.engine is None:
+                print("TensorRT Detection ERROR: Failed to load engine")
+                return
 
-        self.context = self.engine.create_execution_context()
+            self.context = self.engine.create_execution_context()
 
-        # Create dedicated CUDA stream for better performance
-        self.stream = cp.cuda.Stream(non_blocking=True)
+            # Create dedicated CUDA stream for better performance
+            self.stream = cp.cuda.Stream(non_blocking=True)
 
+        # Lock released - continue with setup
         # Initialize output names list
         self.output_names = []
 
@@ -194,17 +196,16 @@ class TensorRTDetection(Thread):
         if batch is None:
             return
 
-        if batch.images:
-            batch_start = time.perf_counter()
+        output = DetectionOutput(batch_id=batch.batch_id, processed=True)
 
-            # Preprocess and run inference
-            keypoints, scores = self._infer_batch(batch.images, self.model_width, self.model_height)
+        # Run inference
+        if batch.images:
+            # Preprocess and run inference (timing done inside _infer_batch)
+            keypoints, scores, inference_time_ms = self._infer_batch(batch.images, self.model_width, self.model_height)
 
             # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
             keypoints[:, :, 1] /= self.model_height
-
-            inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
 
             # Convert to list format
             point_list = [keypoints[i] for i in range(len(keypoints))]
@@ -293,10 +294,10 @@ class TensorRTDetection(Thread):
 
         return keypoints, scores
 
-    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray]:
-        """Run TensorRT inference on batch of images."""
+    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float]:
+        """Run TensorRT inference on batch of images. Returns (keypoints, scores, inference_time_ms)."""
         if not imgs:
-            return np.empty((0, 17, 2)), np.empty((0, 17))
+            return np.empty((0, 17, 2)), np.empty((0, 17)), 0.0
 
         # Preprocess
         batch = self._preprocess_batch(imgs, width, height)
@@ -305,37 +306,40 @@ class TensorRTDetection(Thread):
         # Use CuPy for GPU arrays
         batch_gpu = cp.asarray(batch)
 
-        # Set input shape for current batch
-        self.context.set_input_shape(self.input_name, batch_gpu.shape)
+        # Run inference with global lock to prevent race conditions
+        with get_exec_lock():
+            # Start timing after acquiring lock (excludes wait time)
+            lock_acquired = time.perf_counter()
 
-        # Get output shapes from engine
-        output0_shape = self.context.get_tensor_shape(self.output_names[0])
-        output1_shape = self.context.get_tensor_shape(self.output_names[1])
+            # Set input shape for current batch (must be inside lock!)
+            self.context.set_input_shape(self.input_name, batch_gpu.shape)
 
-        # Allocate GPU output buffers
-        output0_gpu = cp.empty(output0_shape, dtype=cp.float32)
-        output1_gpu = cp.empty(output1_shape, dtype=cp.float32)
+            # Get output shapes from engine
+            output0_shape = self.context.get_tensor_shape(self.output_names[0])
+            output1_shape = self.context.get_tensor_shape(self.output_names[1])
 
-        # Set tensor addresses
-        self.context.set_tensor_address(self.input_name, batch_gpu.data.ptr)
-        self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
-        self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
+            # Allocate GPU output buffers
+            output0_gpu = cp.empty(output0_shape, dtype=cp.float32)
+            output1_gpu = cp.empty(output1_shape, dtype=cp.float32)
 
-        # Run inference on dedicated stream
-        with self.stream:
-            self.context.execute_async_v3(stream_handle=self.stream.ptr)
+            # Set tensor addresses
+            self.context.set_tensor_address(self.input_name, batch_gpu.data.ptr)
+            self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
+            self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
 
-        # Wait for completion and copy back to CPU
-        self.stream.synchronize()
+            # Execute inference
+            with self.stream:
+                self.context.execute_async_v3(stream_handle=self.stream.ptr)
+            self.stream.synchronize()
+
+        # Copy back to CPU
         simcc_x = cp.asnumpy(output0_gpu)
         simcc_y = cp.asnumpy(output1_gpu)
 
-        # Decode SimCC outputs
-        keypoints, scores = TensorRTDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
-
-        return keypoints, scores
+        # Return time spent in lock (actual inference time)
+        inference_time = (time.perf_counter() - lock_acquired) * 1000.0
 
         # Decode SimCC outputs
         keypoints, scores = TensorRTDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
 
-        return keypoints, scores
+        return keypoints, scores, inference_time
