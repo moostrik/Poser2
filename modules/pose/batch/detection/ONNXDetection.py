@@ -1,3 +1,5 @@
+# Create: modules/pose/detection/ONNXDetection.py
+
 # Standard library imports
 from dataclasses import dataclass
 from queue import Queue, Empty
@@ -8,52 +10,55 @@ from typing import Callable
 
 # Third-party imports
 import numpy as np
-import tensorrt as trt
-import cupy as cp
+import onnxruntime as ort
 
 # Reuse dataclasses from MMDetection
-from modules.pose.detection.MMDetection import (
+from modules.pose.batch.detection.MMDetection import (
     DetectionInput,
     DetectionOutput,
     PoseDetectionOutputCallback
 )
 
 from modules.pose.Settings import Settings, ModelSize
-from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
-# TensorRT model file names and keypoint counts
-TENSORRT_MODEL_CONFIG: dict[ModelSize, tuple[str, int]] = {
-    ModelSize.LARGE: ('rtmpose-l_256x192_batch3.trt', 17),
-    ModelSize.MEDIUM: ('rtmpose-m_256x192.trt', 17),
-    ModelSize.SMALL: ('rtmpose-s_256x192.trt', 17),
-    ModelSize.TINY: ('rtmpose-t_256x192.trt', 17),
+# ONNX model file names and keypoint counts
+# Format: (filename, num_keypoints)
+ONNX_MODEL_CONFIG: dict[ModelSize, tuple[str, int]] = {
+    ModelSize.LARGE: ('rtmpose-l_256x192.onnx', 17),
+    ModelSize.MEDIUM: ('rtmpose-m_256x192.onnx', 17),
+    ModelSize.SMALL: ('rtmpose-s_256x192.onnx', 17),
+    ModelSize.TINY: ('rtmpose-t_256x192.onnx', 17),
 }
+
+# For Body8 models, add your specific model type or override:
+# ONNX_MODEL_CONFIG[ModelType.CUSTOM] = ('body8_model.onnx', 8)
 
 # ImageNet normalization (RGB order)
 IMAGENET_MEAN = np.array([123.675, 116.28, 103.53], dtype=np.float32).reshape(1, 3, 1, 1)
 IMAGENET_STD = np.array([58.395, 57.12, 57.375], dtype=np.float32).reshape(1, 3, 1, 1)
 
 
-class TensorRTDetection(Thread):
-    """Asynchronous GPU pose detection using TensorRT.
+class ONNXDetection(Thread):
+    """Asynchronous GPU pose detection using ONNX Runtime.
 
-    Optimized inference using TensorRT engines for maximum performance.
-    Architecture identical to ONNXDetection for drop-in replacement.
+    Faster alternative to MMDetection using exported ONNX models.
+    Architecture identical to MMDetection for drop-in replacement.
     """
 
     def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
-        self.model_size: ModelSize = settings.model_size
-        model_filename, self.num_keypoints = TENSORRT_MODEL_CONFIG[settings.model_size]
+        self.model_type: ModelSize = settings.model_size
+        model_filename, self.num_keypoints = ONNX_MODEL_CONFIG[settings.model_size]
         self.model_file: str = settings.model_path + '/' + model_filename
         self.model_width: int = settings.model_width
         self.model_height: int = settings.model_height
+        self.model_num_warmups: int = settings.max_poses
         self.simcc_split_ratio: float = 2.0  # From RTMPose config
 
         self.verbose: bool = settings.verbose
 
-        # Thread coordination
+        # Thread coordination (identical to MMDetection)
         self._shutdown_event: Event = Event()
         self._notify_update_event: Event = Event()
         self._model_ready: Event = Event()
@@ -70,13 +75,6 @@ class TensorRTDetection(Thread):
         self._callback_queue: Queue[DetectionOutput | None] = Queue(maxsize=2)
         self._callback_thread: Thread = Thread(target=self._callback_worker_loop, daemon=True)
 
-        # TensorRT engine and context (initialized in run())
-        self.engine: trt.ICudaEngine # type: ignore
-        self.context: trt.IExecutionContext # type: ignore
-        self.input_name: str
-        self.output_names: list[str]
-        self.stream: cp.cuda.Stream
-
     @property
     def is_ready(self) -> bool:
         """Check if model is loaded and ready"""
@@ -92,7 +90,7 @@ class TensorRTDetection(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            print("Warning: TensorRT inference thread did not stop cleanly")
+            print("Warning: ONNX inference thread did not stop cleanly")
 
         try:
             self._callback_queue.put_nowait(None)
@@ -101,46 +99,32 @@ class TensorRTDetection(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            print("Warning: TensorRT callback thread did not stop cleanly")
+            print("Warning: ONNX callback thread did not stop cleanly")
 
     def run(self) -> None:
-        # Acquire global lock to prevent concurrent Myelin graph loading
-        with get_init_lock():
-            runtime = get_tensorrt_runtime()
+        # Create ONNX Runtime session with CUDA
+        providers = [
+            ('CUDAExecutionProvider', {
+                'device_id': 0,
+                'arena_extend_strategy': 'kNextPowerOfTwo',
+                'gpu_mem_limit': 2 * 1024 * 1024 * 1024,
+                'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                'do_copy_in_default_stream': True,
+            }),
+            'CPUExecutionProvider',
+        ]
 
-            print(f"TensorRT Detection: Loading engine from {self.model_file}")
-            with open(self.model_file, 'rb') as f:
-                engine_data = f.read()
+        sess_options = ort.SessionOptions()
+        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
-            self.engine = runtime.deserialize_cuda_engine(engine_data)
-            if self.engine is None:
-                print("TensorRT Detection ERROR: Failed to load engine")
-                return
+        session = ort.InferenceSession(self.model_file, sess_options, providers=providers)
 
-            self.context = self.engine.create_execution_context()
+        if 'CUDAExecutionProvider' not in session.get_providers():
+            print("ONNX Detection WARNING: CUDA not available, using CPU")
 
-            # Create dedicated CUDA stream for better performance
-            self.stream = cp.cuda.Stream(non_blocking=True)
-
-        # Lock released - continue with setup
-        # Initialize output names list
-        self.output_names = []
-
-        # Print tensor information
-        for i in range(self.engine.num_io_tensors):
-            name = self.engine.get_tensor_name(i)
-            mode = self.engine.get_tensor_mode(name)
-            shape = self.engine.get_tensor_shape(name)
-            dtype = self.engine.get_tensor_dtype(name)
-            # print(f"  {name}: mode={mode}, shape={shape}, dtype={dtype}")
-
-            if mode == trt.TensorIOMode.INPUT: # type: ignore
-                self.input_name = name
-            else:
-                self.output_names.append(name)
-
+        self._model_warmup(session, self.model_width, self.model_height, self.model_num_warmups)
         self._model_ready.set()
-        print(f"TensorRT Detection: {self.model_size.name} model ready")
+        print(f"ONNX Detection: {self.model_type.name} model ready")
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()
@@ -151,13 +135,13 @@ class TensorRTDetection(Thread):
             self._notify_update_event.clear()
 
             try:
-                self._process_pending_batch()
+                self._process_pending_batch(session)
             except Exception as e:
-                print(f"TensorRT Detection Error: {str(e)}")
+                print(f"ONNX Detection Error: {str(e)}")
                 traceback.print_exc()
 
     def submit_batch(self, input_batch: DetectionInput) -> None:
-        """Submit batch for processing."""
+        """Submit batch for processing. Identical to MMDetection."""
         if self._shutdown_event.is_set():
             return
 
@@ -166,9 +150,9 @@ class TensorRTDetection(Thread):
         with self._input_lock:
             if self._pending_batch is not None:
                 dropped_batch = self._pending_batch
-                # if self.verbose:
-                lag = int((time.time() - self._input_timestamp) * 1000)
-                print(f"TensorRT Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
+                if self.verbose:
+                    lag = int((time.time() - self._input_timestamp) * 1000)
+                    print(f"ONNX Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -190,24 +174,25 @@ class TensorRTDetection(Thread):
             self._pending_batch = None
             return batch
 
-    def _process_pending_batch(self) -> None:
+    def _process_pending_batch(self, session: ort.InferenceSession) -> None:
         batch: DetectionInput | None = self._retrieve_pending_batch()
 
         if batch is None:
             return
 
-        output = DetectionOutput(batch_id=batch.batch_id, processed=True)
-
-        # Run inference
         if batch.images:
-            # Preprocess and run inference (timing done inside _infer_batch)
-            keypoints, scores, inference_time_ms = self._infer_batch(batch.images, self.model_width, self.model_height)
+            batch_start = time.perf_counter()
+
+            # Preprocess and run inference
+            keypoints, scores = self._infer_batch(session, batch.images)
 
             # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
             keypoints[:, :, 1] /= self.model_height
 
-            # Convert to list format
+            inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
+
+            # Convert to list format matching MMDetection
             point_list = [keypoints[i] for i in range(len(keypoints))]
             score_list = [scores[i] for i in range(len(scores))]
 
@@ -224,10 +209,10 @@ class TensorRTDetection(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            print("TensorRT Detection Warning: Callback queue full")
+            print("ONNX Detection Warning: Callback queue full")
 
     def _callback_worker_loop(self) -> None:
-        """Dispatch results to callbacks."""
+        """Dispatch results to callbacks. Identical to MMDetection."""
         while not self._shutdown_event.is_set():
             try:
                 output: DetectionOutput | None = self._callback_queue.get(timeout=0.5)
@@ -242,7 +227,7 @@ class TensorRTDetection(Thread):
                     try:
                         callback(output)
                     except Exception as e:
-                        print(f"TensorRT Detection Callback Error: {str(e)}")
+                        print(f"ONNX Detection Callback Error: {str(e)}")
                         traceback.print_exc()
 
                 self._callback_queue.task_done()
@@ -262,22 +247,37 @@ class TensorRTDetection(Thread):
         if not imgs:
             return np.empty((0, 3, height, width), dtype=np.float32)
 
-        batch_hwc = np.stack(imgs, axis=0).astype(np.float32)
+        # Stack and convert to float32
+        batch_hwc = np.stack(imgs, axis=0).astype(np.float32)  # (B, H, W, 3)
+
+        # BGR to RGB
         batch_rgb = batch_hwc[:, :, :, ::-1]
-        batch_chw = batch_rgb.transpose(0, 3, 1, 2)
+
+        # HWC to CHW
+        batch_chw = batch_rgb.transpose(0, 3, 1, 2)  # (B, 3, H, W)
+
+        # Normalize with ImageNet stats
         batch_norm = (batch_chw - IMAGENET_MEAN) / IMAGENET_STD
 
         return batch_norm
 
     @staticmethod
     def _decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float) -> tuple[np.ndarray, np.ndarray]:
-        """Decode SimCC outputs to keypoints and scores."""
+        """Decode SimCC using MMPose's exact method from get_simcc_maximum.
+
+        Reference: mmpose/codecs/utils/post_processing.py::get_simcc_maximum
+        Reference: projects/rtmpose/examples/onnxruntime/main.py
+        Reference: rtmpose.cpp line 150: score = MAX(score_x, score_y)
+        """
+        # Get coordinates from argmax of raw logits
         x_locs = np.argmax(simcc_x, axis=-1)
         y_locs = np.argmax(simcc_y, axis=-1)
 
+        # Convert bin indices to normalized coordinates
         x_coords = x_locs.astype(np.float32) / split_ratio
         y_coords = y_locs.astype(np.float32) / split_ratio
 
+        # Get max logit values at predicted locations
         batch_size, num_keypoints = simcc_x.shape[:2]
         x_scores = np.zeros((batch_size, num_keypoints), dtype=np.float32)
         y_scores = np.zeros((batch_size, num_keypoints), dtype=np.float32)
@@ -287,59 +287,48 @@ class TensorRTDetection(Thread):
                 x_scores[b, k] = simcc_x[b, k, x_locs[b, k]]
                 y_scores[b, k] = simcc_y[b, k, y_locs[b, k]]
 
+        # MMPose uses element-wise MAX not product!
+        # C++ implementation: score = MAX(score_x, score_y)
         scores = np.maximum(x_scores, y_scores)
+
+        # Clip scores to [0, 1] range
         scores = np.clip(scores, 0.0, 1.0)
 
+        # Stack coordinates
         keypoints = np.stack([x_coords, y_coords], axis=-1)
 
         return keypoints, scores
 
-    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float]:
-        """Run TensorRT inference on batch of images. Returns (keypoints, scores, inference_time_ms)."""
+    def _infer_batch(self, session: ort.InferenceSession, imgs: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+        """Run ONNX inference on batch of images."""
         if not imgs:
-            return np.empty((0, 17, 2)), np.empty((0, 17)), 0.0
+            return np.empty((0, 17, 2)), np.empty((0, 17))
 
         # Preprocess
-        batch = self._preprocess_batch(imgs, width, height)
+        batch = self._preprocess_batch(imgs, self.model_width, self.model_height)
 
-
-        # Use CuPy for GPU arrays
-        batch_gpu = cp.asarray(batch)
-
-        # Run inference with global lock to prevent race conditions
-        with get_exec_lock():
-            # Start timing after acquiring lock (excludes wait time)
-            lock_acquired = time.perf_counter()
-
-            # Set input shape for current batch (must be inside lock!)
-            self.context.set_input_shape(self.input_name, batch_gpu.shape)
-
-            # Get output shapes from engine
-            output0_shape = self.context.get_tensor_shape(self.output_names[0])
-            output1_shape = self.context.get_tensor_shape(self.output_names[1])
-
-            # Allocate GPU output buffers
-            output0_gpu = cp.empty(output0_shape, dtype=cp.float32)
-            output1_gpu = cp.empty(output1_shape, dtype=cp.float32)
-
-            # Set tensor addresses
-            self.context.set_tensor_address(self.input_name, batch_gpu.data.ptr)
-            self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
-            self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
-
-            # Execute inference
-            with self.stream:
-                self.context.execute_async_v3(stream_handle=self.stream.ptr)
-            self.stream.synchronize()
-
-        # Copy back to CPU
-        simcc_x = cp.asnumpy(output0_gpu)
-        simcc_y = cp.asnumpy(output1_gpu)
-
-        # Return time spent in lock (actual inference time)
-        inference_time = (time.perf_counter() - lock_acquired) * 1000.0
+        # Run inference
+        input_name = session.get_inputs()[0].name
+        outputs = session.run(None, {input_name: batch})
 
         # Decode SimCC outputs
-        keypoints, scores = TensorRTDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
+        simcc_x, simcc_y = outputs[0], outputs[1]  # (B, 17, 384), (B, 17, 512)
+        keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)  # type: ignore
 
-        return keypoints, scores, inference_time
+        return keypoints, scores
+
+    @staticmethod
+    def _model_warmup(session: ort.InferenceSession, width: int, height: int, num_imgs: int) -> None:
+        """Initialize CUDA kernels with dummy batches."""
+        if num_imgs <= 0:
+            return
+        if num_imgs > 8:
+            num_imgs = 8
+
+        input_name = session.get_inputs()[0].name
+
+        for batch_size in range(1, num_imgs + 1):
+            dummy = np.zeros((batch_size, 3, height, width), dtype=np.float32)
+            _ = session.run(None, {input_name: dummy})
+
+        print("ONNX Detection: Warmup complete")

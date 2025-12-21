@@ -4,9 +4,9 @@ from typing import Union
 
 import numpy as np
 
-from modules.pose.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput
-from modules.pose.detection.ONNXDetection import ONNXDetection
-from modules.pose.detection.TensorRTDetection import TensorRTDetection
+from modules.pose.batch.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput
+from modules.pose.batch.detection.ONNXDetection import ONNXDetection
+from modules.pose.batch.detection.TensorRTDetection import TensorRTDetection
 from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin
 from modules.pose.Frame import FrameDict
@@ -39,7 +39,6 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         self._lock = Lock()
         self._batch_counter: int = 0
         self._waiting_batches: dict[int, tuple[FrameDict, list[int]]] = {}
-        self._images: dict[int, np.ndarray] = {}
         self._timer = PerformanceTimer(name="RTM Pose", sample_count=100, report_interval=100)
         self._verbose: bool = settings.verbose
 
@@ -53,16 +52,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         """Stop the detection processing thread."""
         self._detection.stop()
 
-    def set_images(self, images: dict[int, np.ndarray]) -> None:
-        """Set images for processing.
-
-        Args:
-            images: Dictionary of pre-cropped/resized images (256x192) keyed by tracklet ID
-        """
-        with self._lock:
-            self._images = images
-
-    def process(self, poses: FrameDict) -> None:
+    def process(self, poses: FrameDict, images: dict[int, np.ndarray]) -> None:
         """Submit poses for async processing. Results broadcast via callbacks.
 
         Args:
@@ -76,9 +66,9 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         image_list: list[np.ndarray] = []
 
         for tracklet_id in poses.keys():
-            if tracklet_id in self._images:
+            if tracklet_id in images:
                 tracklet_ids.append(tracklet_id)
-                image_list.append(self._images[tracklet_id])
+                image_list.append(images[tracklet_id])
 
         with self._lock:
             self._batch_counter += 1

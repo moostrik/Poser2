@@ -12,7 +12,7 @@ import cupy as cp
 from concurrent.futures import ThreadPoolExecutor
 
 # Reuse dataclasses from RAFTOpticalFlow
-from modules.pose.flow.ONNXOpticalFlow import (
+from modules.pose.batch.flow.ONNXOpticalFlow import (
     OpticalFlowInput,
     OpticalFlowOutput,
     OpticalFlowOutputCallback

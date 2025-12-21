@@ -12,7 +12,7 @@ import cupy as cp
 from concurrent.futures import ThreadPoolExecutor
 
 # Reuse dataclasses from RVMSegmentation
-from modules.pose.segmentation.RVMSegmentation import (
+from modules.pose.batch.segmentation.RVMSegmentation import (
     SegmentationInput,
     SegmentationOutput,
     SegmentationOutputCallback,

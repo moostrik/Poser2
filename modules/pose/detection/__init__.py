@@ -1,2 +1,0 @@
-from .MMDetection import MMDetection
-from .PointBatchExtractor import PointBatchExtractor

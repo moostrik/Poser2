@@ -7,8 +7,8 @@ import torch
 
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameDict
-from modules.pose.segmentation.RVMSegmentation import RVMSegmentation, SegmentationInput, SegmentationOutput
-from modules.pose.segmentation.TensorRTSegmentation import TensorRTSegmentation
+from modules.pose.batch.segmentation.RVMSegmentation import RVMSegmentation, SegmentationInput, SegmentationOutput
+from modules.pose.batch.segmentation.TensorRTSegmentation import TensorRTSegmentation
 from modules.pose.Settings import Settings, ModelType
 from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.PerformanceTimer import PerformanceTimer
@@ -38,7 +38,6 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
             self._segmentation = TensorRTSegmentation(settings)
         self._lock = Lock()
         self._batch_counter: int = 0
-        self._images: dict[int, np.ndarray] = {}
         self._verbose: bool = settings.verbose
 
         # Track inference times
@@ -54,27 +53,12 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         """Stop the segmentation processing thread."""
         self._segmentation.stop()
 
-    def set_crop_images(self, images: dict[int, np.ndarray]) -> None:
-        """Set images for processing.
-
-        Args:
-            images: Dictionary of pre-cropped/resized images (256x192) keyed by tracklet ID
-        """
-        with self._lock:
-            self._images = images
-
-    def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None:
-        """Update the camera image for a specific camera ID"""
-        if frame_type != FrameType.VIDEO:
-            return
-        with self._lock:
-            self._images[id] = image
-
-    def process(self, poses: FrameDict) -> None:
+    def process(self, poses: FrameDict, images: dict[int, np.ndarray]) -> None:
         """Submit batch for async processing. Results broadcast via callbacks.
 
         Args:
             poses: Dictionary of poses keyed by tracklet ID
+            images: Dictionary of pre-cropped/resized images keyed by tracklet ID
         """
         if not self._segmentation.is_ready:
             return
@@ -83,9 +67,9 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         image_list: list[np.ndarray] = []
 
         for tracklet_id in poses.keys():
-            if tracklet_id in self._images:
+            if tracklet_id in images:
                 tracklet_id_list.append(tracklet_id)
-                image_list.append(self._images[tracklet_id])
+                image_list.append(images[tracklet_id])
 
         if not image_list:
             return
@@ -124,4 +108,3 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         """Clear all pending and buffered data."""
         with self._lock:
             self._batch_counter = 0
-            self._images.clear()

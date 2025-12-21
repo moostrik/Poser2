@@ -7,7 +7,7 @@ from modules.pose.features import BBox
 from modules.tracker.Tracklet import Tracklet
 
 
-class PoseFromTrackletGenerator(PoseDictCallbackMixin):
+class PosesFromTracklets(PoseDictCallbackMixin):
     """Generates poses from tracklets, maintaining state per track."""
 
     def __init__(self, num_tracks: int) -> None:

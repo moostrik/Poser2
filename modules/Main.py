@@ -9,7 +9,7 @@ from modules.Settings import Settings
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.gui import Gui
 from modules.inout import SoundOsc
-from modules.pose import guis, nodes, trackers, PoseFromTrackletGenerator, PointBatchExtractor, SimilarityComputer, MaskBatchExtractor, FlowBatchExtractor
+from modules.pose import batch, guis, nodes, trackers, similarity
 from modules.pose.pd_stream import PDStreamManager, PDStreamComputer
 from modules.render.HDTRenderManager import HDTRenderManager
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
@@ -55,7 +55,7 @@ class Main():
         self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
 
         # POSE CONFIGURATION
-        self.image_crop_config =    nodes.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion)
+        self.image_crop_config =    batch.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion)
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
@@ -89,15 +89,14 @@ class Main():
         self.simil_gui =            guis.SimilarityExtractorGui(self.simil_config, self.gui, 'SIMILARITY')
 
         # POSE PROCESSING PIPELINES
-        self.pose_from_tracklet =   PoseFromTrackletGenerator(num_players)
+        self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
-        self.image_crop_processor = trackers.ImageCropProcessorTracker(num_players, self.image_crop_config)
+        self.image_crop_processor = batch.ImageCropProcessor(self.image_crop_config)
+        self.point_extractor =      batch.PointBatchExtractor(settings.pose)  # GPU-based 2D point extractor
+        self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
+        self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
 
-        self.point_extractor =      PointBatchExtractor(settings.pose)  # GPU-based 2D point extractor
-        self.mask_extractor =       MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
-        self.flow_extractor =       FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
-
-        self.pose_similator:        SimilarityComputer = SimilarityComputer()
+        self.pose_similator=        similarity.SimilarityComputer()
         self.pose_similarity_extractor = nodes.SimilarityExtractor(self.simil_config)
 
         self.debug_tracker =        trackers.DebugTracker(num_players)
@@ -208,10 +207,9 @@ class Main():
         self.pose_similator.start()
 
         # POSE PROCESSING PIPELINES
-        self.pose_from_tracklet.add_poses_callback(self.bbox_filters.process)
+        self.poses_from_tracklets.add_poses_callback(self.bbox_filters.process)
         self.bbox_filters.add_poses_callback(self.image_crop_processor.process)
-        self.image_crop_processor.add_image_callback(self.point_extractor.set_images)
-        self.image_crop_processor.add_poses_callback(self.point_extractor.process)
+        self.image_crop_processor.add_callback(self.point_extractor.process)
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
 
         self.pose_raw_filters.add_poses_callback(self.pd_pose_streamer.submit)
@@ -230,24 +228,22 @@ class Main():
         self.point_extractor.start()
 
         # SEGMENTATION
-        self.image_crop_processor.add_image_callback(self.mask_extractor.set_crop_images)
-        self.image_crop_processor.add_poses_callback(self.mask_extractor.process)
+        self.image_crop_processor.add_callback(self.mask_extractor.process)
         self.mask_extractor.add_callback(self.data_hub.set_mask_tensors)
         self.mask_extractor.start()
 
         # FLOW
-        self.image_crop_processor.add_image_callback(self.flow_extractor.set_crop_images)
-        self.image_crop_processor.add_poses_callback(self.flow_extractor.process)
+        self.image_crop_processor.add_pair_callback(self.flow_extractor.process)
         self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
         self.flow_extractor.start()
 
         # TRACKER
-        self.tracker.add_tracklet_callback(self.pose_from_tracklet.submit_tracklets)
+        self.tracker.add_tracklet_callback(self.poses_from_tracklets.submit_tracklets)
         self.tracker.add_tracklet_callback(self.data_hub.set_tracklets)
         self.tracker.start()
 
         self.tracklet_sync_bang.add_callback(self.tracker.notify_update)
-        self.frame_sync_bang.add_callback(self.pose_from_tracklet.generate)
+        self.frame_sync_bang.add_callback(self.poses_from_tracklets.generate)
 
         # IN / OUT
         self.sound_osc.start()

@@ -7,8 +7,8 @@ import torch
 
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameDict
-from modules.pose.flow.ONNXOpticalFlow import ONNXOpticalFlow, OpticalFlowInput, OpticalFlowOutput
-from modules.pose.flow.TensorRTOpticalFlow import TensorRTOpticalFlow
+from modules.pose.batch.flow.ONNXOpticalFlow import ONNXOpticalFlow, OpticalFlowInput, OpticalFlowOutput
+from modules.pose.batch.flow.TensorRTOpticalFlow import TensorRTOpticalFlow
 from modules.pose.Settings import Settings, ModelType
 from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.PerformanceTimer import PerformanceTimer
@@ -39,8 +39,6 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
             self._optical_flow = TensorRTOpticalFlow(settings)
         self._lock = Lock()
         self._batch_counter: int = 0
-        self._current_images: dict[int, np.ndarray] = {}
-        self._previous_images: dict[int, np.ndarray] = {}
         self._verbose: bool = settings.verbose
 
         # Track inference times
@@ -56,53 +54,27 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         """Stop the optical flow processing thread."""
         self._optical_flow.stop()
 
-    def set_crop_images(self, images: dict[int, np.ndarray]) -> None:
-        """Set images for processing.
-
-        Args:
-            images: Dictionary of pre-cropped/resized images (e.g., 256x192) keyed by tracklet ID
-        """
-        with self._lock:
-            # Move current images to previous
-            self._previous_images = self._current_images.copy()
-            # Update current images
-            self._current_images = images
-
-    def set_image(self, id: int, frame_type: FrameType, image: np.ndarray) -> None:
-        """Update the camera image for a specific camera ID"""
-        if frame_type != FrameType.VIDEO:
-            return
-        with self._lock:
-            # Store previous image if exists
-            if id in self._current_images:
-                self._previous_images[id] = self._current_images[id]
-            # Update current image
-            self._current_images[id] = image
-
-    def process(self, poses: FrameDict) -> None:
+    def process(self, poses: FrameDict, frame_pairs: dict[int, tuple[np.ndarray, np.ndarray]]) -> None:
         """Submit batch for async processing. Results broadcast via callbacks.
 
         Args:
             poses: Dictionary of poses keyed by tracklet ID
+            frame_pairs: Dictionary of (previous_frame, current_frame) tuples keyed by tracklet ID
         """
         if not self._optical_flow.is_ready:
             return
 
         tracklet_id_list: list[int] = []
-        frame_pairs: list[tuple[np.ndarray, np.ndarray]] = []
+        pair_list: list[tuple[np.ndarray, np.ndarray]] = []
 
         for tracklet_id in poses.keys():
-            # Need both current and previous frame for optical flow
-            if tracklet_id in self._current_images and tracklet_id in self._previous_images:
+            if tracklet_id in frame_pairs:
                 tracklet_id_list.append(tracklet_id)
-                frame_pairs.append((
-                    self._previous_images[tracklet_id],
-                    self._current_images[tracklet_id]
-                ))
+                pair_list.append(frame_pairs[tracklet_id])
 
-        if not frame_pairs:
+        if not pair_list:
             if self._verbose and len(poses) > 0:
-                print(f"FlowBatchExtractor: No frame pairs available (current: {len(self._current_images)}, previous: {len(self._previous_images)})")
+                print(f"FlowBatchExtractor: No frame pairs available")
             return
 
         with self._lock:
@@ -111,7 +83,7 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
 
         self._optical_flow.submit_batch(OpticalFlowInput(
             batch_id=batch_id,
-            frame_pairs=frame_pairs,
+            frame_pairs=pair_list,
             tracklet_ids=tracklet_id_list
         ))
 
@@ -140,5 +112,3 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         """Clear all pending and buffered data."""
         with self._lock:
             self._batch_counter = 0
-            self._current_images.clear()
-            self._previous_images.clear()
