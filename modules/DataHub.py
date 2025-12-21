@@ -29,6 +29,7 @@ class DataHubType(IntEnum):
     sim_M =             8   # single SimilarityBatch
     light_image =       9   # single image
     mask_tensor =      10   # sorted by track_id, GPU tensors (H, W) FP16
+    flow_tensor =      11   # sorted by track_id, GPU tensors (H, W, 2) FP16
 
 
 class PoseDataHubTypes(IntEnum):
@@ -106,6 +107,9 @@ class DataHub:
 
     def set_mask_tensors(self, masks: dict[int, Tensor]) -> None:
         self.set_dict(DataHubType.mask_tensor, masks)
+
+    def set_flow_tensors(self, flows: dict[int, Tensor]) -> None:
+        self.set_dict(DataHubType.flow_tensor, flows)
 
     def set_pd_stream(self, pd_stream: PDStreamData) -> None:
         self.set_item(DataHubType.pd_stream, pd_stream.track_id, pd_stream)

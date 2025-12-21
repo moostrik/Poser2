@@ -238,7 +238,7 @@ class Main():
         # FLOW
         self.image_crop_processor.add_image_callback(self.flow_extractor.set_crop_images)
         self.image_crop_processor.add_poses_callback(self.flow_extractor.process)
-        # self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
+        self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
         self.flow_extractor.start()
 
         # TRACKER

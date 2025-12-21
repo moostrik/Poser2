@@ -15,6 +15,7 @@ def get_format(internat_format) -> Constant:
     if internat_format == GL_R8: return GL_RED
     if internat_format == GL_R16F: return GL_RED
     if internat_format == GL_R32F: return GL_RED
+    if internat_format == GL_RG32F: return GL_RG
     print('GL_texture', 'internal format not supported')
     return GL_NONE
 
@@ -30,6 +31,7 @@ def get_data_type(internat_format) -> Constant:
     if internat_format == GL_R8: return GL_UNSIGNED_BYTE
     if internat_format == GL_R16F: return GL_FLOAT
     if internat_format == GL_R32F: return GL_FLOAT
+    if internat_format == GL_RG32F: return GL_FLOAT
     print('GL_texture', 'internal format not supported')
     return GL_NONE
 

@@ -44,7 +44,8 @@ class Layers(IntEnum):
 
     centre_motion =        auto()
 
-    cam_mask = auto()
+    cam_mask =      auto()
+    cam_flow =      auto()
 
 PREVIEW_LAYERS: list[Layers] = [
     # Layers.centre_cam,
@@ -70,6 +71,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.motion_sim,
     # Layers.cam_mask,
     # Layers.cam_image,
+    Layers.cam_flow,
 ]
 
 LARGE_LAYERS: list[Layers] = [
@@ -129,6 +131,8 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.MotionMultiply], self.L[Layers.centre_motion]))
             self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
             cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]).set_points_callback(cast(layers.ElectricLayer, self.L[Layers.centre_pose][i]).setCentrePoints)
+
+            self.L[Layers.cam_flow][i] =    layers.CamFlowRenderer(i, self.data_hub)
 
 
         # global layers
