@@ -69,7 +69,7 @@ class RVMSegmentation(Thread):
             print('Segmentation WARNING: Segmentation is disabled')
 
         self.model_path: str = settings.model_path
-        self.model_name: str = settings.segmentation_model_name
+        self.model_name: str = 'rvm_mobilenetv3_trt_256x192.onnx'  # TensorRT-compatible ONNX
         self.model_file: str = f"{self.model_path}/{self.model_name}"
         self.verbose: bool = settings.verbose
 
@@ -330,53 +330,46 @@ class RVMSegmentation(Thread):
             return torch.zeros((img.shape[0], img.shape[1]), dtype=torch.float16, device='cuda')
 
         # Preprocess: BGR -> RGB, normalize to [0, 1], HWC -> NCHW
-        img_rgb = img[:, :, ::-1].astype(np.float16)  # BGR to RGB
+        img_rgb = img[:, :, ::-1].astype(np.float32)  # BGR to RGB, FP32
         img_norm = img_rgb / 255.0  # Normalize to [0, 1]
         img_chw = np.transpose(img_norm, (2, 0, 1))  # (H, W, 3) -> (3, H, W)
-        img_nchw = np.expand_dims(img_chw, axis=0).astype(np.float16)  # (1, 3, H, W) FP16
+        img_nchw = np.expand_dims(img_chw, axis=0).astype(np.float32)  # (1, 3, H, W) FP32
 
         # Get or initialize recurrent state for this tracklet
         with self._state_lock:
             state = self._recurrent_states.get(tracklet_id)
 
-        # Get input dimensions for state initialization
-        h, w = img.shape[0], img.shape[1]
+        # New TensorRT-compatible ONNX model has fixed recurrent state shapes for 256x192:
+        # r1: [1, 16, 128, 96], r2: [1, 20, 64, 48], r3: [1, 40, 32, 24], r4: [1, 64, 16, 12]
+        # No downsample_ratio input (hardcoded to 1.0 during export)
+        # Model uses FP32 inputs (ONNX Runtime, not FP16 like old model)
 
-        # Calculate downsampled dimensions (RVM processes at reduced resolution)
-        h_down = int(h * self.downsample_ratio)
-        w_down = int(w * self.downsample_ratio)
-
-        # RVM ONNX model requires all inputs: [src, r1i, r2i, r3i, r4i, downsample_ratio]
-        input_names = [inp.name for inp in self._session.get_inputs()]
-
-        # Prepare ONNX inputs - start with source image
-        onnx_inputs = {input_names[0]: img_nchw}
-
-        # Add recurrent states
-        # For first frame: use (1,1,1,1) shape - RVM model expands internally
-        # For subsequent frames: reuse previous output states at full resolution
+        # Prepare ONNX inputs
         if state is not None:
-            # Use existing states from previous frame - convert to FP16 if needed
-            onnx_inputs[input_names[1]] = state.r1.astype(np.float16) if state.r1.dtype != np.float16 else state.r1
-            onnx_inputs[input_names[2]] = state.r2.astype(np.float16) if state.r2.dtype != np.float16 else state.r2
-            onnx_inputs[input_names[3]] = state.r3.astype(np.float16) if state.r3.dtype != np.float16 else state.r3
-            onnx_inputs[input_names[4]] = state.r4.astype(np.float16) if state.r4.dtype != np.float16 else state.r4
+            # Use existing states from previous frame
+            onnx_inputs = {
+                'src': img_nchw,
+                'r1i': state.r1,
+                'r2i': state.r2,
+                'r3i': state.r3,
+                'r4i': state.r4,
+            }
         else:
-            # Initialize as (1,1,1,1) for first frame per RVM ONNX specification
-            onnx_inputs[input_names[1]] = np.zeros((1, 1, 1, 1), dtype=np.float16)
-            onnx_inputs[input_names[2]] = np.zeros((1, 1, 1, 1), dtype=np.float16)
-            onnx_inputs[input_names[3]] = np.zeros((1, 1, 1, 1), dtype=np.float16)
-            onnx_inputs[input_names[4]] = np.zeros((1, 1, 1, 1), dtype=np.float16)
-
-        # Add downsample_ratio (required input) - FP32 only!
-        onnx_inputs[input_names[5]] = np.array([self.downsample_ratio], dtype=np.float32)  # type: ignore
+            # Initialize with proper shapes for 256x192 input (first frame)
+            onnx_inputs = {
+                'src': img_nchw,
+                'r1i': np.zeros((1, 16, 128, 96), dtype=np.float32),
+                'r2i': np.zeros((1, 20, 64, 48), dtype=np.float32),
+                'r3i': np.zeros((1, 40, 32, 24), dtype=np.float32),
+                'r4i': np.zeros((1, 64, 16, 12), dtype=np.float32),
+            }
 
         # Run ONNX inference
         outputs = self._session.run(None, onnx_inputs)
 
-        # RVM ONNX outputs: [fgr, pha, r1, r2, r3, r4]
+        # ONNX outputs: [fgr, pha, r1o, r2o, r3o, r4o]
         # We need: pha (alpha matte) and update recurrent states
-        pha_np = outputs[1]  # (1, 1, H, W) FP32
+        pha_np = outputs[1]  # (1, 1, H, W) FP16
 
         # Update recurrent states for next frame
         if len(outputs) >= 6:
