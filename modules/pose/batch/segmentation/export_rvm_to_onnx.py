@@ -1,5 +1,16 @@
 # type: ignore
-"""Export RVM model to ONNX with TensorRT-compatible settings."""
+"""Export RVM model to ONNX with TensorRT-compatible settings.
+
+Usage:
+    # Export RVM mobilenetv3 model at 256x192
+    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_256x192.onnx
+
+    # Export at custom resolution 384x288
+    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_384x288.onnx --height 384 --width 288
+
+    # Export at custom resolution 512x384
+    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_512x384.onnx --height 512 --width 384
+"""
 import torch
 import sys
 from pathlib import Path
@@ -112,14 +123,34 @@ def export_rvm_to_onnx(
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description='Export RVM to TensorRT-compatible ONNX')
-    parser.add_argument('--checkpoint', default='models/rvm_mobilenetv3.pth', help='Input checkpoint')
-    parser.add_argument('--output', default='models/rvm_mobilenetv3_trt_256x192.onnx', help='Output ONNX file')
-    parser.add_argument('--height', type=int, default=256, help='Fixed input height')
-    parser.add_argument('--width', type=int, default=192, help='Fixed input width')
-    parser.add_argument('--variant', default='mobilenetv3', choices=['mobilenetv3', 'resnet50'])
-    parser.add_argument('--opset', type=int, default=11, help='ONNX opset version (11 recommended for TensorRT)')
-    parser.add_argument('--downsample', type=float, default=1.0, help='Downsample ratio')
+    print(f"\n{'═'*70}")
+    print(f"🚀 RVM ONNX EXPORT TOOL")
+    print(f"{'═'*70}")
+    print(f"  PyTorch: {torch.__version__}")
+    print(f"{'═'*70}\n")
+
+    parser = argparse.ArgumentParser(
+        description='Export RVM PyTorch model to ONNX format',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+
+    # Required arguments
+    parser.add_argument('--checkpoint', required=True,
+                        help='Path to model checkpoint file (.pth)')
+    parser.add_argument('--output', required=True,
+                        help='Output ONNX file path (.onnx)')
+
+    # Optional arguments with defaults
+    parser.add_argument('--height', type=int, default=256,
+                        help='Input image height (default: 256)')
+    parser.add_argument('--width', type=int, default=192,
+                        help='Input image width (default: 192)')
+    parser.add_argument('--variant', default='mobilenetv3', choices=['mobilenetv3', 'resnet50'],
+                        help='Model variant (default: mobilenetv3)')
+    parser.add_argument('--opset', type=int, default=11,
+                        help='ONNX opset version (default: 11)')
+    parser.add_argument('--downsample', type=float, default=1.0,
+                        help='Downsample ratio (default: 1.0)')
 
     args = parser.parse_args()
 

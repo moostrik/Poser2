@@ -49,8 +49,11 @@ class TensorRTOpticalFlow(Thread):
             print('TensorRT Optical Flow WARNING: Optical flow is disabled')
 
         self.model_path: str = settings.model_path
-        self.model_name: str = 'raft-sintel_256x192_iter12_batch3.trt'  # TensorRT engine
+        self.model_name: str = settings.flow_model
         self.model_file: str = f"{self.model_path}/{self.model_name}"
+        self.model_width: int = settings.flow_width
+        self.model_height: int = settings.flow_height
+        self.resolution_name: str = settings.flow_resolution.name
         self.verbose: bool = settings.verbose
 
         # Thread coordination
@@ -163,7 +166,7 @@ class TensorRTOpticalFlow(Thread):
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="TRT-RAFT-Worker")
 
             self._model_ready.set()
-            print(f"TensorRT Optical Flow: Model '{self.model_name}' loaded successfully with {self._max_workers} workers")
+            print(f"TensorRT Optical Flow: {self.resolution_name} model loaded ({self.model_width}x{self.model_height}) with {self._max_workers} workers")
 
         except Exception as e:
             print(f"TensorRT Optical Flow Error: Failed to load model - {str(e)}")

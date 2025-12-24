@@ -3,6 +3,16 @@
 
 Requires RAFT repository: https://github.com/princeton-vl/RAFT
 Set PYTHONPATH to include RAFT directory before running.
+
+Usage:
+    # Export RAFT Sintel model at 256x192 (default resolution)
+    python modules/pose/batch/flow/export_raft_to_onnx.py --checkpoint models/base/raft-sintel.pth --output models/raft-sintel_256x192_i12.onnx
+
+    # Export RAFT Sintel model at 384x288
+    python modules/pose/batch/flow/export_raft_to_onnx.py --checkpoint models/base/raft-sintel.pth --output models/raft-sintel_384x288_i12.onnx --height 384 --width 288
+
+    # Export at 512x384 with 6 iterations
+    python modules/pose/batch/flow/export_raft_to_onnx.py --checkpoint models/base/raft-sintel.pth --output models/raft-sintel_512x384_i6.onnx --height 512 --width 384 --iters 6
 """
 
 import torch
@@ -67,7 +77,7 @@ def load_raft_model(checkpoint_path: str, device: str = 'cuda:0', small: bool = 
         print(f" ✗")
         print(f"\n❌ ERROR: RAFT directory not found at {raft_path}")
         print(f"   Clone with: git clone https://github.com/princeton-vl/RAFT.git c:/Developer/RAFT")
-        sys.exit(1)
+        return False
 
     # Add both RAFT root and core directory
     if str(raft_path) not in sys.path:
@@ -102,7 +112,7 @@ def load_raft_model(checkpoint_path: str, device: str = 'cuda:0', small: bool = 
             print(f"     - {p}")
         if len(sys.path) > 5:
             print(f"     ... ({len(sys.path)-5} more)")
-        sys.exit(1)
+        return False
 
     # Create model
     print(f"  ├─ Creating RAFT architecture...", end='', flush=True)
@@ -126,7 +136,7 @@ def load_raft_model(checkpoint_path: str, device: str = 'cuda:0', small: bool = 
         print(f" ✗")
         print(f"\n❌ ERROR: Checkpoint file not found!")
         print(f"   Path: {checkpoint_path_obj.absolute()}")
-        sys.exit(1)
+        return False
     file_size_mb = checkpoint_path_obj.stat().st_size / 1024 / 1024
     print(f" ✓ ({file_size_mb:.1f} MB)")
 
@@ -186,7 +196,7 @@ def load_raft_model(checkpoint_path: str, device: str = 'cuda:0', small: bool = 
 
 def export_raft_onnx(checkpoint_file: str, output_file: str,
                      input_height: int = 256, input_width: int = 192,
-                     opset_version: int = 16, simplify: bool = True, iters: int = 12):
+                     opset_version: int = 16, simplify: bool = True, iters: int = 12) -> bool:
     """Export RAFT model to ONNX format.
 
     Args:
@@ -197,6 +207,9 @@ def export_raft_onnx(checkpoint_file: str, output_file: str,
         opset_version: ONNX opset version (16+ required for grid_sampler)
         simplify: Whether to simplify ONNX graph (requires onnx-simplifier)
         iters: Number of RAFT refinement iterations (default: 12)
+
+    Returns:
+        bool: True if successful, False otherwise
     """
     total_start = time.time()
 
@@ -220,6 +233,9 @@ def export_raft_onnx(checkpoint_file: str, output_file: str,
     print(f"\n[1/4] 📥 LOADING MODEL")
     is_small = 'small' in checkpoint_file.lower()
     raft_model = load_raft_model(checkpoint_file, device, small=is_small)
+
+    if raft_model is False:
+        return False
 
     # Step 2: Wrap model
     print(f"\n[2/4] 📦 PREPARING FOR ONNX EXPORT")
@@ -250,7 +266,7 @@ def export_raft_onnx(checkpoint_file: str, output_file: str,
         print(f"\n❌ ERROR: Forward pass failed: {e}")
         import traceback
         traceback.print_exc()
-        raise
+        return False
 
     # Step 4: Export to ONNX
     print(f"\n[4/4] 💾 EXPORTING TO ONNX")
@@ -284,11 +300,11 @@ def export_raft_onnx(checkpoint_file: str, output_file: str,
         print(f"\n❌ ERROR: ONNX export failed: {e}")
         import traceback
         traceback.print_exc()
-        raise
+        return False
 
     if not output_path.exists():
         print(f"\n❌ ERROR: Output file was not created!")
-        sys.exit(1)
+        return False
 
     file_size = output_path.stat().st_size / 1024 / 1024
     print(f"     └─ File size: {file_size:.2f} MB")
@@ -355,61 +371,7 @@ def export_raft_onnx(checkpoint_file: str, output_file: str,
     print(f"  Output:     {output_path.absolute()}")
     print(f"{'═'*60}\n")
 
-
-def export_all_raft_models(models_dir: str = "models"):
-    """Export all RAFT models to ONNX."""
-    print(f"\n{'═'*60}")
-    print(f"📦 BATCH EXPORT MODE")
-    print(f"{'═'*60}")
-
-    models = [
-        # (checkpoint, output, height, width, iters)
-        ('raft-sintel.pth', 'raft-sintel_512x384_iter2.onnx', 512, 384, 2),
-        ('raft-sintel.pth', 'raft-sintel_512x384_iter6.onnx', 512, 384, 6),
-        ('raft-sintel.pth', 'raft-sintel_512x384_iter12.onnx', 512, 384, 12),
-    ]
-
-    models_path = Path(models_dir)
-    print(f"  Models directory: {models_path.absolute()}")
-    print(f"  Total models:     {len(models)}")
-    print(f"{'═'*60}\n")
-
-    success_count = 0
-    skip_count = 0
-    fail_count = 0
-
-    for idx, (checkpoint, output, height, width, iters) in enumerate(models, 1):
-        checkpoint_path = models_path / checkpoint
-        output_path = models_path / output
-
-        print(f"\n{'─'*60}")
-        print(f"[{idx}/{len(models)}] Processing: {output}")
-        print(f"{'─'*60}")
-
-        if not checkpoint_path.exists():
-            print(f"⊘ Skipping: {checkpoint} not found")
-            print(f"   Path: {checkpoint_path}")
-            skip_count += 1
-            continue
-
-        try:
-            export_raft_onnx(str(checkpoint_path), str(output_path), height, width, iters=iters)
-            success_count += 1
-        except Exception as e:
-            print(f"\n❌ FAILED: {e}")
-            import traceback
-            traceback.print_exc()
-            fail_count += 1
-
-    # Summary
-    print(f"\n{'═'*60}")
-    print(f"📊 BATCH EXPORT SUMMARY")
-    print(f"{'═'*60}")
-    print(f"  ✅ Successful: {success_count}")
-    print(f"  ⊘  Skipped:    {skip_count}")
-    print(f"  ❌ Failed:     {fail_count}")
-    print(f"  ━  Total:      {len(models)}")
-    print(f"{'═'*60}\n")
+    return True
 
 
 if __name__ == '__main__':
@@ -423,39 +385,39 @@ if __name__ == '__main__':
         print(f"  GPU:          {torch.cuda.get_device_name(0)}")
     print(f"{'═'*60}\n")
 
-    parser = argparse.ArgumentParser(description='Export RAFT optical flow model to ONNX')
-    parser.add_argument('--models-dir', default='models', help='Directory containing models')
-    parser.add_argument('--checkpoint', help='RAFT checkpoint file (.pth)')
-    parser.add_argument('--output', help='Output ONNX file (.onnx)')
-    parser.add_argument('--height', type=int, default=256, help='Input height (default: 256)')
-    parser.add_argument('--width', type=int, default=192, help='Input width (default: 192)')
-    parser.add_argument('--iters', type=int, default=12, help='RAFT refinement iterations (default: 12)')
-    parser.add_argument('--opset', type=int, default=16, help='ONNX opset version (default: 16, required for grid_sampler)')
-    parser.add_argument('--no-simplify', action='store_true', help='Skip ONNX simplification')
+    parser = argparse.ArgumentParser(
+        description='Export RAFT optical flow model to ONNX',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+
+    # Required arguments
+    parser.add_argument('--checkpoint', required=True,
+                        help='Path to RAFT checkpoint file (.pth)')
+    parser.add_argument('--output', required=True,
+                        help='Output ONNX file path (.onnx)')
+
+    # Optional arguments with defaults
+    parser.add_argument('--height', type=int, default=256,
+                        help='Input image height (default: 256)')
+    parser.add_argument('--width', type=int, default=192,
+                        help='Input image width (default: 192)')
+    parser.add_argument('--iters', type=int, default=12,
+                        help='RAFT refinement iterations (default: 12)')
+    parser.add_argument('--opset', type=int, default=16,
+                        help='ONNX opset version (default: 16)')
+    parser.add_argument('--no-simplify', action='store_true',
+                        help='Skip ONNX graph simplification')
 
     args = parser.parse_args()
 
-    if args.checkpoint and args.output:
-        # Export single model
-        print(f"Mode: Single model export\n")
-        try:
-            export_raft_onnx(
-                args.checkpoint,
-                args.output,
-                args.height,
-                args.width,
-                args.opset,
-                not args.no_simplify,
-                args.iters
-            )
-        except Exception as e:
-            print(f"\n{'═'*60}")
-            print(f"❌ EXPORT FAILED")
-            print(f"{'═'*60}")
-            print(f"  Error: {e}")
-            print(f"{'═'*60}\n")
-            sys.exit(1)
-    else:
-        # Export all models
-        print(f"Mode: Batch export\n")
-        export_all_raft_models(args.models_dir)
+    success = export_raft_onnx(
+        args.checkpoint,
+        args.output,
+        args.height,
+        args.width,
+        args.opset,
+        not args.no_simplify,
+        args.iters
+    )
+
+    sys.exit(0 if success else 1)

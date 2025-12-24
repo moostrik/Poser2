@@ -19,7 +19,7 @@ from os import path
 from signal import signal, SIGINT
 
 from modules.Main import Main
-from modules.Settings import Settings, ModelType, ModelSize
+from modules.Settings import Settings, ModelType
 
 import multiprocessing as mp
 

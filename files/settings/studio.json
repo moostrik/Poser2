@@ -38,8 +38,10 @@
 
   "pose": {
     "max_poses": 3,
-    "model_type": "TENSORRT",
-    "model_size": "LARGE",
+    "model_type": "TRT",
+    "pose_resolution": "STANDARD",
+    "segmentation_resolution": "ULTRA",
+    "flow_resolution": "ULTRA",
     "model_path": "models",
     "confidence_high": 0.7,
     "confidence_low": 0.5,

@@ -1,5 +1,16 @@
 # type: ignore
-"""Convert RAFT ONNX models to TensorRT engines."""
+"""Convert RAFT ONNX models to TensorRT engines.
+
+Usage:
+    # Convert RAFT Sintel 256x192 with batch 3 (FP16 default)
+    python modules/pose/batch/flow/export_raft_onnx_to_tensorrt.py --onnx models/raft-sintel_256x192_i12.onnx --output models/raft-sintel_256x192_i12_b3.trt
+
+    # Convert 384x288 model with batch 3
+    python modules/pose/batch/flow/export_raft_onnx_to_tensorrt.py --onnx models/raft-sintel_384x288_i12.onnx --output models/raft-sintel_384x288_i12_b3.trt --height 384 --width 288
+
+    # Convert 512x384 model with batch 3
+    python modules/pose/batch/flow/export_raft_onnx_to_tensorrt.py --onnx models/raft-sintel_512x384_i12.onnx --output models/raft-sintel_512x384_i12_b3.trt --height 512 --width 384
+"""
 
 import tensorrt as trt
 import os
@@ -17,7 +28,7 @@ def convert_raft_to_tensorrt(
     max_batch: int = 4,
     fp16: bool = True,
     workspace_gb: int = 4
-):
+) -> bool:
     """Convert RAFT ONNX model to TensorRT engine.
 
     Args:
@@ -27,9 +38,12 @@ def convert_raft_to_tensorrt(
         width: Input image width
         min_batch: Minimum batch size
         opt_batch: Optimal batch size (used for optimization)
-        max_batch: Maximum batch size
+        max_batch: Maximum batch size (set to opt_batch if never exceeded)
         fp16: Enable FP16 precision
         workspace_gb: Workspace size in GB
+
+    Returns:
+        bool: True if successful, False otherwise
     """
     print(f"\n{'═'*70}")
     print(f"🔄 RAFT ONNX → TensorRT Conversion")
@@ -132,85 +146,16 @@ def convert_raft_to_tensorrt(
 
     with open(output_path, "wb") as f:
         f.write(engine_bytes)
+    print(f" ✓")
+
+    print(f"\n{'═'*70}")
+    print(f"✅ CONVERSION COMPLETE")
     print(f"{'═'*70}")
     print(f"  Output: {output_path}")
     print(f"  Size:   {engine_size_mb:.1f} MB")
     print(f"{'═'*70}\n")
 
     return True
-
-
-def convert_all_raft_models(
-    models_dir: str = "models",
-    min_batch: int = 1,
-    opt_batch: int = 3,
-    max_batch: int = 4
-):
-    """Convert all RAFT ONNX models to TensorRT."""
-    print(f"\n{'═'*70}")
-    print(f"📦 BATCH TENSORRT CONVERSION")
-    print(f"{'═'*70}")
-
-    models = [
-        # (onnx_file, trt_file, height, width)
-        ('raft-sintel_256x192.onnx', f'raft-sintel_256x192_{opt_batch}.trt', 256, 192),
-        ('raft-small_256x192.onnx', f'raft-small_256x192_{opt_batch}.trt', 256, 192),
-        # ('raft-sintel_384x288.onnx', f'raft-sintel_384x288_{opt_batch}.trt', 384, 288),
-        # ('raft-sintel_512x384.onnx', f'raft-sintel_512x384_{opt_batch}.trt', 512, 384),
-    ]
-
-    models_path = Path(models_dir)
-    print(f"  Models directory: {models_path.absolute()}")
-    print(f"  Total models:     {len(models)}")
-    print(f"  Batch config:     min={min_batch}, opt={opt_batch}, max={max_batch}")
-    print(f"{'═'*70}")
-
-    success_count = 0
-    skip_count = 0
-    fail_count = 0
-
-    for idx, (onnx_file, trt_file, height, width) in enumerate(models, 1):
-        onnx_path = models_path / onnx_file
-        trt_path = models_path / trt_file
-
-        print(f"\n{'─'*70}")
-        print(f"[{idx}/{len(models)}] {onnx_file} → {trt_file}")
-        print(f"{'─'*70}")
-
-        if not onnx_path.exists():
-            print(f"⊘ Skipping: {onnx_file} not found")
-            skip_count += 1
-            continue
-
-        try:
-            success = convert_raft_to_tensorrt(
-                str(onnx_path),
-                str(trt_path),
-                height,
-                width,
-                min_batch,
-                opt_batch,
-                max_batch
-            )
-            if success:
-                success_count += 1
-            else:
-                fail_count += 1
-        except Exception as e:
-            print(f"\n❌ FAILED: {e}")
-            import traceback
-            traceback.print_exc()
-            fail_count += 1
-
-    # Summary
-    print(f"\n{'═'*70}")
-    print(f"📊 CONVERSION SUMMARY")
-    print(f"{'═'*70}")
-    print(f"  ✅ Successful: {success_count}")
-    print(f"  ⊘  Skipped:    {skip_count}")
-    print(f"  ❌ Failed:     {fail_count}")
-    print(f"  ━  Total:      {len(models)}")
-    print(f"{'═'*70}\n")
 
 
 if __name__ == '__main__':
@@ -222,36 +167,45 @@ if __name__ == '__main__':
     print(f"  TensorRT: {trt.__version__}")
     print(f"{'═'*70}\n")
 
-    parser = argparse.ArgumentParser(description='Convert RAFT ONNX models to TensorRT')
-    parser.add_argument('--models-dir', default='models', help='Directory containing models')
-    parser.add_argument('--onnx', help='Input ONNX file')
-    parser.add_argument('--output', help='Output TensorRT file')
-    parser.add_argument('--height', type=int, default=256, help='Input height')
-    parser.add_argument('--width', type=int, default=192, help='Input width')
-    parser.add_argument('--min-batch', type=int, default=1, help='Minimum batch size')
-    parser.add_argument('--opt-batch', type=int, default=3, help='Optimal batch size')
-    parser.add_argument('--max-batch', type=int, default=4, help='Maximum batch size')
-    parser.add_argument('--fp32', action='store_true', help='Use FP32 instead of FP16')
-    parser.add_argument('--workspace', type=int, default=4, help='Workspace size in GB')
+    parser = argparse.ArgumentParser(
+        description='Convert RAFT ONNX model to TensorRT engine',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+
+    # Required arguments
+    parser.add_argument('--onnx', required=True,
+                        help='Path to input ONNX file')
+    parser.add_argument('--output', required=True,
+                        help='Path to output TensorRT engine file (.trt)')
+
+    # Optional arguments with defaults
+    parser.add_argument('--height', type=int, default=256,
+                        help='Input image height (default: 256)')
+    parser.add_argument('--width', type=int, default=192,
+                        help='Input image width (default: 192)')
+    parser.add_argument('--min-batch', type=int, default=1,
+                        help='Minimum batch size (default: 1)')
+    parser.add_argument('--opt-batch', type=int, default=3,
+                        help='Optimal batch size for optimization (default: 3)')
+    parser.add_argument('--max-batch', type=int, default=4,
+                        help='Maximum batch size (default: 4, set to opt-batch if never exceeded)')
+    parser.add_argument('--fp32', action='store_true',
+                        help='Use FP32 precision instead of FP16 (default: FP16)')
+    parser.add_argument('--workspace', type=int, default=8,
+                        help='Workspace size in GB (default: 8)')
 
     args = parser.parse_args()
 
-    if args.onnx and args.output:
-        # Convert single model
-        print("Mode: Single model conversion\n")
-        success = convert_raft_to_tensorrt(
-            args.onnx,
-            args.output,
-            args.height,
-            args.width,
-            args.min_batch,
-            args.opt_batch,
-            args.max_batch,
-            not args.fp32,
-            args.workspace
-        )
-        sys.exit(0 if success else 1)
-    else:
-        # Convert all models
-        print("Mode: Batch conversion\n")
-        convert_all_raft_models(args.models_dir, args.min_batch, args.opt_batch, args.max_batch)
+    success = convert_raft_to_tensorrt(
+        args.onnx,
+        args.output,
+        args.height,
+        args.width,
+        args.min_batch,
+        args.opt_batch,
+        args.max_batch,
+        not args.fp32,
+        args.workspace
+    )
+
+    sys.exit(0 if success else 1)

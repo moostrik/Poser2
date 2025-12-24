@@ -19,17 +19,13 @@ import torch
 # Ensure numpy functions can be safely used in torch serialization
 torch.serialization.add_safe_globals([np.core.multiarray._reconstruct, np.ndarray, np.dtype, np.dtypes.Float32DType, np.dtypes.UInt8DType]) # pyright: ignore
 
-from modules.pose.Settings import Settings, ModelSize
+from modules.pose.Settings import Settings
 
-
-POSE_MODEL_FILE_NAMES: list[tuple[str, str]] = [
-    ('none', ''),
-    ('rtmpose-src-l_8xb256-420e_aic-coco-256x192.py', 'rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth'),
-    ('rtmpose-m_8xb256-420e_aic-coco-256x192.py', 'rtmpose-m_simcc-aic-coco_pt-aic-coco_420e-256x192-63eb25f7_20230126.pth'),
-    ('rtmpose-s_8xb256-420e_aic-coco-256x192.py', 'rtmpose-s_simcc-aic-coco_pt-aic-coco_420e-256x192-fcb2599b_20230126.pth'),
-    ('rtmpose-t_8xb256-420e_aic-coco-256x192.py', 'rtmpose-tiny_simcc-aic-coco_pt-aic-coco_420e-256x192-cfc8f33d_20230126.pth')
-
-]
+# MMDetection uses hardcoded RTMPose-L model paths
+POSE_MODEL_CONFIG = 'models/base/rtmpose-l_8xb256-420e_aic-coco-256x192.py'
+POSE_MODEL_CHECKPOINT = 'models/base/rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth'
+POSE_MODEL_HEIGHT = 256
+POSE_MODEL_WIDTH = 192
 
 @dataclass
 class DetectionInput:
@@ -61,12 +57,13 @@ class MMDetection(Thread):
     def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
-        self.model_size: ModelSize = settings.model_size
-        self.model_config_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_size.value][0]
-        self.model_checkpoint_file: str = settings.model_path + '/' + POSE_MODEL_FILE_NAMES[settings.model_size.value][1]
-        self.model_width: int = settings.model_width
-        self.model_height: int = settings.model_height
+        # Hardcoded RTMPose-L model paths (MMPose framework requirement)
+        self.model_config_file: str = POSE_MODEL_CONFIG
+        self.model_checkpoint_file: str = POSE_MODEL_CHECKPOINT
+        self.model_width: int = POSE_MODEL_WIDTH
+        self.model_height: int = POSE_MODEL_HEIGHT
         self.model_num_warmups: int = settings.max_poses
+        self.resolution_name: str = settings.pose_resolution.name
 
         self.verbose: bool = settings.verbose
 
@@ -133,7 +130,7 @@ class MMDetection(Thread):
         pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline) # pyright: ignore
         self._model_warmup(model, pipeline, self.model_width, self.model_height, self.model_num_warmups)
         self._model_ready.set()  # Signal model is ready
-        print(f"PoseDetection: {self.model_size.name} model ready")
+        print(f"PoseDetection: {self.resolution_name} model ready ({self.model_width}x{self.model_height})")
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()

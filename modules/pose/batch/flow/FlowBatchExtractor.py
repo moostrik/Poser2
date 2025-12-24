@@ -35,7 +35,7 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         self._optical_flow: OpticalFlow = ONNXOpticalFlow(settings)
         if settings.model_type is ModelType.ONNX:
             self._optical_flow = ONNXOpticalFlow(settings)
-        elif settings.model_type is ModelType.TENSORRT:
+        elif settings.model_type is ModelType.TRT:
             self._optical_flow = TensorRTOpticalFlow(settings)
         self._lock = Lock()
         self._batch_counter: int = 0

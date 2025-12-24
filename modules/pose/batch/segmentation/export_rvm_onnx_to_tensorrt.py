@@ -1,5 +1,16 @@
 # type: ignore
-"""Convert RVM ONNX models to TensorRT engines."""
+"""Convert RVM ONNX models to TensorRT engines.
+
+Usage:
+    # Convert RVM mobilenetv3 256x192 with batch 3 (FP16 default)
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_tensorrt.py --onnx models/rvm_mobilenetv3_256x192.onnx --output models/rvm_mobilenetv3_256x192_b3.trt
+
+    # Convert 384x288
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_tensorrt.py --onnx models/rvm_mobilenetv3_384x288.onnx --output models/rvm_mobilenetv3_384x288_b3.trt --height 384 --width 288
+
+    # Convert 512x384
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_tensorrt.py --onnx models/rvm_mobilenetv3_512x384.onnx --output models/rvm_mobilenetv3_512x384_b3.trt --height 512 --width 384
+"""
 
 import tensorrt as trt
 import os
@@ -16,8 +27,8 @@ def convert_rvm_to_tensorrt(
     opt_batch: int = 3,
     max_batch: int = 4,
     fp16: bool = True,
-    workspace_gb: int = 4
-):
+    workspace_gb: int = 8
+) -> bool:
     """Convert RVM ONNX model to TensorRT engine.
 
     Args:
@@ -27,9 +38,12 @@ def convert_rvm_to_tensorrt(
         width: Input image width
         min_batch: Minimum batch size
         opt_batch: Optimal batch size (used for optimization)
-        max_batch: Maximum batch size
+        max_batch: Maximum batch size (set to opt_batch if never exceeded)
         fp16: Enable FP16 precision
         workspace_gb: Workspace size in GB
+
+    Returns:
+        bool: True if successful, False otherwise
     """
     print(f"\n{'═'*70}")
     print(f"🔄 RVM ONNX → TensorRT Conversion")
@@ -88,8 +102,7 @@ def convert_rvm_to_tensorrt(
     print(f"  ├─ Workspace: {workspace_gb} GB")
 
     # Create optimization profile for dynamic batch size
-    # New RVM ONNX: src (image), r1i-r4i (recurrent states with fixed shapes)
-    # No downsample_ratio (hardcoded to 1.0 during export)
+    # RVM ONNX: src (image), r1i-r4i (recurrent states)
     profile = builder.create_optimization_profile()
 
     # Image input: (batch, 3, height, width) - dynamic batch dimension
@@ -98,13 +111,20 @@ def convert_rvm_to_tensorrt(
                       (opt_batch, 3, height, width),
                       (max_batch, 3, height, width))
 
-    # Recurrent states: Fixed size based on 256×192 resolution with downsample_ratio=1.0
-    # These are constant shapes (no dynamic dimensions)
-    # r1: [1, 16, 128, 96], r2: [1, 20, 64, 48], r3: [1, 40, 32, 24], r4: [1, 64, 16, 12]
-    profile.set_shape("r1i", (1, 16, 128, 96), (1, 16, 128, 96), (1, 16, 128, 96))
-    profile.set_shape("r2i", (1, 20, 64, 48), (1, 20, 64, 48), (1, 20, 64, 48))
-    profile.set_shape("r3i", (1, 40, 32, 24), (1, 40, 32, 24), (1, 40, 32, 24))
-    profile.set_shape("r4i", (1, 64, 16, 12), (1, 64, 16, 12), (1, 64, 16, 12))
+    # Recurrent states: Fixed batch=1, channels fixed, spatial dims based on input resolution
+    # RVM downsamples by 2, 4, 8, 16 for r1, r2, r3, r4 respectively
+    profile.set_shape("r1i", (1, 16, height // 2, width // 2),
+                              (1, 16, height // 2, width // 2),
+                              (1, 16, height // 2, width // 2))
+    profile.set_shape("r2i", (1, 20, height // 4, width // 4),
+                              (1, 20, height // 4, width // 4),
+                              (1, 20, height // 4, width // 4))
+    profile.set_shape("r3i", (1, 40, height // 8, width // 8),
+                              (1, 40, height // 8, width // 8),
+                              (1, 40, height // 8, width // 8))
+    profile.set_shape("r4i", (1, 64, height // 16, width // 16),
+                              (1, 64, height // 16, width // 16),
+                              (1, 64, height // 16, width // 16))
 
     config.add_optimization_profile(profile)
     print(f"  ├─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
@@ -158,16 +178,32 @@ if __name__ == '__main__':
     print(f"  TensorRT: {trt.__version__}")
     print(f"{'═'*70}\n")
 
-    parser = argparse.ArgumentParser(description='Convert RVM ONNX models to TensorRT')
-    parser.add_argument('--onnx', default='models/rvm_mobilenetv3_fp16.onnx', help='Input ONNX file')
-    parser.add_argument('--output', default='models/rvm_mobilenetv3_fp16_256x192_3.trt', help='Output TensorRT file')
-    parser.add_argument('--height', type=int, default=256, help='Input height (default: 256)')
-    parser.add_argument('--width', type=int, default=192, help='Input width (default: 192)')
-    parser.add_argument('--min-batch', type=int, default=1, help='Minimum batch size')
-    parser.add_argument('--opt-batch', type=int, default=3, help='Optimal batch size')
-    parser.add_argument('--max-batch', type=int, default=4, help='Maximum batch size')
-    parser.add_argument('--fp32', action='store_true', help='Use FP32 instead of FP16')
-    parser.add_argument('--workspace', type=int, default=4, help='Workspace size in GB')
+    parser = argparse.ArgumentParser(
+        description='Convert RVM ONNX model to TensorRT engine',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+
+    # Required arguments
+    parser.add_argument('--onnx', required=True,
+                        help='Path to input ONNX file')
+    parser.add_argument('--output', required=True,
+                        help='Path to output TensorRT engine file (.trt)')
+
+    # Optional arguments with defaults
+    parser.add_argument('--height', type=int, default=256,
+                        help='Input image height (default: 256)')
+    parser.add_argument('--width', type=int, default=192,
+                        help='Input image width (default: 192)')
+    parser.add_argument('--min-batch', type=int, default=1,
+                        help='Minimum batch size (default: 1)')
+    parser.add_argument('--opt-batch', type=int, default=3,
+                        help='Optimal batch size for optimization (default: 3)')
+    parser.add_argument('--max-batch', type=int, default=4,
+                        help='Maximum batch size (default: 4, set to opt-batch if never exceeded)')
+    parser.add_argument('--fp32', action='store_true',
+                        help='Use FP32 precision instead of FP16 (default: FP16)')
+    parser.add_argument('--workspace', type=int, default=8,
+                        help='Workspace size in GB (default: 8)')
 
     args = parser.parse_args()
 

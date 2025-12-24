@@ -12,7 +12,7 @@ import cupy as cp
 from concurrent.futures import ThreadPoolExecutor
 
 # Reuse dataclasses from RVMSegmentation
-from modules.pose.batch.segmentation.RVMSegmentation import (
+from modules.pose.batch.segmentation.ONNXSegmentation import (
     SegmentationInput,
     SegmentationOutput,
     SegmentationOutputCallback,
@@ -51,8 +51,11 @@ class TensorRTSegmentation(Thread):
             print('TensorRT Segmentation WARNING: Segmentation is disabled')
 
         self.model_path: str = settings.model_path
-        self.model_name: str = 'rvm_mobilenetv3_trt_256x192_3.trt'  # TensorRT engine
+        self.model_name: str = settings.segmentation_model
         self.model_file: str = f"{self.model_path}/{self.model_name}"
+        self.model_width: int = settings.segmentation_width
+        self.model_height: int = settings.segmentation_height
+        self.resolution_name: str = settings.segmentation_resolution.name
         self.verbose: bool = settings.verbose
 
         # Thread coordination
@@ -178,7 +181,7 @@ class TensorRTSegmentation(Thread):
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="TRT-RVM-Worker")
 
             self._model_ready.set()
-            print(f"TensorRT Segmentation: Model '{self.model_name}' loaded successfully with {self._max_workers} workers")
+            print(f"TensorRT Segmentation: {self.resolution_name} model loaded ({self.model_width}x{self.model_height}) with {self._max_workers} workers")
 
         except Exception as e:
             print(f"TensorRT Segmentation Error: Failed to load model - {str(e)}")
@@ -326,18 +329,18 @@ class TensorRTSegmentation(Thread):
         with self._state_lock:
             state = self._recurrent_states.get(tracklet_id)
 
-        # Prepare recurrent state inputs (fixed shapes for 256x192)
+        # Prepare recurrent state inputs (dynamic shapes based on model resolution)
         if state is not None:
             r1_gpu = cp.asarray(state.r1)
             r2_gpu = cp.asarray(state.r2)
             r3_gpu = cp.asarray(state.r3)
             r4_gpu = cp.asarray(state.r4)
         else:
-            # Initialize with proper shapes for first frame
-            r1_gpu = cp.zeros((1, 16, 128, 96), dtype=cp.float32)
-            r2_gpu = cp.zeros((1, 20, 64, 48), dtype=cp.float32)
-            r3_gpu = cp.zeros((1, 40, 32, 24), dtype=cp.float32)
-            r4_gpu = cp.zeros((1, 64, 16, 12), dtype=cp.float32)
+            # Initialize with dynamic shapes for first frame (r1: h/2, r2: h/4, r3: h/8, r4: h/16)
+            r1_gpu = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32)
+            r2_gpu = cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32)
+            r3_gpu = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32)
+            r4_gpu = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32)
 
         # Run inference with global lock to prevent race conditions
         with get_exec_lock():

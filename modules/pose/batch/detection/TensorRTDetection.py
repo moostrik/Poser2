@@ -18,16 +18,8 @@ from modules.pose.batch.detection.MMDetection import (
     PoseDetectionOutputCallback
 )
 
-from modules.pose.Settings import Settings, ModelSize
+from modules.pose.Settings import Settings
 from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
-
-# TensorRT model file names and keypoint counts
-TENSORRT_MODEL_CONFIG: dict[ModelSize, tuple[str, int]] = {
-    ModelSize.LARGE: ('rtmpose-l_256x192_batch3.trt', 17),
-    ModelSize.MEDIUM: ('rtmpose-m_256x192.trt', 17),
-    ModelSize.SMALL: ('rtmpose-s_256x192.trt', 17),
-    ModelSize.TINY: ('rtmpose-t_256x192.trt', 17),
-}
 
 # ImageNet normalization (RGB order)
 IMAGENET_MEAN = np.array([123.675, 116.28, 103.53], dtype=np.float32).reshape(1, 3, 1, 1)
@@ -44,14 +36,14 @@ class TensorRTDetection(Thread):
     def __init__(self, settings: 'Settings') -> None:
         super().__init__()
 
-        self.model_size: ModelSize = settings.model_size
-        model_filename, self.num_keypoints = TENSORRT_MODEL_CONFIG[settings.model_size]
-        self.model_file: str = settings.model_path + '/' + model_filename
-        self.model_width: int = settings.model_width
-        self.model_height: int = settings.model_height
+        self.model_file: str = settings.model_path + '/' + settings.pose_model
+        self.model_width: int = settings.pose_width
+        self.model_height: int = settings.pose_height
+        self.num_keypoints: int = 17  # RTMPose COCO format
         self.simcc_split_ratio: float = 2.0  # From RTMPose config
 
         self.verbose: bool = settings.verbose
+        self.resolution_name: str = settings.pose_resolution.name
 
         # Thread coordination
         self._shutdown_event: Event = Event()
@@ -140,7 +132,7 @@ class TensorRTDetection(Thread):
                 self.output_names.append(name)
 
         self._model_ready.set()
-        print(f"TensorRT Detection: {self.model_size.name} model ready")
+        print(f"TensorRT Detection: {self.resolution_name} model ready ({self.model_width}x{self.model_height})")
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()

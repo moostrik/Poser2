@@ -59,8 +59,11 @@ class ONNXOpticalFlow(Thread):
             print('Optical Flow WARNING: Optical flow is disabled')
 
         self.model_path: str = settings.model_path
-        self.model_name: str = 'raft-sintel_512x384_iter12.onnx'  # ONNX Runtime
+        self.model_name: str = settings.flow_model
         self.model_file: str = f"{self.model_path}/{self.model_name}"
+        self.model_width: int = settings.flow_width
+        self.model_height: int = settings.flow_height
+        self.resolution_name: str = settings.flow_resolution.name
         self.verbose: bool = settings.verbose
 
         # Thread coordination
@@ -163,7 +166,7 @@ class ONNXOpticalFlow(Thread):
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="RAFT-Worker")
 
             self._model_ready.set()
-            print(f"RAFT Optical Flow: Model '{self.model_name}' loaded successfully ({providers_used[0]}) with {self._max_workers} workers")
+            print(f"RAFT Optical Flow: {self.resolution_name} model loaded ({self.model_width}x{self.model_height}, {providers_used[0]}) with {self._max_workers} workers")
 
         except Exception as e:
             print(f"RAFT Optical Flow Error: Failed to load model - {str(e)}")
@@ -200,7 +203,7 @@ class ONNXOpticalFlow(Thread):
                 dropped_batch = self._pending_batch
                 lag = int((time.time() - self._input_timestamp) * 1000)
                 # if self.verbose:
-                print(f"RAFT Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
+                # print(f"RAFT Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -353,7 +356,7 @@ class ONNXOpticalFlow(Thread):
     def _model_warmup(self, session: ort.InferenceSession) -> None:
         """Initialize CUDA kernels with dummy inference."""
         try:
-            dummy_frame = np.zeros((256, 192, 3), dtype=np.uint8)
+            dummy_frame = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
 
             for i in range(2):
                 _ = self._infer_optical_flow(dummy_frame, dummy_frame)

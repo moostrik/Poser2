@@ -4,7 +4,7 @@ from typing import Union
 
 import numpy as np
 
-from modules.pose.batch.detection.MMDetection import MMDetection, DetectionInput, DetectionOutput
+from modules.pose.batch.detection.MMDetection import DetectionInput, DetectionOutput
 from modules.pose.batch.detection.ONNXDetection import ONNXDetection
 from modules.pose.batch.detection.TensorRTDetection import TensorRTDetection
 from modules.pose.features import Points2D
@@ -13,7 +13,7 @@ from modules.pose.Frame import FrameDict
 from modules.pose.Settings import Settings, ModelType
 from modules.utils.PerformanceTimer import PerformanceTimer
 
-Detection = Union[MMDetection, ONNXDetection, TensorRTDetection]
+Detection = Union[ONNXDetection, TensorRTDetection]
 
 class PointBatchExtractor(PoseDictCallbackMixin):
     """GPU-based batch extractor for 2D pose points using RTMPose detection.
@@ -29,11 +29,9 @@ class PointBatchExtractor(PoseDictCallbackMixin):
     def __init__(self, settings: Settings):
         super().__init__()
         self._detection: Detection = TensorRTDetection(settings)
-        if settings.model_type is ModelType.MM:
-            self._detection = MMDetection(settings)
-        elif settings.model_type is ModelType.ONNX:
+        if settings.model_type is ModelType.ONNX:
             self._detection = ONNXDetection(settings)
-        elif settings.model_type is ModelType.TENSORRT:
+        elif settings.model_type is ModelType.TRT:
             self._detection = TensorRTDetection(settings)
 
         self._lock = Lock()

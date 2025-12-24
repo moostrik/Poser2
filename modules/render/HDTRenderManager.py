@@ -71,7 +71,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.motion_sim,
     # Layers.cam_mask,
     # Layers.cam_image,
-    Layers.cam_flow,
+    # Layers.cam_flow,
 ]
 
 LARGE_LAYERS: list[Layers] = [

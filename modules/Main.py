@@ -55,8 +55,8 @@ class Main():
         self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
 
         # POSE CONFIGURATION
-        self.image_crop_config =    batch.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion)
-        self.image_flow_config =    batch.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=384, output_height=512)
+        self.image_crop_config =    batch.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=settings.pose.pose_width, output_height=settings.pose.pose_height)
+        self.image_flow_config =    batch.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=settings.pose.flow_width, output_height=settings.pose.flow_height)
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
@@ -231,12 +231,12 @@ class Main():
         self.point_extractor.start()
 
         # SEGMENTATION
-        self.image_crop_processor.add_callback(self.mask_extractor.process)
+        self.image_flow_processor.add_callback(self.mask_extractor.process)
         self.mask_extractor.add_callback(self.data_hub.set_mask_tensors)
         self.mask_extractor.start()
 
         # FLOW
-        self.image_crop_processor.add_pair_callback(self.flow_extractor.process)
+        self.image_flow_processor.add_pair_callback(self.flow_extractor.process)
         self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
         self.flow_extractor.start()
 

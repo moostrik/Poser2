@@ -48,7 +48,7 @@ class RecurrentState:
         self.r4 = r4
 
 
-class RVMSegmentation(Thread):
+class ONNXSegmentation(Thread):
     """Asynchronous GPU person segmentation using Robust Video Matting (RVM) with ONNX Runtime.
 
     RVM uses recurrent states to maintain temporal coherence across video frames,
@@ -69,8 +69,11 @@ class RVMSegmentation(Thread):
             print('Segmentation WARNING: Segmentation is disabled')
 
         self.model_path: str = settings.model_path
-        self.model_name: str = 'rvm_mobilenetv3_trt_256x192.onnx'  # TensorRT-compatible ONNX
+        self.model_name: str = settings.segmentation_model
         self.model_file: str = f"{self.model_path}/{self.model_name}"
+        self.model_width: int = settings.segmentation_width
+        self.model_height: int = settings.segmentation_height
+        self.resolution_name: str = settings.segmentation_resolution.name
         self.verbose: bool = settings.verbose
 
         # RVM-specific settings
@@ -185,7 +188,7 @@ class RVMSegmentation(Thread):
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="RVM-Worker")
 
             self._model_ready.set()  # Signal model is ready
-            print(f"RVM Segmentation: Model '{self.model_name}' loaded successfully ({providers_used[0]}) with {self._max_workers} workers")
+            print(f"RVM Segmentation: {self.resolution_name} model loaded ({self.model_width}x{self.model_height}, {providers_used[0]}) with {self._max_workers} workers")
 
         except Exception as e:
             print(f"RVM Segmentation Error: Failed to load model - {str(e)}")
@@ -355,13 +358,14 @@ class RVMSegmentation(Thread):
                 'r4i': state.r4,
             }
         else:
-            # Initialize with proper shapes for 256x192 input (first frame)
+            # Initialize with dynamic shapes based on model resolution (first frame)
+            # r1: h/2, r2: h/4, r3: h/8, r4: h/16
             onnx_inputs = {
                 'src': img_nchw,
-                'r1i': np.zeros((1, 16, 128, 96), dtype=np.float32),
-                'r2i': np.zeros((1, 20, 64, 48), dtype=np.float32),
-                'r3i': np.zeros((1, 40, 32, 24), dtype=np.float32),
-                'r4i': np.zeros((1, 64, 16, 12), dtype=np.float32),
+                'r1i': np.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=np.float32),
+                'r2i': np.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=np.float32),
+                'r3i': np.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=np.float32),
+                'r4i': np.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=np.float32),
             }
 
         # Run ONNX inference
@@ -433,8 +437,8 @@ class RVMSegmentation(Thread):
     def _model_warmup(self, session: ort.InferenceSession) -> None:
         """Initialize CUDA kernels with dummy inference to avoid cold-start errors."""
         try:
-            # Create dummy input matching typical inference dimensions
-            dummy_img = np.zeros((256, 192, 3), dtype=np.uint8)
+            # Create dummy input matching model dimensions
+            dummy_img = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
 
             # Run a few warmup inferences with tracklet ID 999 (will be cleared)
             for i in range(3):

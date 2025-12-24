@@ -12,7 +12,7 @@ from modules.cam.Settings import Settings as CamSettings
 from modules.gui.PyReallySimpleGui import GuiSettings
 from modules.inout import SoundOscConfig
 from modules.render.Settings import Settings as RenderSettings
-from modules.pose.Settings import Settings as PoseSettings, ModelType, ModelSize
+from modules.pose.Settings import Settings as PoseSettings, ModelType
 from modules.pose.pd_stream.PDStreamSettings import Settings as PDStreamSettings
 from modules.tracker.TrackerBase import TrackerType
 
