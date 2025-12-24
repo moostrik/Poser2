@@ -3,13 +3,13 @@
 
 Usage:
     # Convert RVM mobilenetv3 256x192 with batch 3 (FP16 default)
-    python modules/pose/batch/segmentation/export_rvm_onnx_to_tensorrt.py --onnx models/rvm_mobilenetv3_256x192.onnx --output models/rvm_mobilenetv3_256x192_b3.trt
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_256x192.onnx --output models/rvm_mobilenetv3_256x192_b3.trt
 
     # Convert 384x288
-    python modules/pose/batch/segmentation/export_rvm_onnx_to_tensorrt.py --onnx models/rvm_mobilenetv3_384x288.onnx --output models/rvm_mobilenetv3_384x288_b3.trt --height 384 --width 288
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_384x288.onnx --output models/rvm_mobilenetv3_384x288_b3.trt --height 384 --width 288
 
     # Convert 512x384
-    python modules/pose/batch/segmentation/export_rvm_onnx_to_tensorrt.py --onnx models/rvm_mobilenetv3_512x384.onnx --output models/rvm_mobilenetv3_512x384_b3.trt --height 512 --width 384
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_512x384.onnx --output models/rvm_mobilenetv3_512x384_b3.trt --height 512 --width 384
 """
 
 import tensorrt as trt

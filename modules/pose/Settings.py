@@ -76,7 +76,6 @@ class Settings:
 
     # Per-model resolution settings
     pose_resolution: Resolution =       field(default=Resolution.STANDARD)
-    segmentation_resolution: Resolution = field(default=Resolution.STANDARD)
     flow_resolution: Resolution =       field(default=Resolution.STANDARD)
 
     model_path: str =                   field(default="models")
@@ -90,6 +89,12 @@ class Settings:
     segmentation_enabled: bool =        field(default=True)
     flow_enabled: bool =                field(default=True)
 
+    # Segmentation resolution follows flow resolution
+    @property
+    def segmentation_resolution(self) -> Resolution:
+        """Segmentation resolution always matches flow resolution."""
+        return self.flow_resolution
+
     # Backward compatibility - deprecated single resolution setting
     @property
     def resolution(self) -> Resolution:
@@ -100,7 +105,6 @@ class Settings:
     def resolution(self, value: Resolution) -> None:
         """Deprecated: Sets all resolutions to the same value."""
         self.pose_resolution = value
-        self.segmentation_resolution = value
         self.flow_resolution = value
 
     # Pose dimensions

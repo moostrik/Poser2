@@ -3,10 +3,10 @@
 
 Usage:
     # Convert RTMPose-L 256x192 with batch 3 (FP16 default)
-    python modules/pose/batch/detection/export_rtm_onnx_to_tensorrt.py --onnx models/rtmpose-l_256x192.onnx --output models/rtmpose-l_256x192_b3.trt
+    python modules/pose/batch/detection/export_rtm_onnx_to_trt.py --onnx models/rtmpose-l_256x192.onnx --output models/rtmpose-l_256x192_b3.trt
 
     # Convert 384x288 model with batch 3
-    python modules/pose/batch/detection/export_rtm_onnx_to_tensorrt.py --onnx models/rtmpose-l_384x288.onnx --output models/rtmpose-l_384x288_b3.trt --height 384 --width 288
+    python modules/pose/batch/detection/export_rtm_onnx_to_trt.py --onnx models/rtmpose-l_384x288.onnx --output models/rtmpose-l_384x288_b3.trt --height 384 --width 288
 """
 
 import tensorrt as trt
