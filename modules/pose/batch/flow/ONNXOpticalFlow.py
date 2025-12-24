@@ -59,7 +59,7 @@ class ONNXOpticalFlow(Thread):
             print('Optical Flow WARNING: Optical flow is disabled')
 
         self.model_path: str = settings.model_path
-        self.model_name: str = 'raft-small_256x192_iter6.onnx'  # ONNX Runtime
+        self.model_name: str = 'raft-sintel_512x384_iter12.onnx'  # ONNX Runtime
         self.model_file: str = f"{self.model_path}/{self.model_name}"
         self.verbose: bool = settings.verbose
 

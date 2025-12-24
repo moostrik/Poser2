@@ -363,12 +363,10 @@ def export_all_raft_models(models_dir: str = "models"):
     print(f"{'═'*60}")
 
     models = [
-        # (checkpoint, output, height, width)
-        # ('raft-sintel.pth', 'raft-sintel_256x192.onnx', 256, 192),
-        # ('raft-sintel.pth', 'raft-sintel_384x288.onnx', 384, 288),
-        # ('raft-sintel.pth', 'raft-sintel_512x384.onnx', 512, 384),
-        ('raft-small.pth', 'raft-small_256x192.onnx', 256, 192),
-        # ('raft-things.pth', 'raft-things_256x192.onnx', 256, 192),
+        # (checkpoint, output, height, width, iters)
+        ('raft-sintel.pth', 'raft-sintel_512x384_iter2.onnx', 512, 384, 2),
+        ('raft-sintel.pth', 'raft-sintel_512x384_iter6.onnx', 512, 384, 6),
+        ('raft-sintel.pth', 'raft-sintel_512x384_iter12.onnx', 512, 384, 12),
     ]
 
     models_path = Path(models_dir)
@@ -380,7 +378,7 @@ def export_all_raft_models(models_dir: str = "models"):
     skip_count = 0
     fail_count = 0
 
-    for idx, (checkpoint, output, height, width) in enumerate(models, 1):
+    for idx, (checkpoint, output, height, width, iters) in enumerate(models, 1):
         checkpoint_path = models_path / checkpoint
         output_path = models_path / output
 
@@ -395,7 +393,7 @@ def export_all_raft_models(models_dir: str = "models"):
             continue
 
         try:
-            export_raft_onnx(str(checkpoint_path), str(output_path), height, width)
+            export_raft_onnx(str(checkpoint_path), str(output_path), height, width, iters=iters)
             success_count += 1
         except Exception as e:
             print(f"\n❌ FAILED: {e}")

@@ -56,6 +56,7 @@ class Main():
 
         # POSE CONFIGURATION
         self.image_crop_config =    batch.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion)
+        self.image_flow_config =    batch.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=384, output_height=512)
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
@@ -92,6 +93,7 @@ class Main():
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
         self.image_crop_processor = batch.ImageCropProcessor(self.image_crop_config)
+        self.image_flow_processor = batch.ImageCropProcessor(self.image_flow_config)
         self.point_extractor =      batch.PointBatchExtractor(settings.pose)  # GPU-based 2D point extractor
         self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
@@ -187,7 +189,7 @@ class Main():
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
             camera.add_frame_callback(self.image_crop_processor.set_image)
-            # camera.add_frame_callback(self.mask_extractor.set_image)
+            camera.add_frame_callback(self.image_flow_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
             camera.add_tracker_callback(self.data_hub.set_depth_tracklets)
@@ -209,6 +211,7 @@ class Main():
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets.add_poses_callback(self.bbox_filters.process)
         self.bbox_filters.add_poses_callback(self.image_crop_processor.process)
+        self.bbox_filters.add_poses_callback(self.image_flow_processor.process)
         self.image_crop_processor.add_callback(self.point_extractor.process)
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
 

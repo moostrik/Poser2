@@ -34,7 +34,7 @@ class CamFlowRenderer(LayerBase):
         self.process_scale: float = 2.0
         self.flow_scale: float = 10.0
         self.flow_gamma: float = 0.5
-        self.noise_threshold: float = 0.01
+        self.noise_threshold: float = 0.2
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -94,9 +94,8 @@ class CamFlowRenderer(LayerBase):
 
         self.process_scale: float = 2.0
         self.flow_scale: float = 1.0
-        self.flow_gamma: float = 1
+        self.flow_gamma: float = 0.5
         self.noise_threshold: float = 0.2
-
 
 
         if self._flow_texture.allocated:
