@@ -1,68 +1,45 @@
 from OpenGL.GL import * # type: ignore
-# import cv2
-import numpy as np
 
 
-def get_format(internat_format) -> Constant:
-    if internat_format == GL_RGB: return GL_BGR
-    if internat_format == GL_RGB8: return GL_BGR
-    if internat_format == GL_RGB16F: return GL_BGR
-    if internat_format == GL_RGB32F: return GL_BGR
-    if internat_format == GL_RGBA: return GL_BGRA
-    if internat_format == GL_RGBA8: return GL_BGRA
-    if internat_format == GL_RGBA16F: return GL_BGRA
-    if internat_format == GL_RGBA32F: return GL_BGRA
-    if internat_format == GL_R8: return GL_RED
-    if internat_format == GL_R16F: return GL_RED
-    if internat_format == GL_R32F: return GL_RED
-    if internat_format == GL_RG32F: return GL_RG
+def get_format(internal_format) -> Constant:
+    """Get the default pixel format for glTexImage2D (always RGB order).
+
+    Args:
+        internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
+
+    Returns:
+        OpenGL format constant (GL_RGB, GL_RGBA, GL_RED, GL_RG)
+    """
+    if internal_format == GL_RGB: return GL_RGB
+    if internal_format == GL_RGB8: return GL_RGB
+    if internal_format == GL_RGB16F: return GL_RGB
+    if internal_format == GL_RGB32F: return GL_RGB
+    if internal_format == GL_RGBA: return GL_RGBA
+    if internal_format == GL_RGBA8: return GL_RGBA
+    if internal_format == GL_RGBA16F: return GL_RGBA
+    if internal_format == GL_RGBA32F: return GL_RGBA
+    if internal_format == GL_R8: return GL_RED
+    if internal_format == GL_R16F: return GL_RED
+    if internal_format == GL_R32F: return GL_RED
+    if internal_format == GL_RG32F: return GL_RG
     print('GL_texture', 'internal format not supported')
-    return GL_NONE
+    return GL_RGB  # fallback
 
-def get_data_type(internat_format) -> Constant:
-    if internat_format == GL_RGB: return GL_UNSIGNED_BYTE
-    if internat_format == GL_RGB8: return GL_UNSIGNED_BYTE
-    if internat_format == GL_RGB16F: return GL_FLOAT
-    if internat_format == GL_RGB32F: return GL_FLOAT
-    if internat_format == GL_RGBA: return GL_UNSIGNED_BYTE
-    if internat_format == GL_RGBA8: return GL_UNSIGNED_BYTE
-    if internat_format == GL_RGBA16F: return GL_FLOAT
-    if internat_format == GL_RGBA32F: return GL_FLOAT
-    if internat_format == GL_R8: return GL_UNSIGNED_BYTE
-    if internat_format == GL_R16F: return GL_FLOAT
-    if internat_format == GL_R32F: return GL_FLOAT
-    if internat_format == GL_RG32F: return GL_FLOAT
+
+def get_data_type(internal_format) -> Constant:
+    if internal_format == GL_RGB: return GL_UNSIGNED_BYTE
+    if internal_format == GL_RGB8: return GL_UNSIGNED_BYTE
+    if internal_format == GL_RGB16F: return GL_FLOAT
+    if internal_format == GL_RGB32F: return GL_FLOAT
+    if internal_format == GL_RGBA: return GL_UNSIGNED_BYTE
+    if internal_format == GL_RGBA8: return GL_UNSIGNED_BYTE
+    if internal_format == GL_RGBA16F: return GL_FLOAT
+    if internal_format == GL_RGBA32F: return GL_FLOAT
+    if internal_format == GL_R8: return GL_UNSIGNED_BYTE
+    if internal_format == GL_R16F: return GL_FLOAT
+    if internal_format == GL_R32F: return GL_FLOAT
+    if internal_format == GL_RG32F: return GL_FLOAT
     print('GL_texture', 'internal format not supported')
-    return GL_NONE
-
-def get_internal_format(image: np.ndarray) -> Constant:
-    # only works for byte images (not float)
-    if image.dtype == np.uint8:
-        if len(image.shape) == 2:  # Grayscale image
-            return GL_R8
-        elif len(image.shape) == 3:
-            if image.shape[2] == 3:  # RGB image
-                return GL_RGB8
-            elif image.shape[2] == 4:  # RGBA image
-                return GL_RGBA8
-    elif image.dtype == np.float16:
-        if len(image.shape) == 2:  # Grayscale image
-            return GL_R16F
-        elif len(image.shape) == 3:
-            if image.shape[2] == 3:  # RGB image
-                return GL_RGB16F
-            elif image.shape[2] == 4:  # RGBA image
-                return GL_RGBA16F
-    elif image.dtype == np.float32:
-        if len(image.shape) == 2:  # Grayscale image
-            return GL_R32F
-        elif len(image.shape) == 3:
-            if image.shape[2] == 3:  # RGB image
-                return GL_RGB32F
-            elif image.shape[2] == 4:  # RGBA image
-                return GL_RGBA32F
-
-    print('GL_texture', 'image format not supported')
     return GL_NONE
 
 def draw_quad(x: float, y: float, w: float, h: float, flipV: bool = False) -> None :
@@ -120,6 +97,13 @@ class Texture():
         self.tex_id = 0
 
     def allocate(self, width: int, height: int, internal_format) -> None :
+        """Allocate OpenGL texture with specified dimensions and format.
+
+        Args:
+            width: Texture width in pixels
+            height: Texture height in pixels
+            internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
+        """
         data_type: Constant = get_data_type(internal_format)
         if data_type == GL_NONE: return
 
@@ -158,22 +142,6 @@ class Texture():
         self.data_type = GL_NONE
         glDeleteTextures(1, [self.tex_id])
         self.tex_id = 0
-
-    def set_from_image(self, image: np.ndarray) -> None:
-        internal_format: Constant = get_internal_format(image)
-        if internal_format == GL_NONE: return
-        height: int = image.shape[0]
-        width:  int = image.shape[1]
-
-        if internal_format != self.internal_format or width != self.width or height != self.height:
-            if self.allocated: self.deallocate()
-            self.allocate(width, height, internal_format)
-
-        if not self.allocated: return
-
-        self.bind()
-        glTexImage2D(GL_TEXTURE_2D, 0, self.internal_format, width, height, 0, self.format, self.data_type, image)
-        self.unbind()
 
     def bind(self) -> None :
         glBindTexture(GL_TEXTURE_2D, self.tex_id)

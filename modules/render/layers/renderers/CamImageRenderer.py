@@ -15,7 +15,7 @@ class CamImageRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._cam_id: int = cam_id
         self._data: DataHub = data
-        self._image: Image = Image()
+        self._image: Image = Image('BGR')
         self._p_frame: np.ndarray | None = None
 
     @property

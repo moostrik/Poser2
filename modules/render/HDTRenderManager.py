@@ -51,7 +51,7 @@ PREVIEW_LAYERS: list[Layers] = [
     # Layers.centre_cam,
     Layers.centre_pose,
     Layers.sim_blend,
-    # Layers.prev_angles,
+    Layers.prev_angles,
     Layers.prev_mt,
 ]
 
@@ -71,7 +71,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.motion_sim,
     # Layers.cam_mask,
     # Layers.cam_image,
-    Layers.cam_flow,
+    # Layers.cam_flow,
 ]
 
 LARGE_LAYERS: list[Layers] = [

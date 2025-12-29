@@ -3,13 +3,13 @@
 
 Usage:
     # Convert RAFT Sintel 256x192 with batch 3 (FP16 default)
-    python modules/pose/batch/flow/export_raft_onnx_to_tensorrt.py --onnx models/raft-sintel_256x192_i12.onnx --output models/raft-sintel_256x192_i12_b3.trt
+    python modules/pose/batch/flow/export_raft_onnx_to_trt.py --onnx models/raft-sintel_256x192_i12.onnx --output models/raft-sintel_256x192_i12_b3.trt
 
     # Convert 384x288 model with batch 3
-    python modules/pose/batch/flow/export_raft_onnx_to_tensorrt.py --onnx models/raft-sintel_384x288_i12.onnx --output models/raft-sintel_384x288_i12_b3.trt --height 384 --width 288
+    python modules/pose/batch/flow/export_raft_onnx_to_trt.py --onnx models/raft-sintel_384x288_i12.onnx --output models/raft-sintel_384x288_i12_b3.trt --height 384 --width 288
 
     # Convert 512x384 model with batch 3
-    python modules/pose/batch/flow/export_raft_onnx_to_tensorrt.py --onnx models/raft-sintel_512x384_i12.onnx --output models/raft-sintel_512x384_i12_b3.trt --height 512 --width 384
+    python modules/pose/batch/flow/export_raft_onnx_to_trt.py --onnx models/raft-sintel_512x384_i12.onnx --output models/raft-sintel_512x384_i12_b3.trt --height 512 --width 384
 """
 
 import tensorrt as trt

@@ -6,7 +6,7 @@ import numpy as np
 
 class StreamCorrelation(Shader):
     # Channel encoding for stream textures
-    SIMILARITY_CHANNEL = 2  # Similarity values
+    SIMILARITY_CHANNEL = 0  # Similarity values
     MASK_CHANNEL = 1        # Valid mask (1.0 = valid, 0.0 = NaN)
 
     def __init__(self) -> None:

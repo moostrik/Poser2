@@ -53,7 +53,8 @@ class StreamPose(Shader):
             confidences: np.ndarray = np.clip(confidences_raw.astype(np.float32), 0, 1)
 
         try:
-            streams: np.ndarray = np.stack([confidences, sign_channel, angles_norm], axis=-1).transpose(1, 0, 2)
+            # Stack in RGB order: angles_norm → Red, sign → Green, confidences → Blue
+            streams: np.ndarray = np.stack([angles_norm, sign_channel, confidences], axis=-1).transpose(1, 0, 2)
         except Exception as e:
             print(len(confidences), len(sign_channel), len(angles_norm))
             print(e)
