@@ -1,5 +1,4 @@
 
-from .Mesh import Mesh
 from .RenderBase import RenderBase
 from .Shader import Shader
 from .WindowManager import WindowManager

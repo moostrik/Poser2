@@ -11,14 +11,16 @@ from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.pose.features import PoseFeatureType, AngleMotion, AggregationMethod, SingleValue
 from modules.pose.Frame import Frame, FrameField
 
-from modules.render.layers.meshes.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
-
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
 from modules.gl.shaders.ValuesBar import ValuesBar as shader
+
+
+POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange
+POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0) # Cyan
 
 class PoseMotionSimLayer(LayerBase):
 
@@ -118,7 +120,6 @@ class PoseMotionSimLayer(LayerBase):
 
         rect = Rect(0, 0, fbo.width, fbo.height)
 
-        LayerBase.setView(fbo.width, fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         fbo.clear(0.0, 0.0, 0.0, 0.0)

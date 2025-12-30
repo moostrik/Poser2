@@ -24,7 +24,4 @@ from .renderers.CamMaskRenderer import          CamMaskRenderer
 from .renderers.PoseBBoxRenderer import         PoseBBoxRenderer
 from .renderers.PoseMotionTimeRenderer import   PoseMotionTimeRenderer
 
-# Deprecated
-from .meshes.CamMeshRenderer import             CamMeshRenderer
-from .meshes.PoseMeshRenderer import            PoseMeshRenderer
 

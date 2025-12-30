@@ -10,7 +10,6 @@ from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.pose.Frame import Frame
 
-from modules.render.layers.meshes.PoseMeshUtils import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 from modules.pose.features.Angles import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.pose.pd_stream.PDStream import PDStreamData
 
@@ -20,6 +19,10 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
 from modules.gl.shaders.StreamPose import StreamPose as shader
+
+
+POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange
+POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0) # Cyan
 
 class PDLineLayer(LayerBase):
 
