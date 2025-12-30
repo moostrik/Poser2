@@ -2,19 +2,11 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
 class HDT_LineFields(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
-
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
-
     def use(self, fbo,
             cam_tex_0, cam_tex_1, cam_tex_2, line_tex_l, line_tex_r,
             visibility_0: float, visibility_1: float, visibility_2: float,
             cam_color_0: tuple[float, float, float, float], cam_color_1: tuple[float, float, float, float], cam_color_2: tuple[float, float, float, float],
             param_0: float, param_1: float, param_2) -> None :
-        super().use()
         if not self.allocated: return
         if not fbo: return
 

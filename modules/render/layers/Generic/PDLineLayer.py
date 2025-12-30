@@ -43,7 +43,7 @@ class PDLineLayer(LayerBase):
         self._label_fbo.allocate(width, height, internal_format)
         PDLineLayer.render_labels(self._label_fbo)
         if not PDLineLayer.pose_stream_shader.allocated:
-            PDLineLayer.pose_stream_shader.allocate(monitor_file=True)
+            PDLineLayer.pose_stream_shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -60,7 +60,7 @@ class PDLineLayer(LayerBase):
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
         if not PDLineLayer.pose_stream_shader.allocated:
-            PDLineLayer.pose_stream_shader.allocate(monitor_file=False)
+            PDLineLayer.pose_stream_shader.allocate()
 
         pd_stream: PDStreamData | None = self._data.get_item(DataHubType.pd_stream, self._cam_id)
 

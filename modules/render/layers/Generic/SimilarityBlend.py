@@ -72,7 +72,7 @@ class SimilarityBlend(LayerBase):
         self._mask_other_2_fbo.allocate(width, height, GL_R32F)
 
         if not SimilarityBlend._blend_shader.allocated:
-            SimilarityBlend._blend_shader.allocate(monitor_file=True)
+            SimilarityBlend._blend_shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -91,11 +91,11 @@ class SimilarityBlend(LayerBase):
     def update(self) -> None:
         # reallocate shader if needed if hot-reloaded
         if not SimilarityBlend._blend_shader.allocated:
-            SimilarityBlend._blend_shader.allocate(monitor_file=True)
+            SimilarityBlend._blend_shader.allocate()
         if not SimilarityBlend._mask_shader.allocated:
-            SimilarityBlend._mask_shader.allocate(monitor_file=True)
+            SimilarityBlend._mask_shader.allocate()
         if not SimilarityBlend._mask_multiply_shader.allocated:
-            SimilarityBlend._mask_multiply_shader.allocate(monitor_file=True)
+            SimilarityBlend._mask_multiply_shader.allocate()
 
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
 

@@ -1,18 +1,9 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
-from random import random
 from time import time
 
 class NoiseSimplex(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
-
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
-
     def use(self, fbo, speed: float, blend: float, width: float, height: float) -> None :
-        super().use()
         if not self.allocated: return
         if not fbo: return
 

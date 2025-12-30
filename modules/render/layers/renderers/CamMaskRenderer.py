@@ -45,7 +45,7 @@ class CamMaskRenderer(LayerBase):
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         if not CamMaskRenderer._dilate_shader.allocated:
-            CamMaskRenderer._dilate_shader.allocate(monitor_file=True)
+            CamMaskRenderer._dilate_shader.allocate()
 
     def deallocate(self) -> None:
         self._cuda_image.deallocate()
@@ -58,7 +58,7 @@ class CamMaskRenderer(LayerBase):
 
     def update(self) -> None:
         if not CamMaskRenderer._dilate_shader.allocated:
-            CamMaskRenderer._dilate_shader.allocate(monitor_file=True)
+            CamMaskRenderer._dilate_shader.allocate()
 
         mask_tensor: torch.Tensor | None = self._data_hub.get_item(DataHubType.mask_tensor, self._track_id)
 
@@ -70,7 +70,7 @@ class CamMaskRenderer(LayerBase):
         self._fbo.clear()
 
         if mask_tensor is None:
-            self._cuda_image.clear()
+            # self._cuda_image.clear()
             return
 
         self._cuda_image.set_tensor(mask_tensor)

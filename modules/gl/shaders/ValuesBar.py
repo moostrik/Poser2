@@ -6,24 +6,19 @@ import numpy as np
 from modules.pose.features import PoseFeatureType as PoseFeatureUnion
 
 class ValuesBar(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
-
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
+    def allocate(self) -> None:
+        super().allocate()
         self.vbo_values = glGenBuffers(1)
         self.vbo_colors = glGenBuffers(1)
         self.tex_values = glGenTextures(1)
         self.tex_colors = glGenTextures(1)
 
     def deallocate(self):
+        super().deallocate()
         glDeleteTextures(2, [self.tex_values, self.tex_colors])
         glDeleteBuffers(2, [self.vbo_values, self.vbo_colors])
-        return super().deallocate()
 
     def use(self, fbo: int, norm_values: np.ndarray, colors: np.ndarray, line_thickness: float = 0.1, line_smooth: float = 0.01) -> None:
-        super().use()
         if not self.allocated: return
         if not fbo: return
 

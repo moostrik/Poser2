@@ -96,7 +96,7 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
             return
 
         # Track inference time
-        self._timer.add_time(output.inference_time_ms, report=True)
+        self._timer.add_time(output.inference_time_ms, report=self._verbose)
 
         # Create dict mapping tracklet_id -> GPU tensor (2, H, W)
         # Flow tensor format: [0] = x-displacement, [1] = y-displacement

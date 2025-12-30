@@ -49,7 +49,7 @@ class PoseScalarBarLayer(LayerBase):
         self._label_fbo.allocate(width, height, internal_format)
 
         if not PoseScalarBarLayer.pose_feature_shader.allocated:
-            PoseScalarBarLayer.pose_feature_shader.allocate(monitor_file=True)
+            PoseScalarBarLayer.pose_feature_shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -64,7 +64,7 @@ class PoseScalarBarLayer(LayerBase):
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
         if not PoseScalarBarLayer.pose_feature_shader.allocated:
-            PoseScalarBarLayer.pose_feature_shader.allocate(monitor_file=True)
+            PoseScalarBarLayer.pose_feature_shader.allocate()
 
         key: int = self._track_id
 

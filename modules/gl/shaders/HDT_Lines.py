@@ -2,21 +2,9 @@ from OpenGL.GL import * # type: ignore
 from OpenGL.GL.shaders import ShaderProgram
 from modules.gl.Shader import Shader, draw_quad
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 class HDT_Lines(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
-
-        # self.hot_reloader = HotReloadMethods(self.__class__, True)
-
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
-
     def use(self, fbo: int, time: float, phase: float, anchor: float, amount: float, thickness: float, sharpness: float, stretch: float, mess: float,
             param01: float = 0.0, param02: float = 0.0, param03: float = 0.0, param04: float = 0.0, param05: float = 0.0) -> None:
-        super().use()
         if not self.allocated:
             return
         s: ShaderProgram | None = self.shader_program

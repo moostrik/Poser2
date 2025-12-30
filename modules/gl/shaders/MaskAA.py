@@ -2,15 +2,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
 class MaskAA(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
-
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
-
     def use(self, fbo, tex0, texel_size: tuple | None = None, blur_radius: float = 1.0, aa_mode: int = 1) -> None:
-        super().use()
         if not self.allocated: return
         if not fbo or not tex0: return
 

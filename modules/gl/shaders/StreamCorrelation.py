@@ -1,5 +1,4 @@
 from OpenGL.GL import * # type: ignore
-from OpenGL.GL.shaders import ShaderProgram # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 import numpy as np
 
@@ -8,13 +7,6 @@ class StreamCorrelation(Shader):
     # Channel encoding for stream textures
     SIMILARITY_CHANNEL = 0  # Similarity values
     MASK_CHANNEL = 1        # Valid mask (1.0 = valid, 0.0 = NaN)
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name: str = self.__class__.__name__
-
-    def allocate(self, monitor_file: bool = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
 
     def use(self, fbo: int, tex0: int, num_samples: int, num_streams: int, line_width: float) -> None:
         """Render correlation streams using shader.
@@ -26,7 +18,6 @@ class StreamCorrelation(Shader):
             num_streams: Height of texture (number of pairs)
             line_width: Line width in normalized coordinates
         """
-        super().use()
 
         # Guard clauses
         if not self.allocated:

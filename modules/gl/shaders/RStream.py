@@ -5,18 +5,22 @@ import numpy as np
 class RStream(Shader):
     def __init__(self) -> None:
         super().__init__()
-        self.shader_name = self.__class__.__name__
         self.texture_id = None
 
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
+    def allocate(self) -> None:
+        super().allocate()
         if self.allocated and self.texture_id is None:
             self.texture_id = glGenTextures(1)
+
+    def deallocate(self) -> None:
+        super().deallocate()
+        if self.texture_id is not None:
+            glDeleteTextures(1, [self.texture_id])
+            self.texture_id = None
 
     def use(self, fbo_id: int, correlation_data: np.ndarray, pair_index: int, total_pairs: int,
             line_color: tuple = (1.0, 1.0, 1.0), line_width: float = 5.0,
             viewport_width: float = 800, viewport_height: float = 600) -> None:
-        super().use()
         if not self.allocated or not fbo_id or self.texture_id is None:
             return
 
@@ -53,9 +57,3 @@ class RStream(Shader):
 
         glUseProgram(0)
         glBindTexture(GL_TEXTURE_2D, 0)
-
-    def unload(self) -> None:
-        if self.texture_id is not None:
-            glDeleteTextures(1, [self.texture_id])
-            self.texture_id = None
-        super().unload()

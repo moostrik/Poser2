@@ -2,19 +2,11 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
 class TripleBlendColor(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
-
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
-
     def use(self, fbo,
             tex0, tex1, tex2,
             mask0, mask1, mask2,
             blend0: float, blend1: float, blend2: float,
             c1, c2, c3) -> None :
-        super().use()
         if not self.allocated: return
         if not fbo or not tex0 or not tex1: return
 

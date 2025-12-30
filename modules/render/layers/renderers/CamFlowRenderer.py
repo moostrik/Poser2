@@ -58,7 +58,7 @@ class CamFlowRenderer(LayerBase):
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         """Initialize renderer resources."""
         if not CamFlowRenderer._flow_shader.allocated:
-            CamFlowRenderer._flow_shader.allocate(monitor_file=True)
+            CamFlowRenderer._flow_shader.allocate()
 
     def deallocate(self) -> None:
         """Release all GPU resources."""
@@ -73,7 +73,7 @@ class CamFlowRenderer(LayerBase):
     def update(self) -> None:
         """Update flow texture from DataHub."""
         if not CamFlowRenderer._flow_shader.allocated:
-            CamFlowRenderer._flow_shader.allocate(monitor_file=True)
+            CamFlowRenderer._flow_shader.allocate()
 
         flow_tensor: torch.Tensor | None = self._data_hub.get_item(DataHubType.flow_tensor, self._track_id)
 
@@ -85,7 +85,7 @@ class CamFlowRenderer(LayerBase):
         self._fbo.clear()
 
         if flow_tensor is None:
-            self._flow_texture.clear()
+            # self._flow_texture.clear()
             return
 
         self._flow_texture.set_tensor(flow_tensor)

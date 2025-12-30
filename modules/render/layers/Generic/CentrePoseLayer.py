@@ -33,7 +33,7 @@ class CentrePoseLayer(PoseLineLayer):
 
     def update(self) -> None:
         if not PoseLineLayer._shader.allocated:
-            PoseLineLayer._shader.allocate(monitor_file=True)
+            PoseLineLayer._shader.allocate()
 
         pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
 

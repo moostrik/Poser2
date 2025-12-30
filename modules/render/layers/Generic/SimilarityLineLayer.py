@@ -43,7 +43,7 @@ class SimilarityLineLayer(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         if not SimilarityLineLayer.r_stream_shader.allocated:
-            SimilarityLineLayer.r_stream_shader.allocate(monitor_file=True)
+            SimilarityLineLayer.r_stream_shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -67,7 +67,7 @@ class SimilarityLineLayer(LayerBase):
         """
         # reallocate shader if needed if hot-reloaded
         if not SimilarityLineLayer.r_stream_shader.allocated:
-            SimilarityLineLayer.r_stream_shader.allocate(monitor_file=True)
+            SimilarityLineLayer.r_stream_shader.allocate()
 
         batch: SimilarityBatch  | None = self._data.get_item(DataHubType(self.data_type))
 

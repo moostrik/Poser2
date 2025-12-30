@@ -65,7 +65,7 @@ class MotionMultiply(LayerBase):
         self._cam_fbo.allocate(width, height, internal_format)
         self._mask_fbo.allocate(width, height, GL_R32F)
         if not MotionMultiply._shader.allocated:
-            MotionMultiply._shader.allocate(monitor_file=True)
+            MotionMultiply._shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -82,7 +82,7 @@ class MotionMultiply(LayerBase):
     def update(self) -> None:
         # reallocate shader if needed if hot-reloaded
         if not MotionMultiply._shader.allocated:
-            MotionMultiply._shader.allocate(monitor_file=True)
+            MotionMultiply._shader.allocate()
 
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
 

@@ -43,7 +43,7 @@ class ElectricLayer(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         if not ElectricLayer._shader.allocated:
-            ElectricLayer._shader.allocate(monitor_file=True)
+            ElectricLayer._shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -62,7 +62,7 @@ class ElectricLayer(LayerBase):
 
     def update(self) -> None:
         if not ElectricLayer._shader.allocated:
-            ElectricLayer._shader.allocate(monitor_file=True)
+            ElectricLayer._shader.allocate()
 
         pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
 

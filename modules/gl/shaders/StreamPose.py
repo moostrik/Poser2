@@ -6,15 +6,7 @@ from modules.pose.pd_stream.PDStream import PDStreamData
 import numpy as np
 
 class StreamPose(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
-
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
-
     def use(self, fbo: int, tex0: int, num_samples: int, num_streams: int, line_width: float) -> None :
-        super().use()
         if not self.allocated: return
         if not fbo or not tex0: return
         s: ShaderProgram | None = self.shader_program

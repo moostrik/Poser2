@@ -10,17 +10,9 @@ from modules.pose.features import Points2D
 class PoseElectric(Shader):
     def __init__(self) -> None:
         super().__init__()
-        self.shader_name = self.__class__.__name__
         self.start_time = pytime.time()
 
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
-
-    def deallocate(self):
-        return super().deallocate()
-
     def use(self, fbo, pose: Frame ) -> None:
-        super().use()
         if not self.allocated: return
         if not fbo or not pose: return
 

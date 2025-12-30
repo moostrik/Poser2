@@ -45,7 +45,7 @@ class PoseMotionSimLayer(LayerBase):
         self._label_fbo.allocate(width, height, internal_format)
 
         if not PoseMotionSimLayer._shader.allocated:
-            PoseMotionSimLayer._shader.allocate(monitor_file=True)
+            PoseMotionSimLayer._shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -60,7 +60,7 @@ class PoseMotionSimLayer(LayerBase):
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
         if not PoseMotionSimLayer._shader.allocated:
-            PoseMotionSimLayer._shader.allocate(monitor_file=True)
+            PoseMotionSimLayer._shader.allocate()
 
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._track_id)
 

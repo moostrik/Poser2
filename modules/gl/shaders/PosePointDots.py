@@ -6,18 +6,7 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.pose.features import Points2D
 
 class PosePointDots(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
-
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
-
-    def deallocate(self):
-        return super().deallocate()
-
     def use(self, fbo, points: Points2D, dot_size: float = 0.01, dot_smooth: float = 0.01) -> None:
-        super().use()
         if not self.allocated: return
         if not fbo or not points: return
 

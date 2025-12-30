@@ -99,11 +99,11 @@ class CentreCamLayer(LayerBase):
 
         self._point_fbo.allocate(width, height, internal_format)
         if not CentreCamLayer._blend_shader.allocated:
-            CentreCamLayer._blend_shader.allocate(monitor_file=True)
+            CentreCamLayer._blend_shader.allocate()
         if not CentreCamLayer._roi_shader.allocated:
-            CentreCamLayer._roi_shader.allocate(monitor_file=True)
+            CentreCamLayer._roi_shader.allocate()
         if not CentreCamLayer._point_shader.allocated:
-            CentreCamLayer._point_shader.allocate(monitor_file=True)
+            CentreCamLayer._point_shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -153,19 +153,19 @@ class CentreCamLayer(LayerBase):
     def update(self) -> None:
         # Ensure shaders are allocated
         if not CentreCamLayer._blend_shader.allocated:
-            CentreCamLayer._blend_shader.allocate(monitor_file=True)
+            CentreCamLayer._blend_shader.allocate()
         if not CentreCamLayer._roi_shader.allocated:
-            CentreCamLayer._roi_shader.allocate(monitor_file=True)
+            CentreCamLayer._roi_shader.allocate()
         if not CentreCamLayer._point_shader.allocated:
-            CentreCamLayer._point_shader.allocate(monitor_file=True)
+            CentreCamLayer._point_shader.allocate()
         if not CentreCamLayer._mask_blend_shader.allocated:
-            CentreCamLayer._mask_blend_shader.allocate(monitor_file=True)
+            CentreCamLayer._mask_blend_shader.allocate()
         if not CentreCamLayer._mask_shader.allocated:
-            CentreCamLayer._mask_shader.allocate(monitor_file=True)
+            CentreCamLayer._mask_shader.allocate()
         if not CentreCamLayer._mask_AA_shader.allocated:
-            CentreCamLayer._mask_AA_shader.allocate(monitor_file=True)
+            CentreCamLayer._mask_AA_shader.allocate()
         if not CentreCamLayer._mask_blur_shader.allocated:
-            CentreCamLayer._mask_blur_shader.allocate(monitor_file=True)
+            CentreCamLayer._mask_blur_shader.allocate()
 
         # Get pose data
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)

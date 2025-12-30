@@ -6,16 +6,8 @@ import numpy as np
 from modules.pose.features import Angles, AngleVelocity
 
 class PoseAngleDeltaBar(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
-
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
-
     def use(self, fbo: int, angles: Angles, deltas: AngleVelocity, line_thickness: float = 0.1, line_smooth: float = 0.01,
             color_odd=(1.0, 0.2, 0.0, 1.0), color_even=(1.0, 0.2, 0.0, 1.0)) -> None:
-        super().use()
         if not self.allocated: return
         if not fbo: return
 

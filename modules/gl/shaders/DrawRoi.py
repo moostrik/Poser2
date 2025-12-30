@@ -3,15 +3,7 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.utils.PointsAndRects import Rect, Point2f
 
 class DrawRoi(Shader):
-    def __init__(self) -> None:
-        super().__init__()
-        self.shader_name = self.__class__.__name__
-
-    def allocate(self, monitor_file = False) -> None:
-        super().allocate(self.shader_name, monitor_file)
-
     def use(self, fbo, tex0, roi: Rect, rotation_radians: float = 0.0, rotation_center_texture_space: Point2f = Point2f(0.5, 0.5), texture_aspect: float = 1.0, flip_x: bool = False, flip_y: bool = True) -> None:
-        super().use()
         if not self.allocated: return
         if not fbo or not tex0: return
 

@@ -48,7 +48,7 @@ class PoseAngleDeltaBarLayer(LayerBase):
         self._label_fbo.allocate(width, height, internal_format)
 
         if not PoseAngleDeltaBarLayer.pose_feature_shader.allocated:
-            PoseAngleDeltaBarLayer.pose_feature_shader.allocate(monitor_file=True)
+            PoseAngleDeltaBarLayer.pose_feature_shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -63,7 +63,7 @@ class PoseAngleDeltaBarLayer(LayerBase):
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
         if not PoseAngleDeltaBarLayer.pose_feature_shader.allocated:
-            PoseAngleDeltaBarLayer.pose_feature_shader.allocate(monitor_file=True)
+            PoseAngleDeltaBarLayer.pose_feature_shader.allocate()
 
         key: int = self._track_id
 
