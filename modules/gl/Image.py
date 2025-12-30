@@ -42,7 +42,6 @@ def get_format(internal_format, channel_order: Literal['BGR', 'RGB']) -> Constan
     print('GL_Image', 'internal format not supported')
     return GL_NONE
 
-
 def get_internal_format(image: np.ndarray) -> Constant:
     """Determine OpenGL internal format from NumPy array properties."""
     if image.dtype == np.uint8:
@@ -72,6 +71,47 @@ def get_internal_format(image: np.ndarray) -> Constant:
 
     print('GL_texture', 'image format not supported')
     return GL_NONE
+
+
+def get_numpy_dtype(data_type: Constant, internal_format: Constant) -> type | None:
+    """Convert OpenGL data type to NumPy dtype.
+
+    Args:
+        data_type: OpenGL data type (e.g., GL_UNSIGNED_BYTE, GL_FLOAT)
+        internal_format: OpenGL internal format to distinguish float16 vs float32
+
+    Returns:
+        NumPy dtype (np.uint8, np.float16, np.float32) or None if unsupported
+    """
+    if data_type == GL_UNSIGNED_BYTE:
+        return np.uint8
+    elif data_type == GL_FLOAT:
+        # Distinguish float16 vs float32 based on internal format
+        if internal_format in (GL_RGB16F, GL_RGBA16F, GL_R16F, GL_RG16F):
+            return np.float16
+        else:
+            return np.float32
+    return None
+
+def get_channel_count(format: Constant) -> int | None:
+    """Get number of channels from OpenGL format.
+
+    Args:
+        format: OpenGL format (e.g., GL_RGB, GL_RGBA, GL_RED)
+
+    Returns:
+        Number of channels (1-4) or None if unsupported
+    """
+    if format in (GL_BGR, GL_RGB):
+        return 3
+    elif format in (GL_BGRA, GL_RGBA):
+        return 4
+    elif format == GL_RED:
+        return 1
+    elif format == GL_RG:
+        return 2
+    return None
+
 
 class Image(Texture):
     def __init__(self, channel_order: Literal['BGR', 'RGB'] = 'RGB') -> None:
@@ -107,13 +147,21 @@ class Image(Texture):
         if needs_update and image is not None:
             self.set_from_image(image)
 
-    def allocate(self, width: int, height: int, internal_format) -> None:
+    def allocate(self, width: int, height: int, internal_format,
+                 wrap_s: int = GL_CLAMP_TO_EDGE,
+                 wrap_t: int = GL_CLAMP_TO_EDGE,
+                 min_filter: int = GL_LINEAR,
+                 mag_filter: int = GL_LINEAR) -> None:
         """Allocate OpenGL texture with channel order support.
 
         Args:
             width: Texture width in pixels
             height: Texture height in pixels
             internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
+            wrap_s: Horizontal wrap mode (default: GL_CLAMP_TO_EDGE)
+            wrap_t: Vertical wrap mode (default: GL_CLAMP_TO_EDGE)
+            min_filter: Minification filter (default: GL_LINEAR)
+            mag_filter: Magnification filter (default: GL_LINEAR)
         """
         data_type: Constant = get_data_type(internal_format)
         if data_type == GL_NONE: return
@@ -126,10 +174,10 @@ class Image(Texture):
         self.tex_id: int = glGenTextures(1)
 
         glBindTexture(GL_TEXTURE_2D, self.tex_id)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter)
 
         # Set the swizzle mask for the texture to draw it as grayscale
         if self.format == GL_RED:
@@ -166,33 +214,70 @@ class Image(Texture):
         glTexImage2D(GL_TEXTURE_2D, 0, self.internal_format, width, height, 0, self.format, self.data_type, image)
         self.unbind()
 
+    def read_to_numpy(self) -> np.ndarray | None:
+        """Read texture data back to CPU as NumPy array (OpenFrameworks-inspired).
+
+        Useful for debugging, saving captures, or analyzing texture content.
+        Respects channel_order to return data in correct BGR/RGB format.
+
+        Returns:
+            NumPy array with texture data in the configured channel order, or None if not allocated
+        """
+        if not self.allocated:
+            return None
+
+        # Get NumPy dtype from GL types
+        dtype = get_numpy_dtype(self.data_type, self.internal_format)
+        if dtype is None:
+            print(f"Image.read_to_numpy: Unsupported data type {self.data_type}")
+            return None
+
+        # Get channel count from format
+        channels = get_channel_count(self.format)
+        if channels is None:
+            print(f"Image.read_to_numpy: Unsupported format {self.format}")
+            return None
+
+        # Allocate output array
+        if channels == 1:
+            pixels = np.zeros((self.height, self.width), dtype=dtype)
+        else:
+            pixels = np.zeros((self.height, self.width, channels), dtype=dtype)
+
+        # Read texture data from GPU
+        self.bind()
+        glGetTexImage(GL_TEXTURE_2D, 0, self.format, self.data_type, pixels)
+        self.unbind()
+
+        return pixels
+
     def draw(self, x, y, w, h) -> None : #override
         self.bind()
         draw_quad(x, y, w, h, True)
         self.unbind()
 
-    def draw_roi(self, x: float, y: float, width: float, height: float,
-             tex_x: float, tex_y: float, tex_width: float, tex_height: float) -> None:
-        """ Draw a region of interest from the texture
-            It is horizontally flipped by default
-        """
+    # def draw_roi(self, x: float, y: float, width: float, height: float,
+    #          tex_x: float, tex_y: float, tex_width: float, tex_height: float) -> None:
+    #     """ Draw a region of interest from the texture
+    #         It is horizontally flipped by default
+    #     """
 
-        self.bind()
+    #     self.bind()
 
-        glBegin(GL_QUADS)
+    #     glBegin(GL_QUADS)
 
-        glTexCoord2f(tex_x, tex_y)
-        glVertex2f(x, y)
+    #     glTexCoord2f(tex_x, tex_y)
+    #     glVertex2f(x, y)
 
-        glTexCoord2f(tex_x + tex_width, tex_y)
-        glVertex2f(x + width, y)
+    #     glTexCoord2f(tex_x + tex_width, tex_y)
+    #     glVertex2f(x + width, y)
 
-        glTexCoord2f(tex_x + tex_width, tex_y + tex_height)
-        glVertex2f(x + width, y + height)
+    #     glTexCoord2f(tex_x + tex_width, tex_y + tex_height)
+    #     glVertex2f(x + width, y + height)
 
-        glTexCoord2f(tex_x, tex_y + tex_height)
-        glVertex2f(x, y + height)
+    #     glTexCoord2f(tex_x, tex_y + tex_height)
+    #     glVertex2f(x, y + height)
 
-        glEnd()
+    #     glEnd()
 
-        self.unbind()
+    #     self.unbind()

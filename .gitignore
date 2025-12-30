@@ -8,6 +8,7 @@ recordings/*
 files/audio/UMU*
 RobustVideoMatting/*
 ofxFlowTools/*
+openFrameworks/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

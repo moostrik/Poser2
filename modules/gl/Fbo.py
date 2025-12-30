@@ -6,8 +6,10 @@ class Fbo(Texture):
         super(Fbo, self).__init__()
         self.fbo_id = 0
 
-    def allocate(self, width: int, height: int, internal_format) -> None :
-        super(Fbo, self).allocate(width, height, internal_format)
+    def allocate(self, width: int, height: int, internal_format,
+                 wrap_s: int = GL_CLAMP_TO_EDGE, wrap_t: int = GL_CLAMP_TO_EDGE,
+                 min_filter: int = GL_LINEAR, mag_filter: int = GL_LINEAR) -> None :
+        super(Fbo, self).allocate(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
         if not self.allocated: return
 
         self.fbo_id = glGenFramebuffers(1)
@@ -24,13 +26,8 @@ class Fbo(Texture):
 
     def begin(self)  -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
-        # Apply transformation to flip the y-coordinates
-        # glPushMatrix()
-        # glTranslatef(0, self.height, 0)
-        # glScalef(1, -1, 1)
 
     def end(self)  -> None:
-        # glPopMatrix()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:

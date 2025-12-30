@@ -86,6 +86,7 @@ def draw_quad(x: float, y: float, w: float, h: float, flipV: bool = False) -> No
 
     glEnd()
 
+
 class Texture():
     def __init__(self) -> None :
         self.allocated = False
@@ -96,13 +97,21 @@ class Texture():
         self.data_type: Constant = GL_NONE
         self.tex_id = 0
 
-    def allocate(self, width: int, height: int, internal_format) -> None :
+    def allocate(self, width: int, height: int, internal_format,
+                 wrap_s: int = GL_CLAMP_TO_EDGE,
+                 wrap_t: int = GL_CLAMP_TO_EDGE,
+                 min_filter: int = GL_LINEAR,
+                 mag_filter: int = GL_LINEAR) -> None :
         """Allocate OpenGL texture with specified dimensions and format.
 
         Args:
             width: Texture width in pixels
             height: Texture height in pixels
             internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
+            wrap_s: Horizontal wrap mode (default: GL_CLAMP_TO_EDGE)
+            wrap_t: Vertical wrap mode (default: GL_CLAMP_TO_EDGE)
+            min_filter: Minification filter (default: GL_LINEAR)
+            mag_filter: Magnification filter (default: GL_LINEAR)
         """
         data_type: Constant = get_data_type(internal_format)
         if data_type == GL_NONE: return
@@ -115,10 +124,10 @@ class Texture():
         self.tex_id: int = glGenTextures(1)
 
         glBindTexture(GL_TEXTURE_2D, self.tex_id)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter)
 
         # Set the swizzle mask for the texture to draw it as grayscale
         if self.format == GL_RED:
