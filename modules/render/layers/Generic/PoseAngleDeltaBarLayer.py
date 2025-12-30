@@ -3,9 +3,8 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Fbo import Fbo
-from modules.gl.LayerBase import LayerBase, Rect
-from modules.gl.Text import draw_box_string, text_init
+from modules.gl import Fbo, draw_box_string, text_init
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
@@ -73,7 +72,6 @@ class PoseAngleDeltaBarLayer(LayerBase):
             return # no update needed
         self._p_pose = pose
 
-        LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)

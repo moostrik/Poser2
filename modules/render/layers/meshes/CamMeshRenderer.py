@@ -10,7 +10,7 @@ from modules.gl.Mesh import Mesh
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.render.layers.meshes.PoseMeshUtils import PoseVertexData, PoseMeshUtils, POSE_VERTEX_INDICES
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 
 class CamMeshRenderer(LayerBase):

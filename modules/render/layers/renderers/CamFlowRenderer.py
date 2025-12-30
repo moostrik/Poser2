@@ -6,11 +6,10 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gl.LayerBase import LayerBase, Rect
-from modules.gl.TensorTexture import TensorTexture
-from modules.gl.Fbo import Fbo, SwapFbo
+from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.gl import Tensor, SwapFbo
 from modules.gl.Texture import draw_quad
-from modules.gl.shaders.FlowFilter import FlowFilter
+from modules.gl.shaders.FlowFilter import FlowFilter as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,12 +21,10 @@ class CamFlowRenderer(LayerBase):
     for visualization. Flow data is 2-channel (x, y displacement).
     """
 
-    _flow_shader: FlowFilter = FlowFilter()
-
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
-        self._flow_texture: TensorTexture = TensorTexture()
+        self._flow_texture: Tensor = Tensor()
         self._prev_tensor: torch.Tensor | None = None
         self._fbo: SwapFbo = SwapFbo()
 
@@ -35,6 +32,8 @@ class CamFlowRenderer(LayerBase):
         self.flow_scale: float = 10.0
         self.flow_gamma: float = 0.5
         self.noise_threshold: float = 0.2
+
+        self._shader: shader = shader()
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -57,13 +56,13 @@ class CamFlowRenderer(LayerBase):
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         """Initialize renderer resources."""
-        if not CamFlowRenderer._flow_shader.allocated:
-            CamFlowRenderer._flow_shader.allocate()
+        self._shader.allocate()
 
     def deallocate(self) -> None:
         """Release all GPU resources."""
         self._flow_texture.deallocate()
         self._fbo.deallocate()
+        self._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         """Draw the flow visualization."""
@@ -72,8 +71,6 @@ class CamFlowRenderer(LayerBase):
 
     def update(self) -> None:
         """Update flow texture from DataHub."""
-        if not CamFlowRenderer._flow_shader.allocated:
-            CamFlowRenderer._flow_shader.allocate()
 
         flow_tensor: torch.Tensor | None = self._data_hub.get_item(DataHubType.flow_tensor, self._track_id)
 
@@ -104,7 +101,6 @@ class CamFlowRenderer(LayerBase):
             if not self._fbo.allocated or self._fbo.width != w or self._fbo.height != h:
                 self._fbo.allocate(w, h, self._flow_texture.internal_format)
 
-            LayerBase.setView(self._fbo.width, self._fbo.height)
             self._fbo.clear()
             glColor4f(1.0, 1.0, 1.0, 1.0)
 
@@ -116,7 +112,7 @@ class CamFlowRenderer(LayerBase):
 
             # Apply flow visualization shader with noise filtering
             self._fbo.swap()
-            CamFlowRenderer._flow_shader.use(
+            self._shader.use(
                 self._fbo.fbo_id,
                 self._fbo.back_tex_id,
                 scale=self.flow_scale,

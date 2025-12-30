@@ -5,10 +5,7 @@ import numpy as np
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Image import Image
-from modules.gl.Fbo import Fbo, SwapFbo
-from modules.gl.Text import draw_box_string, text_init
-
+from modules.gl import Fbo
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
@@ -16,7 +13,7 @@ from modules.pose.features.Points2D import PointLandmark
 from modules.render.layers.renderers import CamImageRenderer
 
 from modules.DataHub import DataHub
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -31,7 +28,6 @@ class PoseCamLayer(LayerBase):
 
         self.data_type: PoseDataHubTypes = data_type
 
-        text_init()
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
@@ -52,7 +48,6 @@ class PoseCamLayer(LayerBase):
             return # no update needed
         self._p_pose = pose
 
-        LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)

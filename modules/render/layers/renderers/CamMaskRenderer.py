@@ -6,8 +6,8 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gl.LayerBase import LayerBase, Rect
-from modules.gl.TensorTexture import TensorTexture
+from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.gl.Tensor import Tensor
 from modules.gl.Fbo import Fbo, SwapFbo
 
 from modules.gl.shaders.MaskDilate import MaskDilate
@@ -21,7 +21,7 @@ class CamMaskRenderer(LayerBase):
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
-        self._cuda_image: TensorTexture = TensorTexture()
+        self._cuda_image: Tensor = Tensor()
         self._prev_tensor: torch.Tensor | None = None
         self._fbo: SwapFbo = SwapFbo()
         self._dilate_shader: MaskDilate = MaskDilate()
@@ -84,7 +84,6 @@ class CamMaskRenderer(LayerBase):
             if not self._fbo.allocated or self._fbo.width != w or self._fbo.height != h:
                 self._fbo.allocate(w, h, self._cuda_image.internal_format)
 
-            LayerBase.setView(self._fbo.width, self._fbo.height)
             self._fbo.clear()
             # glDisable(GL_BLEND)
             glColor4f(1.0, 1.0, 1.0, 1.0)

@@ -11,7 +11,7 @@ from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
 from modules.DataHub import DataHub
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

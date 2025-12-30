@@ -4,9 +4,9 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Fbo import Fbo
+from modules.gl import Fbo
 from modules.DataHub import DataHub, PoseDataHubTypes
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.render.layers.renderers import CamBBoxRenderer, CamDepthTrackRenderer, CamImageRenderer
 from modules.render.layers.generic.PoseLineLayer import PoseLineLayer
@@ -78,9 +78,6 @@ class CamCompositeLayer(LayerBase):
         self._bbox_renderer.update()
         self._pose_points_layer.update()
         self._bbox_renderer.bbox_color = (1.0, 1.0, 1.0, 1.0)  # Example: set bbox color to red
-
-        # Composite them into the FBO
-        LayerBase.setView(self._fbo.width, self._fbo.height)
 
         glEnable(GL_BLEND)
         glColor4f(1.0, 1.0, 1.0, 1.0)

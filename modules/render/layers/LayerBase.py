@@ -17,10 +17,10 @@ class LayerBase(ABC):
     @abstractmethod
     def draw(self, rect:Rect) -> None: ...
 
-    @staticmethod
-    def setView(width, height) -> None:
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        glOrtho(0, width, height, 0, -1, 1)
-        glMatrixMode(GL_MODELVIEW)
-        glViewport(0, 0, width, height)
+    # @staticmethod
+    # def setView(width, height) -> None:
+    #     glMatrixMode(GL_PROJECTION)
+    #     glLoadIdentity()
+    #     glOrtho(0, width, height, 0, -1, 1)
+    #     glMatrixMode(GL_MODELVIEW)
+    #     glViewport(0, 0, width, height)

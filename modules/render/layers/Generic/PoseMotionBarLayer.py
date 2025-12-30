@@ -3,9 +3,8 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Fbo import Fbo
-from modules.gl.LayerBase import LayerBase, Rect
-from modules.gl.Text import draw_box_string, text_init
+from modules.gl import Fbo, draw_box_string, text_init
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
@@ -17,10 +16,9 @@ from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
-from modules.gl.shaders.PoseMotionBar import PoseMotionBar as PoseFeatureShader
+from modules.gl.shaders.PoseMotionBar import PoseMotionBar as shader
 
 class PoseMotionBarLayer(LayerBase):
-    pose_feature_shader = PoseFeatureShader()
 
     def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, feature_type: FrameField,
                 line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0)) -> None:
@@ -39,6 +37,7 @@ class PoseMotionBarLayer(LayerBase):
         self.line_smooth: float = line_smooth
         self.draw_labels: bool = True
 
+        self._shader: shader = shader()
         text_init()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -47,14 +46,12 @@ class PoseMotionBarLayer(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
-
-        if not PoseMotionBarLayer.pose_feature_shader.allocated:
-            PoseMotionBarLayer.pose_feature_shader.allocate()
+        self._shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
-        if PoseMotionBarLayer.pose_feature_shader.allocated:
-            PoseMotionBarLayer.pose_feature_shader.deallocate()
+        self._label_fbo.deallocate()
+        self._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -62,9 +59,6 @@ class PoseMotionBarLayer(LayerBase):
             self._label_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        # shader gets reset on hot reload, so we need to check if it's allocated
-        if not PoseMotionBarLayer.pose_feature_shader.allocated:
-            PoseMotionBarLayer.pose_feature_shader.allocate()
 
         key: int = self._track_id
 
@@ -74,7 +68,6 @@ class PoseMotionBarLayer(LayerBase):
             return # no update needed
         self._p_pose = pose
 
-        LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
@@ -90,7 +83,7 @@ class PoseMotionBarLayer(LayerBase):
         line_thickness = 1.0 / self._fbo.height * self.line_thickness
         line_smooth = 1.0 / self._fbo.height * self.line_smooth
 
-        PoseMotionBarLayer.pose_feature_shader.use(self._fbo.fbo_id, feature, line_thickness, line_smooth,
+        self._shader.use(self._fbo.fbo_id, feature, line_thickness, line_smooth,
                                                    self.color, (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
 
         joint_enum_type = feature.__class__.enum()

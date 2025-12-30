@@ -12,7 +12,7 @@ from modules.pose.Frame import Frame
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.render.layers.meshes.PoseMeshUtils import PoseMeshUtils, POSE_VERTEX_INDICES, PoseVertexData
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 
 class PoseMeshRenderer(LayerBase):

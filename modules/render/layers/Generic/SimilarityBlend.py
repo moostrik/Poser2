@@ -10,7 +10,7 @@ from modules.gl.Fbo import Fbo
 
 from modules.pose.features import AggregationMethod
 from modules.pose.Frame import Frame
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -96,7 +96,6 @@ class SimilarityBlend(LayerBase):
             return # no update needed
         self._p_pose = pose
 
-        LayerBase.setView(self._fbo.width, self._fbo.height)
         glDisable(GL_BLEND)
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
 

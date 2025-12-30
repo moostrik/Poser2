@@ -8,7 +8,7 @@ from modules.gl.Mesh import Mesh
 from modules.pose.Frame import Frame
 from ..PoseMeshUtils import PoseVertexData, PoseMeshUtils, POSE_VERTEX_INDICES
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 class AllMeshRenderer(LayerBase):
     """Methods for updating meshes based on pose data."""

@@ -6,17 +6,13 @@ import numpy as np
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Fbo import Fbo
-
 from modules.pose.Frame import Frame
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.render.layers.generic.PoseLineLayer import PoseLineLayer
 from modules.pose.features import Points2D
-
-from modules.gl.shaders.PosePointLines import PosePointLines as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -32,8 +28,6 @@ class CentrePoseLayer(PoseLineLayer):
         self._points = points
 
     def update(self) -> None:
-        if not PoseLineLayer._shader.allocated:
-            PoseLineLayer._shader.allocate()
 
         pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
 
@@ -41,7 +35,6 @@ class CentrePoseLayer(PoseLineLayer):
             return # no update needed
         self._p_pose = pose
 
-        LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
@@ -51,4 +44,4 @@ class CentrePoseLayer(PoseLineLayer):
         line_width: float = 1.0 / self._fbo.height * self.line_width
         line_smooth: float = 1.0 / self._fbo.height * self.line_smooth
 
-        PoseLineLayer._shader.use(self._fbo.fbo_id, self._points, line_width=line_width, line_smooth=line_smooth, color=self.color, use_scores=self.use_scores)
+        self._shader.use(self._fbo.fbo_id, self._points, line_width=line_width, line_smooth=line_smooth, color=self.color, use_scores=self.use_scores)

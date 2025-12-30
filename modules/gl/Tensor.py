@@ -55,7 +55,7 @@ def infer_internal_format(tensor: torch.Tensor) -> int:
     return format_map.get(channels, GL_R32F)
 
 
-class TensorTexture(Texture):
+class Tensor(Texture):
     """GPU texture updated directly from CUDA tensors using CUDA-OpenGL interop.
 
     Provides zero-copy GPU-to-GPU transfer from PyTorch CUDA tensors to OpenGL textures

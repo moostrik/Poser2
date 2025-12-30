@@ -9,9 +9,8 @@ from pytweening import *    # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
-from modules.gl.Fbo import Fbo
-from modules.gl.LayerBase import LayerBase, Rect
-from modules.gl.Texture import Texture
+from modules.gl import Fbo, Texture
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.pose.features import AggregationMethod, AngleMotion, AngleLandmark
 from modules.pose.Frame import Frame

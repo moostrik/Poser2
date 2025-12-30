@@ -7,7 +7,7 @@ import numpy as np
 from modules.gl.Mesh import Mesh
 from modules.pose.pd_stream.PDStream import PDStreamData
 from modules.DataHub import DataHub
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 class AngleMeshes(LayerBase):
     def __init__(self, data: DataHub, amount: int) -> None:

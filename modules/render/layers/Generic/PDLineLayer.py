@@ -5,10 +5,8 @@ import numpy as np
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Fbo import Fbo
-from modules.gl.Image import Image
-from modules.gl.LayerBase import LayerBase, Rect
-from modules.gl.Text import draw_box_string, text_init
+from modules.gl import Fbo, Image, draw_box_string, text_init
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.pose.Frame import Frame
 
@@ -21,10 +19,10 @@ from modules.DataHub import DataHub, DataHubType
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
-from modules.gl.shaders.StreamPose import StreamPose
+from modules.gl.shaders.StreamPose import StreamPose as shader
 
 class PDLineLayer(LayerBase):
-    pose_stream_shader = StreamPose()
+
 
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._cam_id: int = cam_id
@@ -36,21 +34,19 @@ class PDLineLayer(LayerBase):
 
         self.draw_labels: bool = True
 
+        self._shader: shader = shader()
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
         PDLineLayer.render_labels(self._label_fbo)
-        if not PDLineLayer.pose_stream_shader.allocated:
-            PDLineLayer.pose_stream_shader.allocate()
+        self._shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._label_fbo.deallocate()
-
-        if PDLineLayer.pose_stream_shader.allocated:
-            PDLineLayer.pose_stream_shader.deallocate()
+        self._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -58,9 +54,6 @@ class PDLineLayer(LayerBase):
             self._label_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        # shader gets reset on hot reload, so we need to check if it's allocated
-        if not PDLineLayer.pose_stream_shader.allocated:
-            PDLineLayer.pose_stream_shader.allocate()
 
         pd_stream: PDStreamData | None = self._data.get_item(DataHubType.pd_stream, self._cam_id)
 
@@ -68,19 +61,17 @@ class PDLineLayer(LayerBase):
             return  # no update needed
         self._p_pd_stream = pd_stream
 
-        LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         if pd_stream is None:
             return
 
-        stream_image: np.ndarray = StreamPose.pose_stream_to_image(pd_stream)
+        stream_image: np.ndarray = self._shader.pose_stream_to_image(pd_stream)
         self._image.set_image(stream_image)
         self._image.update()
 
-        PDLineLayer.pose_stream_shader.use(self._fbo.fbo_id, self._image.tex_id, self._image.width, self._image.height, line_width=1.5 / self._fbo.height)
-
+        self._shader.use(self._fbo.fbo_id, self._image.tex_id, self._image.width, self._image.height, line_width=1.5 / self._fbo.height)
 
     @staticmethod
     def render_labels(fbo: Fbo) -> None:
@@ -88,7 +79,6 @@ class PDLineLayer(LayerBase):
 
         rect = Rect(0, 0, fbo.width, fbo.height)
 
-        LayerBase.setView(fbo.width, fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         fbo.clear(0.0, 0.0, 0.0, 0.0)
         fbo.begin()

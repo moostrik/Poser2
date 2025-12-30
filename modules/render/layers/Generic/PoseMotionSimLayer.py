@@ -5,9 +5,8 @@ from OpenGL.GL import * # type: ignore
 import numpy as np
 
 # Local application imports
-from modules.gl.Fbo import Fbo
-from modules.gl.LayerBase import LayerBase, Rect
-from modules.gl.Text import draw_box_string, text_init
+from modules.gl import Fbo, draw_box_string, text_init
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.pose.features import PoseFeatureType, AngleMotion, AggregationMethod, SingleValue
 from modules.pose.Frame import Frame, FrameField
@@ -22,7 +21,6 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.gl.shaders.ValuesBar import ValuesBar as shader
 
 class PoseMotionSimLayer(LayerBase):
-    _shader = shader()
 
     def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes) -> None:
         self._track_id: int = track_id
@@ -35,6 +33,7 @@ class PoseMotionSimLayer(LayerBase):
         self.data_type: PoseDataHubTypes = data_type
         self.draw_labels: bool = True
 
+        self._shader: shader = shader()
         text_init()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -43,14 +42,12 @@ class PoseMotionSimLayer(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
-
-        if not PoseMotionSimLayer._shader.allocated:
-            PoseMotionSimLayer._shader.allocate()
+        self._shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
-        if PoseMotionSimLayer._shader.allocated:
-            PoseMotionSimLayer._shader.deallocate()
+        self._label_fbo.deallocate()
+        self._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -58,9 +55,6 @@ class PoseMotionSimLayer(LayerBase):
         #     self._label_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        # shader gets reset on hot reload, so we need to check if it's allocated
-        if not PoseMotionSimLayer._shader.allocated:
-            PoseMotionSimLayer._shader.allocate()
 
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._track_id)
 
@@ -68,7 +62,6 @@ class PoseMotionSimLayer(LayerBase):
             return # no update needed
         self._p_pose = pose
 
-        LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
@@ -98,9 +91,9 @@ class PoseMotionSimLayer(LayerBase):
         line_thickness = 1.0 / self._fbo.height * 1.0
         line_smooth = 1.0 / self._fbo.height * 4.0
 
-        PoseMotionSimLayer._shader.use(self._fbo.fbo_id, similarity, sim_colors, line_thickness, line_smooth * 10)
-        PoseMotionSimLayer._shader.use(self._fbo.fbo_id, motion_array, motion_colors, line_thickness, line_smooth)
-        PoseMotionSimLayer._shader.use(self._fbo.fbo_id, motion_sim, motion_sim_colors, line_thickness, line_smooth)
+        self._shader.use(self._fbo.fbo_id, similarity, sim_colors, line_thickness, line_smooth * 10)
+        self._shader.use(self._fbo.fbo_id, motion_array, motion_colors, line_thickness, line_smooth)
+        self._shader.use(self._fbo.fbo_id, motion_sim, motion_sim_colors, line_thickness, line_smooth)
         # PoseMotionSimLayer._shader.use(self._fbo.fbo_id, motion_sim, line_thickness, line_smooth,
         #                                            color, (*POSE_COLOR_RIGHT, 1.0), (*POSE_COLOR_LEFT, 1.0))
         # PoseMotionSimLayer._shader.use(self._fbo.fbo_id, motion_feature, line_thickness, line_smooth,

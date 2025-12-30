@@ -10,17 +10,16 @@ from modules.gl.Image import Image
 from modules.gl.Text import draw_box_string, text_init
 
 from modules.pose.similarity.features.SimilarityStream import SimilarityStream, SimilarityStreamData, SimilarityBatch , AggregationMethod
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.DataHub import DataHub, DataHubType, SimilarityDataHubType
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Shaders
-from modules.gl.shaders.StreamCorrelation import StreamCorrelation
+from modules.gl.shaders.StreamCorrelation import StreamCorrelation as shader
 
 
 class SimilarityLineLayer(LayerBase):
-    r_stream_shader = StreamCorrelation()
 
     def __init__(self, num_streams: int, capacity: int, data: DataHub, data_type: SimilarityDataHubType,
                  aggregation_method: AggregationMethod = AggregationMethod.HARMONIC_MEAN, exponent: float = 2.0) -> None:
@@ -35,6 +34,7 @@ class SimilarityLineLayer(LayerBase):
         self.exponent: float = exponent
         self.aggregation_method: AggregationMethod = aggregation_method
 
+        self._shader: shader = shader()
         text_init()
 
         # hot reloader
@@ -42,14 +42,12 @@ class SimilarityLineLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
-        if not SimilarityLineLayer.r_stream_shader.allocated:
-            SimilarityLineLayer.r_stream_shader.allocate()
+        self._shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._image.deallocate()
-        if SimilarityLineLayer.r_stream_shader.allocated:
-            SimilarityLineLayer.r_stream_shader.deallocate()
+        self._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -65,9 +63,6 @@ class SimilarityLineLayer(LayerBase):
 
         The FBO is always cleared, even if no data is available.
         """
-        # reallocate shader if needed if hot-reloaded
-        if not SimilarityLineLayer.r_stream_shader.allocated:
-            SimilarityLineLayer.r_stream_shader.allocate()
 
         batch: SimilarityBatch  | None = self._data.get_item(DataHubType(self.data_type))
 
@@ -77,7 +72,6 @@ class SimilarityLineLayer(LayerBase):
             return
         self._p_batch = batch
 
-        LayerBase.setView(self._fbo.width, self._fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
 
@@ -94,11 +88,11 @@ class SimilarityLineLayer(LayerBase):
             return
 
         pair_arrays: list[np.ndarray] = [stream_data.get_similarities(pair_id) for pair_id in pairs]
-        image_np: np.ndarray = StreamCorrelation.r_stream_to_image(pair_arrays, self._num_streams)
+        image_np: np.ndarray = self._shader.r_stream_to_image(pair_arrays, self._num_streams)
         self._image.set_image(image_np)
         self._image.update()
 
-        self.r_stream_shader.use(self._fbo.fbo_id, self._image.tex_id, self._image.width, self._image.height, 1.5 / self._fbo.height)
+        self._shader.use(self._fbo.fbo_id, self._image.tex_id, self._image.width, self._image.height, 1.5 / self._fbo.height)
 
         step: float = self._fbo.height / self._num_streams
 

@@ -1,3 +1,5 @@
+from .LayerBase import LayerBase
+
 from .generic.CamCompositeLayer import          CamCompositeLayer
 from .generic.CentreCamLayer import             CentreCamLayer
 from .generic.CentrePoseLayer import            CentrePoseLayer

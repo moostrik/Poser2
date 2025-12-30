@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Image import Image
 
 from modules.DataHub import DataHub, DataHubType
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 
 class CamImageRenderer(LayerBase):

@@ -10,7 +10,7 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 
 from modules.DataHub import DataHub, DataHubType
-from modules.gl.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 
 
