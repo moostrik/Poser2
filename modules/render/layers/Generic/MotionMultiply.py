@@ -27,7 +27,6 @@ from modules.gl.shaders.ApplyMask import ApplyMask as shader
 
 
 class MotionMultiply(LayerBase):
-    _shader: shader = shader()
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, centre_cam: CentreCamLayer) -> None:
         self._cam_id: int = cam_id
@@ -38,6 +37,8 @@ class MotionMultiply(LayerBase):
         self._mask_fbo: Fbo = Fbo()
         self._p_pose: Frame | None = None
         self._motion: float = 0.0
+
+        self._shader: shader = shader()
 
         self.data_type: PoseDataHubTypes = data_type
 
@@ -64,15 +65,13 @@ class MotionMultiply(LayerBase):
         self._fbo.allocate(width, height, internal_format)
         self._cam_fbo.allocate(width, height, internal_format)
         self._mask_fbo.allocate(width, height, GL_R32F)
-        if not MotionMultiply._shader.allocated:
-            MotionMultiply._shader.allocate()
+        self._shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._cam_fbo.deallocate()
         self._mask_fbo.deallocate()
-        if MotionMultiply._shader.allocated:
-            MotionMultiply._shader.deallocate()
+        self._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         # self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -80,9 +79,8 @@ class MotionMultiply(LayerBase):
         self._mask_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        # reallocate shader if needed if hot-reloaded
-        if not MotionMultiply._shader.allocated:
-            MotionMultiply._shader.allocate()
+        # Check if shader needs hot-reload
+        self._shader.reload()
 
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
 
@@ -90,7 +88,6 @@ class MotionMultiply(LayerBase):
             return # no update needed
         self._p_pose = pose
 
-        LayerBase.setView(self._cam_fbo.width, self._cam_fbo.height)
         glDisable(GL_BLEND)
         # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
@@ -134,6 +131,6 @@ class MotionMultiply(LayerBase):
         mask.draw(0, 0, self._mask_fbo.width, self._mask_fbo.height)
         self._mask_fbo.end()
 
-        MotionMultiply._shader.use(self._fbo.fbo_id, cam.tex_id, mask.tex_id, motion)
+        self._shader.use(self._fbo.fbo_id, cam.tex_id, mask.tex_id, motion)
         glEnable(GL_BLEND)
         glColor4f(1.0, 1.0, 1.0, 1.0)

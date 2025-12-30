@@ -25,9 +25,6 @@ from modules.gl.shaders.TripleBlendColor import TripleBlendColor as shader
 
 
 class SimilarityBlend(LayerBase):
-    _mask_shader: ApplyMask = ApplyMask()
-    _mask_multiply_shader: MaskMultiply = MaskMultiply()
-    _blend_shader: shader = shader()
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, layers: dict[int, MotionMultiply]) -> None:
         self._cam_id: int = cam_id
@@ -42,6 +39,11 @@ class SimilarityBlend(LayerBase):
         self._mask_fbo: Fbo = Fbo()
         self._mask_other_1_fbo: Fbo = Fbo()
         self._mask_other_2_fbo: Fbo = Fbo()
+
+
+        self._mask_shader: ApplyMask = ApplyMask()
+        self._mask_multiply_shader: MaskMultiply = MaskMultiply()
+        self._blend_shader: shader = shader()
 
         self._p_pose: Frame | None = None
 
@@ -71,8 +73,7 @@ class SimilarityBlend(LayerBase):
         self._mask_other_1_fbo.allocate(width, height, GL_R32F)
         self._mask_other_2_fbo.allocate(width, height, GL_R32F)
 
-        if not SimilarityBlend._blend_shader.allocated:
-            SimilarityBlend._blend_shader.allocate()
+        self._blend_shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
@@ -82,20 +83,12 @@ class SimilarityBlend(LayerBase):
         self._mask_other_1_fbo.deallocate()
         self._mask_other_2_fbo.deallocate()
 
-        if SimilarityBlend._blend_shader.allocated:
-            SimilarityBlend._blend_shader.deallocate()
+        self._blend_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
-        # reallocate shader if needed if hot-reloaded
-        if not SimilarityBlend._blend_shader.allocated:
-            SimilarityBlend._blend_shader.allocate()
-        if not SimilarityBlend._mask_shader.allocated:
-            SimilarityBlend._mask_shader.allocate()
-        if not SimilarityBlend._mask_multiply_shader.allocated:
-            SimilarityBlend._mask_multiply_shader.allocate()
 
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
 
@@ -143,18 +136,18 @@ class SimilarityBlend(LayerBase):
         mask_other_1 = self._layers[other_1_index].mask_texture
         mask_other_2 = self._layers[other_2_index].mask_texture
 
-
-
         alpha: float =      self._layers[index].motion
         alpha_1: float =    float(similarities[other_1_index])
         alpha_2: float =    float(similarities[other_2_index])
 
-        SimilarityBlend._blend_shader.use(self._fbo.fbo_id,
-                                          cam.tex_id,               self._cam_other_1_fbo.tex_id,   self._cam_other_2_fbo.tex_id,
-                                          mask.tex_id,              mask_other_1.tex_id,            mask_other_2.tex_id,
-                                          alpha,                    alpha_1,                        alpha_2,
-                                          colors[self._cam_id],     colors[other_1_index],          colors[other_2_index]
-                                          )
+        self._blend_shader.reload()
+
+        self._blend_shader.use(self._fbo.fbo_id,
+                               cam.tex_id,               self._cam_other_1_fbo.tex_id,   self._cam_other_2_fbo.tex_id,
+                               mask.tex_id,              mask_other_1.tex_id,            mask_other_2.tex_id,
+                               alpha,                    alpha_1,                        alpha_2,
+                               colors[self._cam_id],     colors[other_1_index],          colors[other_2_index]
+                               )
 
 
         glEnable(GL_BLEND)

@@ -10,6 +10,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.RenderBase import RenderBase
 from modules.gl.WindowManager import WindowManager
 from modules.gl.LayerBase import LayerBase
+from modules.gl.Shader import Shader
 
 from modules.DataHub import DataHub, PoseDataHubTypes, SimilarityDataHubType
 from modules.gui.PyReallySimpleGui import Gui
@@ -171,6 +172,8 @@ class HDTRenderManager(RenderBase):
                 else:
                     layer.allocate(1080, 1920, GL_RGBA32F)
         self.allocate_window_renders()
+
+        Shader.enable_hot_reload()
 
     def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size('similarity', 0)

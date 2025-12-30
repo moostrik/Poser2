@@ -26,6 +26,11 @@ class Fbo(Texture):
 
     def begin(self)  -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, self.width, self.height, 0, -1, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glViewport(0, 0, self.width, self.height)
 
     def end(self)  -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
@@ -84,6 +89,11 @@ class SwapFbo():
 
     def begin(self) -> None :
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glOrtho(0, self.width, self.height, 0, -1, 1)
+        glMatrixMode(GL_MODELVIEW)
+        glViewport(0, 0, self.width, self.height)
 
     def end(self) -> None :
         glBindFramebuffer(GL_FRAMEBUFFER, 0)

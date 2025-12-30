@@ -46,6 +46,10 @@ class Shader():
     _monitored_shaders = []
     _observer_lock = threading.Lock()
 
+    # Global shader cache - one instance per shader class
+    _shader_cache = {}  # {class: Shader instance}
+    _cache_lock = threading.Lock()
+
     # Shader file suffixes
     VERTEX_SUFFIX = '.vert'
     FRAGMENT_SUFFIX = '.frag'
@@ -78,22 +82,42 @@ void main() {
 }
 """
 
-    def __init__(self, shader_name: str = '') -> None:
+    def __new__(cls):
+        """Return cached shader instance if it exists, otherwise create new one."""
+        with cls._cache_lock:
+            if cls not in cls._shader_cache:
+                instance = super().__new__(cls)
+                cls._shader_cache[cls] = instance
+            return cls._shader_cache[cls]
+
+    def __init__(self) -> None:
         """Initialize shader and discover shader files."""
+        # Only initialize once (since __new__ returns cached instances)
+        if hasattr(self, '_initialized'):
+            return
+        self._initialized = True
+
         self.allocated: bool = False
-        self.shader_name: str = shader_name or self.__class__.__name__
+        self.shader_name: str = self.__class__.__name__
         self.shader_program: shaders.ShaderProgram | None = None
         self.need_reload: bool = False
         self._reload_lock = threading.Lock()
+        self._ref_count: int = 0
 
-        # Discover shader files now (not in allocate)
+        # Discover shader files in same directory as the class file
         shader_name_normalized = self.shader_name.lower()
-        self.shader_dir = self._discover_shader_dir()
-        self.vertex_file_path = self._find_shader_file(self.shader_dir, shader_name_normalized, self.VERTEX_SUFFIX)
-        self.fragment_file_path = self._find_shader_file(self.shader_dir, shader_name_normalized, self.FRAGMENT_SUFFIX)
+        self.shader_dir = Path(inspect.getfile(self.__class__)).parent
+
+        vertex_path = self.shader_dir / f"{shader_name_normalized}{self.VERTEX_SUFFIX}"
+        fragment_path = self.shader_dir / f"{shader_name_normalized}{self.FRAGMENT_SUFFIX}"
+
+        self.vertex_file_path = vertex_path if vertex_path.exists() else None
+        self.fragment_file_path = fragment_path if fragment_path.exists() else None
 
     def allocate(self) -> None:
         """Compile shaders and create OpenGL resources. Safe to call multiple times."""
+        self._ref_count += 1
+
         if self.allocated:
             return
 
@@ -107,11 +131,17 @@ void main() {
                 Shader._watch_directory(self.shader_dir)
 
         # Now try to compile - sets self.allocated on success
-        self.allocated = self._compile_shaders()
+        self.allocated = self._compile_shaders(True)
 
     def deallocate(self) -> None:
         """Clean up OpenGL resources and unregister from hot-reload."""
-        # Don't guard on allocated - we need to cleanup registration regardless
+        self._ref_count -= 1
+
+        # Only actually deallocate when no references remain
+        if self._ref_count > 0:
+            return
+
+        self._ref_count = 0  # Safety clamp
         self.allocated = False
 
         # Unregister from shared observer
@@ -131,68 +161,83 @@ void main() {
 
         with self._reload_lock:
             self.need_reload = False
-            self.allocated = self._compile_shaders(verbose=True)
+            compiled: bool = self._compile_shaders(verbose=True)
+            print(f"Shader {self.shader_name} reload {'succeeded' if compiled else 'failed'}")
             return True  # We attempted reload
+
+    def _compile_shaders(self, verbose: bool = False) -> bool:
+        """Load and compile shader sources into OpenGL program. Returns True if successful."""
+        # Load sources...
+        vertex_source: str = ''
+        if self.vertex_file_path:
+            vertex_source = self.read_shader_source(str(self.vertex_file_path))
+        if not vertex_source:
+            vertex_source = self.GENERIC_VERTEX_SHADER
+
+        fragment_source: str = ''
+        if self.fragment_file_path:
+            fragment_source = self.read_shader_source(str(self.fragment_file_path))
+        if not fragment_source:
+            fragment_source = self.GENERIC_FRAGMENT_SHADER
+
+        try:
+            # Compile vertex shader
+            vertex_shader = glCreateShader(GL_VERTEX_SHADER)
+            glShaderSource(vertex_shader, vertex_source)
+            glCompileShader(vertex_shader)
+            if not glGetShaderiv(vertex_shader, GL_COMPILE_STATUS):
+                error = glGetShaderInfoLog(vertex_shader).decode()
+                logging.error(f" {self.shader_name} VERTEX SHADER ERROR:\n{error}")
+                glDeleteShader(vertex_shader)
+                return False
+
+            # Compile fragment shader
+            fragment_shader = glCreateShader(GL_FRAGMENT_SHADER)
+            glShaderSource(fragment_shader, fragment_source)
+            glCompileShader(fragment_shader)
+            if not glGetShaderiv(fragment_shader, GL_COMPILE_STATUS):
+                error = glGetShaderInfoLog(fragment_shader).decode()
+                logging.error(f"{self.shader_name} FRAGMENT SHADER ERROR:\n{error}")
+                glDeleteShader(vertex_shader)
+                glDeleteShader(fragment_shader)
+                return False
+
+            # Link program
+            new_program = glCreateProgram()
+            glAttachShader(new_program, vertex_shader)
+            glAttachShader(new_program, fragment_shader)
+            glLinkProgram(new_program)
+
+            if not glGetProgramiv(new_program, GL_LINK_STATUS):
+                error = glGetProgramInfoLog(new_program).decode()
+                logging.error(f"{self.shader_name} LINK ERROR:\n{error}")
+                glDeleteShader(vertex_shader)
+                glDeleteShader(fragment_shader)
+                glDeleteProgram(new_program)
+                return False
+
+            # Clean up shader objects (program keeps them)
+            glDeleteShader(vertex_shader)
+            glDeleteShader(fragment_shader)
+
+            # Only replace if successful
+            if self.shader_program is not None:
+                glDeleteProgram(self.shader_program)
+            self.shader_program = new_program
+
+            if verbose:
+                logging.info(f"{self.shader_name} loaded successfully")
+            return True
+
+        except Exception as e:
+            logging.error(f"{self.shader_name} UNEXPECTED ERROR: {e}")
+            return False
 
     def _on_file_changed(self, file_path: Path) -> None:
         """Mark shader for reload when its file changes."""
         if (self.vertex_file_path and file_path == self.vertex_file_path or
             self.fragment_file_path and file_path == self.fragment_file_path):
             self.need_reload = True  # Atomic bool, no lock needed for setting
-
-    def _compile_shaders(self, verbose: bool = False) -> bool:
-        """Load and compile shader sources into OpenGL program. Returns True if successful."""
-        # Clear existing OpenGL resources before recompiling
-        if self.shader_program is not None:
-            glDeleteProgram(self.shader_program)
-            self.shader_program = None
-
-        # Try to load vertex shader from file, fallback to embedded generic
-        vertex_source: str = ''
-        if self.vertex_file_path:
-            vertex_source = self.read_shader_source(str(self.vertex_file_path))
-        if not vertex_source:
-            vertex_source = self.GENERIC_VERTEX_SHADER
-            if verbose:
-                logging.info(f"{self.shader_name}: Using generic vertex shader")
-
-        # Try to load fragment shader from file, fallback to embedded generic
-        fragment_source: str = ''
-        if self.fragment_file_path:
-            fragment_source = self.read_shader_source(str(self.fragment_file_path))
-        if not fragment_source:
-            fragment_source = self.GENERIC_FRAGMENT_SHADER
-            if verbose:
-                logging.info(f"{self.shader_name}: Using generic fragment shader")
-
-        # Compile shaders
-        vertex_shader = None
-        fragment_shader = None
-        try:
-            vertex_shader = shaders.compileShader(vertex_source, shaders.GL_VERTEX_SHADER) # type: ignore
-        except shaders.ShaderCompilationError as e:
-            logging.error(f"{self.shader_name} VERTEX SHADER ERROR: {e}")
-            return False
-
-        try:
-            fragment_shader = shaders.compileShader(fragment_source, shaders.GL_FRAGMENT_SHADER) # type: ignore
-        except shaders.ShaderCompilationError as e:
-            logging.error(f"{self.shader_name} FRAGMENT SHADER ERROR: {e}")
-            return False
-
-        if not vertex_shader or not fragment_shader:
-            return False
-
-        # Link shader program
-        try:
-            self.shader_program = shaders.compileProgram(vertex_shader, fragment_shader)
-            if verbose:
-                logging.info(f"{self.shader_name} loaded successfully")
-            return True
-        except Exception as e:
-            logging.error(f"{self.shader_name} PROGRAM LINKING ERROR: {e}")
-            return False
-
 
     # STATIC METHODS
     @staticmethod
@@ -203,32 +248,6 @@ void main() {
                 return file.read()
         except FileNotFoundError:
             return ''
-
-    @staticmethod
-    def _discover_shader_dir() -> Path:
-        """Discover shader directory by inspecting the calling class file location."""
-        try:
-            # Get the file path of the class that instantiated this shader
-            frame = inspect.currentframe()
-            if frame and frame.f_back and frame.f_back.f_back:
-                caller_frame = frame.f_back.f_back
-                caller_file = caller_frame.f_globals.get('__file__')
-                if caller_file:
-                    return Path(caller_file).parent
-        except:
-            pass
-
-        # Fallback to default shader directory
-        return Path('modules/gl/shaders')
-
-    @staticmethod
-    def _find_shader_file(shader_dir: Path | None, shader_name_normalized: str, suffix: str) -> Path | None:
-        """Find shader file in the same directory as the Python class file."""
-        if not shader_dir:
-            return None
-
-        shader_path = shader_dir / f"{shader_name_normalized}{suffix}"
-        return shader_path if shader_path.exists() else None
 
 
     # CLASS METHODS FOR HOT-RELOAD MANAGEMENT
