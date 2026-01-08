@@ -1,5 +1,6 @@
 from .generic.Blend import          Blend
 from .generic.DrawRoi import        DrawRoi
+from .generic.DenseFlowFilter import DenseFlowFilter
 
 from .mask.MaskAA import            MaskAA
 from .mask.MaskApply import         MaskApply
@@ -21,3 +22,6 @@ from .stream.StreamCorrelation import StreamCorrelation
 from .stream.StreamPose import      StreamPose
 
 from.hdt.HDTTripleBlend import      HDTTripleBlend
+
+from .ws.WS_Angles import           WS_Angles
+from .ws.WS_Lines import            WS_Lines

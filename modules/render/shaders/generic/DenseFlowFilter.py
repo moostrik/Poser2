@@ -1,7 +1,7 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
-class FlowFilter(Shader):
+class DenseFlowFilter(Shader):
     def use(self, fbo, tex0, scale: float = 1.0, gamma: float = 1.0, noise_threshold: float = 0.01) -> None:
         if not self.allocated: return
         if not fbo or not tex0: return

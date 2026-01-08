@@ -9,12 +9,12 @@ from modules.DataHub import DataHub, DataHubType
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.gl import Tensor, SwapFbo
 from modules.gl.Texture import draw_quad
-from modules.gl.shaders.FlowFilter import FlowFilter as shader
+from modules.render.shaders import DenseFlowFilter as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CamFlowRenderer(LayerBase):
+class DenseFlowRenderer(LayerBase):
     """Renderer for optical flow visualization.
 
     Retrieves flow tensors from DataHub and converts them to OpenGL textures
