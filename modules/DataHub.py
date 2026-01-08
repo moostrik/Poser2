@@ -30,6 +30,7 @@ class DataHubType(IntEnum):
     light_image =       9   # single image
     mask_tensor =      10   # sorted by track_id, GPU tensors (H, W) FP16
     flow_tensor =      11   # sorted by track_id, GPU tensors (H, W, 2) FP16
+    flow_images =      12   # sorted by track_id, flow visualization images
 
 
 class PoseDataHubTypes(IntEnum):
@@ -110,6 +111,9 @@ class DataHub:
 
     def set_flow_tensors(self, flows: dict[int, Tensor]) -> None:
         self.set_dict(DataHubType.flow_tensor, flows)
+
+    def set_flow_images(self, _: FrameDict, images: dict[int, tuple[np.ndarray, np.ndarray]]) -> None:
+        self.set_dict(DataHubType.flow_images, images)
 
     def set_pd_stream(self, pd_stream: PDStreamData) -> None:
         self.set_item(DataHubType.pd_stream, pd_stream.track_id, pd_stream)

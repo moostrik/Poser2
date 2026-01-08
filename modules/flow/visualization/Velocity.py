@@ -117,9 +117,9 @@ class Velocity(FlowBase):
 
     def set(self, texture: Texture) -> None:
         """Set the velocity field texture to visualize. """
-        if texture != self._velocity_texture:
-            self._velocity_texture = texture
-            self._needs_update = True
+        # if texture != self._velocity_texture:
+        self._velocity_texture = texture
+        self._needs_update = True
 
     def _on_config_changed(self) -> None:
         """Called when config values change."""

@@ -44,7 +44,8 @@ class Layers(IntEnum):
     centre_motion = auto()
 
     cam_mask =      auto()
-    cam_flow =      auto()
+    dense_flow =    auto()
+    sparse_flow =   auto()
 
 PREVIEW_LAYERS: list[Layers] = [
     # Layers.centre_cam,
@@ -68,9 +69,11 @@ FINAL_LAYERS: list[Layers] = [
     Layers.sim_blend,
     # Layers.angle_bar,
     # Layers.motion_sim,
-    # Layers.cam_mask,
+    Layers.cam_mask,
     # Layers.cam_image,
     # Layers.cam_flow,
+    # Layers.dense_flow,
+    Layers.sparse_flow,
 ]
 
 LARGE_LAYERS: list[Layers] = [
@@ -130,7 +133,8 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.MotionMultiply], self.L[Layers.centre_motion]))
             self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
 
-            self.L[Layers.cam_flow][i] =    layers.DenseFlowRenderer(i, self.data_hub)
+            self.L[Layers.dense_flow][i] =    layers.DenseFlowRenderer(i, self.data_hub)
+            self.L[Layers.sparse_flow][i] =   layers.OpticalFlowLayer(i, self.data_hub)
 
 
         # global layers

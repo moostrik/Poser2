@@ -6,8 +6,8 @@ Ported from ofxFlowTools ftFlow.h/cpp
 from abc import ABC, abstractmethod
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Fbo, SwapFbo, Texture
-from modules.render.layers.flow.FlowUtil import FlowUtil
+from modules.gl import SwapFbo, Texture
+from .FlowUtil import FlowUtil
 from modules.utils.PointsAndRects import Rect
 
 
@@ -110,25 +110,13 @@ class FlowBase(ABC):
         ...
 
     def draw(self, rect: Rect) -> None:
-        """Draw output FBO to screen.
-
-        Args:
-            rect: Destination rectangle
-        """
+        """Draw output FBO to screen."""
         self.draw_output(rect)
 
     def draw_input(self, rect: Rect) -> None:
-        """Draw input FBO to screen.
-
-        Args:
-            rect: Destination rectangle
-        """
+        """Draw input FBO to screen."""
         self.input_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def draw_output(self, rect: Rect) -> None:
-        """Draw output FBO to screen.
-
-        Args:
-            rect: Destination rectangle
-        """
+        """Draw output FBO to screen."""
         self.output_fbo.draw(rect.x, rect.y, rect.width, rect.height)

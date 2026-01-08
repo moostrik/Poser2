@@ -237,6 +237,7 @@ class Main():
 
         # FLOW
         self.image_flow_processor.add_pair_callback(self.flow_extractor.process)
+        self.image_flow_processor.add_pair_callback(self.data_hub.set_flow_images)
         self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
         self.flow_extractor.start()
 
