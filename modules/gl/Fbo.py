@@ -25,10 +25,11 @@ class Fbo(Texture):
         self.unbind()
 
     def begin(self)  -> None:
+        """Begin rendering to FBO. Uses top-left origin (see COORDINATE_SYSTEM.md)."""
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        glOrtho(0, self.width, self.height, 0, -1, 1)
+        glOrtho(0, self.width, self.height, 0, -1, 1)  # Top-left origin
         glMatrixMode(GL_MODELVIEW)
         glViewport(0, 0, self.width, self.height)
 
@@ -88,10 +89,11 @@ class SwapFbo():
         self.back_tex_id = self.fbos[not self.swap_state].tex_id
 
     def begin(self) -> None :
+        """Begin rendering to FBO. Uses top-left origin (see COORDINATE_SYSTEM.md)."""
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        glOrtho(0, self.width, self.height, 0, -1, 1)
+        glOrtho(0, self.width, self.height, 0, -1, 1)  # Top-left origin
         glMatrixMode(GL_MODELVIEW)
         glViewport(0, 0, self.width, self.height)
 
