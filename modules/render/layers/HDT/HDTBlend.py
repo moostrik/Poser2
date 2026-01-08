@@ -6,22 +6,14 @@ from OpenGL.GL import * # type: ignore
 from pytweening import *    # type: ignore
 
 # Local application imports
+from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl.Fbo import Fbo
-
-from modules.pose.features import AggregationMethod
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
+from modules.render.layers.generic.MotionMultiply import MotionMultiply
+from modules.render.shaders import MaskApply, MaskMultiply, HDTTripleBlend
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-from modules.render.layers.generic.MotionMultiply import MotionMultiply
-
-
-# Shaders
-from modules.gl.shaders.ApplyMask import ApplyMask
-from modules.gl.shaders.MaskMultiply import MaskMultiply
-from modules.gl.shaders.TripleBlendColor import TripleBlendColor as shader
 
 
 class SimilarityBlend(LayerBase):
@@ -41,9 +33,9 @@ class SimilarityBlend(LayerBase):
         self._mask_other_2_fbo: Fbo = Fbo()
 
 
-        self._mask_shader: ApplyMask = ApplyMask()
+        self._mask_shader: MaskApply = MaskApply()
         self._mask_multiply_shader: MaskMultiply = MaskMultiply()
-        self._blend_shader: shader = shader()
+        self._blend_shader: HDTTripleBlend = HDTTripleBlend()
 
         self._p_pose: Frame | None = None
 

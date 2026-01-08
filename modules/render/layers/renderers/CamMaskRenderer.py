@@ -6,17 +6,14 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
+from modules.gl import Tensor, SwapFbo
 from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.gl.Tensor import Tensor
-from modules.gl.Fbo import Fbo, SwapFbo
-
-from modules.gl.shaders.MaskDilate import MaskDilate
+from modules.render.shaders import MaskDilate
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class CamMaskRenderer(LayerBase):
-
 
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id

@@ -1,20 +1,18 @@
+""" Draws an experimental electric effect around the detected pose."""
+
 # Standard library imports
 from dataclasses import replace
-import numpy as np
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Fbo import Fbo
-
-from modules.pose.Frame import Frame
-
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.gl.Fbo import Fbo
 from modules.pose.features import Points2D
-
-from modules.gl.shaders.PoseElectric import PoseElectric as shader
+from modules.pose.Frame import Frame
+from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.shaders import PoseElectric as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

@@ -5,21 +5,16 @@ import numpy as np
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Fbo import Fbo
-from modules.gl.Image import Image
-from modules.gl.Text import draw_box_string, text_init
-
+from modules.DataHub import DataHub, DataHubType, SimilarityDataHubType
+from modules.gl import Fbo, Image, draw_box_string, text_init
 from modules.pose.similarity.features.SimilarityStream import SimilarityStream, SimilarityStreamData, SimilarityBatch , AggregationMethod
 from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.DataHub import DataHub, DataHubType, SimilarityDataHubType
+from modules.render.shaders import StreamCorrelation as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-# Shaders
-from modules.gl.shaders.StreamCorrelation import StreamCorrelation as shader
 
-
-class SimilarityLineLayer(LayerBase):
+class SimilarityLayer(LayerBase):
 
     def __init__(self, num_streams: int, capacity: int, data: DataHub, data_type: SimilarityDataHubType,
                  aggregation_method: AggregationMethod = AggregationMethod.HARMONIC_MEAN, exponent: float = 2.0) -> None:

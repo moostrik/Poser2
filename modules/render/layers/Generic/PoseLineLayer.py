@@ -1,18 +1,16 @@
+""" Renders pose keypoints as lines into an offscreen buffer """
+
 # Standard library imports
-import numpy as np
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl import Fbo
-
-from modules.pose.Frame import Frame
-
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
+from modules.gl import Fbo
+from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
-
-from modules.gl.shaders.PosePointLines import PosePointLines as shader
+from modules.render.shaders import PosePointLines as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

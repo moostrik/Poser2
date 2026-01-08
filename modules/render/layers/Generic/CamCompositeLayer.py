@@ -1,3 +1,5 @@
+""" Draws the full camera image, depth tracklets, pose lines, and bounding boxes."""
+
 # Standard library imports
 
 # Third-party imports
@@ -27,7 +29,7 @@ class CamCompositeLayer(LayerBase):
         self._pose_points_layer: PoseLineLayer = PoseLineLayer(cam_id, data, data_type, line_width, 0.0, False, True, None)
         self._bbox_renderer: CamBBoxRenderer = CamBBoxRenderer(cam_id, data, data_type, int(line_width), (1.0, 1.0, 1.0, 1.0))
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        self.hot_reload = HotReloadMethods(self.__class__)
 
     @property
     def data_type(self) -> PoseDataHubTypes:
@@ -67,10 +69,8 @@ class CamCompositeLayer(LayerBase):
         self._bbox_renderer.deallocate()
         self._pose_points_layer.deallocate()
 
-
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
-
 
     def update(self) -> None:
         # Update all layers

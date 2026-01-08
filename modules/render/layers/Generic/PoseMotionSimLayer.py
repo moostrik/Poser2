@@ -1,3 +1,4 @@
+""" Draws lines representing pose motion similarity and magnitude """
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -5,18 +6,15 @@ from OpenGL.GL import * # type: ignore
 import numpy as np
 
 # Local application imports
-from modules.gl import Fbo, draw_box_string, text_init
-from modules.render.layers.LayerBase import LayerBase, Rect
-
-from modules.pose.features import PoseFeatureType, AngleMotion, AggregationMethod, SingleValue
-from modules.pose.Frame import Frame, FrameField
-
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
+from modules.gl import Fbo, draw_box_string, text_init
+
+from modules.pose.features import AggregationMethod
+from modules.pose.Frame import Frame
+from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.shaders import PoseValuesBar as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-# Shaders
-from modules.gl.shaders.ValuesBar import ValuesBar as shader
 
 
 POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange

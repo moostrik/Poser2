@@ -1,3 +1,7 @@
+""" Draws a centred camera view focused on the detected pose."""
+" Also draws pose points -> to new class"
+" Also draws mask -> to new class"
+
 # Standard library imports
 import numpy as np
 import math
@@ -9,25 +13,18 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
-from modules.render.layers.renderers import CamImageRenderer, CamMaskRenderer
-from modules.utils.PointsAndRects import Rect, Point2f
 from modules.render.layers.LayerBase import LayerBase
+from modules.render.layers.renderers import CamImageRenderer, CamMaskRenderer
+from modules.render.shaders import Blend, DrawRoi, MaskAA, MaskApply, MaskBlend, MaskBlur, PosePointLines
+from modules.utils.PointsAndRects import Rect, Point2f
 
 # GL
 from modules.gl import Fbo, SwapFbo, Texture
-from modules.gl.shaders.DrawRoi import DrawRoi
-from modules.gl.shaders.Blend import Blend
-from modules.gl.shaders.MaskBlend import MaskBlend
-from modules.gl.shaders.MaskAA import MaskAA
-from modules.gl.shaders.MaskBlur import MaskBlur
-from modules.gl.shaders.ApplyMask import ApplyMask
-from modules.gl.shaders.PosePointLines import PosePointLines
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class CentreCamLayer(LayerBase):
-
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
                  cam_image: CamImageRenderer, cam_mask: CamMaskRenderer) -> None:
@@ -65,7 +62,7 @@ class CentreCamLayer(LayerBase):
         self._mask_blur_shader = MaskBlur()
         self._mask_blend_shader = MaskBlend()
         self._mask_AA_shader = MaskAA()
-        self._mask_shader = ApplyMask()
+        self._mask_shader = MaskApply()
         self._roi_shader = DrawRoi()
         self._point_shader = PosePointLines()
 
@@ -129,12 +126,7 @@ class CentreCamLayer(LayerBase):
         # Enable blending for drawing to screen with straight alpha
 
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        # self._cam_blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        # self._mask_fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        # self._mask_blend_fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        # self._mask_AA_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
-        # return
         self.draw_points(rect)
 
         # Debug: draw target positions
@@ -203,16 +195,15 @@ class CentreCamLayer(LayerBase):
         self._roi_shader.use(self._cam_fbo.fbo_id, self._cam_image.tex_id,
                                       self._crop_roi, self._rotation, cam_top, cam_aspect, False, True)
 
-
+        # Blend frames
         self.blend_factor = 0.5
         self._cam_blend_fbo.swap()
         self._blend_shader.use(self._cam_blend_fbo.fbo_id, self._cam_blend_fbo.back_tex_id,self._cam_fbo.tex_id, self.blend_factor)
 
-
         # Render mask with ROI
         bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
 
-        # Calculate mask rotation with aspect correction (matching old working version)
+        # Calculate mask rotation with aspect correction
         mask_delta = self._hip_midpoint - self._shoulder_midpoint
         mask_rotation = math.atan2(mask_delta.x * bbox_aspect, mask_delta.y)
         mask_distance = math.hypot(mask_delta.x * bbox_aspect, mask_delta.y)

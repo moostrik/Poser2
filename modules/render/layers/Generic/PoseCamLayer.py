@@ -1,19 +1,17 @@
+""" Draws camera image roi for a given pose frame """
+
 # Standard library imports
-import numpy as np
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
+from modules.DataHub import DataHub
 from modules.gl import Fbo
-
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.pose.features.Points2D import PointLandmark
-from modules.render.layers.renderers import CamImageRenderer
-
-from modules.DataHub import DataHub
 from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.renderers import CamImageRenderer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

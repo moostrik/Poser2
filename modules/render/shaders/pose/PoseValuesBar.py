@@ -5,7 +5,7 @@ import numpy as np
 
 from modules.pose.features import PoseFeatureType as PoseFeatureUnion
 
-class ValuesBar(Shader):
+class PoseValuesBar(Shader):
     def allocate(self) -> None:
         super().allocate()
         self.vbo_values = glGenBuffers(1)

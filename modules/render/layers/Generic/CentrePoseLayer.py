@@ -1,3 +1,7 @@
+""" Draws a centred camera view focused on the detected pose.
+    Based on PoseLineLayer and gets points from CentreCamLayer."""
+" why not calculate points here? "
+
 # Standard library imports
 from dataclasses import replace
 
@@ -9,8 +13,6 @@ from OpenGL.GL import * # type: ignore
 from modules.pose.Frame import Frame
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.render.layers.LayerBase import LayerBase, Rect
-
 from modules.render.layers.generic.PoseLineLayer import PoseLineLayer
 from modules.pose.features import Points2D
 

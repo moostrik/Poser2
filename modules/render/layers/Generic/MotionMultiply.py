@@ -1,6 +1,6 @@
+""" Draws a motion multiplied view based on the centred camera view."""
+
 # Standard library imports
-import numpy as np
-import time
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -11,18 +11,13 @@ from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
 from modules.gl import Fbo, Texture
 from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.generic.CentreCamLayer import CentreCamLayer
+from modules.render.shaders import MaskApply as shader
 
-from modules.pose.features import AggregationMethod, AngleMotion, AngleLandmark
+from modules.pose.features import AggregationMethod
 from modules.pose.Frame import Frame
 
-from modules.render.layers.generic.CentreCamLayer import CentreCamLayer
-
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
-
-# Shaders
-from modules.gl.shaders.ApplyMask import ApplyMask as shader
 
 
 class MotionMultiply(LayerBase):

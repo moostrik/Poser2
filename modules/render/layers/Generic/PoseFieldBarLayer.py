@@ -1,20 +1,17 @@
+""" Draws a scalar bar for pose features """
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
+from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, draw_box_string, text_init
 from modules.render.layers.LayerBase import LayerBase, Rect
-
+from modules.render.shaders import PoseScalarBar as shader
 from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
 
-from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-# Shaders
-from modules.gl.shaders.PoseScalarBar import PoseScalarBar as shader
 
 
 POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange

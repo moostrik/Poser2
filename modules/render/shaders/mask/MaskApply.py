@@ -1,7 +1,7 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
-class ApplyMask(Shader):
+class MaskApply(Shader):
     def use(self, fbo, color, mask, multiply: float = 1.0) -> None :
         if not self.allocated: return
         if not fbo or not color or not mask: return

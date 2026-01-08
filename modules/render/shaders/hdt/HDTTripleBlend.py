@@ -1,7 +1,7 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
 
-class TripleBlendColor(Shader):
+class HDTTripleBlend(Shader):
     def use(self, fbo,
             tex0, tex1, tex2,
             mask0, mask1, mask2,
