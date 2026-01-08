@@ -18,7 +18,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange
 POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0) # Cyan
 
-class PDLineLayer(LayerBase):
+class PDLayer(LayerBase):
 
 
     def __init__(self, cam_id: int, data: DataHub) -> None:
@@ -37,7 +37,7 @@ class PDLineLayer(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
-        PDLineLayer.render_labels(self._label_fbo)
+        PDLayer.render_labels(self._label_fbo)
         self._shader.allocate()
 
     def deallocate(self) -> None:

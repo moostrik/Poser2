@@ -4,7 +4,7 @@ from .generic.CamCompositeLayer import          CamCompositeLayer
 from .generic.CentreCamLayer import             CentreCamLayer
 from .generic.CentrePoseLayer import            CentrePoseLayer
 from .generic.MotionMultiply import             MotionMultiply
-from .generic.PDLineLayer import                PDLineLayer
+from .generic.PDLayer import                PDLayer
 from .generic.PoseAngleDeltaBarLayer import     PoseAngleDeltaBarLayer
 from .generic.PoseMotionBarLayer import         PoseMotionBarLayer
 from .generic.PoseFieldBarLayer import          PoseScalarBarLayer

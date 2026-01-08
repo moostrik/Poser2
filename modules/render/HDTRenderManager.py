@@ -113,7 +113,7 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.cam_mask][i] =    layers.CamMaskRenderer(i, self.data_hub)
             self.L[Layers.cam_bbox][i] =    layers.CamBBoxRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
             self.L[Layers.cam_track][i] =   layers.CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
-            self.L[Layers.prev_angles][i] = layers.PDLineLayer(i, self.data_hub)
+            self.L[Layers.prev_angles][i] = layers.PDLayer(i, self.data_hub)
             self.L[Layers.prev_mt][i] =     layers.PoseMotionTimeRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
             self.L[Layers.box_cam][i] =     layers.PoseCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
             self.L[Layers.box_pose_I][i] =  layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 1.0, 0.0, True, False)
