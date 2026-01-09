@@ -86,9 +86,11 @@ class OpticalFlowLayer(LayerBase):
         self._optical_flow.update()
 
         self._velocity_viz.config.mode = VisualizationMode.ARROW_FIELD
-        self._velocity_viz.config.scale = 3.0
-        self._velocity_viz.config.arrow_scale = 10.5
-        self._velocity_viz.config.grid_spacing = 10
+        self._velocity_viz.config.scale = 1.0
+        self._velocity_viz.config.spacing = 8
+        self._velocity_viz.config.arrow_length = 8.0
+        self._velocity_viz.config.arrow_thickness = 0.8
+
 
         # Visualize velocity field
         self._velocity_viz.set(self._optical_flow.output)

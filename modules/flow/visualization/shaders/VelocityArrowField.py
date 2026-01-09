@@ -16,8 +16,7 @@ class VelocityArrowField(Shader):
     """
 
     def use(self, target_fbo: Fbo, velocity_tex: Texture, scale: float = 1.0,
-            grid_spacing: float = 20.0, arrow_scale: float = 1.0,
-            arrow_thickness: float = 0.15) -> None:
+            spacing: float = 8.0, arrow_length: float = 8.0, arrow_thickness: float = 0.8) -> None:
         """Render arrow field visualization to FBO.
 
         Args:
@@ -25,8 +24,8 @@ class VelocityArrowField(Shader):
             velocity_tex: Velocity texture (RG = XY velocity)
             scale: Velocity magnitude scale
             grid_spacing: Distance between arrow centers in pixels
-            arrow_scale: Arrow size relative to grid (0.8 = 80% of grid cell)
-            arrow_thickness: Arrow line thickness (0-1)
+            arrow_scale: Arrow length in pixels (e.g., 50 = 50 pixel long arrows)
+            arrow_thickness: Arrow line thickness in pixels
         """
         if not self.allocated:
             return
@@ -42,11 +41,14 @@ class VelocityArrowField(Shader):
         glBindTexture(GL_TEXTURE_2D, velocity_tex.tex_id)
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
         glUniform1f(glGetUniformLocation(self.shader_program, "scale"), scale)
-        glUniform1f(glGetUniformLocation(self.shader_program, "grid_spacing"), grid_spacing)
-        glUniform1f(glGetUniformLocation(self.shader_program, "arrow_scale"), arrow_scale)
+        glUniform1f(glGetUniformLocation(self.shader_program, "grid_spacing"), spacing)
+        glUniform1f(glGetUniformLocation(self.shader_program, "arrow_length"), arrow_length)
         glUniform1f(glGetUniformLocation(self.shader_program, "arrow_thickness"), arrow_thickness)
         glUniform2f(glGetUniformLocation(self.shader_program, "resolution"),
                     float(target_fbo.width), float(target_fbo.height))
+
+        # Debug output
+        # print(f"Arrow uniforms: scale={scale}, grid_spacing={grid_spacing}, arrow_scale={arrow_scale}, arrow_thickness={arrow_thickness}")
 
         draw_quad()
 

@@ -6,7 +6,7 @@
 uniform sampler2D tex0;
 uniform float scale;
 uniform float grid_spacing;
-uniform float arrow_scale;
+uniform float arrow_length;
 uniform float arrow_thickness;
 uniform vec2 resolution;
 
@@ -29,7 +29,7 @@ float arrow(vec2 p, vec2 velocity, float arrow_size, float thickness) {
     vec2 dir = velocity / len;
     vec2 perp = vec2(-dir.y, dir.x);
 
-    // Scale arrow by velocity magnitude
+    // Arrow length scaled by velocity magnitude (clamped to arrow_size max)
     float arrow_len = arrow_size * min(len, 1.0);
 
     // Arrow shaft (from center to tip)
@@ -38,8 +38,8 @@ float arrow(vec2 p, vec2 velocity, float arrow_size, float thickness) {
     float shaft = line_segment(p, start, end, thickness);
 
     // Arrow head (two lines forming a V)
-    float head_len = arrow_len * 0.3;
-    float head_angle = 0.4; // radians
+    float head_len = arrow_len * 0.25;
+    float head_angle = 0.1; // radians
 
     vec2 head_dir1 = vec2(
         dir.x * cos(head_angle) - dir.y * sin(head_angle),
@@ -66,27 +66,36 @@ void main() {
     // Current pixel in screen space
     vec2 pixel = gl_FragCoord.xy;
 
-    // Find nearest grid cell center
-    vec2 grid_pos = floor(pixel / grid_spacing) * grid_spacing + grid_spacing * 0.5;
+    float min_dist = 1e10;
 
-    // Sample velocity at grid center
-    vec2 grid_uv = grid_pos / resolution;
-    vec2 velocity = texture(tex0, grid_uv).xy * scale;
+    // Check arrows from nearby grid cells (to allow arrows longer than grid spacing)
+    int search_radius = int(ceil(arrow_length / grid_spacing)) + 1;
+    for (int dy = -search_radius; dy <= search_radius; dy++) {
+        for (int dx = -search_radius; dx <= search_radius; dx++) {
+            // Grid cell center
+            vec2 grid_pos = floor(pixel / grid_spacing) * grid_spacing + grid_spacing * 0.5;
+            grid_pos += vec2(dx, dy) * grid_spacing;
 
-    // Position relative to grid center
-    vec2 local_pos = pixel - grid_pos;
+            // Sample velocity at this grid center
+            vec2 grid_uv = grid_pos / resolution;
+            vec2 velocity = texture(tex0, grid_uv).xy * scale;
 
-    // Calculate arrow distance (in pixel space)
-    float arrow_size = arrow_scale;
-    float thickness = arrow_thickness;
-    float dist = arrow(local_pos, velocity * grid_spacing * 0.4, arrow_size, thickness);
+            // Position relative to this grid center
+            vec2 local_pos = pixel - grid_pos;
 
-    // Anti-aliased rendering
-    float alpha = 1.0 - smoothstep(0.0, 1.0, dist);
+            // Calculate arrow distance
+            float dist = arrow(local_pos, velocity, arrow_length, arrow_thickness);
+            min_dist = min(min_dist, dist);
+        }
+    }
 
-    // Color based on velocity magnitude
-    float mag = length(velocity);
-    vec3 color = mix(vec3(0.3, 0.5, 0.7), vec3(1.0, 0.2, 0.3), clamp(mag, 0.0, 1.0));
+    // High-quality anti-aliasing using derivative-based smoothing
+    float edge_width = fwidth(min_dist) * 0.5;
+    float alpha = 1.0 - smoothstep(-edge_width, edge_width, min_dist);
 
-    fragColor = vec4(color, alpha);
+    // Simple color (matching original shader style)
+    vec3 color = vec3(1.0, 1.0, 1.0);
+
+    // Premultiply alpha to avoid dark edges
+    fragColor = vec4(color * alpha, alpha);
 }

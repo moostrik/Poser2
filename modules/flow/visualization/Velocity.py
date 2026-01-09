@@ -24,23 +24,23 @@ class VisualizationMode(Enum):
 class VelocityConfig(FlowConfigBase):
     scale: float = field(
         default=1.0,
-        metadata={"min": 0.1, "max": 10.0, "label": "Scale", "description": "Velocity magnitude scale"}
+        metadata={"min": 0.0, "max": 10.0, "label": "Scale", "description": "Velocity magnitude scale"}
     )
     mode: VisualizationMode = field(
         default=VisualizationMode.DIRECTION_MAP,
         metadata={"label": "Mode", "description": "Visualization rendering mode"}
     )
-    grid_spacing: float = field(
-        default=32.0,
-        metadata={"min": 8.0, "max": 128.0, "label": "Grid Spacing", "description": "Distance between arrows (pixels)"}
+    spacing: float = field(
+        default=8.0,
+        metadata={"min": 4.0, "max": 16.0, "label": "Grid Spacing", "description": "Distance between arrows (pixels)"}
     )
-    arrow_scale: float = field(
-        default=0.8,
-        metadata={"min": 0.1, "max": 1.0, "label": "Arrow Scale", "description": "Arrow size relative to grid"}
+    arrow_length: float = field(
+        default=8.0,
+        metadata={"min": 0.5, "max": 64.0, "label": "Arrow Length", "description": "Arrow length in pixels"}
     )
     arrow_thickness: float = field(
-        default=0.3,
-        metadata={"min": 0.05, "max": 0.5, "label": "Arrow Thickness", "description": "Arrow line thickness"}
+        default=0.8,
+        metadata={"min": 0.5, "max": 2.5, "label": "Arrow Thickness", "description": "Arrow line thickness"}
     )
 
 
@@ -112,8 +112,8 @@ class Velocity(FlowBase):
                 fbo,
                 self._velocity_texture,
                 self.config.scale,
-                self.config.grid_spacing,
-                self.config.arrow_scale,
+                self.config.spacing,
+                self.config.arrow_length,
                 self.config.arrow_thickness
             )
 
