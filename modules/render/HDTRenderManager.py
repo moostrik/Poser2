@@ -23,40 +23,51 @@ from modules.render import layers
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
+COLORS: list[tuple[float, float, float, float]] = [
+    (1.0, 0.0, 0.0, 1.85),
+    (0.0, 0.0, 1.0, 1.85),
+    (0.0, 1.0, 0.0, 1.85),
+]
+
 class Layers(IntEnum):
+    # render layers
     cam_image =     0
+    cam_mask =      auto()
+    dense_flow =    auto()
+    sparse_flow =   auto()
+
+    # data layers
     cam_bbox =      auto()
     cam_track =     auto()
-    prev_angles =   auto()
-    prev_mt =       auto()
-    box_cam =       auto()
-    box_pose_I =    auto()
-    box_pose_R =    auto()
-
-    # Centre rendering components
-    centre_math=    auto()
-    centre_cam =    auto()
-    centre_mask =   auto()
-    centre_pose =   auto()
-    centre_D_flow = auto()
-
-    sim_blend =     auto()
+    angle_data =    auto()
+    mtime_data =    auto()
     field_bar_R =   auto()
     field_bar_I =   auto()
     angle_bar =     auto()
     motion_bar =    auto()
     motion_sim =    auto()
 
+    # bbox layers
+    box_cam =       auto()
+    box_pose_I =    auto()
+    box_pose_R =    auto()
+
+    # centre layers
+    centre_math=    auto()
+    centre_mask =   auto()
+    centre_cam =    auto()
+    centre_pose =   auto()
+    centre_D_flow = auto()
     centre_motion = auto()
 
-    cam_mask =      auto()
-    dense_flow =    auto()
-    sparse_flow =   auto()
+    sim_blend =     auto()
 
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
     Layers.cam_mask,
     Layers.dense_flow,
+    Layers.sparse_flow,
+
     Layers.centre_math,
     Layers.centre_cam,
     Layers.centre_mask,
@@ -68,6 +79,14 @@ UPDATE_LAYERS: list[Layers] = [
 INTERFACE_LAYERS: list[Layers] = [
     Layers.cam_track,
     Layers.cam_bbox,
+]
+
+
+LARGE_LAYERS: list[Layers] = [
+    Layers.centre_cam,
+    Layers.centre_mask,
+    Layers.sim_blend,
+    Layers.centre_pose,
 ]
 
 PREVIEW_LAYERS: list[Layers] = [
@@ -82,13 +101,13 @@ PREVIEW_LAYERS: list[Layers] = [
 ]
 
 FINAL_LAYERS: list[Layers] = [
-    Layers.centre_cam,
+    # Layers.centre_cam,
     # Layers.centre_mask,
     Layers.centre_pose,
     # Layers.centre_motion,
     # Layers.centre_pose,
     # Layers.box_pose_I,
-    # Layers.sim_blend,
+    Layers.sim_blend,
     # Layers.angle_bar,
     # Layers.motion_sim,
     # Layers.cam_mask,
@@ -103,20 +122,6 @@ BOX_LAYERS: list[Layers] = [
     Layers.box_cam,
     Layers.box_pose_R,
     Layers.box_pose_I,
-]
-
-
-LARGE_LAYERS: list[Layers] = [
-    Layers.centre_cam,
-    Layers.centre_mask,
-    Layers.sim_blend,
-    Layers.centre_pose,
-]
-
-COLORS: list[tuple[float, float, float, float]] = [
-    (1.0, 0.0, 0.0, 1.85),
-    (0.0, 0.0, 1.0, 1.85),
-    (0.0, 1.0, 0.0, 1.85),
 ]
 
 class HDTRenderManager(RenderBase):
@@ -141,33 +146,31 @@ class HDTRenderManager(RenderBase):
         for i in range(self.num_cams):
             self.L[Layers.cam_image][i] =   layers.CamImageRenderer(i, self.data_hub)
             self.L[Layers.cam_mask][i] =    layers.CamMaskRenderer(i, self.data_hub)
+            self.L[Layers.dense_flow][i] =  layers.DenseFlowRenderer(i, self.data_hub)
+            self.L[Layers.sparse_flow][i] = layers.OpticalFlowLayer(i, self.data_hub)
+
             self.L[Layers.cam_bbox][i] =    layers.CamBBoxRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
             self.L[Layers.cam_track][i] =   layers.CamCompositeLayer(i, self.data_hub, PoseDataHubTypes.pose_R, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
-            self.L[Layers.prev_angles][i] = layers.PDLayer(i, self.data_hub)
-            self.L[Layers.prev_mt][i] =     layers.PoseMotionTimeRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
-            self.L[Layers.box_cam][i] =     layers.PoseCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
-            self.L[Layers.box_pose_I][i] =  layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 1.0, 0.0, True, False)
-            self.L[Layers.box_pose_R][i] =  layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_R, 0.5, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
-
+            self.L[Layers.angle_data][i] =  layers.PDLayer(i, self.data_hub)
+            self.L[Layers.mtime_data][i] =  layers.PoseMotionTimeRenderer(i, self.data_hub, PoseDataHubTypes.pose_I)
             self.L[Layers.field_bar_R][i] = layers.PoseScalarBarLayer(i, self.data_hub, PoseDataHubTypes.pose_R, FrameField.angles, 4.0, 16.0, (0.0, 0.0, 0.0, 0.33))
             self.L[Layers.field_bar_I][i] = layers.PoseScalarBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angles, 2.0, 2.0)
             self.L[Layers.angle_bar][i] =   layers.PoseAngleDeltaBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
             self.L[Layers.motion_bar][i] =  layers.PoseMotionBarLayer(i, self.data_hub, PoseDataHubTypes.pose_I, FrameField.angle_motion, 2.0, 2.0)
             self.L[Layers.motion_sim][i]=   layers.PoseMotionSimLayer(i, self.data_hub, PoseDataHubTypes.pose_I)
 
-            # Centre rendering components
+            self.L[Layers.box_cam][i] =     layers.PoseCamLayer(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
+            self.L[Layers.box_pose_I][i] =  layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 1.0, 0.0, True, False)
+            self.L[Layers.box_pose_R][i] =  layers.PoseLineLayer(i, self.data_hub, PoseDataHubTypes.pose_R, 0.5, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
+
             self.L[Layers.centre_math][i] = layers.CentreGeometry(i, self.data_hub, PoseDataHubTypes.pose_I, 16/9)
-            self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
             self.L[Layers.centre_mask][i] = layers.CentreMaskLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), cast(layers.CamMaskRenderer, self.L[Layers.cam_mask][i]))
+            self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
             self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), 3.0, 0.0, False, COLORS[i % len(COLORS)])
-
-            self.L[Layers.centre_motion][i]=layers.MotionMultiply(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CentreMaskLayer, self.L[Layers.centre_mask][i]))
-            self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.MotionMultiply], self.L[Layers.centre_motion]))
-
-            self.L[Layers.dense_flow][i] =  layers.DenseFlowRenderer(i, self.data_hub)
             self.L[Layers.centre_D_flow][i]=layers.CentreDenseFlowLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), cast(layers.DenseFlowRenderer, self.L[Layers.dense_flow][i]))
-            self.L[Layers.sparse_flow][i] = layers.OpticalFlowLayer(i, self.data_hub)
+            self.L[Layers.centre_motion][i]=layers.MotionMultiply(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CentreMaskLayer, self.L[Layers.centre_mask][i]))
 
+            self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.MotionMultiply], self.L[Layers.centre_motion]))
 
         # global layers
         self.pose_sim_layer =   layers.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, layers.AggregationMethod.HARMONIC_MEAN, 2.0)
@@ -217,7 +220,7 @@ class HDTRenderManager(RenderBase):
             w, h = self.subdivision.get_allocation_size('track', i)
             self.L[Layers.cam_track][i].allocate(w , h, GL_RGBA)
             w, h = self.subdivision.get_allocation_size('preview', i)
-            self.L[Layers.prev_angles][i].allocate(w, h, GL_RGBA)
+            self.L[Layers.angle_data][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         self.pose_sim_layer.deallocate()
@@ -253,15 +256,11 @@ class HDTRenderManager(RenderBase):
             for layer_type in self._interface_layers:
                 self.L[layer_type][i].draw(track_rect)
 
-        # Draw layers
+        # Preview layers
         for i in range(self.num_cams):
             preview_rect: Rect = self.subdivision.get_rect('preview', i)
             for layer_type in self._preview_layers:
                 self.L[layer_type][i].draw(preview_rect)
-
-
-            # cast(layers.PoseLineLayer, self.L[Layers.centre_pose][i]).line_width = 3.0
-            # cast(layers.PoseLineLayer, self.L[Layers.centre_pose][i]).line_smooth = 0.0
 
         self._draw_layers = FINAL_LAYERS
         # self._draw_layers = BOX_LAYERS
