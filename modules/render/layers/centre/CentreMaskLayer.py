@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.render.layers.LayerBase import LayerBase
-from modules.render.layers.renderers import CamMaskRenderer
+from modules.render.layers.source import MaskSourceLayer
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur
 from modules.utils.PointsAndRects import Rect, Point2f

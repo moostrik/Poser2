@@ -14,7 +14,7 @@ from modules.render.shaders import DenseFlowFilter as shader
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class DenseFlowRenderer(LayerBase):
+class DFlowSourceLayer(LayerBase):
     """Renderer for optical flow visualization.
 
     Retrieves flow tensors from DataHub and converts them to OpenGL textures

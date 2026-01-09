@@ -11,7 +11,7 @@ from modules.DataHub import DataHub, DataHubType
 from modules.render.layers.LayerBase import LayerBase, Rect
 
 
-class CamImageRenderer(LayerBase):
+class ImageSourceLayer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._cam_id: int = cam_id
         self._data: DataHub = data

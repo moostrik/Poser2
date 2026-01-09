@@ -11,7 +11,7 @@ from modules.gl import Fbo, Texture
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.render.layers.renderers import CamImageRenderer
+from modules.render.layers.source import ImageSourceLayer
 from modules.render.shaders import DrawRoi
 
 from modules.utils.HotReloadMethods import HotReloadMethods

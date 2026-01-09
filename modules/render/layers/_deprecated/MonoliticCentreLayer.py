@@ -14,7 +14,8 @@ from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.render.layers.LayerBase import LayerBase
-from modules.render.layers.renderers import CamImageRenderer, CamMaskRenderer
+from modules.render.layers.source import ImageSourceLayer
+from modules.render.layers.source import MaskSourceLayer
 from modules.render.shaders import Blend, DrawRoi, MaskAA, MaskApply, MaskBlend, MaskBlur, PosePointLines
 from modules.utils.PointsAndRects import Rect, Point2f
 
@@ -27,7 +28,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class CentreCamLayer(LayerBase):
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
-                 cam_image: CamImageRenderer, cam_mask: CamMaskRenderer) -> None:
+                 cam_image: ImageSourceLayer, cam_mask: MaskSourceLayer) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._fbo = Fbo()
@@ -38,8 +39,8 @@ class CentreCamLayer(LayerBase):
         self._mask_AA_fbo: Fbo = Fbo()
         self._mask_blur_fbo: SwapFbo = SwapFbo()
         self._point_fbo: Fbo = Fbo()
-        self._cam_image: CamImageRenderer = cam_image
-        self._cam_mask: CamMaskRenderer = cam_mask
+        self._cam_image: ImageSourceLayer = cam_image
+        self._cam_mask: MaskSourceLayer = cam_mask
         self._p_pose: Frame | None = None
 
         self._shoulder_midpoint: Point2f = Point2f(0.5, 0.3)

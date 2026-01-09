@@ -10,8 +10,8 @@ from modules.gl import Fbo, Texture
 from modules.DataHub import DataHub, PoseDataHubTypes
 from modules.render.layers.LayerBase import LayerBase, Rect
 
-from modules.render.layers.renderers.BBoxCamRenderer import BBoxCamRenderer
-from modules.render.layers.renderers.TrackletCamRenderer import TrackletCamRenderer
+from modules.render.layers.composite.BBoxCamRenderer import BBoxCamRenderer
+from modules.render.layers.composite.TrackletCamRenderer import TrackletCamRenderer
 from modules.render.layers.data.PoseLineLayer import PoseLineLayer
 
 from modules.utils.HotReloadMethods import HotReloadMethods

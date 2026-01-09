@@ -143,9 +143,9 @@ class HDTRenderManager(RenderBase):
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
         for i in range(self.num_cams):
-            cam_image =     self.L[Layers.cam_image][i] =   ls.CamImageRenderer(    i, self.data_hub)
-            cam_mask =      self.L[Layers.cam_mask][i] =    ls.CamMaskRenderer(     i, self.data_hub)
-            dense_flow =    self.L[Layers.dense_flow][i] =  ls.DenseFlowRenderer(   i, self.data_hub)
+            cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
+            cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
+            dense_flow =    self.L[Layers.dense_flow][i] =  ls.DFlowSourceLayer(   i, self.data_hub)
             sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(    i, self.data_hub)
 
             cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxCamRenderer(     i, self.data_hub,   PoseDataHubTypes.pose_I)
