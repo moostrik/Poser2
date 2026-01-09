@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.render.layers.LayerBase import TextureLayer
+from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.renderers import CamImageRenderer
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import Blend, DrawRoi
@@ -14,7 +14,7 @@ from modules.utils.PointsAndRects import Rect
 from modules.gl import Fbo, SwapFbo, Texture
 
 
-class CentreCamLayer(TextureLayer):
+class CentreCamLayer(LayerBase):
     """Renders camera image cropped and rotated around pose anchor points.
 
     Reads anchor geometry from AnchorPointCalculator and applies DrawRoi

@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.gl import Fbo, Texture
 from modules.DataHub import DataHub, PoseDataHubTypes
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.render.layers.renderers import CamBBoxRenderer, CamDepthTrackRenderer, CamImageRenderer
 from modules.render.layers.generic.PoseLineLayer import PoseLineLayer
@@ -16,7 +16,7 @@ from modules.render.layers.generic.PoseLineLayer import PoseLineLayer
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CamCompositeLayer(TextureLayer):
+class CamCompositeLayer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataHubTypes, image_renderer: CamImageRenderer,
                  line_width: float = 1.0) -> None:
         self._cam_id: int = cam_id

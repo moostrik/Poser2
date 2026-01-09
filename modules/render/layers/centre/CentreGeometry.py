@@ -11,12 +11,12 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
-from modules.render.layers.LayerBase import TextureLayer
+from modules.render.layers.LayerBase import LayerBase
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Texture
 
 
-class CentreGeometry(TextureLayer):
+class CentreGeometry(LayerBase):
     """Calculates anchor points (shoulder/hip midpoints) and derived geometry.
 
     This layer performs no rendering but computes shared geometry used by

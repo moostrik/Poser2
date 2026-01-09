@@ -11,11 +11,11 @@ from modules.tracker.TrackerBase import TrackerType, TrackerMetadata
 from modules.tracker.Tracklet import Tracklet, TrackletIdColor, TrackingStatus
 
 from modules.DataHub import DataHub
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class TrackerPanoramicLayer(TextureLayer):
+class TrackerPanoramicLayer(LayerBase):
     def __init__(self, data: DataHub, num_cams: int) -> None:
         self.data: DataHub = data
         self.data_consumer_key: str = data.get_unique_consumer_key()
@@ -39,7 +39,7 @@ class TrackerPanoramicLayer(TextureLayer):
         if tracklets is None:
             return
         # print(f"PanoramicTrackerRender: Updating with {len(tracklets)} tracklets")
-        TextureLayer.setView(self.fbo.width, self.fbo.height)
+        LayerBase.setView(self.fbo.width, self.fbo.height)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.fbo.begin()

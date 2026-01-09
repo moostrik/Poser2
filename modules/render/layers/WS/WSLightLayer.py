@@ -11,12 +11,12 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.WS.WSOutput import WSOutput
 from modules.pose.similarity.features.SimilarityStream import SimilarityStreamData
 from modules.DataHub import DataHub
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.gl.shaders.WS_Angles import WS_Angles
 from modules.gl.shaders.WS_Lines import WS_Lines
 
-class WSLightLayer(TextureLayer):
+class WSLightLayer(LayerBase):
     angles_shader = WS_Angles()
 
     def __init__(self, data: DataHub) -> None:

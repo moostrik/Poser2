@@ -10,14 +10,14 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub
 from modules.gl import Fbo, Texture, Image
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.flow import OpticalFlow, OpticalFlowConfig, Velocity, VelocityConfig, VisualizationMode
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class OpticalFlowLayer(TextureLayer):
+class OpticalFlowLayer(LayerBase):
     def __init__(self, cam_id: int, data_hub: DataHub) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub

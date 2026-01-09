@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.render.layers.LayerBase import TextureLayer
+from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreMaskLayer import CentreMaskLayer
 from modules.render.shaders import MaskApply
 from modules.utils.PointsAndRects import Rect
@@ -15,14 +15,14 @@ from modules.gl import Fbo, Texture
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class ApplyMaskLayer(TextureLayer):
+class ApplyMaskLayer(LayerBase):
     """Composites source layer with mask layer using MaskApply shader.
 
     Takes any source layer (camera, flow, etc.) and applies the mask from
     CentreMaskLayer. Output is the source masked with alpha channel.
     """
 
-    def __init__(self, source_layer: TextureLayer, mask_layer: CentreMaskLayer, opacity: float = 1.0) -> None:
+    def __init__(self, source_layer: LayerBase, mask_layer: CentreMaskLayer, opacity: float = 1.0) -> None:
         """Initialize mask apply layer.
 
         Args:

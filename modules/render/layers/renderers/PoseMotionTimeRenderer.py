@@ -6,11 +6,11 @@ from OpenGL.GL import * # type: ignore
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import DirectDrawLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.gl.Text import draw_box_string, text_init
 
 
-class PoseMotionTimeRenderer(DirectDrawLayer):
+class PoseMotionTimeRenderer(LayerBase):
     def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes) -> None:
         self._data: DataHub = data
         self._track_id: int = track_id

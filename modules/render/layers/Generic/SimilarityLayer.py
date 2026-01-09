@@ -8,13 +8,13 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, SimilarityDataHubType
 from modules.gl import Fbo, Texture, Image, draw_box_string, text_init
 from modules.pose.similarity.features.SimilarityStream import SimilarityStream, SimilarityStreamData, SimilarityBatch , AggregationMethod
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import StreamCorrelation as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class SimilarityLayer(TextureLayer):
+class SimilarityLayer(LayerBase):
 
     def __init__(self, num_streams: int, capacity: int, data: DataHub, data_type: SimilarityDataHubType,
                  aggregation_method: AggregationMethod = AggregationMethod.HARMONIC_MEAN, exponent: float = 2.0) -> None:

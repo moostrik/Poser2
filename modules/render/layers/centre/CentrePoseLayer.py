@@ -5,13 +5,13 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl import Fbo, Texture
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import PosePointLines
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentrePoseLayer(TextureLayer):
+class CentrePoseLayer(LayerBase):
     """Renders pose keypoint lines in crop space."""
 
     def __init__(self, anchor_calc: CentreGeometry,

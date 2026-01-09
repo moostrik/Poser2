@@ -9,13 +9,13 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, Texture
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import PosePointLines as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class PoseLineLayer(TextureLayer):
+class PoseLineLayer(LayerBase):
 
     def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes,
                  line_width: float = 4.0, line_smooth: float = 2.0, use_scores: bool = True, use_bbox: bool = False,

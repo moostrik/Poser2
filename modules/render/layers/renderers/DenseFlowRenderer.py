@@ -6,7 +6,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.gl import Tensor, SwapFbo, Texture
 from modules.gl.Texture import draw_quad
 from modules.render.shaders import DenseFlowFilter as shader
@@ -14,7 +14,7 @@ from modules.render.shaders import DenseFlowFilter as shader
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class DenseFlowRenderer(TextureLayer):
+class DenseFlowRenderer(LayerBase):
     """Renderer for optical flow visualization.
 
     Retrieves flow tensors from DataHub and converts them to OpenGL textures
@@ -77,10 +77,10 @@ class DenseFlowRenderer(TextureLayer):
         self._flow_texture.set_tensor(flow_tensor)
         self._flow_texture.update()
 
-        self.process_scale: float = 2.0
+        self.process_scale: float = 1.0
         self.flow_scale: float = 1.0
-        self.flow_gamma: float = 0.5
-        self.noise_threshold: float = 0.2
+        self.flow_gamma: float = 1.0
+        self.noise_threshold: float = 0.1
 
         # return
         if self._flow_texture.allocated:

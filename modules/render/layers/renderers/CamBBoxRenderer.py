@@ -7,10 +7,10 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import DirectDrawLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 
-class CamBBoxRenderer(DirectDrawLayer):
+class CamBBoxRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: int = 2,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         # for now make sure the pose meshes are for the correct data type

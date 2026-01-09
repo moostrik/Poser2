@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.render.layers.LayerBase import TextureLayer
+from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.renderers import CamMaskRenderer
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur
@@ -14,7 +14,7 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Fbo, SwapFbo, Texture
 
 
-class CentreMaskLayer(TextureLayer):
+class CentreMaskLayer(LayerBase):
     """Renders mask image cropped and rotated with temporal blending and blur.
 
     Uses independent rotation calculation (aspect-corrected) compared to camera layer.

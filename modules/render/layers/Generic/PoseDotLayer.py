@@ -9,14 +9,14 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, Texture
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import PosePointDots as shader
 from modules.utils.PointsAndRects import Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class PoseDotLayer(TextureLayer):
+class PoseDotLayer(LayerBase):
     def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes,
                  dot_size: float = 4.0, dot_smooth: float = 2.0,
                  color: tuple[float, float, float, float] | None = None) -> None:

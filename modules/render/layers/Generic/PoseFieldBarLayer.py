@@ -6,7 +6,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, Texture, draw_box_string, text_init
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import PoseScalarBar as shader
 from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
@@ -17,7 +17,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange
 POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0) # Cyan
 
-class PoseScalarBarLayer(TextureLayer):
+class PoseScalarBarLayer(LayerBase):
 
     def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, feature_type: FrameField,
                 line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0)) -> None:

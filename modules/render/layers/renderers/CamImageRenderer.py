@@ -8,10 +8,10 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Image import Image, Texture
 
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 
 
-class CamImageRenderer(TextureLayer):
+class CamImageRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._cam_id: int = cam_id
         self._data: DataHub = data

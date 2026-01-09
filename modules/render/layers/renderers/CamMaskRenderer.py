@@ -7,13 +7,13 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
 from modules.gl import Tensor, SwapFbo, Texture
-from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import MaskDilate
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CamMaskRenderer(TextureLayer):
+class CamMaskRenderer(LayerBase):
 
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id

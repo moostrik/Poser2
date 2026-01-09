@@ -13,7 +13,7 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
-from modules.render.layers.LayerBase import TextureLayer
+from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.renderers import CamImageRenderer, CamMaskRenderer
 from modules.render.shaders import Blend, DrawRoi, MaskAA, MaskApply, MaskBlend, MaskBlur, PosePointLines
 from modules.utils.PointsAndRects import Rect, Point2f
@@ -24,7 +24,7 @@ from modules.gl import Fbo, SwapFbo, Texture
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentreCamLayer(TextureLayer):
+class CentreCamLayer(LayerBase):
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
                  cam_image: CamImageRenderer, cam_mask: CamMaskRenderer) -> None:

@@ -1,4 +1,4 @@
-from .LayerBase import LayerBase, TextureLayer, DirectDrawLayer
+from .LayerBase import LayerBase
 
 from .centre.CentreGeometry import              CentreGeometry
 from .centre.CentreCamLayer import              CentreCamLayer
