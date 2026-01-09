@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl import RenderBase, WindowManager, Shader
-from modules.render.layers import TextureLayer
+from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub, PoseDataHubTypes, SimilarityDataHubType
 from modules.gui.PyReallySimpleGui import Gui
@@ -53,6 +53,23 @@ class Layers(IntEnum):
     dense_flow =    auto()
     sparse_flow =   auto()
 
+UPDATE_LAYERS: list[Layers] = [
+    Layers.cam_image,
+    Layers.cam_mask,
+    Layers.dense_flow,
+    Layers.centre_math,
+    Layers.centre_cam,
+    Layers.centre_mask,
+    Layers.centre_pose,
+    Layers.centre_D_flow,
+    Layers.centre_motion,
+]
+
+INTERFACE_LAYERS: list[Layers] = [
+    Layers.cam_track,
+    Layers.cam_bbox,
+]
+
 PREVIEW_LAYERS: list[Layers] = [
     # Layers.centre_cam,
     # Layers.centre_pose,
@@ -62,12 +79,6 @@ PREVIEW_LAYERS: list[Layers] = [
     # Layers.prev_mt,
     # Layers.cam_mask,
     Layers.sparse_flow,
-]
-
-BOX_LAYERS: list[Layers] = [
-    Layers.box_cam,
-    Layers.box_pose_R,
-    Layers.box_pose_I,
 ]
 
 FINAL_LAYERS: list[Layers] = [
@@ -88,15 +99,18 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.sparse_flow,
 ]
 
+BOX_LAYERS: list[Layers] = [
+    Layers.box_cam,
+    Layers.box_pose_R,
+    Layers.box_pose_I,
+]
+
+
 LARGE_LAYERS: list[Layers] = [
     Layers.centre_cam,
     Layers.centre_mask,
     Layers.sim_blend,
     Layers.centre_pose,
-]
-
-DYNAMIC_LAYERS: list[Layers] = [
-    Layers.prev_angles,
 ]
 
 COLORS: list[tuple[float, float, float, float]] = [
@@ -116,13 +130,13 @@ class HDTRenderManager(RenderBase):
         self.data_hub: DataHub = data_hub
 
         # layers
-        self._update_layers: list[Layers] =     [Layers.cam_image, Layers.cam_mask, Layers.dense_flow, Layers.centre_math, Layers.centre_cam, Layers.centre_mask, Layers.centre_pose, Layers.centre_D_flow, Layers.centre_motion]
-        self._interface_layers: list[Layers] =  [Layers.cam_track, Layers.cam_bbox]
+        self._update_layers: list[Layers] =     UPDATE_LAYERS
+        self._interface_layers: list[Layers] =  INTERFACE_LAYERS
         self._preview_layers: list[Layers] =    PREVIEW_LAYERS
         self._draw_layers: list[Layers] =       FINAL_LAYERS
 
         # camera layers
-        self.L: dict[Layers, dict[int, TextureLayer]] = {layer: {} for layer in Layers}
+        self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
         for i in range(self.num_cams):
             self.L[Layers.cam_image][i] =   layers.CamImageRenderer(i, self.data_hub)
