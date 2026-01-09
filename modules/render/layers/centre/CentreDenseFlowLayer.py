@@ -7,11 +7,6 @@ from OpenGL.GL import * # type: ignore
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskApply
-
-from modules.utils.HotReloadMethods import HotReloadMethods
-
-
-# GL
 from modules.gl import Fbo, Texture
 
 
@@ -37,8 +32,7 @@ class CentreDenseFlowLayer(LayerBase):
         self._mask_shader = MaskApply()
 
         self.mask_opacity: float = mask_opacity
-
-        hotreload = HotReloadMethods(self.__class__)
+        self.use_mask: bool = True  # Toggle for mask application
 
     @property
     def texture(self) -> Texture:
@@ -68,7 +62,7 @@ class CentreDenseFlowLayer(LayerBase):
 
         # Check if valid anchor data exists
         if not self._anchor_calc.has_pose:
-            if self._mask_texture:
+            if self._mask_texture and self.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             glEnable(GL_BLEND)
             return
@@ -85,8 +79,8 @@ class CentreDenseFlowLayer(LayerBase):
             False
         )
 
-        # Apply mask if provided
-        if self._mask_texture:
+        # Apply mask if provided and enabled
+        if self._mask_texture and self.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._mask_shader.use(
                 self._masked_fbo.fbo_id,
@@ -94,8 +88,8 @@ class CentreDenseFlowLayer(LayerBase):
                 self._mask_texture.tex_id,
                 self.mask_opacity
             )
+            self._output_fbo = self._masked_fbo
+        else:
+            self._output_fbo = self._flow_fbo
 
         glEnable(GL_BLEND)
-
-        self._output_fbo = self._masked_fbo
-        # self._output_fbo = self._flow_fbo

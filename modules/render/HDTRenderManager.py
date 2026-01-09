@@ -101,7 +101,7 @@ PREVIEW_LAYERS: list[Layers] = [
 ]
 
 FINAL_LAYERS: list[Layers] = [
-    # Layers.centre_cam,
+    Layers.centre_cam,
     # Layers.centre_mask,
     Layers.centre_pose,
     # Layers.centre_motion,
@@ -113,7 +113,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.cam_mask,
     # Layers.cam_image,
     # Layers.cam_flow,
-    Layers.centre_D_flow,
+    # Layers.centre_D_flow,
     # Layers.dense_flow,
     # Layers.sparse_flow,
 ]
@@ -165,9 +165,9 @@ class HDTRenderManager(RenderBase):
 
             self.L[Layers.centre_math][i] = layers.CentreGeometry(i, self.data_hub, PoseDataHubTypes.pose_I, 16/9)
             self.L[Layers.centre_mask][i] = layers.CentreMaskLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), cast(layers.CamMaskRenderer, self.L[Layers.cam_mask][i]))
-            self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), cast(layers.CamImageRenderer, self.L[Layers.cam_image][i]))
-            self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), 3.0, 0.0, False, COLORS[i % len(COLORS)])
+            self.L[Layers.centre_cam][i] =  layers.CentreCamLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), self.L[Layers.cam_image][i].texture, self.L[Layers.centre_mask][i].texture)
             self.L[Layers.centre_D_flow][i]=layers.CentreDenseFlowLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), self.L[Layers.dense_flow][i].texture, self.L[Layers.centre_mask][i].texture)
+            self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(cast(layers.CentreGeometry, self.L[Layers.centre_math][i]), 3.0, 0.0, False, COLORS[i % len(COLORS)])
             self.L[Layers.centre_motion][i]=layers.MotionMultiply(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CentreMaskLayer, self.L[Layers.centre_mask][i]))
 
             self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.MotionMultiply], self.L[Layers.centre_motion]))
@@ -261,10 +261,12 @@ class HDTRenderManager(RenderBase):
             preview_rect: Rect = self.subdivision.get_rect('preview', i)
             for layer_type in self._preview_layers:
                 self.L[layer_type][i].draw(preview_rect)
+            self.L[Layers.centre_cam][i].use_mask = True #type: ignore
 
         self._draw_layers = FINAL_LAYERS
         # self._draw_layers = BOX_LAYERS
         self._preview_layers = PREVIEW_LAYERS
+
 
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
