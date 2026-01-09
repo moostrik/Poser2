@@ -10,11 +10,11 @@ from modules.gl.Text import draw_box_string, text_init
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import DirectDrawLayer, Rect
 
 
 
-class CamDepthTrackRenderer(LayerBase):
+class CamDepthTrackRenderer(DirectDrawLayer):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._data: DataHub = data
         self._cam_id: int = cam_id

@@ -10,7 +10,7 @@ from pytweening import *    # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
 from modules.gl import Fbo, Texture
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import TextureLayer, Rect
 from modules.render.layers.centre.CentreMaskLayer import CentreMaskLayer
 from modules.render.shaders import MaskApply as shader
 
@@ -20,7 +20,7 @@ from modules.pose.Frame import Frame
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class MotionMultiply(LayerBase):
+class MotionMultiply(TextureLayer):
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, centre_mask: CentreMaskLayer) -> None:
         self._cam_id: int = cam_id

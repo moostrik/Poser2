@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl import RenderBase, WindowManager, Shader
-from modules.render.layers import LayerBase
+from modules.render.layers import TextureLayer
 
 from modules.DataHub import DataHub, PoseDataHubTypes, SimilarityDataHubType
 from modules.gui.PyReallySimpleGui import Gui
@@ -122,7 +122,7 @@ class HDTRenderManager(RenderBase):
         self._draw_layers: list[Layers] =       FINAL_LAYERS
 
         # camera layers
-        self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
+        self.L: dict[Layers, dict[int, TextureLayer]] = {layer: {} for layer in Layers}
 
         for i in range(self.num_cams):
             self.L[Layers.cam_image][i] =   layers.CamImageRenderer(i, self.data_hub)

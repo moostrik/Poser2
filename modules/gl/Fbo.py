@@ -6,6 +6,11 @@ class Fbo(Texture):
         super(Fbo, self).__init__()
         self.fbo_id = 0
 
+    @property
+    def texture(self) -> Texture:
+        """Convenience property for LayerBase interface compatibility."""
+        return self
+
     def allocate(self, width: int, height: int, internal_format,
                  wrap_s: int = GL_CLAMP_TO_EDGE, wrap_t: int = GL_CLAMP_TO_EDGE,
                  min_filter: int = GL_LINEAR, mag_filter: int = GL_LINEAR) -> None :

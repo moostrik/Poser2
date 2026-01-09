@@ -6,15 +6,15 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, SimilarityDataHubType
-from modules.gl import Fbo, Image, draw_box_string, text_init
+from modules.gl import Fbo, Texture, Image, draw_box_string, text_init
 from modules.pose.similarity.features.SimilarityStream import SimilarityStream, SimilarityStreamData, SimilarityBatch , AggregationMethod
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import TextureLayer, Rect
 from modules.render.shaders import StreamCorrelation as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class SimilarityLayer(LayerBase):
+class SimilarityLayer(TextureLayer):
 
     def __init__(self, num_streams: int, capacity: int, data: DataHub, data_type: SimilarityDataHubType,
                  aggregation_method: AggregationMethod = AggregationMethod.HARMONIC_MEAN, exponent: float = 2.0) -> None:
@@ -35,6 +35,10 @@ class SimilarityLayer(LayerBase):
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
+    @property
+    def texture(self) -> Texture:
+        return self._fbo.texture
+
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._shader.allocate()
@@ -43,9 +47,6 @@ class SimilarityLayer(LayerBase):
         self._fbo.deallocate()
         self._image.deallocate()
         self._shader.deallocate()
-
-    def draw(self, rect: Rect) -> None:
-        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         """Update and render correlation streams.

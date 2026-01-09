@@ -7,16 +7,16 @@ from pytweening import *    # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl.Fbo import Fbo
+from modules.gl.Fbo import Fbo, Texture
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import TextureLayer, Rect
 from modules.render.layers.generic.MotionMultiply import MotionMultiply
 from modules.render.shaders import MaskApply, MaskMultiply, HDTTripleBlend
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class SimilarityBlend(LayerBase):
+class SimilarityBlend(TextureLayer):
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, layers: dict[int, MotionMultiply]) -> None:
         self._cam_id: int = cam_id
@@ -51,8 +51,8 @@ class SimilarityBlend(LayerBase):
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
-    def tex_id(self) -> int:
-        return self._fbo.tex_id
+    def texture(self) -> Texture:
+        return self._fbo.texture
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)

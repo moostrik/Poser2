@@ -6,10 +6,10 @@ from OpenGL.GL import * # type: ignore
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import DirectDrawLayer, Rect
 
 
-class PoseBBoxRenderer(LayerBase):
+class PoseBBoxRenderer(DirectDrawLayer):
     def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: float = 2.0,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         self._data: DataHub = data

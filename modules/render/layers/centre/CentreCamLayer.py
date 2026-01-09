@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.render.layers.LayerBase import LayerBase
+from modules.render.layers.LayerBase import TextureLayer
 from modules.render.layers.renderers import CamImageRenderer
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import Blend, DrawRoi
@@ -14,7 +14,7 @@ from modules.utils.PointsAndRects import Rect
 from modules.gl import Fbo, SwapFbo, Texture
 
 
-class CentreCamLayer(LayerBase):
+class CentreCamLayer(TextureLayer):
     """Renders camera image cropped and rotated around pose anchor points.
 
     Reads anchor geometry from AnchorPointCalculator and applies DrawRoi
@@ -40,10 +40,6 @@ class CentreCamLayer(LayerBase):
     def texture(self) -> Texture:
         """Output texture for external use."""
         return self._cam_blend_fbo.texture
-
-    def draw(self, rect: Rect) -> None:
-        """Draw the blended camera output to screen."""
-        self.texture.draw(rect.x, rect.y, rect.width, rect.height)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._cam_fbo.allocate(width, height, internal_format)
@@ -74,10 +70,10 @@ class CentreCamLayer(LayerBase):
             return
 
         # Render camera image with ROI from anchor calculator
-        cam_aspect: float = self._cam_image.width / self._cam_image.height
+        cam_aspect: float = self._cam_image.texture.width / self._cam_image.texture.height
         self._roi_shader.use(
             self._cam_fbo.fbo_id,
-            self._cam_image.tex_id,
+            self._cam_image.texture.tex_id,
             self._anchor_calc.cam_crop_roi,
             self._anchor_calc.cam_rotation,
             self._anchor_calc.anchor_top_tex,

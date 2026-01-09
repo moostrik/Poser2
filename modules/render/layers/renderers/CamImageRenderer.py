@@ -5,13 +5,13 @@ import numpy as np
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Image import Image
+from modules.gl.Image import Image, Texture
 
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import TextureLayer, Rect
 
 
-class CamImageRenderer(LayerBase):
+class CamImageRenderer(TextureLayer):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._cam_id: int = cam_id
         self._data: DataHub = data
@@ -19,17 +19,8 @@ class CamImageRenderer(LayerBase):
         self._p_frame: np.ndarray | None = None
 
     @property
-    def width(self) -> int:
-        return self._image.width
-    @property
-    def height(self) -> int:
-        return self._image.height
-    @property
-    def internal_format(self):
-        return self._image.internal_format
-    @property
-    def tex_id(self) -> int:
-        return self._image.tex_id
+    def texture(self) -> Texture:
+        return self._image
 
     def deallocate(self) -> None:
         if self._image.allocated:

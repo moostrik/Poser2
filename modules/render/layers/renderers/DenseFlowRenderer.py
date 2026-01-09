@@ -6,15 +6,15 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.gl import Tensor, SwapFbo
+from modules.render.layers.LayerBase import TextureLayer, Rect
+from modules.gl import Tensor, SwapFbo, Texture
 from modules.gl.Texture import draw_quad
 from modules.render.shaders import DenseFlowFilter as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class DenseFlowRenderer(LayerBase):
+class DenseFlowRenderer(TextureLayer):
     """Renderer for optical flow visualization.
 
     Retrieves flow tensors from DataHub and converts them to OpenGL textures
@@ -39,20 +39,8 @@ class DenseFlowRenderer(LayerBase):
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
-    def width(self) -> int:
-        return self._fbo.width
-
-    @property
-    def height(self) -> int:
-        return self._fbo.height
-
-    @property
-    def internal_format(self):
-        return self._fbo.internal_format
-
-    @property
-    def tex_id(self) -> int:
-        return self._fbo.tex_id
+    def texture(self) -> Texture:
+        return self._fbo.texture
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         """Initialize renderer resources."""

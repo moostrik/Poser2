@@ -7,16 +7,16 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo
+from modules.gl import Fbo, Texture
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import TextureLayer, Rect
 from modules.render.shaders import PosePointDots as shader
 from modules.utils.PointsAndRects import Rect
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class PoseDotLayer(LayerBase):
+class PoseDotLayer(TextureLayer):
     def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes,
                  dot_size: float = 4.0, dot_smooth: float = 2.0,
                  color: tuple[float, float, float, float] | None = None) -> None:
@@ -34,6 +34,10 @@ class PoseDotLayer(LayerBase):
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
+    @property
+    def texture(self) -> Texture:
+        return self._fbo.texture
+
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._shader.allocate()
@@ -41,9 +45,6 @@ class PoseDotLayer(LayerBase):
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._shader.deallocate()
-
-    def draw(self, rect: Rect) -> None:
-        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
 

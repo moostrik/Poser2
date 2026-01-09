@@ -6,9 +6,9 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl import Fbo
+from modules.gl import Fbo, Texture
 from modules.DataHub import DataHub, PoseDataHubTypes
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import TextureLayer, Rect
 
 from modules.render.layers.renderers import CamBBoxRenderer, CamDepthTrackRenderer, CamImageRenderer
 from modules.render.layers.generic.PoseLineLayer import PoseLineLayer
@@ -16,7 +16,7 @@ from modules.render.layers.generic.PoseLineLayer import PoseLineLayer
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CamCompositeLayer(LayerBase):
+class CamCompositeLayer(TextureLayer):
     def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataHubTypes, image_renderer: CamImageRenderer,
                  line_width: float = 1.0) -> None:
         self._cam_id: int = cam_id
@@ -30,6 +30,10 @@ class CamCompositeLayer(LayerBase):
         self._bbox_renderer: CamBBoxRenderer = CamBBoxRenderer(cam_id, data, data_type, int(line_width), (1.0, 1.0, 1.0, 1.0))
 
         self.hot_reload = HotReloadMethods(self.__class__)
+
+    @property
+    def texture(self) -> Texture:
+        return self._fbo.texture
 
     @property
     def data_type(self) -> PoseDataHubTypes:
@@ -68,9 +72,6 @@ class CamCompositeLayer(LayerBase):
         self._depth_track_renderer.deallocate()
         self._bbox_renderer.deallocate()
         self._pose_points_layer.deallocate()
-
-    def draw(self, rect: Rect) -> None:
-        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         # Update all layers

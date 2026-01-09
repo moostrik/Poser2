@@ -13,7 +13,7 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
-from modules.render.layers.LayerBase import LayerBase
+from modules.render.layers.LayerBase import TextureLayer
 from modules.render.layers.renderers import CamImageRenderer, CamMaskRenderer
 from modules.render.shaders import Blend, DrawRoi, MaskAA, MaskApply, MaskBlend, MaskBlur, PosePointLines
 from modules.utils.PointsAndRects import Rect, Point2f
@@ -24,7 +24,7 @@ from modules.gl import Fbo, SwapFbo, Texture
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentreCamLayer(LayerBase):
+class CentreCamLayer(TextureLayer):
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
                  cam_image: CamImageRenderer, cam_mask: CamMaskRenderer) -> None:
@@ -187,12 +187,12 @@ class CentreCamLayer(LayerBase):
         # Render camera image with ROI
         cam_top: Point2f = self._shoulder_midpoint * bbox.size + bbox.position
         cam_bot: Point2f = self._hip_midpoint * bbox.size + bbox.position
-        cam_aspect: float = self._cam_image.width / self._cam_image.height
+        cam_aspect: float = self._cam_image.texture.width / self._cam_image.texture.height
 
         self._rotation, _, self._crop_roi = CentreCamLayer._calculate_roi(
             cam_top, cam_bot, self.target_top, target_distance, self.dst_aspectratio
         )
-        self._roi_shader.use(self._cam_fbo.fbo_id, self._cam_image.tex_id,
+        self._roi_shader.use(self._cam_fbo.fbo_id, self._cam_image.texture.tex_id,
                                       self._crop_roi, self._rotation, cam_top, cam_aspect, False, True)
 
         # Blend frames
@@ -221,7 +221,7 @@ class CentreCamLayer(LayerBase):
         mask_rotation_center = Point2f(self._shoulder_midpoint.x, 1.0 - self._shoulder_midpoint.y)
 
         # Negate rotation for flipped coordinate system
-        self._roi_shader.use(self._mask_fbo.fbo_id, self._cam_mask.tex_id,
+        self._roi_shader.use(self._mask_fbo.fbo_id, self._cam_mask.texture.tex_id,
                                       mask_crop_roi, -mask_rotation, mask_rotation_center, bbox_aspect, False, False)
 
         # Blend frames with mask upscaling and blur

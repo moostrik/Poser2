@@ -10,14 +10,14 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub
 from modules.gl import Fbo, Texture, Image
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import TextureLayer, Rect
 
 from modules.flow import OpticalFlow, OpticalFlowConfig, Velocity, VelocityConfig, VisualizationMode
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class OpticalFlowLayer(LayerBase):
+class OpticalFlowLayer(TextureLayer):
     def __init__(self, cam_id: int, data_hub: DataHub) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
@@ -33,6 +33,10 @@ class OpticalFlowLayer(LayerBase):
         self._velocity_viz: Velocity = Velocity()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
+
+    @property
+    def texture(self) -> Texture:
+        return self._fbo.texture
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)

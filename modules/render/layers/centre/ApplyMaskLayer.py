@@ -15,7 +15,7 @@ from modules.gl import Fbo, Texture
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class ApplyMaskLayer(TextureLayer):
+class CentreMaskApplyLayer(TextureLayer):
     """Composites source layer with mask layer using MaskApply shader.
 
     Takes any source layer (camera, flow, etc.) and applies the mask from
@@ -72,3 +72,7 @@ class ApplyMaskLayer(TextureLayer):
         )
 
         glEnable(GL_BLEND)
+
+    def draw(self, rect: Rect) -> None:
+        """Draw the masked output to screen."""
+        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)

@@ -6,14 +6,14 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gl import Tensor, SwapFbo
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.gl import Tensor, SwapFbo, Texture
+from modules.render.layers.LayerBase import TextureLayer, Rect
 from modules.render.shaders import MaskDilate
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CamMaskRenderer(LayerBase):
+class CamMaskRenderer(TextureLayer):
 
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id
@@ -29,17 +29,8 @@ class CamMaskRenderer(LayerBase):
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
-    def width(self) -> int:
-        return self._fbo.width
-    @property
-    def height(self) -> int:
-        return self._fbo.height
-    @property
-    def internal_format(self):
-        return self._fbo.internal_format
-    @property
-    def tex_id(self) -> int:
-        return self._fbo.tex_id
+    def texture(self) -> Texture:
+        return self._fbo.texture
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         self._dilate_shader.allocate()
@@ -48,11 +39,6 @@ class CamMaskRenderer(LayerBase):
         self._cuda_image.deallocate()
         self._fbo.deallocate()
         self._dilate_shader.deallocate()
-
-    def draw(self, rect: Rect) -> None:
-        if self._fbo.allocated:
-            self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        # self._cuda_image.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         mask_tensor: torch.Tensor | None = self._data_hub.get_item(DataHubType.mask_tensor, self._track_id)

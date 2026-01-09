@@ -7,16 +7,16 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub
-from modules.gl import Fbo
+from modules.gl import Fbo, Texture
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import TextureLayer, Rect
 from modules.render.layers.renderers import CamImageRenderer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class PoseCamLayer(LayerBase):
+class PoseCamLayer(TextureLayer):
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, image_renderer: CamImageRenderer,) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
@@ -28,14 +28,15 @@ class PoseCamLayer(LayerBase):
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
+    @property
+    def texture(self) -> Texture:
+        return self._fbo.texture
+
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
-
-    def draw(self, rect: Rect) -> None:
-        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         key: int = self._cam_id

@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.render.layers.LayerBase import LayerBase
+from modules.render.layers.LayerBase import TextureLayer
 from modules.render.layers.renderers import DenseFlowRenderer
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi
@@ -14,7 +14,7 @@ from modules.utils.PointsAndRects import Rect
 from modules.gl import Fbo, Texture
 
 
-class CentreDenseFlowLayer(LayerBase):
+class CentreDenseFlowLayer(TextureLayer):
     """Renders optical flow visualization cropped and rotated around pose anchor points.
 
     Reads anchor geometry from CentreGeometry and applies DrawRoi shader to flow visualization.
@@ -64,7 +64,7 @@ class CentreDenseFlowLayer(LayerBase):
         # Render flow with ROI from anchor calculator (bbox-space geometry, like mask)
         self._roi_shader.use(
             self._flow_fbo.fbo_id,
-            self._flow_renderer.tex_id,
+            self._flow_renderer.texture.tex_id,
             self._anchor_calc.bbox_crop_roi,
             self._anchor_calc.bbox_rotation,
             self._anchor_calc.bbox_rotation_center,
@@ -74,7 +74,3 @@ class CentreDenseFlowLayer(LayerBase):
         )
 
         glEnable(GL_BLEND)
-
-    def draw(self, rect: Rect) -> None:
-        """Draw the cropped flow output to screen."""
-        self._flow_fbo.draw(rect.x, rect.y, rect.width, rect.height)

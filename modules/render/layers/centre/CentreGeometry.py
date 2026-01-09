@@ -11,12 +11,12 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
-from modules.render.layers.LayerBase import LayerBase
+from modules.render.layers.LayerBase import TextureLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Texture
 
 
-class CentreGeometry(LayerBase):
+class CentreGeometry(TextureLayer):
     """Calculates anchor points (shoulder/hip midpoints) and derived geometry.
 
     This layer performs no rendering but computes shared geometry used by
@@ -201,10 +201,6 @@ class CentreGeometry(LayerBase):
         self._transformed_points = CentreGeometry._transform_points(
             pose.points, self._bbox, self._anchor_top_tex, self._cam_aspect, self._cam_rotation, self._cam_crop_roi
         )
-
-    def draw(self, rect: Rect) -> None:
-        """No rendering performed by this layer."""
-        pass
 
     @staticmethod
     def _get_midpoint(points: Points2D, left_landmark: PointLandmark, right_landmark: PointLandmark) -> Point2f | None:

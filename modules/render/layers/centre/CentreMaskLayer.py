@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.render.layers.LayerBase import LayerBase
+from modules.render.layers.LayerBase import TextureLayer
 from modules.render.layers.renderers import CamMaskRenderer
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur
@@ -14,7 +14,7 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Fbo, SwapFbo, Texture
 
 
-class CentreMaskLayer(LayerBase):
+class CentreMaskLayer(TextureLayer):
     """Renders mask image cropped and rotated with temporal blending and blur.
 
     Uses independent rotation calculation (aspect-corrected) compared to camera layer.
@@ -93,7 +93,7 @@ class CentreMaskLayer(LayerBase):
         # Use bbox geometry from CentreGeometry
         self._roi_shader.use(
             self._mask_fbo.fbo_id,
-            self._cam_mask.tex_id,
+            self._cam_mask.texture.tex_id,
             self._anchor_calc.bbox_crop_roi,
             self._anchor_calc.bbox_rotation,
             self._anchor_calc.bbox_rotation_center,
@@ -138,6 +138,3 @@ class CentreMaskLayer(LayerBase):
 
         glEnable(GL_BLEND)
 
-    def draw(self, rect: Rect) -> None:
-        """Draw the processed mask output to screen."""
-        self._mask_blur_fbo.draw(rect.x, rect.y, rect.width, rect.height)

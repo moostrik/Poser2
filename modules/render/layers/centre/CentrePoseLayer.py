@@ -4,14 +4,14 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl import Fbo
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.gl import Fbo, Texture
+from modules.render.layers.LayerBase import TextureLayer, Rect
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import PosePointLines
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentrePoseLayer(LayerBase):
+class CentrePoseLayer(TextureLayer):
     """Renders pose keypoint lines in crop space."""
 
     def __init__(self, anchor_calc: CentreGeometry,
@@ -28,6 +28,11 @@ class CentrePoseLayer(LayerBase):
 
         HotReloadMethods(self.__class__, True, True)
 
+    @property
+    def texture(self) -> Texture:
+        """Output texture for external use."""
+        return self._fbo.texture
+
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._shader.allocate()
@@ -35,9 +40,6 @@ class CentrePoseLayer(LayerBase):
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._shader.deallocate()
-
-    def draw(self, rect: Rect) -> None:
-        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
