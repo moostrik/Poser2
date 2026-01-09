@@ -85,7 +85,7 @@ class OpticalFlowLayer(LayerBase):
         self._optical_flow.set(self.curr_image)
         self._optical_flow.update()
 
-        self._velocity_viz.config.mode = VisualizationMode.ARROW_FIELD
+        self._velocity_viz.config.mode = VisualizationMode.DIRECTION_MAP
         self._velocity_viz.config.scale = 1.0
         self._velocity_viz.config.spacing = 8
         self._velocity_viz.config.arrow_length = 8.0

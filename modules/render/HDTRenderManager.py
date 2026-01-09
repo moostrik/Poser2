@@ -135,6 +135,7 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.centre_motion][i]=layers.MotionMultiply(i, self.data_hub, PoseDataHubTypes.pose_I, cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]))
             self.L[Layers.sim_blend][i] =   layers.SimilarityBlend(i, self.data_hub, PoseDataHubTypes.pose_I, cast(dict[int, layers.MotionMultiply], self.L[Layers.centre_motion]))
             self.L[Layers.centre_pose][i] = layers.CentrePoseLayer(i, self.data_hub, PoseDataHubTypes.pose_I, 50.0, 25.0, False, False, COLORS[i % len(COLORS)])
+            cast(layers.CentreCamLayer, self.L[Layers.centre_cam][i]).set_points_callback(cast(layers.CentrePoseLayer, self.L[Layers.centre_pose][i]).setCentrePoints)
 
             self.L[Layers.dense_flow][i] =    layers.DenseFlowRenderer(i, self.data_hub)
             self.L[Layers.sparse_flow][i] =   layers.OpticalFlowLayer(i, self.data_hub)
