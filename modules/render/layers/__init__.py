@@ -1,8 +1,13 @@
 from .LayerBase import LayerBase
 
+from .centre.CentreGeometry import              CentreGeometry
+from .centre.CentreCamLayer import              CentreCamLayer
+from .centre.CentreMaskLayer import             CentreMaskLayer
+from .centre.CentrePoseLayer import             CentrePoseLayer
+from .centre.CentreDenseFlowLayer import        CentreDenseFlowLayer
+from .generic.ApplyMaskLayer import             ApplyMaskLayer
+
 from .generic.CamCompositeLayer import          CamCompositeLayer
-from .generic.CentreCamLayer import             CentreCamLayer
-from .generic.CentrePoseLayer import            CentrePoseLayer
 from .generic.MotionMultiply import             MotionMultiply
 from .generic.OpticalFlowLayer import           OpticalFlowLayer
 from .generic.PDLayer import                    PDLayer

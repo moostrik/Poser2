@@ -79,7 +79,8 @@ class DenseFlowRenderer(LayerBase):
             return
         self._prev_tensor = flow_tensor
 
-        self._fbo.clear()
+        if self._fbo.allocated:
+            self._fbo.clear()
 
         if flow_tensor is None:
             # self._flow_texture.clear()
@@ -88,13 +89,12 @@ class DenseFlowRenderer(LayerBase):
         self._flow_texture.set_tensor(flow_tensor)
         self._flow_texture.update()
 
-
         self.process_scale: float = 2.0
         self.flow_scale: float = 1.0
         self.flow_gamma: float = 0.5
         self.noise_threshold: float = 0.2
 
-
+        # return
         if self._flow_texture.allocated:
             w = int(self._flow_texture.width * self.process_scale)
             h = int(self._flow_texture.height * self.process_scale)
