@@ -22,10 +22,10 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class MotionMultiply(LayerBase):
 
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, centre_mask: CentreMaskLayer) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, centre_mask: Texture) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
-        self._centre_mask: CentreMaskLayer = centre_mask
+        self._centre_mask: Texture = centre_mask
         self._fbo: Fbo = Fbo()
         self._cam_fbo: Fbo = Fbo()
         self._mask_fbo: Fbo = Fbo()
@@ -92,8 +92,8 @@ class MotionMultiply(LayerBase):
         if pose is None:
             return
 
-        cam = self._centre_mask.texture
-        mask = self._centre_mask.texture  # MotionMultiply currently doesn't use mask separately
+        cam = self._centre_mask
+        mask = self._centre_mask  # MotionMultiply currently doesn't use mask separately
 
 
 

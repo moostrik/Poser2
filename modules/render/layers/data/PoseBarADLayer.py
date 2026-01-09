@@ -16,7 +16,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange
 POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0) # Cyan
 
-class PoseAngleDeltaBarLayer(LayerBase):
+class PoseBarADLayer(LayerBase):
     pose_feature_shader = PoseAngleDeltaBar()
 
     def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
@@ -48,13 +48,13 @@ class PoseAngleDeltaBarLayer(LayerBase):
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
 
-        if not PoseAngleDeltaBarLayer.pose_feature_shader.allocated:
-            PoseAngleDeltaBarLayer.pose_feature_shader.allocate()
+        if not PoseBarADLayer.pose_feature_shader.allocated:
+            PoseBarADLayer.pose_feature_shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
-        if PoseAngleDeltaBarLayer.pose_feature_shader.allocated:
-            PoseAngleDeltaBarLayer.pose_feature_shader.deallocate()
+        if PoseBarADLayer.pose_feature_shader.allocated:
+            PoseBarADLayer.pose_feature_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
@@ -63,8 +63,8 @@ class PoseAngleDeltaBarLayer(LayerBase):
 
     def update(self) -> None:
         # shader gets reset on hot reload, so we need to check if it's allocated
-        if not PoseAngleDeltaBarLayer.pose_feature_shader.allocated:
-            PoseAngleDeltaBarLayer.pose_feature_shader.allocate()
+        if not PoseBarADLayer.pose_feature_shader.allocated:
+            PoseBarADLayer.pose_feature_shader.allocate()
 
         key: int = self._track_id
 
@@ -83,7 +83,7 @@ class PoseAngleDeltaBarLayer(LayerBase):
         line_thickness = 1.0 / self._fbo.height * self.line_thickness
         line_smooth = 1.0 / self._fbo.height * self.line_smooth
 
-        PoseAngleDeltaBarLayer.pose_feature_shader.use(self._fbo.fbo_id, pose.angles, pose.angle_vel,
+        PoseBarADLayer.pose_feature_shader.use(self._fbo.fbo_id, pose.angles, pose.angle_vel,
                                                        line_thickness, line_smooth,
                                                        (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
 
@@ -91,7 +91,7 @@ class PoseAngleDeltaBarLayer(LayerBase):
         num_joints: int = len(pose.angles)
         labels: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
         if labels != self._labels:
-            PoseAngleDeltaBarLayer.render_labels(self._label_fbo, labels)
+            PoseBarADLayer.render_labels(self._label_fbo, labels)
         self._labels = [joint_enum_type(i).name for i in range(num_joints)]
 
 

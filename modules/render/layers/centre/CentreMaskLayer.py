@@ -21,9 +21,9 @@ class CentreMaskLayer(LayerBase):
     Reads anchor points from AnchorPointCalculator.
     """
 
-    def __init__(self, anchor_calc: CentreGeometry, cam_mask: CamMaskRenderer) -> None:
+    def __init__(self, anchor_calc: CentreGeometry, cam_texture: Texture) -> None:
         self._anchor_calc: CentreGeometry = anchor_calc
-        self._cam_mask: CamMaskRenderer = cam_mask
+        self._cam_texture: Texture = cam_texture
 
         # FBOs
         self._mask_fbo: Fbo = Fbo()
@@ -93,7 +93,7 @@ class CentreMaskLayer(LayerBase):
         # Use bbox geometry from CentreGeometry
         self._roi_shader.use(
             self._mask_fbo.fbo_id,
-            self._cam_mask.texture.tex_id,
+            self._cam_texture.tex_id,
             self._anchor_calc.bbox_crop_roi,
             self._anchor_calc.bbox_rotation,
             self._anchor_calc.bbox_rotation_center,
