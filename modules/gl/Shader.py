@@ -1,5 +1,6 @@
 from OpenGL.GL import * # type: ignore
 from OpenGL.GL import shaders
+
 import time
 import inspect
 import threading

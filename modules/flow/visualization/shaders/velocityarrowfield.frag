@@ -77,8 +77,8 @@ void main() {
     vec2 local_pos = pixel - grid_pos;
 
     // Calculate arrow distance (in pixel space)
-    float arrow_size = grid_spacing * arrow_scale * 0.5;
-    float thickness = grid_spacing * arrow_thickness * 0.05;
+    float arrow_size = arrow_scale;
+    float thickness = arrow_thickness;
     float dist = arrow(local_pos, velocity * grid_spacing * 0.4, arrow_size, thickness);
 
     // Anti-aliased rendering

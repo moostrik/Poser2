@@ -285,6 +285,6 @@ class Tensor(Texture):
     def draw(self, x, y, w, h) -> None:
         """Draw the texture with vertical flip (matching Image behavior)."""
         self.bind()
-        draw_quad(x, y, w, h)
+        draw_quad(x, y, w, h, True)
         self.unbind()
 

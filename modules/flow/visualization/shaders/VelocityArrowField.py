@@ -16,7 +16,7 @@ class VelocityArrowField(Shader):
     """
 
     def use(self, target_fbo: Fbo, velocity_tex: Texture, scale: float = 1.0,
-            grid_spacing: float = 20.0, arrow_scale: float = 0.8,
+            grid_spacing: float = 20.0, arrow_scale: float = 1.0,
             arrow_thickness: float = 0.15) -> None:
         """Render arrow field visualization to FBO.
 

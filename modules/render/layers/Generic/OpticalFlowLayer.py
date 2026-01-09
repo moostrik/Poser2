@@ -55,6 +55,7 @@ class OpticalFlowLayer(LayerBase):
     def draw(self, rect: Rect) -> None:
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
         # self._optical_flow.draw(rect)
+        # self._optical_flow.draw_input(rect)
         # self.curr_image.draw(rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
@@ -84,6 +85,11 @@ class OpticalFlowLayer(LayerBase):
         self._optical_flow.set(self.curr_image)
         self._optical_flow.update()
 
+        self._velocity_viz.config.mode = VisualizationMode.ARROW_FIELD
+        self._velocity_viz.config.scale = 3.0
+        self._velocity_viz.config.arrow_scale = 10.5
+        self._velocity_viz.config.grid_spacing = 10
+
         # Visualize velocity field
         self._velocity_viz.set(self._optical_flow.output)
         self._velocity_viz.update()
@@ -96,11 +102,3 @@ class OpticalFlowLayer(LayerBase):
     def get_fbo(self) -> Fbo:
         return self._fbo
 
-    # Config access for GUI
-    @property
-    def optical_flow_config(self) -> OpticalFlowConfig:
-        return self._optical_flow.config
-
-    @property
-    def velocity_config(self) -> VelocityConfig:
-        return self._velocity_viz.config

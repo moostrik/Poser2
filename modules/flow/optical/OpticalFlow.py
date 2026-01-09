@@ -11,8 +11,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Texture import Texture
 
 from .. import FlowBase, FlowConfigBase, FlowUtil
-from ..shaders import RGB2Luminance
-from .shaders.OpticalFlow import OpticalFlow as OpticalFlowShader
+from .shaders import Luminance, OpticalFlow as OpticalFlowShader
 
 
 @dataclass
@@ -62,7 +61,7 @@ class OpticalFlow(FlowBase):
 
         # Shaders
         self._optical_flow_shader: OpticalFlowShader = OpticalFlowShader()
-        self._rgb2lum_shader: RGB2Luminance = RGB2Luminance()
+        self._luminance_shader: Luminance = Luminance()
 
     @property
     def velocity(self) -> Texture:
@@ -71,7 +70,7 @@ class OpticalFlow(FlowBase):
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate optical flow layer."""
         self._optical_flow_shader.allocate()
-        self._rgb2lum_shader.allocate()
+        self._luminance_shader.allocate()
 
         super().allocate(width, height, output_width, output_height)
 
@@ -82,7 +81,7 @@ class OpticalFlow(FlowBase):
         """Release all resources."""
         super().deallocate()
         self._optical_flow_shader.deallocate()
-        self._rgb2lum_shader.deallocate()
+        self._luminance_shader.deallocate()
 
 
     def update(self) -> None:
@@ -117,12 +116,11 @@ class OpticalFlow(FlowBase):
             power=power
         )
 
-    def set(self, texture: Texture, is_luminance: bool = False) -> None:
+    def set(self, texture: Texture) -> None:
         """Set input frame texture.
 
         Args:
-            texture: Input texture (RGB or luminance)
-            is_luminance: If True, skip RGB to luminance conversion
+            texture: Input texture (will be converted to luminance)
         """
         if not self._allocated:
             return
@@ -131,12 +129,8 @@ class OpticalFlow(FlowBase):
         self.input_fbo.swap()
         current_frame_fbo = self.input_fbo.fbos[self.input_fbo.swap_state]
 
-        if is_luminance:
-            # Direct copy to input_fbo
-            FlowUtil.stretch(current_frame_fbo, texture)
-        else:
-            # Convert RGB to luminance, store in input_fbo
-            self._rgb2lum_shader.use(current_frame_fbo, texture)
+        # Convert RGB to luminance with Y-flip for Image textures
+        self._luminance_shader.use(current_frame_fbo, texture, flip_y=True)
 
         self._frame_count += 1
         self._needs_update = True

@@ -100,12 +100,14 @@ class Velocity(FlowBase):
         fbo.clear(0.0, 0.0, 0.0, 0.0)
 
         if self.config.mode == VisualizationMode.DIRECTION_MAP:
+            self._direction_shader.reload()
             self._direction_shader.use(
                 fbo,
                 self._velocity_texture,
                 self.config.scale
             )
         else:  # ARROW_FIELD
+            self._arrow_shader.reload()
             self._arrow_shader.use(
                 fbo,
                 self._velocity_texture,

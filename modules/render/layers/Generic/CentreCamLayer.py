@@ -212,13 +212,17 @@ class CentreCamLayer(LayerBase):
 
         mask_crop_roi = Rect(
             x=self._shoulder_midpoint.x - mask_width * self.target_top.x,
-            y=self._shoulder_midpoint.y - mask_height * self.target_top.y,
+            y=1.0 - self._shoulder_midpoint.y - mask_height * (1.0 - self.target_top.y),
             width=mask_width,
             height=mask_height
         )
 
+        # Invert rotation center Y for flipped texture coordinate system
+        mask_rotation_center = Point2f(self._shoulder_midpoint.x, 1.0 - self._shoulder_midpoint.y)
+
+        # Negate rotation for flipped coordinate system
         self._roi_shader.use(self._mask_fbo.fbo_id, self._cam_mask.tex_id,
-                                      mask_crop_roi, mask_rotation, self._shoulder_midpoint, bbox_aspect, False, True)
+                                      mask_crop_roi, -mask_rotation, mask_rotation_center, bbox_aspect, False, False)
 
         # Blend frames with mask upscaling and blur
         self.blend_factor = 0.33

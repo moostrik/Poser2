@@ -9,15 +9,16 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo, Texture
 
 
-class RGB2Luminance(Shader):
-    """Convert RGB texture to luminance (grayscale)."""
+class Luminance(Shader):
+    """Convert RGB texture to luminance (grayscale) with optional Y-flip for Image textures."""
 
-    def use(self, target_fbo: Fbo, source_tex: Texture) -> None:
+    def use(self, target_fbo: Fbo, source_tex: Texture, flip_y: bool = False) -> None:
         """Render luminance to FBO.
 
         Args:
             target_fbo: Target framebuffer
             source_tex: Source RGB texture
+            flip_y: Flip texture coordinates vertically (True for Image textures)
         """
         if not self.allocated:
             return
@@ -33,6 +34,7 @@ class RGB2Luminance(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, source_tex.tex_id)
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
+        glUniform1i(glGetUniformLocation(self.shader_program, "flipV"), 1 if flip_y else 0)
 
         draw_quad()
 
