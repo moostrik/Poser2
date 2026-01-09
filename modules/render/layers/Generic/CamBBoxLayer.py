@@ -17,7 +17,7 @@ from modules.render.shaders import DrawRoi
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class PoseCamLayer(LayerBase):
+class CamBBoxLayer(LayerBase):
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, cam_texture: Texture) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
@@ -61,8 +61,4 @@ class PoseCamLayer(LayerBase):
 
         pose_rect = pose.bbox.to_rect()
 
-        # Use DrawRoi shader instead of image_renderer.draw_roi
         self._roi_shader.use(self._fbo.fbo_id, self._cam_texture.tex_id, pose_rect)
-
-    def get_fbo(self) -> Fbo:
-        return self._fbo

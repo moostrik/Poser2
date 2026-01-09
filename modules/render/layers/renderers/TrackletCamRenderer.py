@@ -14,7 +14,7 @@ from modules.render.layers.LayerBase import LayerBase, Rect
 
 
 
-class CamDepthTrackRenderer(LayerBase):
+class TrackletCamRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._data: DataHub = data
         self._cam_id: int = cam_id
@@ -28,7 +28,7 @@ class CamDepthTrackRenderer(LayerBase):
         if self._tracklets is None:
             return
         for depth_tracklet in self._tracklets or []:
-            CamDepthTrackRenderer.draw_depth_tracklet(depth_tracklet, rect.x, rect.y, rect.width, rect.height)
+            TrackletCamRenderer.draw_depth_tracklet(depth_tracklet, rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         self._tracklets: list[DepthTracklet] | None = self._data.get_item(DataHubType.depth_tracklet, self._cam_id)

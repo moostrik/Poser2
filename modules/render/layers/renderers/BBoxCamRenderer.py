@@ -1,6 +1,3 @@
-# Standard library imports
-import numpy as np
-
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
@@ -10,7 +7,7 @@ from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
 
 
-class CamBBoxRenderer(LayerBase):
+class BBoxCamRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: int = 2,
                  bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
         # for now make sure the pose meshes are for the correct data type

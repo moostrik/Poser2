@@ -148,7 +148,7 @@ class HDTRenderManager(RenderBase):
             dense_flow =    self.L[Layers.dense_flow][i] =  ls.DenseFlowRenderer(   i, self.data_hub)
             sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(    i, self.data_hub)
 
-            cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.CamBBoxRenderer(     i, self.data_hub,   PoseDataHubTypes.pose_I)
+            cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxCamRenderer(     i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=1.0)
             angle_data =    self.L[Layers.angle_data][i] =  ls.PDLayer(             i, self.data_hub)
             mtime_data =    self.L[Layers.mtime_data][i] =  ls.PoseMTimeRenderer(   i, self.data_hub,   PoseDataHubTypes.pose_I)
@@ -158,7 +158,7 @@ class HDTRenderManager(RenderBase):
             motion_bar =    self.L[Layers.motion_bar][i] =  ls.PoseBarMLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I,    FrameField.angle_motion, line_thickness=2.0, line_smooth=2.0)
             motion_sim =    self.L[Layers.motion_sim][i] =  ls.PoseBarSLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I)
 
-            box_cam =       self.L[Layers.box_cam][i] =     ls.PoseCamLayer(        i, self.data_hub,   PoseDataHubTypes.pose_I,    cam_image.texture)
+            box_cam =       self.L[Layers.box_cam][i] =     ls.CamBBoxLayer(        i, self.data_hub,   PoseDataHubTypes.pose_I,    cam_image.texture)
             box_pose_I =    self.L[Layers.box_pose_I][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I,    1.0, 0.0, True, False)
             box_pose_R =    self.L[Layers.box_pose_R][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_R,    0.5, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
 

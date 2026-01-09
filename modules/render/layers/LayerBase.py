@@ -28,4 +28,5 @@ class LayerBase(ABC):
 
     def draw(self, rect: Rect) -> None:
         """Default implementation: draw texture to rect."""
-        self.texture.draw(rect.x, rect.y, rect.width, rect.height)
+        if self.texture.allocated:
+            self.texture.draw(rect.x, rect.y, rect.width, rect.height)

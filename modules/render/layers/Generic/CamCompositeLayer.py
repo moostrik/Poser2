@@ -10,8 +10,9 @@ from modules.gl import Fbo, Texture
 from modules.DataHub import DataHub, PoseDataHubTypes
 from modules.render.layers.LayerBase import LayerBase, Rect
 
-from modules.render.layers.renderers import CamBBoxRenderer, CamDepthTrackRenderer, CamImageRenderer
-from modules.render.layers.generic.PoseLineLayer import PoseLineLayer
+from modules.render.layers.renderers.BBoxCamRenderer import BBoxCamRenderer
+from modules.render.layers.renderers.TrackletCamRenderer import TrackletCamRenderer
+from modules.render.layers.data.PoseLineLayer import PoseLineLayer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -25,9 +26,10 @@ class CamCompositeLayer(LayerBase):
         self._data_type: PoseDataHubTypes = data_type
 
         self._cam_texture: Texture = cam_texture
-        self._depth_track_renderer: CamDepthTrackRenderer = CamDepthTrackRenderer(cam_id, data)
-        self._pose_points_layer: PoseLineLayer = PoseLineLayer(cam_id, data, data_type, line_width, 0.0, False, True, None)
-        self._bbox_renderer: CamBBoxRenderer = CamBBoxRenderer(cam_id, data, data_type, int(line_width), (1.0, 1.0, 1.0, 1.0))
+        self._depth_track_renderer: TrackletCamRenderer = TrackletCamRenderer(cam_id, data)
+        self._bbox_renderer: BBoxCamRenderer = BBoxCamRenderer(cam_id, data, data_type, int(line_width), (1.0, 1.0, 1.0, 1.0))
+        # Pose Points Layer works on track id, not cam id -> fix
+        self._pose_line_layer: PoseLineLayer = PoseLineLayer(cam_id, data, data_type, line_width, 0.0, False, True, None)
 
         self.hot_reload = HotReloadMethods(self.__class__)
 
@@ -49,7 +51,7 @@ class CamCompositeLayer(LayerBase):
     @line_width.setter
     def line_width(self, value: float) -> None:
         self._line_width = value
-        self._pose_points_layer.line_width = value
+        self._pose_line_layer.line_width = value
         self._bbox_renderer.line_width = int(value)
 
     @property
@@ -63,19 +65,19 @@ class CamCompositeLayer(LayerBase):
         self._fbo.allocate(width, height, internal_format)
         self._depth_track_renderer.allocate()
         self._bbox_renderer.allocate()
-        self._pose_points_layer.allocate(width, height, internal_format)
+        self._pose_line_layer.allocate(width, height, internal_format)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._depth_track_renderer.deallocate()
         self._bbox_renderer.deallocate()
-        self._pose_points_layer.deallocate()
+        self._pose_line_layer.deallocate()
 
     def update(self) -> None:
         # Update all layers
         self._depth_track_renderer.update()
         self._bbox_renderer.update()
-        self._pose_points_layer.update()
+        self._pose_line_layer.update()
         self._bbox_renderer.bbox_color = (1.0, 1.0, 1.0, 1.0)  # Example: set bbox color to red
 
         glEnable(GL_BLEND)
@@ -89,5 +91,5 @@ class CamCompositeLayer(LayerBase):
         self._cam_texture.draw(full_rect.x, full_rect.y, full_rect.width, full_rect.height)
         self._depth_track_renderer.draw(full_rect)
         self._bbox_renderer.draw(full_rect)
-        self._pose_points_layer.draw(full_rect)
+        self._pose_line_layer.draw(full_rect)
         self._fbo.end()

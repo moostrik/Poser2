@@ -26,15 +26,6 @@ class CamImageRenderer(LayerBase):
         if self._image.allocated:
             self._image.deallocate()
 
-    def draw(self, rect: Rect) -> None:
-        if self._image.allocated:
-             self._image.draw(rect.x, rect.y, rect.width, rect.height)
-
-    def draw_roi(self, draw_rect: Rect, text_rect: Rect) -> None:
-        if self._image.allocated:
-             self._image.draw_roi(draw_rect.x, draw_rect.y, draw_rect.width, draw_rect.height,
-                                  text_rect.x, text_rect.y, text_rect.width, text_rect.height)
-
     def update(self) -> None:
         frame: np.ndarray | None = self._data.get_item(DataHubType.cam_image, self._cam_id)
 
