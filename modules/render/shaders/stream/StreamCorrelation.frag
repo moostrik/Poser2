@@ -10,7 +10,7 @@ in vec2     texCoord;
 out vec4    fragColor;
 
 void main() {
-    vec2    uv = vec2(texCoord.x, 1.0 - texCoord.y);
+    vec2    uv = texCoord;  // Top-left origin from vertex shader
 
     // Calculate stream ID
     int     stream_id = int(floor(uv.y / stream_step));

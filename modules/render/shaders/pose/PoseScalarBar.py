@@ -1,15 +1,16 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl import Fbo
 
 import numpy as np
 
 from modules.pose.features import PoseFeatureType as PoseFeatureUnion
 
 class PoseScalarBar(Shader):
-    def use(self, fbo: int, feature: PoseFeatureUnion, line_thickness: float = 0.1, line_smooth: float = 0.01,
+    def use(self, fbo: Fbo, feature: PoseFeatureUnion, line_thickness: float = 0.1, line_smooth: float = 0.01,
             color=(0.0, 0.5, 1.0, 1.0), color_odd=(1.0, 0.2, 0.0, 1.0), color_even=(1.0, 0.2, 0.0, 1.0)) -> None:
-        if not self.allocated: return
-        if not fbo: return
+        if not self.allocated or not self.shader_program: return
+        if not fbo.allocated: return
 
         # Flatten values and scores to pass to shader
         values: np.ndarray = np.nan_to_num(feature.values.astype(np.float32), nan=0.0)
@@ -19,62 +20,30 @@ class PoseScalarBar(Shader):
         min_range = max(min_range, -10.0)
         max_range = min(max_range, 10.0)
 
-        # Create buffer objects
-        vbo_values = glGenBuffers(1)
-        vbo_scores = glGenBuffers(1)
+        # Activate shader program
+        glUseProgram(self.shader_program)
 
-        # Create texture buffers
-        tex_values = glGenTextures(1)
-        tex_scores = glGenTextures(1)
+        # Set up render target
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
+        glViewport(0, 0, fbo.width, fbo.height)
 
-        # # Setup values buffer
-        glBindBuffer(GL_TEXTURE_BUFFER, vbo_values)
-        glBufferData(GL_TEXTURE_BUFFER, values.nbytes, values, GL_STATIC_DRAW)
-        glBindTexture(GL_TEXTURE_BUFFER, tex_values)
-        glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, vbo_values)
+        # Configure shader uniforms
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
+        glUniform1fv(glGetUniformLocation(self.shader_program, "values"), len(values), values)
+        glUniform1fv(glGetUniformLocation(self.shader_program, "scores"), len(scores), scores)
+        glUniform1i(glGetUniformLocation(self.shader_program, "num_joints"), len(feature))
+        glUniform1f(glGetUniformLocation(self.shader_program, "value_min"), min_range)
+        glUniform1f(glGetUniformLocation(self.shader_program, "value_max"), max_range)
+        glUniform1f(glGetUniformLocation(self.shader_program, "line_thickness"), line_thickness)
+        glUniform1f(glGetUniformLocation(self.shader_program, "line_smooth"), line_smooth)
+        glUniform4f(glGetUniformLocation(self.shader_program, "color"), *color)
+        glUniform4f(glGetUniformLocation(self.shader_program, "color_odd"), *color_odd)
+        glUniform4f(glGetUniformLocation(self.shader_program, "color_even"), *color_even)
 
-        # # Setup scores buffer
-        glBindBuffer(GL_TEXTURE_BUFFER, vbo_scores)
-        glBufferData(GL_TEXTURE_BUFFER, scores.nbytes, scores, GL_STATIC_DRAW)
-        glBindTexture(GL_TEXTURE_BUFFER, tex_scores)
-        glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, vbo_scores)
-
-        s = self.shader_program
-        glUseProgram(s)
-
-        # Pass uniforms to shader
-        glUniform1i(glGetUniformLocation(s, "num_joints"), len(feature))
-        glUniform1f(glGetUniformLocation(s, "value_min"), min_range)
-        glUniform1f(glGetUniformLocation(s, "value_max"), max_range)
-        glUniform1f(glGetUniformLocation(s, "line_thickness"), line_thickness)
-        glUniform1f(glGetUniformLocation(s, "line_smooth"), line_smooth)
-
-        # Pass color uniforms
-        glUniform4f(glGetUniformLocation(s, "color"), *color)
-        glUniform4f(glGetUniformLocation(s, "color_odd"), *color_odd)
-        glUniform4f(glGetUniformLocation(s, "color_even"), *color_even)
-
-        # Bind texture units
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_BUFFER, tex_values)
-        glUniform1i(glGetUniformLocation(s, "values_buffer"), 0)
-
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_BUFFER, tex_scores)
-        glUniform1i(glGetUniformLocation(s, "scores_buffer"), 1)
-
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo)
-        draw_quad()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-        glUseProgram(0)
+        # Render
+        draw_quad_pixels(fbo.width, fbo.height)
 
         # Cleanup
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_BUFFER, 0)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_BUFFER, 0)
-        glBindBuffer(GL_TEXTURE_BUFFER, 0)
-        glDeleteTextures(2, [tex_values, tex_scores])
-        glDeleteBuffers(2, [vbo_values, vbo_scores])
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)
 

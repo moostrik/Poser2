@@ -1,5 +1,6 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl import Fbo
 import numpy as np
 
 class RStream(Shader):
@@ -18,11 +19,9 @@ class RStream(Shader):
             glDeleteTextures(1, [self.texture_id])
             self.texture_id = None
 
-    def use(self, fbo_id: int, correlation_data: np.ndarray, pair_index: int, total_pairs: int,
-            line_color: tuple = (1.0, 1.0, 1.0), line_width: float = 5.0,
-            viewport_width: float = 800, viewport_height: float = 600) -> None:
-        if not self.allocated or not fbo_id or self.texture_id is None:
-            return
+    def use(self, fbo: Fbo, correlation_data: np.ndarray, pair_index: int, total_pairs: int,
+            line_color: tuple = (1.0, 1.0, 1.0), line_width: float = 5.0) -> None:
+        if not self.allocated or not self.shader_program or not fbo.allocated or self.texture_id is None: return
 
         # Upload correlation data to texture
         glActiveTexture(GL_TEXTURE0)
@@ -38,22 +37,27 @@ class RStream(Shader):
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
 
-        # Use shader program
-        s = self.shader_program
-        glUseProgram(s)
+        # Activate shader program
+        glUseProgram(self.shader_program)
 
-        # Set uniforms
-        glUniform1i(glGetUniformLocation(s, "correlationTexture"), 0)
-        glUniform3f(glGetUniformLocation(s, "lineColor"), *line_color)
-        glUniform1f(glGetUniformLocation(s, "lineWidth"), line_width)
-        glUniform2f(glGetUniformLocation(s, "viewportSize"), viewport_width, viewport_height)
-        glUniform1i(glGetUniformLocation(s, "pairIndex"), pair_index)
-        glUniform1i(glGetUniformLocation(s, "totalPairs"), total_pairs)
+        # Set up render target
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
+        glViewport(0, 0, fbo.width, fbo.height)
 
-        # Render to FBO
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo_id)
-        draw_quad()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        # Configure shader uniforms
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
+        glUniform1i(glGetUniformLocation(self.shader_program, "correlationTexture"), 0)
+        glUniform3f(glGetUniformLocation(self.shader_program, "lineColor"), *line_color)
+        glUniform1f(glGetUniformLocation(self.shader_program, "lineWidth"), line_width)
+        glUniform2f(glGetUniformLocation(self.shader_program, "viewportSize"), float(fbo.width), float(fbo.height))
+        glUniform1i(glGetUniformLocation(self.shader_program, "pairIndex"), pair_index)
+        glUniform1i(glGetUniformLocation(self.shader_program, "totalPairs"), total_pairs)
 
-        glUseProgram(0)
+        # Render
+        draw_quad_pixels(fbo.width, fbo.height)
+
+        # Cleanup
+        glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)

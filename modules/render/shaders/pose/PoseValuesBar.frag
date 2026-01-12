@@ -4,8 +4,8 @@ uniform int num_values;
 uniform float line_thickness = 0.001;
 uniform float line_smooth = 0.001;
 
-uniform samplerBuffer values_buffer;
-uniform samplerBuffer colors_buffer;
+uniform float values[256];
+uniform vec4 colors[256];
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -14,8 +14,8 @@ void main() {
     float step_width = 1.0 / float(num_values);
     int step_index = int(texCoord.x / step_width);
 
-    float value = texelFetch(values_buffer, step_index).r;
-    vec4 color = texelFetch(colors_buffer, step_index);
+    float value = values[step_index];
+    vec4 color = colors[step_index];
 
     // Draw a thick horizontal line at normalized_value with smooth edges inward
 

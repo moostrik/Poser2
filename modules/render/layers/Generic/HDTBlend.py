@@ -133,11 +133,11 @@ class SimilarityBlend(LayerBase):
 
         self._blend_shader.reload()
 
-        self._blend_shader.use(self._fbo.fbo_id,
-                               cam.tex_id,               self._cam_other_1_fbo.tex_id,   self._cam_other_2_fbo.tex_id,
-                               mask.tex_id,              mask_other_1.tex_id,            mask_other_2.tex_id,
-                               alpha,                    alpha_1,                        alpha_2,
-                               colors[self._cam_id],     colors[other_1_index],          colors[other_2_index]
+        self._blend_shader.use(self._fbo,
+                               cam,                     self._cam_other_1_fbo,  self._cam_other_2_fbo,
+                               mask,                    mask_other_1,           mask_other_2,
+                               alpha,                   alpha_1,                alpha_2,
+                               colors[self._cam_id],    colors[other_1_index],  colors[other_2_index]
                                )
 
 

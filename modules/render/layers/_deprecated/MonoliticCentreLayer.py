@@ -14,8 +14,8 @@ from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.render.layers.LayerBase import LayerBase
-from modules.render.layers.source import ImageSourceLayer
-from modules.render.layers.source import MaskSourceLayer
+from modules.render.layers.source.ImageSourceLayer import ImageSourceLayer
+from modules.render.layers.source.MaskSourceLayer import MaskSourceLayer
 from modules.render.shaders import Blend, DrawRoi, MaskAA, MaskApply, MaskBlend, MaskBlur, PosePointLines
 from modules.utils.PointsAndRects import Rect, Point2f
 
@@ -193,13 +193,13 @@ class CentreCamLayer(LayerBase):
         self._rotation, _, self._crop_roi = CentreCamLayer._calculate_roi(
             cam_top, cam_bot, self.target_top, target_distance, self.dst_aspectratio
         )
-        self._roi_shader.use(self._cam_fbo.fbo_id, self._cam_image.texture.tex_id,
+        self._roi_shader.use(self._cam_fbo, self._cam_image.texture,
                                       self._crop_roi, self._rotation, cam_top, cam_aspect, False, True)
 
         # Blend frames
         self.blend_factor = 0.5
         self._cam_blend_fbo.swap()
-        self._blend_shader.use(self._cam_blend_fbo.fbo_id, self._cam_blend_fbo.back_tex_id,self._cam_fbo.tex_id, self.blend_factor)
+        self._blend_shader.use(self._cam_blend_fbo, self._cam_blend_fbo.back_texture, self._cam_fbo.texture, self.blend_factor)
 
         # Render mask with ROI
         bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
@@ -222,14 +222,14 @@ class CentreCamLayer(LayerBase):
         mask_rotation_center = Point2f(self._shoulder_midpoint.x, 1.0 - self._shoulder_midpoint.y)
 
         # Negate rotation for flipped coordinate system
-        self._roi_shader.use(self._mask_fbo.fbo_id, self._cam_mask.texture.tex_id,
+        self._roi_shader.use(self._mask_fbo, self._cam_mask.texture,
                                       mask_crop_roi, -mask_rotation, mask_rotation_center, bbox_aspect, False, False)
 
         # Blend frames with mask upscaling and blur
         self.blend_factor = 0.33
         self._mask_blend_fbo.swap()
-        self._mask_blend_shader.use(self._mask_blend_fbo.fbo_id, self._mask_blend_fbo.back_tex_id, self._mask_fbo.tex_id, self.blend_factor)
-        self._mask_AA_shader.use(self._mask_AA_fbo.fbo_id, self._mask_blend_fbo.tex_id)
+        self._mask_blend_shader.use(self._mask_blend_fbo, self._mask_blend_fbo.back_texture, self._mask_fbo.texture, self.blend_factor)
+        self._mask_AA_shader.use(self._mask_AA_fbo, self._mask_blend_fbo.texture)
 
         self._mask_blur_fbo.begin()
         self._mask_AA_fbo.draw(0, 0, self._mask_blur_fbo.width, self._mask_blur_fbo.height)
@@ -239,11 +239,11 @@ class CentreCamLayer(LayerBase):
         blur_radius = 8.0
         for i in range(blur_steps):
             self._mask_blur_fbo.swap()
-            self._mask_blur_shader.use(self._mask_blur_fbo.fbo_id, self._mask_blur_fbo.back_tex_id, True, blur_radius)
+            self._mask_blur_shader.use(self._mask_blur_fbo, self._mask_blur_fbo.back_texture, True, blur_radius)
             self._mask_blur_fbo.swap()
-            self._mask_blur_shader.use(self._mask_blur_fbo.fbo_id, self._mask_blur_fbo.back_tex_id, False, blur_radius)
+            self._mask_blur_shader.use(self._mask_blur_fbo, self._mask_blur_fbo.back_texture, False, blur_radius)
 
-        self._mask_shader.use(self._fbo.fbo_id, self._cam_blend_fbo.tex_id, self._mask_blur_fbo.tex_id)
+        self._mask_shader.use(self._fbo, self._cam_blend_fbo.texture, self._mask_blur_fbo.texture)
 
 
         # Transform and render pose points
@@ -256,7 +256,7 @@ class CentreCamLayer(LayerBase):
         line_width: float = 50.0 / self._point_fbo.height
         line_smooth: float = 25.0 / self._point_fbo.height
         self._point_fbo.clear(0.0, 0.0, 0.0, 0.0)
-        self._point_shader.use(self._point_fbo.fbo_id, self._transformed_points, line_width=line_width, line_smooth=line_smooth)
+        self._point_shader.use(self._point_fbo, self._transformed_points, line_width=line_width, line_smooth=line_smooth)
 
 
         glEnable(GL_BLEND)

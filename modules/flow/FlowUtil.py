@@ -20,8 +20,7 @@ class FlowUtil:
             fbo: Fbo or SwapFbo to clear
         """
         if isinstance(fbo, SwapFbo):
-            fbo.fbos[0].clear(0.0, 0.0, 0.0, 0.0)
-            fbo.fbos[1].clear(0.0, 0.0, 0.0, 0.0)
+            fbo.clear_all(0.0, 0.0, 0.0, 0.0)
         else:
             fbo.clear(0.0, 0.0, 0.0, 0.0)
 
@@ -33,8 +32,7 @@ class FlowUtil:
             fbo: Fbo or SwapFbo to fill
         """
         if isinstance(fbo, SwapFbo):
-            fbo.fbos[0].clear(1.0, 1.0, 1.0, 1.0)
-            fbo.fbos[1].clear(1.0, 1.0, 1.0, 1.0)
+            fbo.clear_all(1.0, 1.0, 1.0, 1.0)
         else:
             fbo.clear(1.0, 1.0, 1.0, 1.0)
 
@@ -103,14 +101,10 @@ class FlowUtil:
             FlowUtil._add_shader = AddMultiplied()
             FlowUtil._add_shader.allocate()
 
-        # Swap and get FBOs
+        # Swap and add: curr = prev + (src * strength)
         dst_fbo.swap()
-        prev_fbo = dst_fbo.fbos[1 - dst_fbo.swap_state]
-        curr_fbo = dst_fbo.fbos[dst_fbo.swap_state]
-
-        # Add: curr = prev + (src * strength)
         FlowUtil._add_shader.use(
-            curr_fbo, prev_fbo, src_texture,
+            dst_fbo, dst_fbo.back_texture, src_texture,
             strength0=1.0, strength1=strength
         )
 

@@ -6,8 +6,8 @@ uniform float value_max;
 uniform float line_thickness = .001;
 uniform float line_smooth = 0.1;
 
-uniform samplerBuffer values_buffer;
-uniform samplerBuffer scores_buffer;
+uniform float values[32];
+uniform float scores[32];
 
 // Add these uniforms for color control
 uniform vec4 color;
@@ -25,8 +25,8 @@ void main() {
         discard;
     }
 
-    float value = texelFetch(values_buffer, joint_index).r;
-    float score = texelFetch(scores_buffer, joint_index).r;
+    float value = values[joint_index];
+    float score = scores[joint_index];
 
     float normalized_value = (value - value_min) / (value_max - value_min);
     normalized_value = clamp(normalized_value, 0.0, 1.0);

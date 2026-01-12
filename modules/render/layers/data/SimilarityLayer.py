@@ -85,10 +85,10 @@ class SimilarityLayer(LayerBase):
 
         pair_arrays: list[np.ndarray] = [stream_data.get_similarities(pair_id) for pair_id in pairs]
         image_np: np.ndarray = self._shader.r_stream_to_image(pair_arrays, self._num_streams)
-        self._image.set_image(image_np)
+        self._image.set_image(image_np) # should the shader return the image?
         self._image.update()
 
-        self._shader.use(self._fbo.fbo_id, self._image.tex_id, self._image.width, self._image.height, 1.5 / self._fbo.height)
+        self._shader.use(self._fbo, self._image.texture, self._image.width, self._image.height, 1.5 / self._fbo.height)
 
         step: float = self._fbo.height / self._num_streams
 

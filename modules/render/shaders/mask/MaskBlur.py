@@ -1,33 +1,41 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl import Fbo, Texture
 
 class MaskBlur(Shader):
-    def use(self, fbo, tex0, horizontal: bool = True, radius: float = 1.0, texel_size: tuple[float, float] | None = None) -> None:
-        if not self.allocated: return
-        if not fbo or not tex0: return
+    def use(self, fbo: Fbo, tex0: Texture, horizontal: bool = True, radius: float = 1.0, texel_size: tuple[float, float] | None = None) -> None:
+        if not self.allocated or not self.shader_program: return
+        if not fbo.allocated or not tex0.allocated: return
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex0)
         if texel_size is None:
-            width = glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH)
-            height = glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT)
-            texel_size = (1.0 / width, 1.0 / height)
+            texel_size = (1.0 / tex0.width, 1.0 / tex0.height)
 
         # Set direction based on horizontal flag
         direction = (1.0, 0.0) if horizontal else (0.0, 1.0)
 
-        s = self.shader_program
-        glUseProgram(s)
-        glUniform1i(glGetUniformLocation(s, "tex0"), 0)
-        glUniform2f(glGetUniformLocation(s, "direction"), direction[0], direction[1])
-        glUniform2f(glGetUniformLocation(s, "texelSize"), texel_size[0], texel_size[1])
-        glUniform1f(glGetUniformLocation(s, "blurRadius"), radius)
+        # Activate shader program
+        glUseProgram(self.shader_program)
 
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo)
-        draw_quad()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        # Set up render target
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
+        glViewport(0, 0, fbo.width, fbo.height)
 
-        glUseProgram(0)
+        # Bind input texture
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
+        # Configure shader uniforms
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
+        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
+        glUniform2f(glGetUniformLocation(self.shader_program, "direction"), direction[0], direction[1])
+        glUniform2f(glGetUniformLocation(self.shader_program, "texelSize"), texel_size[0], texel_size[1])
+        glUniform1f(glGetUniformLocation(self.shader_program, "blurRadius"), radius)
+
+        # Render
+        draw_quad_pixels(fbo.width, fbo.height)
+
+        # Cleanup
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)

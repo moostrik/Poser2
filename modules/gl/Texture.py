@@ -97,6 +97,11 @@ class Texture():
         self.data_type: Constant = GL_NONE
         self.tex_id = 0
 
+    @property
+    def texture(self) -> 'Texture':
+        """Convenience property for interface compatibility."""
+        return self
+
     def allocate(self, width: int, height: int, internal_format,
                  wrap_s: int = GL_CLAMP_TO_EDGE,
                  wrap_t: int = GL_CLAMP_TO_EDGE,

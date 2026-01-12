@@ -83,9 +83,8 @@ class PoseBarADLayer(LayerBase):
         line_thickness = 1.0 / self._fbo.height * self.line_thickness
         line_smooth = 1.0 / self._fbo.height * self.line_smooth
 
-        PoseBarADLayer.pose_feature_shader.use(self._fbo.fbo_id, pose.angles, pose.angle_vel,
-                                                       line_thickness, line_smooth,
-                                                       (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
+        PoseBarADLayer.pose_feature_shader.use(self._fbo, pose.angles, pose.angle_vel, line_thickness, line_smooth,
+                                               (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
 
         joint_enum_type = pose.angles.__class__.enum()
         num_joints: int = len(pose.angles)

@@ -96,17 +96,16 @@ class OpticalFlow(FlowBase):
             FlowUtil.zero(self.output_fbo)
             return
 
-        # Get current and previous frames from input_fbo
-        curr_frame = self.input_fbo.fbos[self.input_fbo.swap_state]
-        prev_frame = self.input_fbo.fbos[not self.input_fbo.swap_state]
+        # Get current and previous frames from input_fbo using properties
+        curr_frame = self.input_fbo.texture      # Current buffer (Fbo)
+        prev_frame = self.input_fbo.back_texture # Previous buffer (Fbo)
 
         # Compute optical flow using config values
         power = 1.0 - self.config.boost
 
-        output_target = self.output_fbo.fbos[self.output_fbo.swap_state]
-
+        # Pass output_fbo directly since it's now a Fbo
         self._optical_flow_shader.use(
-            output_target,
+            self.output_fbo,
             curr_frame,
             prev_frame,
             offset=self.config.offset,
@@ -127,10 +126,9 @@ class OpticalFlow(FlowBase):
 
         # Swap to next frame slot in input_fbo
         self.input_fbo.swap()
-        current_frame_fbo = self.input_fbo.fbos[self.input_fbo.swap_state]
 
         # Convert RGB to luminance with Y-flip for Image textures
-        self._luminance_shader.use(current_frame_fbo, texture, flip_y=True)
+        self._luminance_shader.use(self.input_fbo, texture)
 
         self._frame_count += 1
         self._needs_update = True

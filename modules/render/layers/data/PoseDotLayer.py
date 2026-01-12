@@ -63,4 +63,4 @@ class PoseDotLayer(LayerBase):
         dot_size: float = 1.0 / self._fbo.height * self.dot_size * 2
         dot_smooth: float = 1.0 / self._fbo.height * self.dot_smooth * 2
 
-        self._shader.use(self._fbo.fbo_id, pose.points, dot_size=dot_size, dot_smooth=dot_smooth)
+        self._shader.use(self._fbo, pose.points, dot_size=dot_size, dot_smooth=dot_smooth)

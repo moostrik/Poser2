@@ -75,4 +75,4 @@ class ElectricLayer(LayerBase):
         line_width: float = 1.0 / self._fbo.height * self.line_width * 2
         line_smooth: float = 1.0 / self._fbo.height * self.line_smooth * 2
 
-        self._shader.use(self._fbo.fbo_id, centre_pose)
+        self._shader.use(self._fbo, centre_pose)

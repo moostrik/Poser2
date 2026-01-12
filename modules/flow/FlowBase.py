@@ -86,7 +86,7 @@ class FlowBase(ABC):
         """
         if not self._allocated:
             return
-        FlowUtil.stretch(self.input_fbo.fbos[self.input_fbo.swap_state], texture)
+        FlowUtil.stretch(self.input_fbo, texture)
 
     def add(self, texture: Texture, strength: float = 1.0) -> None:
         """Add to input FBO with strength multiplier.

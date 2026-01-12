@@ -6,8 +6,8 @@ uniform float value_max;
 uniform float line_thickness = 0.001;
 uniform float line_smooth = 0.001;
 
-uniform samplerBuffer values_buffer;
-uniform samplerBuffer scores_buffer;
+uniform float values[32];
+uniform float scores[32];
 
 // Add these uniforms for color control
 uniform vec4 color;
@@ -29,8 +29,8 @@ void main() {
         return;
     }
 
-    float value = texelFetch(values_buffer, joint_index).r;
-    float score = texelFetch(scores_buffer, joint_index).r;
+    float value = values[joint_index];
+    float score = scores[joint_index];
 
     if (score <= 0.0) {
         fragColor = bg_color;

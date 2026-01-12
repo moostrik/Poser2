@@ -125,6 +125,6 @@ class MotionMultiply(LayerBase):
         mask.draw(0, 0, self._mask_fbo.width, self._mask_fbo.height)
         self._mask_fbo.end()
 
-        self._shader.use(self._fbo.fbo_id, cam.tex_id, mask.tex_id, motion)
+        self._shader.use(self._fbo, cam, mask, motion)
         glEnable(GL_BLEND)
         glColor4f(1.0, 1.0, 1.0, 1.0)

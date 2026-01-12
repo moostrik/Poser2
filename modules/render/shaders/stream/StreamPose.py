@@ -1,34 +1,42 @@
 from OpenGL.GL import * # type: ignore
-from OpenGL.GL.shaders import ShaderProgram # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl import Fbo, Texture
 
 from modules.pose.pd_stream.PDStream import PDStreamData
 import numpy as np
 
 class StreamPose(Shader):
-    def use(self, fbo: int, tex0: int, num_samples: int, num_streams: int, line_width: float) -> None :
-        if not self.allocated: return
-        if not fbo or not tex0: return
-        s: ShaderProgram | None = self.shader_program
-        if s is None: return
+    def use(self, fbo: Fbo, tex0: Texture, num_samples: int, num_streams: int, line_width: float) -> None:
+        if not self.allocated or not self.shader_program: return
+        if not fbo.allocated or not tex0.allocated: return
 
+        # Activate shader program
+        glUseProgram(self.shader_program)
+
+        # Set up render target
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
+        glViewport(0, 0, fbo.width, fbo.height)
+
+        # Bind input texture
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex0)
+        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        glUseProgram(s)
-        glUniform1i(glGetUniformLocation(s, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(s, "sample_step"), 1.0  / num_samples)
-        glUniform1i(glGetUniformLocation(s, "num_streams"), num_streams)
-        glUniform1f(glGetUniformLocation(s, "stream_step"), 1.0  / num_streams)
-        glUniform1f(glGetUniformLocation(s, "line_width"),  line_width)
+        # Configure shader uniforms
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
+        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
+        glUniform1f(glGetUniformLocation(self.shader_program, "sample_step"), 1.0 / num_samples)
+        glUniform1i(glGetUniformLocation(self.shader_program, "num_streams"), num_streams)
+        glUniform1f(glGetUniformLocation(self.shader_program, "stream_step"), 1.0 / num_streams)
+        glUniform1f(glGetUniformLocation(self.shader_program, "line_width"), line_width)
 
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo)
-        draw_quad()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        # Render
+        draw_quad_pixels(fbo.width, fbo.height)
 
-        glUseProgram(0)
-
+        # Cleanup
+        glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)
 
 
     @staticmethod

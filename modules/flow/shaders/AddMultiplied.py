@@ -5,7 +5,7 @@ Ported from ofxFlowTools ftAddMultipliedShader.h
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl.Shader import Shader, draw_quad_pixels
 from modules.gl import Fbo, Texture
 
 
@@ -23,34 +23,36 @@ class AddMultiplied(Shader):
             strength0: Multiplier for first texture
             strength1: Multiplier for second texture
         """
-        if not self.allocated:
-            return
-        if self.shader_program is None:
-            return
+        if not self.allocated or not self.shader_program: return
+        if not target_fbo.allocated or not tex0.allocated or not tex1.allocated: return
 
-        glBindFramebuffer(GL_FRAMEBUFFER, target_fbo.fbo_id)
-        glViewport(0, 0, target_fbo.width, target_fbo.height)
-        glDisable(GL_BLEND)
-
+        # Activate shader program
         glUseProgram(self.shader_program)
 
+        # Set up render target
+        glBindFramebuffer(GL_FRAMEBUFFER, target_fbo.fbo_id)
+        glViewport(0, 0, target_fbo.width, target_fbo.height)
+
+        # Bind input textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, tex1.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
 
+        # Configure shader uniforms
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(target_fbo.width), float(target_fbo.height))
+        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
+        glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
         glUniform1f(glGetUniformLocation(self.shader_program, "strength0"), strength0)
         glUniform1f(glGetUniformLocation(self.shader_program, "strength1"), strength1)
 
-        draw_quad()
+        # Render
+        draw_quad_pixels(target_fbo.width, target_fbo.height)
 
-        glEnable(GL_BLEND)
-        glUseProgram(0)
+        # Cleanup
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)

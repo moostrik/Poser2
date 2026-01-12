@@ -22,7 +22,7 @@ bool isBetweenStreamLine(vec2 uv, float stream_step, float line_width, int num_s
 
 
 void main() {
-    vec2    uv = vec2(texCoord.x, 1.0 - texCoord.y);
+    vec2    uv = texCoord;  // Top-left origin from vertex shader
 
     if (isBetweenStreamLine(uv, stream_step, line_width, num_streams)) {
         fragColor = vec4(1.0, 1.0, 1.0, 1.0); // White line

@@ -5,7 +5,7 @@ Ported from ofxFlowTools ftOpticalFlowShader.h
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl.Shader import Shader, draw_quad_pixels
 from modules.gl import Fbo, Texture
 
 
@@ -27,45 +27,42 @@ class OpticalFlow(Shader):
             strength_y: Y velocity multiplier (-10.0 to 10.0, negative inverts)
             power: Power curve for magnitude (related to boost)
         """
-        if not self.allocated:
-            return
-        if self.shader_program is None:
-            return
+        if not self.allocated or not self.shader_program: return
+        if not target_fbo.allocated or not curr_tex.allocated or not prev_tex.allocated: return
 
-        glBindFramebuffer(GL_FRAMEBUFFER, target_fbo.fbo_id)
-        glViewport(0, 0, target_fbo.width, target_fbo.height)
-        glDisable(GL_BLEND)
-
+        # Activate shader program
         glUseProgram(self.shader_program)
 
-        # Bind textures
+        # Set up render target
+        glBindFramebuffer(GL_FRAMEBUFFER, target_fbo.fbo_id)
+        glViewport(0, 0, target_fbo.width, target_fbo.height)
+
+        # Bind input textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, curr_tex.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, prev_tex.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
 
-        # Convert pixel offset to normalized coordinates (shader responsibility)
+        # Configure shader uniforms
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(target_fbo.width), float(target_fbo.height))
+        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
+        glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
         glUniform2f(
             glGetUniformLocation(self.shader_program, "offset"),
             float(offset) / target_fbo.width,
             float(offset) / target_fbo.height
         )
         glUniform1f(glGetUniformLocation(self.shader_program, "threshold"), threshold)
-
-        # Strength includes direction (negative = inverted)
         glUniform2f(glGetUniformLocation(self.shader_program, "force"), strength_x, strength_y)
-
         glUniform1f(glGetUniformLocation(self.shader_program, "power"), power)
 
-        draw_quad()
+        # Render
+        draw_quad_pixels(target_fbo.width, target_fbo.height)
 
-        glEnable(GL_BLEND)
-        glUseProgram(0)
+        # Cleanup
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)

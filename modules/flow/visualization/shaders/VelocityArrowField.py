@@ -5,7 +5,7 @@ Ported from ofxFlowTools visualization concepts.
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl.Shader import Shader, draw_quad_pixels
 from modules.gl import Fbo, Texture
 
 
@@ -27,31 +27,33 @@ class VelocityArrowField(Shader):
             arrow_scale: Arrow length in pixels (e.g., 50 = 50 pixel long arrows)
             arrow_thickness: Arrow line thickness in pixels
         """
-        if not self.allocated:
-            return
-        if self.shader_program is None:
-            return
+        if not self.allocated or not self.shader_program: return
+        if not target_fbo.allocated or not velocity_tex.allocated: return
 
+        # Activate shader program
+        glUseProgram(self.shader_program)
+
+        # Set up render target
         glBindFramebuffer(GL_FRAMEBUFFER, target_fbo.fbo_id)
         glViewport(0, 0, target_fbo.width, target_fbo.height)
 
-        glUseProgram(self.shader_program)
-
+        # Bind input texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity_tex.tex_id)
+
+        # Configure shader uniforms
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(target_fbo.width), float(target_fbo.height))
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
         glUniform1f(glGetUniformLocation(self.shader_program, "scale"), scale)
         glUniform1f(glGetUniformLocation(self.shader_program, "grid_spacing"), spacing)
         glUniform1f(glGetUniformLocation(self.shader_program, "arrow_length"), arrow_length)
         glUniform1f(glGetUniformLocation(self.shader_program, "arrow_thickness"), arrow_thickness)
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"),
-                    float(target_fbo.width), float(target_fbo.height))
 
-        # Debug output
-        # print(f"Arrow uniforms: scale={scale}, grid_spacing={grid_spacing}, arrow_scale={arrow_scale}, arrow_thickness={arrow_thickness}")
+        # Render
+        draw_quad_pixels(target_fbo.width, target_fbo.height)
 
-        draw_quad()
-
-        glUseProgram(0)
+        # Cleanup
+        glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)

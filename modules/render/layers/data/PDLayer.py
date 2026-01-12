@@ -72,7 +72,7 @@ class PDLayer(LayerBase):
         self._image.set_image(stream_image)
         self._image.update()
 
-        self._shader.use(self._fbo.fbo_id, self._image.tex_id, self._image.width, self._image.height, line_width=1.5 / self._fbo.height)
+        self._shader.use(self._fbo, self._image, self._image.width, self._image.height, line_width=1.5 / self._fbo.height)
 
     @staticmethod
     def render_labels(fbo: Fbo) -> None:

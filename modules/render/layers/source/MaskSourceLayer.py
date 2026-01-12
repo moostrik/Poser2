@@ -74,4 +74,4 @@ class MaskSourceLayer(LayerBase):
 
             for i in range(self.dilatations):
                 self._fbo.swap()
-                self._dilate_shader.use(self._fbo.fbo_id, self._fbo.back_tex_id, 1.0)
+                self._dilate_shader.use(self._fbo, self._fbo.back_texture, 1.0)

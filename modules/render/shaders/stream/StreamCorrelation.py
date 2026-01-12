@@ -1,5 +1,6 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl import Fbo, Texture
 import numpy as np
 
 
@@ -8,45 +9,47 @@ class StreamCorrelation(Shader):
     SIMILARITY_CHANNEL = 0  # Similarity values
     MASK_CHANNEL = 1        # Valid mask (1.0 = valid, 0.0 = NaN)
 
-    def use(self, fbo: int, tex0: int, num_samples: int, num_streams: int, line_width: float) -> None:
+    def use(self, fbo: Fbo, tex0: Texture, num_samples: int, num_streams: int, line_width: float) -> None:
         """Render correlation streams using shader.
 
         Args:
-            fbo: Target framebuffer ID (0 = default framebuffer)
-            tex0: Source texture ID containing stream data
+            fbo: Target framebuffer object
+            tex0: Source texture object containing stream data
             num_samples: Width of texture (capacity)
             num_streams: Height of texture (number of pairs)
             line_width: Line width in normalized coordinates
         """
 
-        # Guard clauses
-        if not self.allocated:
-            return
-        if not tex0:
-            return
-        if self.shader_program is None:
-            return
+        if not self.allocated or not self.shader_program: return
+        if not fbo.allocated or not tex0.allocated: return
 
-        # Bind texture
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, tex0)
-
-        # Setup shader
+        # Activate shader program
         glUseProgram(self.shader_program)
+
+        # Set up render target
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
+        glViewport(0, 0, fbo.width, fbo.height)
+
+        # Bind input texture
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
+
+        # Configure shader uniforms
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
         glUniform1f(glGetUniformLocation(self.shader_program, "sample_step"), 1.0 / num_samples)
         glUniform1i(glGetUniformLocation(self.shader_program, "num_streams"), num_streams)
         glUniform1f(glGetUniformLocation(self.shader_program, "stream_step"), 1.0 / num_streams)
         glUniform1f(glGetUniformLocation(self.shader_program, "line_width"), line_width)
 
-        # Render to FBO
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo)
-        draw_quad()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        # Render
+        draw_quad_pixels(fbo.width, fbo.height)
 
         # Cleanup
-        glUseProgram(0)
+        glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)
 
     @staticmethod
     def r_stream_to_image(pair_arrays: list[np.ndarray], num_streams: int) -> np.ndarray:

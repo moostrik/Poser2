@@ -71,4 +71,4 @@ class PoseLineLayer(LayerBase):
         line_width: float = 1.0 / self._fbo.height * self.line_width * 2
         line_smooth: float = 1.0 / self._fbo.height * self.line_smooth * 2
 
-        self._shader.use(self._fbo.fbo_id, pose.points, line_width=line_width, line_smooth=line_smooth, color=self.color, use_scores=self.use_scores)
+        self._shader.use(self._fbo, pose.points, line_width=line_width, line_smooth=line_smooth, color=self.color, use_scores=self.use_scores)

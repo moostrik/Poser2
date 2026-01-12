@@ -52,5 +52,5 @@ class WSLinesLayer(LayerBase):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.fbo_lines.begin()
-        self.lines_shader.use(self.fbo_lines.fbo_id, self.image.tex_id)
+        self.lines_shader.use(self.fbo_lines, self.image.texture)
         self.fbo_lines.end()

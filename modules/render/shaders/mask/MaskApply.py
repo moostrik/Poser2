@@ -1,29 +1,39 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
+from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl import Fbo, Texture
 
 class MaskApply(Shader):
-    def use(self, fbo, color, mask, multiply: float = 1.0) -> None :
-        if not self.allocated: return
-        if not fbo or not color or not mask: return
+    def use(self, fbo: Fbo, color: Texture, mask: Texture, multiply: float = 1.0) -> None:
+        if not self.allocated or not self.shader_program: return
+        if not fbo.allocated or not color.allocated or not mask.allocated: return
 
+        # Activate shader program
+        glUseProgram(self.shader_program)
+
+        # Set up render target
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
+        glViewport(0, 0, fbo.width, fbo.height)
+
+        # Bind input textures
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, color)
+        glBindTexture(GL_TEXTURE_2D, color.tex_id)
         glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, mask)
+        glBindTexture(GL_TEXTURE_2D, mask.tex_id)
 
-        s = self.shader_program
-        glUseProgram(s)
-        glUniform1i(glGetUniformLocation(s, "color"), 0)
-        glUniform1i(glGetUniformLocation(s, "mask"), 1)
-        glUniform1f(glGetUniformLocation(s, "multiply"), multiply)
+        # Configure shader uniforms
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
+        glUniform1i(glGetUniformLocation(self.shader_program, "color"), 0)
+        glUniform1i(glGetUniformLocation(self.shader_program, "mask"), 1)
+        glUniform1f(glGetUniformLocation(self.shader_program, "multiply"), multiply)
 
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo)
-        draw_quad()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        # Render
+        draw_quad_pixels(fbo.width, fbo.height)
 
-        glUseProgram(0)
-
+        # Cleanup
+        glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glUseProgram(0)
 

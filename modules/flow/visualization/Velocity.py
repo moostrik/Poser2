@@ -95,21 +95,19 @@ class Velocity(FlowBase):
 
         self._needs_update = False
 
-        # Get current output FBO
-        fbo: Fbo = self.output_fbo.fbos[self.output_fbo.swap_state]
-        fbo.clear(0.0, 0.0, 0.0, 0.0)
+        self.output_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
         if self.config.mode == VisualizationMode.DIRECTION_MAP:
             self._direction_shader.reload()
             self._direction_shader.use(
-                fbo,
+                self.output_fbo,
                 self._velocity_texture,
                 self.config.scale
             )
         else:  # ARROW_FIELD
             self._arrow_shader.reload()
             self._arrow_shader.use(
-                fbo,
+                self.output_fbo,
                 self._velocity_texture,
                 self.config.scale,
                 self.config.spacing,

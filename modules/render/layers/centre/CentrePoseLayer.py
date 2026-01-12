@@ -52,6 +52,6 @@ class CentrePoseLayer(LayerBase):
         line_width: float = 1.0 / self._fbo.height * self.line_width
         line_smooth: float = 1.0 / self._fbo.height * self.line_smooth
 
-        self._shader.use(self._fbo.fbo_id, transformed_points,
+        self._shader.use(self._fbo, transformed_points,
                         line_width=line_width, line_smooth=line_smooth,
                         color=self.color, use_scores=self.use_scores)

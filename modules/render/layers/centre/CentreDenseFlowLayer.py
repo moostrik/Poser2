@@ -69,8 +69,8 @@ class CentreDenseFlowLayer(LayerBase):
 
         # Render flow with ROI from anchor calculator (bbox-space geometry, like mask)
         self._roi_shader.use(
-            self._flow_fbo.fbo_id,
-            self._flow_texture.tex_id,
+            self._flow_fbo,
+            self._flow_texture,
             self._anchor_calc.bbox_crop_roi,
             self._anchor_calc.bbox_rotation,
             self._anchor_calc.bbox_rotation_center,
@@ -83,9 +83,9 @@ class CentreDenseFlowLayer(LayerBase):
         if self._mask_texture and self.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._mask_shader.use(
-                self._masked_fbo.fbo_id,
-                self._flow_fbo.tex_id,
-                self._mask_texture.tex_id,
+                self._masked_fbo,
+                self._flow_fbo,
+                self._mask_texture,
                 self.mask_opacity
             )
             self._output_fbo = self._masked_fbo
