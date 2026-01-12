@@ -6,24 +6,28 @@ from .centre.CentreMaskLayer import         CentreMaskLayer
 from .centre.CentrePoseLayer import         CentrePoseLayer
 from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer
 
-from .composite.CamCompositeLayer import    CamCompositeLayer
+from .flow.FlowSourceLayer import           FlowSourceLayer
+from .flow.OpticalFlowLayer import          OpticalFlowLayer
+
 from .generic.MotionMultiply import         MotionMultiply
-from .generic.OpticalFlowLayer import       OpticalFlowLayer
+from .generic.CamBBoxLayer import           CamBBoxLayer
+from .generic.HDTBlend import               SimilarityBlend
+
 from .data.PDLayer import                   PDLayer
 from .data.PoseBarADLayer import            PoseBarADLayer
 from .data.PoseBarMLayer import             PoseBarMLayer
 from .data.PoseBarScalarLayer import        PoseBarScalarLayer
-from .generic.CamBBoxLayer import           CamBBoxLayer
 from .data.SimilarityLayer import           SimilarityLayer, AggregationMethod
 from .data.PoseBarSLayer import             PoseBarSLayer
 from .data.PoseDotLayer import              PoseDotLayer
 from .data.PoseLineLayer import             PoseLineLayer
 
+from .composite.CamCompositeLayer import    CamCompositeLayer
 from .composite.BBoxCamRenderer import      BBoxCamRenderer
 from .composite.TrackletCamRenderer import  TrackletCamRenderer
+from .composite.PoseMTimeRenderer import    PoseMTimeRenderer
+
 from .source.DFlowSourceLayer import        DFlowSourceLayer
 from .source.ImageSourceLayer import        ImageSourceLayer
 from .source.MaskSourceLayer import         MaskSourceLayer
-from .composite.PoseMTimeRenderer import    PoseMTimeRenderer
 
-from .generic.HDTBlend import               SimilarityBlend

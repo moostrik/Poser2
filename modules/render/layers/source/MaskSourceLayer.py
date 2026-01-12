@@ -15,7 +15,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 class MaskSourceLayer(LayerBase):
 
-    def __init__(self, track_id: int, data_hub: DataHub) -> None:
+    def __init__(self, track_id: int, data_hub: DataHub, process_scale: float = 1.0, dilations: int = 0) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._cuda_image: Tensor = Tensor()
@@ -23,7 +23,8 @@ class MaskSourceLayer(LayerBase):
         self._fbo: SwapFbo = SwapFbo()
         self._dilate_shader: MaskDilate = MaskDilate()
 
-        self.process_scale: float = 2.0
+        self.process_scale: float = process_scale
+        self.dilatations: int = dilations
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -52,14 +53,10 @@ class MaskSourceLayer(LayerBase):
             self._fbo.clear()
 
         if mask_tensor is None:
-            # self._cuda_image.clear()
             return
 
         self._cuda_image.set_tensor(mask_tensor)
         self._cuda_image.update()
-
-
-        self.process_scale: float = 2.0
 
         if self._cuda_image.allocated:
             w = int(self._cuda_image.width * self.process_scale)
@@ -75,10 +72,6 @@ class MaskSourceLayer(LayerBase):
             self._cuda_image.draw(0, 0, w, h)
             self._fbo.end()
 
-            for i in range(1):
+            for i in range(self.dilatations):
                 self._fbo.swap()
                 self._dilate_shader.use(self._fbo.fbo_id, self._fbo.back_tex_id, 1.0)
-
-
-
-

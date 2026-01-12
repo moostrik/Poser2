@@ -33,6 +33,7 @@ class Layers(IntEnum):
     cam_image =     0
     cam_mask =      auto()
     dense_flow =    auto()
+    flow_image =    auto()
     sparse_flow =   auto()
 
     # data layers
@@ -58,6 +59,7 @@ class Layers(IntEnum):
     centre_pose =   auto()
     centre_D_flow = auto()
     centre_motion = auto()
+    centre_flow =   auto()
 
     sim_blend =     auto()
 
@@ -65,6 +67,8 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
     Layers.cam_mask,
     Layers.dense_flow,
+    Layers.centre_flow,
+    Layers.flow_image,
     Layers.sparse_flow,
 
     Layers.centre_math,
@@ -96,7 +100,7 @@ PREVIEW_LAYERS: list[Layers] = [
     # Layers.prev_angles,
     # Layers.prev_mt,
     # Layers.cam_mask,
-    Layers.sparse_flow,
+    Layers.centre_flow,
 ]
 
 FINAL_LAYERS: list[Layers] = [
@@ -114,7 +118,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.cam_flow,
     # Layers.centre_D_flow,
     # Layers.dense_flow,
-    # Layers.sparse_flow,
+    Layers.centre_flow,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -145,8 +149,9 @@ class HDTRenderManager(RenderBase):
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
-            dense_flow =    self.L[Layers.dense_flow][i] =  ls.DFlowSourceLayer(   i, self.data_hub)
-            sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(    i, self.data_hub)
+            dense_flow =    self.L[Layers.dense_flow][i] =  ls.DFlowSourceLayer(    i, self.data_hub)
+            flow_image =    self.L[Layers.flow_image][i] =  ls.FlowSourceLayer(     i, self.data_hub)
+            sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(        flow_image)
 
             cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxCamRenderer(     i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=1.0)
@@ -169,6 +174,7 @@ class HDTRenderManager(RenderBase):
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_math,                                 line_width=3.0, line_smooth=0.0, use_scores=False, color=COLORS[i % len(COLORS)])
             centre_motion = self.L[Layers.centre_motion][i]=ls.MotionMultiply(      i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
 
+            sparse_flow =   self.L[Layers.centre_flow][i] = ls.OpticalFlowLayer(        centre_motion)
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
 
         # global layers
