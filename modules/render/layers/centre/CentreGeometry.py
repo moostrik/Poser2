@@ -15,6 +15,8 @@ from modules.render.layers.LayerBase import LayerBase
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Texture
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 class CentreGeometry(LayerBase):
     """Calculates anchor points (shoulder/hip midpoints) and derived geometry.
@@ -58,6 +60,9 @@ class CentreGeometry(LayerBase):
         self.target_top: Point2f = Point2f(0.5, 0.33)
         self.target_bottom: Point2f = Point2f(0.5, 0.6)
         self.dst_aspectratio: float = 9/16
+
+        # hot reloader
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def has_pose(self) -> bool:

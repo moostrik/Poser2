@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Texture import Texture, draw_quad, get_data_type
+from modules.gl.Texture import Texture, get_data_type
 import numpy as np
 from threading import Lock
 from typing import Literal
@@ -250,34 +250,3 @@ class Image(Texture):
         self.unbind()
 
         return pixels
-
-    def draw(self, x, y, w, h) -> None : #override
-        self.bind()
-        draw_quad(x, y, w, h, True)
-        self.unbind()
-
-    # def draw_roi(self, x: float, y: float, width: float, height: float,
-    #          tex_x: float, tex_y: float, tex_width: float, tex_height: float) -> None:
-    #     """ Draw a region of interest from the texture
-    #         It is horizontally flipped by default
-    #     """
-
-    #     self.bind()
-
-    #     glBegin(GL_QUADS)
-
-    #     glTexCoord2f(tex_x, tex_y)
-    #     glVertex2f(x, y)
-
-    #     glTexCoord2f(tex_x + tex_width, tex_y)
-    #     glVertex2f(x + width, y)
-
-    #     glTexCoord2f(tex_x + tex_width, tex_y + tex_height)
-    #     glVertex2f(x + width, y + height)
-
-    #     glTexCoord2f(tex_x, tex_y + tex_height)
-    #     glVertex2f(x, y + height)
-
-    #     glEnd()
-
-    #     self.unbind()

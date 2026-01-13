@@ -1,6 +1,5 @@
-#version 460 core
+#version 460 compatibility
 
-layout(location = 0) in vec2 position;
 out vec2 texCoord;
 
 uniform vec2 resolution;
@@ -8,6 +7,9 @@ uniform bool flipX = false;
 uniform bool flipY = false;
 
 void main() {
+    // Get position from immediate mode (glVertex2f)
+    vec2 position = gl_Vertex.xy;
+
     // Normalize pixel coordinates to [0, 1]
     vec2 normalized = position / resolution;
 

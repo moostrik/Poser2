@@ -1,4 +1,5 @@
 from OpenGL.GL import * # type: ignore
+from modules.gl.shaders.TextureBlit import TextureBlit
 
 
 def get_format(internal_format) -> Constant:
@@ -41,50 +42,6 @@ def get_data_type(internal_format) -> Constant:
     if internal_format == GL_RG32F: return GL_FLOAT
     print('GL_texture', 'internal format not supported')
     return GL_NONE
-
-def draw_quad(x: float, y: float, w: float, h: float, flipV: bool = False) -> None :
-    x0: float = x
-    x1: float = x + w
-    y0: float = y
-    y1: float = y + h
-
-    glBegin(GL_QUADS)
-
-    if flipV:
-        # Lower-left corner
-        glTexCoord2f(0.0, 0.0)
-        glVertex2f(x0, y0)
-
-        # Lower-right corner
-        glTexCoord2f(1.0, 0.0)
-        glVertex2f(x1, y0)
-
-        # Upper-right corner
-        glTexCoord2f(1.0, 1.0)
-        glVertex2f(x1, y1)
-
-        # Upper-left corner
-        glTexCoord2f(0.0, 1.0)
-        glVertex2f(x0, y1)
-
-    else:
-        # Lower-left corner
-        glTexCoord2f(0.0, 1.0)
-        glVertex2f(x0, y0)
-
-        # Lower-right corner
-        glTexCoord2f(1.0, 1.0)
-        glVertex2f(x1, y0)
-
-        # Upper-right corner
-        glTexCoord2f(1.0, 0.0)
-        glVertex2f(x1, y1)
-
-        # Upper-left corner
-        glTexCoord2f(0.0, 0.0)
-        glVertex2f(x0, y1)
-
-    glEnd()
 
 
 class Texture():
@@ -146,6 +103,11 @@ class Texture():
 
         self.allocated = True
 
+        # Allocate blit shader for drawing
+        shader = TextureBlit()
+        if not shader.allocated:
+            shader.allocate()
+
     def deallocate(self) -> None :
         if not self.allocated: return
         self.allocated = False
@@ -157,13 +119,11 @@ class Texture():
         glDeleteTextures(1, [self.tex_id])
         self.tex_id = 0
 
+    def draw(self, x: float, y: float, w: float, h: float) -> None:
+        TextureBlit().use(self, x, y, w, h)
+
     def bind(self) -> None :
         glBindTexture(GL_TEXTURE_2D, self.tex_id)
 
     def unbind(self) -> None :
         glBindTexture(GL_TEXTURE_2D, 0)
-
-    def draw(self, x, y, w, h) -> None :
-        self.bind()
-        draw_quad(x, y, w, h)
-        self.unbind()

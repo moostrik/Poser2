@@ -26,22 +26,25 @@ class Fbo(Texture):
         self.unbind()
 
     def begin(self)  -> None:
-        """Begin rendering to FBO. Uses top-left origin (see COORDINATE_SYSTEM.md)."""
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        glOrtho(0, self.width, self.height, 0, -1, 1)  # Top-left origin
-        glMatrixMode(GL_MODELVIEW)
         glViewport(0, 0, self.width, self.height)
 
     def end(self)  -> None:
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
+    def blit(self, texture: Texture) -> None:
+        """Blit a texture to this FBO. """
+        from modules.gl.shaders.FboBlit import FboBlit
+        shader = FboBlit()
+        if not shader.allocated:
+            shader.allocate()
+        shader.use(self, texture)
+
     def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
-        self.begin()
+        glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
         glClearColor(r, g, b, a)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # type: ignore
-        self.end()
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
 class SwapFbo(Fbo):
     """Double-buffered FBO that swaps between two buffers.
@@ -115,12 +118,16 @@ class SwapFbo(Fbo):
         self._swap_state = 1 - self._swap_state
 
     def begin(self) -> None:
-        """Begin rendering to current buffer. Uses top-left origin."""
+        """Begin rendering to current buffer."""
         self._fbos[self._swap_state].begin()
 
     def end(self) -> None:
         """End rendering to current buffer."""
         self._fbos[self._swap_state].end()
+
+    def blit(self, texture: Texture) -> None:
+        """Blit a texture to current buffer."""
+        self._fbos[self._swap_state].blit(texture)
 
     def bind(self) -> None:
         """Bind current buffer's texture."""

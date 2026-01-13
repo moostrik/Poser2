@@ -61,6 +61,29 @@ def draw_quad_pixels(width: float, height: float) -> None:
     glVertex2f(0.0, height)
     glEnd()
 
+def draw_quad_pixels_at(x: float, y: float, width: float, height: float) -> None:
+    """Draw a quad at specific pixel coordinates.
+
+    Vertices define a rectangular region in pixel space.
+    Requires vertex shader with 'resolution' uniform to convert pixels to NDC.
+
+    Args:
+        x: X position in pixels (top-left corner)
+        y: Y position in pixels (top-left corner)
+        width: Width in pixels
+        height: Height in pixels
+    """
+    glBegin(GL_QUADS)
+    # Top-left
+    glVertex2f(x, y)
+    # Top-right
+    glVertex2f(x + width, y)
+    # Bottom-right
+    glVertex2f(x + width, y + height)
+    # Bottom-left
+    glVertex2f(x, y + height)
+    glEnd()
+
 class Shader():
     # Class-level hot-reload management (one observer per directory)
     _directory_observers = {}  # {Path: Observer}
@@ -75,34 +98,6 @@ class Shader():
     # Shader file suffixes
     VERTEX_SUFFIX = '.vert'
     FRAGMENT_SUFFIX = '.frag'
-
-    # Embedded generic shaders as fallbacks
-    GENERIC_VERTEX_SHADER = """#version 460 core
-
-in vec2 position;
-out vec2 texCoord;
-
-void main() {
-    texCoord = position * 0.5 + 0.5;
-    gl_Position = vec4(position, 0.0, 1.0);
-}
-"""
-
-    GENERIC_FRAGMENT_SHADER = """#version 460 core
-
-uniform sampler2D tex0;
-uniform sampler2D tex1;
-uniform float fade;
-
-in vec2 texCoord;
-out vec4 fragColor;
-
-void main() {
-    vec4 texel0 = texture(tex0, texCoord);
-    vec4 texel1 = texture(tex1, texCoord);
-    fragColor = mix(texel0, texel1, fade);
-}
-"""
 
     def __new__(cls):
         """Return cached shader instance if it exists, otherwise create new one."""
@@ -189,18 +184,41 @@ void main() {
 
     def _compile_shaders(self, verbose: bool = False) -> bool:
         """Load and compile shader sources into OpenGL program. Returns True if successful."""
-        # Load sources...
+        # Load vertex shader source
         vertex_source: str = ''
         if self.vertex_file_path:
             vertex_source = self.read_shader_source(str(self.vertex_file_path))
         if not vertex_source:
-            vertex_source = self.GENERIC_VERTEX_SHADER
+            # Try to load _generic.vert from local shader directory
+            generic_vertex_path = self.shader_dir / "_generic.vert"
+            if generic_vertex_path.exists():
+                vertex_source = self.read_shader_source(str(generic_vertex_path))
+        if not vertex_source:
+            # Try to load _generic.vert from main GL shaders directory
+            gl_generic_vertex_path = Path(__file__).parent / "shaders" / "_generic.vert"
+            if gl_generic_vertex_path.exists():
+                vertex_source = self.read_shader_source(str(gl_generic_vertex_path))
+        if not vertex_source:
+            logging.error(f"{self.shader_name}: No vertex shader found! Looking for {self.vertex_file_path} or {self.shader_dir / '_generic.vert'} or {Path(__file__).parent / 'shaders' / '_generic.vert'}")
+            return False
 
+        # Load fragment shader source
         fragment_source: str = ''
         if self.fragment_file_path:
             fragment_source = self.read_shader_source(str(self.fragment_file_path))
         if not fragment_source:
-            fragment_source = self.GENERIC_FRAGMENT_SHADER
+            # Try to load _generic.frag from local shader directory
+            generic_fragment_path = self.shader_dir / "_generic.frag"
+            if generic_fragment_path.exists():
+                fragment_source = self.read_shader_source(str(generic_fragment_path))
+        if not fragment_source:
+            # Try to load _generic.frag from main GL shaders directory
+            gl_generic_fragment_path = Path(__file__).parent / "shaders" / "_generic.frag"
+            if gl_generic_fragment_path.exists():
+                fragment_source = self.read_shader_source(str(gl_generic_fragment_path))
+        if not fragment_source:
+            logging.error(f"{self.shader_name}: No fragment shader found! Looking for {self.fragment_file_path} or {self.shader_dir / '_generic.frag'} or {Path(__file__).parent / 'shaders' / '_generic.frag'}")
+            return False
 
         try:
             # Compile vertex shader

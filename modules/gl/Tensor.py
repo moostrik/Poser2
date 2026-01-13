@@ -8,7 +8,7 @@ from cuda.bindings import runtime # type: ignore
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Texture import Texture, draw_quad
+from modules.gl.Texture import Texture
 
 
 def get_channel_count_from_format(internal_format) -> int:
@@ -280,11 +280,5 @@ class Tensor(Texture):
         # Upload to OpenGL texture
         self.bind()
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, upload_format, GL_FLOAT, tensor_np)
-        self.unbind()
-
-    def draw(self, x, y, w, h) -> None:
-        """Draw the texture with vertical flip (matching Image behavior)."""
-        self.bind()
-        draw_quad(x, y, w, h, True)
         self.unbind()
 

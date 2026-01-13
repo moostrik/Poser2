@@ -1,6 +1,11 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
-from modules.gl.Texture import Texture
+from modules.gl.Shader import Shader, draw_quad_pixels_at
+
+if TYPE_CHECKING:
+    from modules.gl.Texture import Texture
 
 class TextureBlit(Shader):
     """Simple shader for drawing textures to screen using pixel coordinates.
@@ -21,25 +26,24 @@ class TextureBlit(Shader):
         if not self.allocated or not self.shader_program: return
         if not texture.allocated: return
 
+        # Get current viewport to determine screen dimensions
+        viewport = glGetIntegerv(GL_VIEWPORT)
+        screen_width, screen_height = viewport[2], viewport[3]
+
         # Activate shader program
         glUseProgram(self.shader_program)
 
-        # Bind to screen framebuffer
+        # Bind to screen framebuffer (already bound, but explicit for clarity)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        glViewport(int(x), int(y), int(w), int(h))
 
         # Bind texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, texture.tex_id)
 
-        # Configure shader uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(w), float(h))
+        # Configure shader uniforms - use screen resolution, not region size
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"),
+                    float(screen_width), float(screen_height))
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
 
-        # Render quad in pixel space
-        draw_quad_pixels(w, h)
-
-        # Cleanup
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        glUseProgram(0)
+        # Render quad at specified position in pixel space
+        draw_quad_pixels_at(x, y, w, h)

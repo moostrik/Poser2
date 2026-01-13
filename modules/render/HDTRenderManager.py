@@ -93,14 +93,14 @@ LARGE_LAYERS: list[Layers] = [
 ]
 
 PREVIEW_LAYERS: list[Layers] = [
-    # Layers.centre_cam,
+    Layers.cam_image,
     # Layers.centre_pose,
     # Layers.centre_motion,
-    Layers.sim_blend,
+    # Layers.sim_blend,
     # Layers.prev_angles,
     # Layers.prev_mt,
     # Layers.cam_mask,
-    Layers.centre_flow,
+    # Layers.centre_flow,
 ]
 
 FINAL_LAYERS: list[Layers] = [
@@ -118,7 +118,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.cam_flow,
     # Layers.centre_D_flow,
     # Layers.dense_flow,
-    Layers.centre_flow,
+    # Layers.centre_flow,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -242,7 +242,7 @@ class HDTRenderManager(RenderBase):
 
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
-        self.setView(width, height)
+        glViewport(0, 0, width, height)
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -270,7 +270,7 @@ class HDTRenderManager(RenderBase):
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
-        self.setView(width, height)
+        glViewport(0, 0, width, height)
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)

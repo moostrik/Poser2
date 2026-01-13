@@ -44,35 +44,7 @@ class FlowUtil:
             dst_fbo: Destination FBO
             src_texture: Source texture
         """
-        if not dst_fbo.allocated:
-            return
-
-        glBindFramebuffer(GL_FRAMEBUFFER, dst_fbo.fbo_id)
-        glViewport(0, 0, dst_fbo.width, dst_fbo.height)
-
-        glDisable(GL_BLEND)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src_texture.tex_id)
-
-        # Simple textured quad using fixed function
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1.0, 1.0, 1.0, 1.0)
-
-        glBegin(GL_QUADS)
-        glTexCoord2f(0.0, 0.0)
-        glVertex2f(-1.0, -1.0)
-        glTexCoord2f(1.0, 0.0)
-        glVertex2f(1.0, -1.0)
-        glTexCoord2f(1.0, 1.0)
-        glVertex2f(1.0, 1.0)
-        glTexCoord2f(0.0, 1.0)
-        glVertex2f(-1.0, 1.0)
-        glEnd()
-
-        glDisable(GL_TEXTURE_2D)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        glEnable(GL_BLEND)
+        dst_fbo.blit(src_texture)
 
     @staticmethod
     def copy(dst_fbo: Fbo, src_fbo: Fbo) -> None:

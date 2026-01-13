@@ -8,7 +8,6 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.gl import Tensor, SwapFbo, Texture
-from modules.gl.Texture import draw_quad
 from modules.render.shaders import DenseFlowFilter as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -90,13 +89,7 @@ class DFlowSourceLayer(LayerBase):
                 self._fbo.allocate(w, h, self._flow_texture.internal_format)
 
             self._fbo.clear()
-            glColor4f(1.0, 1.0, 1.0, 1.0)
-
-            self._fbo.begin()
-            self._flow_texture.bind()
-            draw_quad(0, 0, w, h, flipV=True)
-            self._flow_texture.unbind()
-            self._fbo.end()
+            self._fbo.blit(self._flow_texture)
 
             # Apply flow visualization shader with noise filtering
             self._fbo.swap()
