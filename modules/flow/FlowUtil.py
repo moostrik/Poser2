@@ -47,32 +47,9 @@ class FlowUtil:
         if not dst_fbo.allocated:
             return
 
-        glBindFramebuffer(GL_FRAMEBUFFER, dst_fbo.fbo_id)
-        glViewport(0, 0, dst_fbo.width, dst_fbo.height)
-
-        glDisable(GL_BLEND)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src_texture.tex_id)
-
-        # Simple textured quad using fixed function
-        glEnable(GL_TEXTURE_2D)
-        glColor4f(1.0, 1.0, 1.0, 1.0)
-
-        glBegin(GL_QUADS)
-        glTexCoord2f(0.0, 0.0)
-        glVertex2f(-1.0, -1.0)
-        glTexCoord2f(1.0, 0.0)
-        glVertex2f(1.0, -1.0)
-        glTexCoord2f(1.0, 1.0)
-        glVertex2f(1.0, 1.0)
-        glTexCoord2f(0.0, 1.0)
-        glVertex2f(-1.0, 1.0)
-        glEnd()
-
-        glDisable(GL_TEXTURE_2D)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        glEnable(GL_BLEND)
+        dst_fbo.begin()
+        src_texture.draw(0, 0, dst_fbo.width, dst_fbo.height)
+        dst_fbo.end()
 
     @staticmethod
     def copy(dst_fbo: Fbo, src_fbo: Fbo) -> None:
@@ -103,10 +80,9 @@ class FlowUtil:
 
         # Swap and add: curr = prev + (src * strength)
         dst_fbo.swap()
-        FlowUtil._add_shader.use(
-            dst_fbo, dst_fbo.back_texture, src_texture,
-            strength0=1.0, strength1=strength
-        )
+        dst_fbo.begin()
+        FlowUtil._add_shader.use(dst_fbo.back_texture, src_texture, strength0=1.0, strength1=strength)
+        dst_fbo.end()
 
     @staticmethod
     def get_num_channels(internal_format: int) -> int:

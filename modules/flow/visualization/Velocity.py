@@ -95,25 +95,25 @@ class Velocity(FlowBase):
 
         self._needs_update = False
 
-        self.output_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
+        self.output_fbo.clear(0.0, 0.0, 0.0, 0.0)
+        self.output_fbo.begin()
         if self.config.mode == VisualizationMode.DIRECTION_MAP:
             self._direction_shader.reload()
             self._direction_shader.use(
-                self.output_fbo,
                 self._velocity_texture,
                 self.config.scale
             )
         else:  # ARROW_FIELD
             self._arrow_shader.reload()
             self._arrow_shader.use(
-                self.output_fbo,
                 self._velocity_texture,
                 self.config.scale,
                 self.config.spacing,
                 self.config.arrow_length,
                 self.config.arrow_thickness
             )
+        self.output_fbo.end()
 
     def set(self, texture: Texture) -> None:
         """Set the velocity field texture to visualize. """

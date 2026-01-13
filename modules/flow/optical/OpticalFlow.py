@@ -104,8 +104,8 @@ class OpticalFlow(FlowBase):
         power = 1.0 - self.config.boost
 
         # Pass output_fbo directly since it's now a Fbo
+        self.output_fbo.begin()
         self._optical_flow_shader.use(
-            self.output_fbo,
             curr_frame,
             prev_frame,
             offset=self.config.offset,
@@ -114,6 +114,7 @@ class OpticalFlow(FlowBase):
             strength_y=self.config.strength_y,
             power=power
         )
+        self.output_fbo.end()
 
     def set(self, texture: Texture) -> None:
         """Set input frame texture.
@@ -127,8 +128,9 @@ class OpticalFlow(FlowBase):
         # Swap to next frame slot in input_fbo
         self.input_fbo.swap()
 
-        # Convert RGB to luminance with Y-flip for Image textures
-        self._luminance_shader.use(self.input_fbo, texture)
+        self.input_fbo.begin()
+        self._luminance_shader.use(texture)
+        self.input_fbo.end()
 
         self._frame_count += 1
         self._needs_update = True
