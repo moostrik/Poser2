@@ -100,10 +100,6 @@ class DFlowSourceLayer(LayerBase):
 
             # Apply flow visualization shader with noise filtering
             self._fbo.swap()
-            self._shader.use(
-                self._fbo,
-                self._fbo.back_texture,
-                scale=self.flow_scale,
-                gamma=self.flow_gamma,
-                noise_threshold=self.noise_threshold
-            )
+            self._fbo.begin()
+            self._shader.use(self._fbo.back_texture, self.flow_scale, self.flow_gamma, self.noise_threshold)
+            self._fbo.end()

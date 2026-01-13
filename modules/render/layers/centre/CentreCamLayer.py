@@ -83,8 +83,8 @@ class CentreCamLayer(LayerBase):
 
         # Render camera image with ROI from anchor calculator
         cam_aspect: float = self._cam_texture.width / self._cam_texture.height
+        self._cam_fbo.begin()
         self._roi_shader.use(
-            self._cam_fbo,
             self._cam_texture,
             self._anchor_calc.cam_crop_roi,
             self._anchor_calc.cam_rotation,
@@ -93,25 +93,28 @@ class CentreCamLayer(LayerBase):
             False,
             True
         )
+        self._cam_fbo.end()
 
         # Temporal blending
         self._cam_blend_fbo.swap()
+        self._cam_blend_fbo.begin()
         self._blend_shader.use(
-            self._cam_blend_fbo,
             self._cam_blend_fbo.back_texture,
             self._cam_fbo.texture,
             self.blend_factor
         )
+        self._cam_blend_fbo.end()
 
         # Apply mask if provided and enabled
         if self._mask_texture and self.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
+            self._masked_fbo.begin()
             self._mask_shader.use(
-                self._masked_fbo,
                 self._cam_blend_fbo.texture,
                 self._mask_texture,
                 self.mask_opacity
             )
+            self._masked_fbo.end()
             self._output_fbo = self._masked_fbo
         else:
             self._output_fbo = self._cam_blend_fbo

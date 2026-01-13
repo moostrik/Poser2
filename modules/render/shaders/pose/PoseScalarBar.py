@@ -1,16 +1,16 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Fbo
 
 import numpy as np
 
 from modules.pose.features import PoseFeatureType as PoseFeatureUnion
 
 class PoseScalarBar(Shader):
-    def use(self, fbo: Fbo, feature: PoseFeatureUnion, line_thickness: float = 0.1, line_smooth: float = 0.01,
+    def use(self, feature: PoseFeatureUnion, line_thickness: float = 0.1, line_smooth: float = 0.01,
             color=(0.0, 0.5, 1.0, 1.0), color_odd=(1.0, 0.2, 0.0, 1.0), color_even=(1.0, 0.2, 0.0, 1.0)) -> None:
-        if not self.allocated or not self.shader_program: return
-        if not fbo.allocated: return
+        if not self.allocated or not self.shader_program:
+            print("PoseScalarBar shader not allocated or shader program missing.")
+            return
 
         # Flatten values and scores to pass to shader
         values: np.ndarray = np.nan_to_num(feature.values.astype(np.float32), nan=0.0)
@@ -23,12 +23,7 @@ class PoseScalarBar(Shader):
         # Activate shader program
         glUseProgram(self.shader_program)
 
-        # Set up render target
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
-        glViewport(0, 0, fbo.width, fbo.height)
-
         # Configure shader uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
         glUniform1fv(glGetUniformLocation(self.shader_program, "values"), len(values), values)
         glUniform1fv(glGetUniformLocation(self.shader_program, "scores"), len(scores), scores)
         glUniform1i(glGetUniformLocation(self.shader_program, "num_joints"), len(feature))
@@ -44,6 +39,5 @@ class PoseScalarBar(Shader):
         draw_quad()
 
         # Cleanup
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 

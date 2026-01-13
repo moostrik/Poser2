@@ -1,16 +1,16 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Fbo
 
 import numpy as np
 
 from modules.pose.features import Angles, AngleVelocity
 
 class PoseAngleDeltaBar(Shader):
-    def use(self, fbo: Fbo, angles: Angles, deltas: AngleVelocity, line_thickness: float = 0.1, line_smooth: float = 0.01,
+    def use(self, angles: Angles, deltas: AngleVelocity, line_thickness: float = 0.1, line_smooth: float = 0.01,
             color_odd=(1.0, 0.2, 0.0, 1.0), color_even=(1.0, 0.2, 0.0, 1.0)) -> None:
-        if not self.allocated or not self.shader_program: return
-        if not fbo.allocated: return
+        if not self.allocated or not self.shader_program:
+            print("PoseAngleDeltaBar shader not allocated or shader program missing.")
+            return
 
         # Flatten values and scores to pass to shader
         angle_values: np.ndarray = np.nan_to_num(angles.values.astype(np.float32), nan=0.0)
@@ -20,12 +20,7 @@ class PoseAngleDeltaBar(Shader):
         # Activate shader program
         glUseProgram(self.shader_program)
 
-        # Set up render target
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
-        glViewport(0, 0, fbo.width, fbo.height)
-
         # Configure shader uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
         glUniform1fv(glGetUniformLocation(self.shader_program, "angles"), len(angle_values), angle_values)
         glUniform1fv(glGetUniformLocation(self.shader_program, "deltas"), len(delta_values), delta_values)
         glUniform1fv(glGetUniformLocation(self.shader_program, "scores"), len(score_values), score_values)
@@ -41,6 +36,5 @@ class PoseAngleDeltaBar(Shader):
         draw_quad()
 
         # Cleanup
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 

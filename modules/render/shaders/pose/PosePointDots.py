@@ -2,14 +2,17 @@ import numpy as np
 
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Fbo
 
 from modules.pose.features import Points2D
 
 class PosePointDots(Shader):
-    def use(self, fbo: Fbo, points: Points2D, dot_size: float = 0.01, dot_smooth: float = 0.01) -> None:
-        if not self.allocated or not self.shader_program: return
-        if not fbo.allocated or not points: return
+    def use(self, points: Points2D, dot_size: float = 0.01, dot_smooth: float = 0.01) -> None:
+        if not self.allocated or not self.shader_program:
+            print("PosePointDots shader not allocated or shader program missing.")
+            return
+        if not points:
+            print("PosePointDots shader: points not provided.")
+            return
 
         # Pack data: [x, y, score, visibility] per point
         n_points: int = len(points.values)
@@ -22,25 +25,15 @@ class PosePointDots(Shader):
         # Activate shader program
         glUseProgram(self.shader_program)
 
-        # Set up render target
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
-        glViewport(0, 0, fbo.width, fbo.height)
-
-        # Calculate aspect ratio
-        aspect_ratio = fbo.width / fbo.height if fbo.height > 0 else 1.0
-
         # Configure shader uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
         glUniform1i(glGetUniformLocation(self.shader_program, "num_points"), n_points)
         glUniform1f(glGetUniformLocation(self.shader_program, "dot_size"), dot_size)
         glUniform1f(glGetUniformLocation(self.shader_program, "dot_smooth"), dot_smooth)
-        glUniform1f(glGetUniformLocation(self.shader_program, "aspect_ratio"), aspect_ratio)
         glUniform4fv(glGetUniformLocation(self.shader_program, "points"), n_points, packed_data.flatten())
 
         # Render
         draw_quad()
 
         # Cleanup
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 

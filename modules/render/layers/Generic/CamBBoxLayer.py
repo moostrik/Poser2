@@ -61,4 +61,6 @@ class CamBBoxLayer(LayerBase):
 
         pose_rect = pose.bbox.to_rect()
 
-        self._roi_shader.use(self._fbo, self._cam_texture, pose_rect)
+        self._fbo.begin()
+        self._roi_shader.use(self._cam_texture, pose_rect)
+        self._fbo.end()

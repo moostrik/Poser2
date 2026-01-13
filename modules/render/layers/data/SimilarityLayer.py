@@ -88,7 +88,9 @@ class SimilarityLayer(LayerBase):
         self._image.set_image(image_np) # should the shader return the image?
         self._image.update()
 
-        self._shader.use(self._fbo, self._image.texture, self._image.width, self._image.height, 1.5 / self._fbo.height)
+        self._fbo.begin()
+        self._shader.use(self._image.texture, self._image.width, self._image.height, 1.5 / self._fbo.height)
+        self._fbo.end()
 
         step: float = self._fbo.height / self._num_streams
 

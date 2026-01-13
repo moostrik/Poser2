@@ -91,8 +91,8 @@ class CentreMaskLayer(LayerBase):
             return
 
         # Use bbox geometry from CentreGeometry
+        self._mask_fbo.begin()
         self._roi_shader.use(
-            self._mask_fbo,
             self._cam_texture,
             self._anchor_calc.bbox_crop_roi,
             self._anchor_calc.bbox_rotation,
@@ -101,18 +101,22 @@ class CentreMaskLayer(LayerBase):
             False,
             False
         )
+        self._mask_fbo.end()
 
         # Temporal blending
         self._mask_blend_fbo.swap()
+        self._mask_blend_fbo.begin()
         self._mask_blend_shader.use(
-            self._mask_blend_fbo,
             self._mask_blend_fbo.back_texture,
             self._mask_fbo.texture,
             self.blend_factor
         )
+        self._mask_blend_fbo.end()
 
         # Anti-aliasing
-        self._mask_AA_shader.use(self._mask_AA_fbo, self._mask_blend_fbo.texture)
+        self._mask_AA_fbo.begin()
+        self._mask_AA_shader.use(self._mask_blend_fbo.texture)
+        self._mask_AA_fbo.end()
 
         # Copy AA result to blur buffer
         self._mask_blur_fbo.begin()
@@ -122,19 +126,22 @@ class CentreMaskLayer(LayerBase):
         # Multi-pass blur
         for i in range(self.blur_steps):
             self._mask_blur_fbo.swap()
+            self._mask_blur_fbo.begin()
             self._mask_blur_shader.use(
-                self._mask_blur_fbo,
                 self._mask_blur_fbo.back_texture,
                 True,
                 self.blur_radius
             )
+            self._mask_blur_fbo.end()
+
             self._mask_blur_fbo.swap()
+            self._mask_blur_fbo.begin()
             self._mask_blur_shader.use(
-                self._mask_blur_fbo,
                 self._mask_blur_fbo.back_texture,
                 False,
                 self.blur_radius
             )
+            self._mask_blur_fbo.end()
 
         glEnable(GL_BLEND)
 

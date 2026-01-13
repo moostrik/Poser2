@@ -89,15 +89,11 @@ class PoseBarSLayer(LayerBase):
         line_thickness = 1.0 / self._fbo.height * 1.0
         line_smooth = 1.0 / self._fbo.height * 4.0
 
-        self._shader.use(self._fbo, similarity, sim_colors, line_thickness, line_smooth * 10)
-        self._shader.use(self._fbo, motion_array, motion_colors, line_thickness, line_smooth)
-        self._shader.use(self._fbo, motion_sim, motion_sim_colors, line_thickness, line_smooth)
-        # PoseMotionSimLayer._shader.use(self._fbo.fbo_id, motion_sim, line_thickness, line_smooth,
-        #                                            color, (*POSE_COLOR_RIGHT, 1.0), (*POSE_COLOR_LEFT, 1.0))
-        # PoseMotionSimLayer._shader.use(self._fbo.fbo_id, motion_feature, line_thickness, line_smooth,
-        #                                            color, color, color)
-
-
+        self._fbo.begin()
+        self._shader.use(similarity, sim_colors, line_thickness, line_smooth * 10)
+        self._shader.use(motion_array, motion_colors, line_thickness, line_smooth)
+        self._shader.use(motion_sim, motion_sim_colors, line_thickness, line_smooth)
+        self._fbo.end()
 
         return
 

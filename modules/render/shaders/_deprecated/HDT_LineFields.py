@@ -1,22 +1,19 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Fbo, Texture
+from modules.gl import Texture
 
 class HDT_LineFields(Shader):
-    def use(self, fbo: Fbo,
+    def use(self,
             cam_tex_0: Texture, cam_tex_1: Texture, cam_tex_2: Texture, line_tex_l: Texture, line_tex_r: Texture,
             visibility_0: float, visibility_1: float, visibility_2: float,
             cam_color_0: tuple[float, float, float, float], cam_color_1: tuple[float, float, float, float], cam_color_2: tuple[float, float, float, float],
             param_0: float, param_1: float, param_2: float) -> None:
-        if not self.allocated or not self.shader_program: return
-        if not fbo.allocated: return
+        if not self.allocated or not self.shader_program:
+            print("HDT_LineFields shader not allocated or shader program missing.")
+            return
 
         # Activate shader program
         glUseProgram(self.shader_program)
-
-        # Set up render target
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
-        glViewport(0, 0, fbo.width, fbo.height)
 
         # Bind input textures
         glActiveTexture(GL_TEXTURE0)
@@ -31,7 +28,6 @@ class HDT_LineFields(Shader):
         glBindTexture(GL_TEXTURE_2D, line_tex_r.tex_id)
 
         # Configure shader uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
         glUniform1i(glGetUniformLocation(self.shader_program, "cam_tex_0"), 0)
         glUniform1i(glGetUniformLocation(self.shader_program, "cam_tex_1"), 1)
         glUniform1i(glGetUniformLocation(self.shader_program, "cam_tex_2"), 2)
@@ -61,5 +57,4 @@ class HDT_LineFields(Shader):
         glBindTexture(GL_TEXTURE_2D, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)

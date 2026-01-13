@@ -2,15 +2,17 @@ import numpy as np
 
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Fbo
-
 from modules.pose.features import Points2D
 
 class PosePointLines(Shader):
-    def use(self, fbo: Fbo, points: Points2D, line_width: float = 0.01, line_smooth: float = 0.01,
+    def use(self, points: Points2D, line_width: float = 0.01, line_smooth: float = 0.01,
             color: tuple[float, float, float, float] | None = None, use_scores: bool = True) -> None:
-        if not self.allocated or not self.shader_program: return
-        if not fbo.allocated or not points: return
+        if not self.allocated or not self.shader_program:
+            print("PosePointLines shader not allocated or shader program missing.")
+            return
+        if not points:
+            print("PosePointLines shader: points not provided.")
+            return
 
         # Pack data: [x, y, score, visibility] per point
         n_points: int = len(points.values)
@@ -23,18 +25,9 @@ class PosePointLines(Shader):
         # Activate shader program
         glUseProgram(self.shader_program)
 
-        # Set up render target
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
-        glViewport(0, 0, fbo.width, fbo.height)
-
-        # Calculate aspect ratio
-        aspect_ratio = fbo.width / fbo.height if fbo.height > 0 else 1.0
-
         # Configure shader uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
         glUniform1f(glGetUniformLocation(self.shader_program, "line_width"), line_width)
         glUniform1f(glGetUniformLocation(self.shader_program, "line_smooth"), line_smooth)
-        glUniform1f(glGetUniformLocation(self.shader_program, "aspect_ratio"), aspect_ratio)
         if color is not None:
             glUniform4f(glGetUniformLocation(self.shader_program, "line_color"), *color)
         else:
@@ -45,6 +38,5 @@ class PosePointLines(Shader):
         draw_quad()
 
         # Cleanup
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 

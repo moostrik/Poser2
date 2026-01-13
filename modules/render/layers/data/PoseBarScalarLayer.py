@@ -85,8 +85,10 @@ class PoseBarScalarLayer(LayerBase):
         line_thickness = 1.0 / self._fbo.height * self.line_thickness
         line_smooth = 1.0 / self._fbo.height * self.line_smooth
 
-        self._shader.use(self._fbo, feature, line_thickness, line_smooth,
+        self._fbo.begin()
+        self._shader.use(feature, line_thickness, line_smooth,
                          self.color, (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
+        self._fbo.end()
 
         joint_enum_type = feature.__class__.enum()
         num_joints: int = len(feature)

@@ -1,18 +1,18 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Fbo, Texture
+from modules.gl import Texture
 
 class MaskApply(Shader):
-    def use(self, fbo: Fbo, color: Texture, mask: Texture, multiply: float = 1.0) -> None:
-        if not self.allocated or not self.shader_program: return
-        if not fbo.allocated or not color.allocated or not mask.allocated: return
+    def use(self, color: Texture, mask: Texture, multiply: float = 1.0) -> None:
+        if not self.allocated or not self.shader_program:
+            print("MaskApply shader not allocated or shader program missing.")
+            return
+        if not color.allocated or not mask.allocated:
+            print("MaskApply shader: input textures not allocated.")
+            return
 
         # Activate shader program
         glUseProgram(self.shader_program)
-
-        # Set up render target
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
-        glViewport(0, 0, fbo.width, fbo.height)
 
         # Bind input textures
         glActiveTexture(GL_TEXTURE0)
@@ -21,7 +21,6 @@ class MaskApply(Shader):
         glBindTexture(GL_TEXTURE_2D, mask.tex_id)
 
         # Configure shader uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
         glUniform1i(glGetUniformLocation(self.shader_program, "color"), 0)
         glUniform1i(glGetUniformLocation(self.shader_program, "mask"), 1)
         glUniform1f(glGetUniformLocation(self.shader_program, "multiply"), multiply)
@@ -34,6 +33,5 @@ class MaskApply(Shader):
         glBindTexture(GL_TEXTURE_2D, 0)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 

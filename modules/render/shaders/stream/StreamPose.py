@@ -1,28 +1,27 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Fbo, Texture
+from modules.gl import Texture
 
 from modules.pose.pd_stream.PDStream import PDStreamData
 import numpy as np
 
 class StreamPose(Shader):
-    def use(self, fbo: Fbo, tex0: Texture, num_samples: int, num_streams: int, line_width: float) -> None:
-        if not self.allocated or not self.shader_program: return
-        if not fbo.allocated or not tex0.allocated: return
+    def use(self, tex0: Texture, num_samples: int, num_streams: int, line_width: float) -> None:
+        if not self.allocated or not self.shader_program:
+            print("StreamPose shader not allocated or shader program missing.")
+            return
+        if not tex0.allocated:
+            print("StreamPose shader: input texture not allocated.")
+            return
 
         # Activate shader program
         glUseProgram(self.shader_program)
-
-        # Set up render target
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
-        glViewport(0, 0, fbo.width, fbo.height)
 
         # Bind input texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
         # Configure shader uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
         glUniform1f(glGetUniformLocation(self.shader_program, "sample_step"), 1.0 / num_samples)
         glUniform1i(glGetUniformLocation(self.shader_program, "num_streams"), num_streams)
@@ -35,7 +34,6 @@ class StreamPose(Shader):
         # Cleanup
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glUseProgram(0)
 
 
