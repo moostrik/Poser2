@@ -9,6 +9,8 @@ from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import Blend, DrawRoi, MaskApply
 from modules.utils.PointsAndRects import Rect
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 # GL
 from modules.gl import Fbo, SwapFbo, Texture
 
@@ -41,6 +43,10 @@ class CentreCamLayer(LayerBase):
         self.mask_opacity: float = mask_opacity
         self.use_mask: bool = True  # Toggle for mask application
 
+        # hot reloader
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
+
+
     @property
     def texture(self) -> Texture:
         """Output texture for external use."""
@@ -66,7 +72,7 @@ class CentreCamLayer(LayerBase):
     def update(self) -> None:
         """Render camera crop using anchor geometry, optionally with mask."""
         # Disable blending during FBO rendering
-        glDisable(GL_BLEND)
+        # glDisable(GL_BLEND)
         glColor4f(1.0, 1.0, 1.0, 1.0)
 
         self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
@@ -78,7 +84,7 @@ class CentreCamLayer(LayerBase):
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             if self._mask_texture and self.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            glEnable(GL_BLEND)
+            # glEnable(GL_BLEND)
             return
 
         # Render camera image with ROI from anchor calculator
@@ -89,9 +95,7 @@ class CentreCamLayer(LayerBase):
             self._anchor_calc.cam_crop_roi,
             self._anchor_calc.cam_rotation,
             self._anchor_calc.anchor_top_tex,
-            cam_aspect,
-            False,
-            True
+            cam_aspect
         )
 
         # Temporal blending
@@ -104,6 +108,8 @@ class CentreCamLayer(LayerBase):
         )
 
         # Apply mask if provided and enabled
+
+        self.use_mask = False
         if self._mask_texture and self.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._mask_shader.use(
@@ -117,3 +123,6 @@ class CentreCamLayer(LayerBase):
             self._output_fbo = self._cam_blend_fbo
 
         glEnable(GL_BLEND)
+
+
+        # print("now")

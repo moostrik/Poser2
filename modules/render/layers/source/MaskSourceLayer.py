@@ -31,7 +31,7 @@ class MaskSourceLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        return self._fbo.texture
+        return self._cuda_image.texture
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         self._dilate_shader.allocate()
@@ -68,9 +68,7 @@ class MaskSourceLayer(LayerBase):
             # glDisable(GL_BLEND)
             glColor4f(1.0, 1.0, 1.0, 1.0)
 
-            self._fbo.begin()
-            self._cuda_image.draw(0, 0, w, h)
-            self._fbo.end()
+            self._fbo.blit(self._cuda_image)
 
             for i in range(self.dilatations):
                 self._fbo.swap()

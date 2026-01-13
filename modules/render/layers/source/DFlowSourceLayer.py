@@ -39,7 +39,7 @@ class DFlowSourceLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        return self._fbo.texture
+        return self._flow_texture.texture
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         """Initialize renderer resources."""

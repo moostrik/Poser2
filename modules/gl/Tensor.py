@@ -8,7 +8,7 @@ from cuda.bindings import runtime # type: ignore
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Texture import Texture
+from modules.gl.Texture import Texture, TextureBlit
 
 
 def get_channel_count_from_format(internal_format) -> int:
@@ -61,6 +61,9 @@ class Tensor(Texture):
     Provides zero-copy GPU-to-GPU transfer from PyTorch CUDA tensors to OpenGL textures
     via Pixel Buffer Objects (PBO) and CUDA graphics resource registration.
     Falls back to CPU transfer if CUDA-OpenGL interop is unavailable.
+
+    Tensors are vertically flipped during upload (using torch.flip) to ensure uniform
+    V orientation (top at V=1), matching FBO-rendered content.
     """
 
     def __init__(self) -> None:
@@ -204,6 +207,7 @@ class Tensor(Texture):
         """GPU-to-GPU copy using CUDA-OpenGL interop.
 
         PyTorch CUDA tensor → PBO (device-to-device) → GL texture (all on GPU).
+        Tensor is flipped vertically to ensure uniform V orientation (top at V=1).
         """
         # Convert to FP32
         if tensor.dtype == torch.float16:
@@ -214,6 +218,9 @@ class Tensor(Texture):
         # Permute multi-channel tensors from (C, H, W) to (H, W, C)
         if len(tensor.shape) == 3 and tensor.shape[0] <= 4:
             tensor = tensor.permute(1, 2, 0)
+
+        # Flip vertically on GPU to normalize orientation (top at V=1)
+        tensor = torch.flip(tensor, dims=[0])
 
         # Ensure contiguous memory for GPU copy
         tensor = tensor.contiguous()
@@ -262,10 +269,16 @@ class Tensor(Texture):
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
 
     def _update_with_cpu(self, tensor: torch.Tensor) -> None:
-        """Fallback: CPU transfer (GPU → CPU → GPU)."""
+        """Fallback: CPU transfer (GPU → CPU → GPU).
+
+        Tensor is flipped vertically to ensure uniform V orientation (top at V=1).
+        """
         # Permute multi-channel tensors from (C, H, W) to (H, W, C)
         if len(tensor.shape) == 3 and tensor.shape[0] <= 4:
             tensor = tensor.permute(1, 2, 0)
+
+        # Flip vertically on GPU before CPU transfer to normalize orientation
+        tensor = torch.flip(tensor, dims=[0])
 
         # Convert to float32 and move to CPU
         tensor_np = tensor.float().cpu().numpy()  # (H, W) or (H, W, C)
@@ -281,4 +294,3 @@ class Tensor(Texture):
         self.bind()
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, upload_format, GL_FLOAT, tensor_np)
         self.unbind()
-

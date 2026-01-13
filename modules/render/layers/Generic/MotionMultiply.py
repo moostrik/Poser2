@@ -115,6 +115,8 @@ class MotionMultiply(LayerBase):
         motion = easeInOutSine(motion)
         self._motion = motion
 
+        return
+
         self._cam_fbo.begin()
         glColor4f(1.0, 1.0, 1.0, motion)
         cam.draw(0, 0, self._cam_fbo.width, self._cam_fbo.height)

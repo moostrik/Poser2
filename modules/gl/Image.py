@@ -1,4 +1,5 @@
 from OpenGL.GL import * # type: ignore
+from modules.gl.Fbo import Fbo
 from modules.gl.Texture import Texture, get_data_type
 import numpy as np
 from threading import Lock
@@ -73,47 +74,13 @@ def get_internal_format(image: np.ndarray) -> Constant:
     return GL_NONE
 
 
-def get_numpy_dtype(data_type: Constant, internal_format: Constant) -> type | None:
-    """Convert OpenGL data type to NumPy dtype.
+class Image(Fbo):
+    """GPU texture for CPU-uploaded images with automatic GPU flip for uniform orientation.
 
-    Args:
-        data_type: OpenGL data type (e.g., GL_UNSIGNED_BYTE, GL_FLOAT)
-        internal_format: OpenGL internal format to distinguish float16 vs float32
-
-    Returns:
-        NumPy dtype (np.uint8, np.float16, np.float32) or None if unsupported
+    Extends Fbo to enable GPU-side vertical flip during upload, ensuring all textures
+    have consistent V orientation (top at V=1) regardless of source format.
     """
-    if data_type == GL_UNSIGNED_BYTE:
-        return np.uint8
-    elif data_type == GL_FLOAT:
-        # Distinguish float16 vs float32 based on internal format
-        if internal_format in (GL_RGB16F, GL_RGBA16F, GL_R16F, GL_RG16F):
-            return np.float16
-        else:
-            return np.float32
-    return None
 
-def get_channel_count(format: Constant) -> int | None:
-    """Get number of channels from OpenGL format.
-
-    Args:
-        format: OpenGL format (e.g., GL_RGB, GL_RGBA, GL_RED)
-
-    Returns:
-        Number of channels (1-4) or None if unsupported
-    """
-    if format in (GL_BGR, GL_RGB):
-        return 3
-    elif format in (GL_BGRA, GL_RGBA):
-        return 4
-    elif format == GL_RED:
-        return 1
-    elif format == GL_RG:
-        return 2
-    return None
-
-
-class Image(Texture):
     def __init__(self, channel_order: Literal['BGR', 'RGB'] = 'RGB') -> None:
         """Initialize Image texture with specified channel order.
 
@@ -125,6 +92,8 @@ class Image(Texture):
         self._needs_update: bool = False
         self._mutex: Lock = Lock()
         self._channel_order: Literal['BGR', 'RGB'] = channel_order
+        # Staging texture for CPU upload before GPU flip
+        self._staging: Texture = Texture()
 
     def set_image(self, image: np.ndarray) -> None:
         """Set image to be uploaded to texture.
@@ -152,7 +121,7 @@ class Image(Texture):
                  wrap_t: int = GL_CLAMP_TO_EDGE,
                  min_filter: int = GL_LINEAR,
                  mag_filter: int = GL_LINEAR) -> None:
-        """Allocate OpenGL texture with channel order support.
+        """Allocate FBO and staging texture for GPU-flipped image upload.
 
         Args:
             width: Texture width in pixels
@@ -163,40 +132,30 @@ class Image(Texture):
             min_filter: Minification filter (default: GL_LINEAR)
             mag_filter: Magnification filter (default: GL_LINEAR)
         """
-        data_type: Constant = get_data_type(internal_format)
-        if data_type == GL_NONE: return
+        # Allocate staging texture for CPU upload (uses channel order format)
+        self._staging.allocate(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
+        # Override staging format for BGR support
+        self._staging.format = get_format(internal_format, self._channel_order)
 
-        self.width = width
-        self.height = height
-        self.internal_format = internal_format
-        self.format = get_format(internal_format, self._channel_order)
-        self.data_type = data_type
-        self.tex_id: int = glGenTextures(1)
+        # Allocate FBO (self) for flipped result - uses parent Fbo.allocate
+        super().allocate(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
 
-        glBindTexture(GL_TEXTURE_2D, self.tex_id)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter)
-
-        # Set the swizzle mask for the texture to draw it as grayscale
-        if self.format == GL_RED:
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_RED)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ONE)
-
-        glTexImage2D(GL_TEXTURE_2D, 0, self.internal_format, self.width, self.height, 0, self.format, self.data_type, None)
-        glBindTexture(GL_TEXTURE_2D, 0)
-
-        self.allocated = True
+    def deallocate(self) -> None:
+        """Deallocate FBO and staging texture."""
+        self._staging.deallocate()
+        super().deallocate()
 
     def set_from_image(self, image: np.ndarray) -> None:
-        """Upload a NumPy array to the texture.
+        """Upload a NumPy array to the texture with GPU flip for uniform orientation.
+
+        The image is first uploaded to a staging texture, then blitted with V flip
+        to this FBO, ensuring top of image is at V=1 (matching FBO-rendered content).
 
         Args:
             image: NumPy array containing the image data
         """
+        from modules.gl.shaders.FboBlit import FboBlit
+
         internal_format: Constant = get_internal_format(image)
         if internal_format == GL_NONE: return
         height: int = image.shape[0]
@@ -209,44 +168,14 @@ class Image(Texture):
 
         if not self.allocated: return
 
-        # Upload image data
-        self.bind()
-        glTexImage2D(GL_TEXTURE_2D, 0, self.internal_format, width, height, 0, self.format, self.data_type, image)
-        self.unbind()
+        # Step 1: Upload to staging texture (CPU -> GPU, no flip)
+        self._staging.bind()
+        glTexImage2D(GL_TEXTURE_2D, 0, self._staging.internal_format, width, height, 0,
+                     self._staging.format, self._staging.data_type, image)
+        self._staging.unbind()
 
-    def read_to_numpy(self) -> np.ndarray | None:
-        """Read texture data back to CPU as NumPy array (OpenFrameworks-inspired).
-
-        Useful for debugging, saving captures, or analyzing texture content.
-        Respects channel_order to return data in correct BGR/RGB format.
-
-        Returns:
-            NumPy array with texture data in the configured channel order, or None if not allocated
-        """
-        if not self.allocated:
-            return None
-
-        # Get NumPy dtype from GL types
-        dtype = get_numpy_dtype(self.data_type, self.internal_format)
-        if dtype is None:
-            print(f"Image.read_to_numpy: Unsupported data type {self.data_type}")
-            return None
-
-        # Get channel count from format
-        channels = get_channel_count(self.format)
-        if channels is None:
-            print(f"Image.read_to_numpy: Unsupported format {self.format}")
-            return None
-
-        # Allocate output array
-        if channels == 1:
-            pixels = np.zeros((self.height, self.width), dtype=dtype)
-        else:
-            pixels = np.zeros((self.height, self.width, channels), dtype=dtype)
-
-        # Read texture data from GPU
-        self.bind()
-        glGetTexImage(GL_TEXTURE_2D, 0, self.format, self.data_type, pixels)
-        self.unbind()
-
-        return pixels
+        # Step 2: Blit with V flip to self (FBO) - normalizes orientation on GPU
+        shader = FboBlit()
+        if not shader.allocated:
+            shader.allocate()
+        shader.use(self, self._staging, flip_v=True)

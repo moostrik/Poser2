@@ -81,7 +81,7 @@
 
   "render": {
     "title": "Poser",
-    "monitor": 0,
+    "monitor": 1,
     "width": 1920,
     "height": 1000,
     "x": 0,

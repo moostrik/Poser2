@@ -14,12 +14,13 @@ class FboBlit(Shader):
     Uses generic vertex/fragment shaders for texture sampling.
     """
 
-    def use(self, dst_fbo: Fbo, src_texture: Texture) -> None:
+    def use(self, dst_fbo: Fbo, src_texture: Texture, flip_v: bool = False) -> None:
         """Blit source texture to destination FBO.
 
         Args:
             dst_fbo: Destination FBO to blit to
             src_texture: Source texture to blit from
+            flip_v: Flip texture V coordinate (for normalizing upload orientation)
         """
         if not self.allocated or not self.shader_program: return
         if not dst_fbo.allocated or not src_texture.allocated: return
@@ -38,6 +39,9 @@ class FboBlit(Shader):
         # Configure shader uniforms
         glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(dst_fbo.width), float(dst_fbo.height))
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
+        # flip_v=True means source is staging (top at V=0), so DON'T flip V in shader
+        # flip_v=False means source is normalized (top at V=1), use default flipV=true
+        glUniform1i(glGetUniformLocation(self.shader_program, "flipV"), int(not flip_v))
 
         # Render fullscreen quad in pixel space
         draw_quad_pixels(dst_fbo.width, dst_fbo.height)

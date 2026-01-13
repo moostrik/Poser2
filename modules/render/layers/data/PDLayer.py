@@ -76,6 +76,7 @@ class PDLayer(LayerBase):
 
     @staticmethod
     def render_labels(fbo: Fbo) -> None:
+        return
         text_init()
 
         rect = Rect(0, 0, fbo.width, fbo.height)

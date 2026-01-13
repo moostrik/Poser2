@@ -10,6 +10,8 @@ from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur
 from modules.utils.PointsAndRects import Rect, Point2f
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 # GL
 from modules.gl import Fbo, SwapFbo, Texture
 
@@ -31,6 +33,8 @@ class CentreMaskLayer(LayerBase):
         self._mask_AA_fbo: Fbo = Fbo()
         self._mask_blur_fbo: SwapFbo = SwapFbo()
 
+        self._outpput_fbo: Fbo = self._mask_blur_fbo
+
         # Shaders
         self._roi_shader = DrawRoi()
         self._mask_blend_shader = MaskBlend()
@@ -42,10 +46,12 @@ class CentreMaskLayer(LayerBase):
         self.blur_steps: int = 0
         self.blur_radius: float = 8.0
 
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
+
     @property
     def texture(self) -> Texture:
         """Output texture for external use."""
-        return self._mask_blur_fbo.texture
+        return self._outpput_fbo.texture
 
     @property
     def mask_blur_fbo(self) -> SwapFbo:
@@ -87,7 +93,6 @@ class CentreMaskLayer(LayerBase):
             self._mask_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._mask_blend_fbo.swap()
             self._mask_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            glEnable(GL_BLEND)
             return
 
         # Use bbox geometry from CentreGeometry
@@ -97,9 +102,7 @@ class CentreMaskLayer(LayerBase):
             self._anchor_calc.bbox_crop_roi,
             self._anchor_calc.bbox_rotation,
             self._anchor_calc.bbox_rotation_center,
-            self._anchor_calc.bbox_aspect,
-            False,
-            False
+            self._anchor_calc.bbox_aspect
         )
 
         # Temporal blending
@@ -115,9 +118,7 @@ class CentreMaskLayer(LayerBase):
         self._mask_AA_shader.use(self._mask_AA_fbo, self._mask_blend_fbo.texture)
 
         # Copy AA result to blur buffer
-        self._mask_blur_fbo.begin()
-        self._mask_AA_fbo.draw(0, 0, self._mask_blur_fbo.width, self._mask_blur_fbo.height)
-        self._mask_blur_fbo.end()
+        self.mask_blur_fbo.blit(self._mask_AA_fbo.texture)
 
         # Multi-pass blur
         for i in range(self.blur_steps):
@@ -136,5 +137,6 @@ class CentreMaskLayer(LayerBase):
                 self.blur_radius
             )
 
-        glEnable(GL_BLEND)
+        self._outpput_fbo: Fbo = self._mask_blur_fbo
 
+        glEnable(GL_BLEND)

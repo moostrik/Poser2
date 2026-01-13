@@ -94,7 +94,7 @@ LARGE_LAYERS: list[Layers] = [
 
 PREVIEW_LAYERS: list[Layers] = [
     Layers.cam_image,
-    # Layers.centre_pose,
+    Layers.centre_pose,
     # Layers.centre_motion,
     # Layers.sim_blend,
     # Layers.prev_angles,
@@ -104,8 +104,14 @@ PREVIEW_LAYERS: list[Layers] = [
 ]
 
 FINAL_LAYERS: list[Layers] = [
+    Layers.cam_image,
     Layers.centre_cam,
+    # Layers.cam_mask,
     # Layers.centre_mask,
+    # Layers.dense_flow,
+    # Layers.centre_mask,
+    # Layers.centre_cam,
+    # Layers.dense_flow,
     Layers.centre_pose,
     # Layers.centre_motion,
     # Layers.centre_pose,
@@ -115,7 +121,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.motion_sim,
     # Layers.cam_mask,
     # Layers.cam_image,
-    # Layers.cam_flow,
+    # Layers.dense_flow,
     # Layers.centre_D_flow,
     # Layers.dense_flow,
     # Layers.centre_flow,

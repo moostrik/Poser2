@@ -25,12 +25,12 @@ class Fbo(Texture):
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         self.unbind()
 
-    def begin(self)  -> None:
-        glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
-        glViewport(0, 0, self.width, self.height)
+    # def begin(self)  -> None:
+    #     glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
+    #     glViewport(0, 0, self.width, self.height)
 
-    def end(self)  -> None:
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+    # def end(self)  -> None:
+    #     glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def blit(self, texture: Texture) -> None:
         """Blit a texture to this FBO. """
@@ -45,6 +45,11 @@ class Fbo(Texture):
         glClearColor(r, g, b, a)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # type: ignore
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def draw(self, x: float, y: float, w: float, h: float) -> None:
+        """Draw FBO to screen. All textures now have uniform V orientation."""
+        from modules.gl.shaders.TextureBlit import TextureBlit
+        TextureBlit().use(self, x, y, w, h, flip_v=False)
 
 class SwapFbo(Fbo):
     """Double-buffered FBO that swaps between two buffers.
@@ -117,13 +122,13 @@ class SwapFbo(Fbo):
         """Swap buffers (back becomes front)."""
         self._swap_state = 1 - self._swap_state
 
-    def begin(self) -> None:
-        """Begin rendering to current buffer."""
-        self._fbos[self._swap_state].begin()
+    # def begin(self) -> None:
+    #     """Begin rendering to current buffer."""
+    #     self._fbos[self._swap_state].begin()
 
-    def end(self) -> None:
-        """End rendering to current buffer."""
-        self._fbos[self._swap_state].end()
+    # def end(self) -> None:
+    #     """End rendering to current buffer."""
+    #     self._fbos[self._swap_state].end()
 
     def blit(self, texture: Texture) -> None:
         """Blit a texture to current buffer."""

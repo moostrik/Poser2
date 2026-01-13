@@ -6,7 +6,7 @@ import traceback
 from typing import Callable, Optional
 
 # Third-party imports
-from OpenGL.GL import glGetString, GL_VERSION
+from OpenGL.GL import glGetString, GL_VERSION, glClipControl, GL_UPPER_LEFT, GL_ZERO_TO_ONE
 import glfw
 
 # Local application imports
@@ -145,6 +145,10 @@ class WindowManager():
 
         # Make context current
         glfw.make_context_current(self.main_window)
+        # Configure OpenGL to use top-left origin for clip space
+        # This makes (0,0) top-left everywhere - screen, FBOs, textures
+
+        # glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE)
 
         version = glGetString(GL_VERSION)
         if isinstance(version, bytes):
@@ -271,6 +275,11 @@ class WindowManager():
         if not win:
             print("Failed to create secondary window")
             return None
+
+        # Make context current and configure it
+        glfw.make_context_current(win)
+        # glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE)  # Set top-left origin for this context
+        glfw.make_context_current(self.main_window)  # Switch back to main context
 
         glfw.set_mouse_button_callback(win, self._invoke_secondary_callbacks)
         self._setup_secondary_window(win, monitor_id, True)

@@ -1,4 +1,5 @@
 from OpenGL.GL import * # type: ignore
+import numpy as np
 from modules.gl.shaders.TextureBlit import TextureBlit
 
 
@@ -42,6 +43,47 @@ def get_data_type(internal_format) -> Constant:
     if internal_format == GL_RG32F: return GL_FLOAT
     print('GL_texture', 'internal format not supported')
     return GL_NONE
+
+
+def _get_numpy_dtype(data_type: Constant, internal_format: Constant) -> type | None:
+    """Convert OpenGL data type to NumPy dtype.
+
+    Args:
+        data_type: OpenGL data type (e.g., GL_UNSIGNED_BYTE, GL_FLOAT)
+        internal_format: OpenGL internal format to distinguish float16 vs float32
+
+    Returns:
+        NumPy dtype (np.uint8, np.float16, np.float32) or None if unsupported
+    """
+    if data_type == GL_UNSIGNED_BYTE:
+        return np.uint8
+    elif data_type == GL_FLOAT:
+        # Distinguish float16 vs float32 based on internal format
+        if internal_format in (GL_RGB16F, GL_RGBA16F, GL_R16F, GL_RG16F):
+            return np.float16
+        else:
+            return np.float32
+    return None
+
+
+def _get_channel_count(format: Constant) -> int | None:
+    """Get number of channels from OpenGL format.
+
+    Args:
+        format: OpenGL format (e.g., GL_RGB, GL_RGBA, GL_RED)
+
+    Returns:
+        Number of channels (1-4) or None if unsupported
+    """
+    if format in (GL_BGR, GL_RGB):
+        return 3
+    elif format in (GL_BGRA, GL_RGBA):
+        return 4
+    elif format == GL_RED:
+        return 1
+    elif format == GL_RG:
+        return 2
+    return None
 
 
 class Texture():
@@ -120,7 +162,46 @@ class Texture():
         self.tex_id = 0
 
     def draw(self, x: float, y: float, w: float, h: float) -> None:
-        TextureBlit().use(self, x, y, w, h)
+        """Draw texture to screen. All textures have uniform V orientation (top at V=1)."""
+        TextureBlit().use(self, x, y, w, h, flip_v=False)
+
+    def read_to_numpy(self) -> np.ndarray | None:
+        """Read texture data back to CPU as NumPy array.
+
+        Data is returned in top-left origin format to match our coordinate system.
+        OpenGL reads bottom-up, so we flip vertically.
+
+        Returns:
+            NumPy array with texture data (top-left origin), or None if not allocated
+        """
+        if not self.allocated:
+            return None
+
+        # Get NumPy dtype from GL data type
+        dtype = _get_numpy_dtype(self.data_type, self.internal_format)
+        if dtype is None:
+            print(f"Texture.read_to_numpy: Unsupported data type {self.data_type}")
+            return None
+
+        # Get channel count from format
+        channels = _get_channel_count(self.format)
+        if channels is None:
+            print(f"Texture.read_to_numpy: Unsupported format {self.format}")
+            return None
+
+        # Allocate output array
+        if channels == 1:
+            pixels = np.zeros((self.height, self.width), dtype=dtype)
+        else:
+            pixels = np.zeros((self.height, self.width, channels), dtype=dtype)
+
+        # Read texture data from GPU
+        self.bind()
+        glGetTexImage(GL_TEXTURE_2D, 0, self.format, self.data_type, pixels)
+        self.unbind()
+
+        # Flip vertically: OpenGL reads bottom-up, we want top-left origin
+        return np.flipud(pixels)
 
     def bind(self) -> None :
         glBindTexture(GL_TEXTURE_2D, self.tex_id)

@@ -28,18 +28,6 @@ def monitor_path(path, callback):
     observer.start()
     return observer
 
-def draw_quad() -> None :
-    glBegin(GL_QUADS)
-    glTexCoord2f( 0.0,  0.0)
-    glVertex2f(  -1.0, -1.0)
-    glTexCoord2f( 1.0,  0.0)
-    glVertex2f(   1.0, -1.0)
-    glTexCoord2f( 1.0,  1.0)
-    glVertex2f(   1.0,  1.0)
-    glTexCoord2f( 0.0,  1.0)
-    glVertex2f(  -1.0,  1.0)
-    glEnd()
-
 def draw_quad_pixels(width: float, height: float) -> None:
     """Draw a fullscreen quad using pixel coordinates.
 
@@ -52,12 +40,16 @@ def draw_quad_pixels(width: float, height: float) -> None:
     """
     glBegin(GL_QUADS)
     # Top-left
+    glTexCoord2f(0.0, 0.0)
     glVertex2f(0.0, 0.0)
     # Top-right
+    glTexCoord2f(1.0, 0.0)
     glVertex2f(width, 0.0)
     # Bottom-right
+    glTexCoord2f(1.0, 1.0)
     glVertex2f(width, height)
     # Bottom-left
+    glTexCoord2f(0.0, 1.0)
     glVertex2f(0.0, height)
     glEnd()
 
@@ -75,12 +67,16 @@ def draw_quad_pixels_at(x: float, y: float, width: float, height: float) -> None
     """
     glBegin(GL_QUADS)
     # Top-left
+    glTexCoord2f(0.0, 0.0)
     glVertex2f(x, y)
     # Top-right
+    glTexCoord2f(1.0, 0.0)
     glVertex2f(x + width, y)
     # Bottom-right
+    glTexCoord2f(1.0, 1.0)
     glVertex2f(x + width, y + height)
     # Bottom-left
+    glTexCoord2f(0.0, 1.0)
     glVertex2f(x, y + height)
     glEnd()
 

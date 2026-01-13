@@ -50,7 +50,7 @@ class PoseLineLayer(LayerBase):
     def draw(self, rect: Rect) -> None:
         if self.use_bbox and self._p_pose is not None:
             box_rect: Rect = self._p_pose.bbox.to_rect()
-            rect = box_rect.affine_transform(rect)
+            rect = box_rect.affine_transform(Rect(0,0,1, 1))
 
         self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
 

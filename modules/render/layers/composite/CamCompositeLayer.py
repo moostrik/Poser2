@@ -87,9 +87,21 @@ class CamCompositeLayer(LayerBase):
         full_rect = Rect(0, 0, self._fbo.width, self._fbo.height)
 
         self._fbo.clear(0.0, 0.0, 0.0, 1.0)
-        self._fbo.begin()
-        self._cam_texture.draw(full_rect.x, full_rect.y, full_rect.width, full_rect.height)
-        self._depth_track_renderer.draw(full_rect)
-        self._bbox_renderer.draw(full_rect)
-        self._pose_line_layer.draw(full_rect)
-        self._fbo.end()
+        # self._fbo.begin()
+
+        # Set up projection matrix for immediate mode rendering in this FBO
+        # glMatrixMode(GL_PROJECTION)
+        # glLoadIdentity()
+        # glOrtho(0, self._fbo.width, self._fbo.height, 0, -1, 1)  # Top-left origin
+        # glMatrixMode(GL_MODELVIEW)
+        # glLoadIdentity()
+
+        self._fbo.blit(self._cam_texture)
+        self._fbo.blit(self._pose_line_layer.texture)
+
+
+        # self._cam_texture.draw(full_rect.x, full_rect.y, full_rect.width, full_rect.height)
+        # self._depth_track_renderer.draw(full_rect)
+        # self._bbox_renderer.draw(full_rect)
+        # self._pose_line_layer.draw(full_rect)
+        # self._fbo.end()

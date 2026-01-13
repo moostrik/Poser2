@@ -92,6 +92,8 @@ class SimilarityLayer(LayerBase):
 
         step: float = self._fbo.height / self._num_streams
 
+        return
+
         self._fbo.begin()
         glColor4f(1.0, 0.5, 0.5, 1.0)
         for i, pair in enumerate(pairs):

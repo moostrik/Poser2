@@ -51,23 +51,25 @@ def popStyle() -> None:
     glLineWidth(state.line_width)
 
 
-def setOrthoView(width: int, height: int, flip_y: bool = True) -> None:
-    """Set up orthographic projection for 2D rendering.
+# def setOrthoView(width: int, height: int, flip_y: bool = True) -> None:
+#     """Set up orthographic projection for 2D rendering.
 
-    Args:
-        width: Viewport width in pixels
-        height: Viewport height in pixels
-        flip_y: If True, origin at top-left (UI convention).
-                If False, origin at bottom-left (OpenGL convention)
-    """
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
+#     Args:
+#         width: Viewport width in pixels
+#         height: Viewport height in pixels
+#         flip_y: If True, origin at top-left (UI convention).
+#                 If False, origin at bottom-left (OpenGL convention)
+#     """
 
-    if flip_y:
-        glOrtho(0, width, height, 0, -1, 1)
-    else:
-        glOrtho(0, width, 0, height, -1, 1)
+#     print("ORTHO HERE")
+#     glMatrixMode(GL_PROJECTION)
+#     glLoadIdentity()
 
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity()
-    glViewport(0, 0, width, height)
+#     if flip_y:
+#         glOrtho(0, width, height, 0, -1, 1)
+#     else:
+#         glOrtho(0, width, 0, height, -1, 1)
+
+#     glMatrixMode(GL_MODELVIEW)
+#     glLoadIdentity()
+#     glViewport(0, 0, width, height)
