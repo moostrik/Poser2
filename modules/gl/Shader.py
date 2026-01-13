@@ -41,6 +41,9 @@ def draw_quad() -> None :
     glEnd()
 
 def draw_quad_pixels(width: float, height: float) -> None:
+
+    draw_quad()
+    return
     """Draw a fullscreen quad using pixel coordinates.
 
     Vertices are in pixel space with (0,0) at top-left, (width,height) at bottom-right.

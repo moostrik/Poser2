@@ -70,4 +70,5 @@ void main() {
 
     vec3 color = alphaAccum > 0.001 ? colorAccum / alphaAccum : vec3(0.0);
     fragColor = vec4(color, alphaAccum);
+    fragColor.r = 1.0;
 }
