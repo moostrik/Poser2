@@ -118,7 +118,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.cam_flow,
     # Layers.centre_D_flow,
     # Layers.dense_flow,
-    Layers.centre_flow,
+    # Layers.centre_flow,
 ]
 
 BOX_LAYERS: list[Layers] = [

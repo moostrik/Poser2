@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo
 import numpy as np
 
@@ -54,7 +54,7 @@ class RStream(Shader):
         glUniform1i(glGetUniformLocation(self.shader_program, "totalPairs"), total_pairs)
 
         # Render
-        draw_quad_pixels(fbo.width, fbo.height)
+        draw_quad()
 
         # Cleanup
         glActiveTexture(GL_TEXTURE0)

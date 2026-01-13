@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo, Texture
 
 class Curtain(Shader):
@@ -27,7 +27,7 @@ class Curtain(Shader):
         glUniform1f(glGetUniformLocation(self.shader_program, "fade"), fade)
 
         # Render
-        draw_quad_pixels(fbo.width, fbo.height)
+        draw_quad()
 
         # Cleanup
         glActiveTexture(GL_TEXTURE1)

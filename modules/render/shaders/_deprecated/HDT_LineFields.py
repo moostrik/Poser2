@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo, Texture
 
 class HDT_LineFields(Shader):
@@ -48,7 +48,7 @@ class HDT_LineFields(Shader):
         glUniform1f(glGetUniformLocation(self.shader_program, "param2"), param_2)
 
         # Render
-        draw_quad_pixels(fbo.width, fbo.height)
+        draw_quad()
 
         # Cleanup
         glActiveTexture(GL_TEXTURE4)

@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo, Texture
 
 class MaskAA(Shader):
@@ -29,7 +29,7 @@ class MaskAA(Shader):
         glUniform2f(glGetUniformLocation(self.shader_program, "texelSize"), texel_size[0], texel_size[1])
 
         # Render
-        draw_quad_pixels(fbo.width, fbo.height)
+        draw_quad()
 
         # Cleanup
         glActiveTexture(GL_TEXTURE0)

@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl.Texture import Texture
 
 class TextureBlit(Shader):
@@ -37,7 +37,7 @@ class TextureBlit(Shader):
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
 
         # Render quad in pixel space
-        draw_quad_pixels(w, h)
+        draw_quad()
 
         # Cleanup
         glBindTexture(GL_TEXTURE_2D, 0)

@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo, Texture
 
 class BlurH(Shader):
@@ -24,7 +24,7 @@ class BlurH(Shader):
         glUniform1f(glGetUniformLocation(self.shader_program, "radius"), radius)
 
         # Render
-        draw_quad_pixels(fbo.width, fbo.height)
+        draw_quad()
 
         # Cleanup
         glActiveTexture(GL_TEXTURE0)

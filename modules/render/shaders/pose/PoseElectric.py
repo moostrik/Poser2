@@ -2,7 +2,7 @@ import numpy as np
 import time as pytime
 
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo
 
 from modules.pose.Frame import Frame
@@ -38,7 +38,7 @@ class PoseElectric(Shader):
         glUniform4fv(glGetUniformLocation(self.shader_program, "points"), n_points, packed_data.flatten())
 
         # Render
-        draw_quad_pixels(fbo.width, fbo.height)
+        draw_quad()
 
         # Cleanup
         glBindFramebuffer(GL_FRAMEBUFFER, 0)

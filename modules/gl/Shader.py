@@ -40,30 +40,6 @@ def draw_quad() -> None :
     glVertex2f(  -1.0,  1.0)
     glEnd()
 
-def draw_quad_pixels(width: float, height: float) -> None:
-
-    draw_quad()
-    return
-    """Draw a fullscreen quad using pixel coordinates.
-
-    Vertices are in pixel space with (0,0) at top-left, (width,height) at bottom-right.
-    Requires vertex shader with 'resolution' uniform to convert pixels to NDC.
-
-    Args:
-        width: Width in pixels (e.g., FBO width or window width)
-        height: Height in pixels (e.g., FBO height or window height)
-    """
-    glBegin(GL_QUADS)
-    # Top-left
-    glVertex2f(0.0, 0.0)
-    # Top-right
-    glVertex2f(width, 0.0)
-    # Bottom-right
-    glVertex2f(width, height)
-    # Bottom-left
-    glVertex2f(0.0, height)
-    glEnd()
-
 class Shader():
     # Class-level hot-reload management (one observer per directory)
     _directory_observers = {}  # {Path: Observer}

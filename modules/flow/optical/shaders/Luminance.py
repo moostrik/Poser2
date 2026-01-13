@@ -5,7 +5,7 @@ Ported from ofxFlowTools ftRGB2LuminanceShader.h
 """
 
 from OpenGL.GL import *  # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo, Texture
 
 
@@ -40,7 +40,7 @@ class Luminance(Shader):
         glUniform1i(glGetUniformLocation(self.shader_program, "flipV"), 1 if flip_y else 0)
 
         # Render
-        draw_quad_pixels(target_fbo.width, target_fbo.height)
+        draw_quad()
 
         # Cleanup
         glActiveTexture(GL_TEXTURE0)

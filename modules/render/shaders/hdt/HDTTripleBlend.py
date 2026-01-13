@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo, Texture
 
 class HDTTripleBlend(Shader):
@@ -49,7 +49,7 @@ class HDTTripleBlend(Shader):
         glUniform4f(glGetUniformLocation(self.shader_program, "color2"), *c3)
 
         # Render
-        draw_quad_pixels(fbo.width, fbo.height)
+        draw_quad()
 
         # Cleanup (reverse order)
         glActiveTexture(GL_TEXTURE5)

@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo
 
 class HDT_Lines(Shader):
@@ -35,7 +35,7 @@ class HDT_Lines(Shader):
         glUniform1f(glGetUniformLocation(self.shader_program, "param05"), param05)
 
         # Render
-        draw_quad_pixels(fbo.width, fbo.height)
+        draw_quad()
 
         # Cleanup
         glBindFramebuffer(GL_FRAMEBUFFER, 0)

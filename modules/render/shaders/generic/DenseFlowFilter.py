@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo, Texture
 
 class DenseFlowFilter(Shader):
@@ -26,7 +26,7 @@ class DenseFlowFilter(Shader):
         glUniform1f(glGetUniformLocation(self.shader_program, "noiseThreshold"), noise_threshold)
 
         # Render
-        draw_quad_pixels(fbo.width, fbo.height)
+        draw_quad()
 
         # Cleanup (reverse order)
         glActiveTexture(GL_TEXTURE0)

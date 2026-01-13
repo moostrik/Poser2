@@ -1,5 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad_pixels
+from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Fbo
 
 import numpy as np
@@ -31,7 +31,7 @@ class PoseValuesBar(Shader):
         glUniform1f(glGetUniformLocation(self.shader_program, "line_smooth"), line_smooth)
 
         # Render
-        draw_quad_pixels(fbo.width, fbo.height)
+        draw_quad()
 
         # Cleanup
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
