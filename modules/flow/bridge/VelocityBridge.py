@@ -3,7 +3,7 @@
 Simplest bridge: velocity passthrough with temporal/spatial smoothing.
 Ported from ofxFlowTools ftVelocityBridgeFlow.h
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from OpenGL.GL import *  # type: ignore
 
@@ -19,8 +19,15 @@ class VelocityBridgeConfig(BridgeConfigBase):
 
     Inherits trail_weight, blur_radius, and speed from BridgeConfigBase.
     """
-    pass
-
+    scale: float = field(
+        default=60.0,  # ⭐ Override for velocity-specific default
+        metadata={
+            "min": 0.0,
+            "max": 200.0,
+            "label": "Velocity Scale",
+            "description": "Converts optical flow to simulation velocity"
+        }
+    )
 
 class VelocityBridge(BridgeBase):
     """Velocity bridge with temporal and spatial smoothing.
@@ -70,7 +77,7 @@ class VelocityBridge(BridgeBase):
         self._process_velocity_trail()
 
         # Scale by timestep for framerate independence
-        timestep = delta_time * self.config.speed * 200.0
+        timestep = delta_time * self.config.scale
 
         self.output_fbo.begin()
         self._multiply_shader.use(self._velocity_trail_fbo.texture, timestep)

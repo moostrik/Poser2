@@ -33,10 +33,10 @@ class BridgeConfigBase(FlowConfigBase):
         metadata={"min": 0.0, "max": 10.0, "label": "Blur Radius",
                   "description": "Gaussian blur radius in pixels"}
     )
-    speed: float = field(
-        default=0.3,
-        metadata={"min": 0.0, "max": 1.0, "label": "Speed",
-                  "description": "Global speed multiplier"}
+    scale: float = field(
+        default=1.0,
+        metadata={"min": 0.0, "max": 200.0, "label": "Scale",
+                  "description": "Output scaling factor"}
     )
 
 

@@ -1,7 +1,6 @@
 """Bridge Flow Layer - smooths and processes optical flow for fluid simulation."""
 
 # Standard library imports
-import time
 
 # Third-party imports
 from OpenGL.GL import *  # type: ignore
@@ -33,7 +32,7 @@ class BridgeFlowLayer(LayerBase):
         velocity = bridge.texture  # Smoothed velocity for fluid
     """
 
-    def __init__(self, source: LayerBase) -> None:
+    def __init__(self, source: LayerBase, fps: float = 60) -> None:
         """Initialize bridge layer.
 
         Args:
@@ -51,8 +50,7 @@ class BridgeFlowLayer(LayerBase):
         self.draw_mode: DrawModes = DrawModes.FIELD
 
         # Timestep tracking
-        self._last_time: float = time.time()
-        self._delta_time: float = 0.016  # Default ~60fps
+        self._delta_time: float = 1 / fps
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -94,13 +92,7 @@ class BridgeFlowLayer(LayerBase):
 
     def update(self) -> None:
         """Update bridge processing with automatic timestep calculation."""
-        # Calculate delta time
-        current_time = time.time()
-        self._delta_time = current_time - self._last_time
-        self._last_time = current_time
 
-        # Clamp delta time to reasonable range (avoid huge jumps)
-        self._delta_time = max(0.001, min(self._delta_time, 0.1))
 
         # Check if source is active
         active: bool = getattr(self._source, "available", True)
@@ -121,7 +113,7 @@ class BridgeFlowLayer(LayerBase):
         """Draw bridge output or visualization."""
 
 
-        self.draw_mode: DrawModes = DrawModes.FIELD
+        self.draw_mode: DrawModes = DrawModes.SCALAR
 
         self._velocity_vis.config.arrow_length = 40.0
 
@@ -150,4 +142,3 @@ class BridgeFlowLayer(LayerBase):
     def reset(self) -> None:
         """Reset bridge state."""
         self._bridge.reset()
-        self._last_time = time.time()

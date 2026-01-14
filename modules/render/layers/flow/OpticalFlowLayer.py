@@ -27,7 +27,7 @@ class OpticalFlowLayer(LayerBase):
         self._velocity_vis: Velocity = Velocity()
         self.vis_config: VelocityConfig = self._velocity_vis.config
 
-        self.draw_mode = DrawModes.FIELD
+        self.draw_mode = DrawModes.SCALAR
         self._velocity_vis.config.arrow_length = 40.0
 
         self.draw_mode: DrawModes = DrawModes.OUTPUT
