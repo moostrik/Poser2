@@ -9,8 +9,7 @@ from modules.render.layers.LayerBase import LayerBase, Rect
 
 class BBoxCamRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: int = 2,
-                 bbox_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
-        # for now make sure the pose meshes are for the correct data type
+                 bbox_color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)) -> None:
         self._data: DataHub = data
         self._cam_id: int = cam_id
         self._cam_bbox_rects: list[Rect] = []
