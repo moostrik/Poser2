@@ -97,9 +97,7 @@ class CentreMaskLayer(LayerBase):
             self._anchor_calc.bbox_crop_roi,
             self._anchor_calc.bbox_rotation,
             self._anchor_calc.bbox_rotation_center,
-            self._anchor_calc.bbox_aspect,
-            False,
-            False
+            self._anchor_calc.bbox_aspect
         )
         self._mask_fbo.end()
 

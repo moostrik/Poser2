@@ -15,6 +15,8 @@ from modules.render.layers.LayerBase import LayerBase
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Texture
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 class CentreGeometry(LayerBase):
     """Calculates anchor points (shoulder/hip midpoints) and derived geometry.
@@ -58,6 +60,8 @@ class CentreGeometry(LayerBase):
         self.target_top: Point2f = Point2f(0.5, 0.33)
         self.target_bottom: Point2f = Point2f(0.5, 0.6)
         self.dst_aspectratio: float = 9/16
+
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def has_pose(self) -> bool:
@@ -164,15 +168,28 @@ class CentreGeometry(LayerBase):
         if hip_mid:
             self._hip_midpoint = hip_mid
 
-        # Convert to texture coordinates
+        # Calculate anchor points in image space (full image coordinates)
         self._bbox = pose.bbox.to_rect()
-        self._anchor_top_tex = self._shoulder_midpoint * self._bbox.size + self._bbox.position
-        self._anchor_bot_tex = self._hip_midpoint * self._bbox.size + self._bbox.position
+        anchor_top_img = self._shoulder_midpoint * self._bbox.size + self._bbox.position
+        anchor_bot_img = self._hip_midpoint * self._bbox.size + self._bbox.position
 
-        # Calculate camera-space geometry
+        # Convert anchor points to texture space (bottom-left origin)
+        self._anchor_top_tex = CentreGeometry._image_to_texture_point(anchor_top_img)
+        self._anchor_bot_tex = CentreGeometry._image_to_texture_point(anchor_bot_img)
+
+        # Calculate camera-space geometry in texture space
         target_distance: float = self.target_bottom.y - self.target_top.y
-        self._cam_rotation, self._distance, self._cam_crop_roi = CentreGeometry._calculate_roi(
-            self._anchor_top_tex, self._anchor_bot_tex, self.target_top, target_distance, self.dst_aspectratio
+        cam_rotation_img, self._distance, cam_crop_roi_img = CentreGeometry._calculate_roi(
+            anchor_top_img, anchor_bot_img, self.target_top, target_distance, self.dst_aspectratio
+        )
+
+        # Convert camera geometry to texture space
+        self._cam_rotation = CentreGeometry._image_to_texture_rotation(cam_rotation_img)
+        self._cam_crop_roi = Rect(
+            cam_crop_roi_img.x,
+            CentreGeometry._image_to_texture_y(cam_crop_roi_img.y + cam_crop_roi_img.height),
+            cam_crop_roi_img.width,
+            cam_crop_roi_img.height
         )
 
         # Calculate bbox-space geometry (aspect-corrected for mask)
@@ -197,9 +214,9 @@ class CentreGeometry(LayerBase):
             1.0 - self._shoulder_midpoint.y
         )
 
-        # Transform pose points using camera geometry
+        # Transform pose points using camera geometry (in image space)
         self._transformed_points = CentreGeometry._transform_points(
-            pose.points, self._bbox, self._anchor_top_tex, self._cam_aspect, self._cam_rotation, self._cam_crop_roi
+            pose.points, self._bbox, anchor_top_img, self._cam_aspect, cam_rotation_img, cam_crop_roi_img
         )
 
     @staticmethod
@@ -237,6 +254,21 @@ class CentreGeometry(LayerBase):
         )
 
         return rotation, distance, roi
+
+    @staticmethod
+    def _image_to_texture_y(y: float) -> float:
+        """Convert Y coordinate from image space (top-left) to texture space (bottom-left)."""
+        return 1.0 - y
+
+    @staticmethod
+    def _image_to_texture_point(point: Point2f) -> Point2f:
+        """Convert point from image space to texture space."""
+        return Point2f(point.x, 1.0 - point.y)
+
+    @staticmethod
+    def _image_to_texture_rotation(rotation: float) -> float:
+        """Convert rotation from image space to texture space (negate)."""
+        return -rotation
 
     @staticmethod
     def _transform_points(points: Points2D, bbox: Rect, top: Point2f,

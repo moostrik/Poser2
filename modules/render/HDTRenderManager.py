@@ -105,24 +105,40 @@ PREVIEW_LAYERS: list[Layers] = [
 ]
 
 FINAL_LAYERS: list[Layers] = [
+    # Layers.cam_image,
+    # Layers.cam_mask,
+    # Layers.dense_flow,
+    # Layers.flow_image,
+    # Layers.sparse_flow,
+
+    # Layers.cam_bbox, # what?
+    # Layers.cam_track,
+    # Layers.angle_data, # seems upside down
+    # Layers.mtime_data,
+    # Layers.field_bar_R,
+    # Layers.field_bar_I,
+    # Layers.angle_bar,
+    # Layers.motion_bar,
+    # Layers.motion_sim,
+
+    # Layers.box_cam, # is out of poition in relation to pose
+    # Layers.box_pose_I,
+    # Layers.box_pose_R,
+
+    # Layers.centre_mask,
+    # Layers.centre_cam,
+    # Layers.centre_pose,
+    # Layers.centre_D_flow,
+    # Layers.centre_motion,
+    # Layers.centre_flow,
+
+    # Layers.sim_blend,
+
     # Layers.centre_cam,
     # Layers.centre_mask,
     # Layers.centre_pose,
-    # Layers.centre_motion,
-    # Layers.centre_pose,
-    # Layers.box_pose_I,
-    Layers.sim_blend,
-    # Layers.angle_bar,
-    # Layers.motion_sim,
-    # Layers.cam_mask,
-    # Layers.cam_image,
-    # Layers.cam_flow,
-    # Layers.centre_D_flow,
-    # Layers.flow_image,
-
-    # Layers.sparse_flow,
-    Layers.centre_flow,
-    # Layers.centre_mask,
+    # Layers.sim_blend,
+    # Layers.centre_flow,
 ]
 
 BOX_LAYERS: list[Layers] = [

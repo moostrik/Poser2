@@ -90,8 +90,6 @@ class CentreCamLayer(LayerBase):
             self._anchor_calc.cam_rotation,
             self._anchor_calc.anchor_top_tex,
             cam_aspect,
-            False,
-            True
         )
         self._cam_fbo.end()
 
