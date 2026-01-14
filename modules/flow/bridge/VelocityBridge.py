@@ -80,5 +80,5 @@ class VelocityBridge(BridgeBase):
         timestep = delta_time * self.config.scale
 
         self.output_fbo.begin()
-        self._multiply_shader.use(self._velocity_trail_fbo.texture, timestep)
+        self._multiply_shader.use(self.velocity, timestep)
         self.output_fbo.end()

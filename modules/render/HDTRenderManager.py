@@ -288,6 +288,7 @@ class HDTRenderManager(RenderBase):
             for layer_type in self._preview_layers:
                 self.L[layer_type][i].draw(preview_rect)
             self.L[Layers.centre_cam][i].use_mask = True #type: ignore
+            self.L[Layers.centre_mask][i].blur_steps = 0 #type: ignore
 
         self._draw_layers = FINAL_LAYERS
         # self._draw_layers = BOX_LAYERS

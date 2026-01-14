@@ -119,6 +119,10 @@ class BridgeFlowLayer(LayerBase):
         self.draw_mode: DrawModes = DrawModes.FIELD
 
         self._velocity_vis.config.arrow_length = 40.0
+        self.bridge_config.trail_weight = 0.66
+        self.bridge_config.blur_steps = 2
+        self.bridge_config.blur_radius = 3.0
+
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
