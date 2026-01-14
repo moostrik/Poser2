@@ -3,6 +3,7 @@ from .RenderBase import RenderBase
 from .Shader import Shader
 from .WindowManager import WindowManager
 from . import View
+from . import Style
 
 # TEXTURE CLASSES
 from .Texture import Texture

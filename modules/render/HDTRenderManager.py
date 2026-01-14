@@ -6,7 +6,7 @@ from typing import cast
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl import RenderBase, WindowManager, Shader
+from modules.gl import RenderBase, WindowManager, Shader, View
 from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub, PoseDataHubTypes, SimilarityDataHubType
@@ -90,6 +90,7 @@ LARGE_LAYERS: list[Layers] = [
     Layers.centre_mask,
     Layers.sim_blend,
     Layers.centre_pose,
+    Layers.centre_flow
 ]
 
 PREVIEW_LAYERS: list[Layers] = [
@@ -104,21 +105,24 @@ PREVIEW_LAYERS: list[Layers] = [
 ]
 
 FINAL_LAYERS: list[Layers] = [
-    Layers.centre_cam,
+    # Layers.centre_cam,
     # Layers.centre_mask,
-    Layers.centre_pose,
+    # Layers.centre_pose,
     # Layers.centre_motion,
     # Layers.centre_pose,
     # Layers.box_pose_I,
-    # Layers.sim_blend,
+    Layers.sim_blend,
     # Layers.angle_bar,
     # Layers.motion_sim,
     # Layers.cam_mask,
     # Layers.cam_image,
     # Layers.cam_flow,
     # Layers.centre_D_flow,
-    # Layers.dense_flow,
-    # Layers.centre_flow,
+    # Layers.flow_image,
+
+    # Layers.sparse_flow,
+    Layers.centre_flow,
+    # Layers.centre_mask,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -242,7 +246,7 @@ class HDTRenderManager(RenderBase):
 
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
-        self.setView(width, height)
+        View.set_view(width, height)
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -270,7 +274,7 @@ class HDTRenderManager(RenderBase):
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
-        self.setView(width, height)
+        View.set_view(width, height)
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)

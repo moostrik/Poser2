@@ -4,39 +4,41 @@ from dataclasses import dataclass
 
 
 @dataclass
-class Style:
+class _StyleState:
     """Current OpenGL rendering style state."""
     blend_enabled: bool = False
     blend_src: int = GL_SRC_ALPHA
     blend_dst: int = GL_ONE_MINUS_SRC_ALPHA
     color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
     line_width: float = 1.0
+    point_size: float = 1.0
 
 
-_style_stack: list[Style] = []
+_style_stack: list[_StyleState] = []
 _MAX_STYLE_HISTORY: int = 32
 
 
-def pushStyle() -> None:
+def push_style() -> None:
     """Save current OpenGL rendering state."""
-    state = Style(
+    state = _StyleState(
         blend_enabled=bool(glIsEnabled(GL_BLEND)),
         blend_src=glGetIntegerv(GL_BLEND_SRC),
         blend_dst=glGetIntegerv(GL_BLEND_DST),
         color=tuple(glGetFloatv(GL_CURRENT_COLOR)),
         line_width=glGetFloatv(GL_LINE_WIDTH)[0],
+        point_size=glGetFloatv(GL_POINT_SIZE)[0],
     )
     _style_stack.append(state)
 
     if len(_style_stack) > _MAX_STYLE_HISTORY:
         _style_stack.pop(0)
-        print(f"pushStyle(): maximum style stack depth {_MAX_STYLE_HISTORY} reached")
+        print(f"push_style(): maximum style stack depth {_MAX_STYLE_HISTORY} reached")
 
 
-def popStyle() -> None:
+def pop_style() -> None:
     """Restore previously saved OpenGL rendering state."""
     if not _style_stack:
-        print("popStyle() called without matching pushStyle()")
+        print("pop_style() called without matching push_style()")
         return
 
     state = _style_stack.pop()
@@ -49,25 +51,4 @@ def popStyle() -> None:
     glBlendFunc(state.blend_src, state.blend_dst)
     glColor4f(*state.color)
     glLineWidth(state.line_width)
-
-
-def setOrthoView(width: int, height: int, flip_y: bool = True) -> None:
-    """Set up orthographic projection for 2D rendering.
-
-    Args:
-        width: Viewport width in pixels
-        height: Viewport height in pixels
-        flip_y: If True, origin at top-left (UI convention).
-                If False, origin at bottom-left (OpenGL convention)
-    """
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-
-    if flip_y:
-        glOrtho(0, width, height, 0, -1, 1)
-    else:
-        glOrtho(0, width, 0, height, -1, 1)
-
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity()
-    glViewport(0, 0, width, height)
+    glPointSize(state.point_size)
