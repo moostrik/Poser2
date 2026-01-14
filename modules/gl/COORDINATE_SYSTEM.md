@@ -36,6 +36,21 @@ This inverts the Y-axis compared to OpenGL's default bottom-left origin.
 
 ## Texture Coordinates
 
+### IMPORTANT: Two Different Coordinate Spaces
+
+**Texture Coordinate Space** (Internal - OpenGL Standard):
+```
+ │ V
+ │
+ │
+(0,0) ──────────► U
+
+OpenGL texture coordinate space:
+(0, 0) = bottom-left of texture
+(1, 1) = top-right of texture
+```
+
+**Rendered Output Space** (Visual - Screen Mapping):
 ```
 (0,0) ──────────► U
  │
@@ -43,24 +58,58 @@ This inverts the Y-axis compared to OpenGL's default bottom-left origin.
  │
  ▼ V
 
-Standard texture mapping:
-(0, 0) = top-left of texture
-(1, 1) = bottom-right of texture
+After draw_quad() mapping:
+(0, 0) = top-left of rendered output
+(1, 1) = bottom-right of rendered output
 ```
 
 ### Key Points
-- **Standard OpenGL convention**: `(0, 0)` = bottom-left
-- **Our convention**: Textures are **flipped** to match screen coordinates
+- **Internal texture coordinates**: Follow OpenGL convention (bottom-left origin)
+- **Rendered output**: Flipped to match screen coordinates (top-left origin)
 - **U/S**: Horizontal coordinate (0.0 - 1.0)
 - **V/T**: Vertical coordinate (0.0 - 1.0)
 
-### Texture Flipping
-The `draw_quad()` function handles texture flipping:
-- **`flipV=False` (default)**: Matches our top-left screen coordinates
-  - Maps texture `(0,1)` to screen top-left
-  - Maps texture `(1,0)` to screen bottom-right
-- **`flipV=True`**: Standard OpenGL (bottom-left origin)
-  - Use when source texture is already in bottom-left coordinates
+### When to Use Each Space
+
+**Use Texture Space (bottom-left origin) for:**
+- Geometric calculations (CentreGeometry anchor points)
+- Shader uniform coordinates
+- Direct texture coordinate manipulation
+- ROI calculations in texture space
+
+**Use Screen Space (top-left origin) for:**
+- Drawing to screen/FBO
+- Mouse/UI coordinates
+- Image pixel coordinates
+
+### Drawing Functions
+
+**View.draw_quad(x, y, w, h)** - Screen & FBO rendering:
+```python
+from modules.gl.View import draw_quad
+draw_quad(x, y, width, height)  # ALWAYS flips Y
+```
+- Texture `(0, 1)` → Top-left of destination
+- Texture `(1, 0)` → Bottom-right of destination
+- Use for all rendering to screen or FBO
+
+**Shader.draw_quad()** - Fullscreen shader passes:
+```python
+from modules.gl.Shader import draw_quad
+draw_quad()  # NO flip, NDC space
+```
+- Texture `(0, 0)` → NDC `(-1, -1)`
+- Use only for fullscreen shader effects
+
+### Converting Between Spaces
+```python
+# Image space (top-left) → Texture space (bottom-left)
+tex_y = 1.0 - img_y
+tex_rotation = -img_rotation
+
+# Example from CentreGeometry
+anchor_tex = Point2f(anchor_img.x, 1.0 - anchor_img.y)
+```
 
 ---
 
@@ -75,10 +124,11 @@ fbo.end()    # Restores previous state
 ```
 
 ### Important Behavior
-- `Fbo.begin()` calls `set_view(width, height)` internally
-- Rendering to FBO uses top-left origin
-- Reading from FBO texture uses standard texture coordinates
-- **No additional flipping needed** when drawing FBO to screen
+- `Fbo.begin()` calls `set_view(width, height)` internally (top-left origin)
+- `View.draw_quad()` flips when rendering INTO FBO → stores bottom-left texture
+- FBO texture is standard OpenGL (0,0) = bottom-left
+- `View.draw_quad()` flips again when drawing FBO to screen → displays correctly
+- **Double-flip system** makes FBOs "just work"
 
 ### State Management
 ```python
@@ -113,32 +163,52 @@ if x <= mouse_x <= x + width and y <= mouse_y <= y + height:
 
 | Aspect | OpenGL Default | Our System |
 |--------|----------------|------------|
-| **Origin** | Bottom-left `(0, 0)` | Top-left `(0, 0)` |
-| **Y-axis** | Points UP | Points DOWN |
-| **Texture (0,0)** | Bottom-left | Top-left |
+| **Screen Origin** | Bottom-left `(0, 0)` | Top-left `(0, 0)` |
+| **Screen Y-axis** | Points UP | Points DOWN |
+| **Texture Coords (Internal)** | Bottom-left `(0, 0)` | Bottom-left `(0, 0)` ✓ |
+| **Texture Rendering** | No flip | Y-flipped via `draw_quad()` |
 | **glOrtho** | `(0, W, 0, H, -1, 1)` | `(0, W, H, 0, -1, 1)` |
 
 ---
 
 ## Common Patterns
 
-### Drawing a Texture
+### Drawing Textures
 ```python
+from modules.gl.View import draw_quad
+
+# To screen/FBO
 texture.bind()
-draw_quad(x, y, width, height, flipV=False)
+draw_quad(x, y, width, height)  # Auto Y-flip
 texture.unbind()
-# Draws texture at (x, y) with top-left origin
+```
+
+### Geometric Calculations (CentreGeometry Pattern)
+```python
+# Calculate in image space (intuitive)
+anchor_img = Point2f(x_img, y_img)
+
+# Convert to texture space (for shaders)
+anchor_tex = Point2f(x_img, 1.0 - y_img)
+rotation_tex = -rotation_img
+roi_tex_y = 1.0 - (roi_img.y + roi_img.height)
 ```
 
 ### Drawing to FBO then to Screen
 ```python
-# Render to FBO
-fbo.begin()  # Sets top-left origin for FBO
-draw_something()
+from modules.gl.View import draw_quad
+
+# Render to FBO (View.draw_quad flips → stores bottom-left texture)
+fbo.begin()
+texture.bind()
+draw_quad(0, 0, fbo.width, fbo.height)
+texture.unbind()
 fbo.end()
 
-# Draw FBO to screen
-fbo.draw(x, y, width, height)  # No flip needed
+# Draw FBO to screen (View.draw_quad flips again → correct display)
+fbo.bind()
+draw_quad(x, y, width, height)
+fbo.unbind()
 ```
 
 ### SwapFbo Double Buffering
@@ -168,6 +238,60 @@ These return positions in top-left coordinate system.
 
 ---
 
+## Advanced: Multi-Space Geometry (CentreGeometry Pattern)
+
+Some layers like **CentreGeometry** work across multiple coordinate spaces for geometric accuracy:
+
+### Coordinate Spaces Used
+
+1. **Bbox-relative space** `[0, 1]` - Normalized within bounding box
+2. **Image space** - Full image coordinates (top-left origin)
+3. **Texture space** - OpenGL coordinates (bottom-left origin)
+4. **Crop space** `[0, 1]` - Normalized within crop region
+
+### Why Use Texture Space?
+
+**Texture space is used for geometric calculations** because:
+- ROI rectangles map directly to shader uniforms
+- Rotation calculations align with OpenGL rendering
+- No coordinate flip needed when passing to shaders
+
+### Conversion Pattern
+
+```python
+# 1. Calculate in image space (top-left, intuitive)
+anchor_img = shoulder_pos * bbox.size + bbox.position
+
+# 2. Convert to texture space (bottom-left, for OpenGL)
+anchor_tex = Point2f(anchor_img.x, 1.0 - anchor_img.y)
+
+# 3. Calculate ROI in image space
+roi_img = Rect(x, y, width, height)
+
+# 4. Convert ROI to texture space (flip Y)
+roi_tex = Rect(
+    roi_img.x,
+    1.0 - (roi_img.y + roi_img.height),  # Flip: bottom edge becomes top
+    roi_img.width,
+    roi_img.height
+)
+
+# 5. Negate rotation for texture space
+rotation_tex = -rotation_img
+```
+
+### When to Use This Pattern
+
+Use multi-space calculations when:
+- Computing ROIs for shader-based cropping
+- Calculating anchor points for geometric transformations
+- Passing coordinates directly to shader uniforms
+- Need precise alignment between CPU calculations and GPU rendering
+
+**Example:** [CentreGeometry.py](modules/render/layers/centre/CentreGeometry.py) calculates pose-centered crop regions by working in image space then converting to texture space for shader consumption.
+
+---
+
 ## Image/Tensor Data
 
 ### NumPy Arrays (from OpenCV, PIL, etc.)
@@ -193,15 +317,16 @@ image.update()
 ## Troubleshooting
 
 ### Image Appears Upside Down
-- **Cause**: Source texture is in OpenGL bottom-left coordinates
-- **Solution**: Use `draw_quad(..., flipV=True)`
+- **Cause**: Using wrong `draw_quad()` - use `View.draw_quad()` for rendering
+- **Cause**: Using `Shader.draw_quad()` outside shader context
 
 ### FBO Rendering Looks Flipped
-- **Check**: Verify `fbo.begin()` is called (it sets up proper view)
-- **Check**: Not mixing manual `glOrtho()` calls with `set_view()`
+- **Check**: `fbo.begin()` is called (sets top-left view)
+- **Check**: Using `View.draw_quad()` not `Shader.draw_quad()`
+- **Check**: Not mixing manual `glOrtho()` with `set_view()`
 
 ### Mouse Clicks Not Registering
-- **Check**: Using screen coordinates directly, not inverting Y
+- **Check**: Using screen coordinates directly (no Y inversion)
 - **Check**: Rectangle test uses `y + height`, not `y - height`
 
 ---
@@ -213,13 +338,20 @@ image.update()
 (0, 0)           # Top-left corner
 (width, height)  # Bottom-right corner
 
-# TEXTURE SPACE
-(0.0, 0.0)       # Top-left of texture (after our mapping)
-(1.0, 1.0)       # Bottom-right of texture
+# TEXTURE SPACE (Internal - OpenGL)
+(0.0, 0.0)       # Bottom-left of texture coordinate system
+(1.0, 1.0)       # Top-right of texture coordinate system
+
+# RENDERED OUTPUT (After draw_quad flip)
+(0.0, 0.0)       # Appears at top-left of screen
+(1.0, 1.0)       # Appears at bottom-right of screen
 
 # DRAWING
-draw_quad(x, y, w, h, flipV=False)  # Default: top-left origin
-draw_quad(x, y, w, h, flipV=True)   # OpenGL bottom-left origin
+from modules.gl.View import draw_quad  # Use this for rendering
+draw_quad(x, y, w, h)  # Always Y-flipped (screen/FBO)
+
+from modules.gl.Shader import draw_quad  # Only for shaders
+draw_quad()  # No flip (NDC space)
 
 # FBO
 fbo.begin()      # Auto-applies top-left coordinate system
@@ -229,6 +361,10 @@ fbo.end()        # Restores previous state
 set_view(w, h)   # Apply top-left coordinate system
 push_view()      # Save current state
 pop_view()       # Restore state
+
+# COORDINATE CONVERSION
+image_y_to_tex_y = 1.0 - image_y     # Image (top-left) → Texture (bottom-left)
+image_rot_to_tex = -image_rotation   # Negate rotation for texture space
 ```
 
 ---
@@ -238,3 +374,4 @@ pop_view()       # Restore state
 - [Fbo.py](Fbo.py) - FBO coordinate system handling
 - [Texture.py](Texture.py) - `draw_quad()` texture mapping
 - [WindowManager.py](WindowManager.py) - Window coordinate callbacks
+- [CentreGeometry.py](modules/render/layers/centre/CentreGeometry.py) - Multi-space geometric calculations

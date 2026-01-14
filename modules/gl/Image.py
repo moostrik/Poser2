@@ -74,7 +74,12 @@ def _get_internal_format(image: np.ndarray) -> Constant:
     return GL_NONE
 
 def _draw_quad_flipped(x: float, y: float, w: float, h: float) -> None :
-    """Draw a quad with vertically flipped texture coordinates."""
+    """Draw a quad with vertically flipped texture coordinates.
+
+    "Flipped" means inverted relative to View.draw_quad() - produces opposite
+    vertical orientation. Used internally by Image class to correct NumPy array
+    upload which stores data upside-down in OpenGL texture format.
+    """
     x0, x1 = x, x + w
     y0, y1 = y, y + h
 
