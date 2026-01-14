@@ -18,7 +18,6 @@ class Luminance(Shader):
         Args:
             target_fbo: Target framebuffer
             source_tex: Source RGB texture
-            flip_y: Flip texture coordinates vertically (True for Image textures)
         """
         if not self.allocated or not self.shader_program:
             print("Luminance shader not allocated or shader program missing.")

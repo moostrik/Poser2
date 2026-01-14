@@ -59,7 +59,9 @@ class CamBBoxLayer(LayerBase):
         if pose is None:
             return
 
-        pose_rect = pose.bbox.to_rect()
+        pose_rect: Rect = pose.bbox.to_rect()
+        # convert to texture space
+        pose_rect = pose_rect.flip_y(0.5)
 
         self._fbo.begin()
         self._roi_shader.use(self._cam_texture, pose_rect)

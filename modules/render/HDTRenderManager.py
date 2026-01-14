@@ -111,9 +111,9 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.flow_image,
     # Layers.sparse_flow,
 
-    Layers.cam_bbox,
+    # Layers.cam_bbox,
     # Layers.cam_track,
-    Layers.angle_data,
+    # Layers.angle_data,
     # Layers.mtime_data,
     # Layers.field_bar_R,
     # Layers.field_bar_I,
@@ -121,8 +121,8 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.motion_bar,
     # Layers.motion_sim,
 
-    # Layers.box_cam, # is out of poition in relation to pose
-    # Layers.box_pose_I,
+    Layers.box_cam,
+    Layers.box_pose_I,
     # Layers.box_pose_R,
 
     # Layers.centre_mask,
