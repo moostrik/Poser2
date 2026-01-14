@@ -107,6 +107,8 @@ class OpticalFlow(FlowBase):
         # Compute optical flow using config values
         power = 1.0 - self.config.boost
 
+        self._optical_flow_shader.reload()
+
         # Pass output_fbo directly since it's now a Fbo
         self.output_fbo.begin()
         self._optical_flow_shader.use(
