@@ -1,166 +1,240 @@
-# Coordinate System Convention
+# Coordinate System Quick Reference
 
 ## Overview
+This project uses a **top-left origin** coordinate system with **Y-axis pointing down**, matching common windowing systems and image coordinate conventions.
 
-This application uses a **top-left origin, pixel-based coordinate system** throughout.
+---
 
-All rendering is shader-based. Vertices are specified in **pixel coordinates** and the vertex shader converts them to normalized device coordinates (NDC) with Y-axis inverted.
-
-## Screen/Window Space
+## Screen/Window Coordinates
 
 ```
-(0, 0) ──────────────► X
-  │
-  │
-  │
-  ▼
-  Y                (width, height)
+(0,0) ──────────► X
+ │
+ │
+ │
+ ▼ Y
+
+Origin: Top-left corner
+X-axis: Left → Right (positive)
+Y-axis: Top → Bottom (positive)
 ```
 
-- **Origin (0, 0)**: Top-left corner of screen/window/FBO
-- **X-axis**: Increases rightward (standard)
-- **Y-axis**: Increases **downward** (screen/UI convention, not OpenGL default)
+### Key Points
+- **Origin**: `(0, 0)` is at the **top-left** corner
+- **X increases**: left to right
+- **Y increases**: top to bottom
+- **Window dimensions**: `(width, height)` is at the bottom-right corner
 
-This matches:
-- Window coordinate systems (GLFW, Win32, etc.)
-- NumPy/image array indexing `image[y, x]`
-- Most UI frameworks
-- Fragment shader `gl_FragCoord.xy` when Y is inverted
-
-## Implementation
-
-### Pixel-Based Rendering
-
-All rendering uses **pixel coordinates** (0 to width/height), not NDC coordinates (-1 to 1).
-
-**Vertex Input**: `position` attribute receives pixel coordinates
+### Implementation
+Set via `View.set_view(width, height)`:
 ```python
-# Draw a quad covering a 1920x1080 framebuffer
-draw_quad_pixels(1920.0, 1080.0)  # Vertices: (0,0) to (1920,1080)
+glOrtho(0, width, height, 0, -1, 1)
+```
+This inverts the Y-axis compared to OpenGL's default bottom-left origin.
+
+---
+
+## Texture Coordinates
+
+```
+(0,0) ──────────► U
+ │
+ │
+ │
+ ▼ V
+
+Standard texture mapping:
+(0, 0) = top-left of texture
+(1, 1) = bottom-right of texture
 ```
 
-**Vertex Shader** (_generic.vert):
-```glsl
-in vec2 position;              // Pixel coordinates (e.g., 0 to 1920)
-uniform vec2 resolution;       // FBO/window dimensions
-out vec2 texCoord;
+### Key Points
+- **Standard OpenGL convention**: `(0, 0)` = bottom-left
+- **Our convention**: Textures are **flipped** to match screen coordinates
+- **U/S**: Horizontal coordinate (0.0 - 1.0)
+- **V/T**: Vertical coordinate (0.0 - 1.0)
 
-void main() {
-    // Normalize to [0, 1]
-    vec2 normalized = position / resolution;
+### Texture Flipping
+The `draw_quad()` function handles texture flipping:
+- **`flipV=False` (default)**: Matches our top-left screen coordinates
+  - Maps texture `(0,1)` to screen top-left
+  - Maps texture `(1,0)` to screen bottom-right
+- **`flipV=True`**: Standard OpenGL (bottom-left origin)
+  - Use when source texture is already in bottom-left coordinates
 
-    // Texture coordinates
-    texCoord = normalized;
-    if (flipX) texCoord.x = 1.0 - texCoord.x;
-    if (flipY) texCoord.y = 1.0 - texCoord.y;
+---
 
-    // Convert to NDC with Y-flip for top-left origin
-    vec2 ndc;
-    ndc.x = normalized.x * 2.0 - 1.0;    // 0→-1, width→1
-    ndc.y = 1.0 - normalized.y * 2.0;    // 0→1, height→-1 (FLIPPED)
+## FBO (Framebuffer Object) Rendering
 
-    gl_Position = vec4(ndc, 0.0, 1.0);
-}
+### Coordinate System
+FBOs use the **same top-left origin** as the main window:
+```python
+fbo.begin()  # Sets up top-left origin viewport
+# Draw here - (0,0) is top-left
+fbo.end()    # Restores previous state
 ```
 
-**Key transformation**: Pixel (0, 0) → NDC (-1, 1) = top-left
+### Important Behavior
+- `Fbo.begin()` calls `set_view(width, height)` internally
+- Rendering to FBO uses top-left origin
+- Reading from FBO texture uses standard texture coordinates
+- **No additional flipping needed** when drawing FBO to screen
 
-### Shader Usage Pattern
+### State Management
+```python
+fbo.begin()      # Saves current view, sets FBO viewport
+push_view()      # Manual view state save
+set_view(w, h)   # Apply top-left coordinate system
+pop_view()       # Restore previous view
+fbo.end()        # Restores saved view state
+```
 
-Every shader that renders to an FBO follows this pattern:
+---
+
+## Mouse/Input Coordinates
+
+### Mouse Position
+```python
+mouse_x, mouse_y  # (0,0) at top-left, increases down-right
+```
+- Directly matches screen coordinates
+- No transformation needed
+
+### Click Regions
+When testing if a click is inside a rectangle:
+```python
+if x <= mouse_x <= x + width and y <= mouse_y <= y + height:
+    # Inside rectangle at (x, y) with size (width, height)
+```
+
+---
+
+## OpenGL Default vs. Our System
+
+| Aspect | OpenGL Default | Our System |
+|--------|----------------|------------|
+| **Origin** | Bottom-left `(0, 0)` | Top-left `(0, 0)` |
+| **Y-axis** | Points UP | Points DOWN |
+| **Texture (0,0)** | Bottom-left | Top-left |
+| **glOrtho** | `(0, W, 0, H, -1, 1)` | `(0, W, H, 0, -1, 1)` |
+
+---
+
+## Common Patterns
+
+### Drawing a Texture
+```python
+texture.bind()
+draw_quad(x, y, width, height, flipV=False)
+texture.unbind()
+# Draws texture at (x, y) with top-left origin
+```
+
+### Drawing to FBO then to Screen
+```python
+# Render to FBO
+fbo.begin()  # Sets top-left origin for FBO
+draw_something()
+fbo.end()
+
+# Draw FBO to screen
+fbo.draw(x, y, width, height)  # No flip needed
+```
+
+### SwapFbo Double Buffering
+```python
+swap_fbo.begin()          # Draw to current buffer (top-left origin)
+swap_fbo.back_texture     # Read from previous buffer
+# ... render ...
+swap_fbo.end()
+swap_fbo.swap()           # Swap buffers for next frame
+```
+
+---
+
+## Utility Functions
+
+### Fit/Fill Calculations
+```python
+from modules.gl.Utils import fit, fill
+
+# Fit: Maintain aspect ratio, letterbox if needed
+x, y, w, h = fit(src_w, src_h, dst_w, dst_h)
+
+# Fill: Maintain aspect ratio, crop if needed
+x, y, w, h = fill(src_w, src_h, dst_w, dst_h)
+```
+These return positions in top-left coordinate system.
+
+---
+
+## Image/Tensor Data
+
+### NumPy Arrays (from OpenCV, PIL, etc.)
+- **OpenCV images**: Already in top-left origin (row 0 = top)
+- **Shape**: `(height, width, channels)` or `(height, width)`
+- **Directly compatible** with our coordinate system
+
+### PyTorch Tensors
+- **Shape**: `(C, H, W)` or `(H, W, C)` or `(H, W)`
+- **First row**: Top of image
+- **Directly compatible** with our coordinate system
+
+### Upload to Texture
+```python
+image = Image()  # or Tensor()
+image.set_image(numpy_array)  # or set_tensor(torch_tensor)
+image.update()
+# Texture (0,0) will be top-left of array
+```
+
+---
+
+## Troubleshooting
+
+### Image Appears Upside Down
+- **Cause**: Source texture is in OpenGL bottom-left coordinates
+- **Solution**: Use `draw_quad(..., flipV=True)`
+
+### FBO Rendering Looks Flipped
+- **Check**: Verify `fbo.begin()` is called (it sets up proper view)
+- **Check**: Not mixing manual `glOrtho()` calls with `set_view()`
+
+### Mouse Clicks Not Registering
+- **Check**: Using screen coordinates directly, not inverting Y
+- **Check**: Rectangle test uses `y + height`, not `y - height`
+
+---
+
+## Quick Cheat Sheet
 
 ```python
-def use(self, fbo: Fbo, texture: Texture, ...) -> None:
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo.fbo_id)
-    glViewport(0, 0, fbo.width, fbo.height)
+# SCREEN SPACE
+(0, 0)           # Top-left corner
+(width, height)  # Bottom-right corner
 
-    glUseProgram(self.shader_program)
+# TEXTURE SPACE
+(0.0, 0.0)       # Top-left of texture (after our mapping)
+(1.0, 1.0)       # Bottom-right of texture
 
-    # Pass resolution to vertex shader
-    glUniform2f(glGetUniformLocation(self.shader_program, "resolution"),
-                float(fbo.width), float(fbo.height))
+# DRAWING
+draw_quad(x, y, w, h, flipV=False)  # Default: top-left origin
+draw_quad(x, y, w, h, flipV=True)   # OpenGL bottom-left origin
 
-    # Optional: texture flipping
-    glUniform1i(glGetUniformLocation(self.shader_program, "flipX"), 0)
-    glUniform1i(glGetUniformLocation(self.shader_program, "flipY"), 0)
+# FBO
+fbo.begin()      # Auto-applies top-left coordinate system
+fbo.end()        # Restores previous state
 
-    # Other uniforms...
-
-    # Draw fullscreen quad in pixel space
-    draw_quad_pixels(fbo.width, fbo.height)
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0)
+# VIEW MANAGEMENT
+set_view(w, h)   # Apply top-left coordinate system
+push_view()      # Save current state
+pop_view()       # Restore state
 ```
 
-### No Projection Matrix
+---
 
-**This system does NOT use projection matrices** (`glOrtho`, `glMatrixMode`, etc.). The vertex shader handles all coordinate conversion directly.
-
-- `Fbo.begin()` only binds framebuffer and sets viewport
-- `SwapFbo.begin()` only binds framebuffer and sets viewport
-- No `setView()` calls needed for shader rendering
-
-### Texture Coordinates
-
-Texture coordinates are automatically normalized by the vertex shader:
-- Pixel position → Normalized [0, 1] → TexCoord
-- Optional flipping via `flipX`/`flipY` uniforms
-- Matches NumPy array indexing (row 0 = V=0 at top)
-
-### Fragment Shaders
-
-Fragment shaders automatically use our top-left coordinate system:
-
-**1. Texture Sampling**
-```glsl
-uniform sampler2D tex0;
-in vec2 texCoord;
-
-void main() {
-    vec4 color = texture(tex0, texCoord);
-    // texCoord (0, 0) = top-left of texture
-    // texCoord (1, 1) = bottom-right of texture
-}
-```
-
-**2. Pixel Coordinates (gl_FragCoord)**
-```glsl
-layout(origin_upper_left) in vec4 gl_FragCoord;
-
-void main() {
-    vec2 pixelPos = gl_FragCoord.xy;
-    // pixelPos (0, 0) = top-left of framebuffer
-    // pixelPos (width, height) = bottom-right of framebuffer
-}
-```
-
-**Important**: Add `layout(origin_upper_left)` to fragment shaders that use `gl_FragCoord.xy` to ensure pixel (0,0) is at top-left. Without this qualifier, `gl_FragCoord` uses OpenGL's default bottom-left origin.
-
-**3. Custom Calculations**
-If your fragment shader calculates positions or patterns, work in pixel space:
-```glsl
-uniform vec2 resolution;
-in vec2 texCoord;
-
-void main() {
-    // Get pixel position from texCoord
-    vec2 pixelPos = texCoord * resolution;
-    // pixelPos is now in [0, width] x [0, height] with (0,0) at top-left
-}
-```
-**Rule of thumb**: If you're drawing fullscreen and care about exact pixels, use gl_FragCoord. If you're working with texture regions or normalized coordinates, calculate from texCoord.
-
-## Advantages
-
-1. **Intuitive**: Work in pixels, not abstract NDC space
-2. **Consistent**: Fragment shader `gl_FragCoord.xy` matches vertex input
-3. **Simple**: No projection matrix setup or management
-4. **Flexible**: Per-shader resolution, supports any FBO/window size
-5. **Modern**: Shader-based approach, not legacy fixed-function pipeline
-
-## Compatibility
-
-- **NumPy/Image Arrays**: Row 0 (top) maps to Y=0 (top) - direct match
-- **OpenGL Textures**: Handled via `flipY` uniform when needed
-- **UI Coordinates**: Direct 1:1 mapping with screen/window coordinates
-- **ofxFlowTools (C++)**: Matches the pixel-based rendering approach
+## References
+- [View.py](View.py) - `set_view()` implementation
+- [Fbo.py](Fbo.py) - FBO coordinate system handling
+- [Texture.py](Texture.py) - `draw_quad()` texture mapping
+- [WindowManager.py](WindowManager.py) - Window coordinate callbacks

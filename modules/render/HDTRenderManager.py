@@ -174,8 +174,8 @@ class HDTRenderManager(RenderBase):
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_math,                                 line_width=3.0, line_smooth=0.0, use_scores=False, color=COLORS[i % len(COLORS)])
             centre_motion = self.L[Layers.centre_motion][i]=ls.MotionMultiply(      i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
 
-            sparse_flow =   self.L[Layers.centre_flow][i] = ls.OpticalFlowLayer(        centre_motion)
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
+            centre_flow =   self.L[Layers.centre_flow][i] = ls.OpticalFlowLayer(        sim_blend)
 
         # global layers
         self.pose_sim_layer =   ls.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, ls.AggregationMethod.HARMONIC_MEAN, 2.0)

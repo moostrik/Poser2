@@ -69,7 +69,9 @@ class OpticalFlowLayer(LayerBase):
         # return
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        self.draw_mode = DrawModes.INPUT
+        self.draw_mode = DrawModes.FIELD
+        self._velocity_vis.config.arrow_length = 40.0
+
         if self.draw_mode == DrawModes.INPUT:
             self._optical_flow.draw_input(rect)
         elif self.draw_mode == DrawModes.OUTPUT:
@@ -78,4 +80,6 @@ class OpticalFlowLayer(LayerBase):
             self._velocity_vis.config.mode = VisualizationMode.DIRECTION_MAP if self.draw_mode == DrawModes.SCALAR else VisualizationMode.ARROW_FIELD
             self._velocity_vis.set(self._optical_flow.output)
             self._velocity_vis.update()
+
+            glViewport(0, 0, rect.width, rect.height)
             self._velocity_vis.draw(rect)

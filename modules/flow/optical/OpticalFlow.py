@@ -13,6 +13,8 @@ from modules.gl.Texture import Texture
 from .. import FlowBase, FlowConfigBase, FlowUtil
 from .shaders import Luminance, OpticalFlow as OpticalFlowShader
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 @dataclass
 class OpticalFlowConfig(FlowConfigBase):
@@ -62,6 +64,8 @@ class OpticalFlow(FlowBase):
         # Shaders
         self._optical_flow_shader: OpticalFlowShader = OpticalFlowShader()
         self._luminance_shader: Luminance = Luminance()
+
+        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def velocity(self) -> Texture:

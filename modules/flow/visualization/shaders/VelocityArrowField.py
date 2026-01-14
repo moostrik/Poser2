@@ -47,6 +47,7 @@ class VelocityArrowField(Shader):
         glUniform1f(glGetUniformLocation(self.shader_program, "grid_spacing"), spacing)
         glUniform1f(glGetUniformLocation(self.shader_program, "arrow_length"), arrow_length)
         glUniform1f(glGetUniformLocation(self.shader_program, "arrow_thickness"), arrow_thickness)
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), velocity_tex.width, velocity_tex.height)
 
         # Render
         draw_quad()

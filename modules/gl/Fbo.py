@@ -1,5 +1,6 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Texture import Texture
+from modules.gl.View import push_view, pop_view, set_view
 
 class Fbo(Texture):
     def __init__(self) -> None :
@@ -28,13 +29,12 @@ class Fbo(Texture):
     def begin(self)  -> None:
         """Begin rendering to FBO. Uses top-left origin (see COORDINATE_SYSTEM.md)."""
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        glOrtho(0, self.width, self.height, 0, -1, 1)  # Top-left origin
-        glMatrixMode(GL_MODELVIEW)
-        glViewport(0, 0, self.width, self.height)
+        push_view()
+        set_view(self.width, self.height)
 
     def end(self)  -> None:
+        """End rendering to FBO and restore previous state."""
+        pop_view()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:

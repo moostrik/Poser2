@@ -13,6 +13,8 @@ from modules.gl import Fbo, Texture
 from .. import FlowBase, FlowConfigBase
 from .shaders import VelocityDirectionMap, VelocityArrowField
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 class VisualizationMode(Enum):
     """Velocity visualization rendering modes."""
@@ -70,6 +72,8 @@ class Velocity(FlowBase):
         self._arrow_shader: VelocityArrowField = VelocityArrowField()
 
         self._needs_update: bool = True
+
+        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate visualization layer."""
