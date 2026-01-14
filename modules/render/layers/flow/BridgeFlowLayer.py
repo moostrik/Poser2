@@ -116,7 +116,7 @@ class BridgeFlowLayer(LayerBase):
     def draw(self, rect: Rect) -> None:
         """Draw bridge output or visualization."""
 
-        self.draw_mode: DrawModes = DrawModes.SCALAR
+        self.draw_mode: DrawModes = DrawModes.FIELD
 
         self._velocity_vis.config.arrow_length = 40.0
 

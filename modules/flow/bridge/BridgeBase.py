@@ -62,6 +62,7 @@ class BridgeBase(FlowBase):
         # Additional internal FBOs
         self._velocity_input_fbo: SwapFbo = SwapFbo()
         self._velocity_trail_fbo: SwapFbo = SwapFbo()
+        self._velocity_output_fbo: SwapFbo = SwapFbo()
 
         # Core bridge shaders
         self._bridge_trail_shader: BridgeTrail = BridgeTrail()
@@ -89,6 +90,7 @@ class BridgeBase(FlowBase):
         # Velocity FBOs always use RG32F
         self._velocity_input_fbo.allocate(width, height, GL_RG32F)
         self._velocity_trail_fbo.allocate(width, height, GL_RG32F)
+        self._velocity_output_fbo.allocate(width, height, GL_RG32F)
         FlowUtil.zero(self._velocity_input_fbo)
         FlowUtil.zero(self._velocity_trail_fbo)
 
@@ -101,6 +103,7 @@ class BridgeBase(FlowBase):
 
         self._velocity_input_fbo.deallocate()
         self._velocity_trail_fbo.deallocate()
+        self._velocity_output_fbo.deallocate()
 
         self._bridge_trail_shader.deallocate()
         self._multiply_shader.deallocate()
@@ -175,14 +178,21 @@ class BridgeBase(FlowBase):
         )
         self._velocity_trail_fbo.end()
 
+
+        FlowUtil.stretch(self._velocity_output_fbo, self._velocity_trail_fbo)
         # Spatial smoothing: Gaussian blur
         if self.config.blur_radius > 0:
-            self._velocity_trail_fbo.swap()
-            self._blur_shader.use(
-                self._velocity_trail_fbo.back_texture,
-                self.config.blur_radius,
-                self._velocity_trail_fbo
-            )
+            # Horizontal pass
+            self._velocity_output_fbo.swap()
+            self._velocity_output_fbo.begin()
+            self._blur_shader.use(self._velocity_output_fbo.back_texture, self.config.blur_radius, True)
+            self._velocity_output_fbo.end()
+
+            # Vertical pass
+            self._velocity_output_fbo.swap()
+            self._velocity_output_fbo.begin()
+            self._blur_shader.use(self._velocity_output_fbo.back_texture, self.config.blur_radius, False)
+            self._velocity_output_fbo.end()
 
     def _on_config_changed(self) -> None:
         """Called when config values change."""
