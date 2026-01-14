@@ -94,7 +94,7 @@ class DFlowSourceLayer(LayerBase):
 
             self._fbo.begin()
             self._flow_texture.bind()
-            draw_quad(0, 0, w, h, flipV=True)
+            draw_quad(0, 0, w, h)
             self._flow_texture.unbind()
             self._fbo.end()
 

@@ -6,7 +6,6 @@ Ported from ofxFlowTools ftUtil.h/cpp
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Fbo import Fbo, SwapFbo
 from modules.gl.Texture import Texture
-from modules.gl.Shader import draw_quad
 
 
 class FlowUtil:

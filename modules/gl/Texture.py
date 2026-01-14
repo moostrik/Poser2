@@ -1,4 +1,47 @@
 from OpenGL.GL import * # type: ignore
+import numpy as np
+from .View import draw_quad
+
+
+def get_numpy_dtype(data_type: Constant, internal_format: Constant) -> type | None:
+    """Convert OpenGL data type to NumPy dtype.
+
+    Args:
+        data_type: OpenGL data type (e.g., GL_UNSIGNED_BYTE, GL_FLOAT)
+        internal_format: OpenGL internal format to distinguish float16 vs float32
+
+    Returns:
+        NumPy dtype (np.uint8, np.float16, np.float32) or None if unsupported
+    """
+    if data_type == GL_UNSIGNED_BYTE:
+        return np.uint8
+    elif data_type == GL_FLOAT:
+        # Distinguish float16 vs float32 based on internal format
+        if internal_format in (GL_RGB16F, GL_RGBA16F, GL_R16F, GL_RG16F):
+            return np.float16
+        else:
+            return np.float32
+    return None
+
+
+def get_channel_count(format: Constant) -> int | None:
+    """Get number of channels from OpenGL format.
+
+    Args:
+        format: OpenGL format (e.g., GL_RGB, GL_RGBA, GL_RED)
+
+    Returns:
+        Number of channels (1-4) or None if unsupported
+    """
+    if format in (GL_BGR, GL_RGB):
+        return 3
+    elif format in (GL_BGRA, GL_RGBA):
+        return 4
+    elif format == GL_RED:
+        return 1
+    elif format == GL_RG:
+        return 2
+    return None
 
 
 def get_format(internal_format) -> Constant:
@@ -42,49 +85,7 @@ def get_data_type(internal_format) -> Constant:
     print('GL_texture', 'internal format not supported')
     return GL_NONE
 
-def draw_quad(x: float, y: float, w: float, h: float, flipV: bool = False) -> None :
-    x0: float = x
-    x1: float = x + w
-    y0: float = y
-    y1: float = y + h
 
-    glBegin(GL_QUADS)
-
-    if flipV:
-        # Lower-left corner
-        glTexCoord2f(0.0, 0.0)
-        glVertex2f(x0, y0)
-
-        # Lower-right corner
-        glTexCoord2f(1.0, 0.0)
-        glVertex2f(x1, y0)
-
-        # Upper-right corner
-        glTexCoord2f(1.0, 1.0)
-        glVertex2f(x1, y1)
-
-        # Upper-left corner
-        glTexCoord2f(0.0, 1.0)
-        glVertex2f(x0, y1)
-
-    else:
-        # Lower-left corner
-        glTexCoord2f(0.0, 1.0)
-        glVertex2f(x0, y0)
-
-        # Lower-right corner
-        glTexCoord2f(1.0, 1.0)
-        glVertex2f(x1, y0)
-
-        # Upper-right corner
-        glTexCoord2f(1.0, 0.0)
-        glVertex2f(x1, y1)
-
-        # Upper-left corner
-        glTexCoord2f(0.0, 0.0)
-        glVertex2f(x0, y1)
-
-    glEnd()
 
 
 class Texture():
@@ -167,3 +168,41 @@ class Texture():
         self.bind()
         draw_quad(x, y, w, h)
         self.unbind()
+
+    def read_to_numpy(self, flip: bool = True) -> np.ndarray | None:
+        """Read texture data back to CPU as NumPy array.
+
+        Useful for debugging, saving captures, or analyzing texture content.
+
+        Returns:
+            NumPy array with texture data, or None if not allocated
+        """
+        if not self.allocated:
+            return None
+
+        # Get NumPy dtype from GL types
+        dtype = get_numpy_dtype(self.data_type, self.internal_format)
+        if dtype is None:
+            print(f"Texture.read_to_numpy: Unsupported data type {self.data_type}")
+            return None
+
+        # Get channel count from format
+        channels = get_channel_count(self.format)
+        if channels is None:
+            print(f"Texture.read_to_numpy: Unsupported format {self.format}")
+            return None
+
+        # Allocate output array
+        if channels == 1:
+            pixels = np.zeros((self.height, self.width), dtype=dtype)
+        else:
+            pixels = np.zeros((self.height, self.width, channels), dtype=dtype)
+
+        # Read texture data from GPU
+        self.bind()
+        glGetTexImage(GL_TEXTURE_2D, 0, self.format, self.data_type, pixels)
+        self.unbind()
+
+        if flip:
+            pixels = np.flipud(pixels)
+        return pixels

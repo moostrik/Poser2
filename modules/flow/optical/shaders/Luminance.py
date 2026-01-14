@@ -12,7 +12,7 @@ from modules.gl import Texture
 class Luminance(Shader):
     """Convert RGB texture to luminance (grayscale) with optional Y-flip for Image textures."""
 
-    def use(self, source_tex: Texture, flip_y: bool = False) -> None:
+    def use(self, source_tex: Texture) -> None:
         """Render luminance to FBO.
 
         Args:
@@ -36,7 +36,6 @@ class Luminance(Shader):
 
         # Configure shader uniforms
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "flipV"), 1 if flip_y else 0)
 
         # Render
         draw_quad()

@@ -1,11 +1,12 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Texture import Texture, draw_quad, get_data_type
+from modules.gl.Fbo import Fbo
+from modules.gl.Texture import Texture, get_data_type
 import numpy as np
 from threading import Lock
 from typing import Literal
 
 
-def get_format(internal_format, channel_order: Literal['BGR', 'RGB']) -> Constant:
+def _get_format_bgr(internal_format, channel_order: Literal['BGR', 'RGB']) -> Constant:
     """Get pixel format for glTexImage2D with channel order support.
 
     Args:
@@ -42,7 +43,7 @@ def get_format(internal_format, channel_order: Literal['BGR', 'RGB']) -> Constan
     print('GL_Image', 'internal format not supported')
     return GL_NONE
 
-def get_internal_format(image: np.ndarray) -> Constant:
+def _get_internal_format(image: np.ndarray) -> Constant:
     """Determine OpenGL internal format from NumPy array properties."""
     if image.dtype == np.uint8:
         if len(image.shape) == 2:  # Grayscale image
@@ -72,59 +73,33 @@ def get_internal_format(image: np.ndarray) -> Constant:
     print('GL_texture', 'image format not supported')
     return GL_NONE
 
+def _draw_quad_flipped(x: float, y: float, w: float, h: float) -> None :
+    """Draw a quad with vertically flipped texture coordinates."""
+    x0, x1 = x, x + w
+    y0, y1 = y, y + h
 
-def get_numpy_dtype(data_type: Constant, internal_format: Constant) -> type | None:
-    """Convert OpenGL data type to NumPy dtype.
-
-    Args:
-        data_type: OpenGL data type (e.g., GL_UNSIGNED_BYTE, GL_FLOAT)
-        internal_format: OpenGL internal format to distinguish float16 vs float32
-
-    Returns:
-        NumPy dtype (np.uint8, np.float16, np.float32) or None if unsupported
-    """
-    if data_type == GL_UNSIGNED_BYTE:
-        return np.uint8
-    elif data_type == GL_FLOAT:
-        # Distinguish float16 vs float32 based on internal format
-        if internal_format in (GL_RGB16F, GL_RGBA16F, GL_R16F, GL_RG16F):
-            return np.float16
-        else:
-            return np.float32
-    return None
-
-def get_channel_count(format: Constant) -> int | None:
-    """Get number of channels from OpenGL format.
-
-    Args:
-        format: OpenGL format (e.g., GL_RGB, GL_RGBA, GL_RED)
-
-    Returns:
-        Number of channels (1-4) or None if unsupported
-    """
-    if format in (GL_BGR, GL_RGB):
-        return 3
-    elif format in (GL_BGRA, GL_RGBA):
-        return 4
-    elif format == GL_RED:
-        return 1
-    elif format == GL_RG:
-        return 2
-    return None
+    glBegin(GL_QUADS)
+    glTexCoord2f(0.0, 0.0); glVertex2f(x0, y0)  # Lower-left
+    glTexCoord2f(1.0, 0.0); glVertex2f(x1, y0)  # Lower-right
+    glTexCoord2f(1.0, 1.0); glVertex2f(x1, y1)  # Upper-right
+    glTexCoord2f(0.0, 1.0); glVertex2f(x0, y1)  # Upper-left
+    glEnd()
 
 
-class Image(Texture):
+class Image(Fbo):
     def __init__(self, channel_order: Literal['BGR', 'RGB'] = 'RGB') -> None:
         """Initialize Image texture with specified channel order.
 
         Args:
-            channel_order: Channel order for all images - 'BGR' (OpenCV default) or 'RGB' (standard)
+            channel_order: Channel order for input images - 'BGR' (OpenCV default) or 'RGB' (standard)
+            The output FBO texture is always in RGB format.
         """
         super().__init__()
         self._image: np.ndarray | None = None
         self._needs_update: bool = False
         self._mutex: Lock = Lock()
         self._channel_order: Literal['BGR', 'RGB'] = channel_order
+        self._source: Texture = Texture()  # Private texture for numpy upload
 
     def set_image(self, image: np.ndarray) -> None:
         """Set image to be uploaded to texture.
@@ -152,7 +127,7 @@ class Image(Texture):
                  wrap_t: int = GL_CLAMP_TO_EDGE,
                  min_filter: int = GL_LINEAR,
                  mag_filter: int = GL_LINEAR) -> None:
-        """Allocate OpenGL texture with channel order support.
+        """Allocate source texture and FBO for flipped output.
 
         Args:
             width: Texture width in pixels
@@ -163,95 +138,85 @@ class Image(Texture):
             min_filter: Minification filter (default: GL_LINEAR)
             mag_filter: Magnification filter (default: GL_LINEAR)
         """
+        # Allocate FBO (output texture in RGB format)
+        super().allocate(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
+        if not self.allocated:
+            return
+
+        # Allocate source texture for numpy upload (with BGR support)
+        self._allocate_source(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
+
+    def _allocate_source(self, width: int, height: int, internal_format,
+                         wrap_s: int, wrap_t: int, min_filter: int, mag_filter: int) -> None:
+        """Allocate the internal source texture with BGR channel order support."""
         data_type: Constant = get_data_type(internal_format)
-        if data_type == GL_NONE: return
+        if data_type == GL_NONE:
+            return
 
-        self.width = width
-        self.height = height
-        self.internal_format = internal_format
-        self.format = get_format(internal_format, self._channel_order)
-        self.data_type = data_type
-        self.tex_id: int = glGenTextures(1)
+        self._source.width = width
+        self._source.height = height
+        self._source.internal_format = internal_format
+        self._source.format = _get_format_bgr(internal_format, self._channel_order)
+        self._source.data_type = data_type
+        self._source.tex_id = glGenTextures(1)
 
-        glBindTexture(GL_TEXTURE_2D, self.tex_id)
+        glBindTexture(GL_TEXTURE_2D, self._source.tex_id)
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s)
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t)
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter)
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter)
 
-        # Set the swizzle mask for the texture to draw it as grayscale
-        if self.format == GL_RED:
+        # Set the swizzle mask for grayscale textures
+        if self._source.format == GL_RED:
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, GL_RED)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_RED)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ONE)
 
-        glTexImage2D(GL_TEXTURE_2D, 0, self.internal_format, self.width, self.height, 0, self.format, self.data_type, None)
+        glTexImage2D(GL_TEXTURE_2D, 0, self._source.internal_format, width, height, 0,
+                     self._source.format, self._source.data_type, None)
         glBindTexture(GL_TEXTURE_2D, 0)
 
-        self.allocated = True
+        self._source.allocated = True
+
+    def deallocate(self) -> None:
+        """Deallocate source texture and FBO."""
+        self._source.deallocate()
+        super().deallocate()
 
     def set_from_image(self, image: np.ndarray) -> None:
-        """Upload a NumPy array to the texture.
+        """Upload a NumPy array to the texture and flip vertically via FBO.
 
         Args:
             image: NumPy array containing the image data
         """
-        internal_format: Constant = get_internal_format(image)
-        if internal_format == GL_NONE: return
+        internal_format: Constant = _get_internal_format(image)
+        if internal_format == GL_NONE:
+            return
         height: int = image.shape[0]
         width: int = image.shape[1]
 
         # Reallocate if dimensions or format changed
         if internal_format != self.internal_format or width != self.width or height != self.height:
-            if self.allocated: self.deallocate()
+            if self.allocated:
+                self.deallocate()
             self.allocate(width, height, internal_format)
 
-        if not self.allocated: return
-
-        # Upload image data
-        self.bind()
-        glTexImage2D(GL_TEXTURE_2D, 0, self.internal_format, width, height, 0, self.format, self.data_type, image)
-        self.unbind()
-
-    def read_to_numpy(self) -> np.ndarray | None:
-        """Read texture data back to CPU as NumPy array (OpenFrameworks-inspired).
-
-        Useful for debugging, saving captures, or analyzing texture content.
-        Respects channel_order to return data in correct BGR/RGB format.
-
-        Returns:
-            NumPy array with texture data in the configured channel order, or None if not allocated
-        """
         if not self.allocated:
-            return None
+            return
 
-        # Get NumPy dtype from GL types
-        dtype = get_numpy_dtype(self.data_type, self.internal_format)
-        if dtype is None:
-            print(f"Image.read_to_numpy: Unsupported data type {self.data_type}")
-            return None
+        # Upload image data to source texture
+        self._source.bind()
+        glTexImage2D(GL_TEXTURE_2D, 0, self._source.internal_format, width, height, 0,
+                     self._source.format, self._source.data_type, image)
+        self._source.unbind()
 
-        # Get channel count from format
-        channels = get_channel_count(self.format)
-        if channels is None:
-            print(f"Image.read_to_numpy: Unsupported format {self.format}")
-            return None
+        # Render flipped to FBO
+        self.begin()
+        glColor4f(1.0, 1.0, 1.0, 1.0)
+        self._source.bind()
+        _draw_quad_flipped(0, 0, self.width, self.height)
+        self._source.unbind()
+        self.end()
 
-        # Allocate output array
-        if channels == 1:
-            pixels = np.zeros((self.height, self.width), dtype=dtype)
-        else:
-            pixels = np.zeros((self.height, self.width, channels), dtype=dtype)
 
-        # Read texture data from GPU
-        self.bind()
-        glGetTexImage(GL_TEXTURE_2D, 0, self.format, self.data_type, pixels)
-        self.unbind()
-
-        return pixels
-
-    def draw(self, x, y, w, h) -> None : #override
-        self.bind()
-        draw_quad(x, y, w, h, True)
-        self.unbind()

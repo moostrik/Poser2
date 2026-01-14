@@ -215,6 +215,9 @@ class Tensor(Texture):
         if len(tensor.shape) == 3 and tensor.shape[0] <= 4:
             tensor = tensor.permute(1, 2, 0)
 
+        # Flip vertically to match OpenGL/FBO/Image convention
+        tensor = torch.flip(tensor, [0])
+
         # Ensure contiguous memory for GPU copy
         tensor = tensor.contiguous()
 
@@ -267,6 +270,9 @@ class Tensor(Texture):
         if len(tensor.shape) == 3 and tensor.shape[0] <= 4:
             tensor = tensor.permute(1, 2, 0)
 
+        # Flip vertically to match OpenGL/FBO/Image convention
+        tensor = torch.flip(tensor, [0])
+
         # Convert to float32 and move to CPU
         tensor_np = tensor.float().cpu().numpy()  # (H, W) or (H, W, C)
 
@@ -280,11 +286,5 @@ class Tensor(Texture):
         # Upload to OpenGL texture
         self.bind()
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, upload_format, GL_FLOAT, tensor_np)
-        self.unbind()
-
-    def draw(self, x, y, w, h) -> None:
-        """Draw the texture with vertical flip (matching Image behavior)."""
-        self.bind()
-        draw_quad(x, y, w, h, True)
         self.unbind()
 

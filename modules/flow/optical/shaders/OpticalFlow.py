@@ -46,12 +46,12 @@ class OpticalFlow(Shader):
         # Configure shader uniforms
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
         glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
-        
+
         # Convert pixel offset to normalized coordinates
         offset_x = float(offset) / curr_tex.width
         offset_y = float(offset) / curr_tex.height
         glUniform2f(glGetUniformLocation(self.shader_program, "offset"), offset_x, offset_y)
-        
+
         glUniform1f(glGetUniformLocation(self.shader_program, "threshold"), threshold)
         glUniform2f(glGetUniformLocation(self.shader_program, "force"), strength_x, strength_y)
         glUniform1f(glGetUniformLocation(self.shader_program, "power"), power)

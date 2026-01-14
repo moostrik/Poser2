@@ -30,14 +30,10 @@ def monitor_path(path, callback):
 
 def draw_quad() -> None :
     glBegin(GL_QUADS)
-    glTexCoord2f( 0.0,  0.0)
-    glVertex2f(  -1.0, -1.0)
-    glTexCoord2f( 1.0,  0.0)
-    glVertex2f(   1.0, -1.0)
-    glTexCoord2f( 1.0,  1.0)
-    glVertex2f(   1.0,  1.0)
-    glTexCoord2f( 0.0,  1.0)
-    glVertex2f(  -1.0,  1.0)
+    glTexCoord2f( 0.0,  0.0); glVertex2f(  -1.0, -1.0)
+    glTexCoord2f( 1.0,  0.0); glVertex2f(   1.0, -1.0)
+    glTexCoord2f( 1.0,  1.0); glVertex2f(   1.0,  1.0)
+    glTexCoord2f( 0.0,  1.0); glVertex2f(  -1.0,  1.0)
     glEnd()
 
 class Shader():

@@ -1,6 +1,7 @@
 from OpenGL.GL import (
-    GL_MODELVIEW, GL_PROJECTION, GL_VIEWPORT,
-    glGetIntegerv, glLoadIdentity, glMatrixMode, glOrtho, glPopMatrix, glPushMatrix, glViewport
+    GL_MODELVIEW, GL_PROJECTION, GL_VIEWPORT, GL_QUADS,
+    glGetIntegerv, glLoadIdentity, glMatrixMode, glOrtho, glPopMatrix, glPushMatrix, glViewport,
+    glBegin, glEnd, glTexCoord2f, glVertex2f
 )
 
 
@@ -48,3 +49,13 @@ def pop_view() -> None:
     if _viewport_stack:
         viewport = _viewport_stack.pop()
         glViewport(viewport[0], viewport[1], viewport[2], viewport[3])
+
+def draw_quad(x: float, y: float, w: float, h: float) -> None:
+    x0, x1 = x, x + w
+    y0, y1 = y, y + h
+    glBegin(GL_QUADS)
+    glTexCoord2f(0.0, 1.0); glVertex2f(x0, y0)
+    glTexCoord2f(1.0, 1.0); glVertex2f(x1, y0)
+    glTexCoord2f(1.0, 0.0); glVertex2f(x1, y1)
+    glTexCoord2f(0.0, 0.0); glVertex2f(x0, y1)
+    glEnd()
