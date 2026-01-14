@@ -46,8 +46,14 @@ class FlowUtil:
         if not dst_fbo.allocated:
             return
 
+        # Lazy init shader
+        if not hasattr(FlowUtil, '_stretch_shader'):
+            from .shaders.Stretch import Stretch
+            FlowUtil._stretch_shader = Stretch()
+            FlowUtil._stretch_shader.allocate()
+
         dst_fbo.begin()
-        src_texture.draw(0, 0, dst_fbo.width, dst_fbo.height)
+        FlowUtil._stretch_shader.use(src_texture)
         dst_fbo.end()
 
     @staticmethod

@@ -93,6 +93,8 @@ class BridgeFlowLayer(LayerBase):
     def update(self) -> None:
         """Update bridge processing with automatic timestep calculation."""
 
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         # Check if source is active
         active: bool = getattr(self._source, "available", True)
@@ -109,9 +111,10 @@ class BridgeFlowLayer(LayerBase):
         self._bridge.set_velocity(source_velocity)
         self._bridge.update(self._delta_time)
 
+        Style.pop_style()
+
     def draw(self, rect: Rect) -> None:
         """Draw bridge output or visualization."""
-
 
         self.draw_mode: DrawModes = DrawModes.SCALAR
 
