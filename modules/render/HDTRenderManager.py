@@ -98,22 +98,22 @@ PREVIEW_LAYERS: list[Layers] = [
     # Layers.centre_pose,
     # Layers.centre_motion,
     Layers.sim_blend,
-    # Layers.angle_data,
+    Layers.angle_data,
     # Layers.prev_mt,
     # Layers.cam_mask,
     # Layers.centre_flow,
 ]
 
 FINAL_LAYERS: list[Layers] = [
-    # Layers.cam_image,
+    Layers.cam_image,
     # Layers.cam_mask,
     # Layers.dense_flow,
     # Layers.flow_image,
     # Layers.sparse_flow,
 
-    # Layers.cam_bbox, # what?
+    Layers.cam_bbox,
     # Layers.cam_track,
-    # Layers.angle_data, # seems upside down
+    Layers.angle_data,
     # Layers.mtime_data,
     # Layers.field_bar_R,
     # Layers.field_bar_I,
