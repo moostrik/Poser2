@@ -30,8 +30,6 @@ class _StyleState:
     blend_enabled: bool = False
     blend_mode: BlendMode = BlendMode.ALPHA  # Intuitive blend mode
     color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
-    line_width: float = 1.0
-    point_size: float = 1.0
 
 
 _style_stack: list[_StyleState] = []
@@ -55,8 +53,6 @@ def push_style() -> None:
         blend_enabled=bool(glIsEnabled(GL_BLEND)),
         blend_mode=blend_mode,
         color=tuple(glGetFloatv(GL_CURRENT_COLOR)),
-        line_width=glGetFloatv(GL_LINE_WIDTH)[0],
-        point_size=glGetFloatv(GL_POINT_SIZE)[0],
     )
     _style_stack.append(state)
 
@@ -80,8 +76,6 @@ def pop_style() -> None:
 
     glBlendFunc(state.blend_mode.src_factor, state.blend_mode.dst_factor)
     glColor4f(*state.color)
-    glLineWidth(state.line_width)
-    glPointSize(state.point_size)
 
 
 def set_blend_mode(mode: BlendMode) -> None:
@@ -97,13 +91,3 @@ def set_blend_mode(mode: BlendMode) -> None:
 def set_color(r: float, g: float, b: float, a: float = 1.0) -> None:
     """Set the current drawing color."""
     glColor4f(r, g, b, a)
-
-
-def set_line_width(width: float) -> None:
-    """Set the line width for line drawing."""
-    glLineWidth(width)
-
-
-def set_point_size(size: float) -> None:
-    """Set the point size for point drawing."""
-    glPointSize(size)

@@ -105,7 +105,7 @@ PREVIEW_LAYERS: list[Layers] = [
 ]
 
 FINAL_LAYERS: list[Layers] = [
-    Layers.cam_image,
+    # Layers.cam_image,
     # Layers.cam_mask,
     # Layers.dense_flow,
     # Layers.flow_image,
@@ -121,8 +121,8 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.motion_bar,
     # Layers.motion_sim,
 
-    Layers.box_cam,
-    Layers.box_pose_I,
+    # Layers.box_cam,
+    # Layers.box_pose_I,
     # Layers.box_pose_R,
 
     # Layers.centre_mask,
@@ -136,9 +136,9 @@ FINAL_LAYERS: list[Layers] = [
 
     # Layers.centre_cam,
     # Layers.centre_mask,
-    # Layers.centre_pose,
-    # Layers.sim_blend,
-    # Layers.centre_flow,
+    Layers.centre_pose,
+    Layers.sim_blend,
+    Layers.centre_flow,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -171,7 +171,7 @@ class HDTRenderManager(RenderBase):
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
             dense_flow =    self.L[Layers.dense_flow][i] =  ls.DFlowSourceLayer(    i, self.data_hub)
             flow_image =    self.L[Layers.flow_image][i] =  ls.FlowSourceLayer(     i, self.data_hub)
-            sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(        flow_image)
+            sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(       flow_image)
 
             cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxCamRenderer(     i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=1.0)
@@ -195,7 +195,7 @@ class HDTRenderManager(RenderBase):
             centre_motion = self.L[Layers.centre_motion][i]=ls.MotionMultiply(      i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
 
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
-            centre_flow =   self.L[Layers.centre_flow][i] = ls.OpticalFlowLayer(        sim_blend)
+            centre_flow =   self.L[Layers.centre_flow][i] = ls.OpticalFlowLayer(       sim_blend)
 
         # global layers
         self.pose_sim_layer =   ls.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, ls.AggregationMethod.HARMONIC_MEAN, 2.0)
