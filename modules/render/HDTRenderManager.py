@@ -62,8 +62,6 @@ class Layers(IntEnum):
 
     sim_blend =     auto()
 
-    optical_flow =  auto()
-    bridge_flow =   auto()
     flow =          auto()
 
 UPDATE_LAYERS: list[Layers] = [
@@ -79,9 +77,6 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.centre_pose,
     Layers.centre_D_flow,
     Layers.centre_motion,
-
-    Layers.optical_flow,
-    Layers.bridge_flow,
 ]
 
 INTERFACE_LAYERS: list[Layers] = [
@@ -95,7 +90,6 @@ LARGE_LAYERS: list[Layers] = [
     Layers.centre_mask,
     Layers.sim_blend,
     Layers.centre_pose,
-    Layers.optical_flow
 ]
 
 PREVIEW_LAYERS: list[Layers] = [
@@ -143,8 +137,6 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.centre_mask,
     Layers.centre_pose,
     Layers.sim_blend,
-    # Layers.optical_flow,
-    Layers.bridge_flow,
     Layers.flow,
 ]
 
@@ -202,8 +194,6 @@ class HDTRenderManager(RenderBase):
             centre_motion = self.L[Layers.centre_motion][i]=ls.MotionMultiply(      i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
 
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
-            optical_flow =  self.L[Layers.optical_flow][i]= ls.OpticalFlowLayer(       sim_blend)
-            bridge_flow =   self.L[Layers.bridge_flow][i] = ls.BridgeFlowLayer(        optical_flow)
             flow =          self.L[Layers.flow][i] =        ls.FlowLayer(              sim_blend)
 
         # global layers

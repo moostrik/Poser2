@@ -176,6 +176,17 @@ class FlowLayer(LayerBase):
     # ========== Processing ==========
 
     def update(self) -> None:
+
+
+        self.vis_config.element_length = 40.0
+        self.vis_config.toggle_scalar = False
+        self.velocity_config.trail_weight = 0.9
+        self.velocity_config.blur_steps = 2
+        self.velocity_config.blur_radius = 3.0
+
+        self.draw_mode = FlowDrawMode.DENSITY_VISIBLE
+
+
         """Update full processing pipeline."""
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -203,7 +214,7 @@ class FlowLayer(LayerBase):
         self._velocity_bridge.update(self._delta_time)
 
         # Stage 3: Apply density bridge (uses smoothed velocity + source RGB)
-        self._density_bridge.set_velocity(self._velocity_bridge.velocity)
+        self._density_bridge.set_velocity(self._optical_flow.output)
         self._density_bridge.set_density(self._source.texture)
         self._density_bridge.update(self._delta_time)
 
@@ -212,8 +223,6 @@ class FlowLayer(LayerBase):
     # ========== Rendering ==========
 
     def draw(self, rect: Rect) -> None:
-
-        self.draw_mode = FlowDrawMode.OPTICAL_RAW
 
         """Draw flow visualization based on draw_mode."""
         Style.push_style()
