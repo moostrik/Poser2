@@ -90,7 +90,7 @@ class FlowUtil:
         dst_fbo.end()
 
     @staticmethod
-    def get_num_channels(internal_format: int) -> int:
+    def get_num_channels(internal_format) -> int:
         """Get number of channels from OpenGL internal format.
 
         Args:

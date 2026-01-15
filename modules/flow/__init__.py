@@ -6,6 +6,6 @@ from .FlowUtil import FlowUtil
 
 # Layers
 from .optical import OpticalFlow, OpticalFlowConfig
-from .bridge import VelocityBridge, VelocityBridgeConfig
-from .visualization import Velocity, VelocityConfig, VisualizationMode
+from .bridge import VelocityBridge, VelocityBridgeConfig, DensityBridge, DensityBridgeConfig
+from .visualization import VisualisationFieldConfig, Visualizer, VelocityField
 # Shaders

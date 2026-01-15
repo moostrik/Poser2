@@ -10,7 +10,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Rect
 
-from modules.flow import OpticalFlow, OpticalFlowConfig, Velocity, VelocityConfig, VisualizationMode
+from modules.flow import OpticalFlow, OpticalFlowConfig, Visualizer, VisualisationFieldConfig
 from modules.render.layers.flow.FlowDefinitions import DrawModes
 from modules.render.layers import LayerBase
 
@@ -23,16 +23,22 @@ class OpticalFlowLayer(LayerBase):
 
         # Flow pipeline
         self._optical_flow: OpticalFlow = OpticalFlow()
-        self.flow_config: OpticalFlowConfig = self._optical_flow.config
-        self._velocity_vis: Velocity = Velocity()
-        self.vis_config: VelocityConfig = self._velocity_vis.config
+        self._visualizer: Visualizer = Visualizer()
 
-        self.draw_mode = DrawModes.SCALAR
-        self._velocity_vis.config.arrow_length = 40.0
-
-        self.draw_mode: DrawModes = DrawModes.OUTPUT
+        self.vis_config.element_length = 40.0
+        self.draw_mode: DrawModes = DrawModes.FIELD
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
+
+    @property
+    def config(self) -> OpticalFlowConfig:
+        """Access to optical flow configuration."""
+        return self._optical_flow.config  # type: ignore
+
+    @property
+    def vis_config(self) -> VisualisationFieldConfig:
+        """Access to visualization configuration."""
+        return self._visualizer.config  # type: ignore
 
     @property
     def texture(self) -> Texture:
@@ -40,11 +46,11 @@ class OpticalFlowLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._optical_flow.allocate(width, height)
-        self._velocity_vis.allocate(width, height)
+        self._visualizer.allocate(width, height)
 
     def deallocate(self) -> None:
         self._optical_flow.deallocate()
-        self._velocity_vis.deallocate()
+        self._visualizer.deallocate()
 
     def update(self) -> None:
         active: bool = getattr(self._source, "available", True)
@@ -66,19 +72,19 @@ class OpticalFlowLayer(LayerBase):
 
 
     def draw(self, rect: Rect) -> None:
-
-        self.draw_mode = DrawModes.SCALAR
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
+
         if self.draw_mode == DrawModes.INPUT:
             self._optical_flow.draw_input(rect)
         elif self.draw_mode == DrawModes.OUTPUT:
             self._optical_flow.draw_output(rect)
         else:
             Style.set_blend_mode(Style.BlendMode.ADDITIVE)
-            self._velocity_vis.config.mode = VisualizationMode.DIRECTION_MAP if self.draw_mode == DrawModes.SCALAR else VisualizationMode.ARROW_FIELD
-            self._velocity_vis.set(self._optical_flow.output)
-            self._velocity_vis.update()
+            self._visualizer.draw(self._optical_flow.velocity, rect)
 
-            self._velocity_vis.draw(rect)
         Style.pop_style()
+
+    def reset(self) -> None:
+        """Reset bridge state."""
+        self._optical_flow.reset()

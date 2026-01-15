@@ -9,6 +9,7 @@ from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer
 from .flow.FlowSourceLayer import           FlowSourceLayer
 from .flow.OpticalFlowLayer import          OpticalFlowLayer
 from .flow.BridgeFlowLayer import           BridgeFlowLayer
+from .flow.FlowLayer import                 FlowLayer
 
 from .generic.MotionMultiply import         MotionMultiply
 from .generic.CamBBoxLayer import           CamBBoxLayer

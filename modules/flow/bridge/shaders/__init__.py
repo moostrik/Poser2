@@ -1,10 +1,5 @@
 # Bridge shaders
 from .BridgeTrail import BridgeTrail
-from .MultiplyForce import MultiplyForce
-from .GaussianBlur import GaussianBlur
-
-__all__ = [
-    'BridgeTrail',
-    'MultiplyForce',
-    'GaussianBlur',
-]
+from .DensityBridgeShader import DensityBridgeShader
+from ...shaders.MultiplyForce import MultiplyForce
+from ...shaders.GaussianBlur import GaussianBlur

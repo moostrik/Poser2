@@ -34,6 +34,9 @@ class FlowBase(ABC):
         self.input_internal_format: int = 0
         self.output_internal_format: int = 0
 
+        # Auto-detecting visualization (lazy initialized)
+        self._visualization_field = None
+
     @property
     def input(self) -> Texture:
         """Input texture."""
@@ -72,29 +75,26 @@ class FlowBase(ABC):
 
         self._allocated = True
 
+        # Allocate visualization if already created
+        if self._visualization_field is not None:
+            self._visualization_field.allocate(out_w, out_h)
+
     def deallocate(self) -> None:
         """Release all FBO resources."""
         self.input_fbo.deallocate()
         self.output_fbo.deallocate()
+        if self._visualization_field is not None:
+            self._visualization_field.deallocate()
         self._allocated = False
 
     def set(self, texture: Texture) -> None:
-        """Set input texture (copies to input FBO).
-
-        Args:
-            texture: Input texture
-        """
+        """Set input texture (copies to input FBO)."""
         if not self._allocated:
             return
         FlowUtil.stretch(self.input_fbo, texture)
 
     def add(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to input FBO with strength multiplier.
-
-        Args:
-            texture: Input texture
-            strength: Blend strength
-        """
+        """Add to input FBO with strength multiplier."""
         if not self._allocated:
             return
         FlowUtil.add(self.input_fbo, texture, strength)
@@ -118,5 +118,12 @@ class FlowBase(ABC):
         self.input_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def draw_output(self, rect: Rect) -> None:
-        """Draw output FBO to screen."""
-        self.output_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        """Draw output FBO with auto-detecting visualization."""
+        # Lazy init visualization field
+        if self._visualization_field is None:
+            from .visualization.Visualiser import Visualizer
+            self._visualization_field = Visualizer()
+            if self._allocated:
+                self._visualization_field.allocate(self.output_fbo.width, self.output_fbo.height)
+
+        self._visualization_field.draw(self.output, rect)

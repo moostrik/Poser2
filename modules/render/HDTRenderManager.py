@@ -64,6 +64,7 @@ class Layers(IntEnum):
 
     optical_flow =  auto()
     bridge_flow =   auto()
+    flow =          auto()
 
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
@@ -144,6 +145,7 @@ FINAL_LAYERS: list[Layers] = [
     Layers.sim_blend,
     # Layers.optical_flow,
     Layers.bridge_flow,
+    Layers.flow,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -202,6 +204,7 @@ class HDTRenderManager(RenderBase):
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
             optical_flow =  self.L[Layers.optical_flow][i]= ls.OpticalFlowLayer(       sim_blend)
             bridge_flow =   self.L[Layers.bridge_flow][i] = ls.BridgeFlowLayer(        optical_flow)
+            flow =          self.L[Layers.flow][i] =        ls.FlowLayer(              sim_blend)
 
         # global layers
         self.pose_sim_layer =   ls.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, ls.AggregationMethod.HARMONIC_MEAN, 2.0)

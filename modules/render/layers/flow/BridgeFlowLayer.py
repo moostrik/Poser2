@@ -1,6 +1,7 @@
 """Bridge Flow Layer - smooths and processes optical flow for fluid simulation."""
 
 # Standard library imports
+from typing import cast
 
 # Third-party imports
 from OpenGL.GL import *  # type: ignore
@@ -9,7 +10,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Rect
 
-from modules.flow import VelocityBridge, VelocityBridgeConfig, Velocity, VelocityConfig, VisualizationMode
+from modules.flow import VelocityBridge, VelocityBridgeConfig, Visualizer, VisualisationFieldConfig
 from modules.render.layers.flow.FlowDefinitions import DrawModes
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -39,30 +40,23 @@ class BridgeFlowLayer(LayerBase):
             source: Source layer providing velocity input (e.g., OpticalFlowLayer)
         """
         self._source: LayerBase = source
-
-        # Bridge pipeline
         self._bridge: VelocityBridge = VelocityBridge()
+        self._visualizer: Visualizer = Visualizer()
 
-        # Visualization
-        self._velocity_vis: Velocity = Velocity()
-
-        # Draw mode
         self.draw_mode: DrawModes = DrawModes.FIELD
-
-        # Timestep tracking
         self._delta_time: float = 1 / fps
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
-    def bridge_config(self) -> VelocityBridgeConfig:
+    def config(self) -> VelocityBridgeConfig:
         """Access to bridge configuration."""
-        return self._bridge.config  # type: ignore
+        return cast(VelocityBridgeConfig, self._bridge.config)
 
     @property
-    def vis_config(self) -> VelocityConfig:
+    def vis_config(self) -> VisualisationFieldConfig:
         """Access to visualization configuration."""
-        return self._velocity_vis.config  # type: ignore
+        return self._visualizer.config
 
     @property
     def texture(self) -> Texture:
@@ -83,12 +77,12 @@ class BridgeFlowLayer(LayerBase):
             internal_format: Ignored (uses RG32F internally)
         """
         self._bridge.allocate(width, height)
-        self._velocity_vis.allocate(width, height)
+        self._visualizer.allocate(width, height)
 
     def deallocate(self) -> None:
         """Deallocate all resources."""
         self._bridge.deallocate()
-        self._velocity_vis.deallocate()
+        self._visualizer.deallocate()
 
     def update(self) -> None:
         """Update bridge processing with automatic timestep calculation."""
@@ -114,14 +108,13 @@ class BridgeFlowLayer(LayerBase):
         Style.pop_style()
 
     def draw(self, rect: Rect) -> None:
-        """Draw bridge output or visualization."""
-
         self.draw_mode: DrawModes = DrawModes.FIELD
 
-        self._velocity_vis.config.arrow_length = 40.0
-        self.bridge_config.trail_weight = 0.66
-        self.bridge_config.blur_steps = 2
-        self.bridge_config.blur_radius = 3.0
+        self.vis_config.element_length = 40.0
+        self.vis_config.toggle_scalar = False
+        self.config.trail_weight = 0.9
+        self.config.blur_steps = 2
+        self.config.blur_radius = 3.0
 
 
         Style.push_style()
@@ -134,15 +127,8 @@ class BridgeFlowLayer(LayerBase):
             # Draw smoothed velocity (raw RG texture)
             self._bridge.draw_output(rect)
         else:
-            # Draw visualization (direction map or arrow field)
             Style.set_blend_mode(Style.BlendMode.ADDITIVE)
-            self._velocity_vis.config.mode = (
-                VisualizationMode.DIRECTION_MAP if self.draw_mode == DrawModes.SCALAR
-                else VisualizationMode.ARROW_FIELD
-            )
-            self._velocity_vis.set(self._bridge.velocity)
-            self._velocity_vis.update()
-            self._velocity_vis.draw(rect)
+            self._visualizer.draw(self._bridge.velocity, rect)
 
         Style.pop_style()
 
