@@ -1,30 +1,41 @@
-"""Velocity Bridge.
+"""Velocity Processor - standalone velocity smoothing component.
 
-Simplest bridge: velocity passthrough with temporal/spatial smoothing.
-Uses VelocityProcessor for smoothing, then applies timestep scaling.
-
-Ported from ofxFlowTools ftVelocityBridgeFlow.h
+Handles temporal smoothing (trail) and spatial smoothing (blur) for velocity fields.
+Extracted from BridgeBase to provide clear separation of concerns.
 """
+
 from dataclasses import dataclass, field
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Texture
-from modules.utils.PointsAndRects import Rect
-from .BridgeBase import BridgeBase, BridgeConfigBase
+from modules.gl import Texture, Fbo
+from .. import FlowBase, FlowConfigBase
+from .shaders import BridgeTrail, GaussianBlur, MultiplyForce
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class VelocityBridgeConfig(BridgeConfigBase):
-    """Configuration for velocity bridge.
+class VelocityBridgeConfig(FlowConfigBase):
+    """Configuration for velocity processor."""
 
-    Inherits trail_weight, blur_radius, blur_steps from BridgeConfigBase.
-    Overrides scale default for velocity-specific scaling.
-    """
-    scale: float = field(
-        default=60.0,  # Velocity-specific default (converts optical flow to simulation velocity)
+    trail_weight: float = field(
+        default=0.3,
+        metadata={"min": 0.0, "max": 0.99, "label": "Trail Weight",
+                  "description": "Temporal smoothing (0=no trail, 0.99=long trail)"}
+    )
+    blur_radius: float = field(
+        default=3.0,
+        metadata={"min": 0.0, "max": 10.0, "label": "Blur Radius",
+                  "description": "Gaussian blur radius in pixels"}
+    )
+    blur_steps: int = field(
+        default=1,
+        metadata={"min": 0, "max": 8, "label": "Blur Steps",
+                  "description": "Number of Gaussian blur passes"}
+    )
+    time_scale: float = field(
+        default=60.0,
         metadata={
             "min": 0.0,
             "max": 200.0,
@@ -34,60 +45,141 @@ class VelocityBridgeConfig(BridgeConfigBase):
     )
 
 
-class VelocityBridge(BridgeBase):
-    """Velocity bridge with temporal and spatial smoothing.
+class VelocityBridge(FlowBase):
+    """Standalone velocity smoothing processor.
+
+    Provides temporal smoothing (trail effect) and spatial smoothing (Gaussian blur)
+    for velocity fields. Uses FlowBase input/output FBOs.
 
     Pipeline:
-        1. Receive velocity from optical flow via set_velocity()
-        2. VelocityProcessor applies temporal smoothing (trail)
-        3. VelocityProcessor applies Gaussian blur (spatial smoothing)
-        4. Scale by timestep (framerate independent)
-        5. Output smoothed velocity via .velocity property (from VelocityProcessor)
-        6. Output timestep-scaled velocity via .output property (for fluid simulation)
+        1. Blend new velocity with previous trail (temporal smoothing)
+        2. Apply Gaussian blur passes (spatial smoothing)
+        3. Output smoothed velocity
+
+    FBOs (from FlowBase):
+        - input_fbo: Receives raw velocity input
+        - output_fbo: Stores temporally smoothed velocity (output)
+
+    Usage:
+        processor = VelocityProcessor(config)
+        processor.allocate(256, 256)
+
+        # Each frame
+        processor.set(optical_flow.output)
+        processor.update()
+        smoothed = processor.output  # Access smoothed output
     """
 
     def __init__(self, config: VelocityBridgeConfig | None = None) -> None:
-        super().__init__(config or VelocityBridgeConfig())
+        """Initialize velocity processor.
 
-        # Ensure config is VelocityBridgeConfig for type checking
-        self.config: VelocityBridgeConfig
+        Args:
+            config: Optional configuration (defaults to VelocityProcessorConfig)
+        """
+        super().__init__()
 
-        # Define internal formats (output only - no input_fbo used)
-        self.input_internal_format = GL_RG32F   # Not used, but required by FlowBase
-        self.output_internal_format = GL_RG32F  # Timestep-scaled velocity output
+        # Define formats for FlowBase
+        self.input_internal_format = GL_RG32F
+        self.output_internal_format = GL_RG32F
+
+        self.config: VelocityBridgeConfig = config or VelocityBridgeConfig()
+
+        self._output_delta: Fbo = Fbo()
+
+        # Shaders
+        self._bridge_trail_shader: BridgeTrail = BridgeTrail()
+        self._blur_shader: GaussianBlur = GaussianBlur()
+        self._multiply_shader: MultiplyForce = MultiplyForce()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
-    def input(self) -> Texture:
-        """Input texture."""
-        return self.bridge_velocity_input
-
-    @property
     def velocity(self) -> Texture:
+        """Smoothed velocity output."""
         return self.output
 
-    def set(self, texture: Texture) -> None:
-        self.set_velocity(texture)
+    @property
+    def velocity_delta(self) -> Texture:
+        """Smoothed velocity scaled by timestep."""
+        return self._output_delta
 
-    def add(self, texture: Texture, strength: float = 1.0) -> None:
-        self.add_velocity(texture, strength)
-
-    def update(self, delta_time: float) -> None:
-        """Update velocity bridge processing.
+    def set_velocity(self, velocity: Texture) -> None:
+        """Set velocity input to VelocityProcessor.
 
         Args:
-            delta_time: Time since last update in seconds
+            velocity: Velocity texture (RG32F)
         """
+        self.set(velocity)
+
+    def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
+        """Allocate velocity processor.
+
+        Args:
+            width: Velocity field width
+            height: Velocity field height
+            output_width: Optional output width (defaults to width)
+            output_height: Optional output height (defaults to height)
+        """
+        super().allocate(width, height, output_width, output_height)
+
+        self._output_delta.allocate(width, height, self.output_internal_format)
+        # Allocate shaders
+        self._bridge_trail_shader.allocate()
+        self._blur_shader.allocate()
+        self._multiply_shader.allocate()
+
+    def deallocate(self) -> None:
+        """Deallocate all resources."""
+        super().deallocate()
+        self._output_delta.deallocate()
+        self._bridge_trail_shader.deallocate()
+        self._blur_shader.deallocate()
+
+    def reset(self) -> None:
+        """Reset all buffers to zero."""
+        super().reset()
+
+    def update(self, delta_time: float) -> None:
+        """Process velocity with temporal and spatial smoothing."""
         if not self._allocated:
             return
 
-        # Stage 1: Process velocity through VelocityProcessor (trail + blur)
-        self._velocity_processor.update()
-
-        # Stage 2: Scale by timestep for framerate independence
-        timestep = delta_time * self.config.scale
-
+        # Stage 1: Temporal smoothing (trail blend)
+        self.output_fbo.swap()
         self.output_fbo.begin()
-        self._multiply_shader.use(self._velocity_processor.output, timestep)
+        self._bridge_trail_shader.use(
+            self.output_fbo.back_texture,  # Previous trail
+            self.input_fbo.texture,        # New velocity
+            self.config.trail_weight
+        )
         self.output_fbo.end()
+
+        # Stage 2: Spatial smoothing (Gaussian blur)
+        if self.config.blur_steps > 0 and self.config.blur_radius > 0:
+            # In-place blur using swap operations (like C++ original)
+            for _ in range(self.config.blur_steps):
+                # Horizontal pass
+                self.output_fbo.swap()
+                self.output_fbo.begin()
+                self._blur_shader.use(
+                    self.output_fbo.back_texture,
+                    self.config.blur_radius,
+                    horizontal=True
+                )
+                self.output_fbo.end()
+
+                # Vertical pass
+                self.output_fbo.swap()
+                self.output_fbo.begin()
+                self._blur_shader.use(
+                    self.output_fbo.back_texture,
+                    self.config.blur_radius,
+                    horizontal=False
+                )
+                self.output_fbo.end()
+
+        timestep: float = delta_time * self.config.time_scale
+
+        self._output_delta.begin()
+        self._multiply_shader.use(self.output_fbo, timestep)
+        self._output_delta.end()

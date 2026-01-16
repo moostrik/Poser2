@@ -51,7 +51,6 @@ DRAW_MODE_BLEND_MODES: dict[FlowDrawMode, Style.BlendMode] = {
     FlowDrawMode.DENSITY_BRIDGE_INPUT_DENSITY:  Style.BlendMode.DISABLED,
     FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: Style.BlendMode.ADDITIVE,
     FlowDrawMode.DENSITY_BRIDGE_OUTPUT:         Style.BlendMode.DISABLED,
-    FlowDrawMode.DENSITY_BRIDGE_VISIBLE:        Style.BlendMode.DISABLED,
     FlowDrawMode.DENSITY_BRIDGE_OUTPUT_VELOCITY:Style.BlendMode.ADDITIVE,
 }
 
@@ -170,16 +169,17 @@ class FlowLayer(LayerBase):
         self.velocity_bridge_config.trail_weight = 0.9
         self.velocity_bridge_config.blur_steps = 2
         self.velocity_bridge_config.blur_radius = 3.0
-        self.velocity_bridge_config.scale = 160.0
-        self.density_bridge_config.trail_weight = self.velocity_bridge_config.trail_weight
-        self.density_bridge_config.blur_steps = self.velocity_bridge_config.blur_steps
-        self.density_bridge_config.blur_radius = self.velocity_bridge_config.blur_radius
+        self.velocity_bridge_config.time_scale = 160.0
+        self.density_bridge_config.velocity_trail_weight = self.velocity_bridge_config.trail_weight
+        self.density_bridge_config.velocity_blur_steps = self.velocity_bridge_config.blur_steps
+        self.density_bridge_config.velocity_blur_radius = self.velocity_bridge_config.blur_radius
+        self.density_bridge_config.time_scale = 1.0
 
 
         self.draw_mode = FlowDrawMode.VELOCITY_BRIDGE_INPUT
         self.draw_mode = FlowDrawMode.VELOCITY_BRIDGE_OUTPUT
         # self.draw_mode = FlowDrawMode.DENSITY_BRIDGE_OUTPUT_VELOCITY
-        # self.draw_mode = FlowDrawMode.DENSITY_BRIDGE_OUTPUT
+        self.draw_mode = FlowDrawMode.DENSITY_BRIDGE_OUTPUT
         self.draw_mode = FlowDrawMode.DENSITY_BRIDGE_VISIBLE
 
 
@@ -240,12 +240,12 @@ class FlowLayer(LayerBase):
         elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_INPUT_DENSITY:
             return self._density_bridge.input
         elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY:
-            return self._density_bridge.bridge_velocity_input
+            return self._density_bridge.velocity_input
         elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_OUTPUT:
-            return self._density_bridge.density
+            return self._density_bridge.density_delta
         elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_VISIBLE:
-            return self._density_bridge.density_visible
+            return self._density_bridge.density
         elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_OUTPUT_VELOCITY:
-            return self._density_bridge.bridge_velocity_output
+            return self._density_bridge.velocity
         else:
             return self._optical_flow.output
