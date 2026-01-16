@@ -109,6 +109,7 @@ class FlowBase(ABC):
         """Process input and generate output. Must be implemented by subclass."""
         ...
 
+    # CONVENIENCE DRAW METHODS
     def draw(self, rect: Rect) -> None:
         """Draw output FBO to screen."""
         self.draw_output(rect)
