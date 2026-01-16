@@ -26,8 +26,10 @@ class GaussianBlur(Shader):
             horizontal: True for horizontal pass, False for vertical
         """
         if not self.allocated or not self.shader_program:
+            print("GaussianBlur shader not allocated or shader program missing.")
             return
         if not source_texture.allocated:
+            print("GaussianBlur shader: input texture not allocated.")
             return
         if radius <= 0:
             # No blur, just draw source

@@ -17,6 +17,8 @@ from modules.flow import (
     Visualizer, VisualisationFieldConfig
 )
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 class FlowDrawMode(IntEnum):
     """Draw modes for unified FlowLayer.
@@ -32,14 +34,26 @@ class FlowDrawMode(IntEnum):
     """
     # Inputs
     OPTICAL_INPUT = 0
+    OPTICAL_OUTPUT = auto()
+    VELOCITY_BRIDGE_INPUT = auto()
+    VELOCITY_BRIDGE_OUTPUT = auto()
+    DENSITY_BRIDGE_INPUT_DENSITY = auto()
+    DENSITY_BRIDGE_INPUT_VELOCITY = auto()
+    DENSITY_BRIDGE_OUTPUT = auto()
+    DENSITY_BRIDGE_VISIBLE = auto()
+    DENSITY_BRIDGE_OUTPUT_VELOCITY = auto()
 
-    # Outputs
-    OPTICAL_RAW = auto()
-    VELOCITY = auto()
-    DENSITY = auto()
-    DENSITY_VISIBLE = auto()
-
-from modules.utils.HotReloadMethods import HotReloadMethods
+DRAW_MODE_BLEND_MODES: dict[FlowDrawMode, Style.BlendMode] = {
+    FlowDrawMode.OPTICAL_INPUT:                 Style.BlendMode.DISABLED,
+    FlowDrawMode.OPTICAL_OUTPUT:                Style.BlendMode.ADDITIVE,
+    FlowDrawMode.VELOCITY_BRIDGE_INPUT:         Style.BlendMode.DISABLED,
+    FlowDrawMode.VELOCITY_BRIDGE_OUTPUT:        Style.BlendMode.ADDITIVE,
+    FlowDrawMode.DENSITY_BRIDGE_INPUT_DENSITY:  Style.BlendMode.DISABLED,
+    FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: Style.BlendMode.ADDITIVE,
+    FlowDrawMode.DENSITY_BRIDGE_OUTPUT:         Style.BlendMode.DISABLED,
+    FlowDrawMode.DENSITY_BRIDGE_VISIBLE:        Style.BlendMode.DISABLED,
+    FlowDrawMode.DENSITY_BRIDGE_OUTPUT_VELOCITY:Style.BlendMode.ADDITIVE,
+}
 
 
 class FlowLayer(LayerBase):
@@ -84,7 +98,7 @@ class FlowLayer(LayerBase):
         self._visualizer: Visualizer = Visualizer()
 
         # Draw settings
-        self.draw_mode: FlowDrawMode = FlowDrawMode.VELOCITY
+        self.draw_mode: FlowDrawMode = FlowDrawMode.VELOCITY_BRIDGE_INPUT
         self.velocity_field_mode: bool = False  # False=scalar/direction, True=arrow field
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -92,22 +106,22 @@ class FlowLayer(LayerBase):
     # ========== Configuration Access ==========
 
     @property
-    def optical_config(self) -> OpticalFlowConfig:
+    def optical_flow_config(self) -> OpticalFlowConfig:
         """Optical flow configuration."""
         return self._optical_flow.config  # type: ignore
 
     @property
-    def velocity_config(self) -> VelocityBridgeConfig:
+    def velocity_bridge_config(self) -> VelocityBridgeConfig:
         """Velocity bridge configuration."""
         return self._velocity_bridge.config  # type: ignore
 
     @property
-    def density_config(self) -> DensityBridgeConfig:
+    def density_bridge_config(self) -> DensityBridgeConfig:
         """Density bridge configuration."""
         return self._density_bridge.config  # type: ignore
 
     @property
-    def vis_config(self) -> VisualisationFieldConfig:
+    def visualisation_config(self) -> VisualisationFieldConfig:
         """Visualization configuration."""
         return self._visualizer.config  # type: ignore
 
@@ -115,35 +129,8 @@ class FlowLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        """Primary output based on draw_mode."""
-        if self.draw_mode == FlowDrawMode.DENSITY:
-            return self._density_bridge.density
-        elif self.draw_mode == FlowDrawMode.DENSITY_VISIBLE:
-            return self._density_bridge.density_visible
-        elif self.draw_mode == FlowDrawMode.OPTICAL_RAW:
-            return self._optical_flow.output
-        else:
-            return self._velocity_bridge.velocity
-
-    @property
-    def velocity(self) -> Texture:
         """Smoothed velocity output (RG32F)."""
         return self._velocity_bridge.velocity
-
-    @property
-    def density(self) -> Texture:
-        """Density output with velocity-driven alpha (RGBA32F)."""
-        return self._density_bridge.density
-
-    @property
-    def density_visible(self) -> Texture:
-        """Display-ready density (RGBA8, framerate-scaled)."""
-        return self._density_bridge.density_visible
-
-    @property
-    def optical_flow_raw(self) -> Texture:
-        """Raw optical flow output (RG32F, before bridging)."""
-        return self._optical_flow.output
 
     # ========== Lifecycle Methods ==========
 
@@ -178,13 +165,19 @@ class FlowLayer(LayerBase):
     def update(self) -> None:
 
 
-        self.vis_config.element_length = 40.0
-        self.vis_config.toggle_scalar = False
-        self.velocity_config.trail_weight = 0.9
-        self.velocity_config.blur_steps = 2
-        self.velocity_config.blur_radius = 3.0
+        self.visualisation_config.element_length = 40.0
+        self.visualisation_config.toggle_scalar = False
+        self.velocity_bridge_config.trail_weight = 0.9
+        self.velocity_bridge_config.blur_steps = 2
+        self.velocity_bridge_config.blur_radius = 3.0
+        self.density_bridge_config.trail_weight = self.velocity_bridge_config.trail_weight
+        self.density_bridge_config.blur_steps = self.velocity_bridge_config.blur_steps
+        self.density_bridge_config.blur_radius = self.velocity_bridge_config.blur_radius
 
-        self.draw_mode = FlowDrawMode.DENSITY_VISIBLE
+
+        # self.draw_mode = FlowDrawMode.VELOCITY_BRIDGE_OUTPUT
+        self.draw_mode = FlowDrawMode.DENSITY_BRIDGE_OUTPUT_VELOCITY
+        self.draw_mode = FlowDrawMode.DENSITY_BRIDGE_VISIBLE
 
 
         """Update full processing pipeline."""
@@ -226,30 +219,30 @@ class FlowLayer(LayerBase):
 
         """Draw flow visualization based on draw_mode."""
         Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
-
-        if self.draw_mode == FlowDrawMode.OPTICAL_INPUT:
-            # Show optical flow input (luminance)
-            self._optical_flow.draw_input(rect)
-
-        elif self.draw_mode == FlowDrawMode.OPTICAL_RAW:
-            # Raw optical flow (RG32F) - visualize it
-            Style.set_blend_mode(Style.BlendMode.ADDITIVE)
-            self._visualizer.velocity_field.config.toggle_scalar = self.velocity_field_mode
-            self._visualizer.draw(self._optical_flow.output, rect)
-
-        elif self.draw_mode == FlowDrawMode.VELOCITY:
-            # Smoothed velocity (RG32F) - visualize it
-            Style.set_blend_mode(Style.BlendMode.ADDITIVE)
-            self._visualizer.velocity_field.config.toggle_scalar = self.velocity_field_mode
-            self._visualizer.draw(self._velocity_bridge.velocity, rect)
-
-        elif self.draw_mode == FlowDrawMode.DENSITY:
-            # Density (RGBA32F) - draw directly
-            self._density_bridge.density.draw(rect.x, rect.y, rect.width, rect.height)
-
-        elif self.draw_mode == FlowDrawMode.DENSITY_VISIBLE:
-            # Display density (RGBA8) - draw directly
-            self._density_bridge.density_visible.draw(rect.x, rect.y, rect.width, rect.height)
+        Style.set_blend_mode(DRAW_MODE_BLEND_MODES.get(self.draw_mode, Style.BlendMode.DISABLED))
+        self._visualizer.draw(self._get_draw_texture(), rect)
 
         Style.pop_style()
+
+    def _get_draw_texture(self) -> Texture:
+        """Get texture to draw based on draw_mode."""
+        if self.draw_mode == FlowDrawMode.OPTICAL_INPUT:
+            return self._optical_flow.input
+        elif self.draw_mode == FlowDrawMode.OPTICAL_OUTPUT:
+            return self._optical_flow.output
+        elif self.draw_mode == FlowDrawMode.VELOCITY_BRIDGE_INPUT:
+            return self._velocity_bridge.input
+        elif self.draw_mode == FlowDrawMode.VELOCITY_BRIDGE_OUTPUT:
+            return self._velocity_bridge.velocity
+        elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_INPUT_DENSITY:
+            return self._density_bridge.input
+        elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY:
+            return self._density_bridge.input_velocity
+        elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_OUTPUT:
+            return self._density_bridge.density
+        elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_VISIBLE:
+            return self._density_bridge.density_visible
+        elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_OUTPUT_VELOCITY:
+            return self._density_bridge.output_velocity
+        else:
+            return self._optical_flow.output

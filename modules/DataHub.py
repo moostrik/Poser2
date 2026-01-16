@@ -80,7 +80,7 @@ class DataHub:
         return any(self.get_filtered(data_type, lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id))
 
     # GENERIC SETTERS
-    def set_item(self, data_type: DataHubType, key: int, value: Any) -> None:
+    def set_item(self, data_type: DataHubType, key: int, value: object) -> None:
         """Set a single item without replacing the entire dict."""
         with self.mutex:
             if data_type not in self._data:

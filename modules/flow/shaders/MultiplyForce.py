@@ -20,8 +20,10 @@ class MultiplyForce(Shader):
             force: Multiplier value
         """
         if not self.allocated or not self.shader_program:
+            print("MultiplyForce shader not allocated or shader program missing.")
             return
         if not source.allocated:
+            print("MultiplyForce shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

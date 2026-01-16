@@ -115,10 +115,15 @@ class FlowBase(ABC):
 
     def draw_input(self, rect: Rect) -> None:
         """Draw input FBO to screen."""
+        self._draw_with_visualization_field(self.input_fbo.texture, rect)
         self.input_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def draw_output(self, rect: Rect) -> None:
         """Draw output FBO with auto-detecting visualization."""
+        self._draw_with_visualization_field(self.output_fbo.texture, rect)
+
+    def _draw_with_visualization_field(self, texture: Texture, rect: Rect) -> None:
+        """Draw output FBO using visualization field."""
         # Lazy init visualization field
         if self._visualization_field is None:
             from .visualization.Visualiser import Visualizer
@@ -126,4 +131,5 @@ class FlowBase(ABC):
             if self._allocated:
                 self._visualization_field.allocate(self.output_fbo.width, self.output_fbo.height)
 
-        self._visualization_field.draw(self.output, rect)
+        self._visualization_field.draw(texture, rect)
+

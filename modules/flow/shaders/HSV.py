@@ -23,8 +23,10 @@ class HSV(Shader):
             value: Value/brightness multiplier (0 = black, 1 = original, >1 = brighter)
         """
         if not self.allocated or not self.shader_program:
+            print("HSV shader not allocated or shader program missing.")
             return
         if not source.allocated:
+            print("HSV shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)

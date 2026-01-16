@@ -54,26 +54,6 @@ class DensityBridge(BridgeBase):
     6. Apply HSV saturation adjustment
     7. Output RGBA32F density via .density property
     8. Provide display-ready RGBA8 via .density_visible property
-
-    Usage:
-        density_bridge = DensityBridge(DensityBridgeConfig(
-            trail_weight=0.5,
-            blur_radius=2.0,
-            scale=10.0,
-            saturation=2.5
-        ))
-        density_bridge.allocate(256, 256)
-
-        # Each frame
-        density_bridge.set_density(rgb_texture)
-        density_bridge.set_velocity(optical_flow.velocity)
-        density_bridge.update(delta_time)
-
-        # Use for fluid simulation
-        fluid.set_density(density_bridge.density)
-
-        # Or display
-        density_bridge.density_visible.draw(0, 0, width, height)
     """
 
     def __init__(self, config: DensityBridgeConfig | None = None) -> None:
@@ -95,6 +75,24 @@ class DensityBridge(BridgeBase):
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
+    @property
+    def input_density(self) -> Texture:
+        """Input density texture."""
+        return self.input
+
+    @property
+    def density(self) -> Texture:
+        return self.output
+
+    @property
+    def density_visible(self) -> Texture:
+        """Get RGBA8 density output for display (framerate-scaled)."""
+        # Multiply by framerate for visible output
+        self._visible_fbo.begin()
+        self._multiply_shader.use(self.output, 60.0)  # Default 60 FPS scaling
+        self._visible_fbo.end()
+        return self._visible_fbo
+
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate density bridge FBOs.
 
@@ -112,6 +110,9 @@ class DensityBridge(BridgeBase):
         out_h = output_height if output_height is not None else height
         self._visible_fbo.allocate(out_w, out_h, GL_RGBA8)
         self._visible_fbo.clear(0.0, 0.0, 0.0, 0.0)
+
+        self._density_bridge_shader.allocate()
+        self._hsv_shader.allocate()
 
     def deallocate(self) -> None:
         """Release all FBO resources."""
@@ -136,20 +137,6 @@ class DensityBridge(BridgeBase):
             strength: Blend strength multiplier
         """
         self.add(density, strength)
-
-    @property
-    def density(self) -> Texture:
-        """Get RGBA32F density output for simulation."""
-        return self.output
-
-    @property
-    def density_visible(self) -> Texture:
-        """Get RGBA8 density output for display (framerate-scaled)."""
-        # Multiply by framerate for visible output
-        self._visible_fbo.begin()
-        self._multiply_shader.use(self.output, 60.0)  # Default 60 FPS scaling
-        self._visible_fbo.end()
-        return self._visible_fbo
 
     def reset(self) -> None:
         """Reset all FBOs to zero."""

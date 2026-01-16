@@ -79,6 +79,16 @@ class BridgeBase(FlowBase):
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
+    @property
+    def input_velocity(self) -> Texture:
+        """Input texture."""
+        return self._velocity_input_fbo.texture
+
+    @property
+    def output_velocity(self) -> Texture:
+        """Output texture."""
+        return self._velocity_output_fbo.texture
+
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate bridge layer.
 

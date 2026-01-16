@@ -2,17 +2,34 @@
 from math import ceil
 from typing import Optional
 from functools import partial
+from datetime import datetime
+import os
 
 # Local application imports
-from modules.DataHub import DataHub, DataHubType
+def _print_import(msg: str) -> None:
+    """Helper to print imports with timestamp and process info - only in main process"""
+    # Check if we're in a spawned worker process by looking at the module name
+    # Main process will have __name__ == '__main__' when running launcher.py
+    import sys
+    if hasattr(sys, 'argv') and 'launcher.py' in ' '.join(sys.argv):
+        ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        pid = os.getpid()
+        print(f"[{ts}] PID:{pid} - {msg}")
+
+_print_import("importing Settings, DataHub, Gui and SoundOsc modules")
 from modules.Settings import Settings
-from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
+from modules.DataHub import DataHub, DataHubType
 from modules.gui import Gui
 from modules.inout import SoundOsc
+_print_import("Importing Cam and Tracker modules")
+from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
+from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
+_print_import("Importing Pose modules")
 from modules.pose import batch, guis, nodes, trackers, similarity
 from modules.pose.pd_stream import PDStreamManager, PDStreamComputer
+_print_import("Importing Render Manager")
 from modules.render.HDTRenderManager import HDTRenderManager
-from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
+_print_import("imports complete")
 
 
 class Main():
