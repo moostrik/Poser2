@@ -116,7 +116,6 @@ class FlowBase(ABC):
     def draw_input(self, rect: Rect) -> None:
         """Draw input FBO to screen."""
         self._draw_with_visualization_field(self.input_fbo.texture, rect)
-        self.input_fbo.draw(rect.x, rect.y, rect.width, rect.height)
 
     def draw_output(self, rect: Rect) -> None:
         """Draw output FBO with auto-detecting visualization."""
