@@ -87,6 +87,7 @@ class Settings:
 
     # Feature toggles
     segmentation_enabled: bool =        field(default=True)
+    segmentation_reset_interval: int =  field(default=60)
     flow_enabled: bool =                field(default=True)
 
     # Segmentation resolution follows flow resolution

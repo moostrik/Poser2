@@ -99,6 +99,8 @@ class ONNXSegmentation(Thread):
         # Per-tracklet recurrent states for temporal coherence
         self._state_lock: Lock = Lock()
         self._recurrent_states: dict[int, RecurrentState] = {}
+        self._frame_counter: int = 0  # For periodic state reset
+        self._state_reset_interval: int = settings.segmentation_reset_interval  # Reset all states every N frames (0=disabled)
 
         # ONNX session (initialized in run thread)
         self._session: ort.InferenceSession | None = None
@@ -271,6 +273,15 @@ class ONNXSegmentation(Thread):
             if self.verbose:
                 print("RVM Segmentation Warning: No pending batch to process, this should not happen")
             return
+
+        # Increment frame counter for periodic state reset
+        self._frame_counter += 1
+
+        # Periodic state reset as failsafe (0=disabled)
+        if self._state_reset_interval > 0 and self._frame_counter % self._state_reset_interval == 0:
+            if self.verbose:
+                print(f"RVM Segmentation: Periodic state reset at frame {self._frame_counter}")
+            self.clear_all_states()
 
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 

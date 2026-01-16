@@ -40,6 +40,9 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         self._batch_counter: int = 0
         self._verbose: bool = settings.verbose
 
+        # Track active tracklet IDs for detecting removed tracklets
+        self._previous_tracklet_ids: set[int] = set()
+
         # Track inference times
         self._timer = PerformanceTimer(name="RVM Segmentation", sample_count=100, report_interval=100)
 
@@ -73,6 +76,15 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
 
         if not image_list:
             return
+
+        # Detect removed tracklets and clear their recurrent states
+        current_ids = set(tracklet_id_list)
+        removed_ids = self._previous_tracklet_ids - current_ids
+
+        for removed_id in removed_ids:
+            self._segmentation.clear_tracklet_state(removed_id)
+
+        self._previous_tracklet_ids = current_ids
 
         with self._lock:
             self._batch_counter += 1

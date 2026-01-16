@@ -47,6 +47,7 @@
     "verbose": false,
     "crop_expansion": 0.1,
     "segmentation_enabled": true,
+    "segmentation_reset_interval": 0,
     "flow_enabled": true
   },
 

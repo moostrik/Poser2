@@ -26,6 +26,8 @@ if TYPE_CHECKING:
 
 from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 class TensorRTSegmentation(Thread):
     """Asynchronous GPU person segmentation using Robust Video Matting (RVM) with TensorRT.
@@ -78,6 +80,8 @@ class TensorRTSegmentation(Thread):
         # Per-tracklet recurrent states for temporal coherence
         self._state_lock: Lock = Lock()
         self._recurrent_states: dict[int, RecurrentState] = {}
+        self._frame_counter: int = 0  # For periodic state reset
+        self._state_reset_interval: int = settings.segmentation_reset_interval  # Reset all states every N frames (0=disabled)
 
         # TensorRT engine and context (initialized in run())
         self.engine: trt.ICudaEngine  # type: ignore
@@ -257,6 +261,15 @@ class TensorRTSegmentation(Thread):
 
         if batch is None:
             return
+
+        # Increment frame counter for periodic state reset
+        self._frame_counter += 1
+
+        # Periodic state reset as failsafe (0=disabled)
+        if self._state_reset_interval > 0 and self._frame_counter % self._state_reset_interval == 0:
+            if self.verbose:
+                print(f"TensorRT Segmentation: Periodic state reset at frame {self._frame_counter}")
+            self.clear_all_states()
 
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 

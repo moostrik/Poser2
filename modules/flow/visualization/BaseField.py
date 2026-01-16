@@ -61,16 +61,6 @@ class FieldBase(ABC):
         return self._allocated
 
     @property
-    def width(self) -> int:
-        """Visualization width."""
-        return self._width
-
-    @property
-    def height(self) -> int:
-        """Visualization height."""
-        return self._height
-
-    @property
     def texture(self) -> Texture:
         """Output texture."""
         return self._fbo
