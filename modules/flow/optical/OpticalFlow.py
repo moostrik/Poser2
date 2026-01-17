@@ -11,7 +11,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Texture import Texture
 
 from .. import FlowBase, FlowConfigBase, FlowUtil
-from .shaders import Luminance, OpticalFlowMM as OpticalFlowShader
+from .shaders import Luminance, OpticalFlow as OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -36,7 +36,7 @@ class OpticalFlowConfig(FlowConfigBase):
     )
     boost: float = field(
         default=0.0,
-        metadata={"min": 0.0, "max": 0.9, "label": "Boost", "description": "Power boost for small motions"}
+        metadata={"min": -0.5, "max": 0.9, "label": "Boost", "description": "Power boost for small motions"}
     )
 
 
@@ -63,6 +63,7 @@ class OpticalFlow(FlowBase):
 
         # Shaders
         self._optical_flow_shader: OpticalFlowShader = OpticalFlowShader()
+        self._optical_flow_shader_mm: OpticalFlowMMShader = OpticalFlowMMShader()
         self._luminance_shader: Luminance = Luminance()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -89,6 +90,7 @@ class OpticalFlow(FlowBase):
         glBindTexture(GL_TEXTURE_2D, 0)
 
         self._optical_flow_shader.allocate()
+        self._optical_flow_shader_mm.allocate()
         self._luminance_shader.allocate()
 
         self._frame_count = 0
@@ -98,6 +100,7 @@ class OpticalFlow(FlowBase):
         """Release all resources."""
         super().deallocate()
         self._optical_flow_shader.deallocate()
+        self._optical_flow_shader_mm.deallocate()
         self._luminance_shader.deallocate()
 
 
@@ -123,14 +126,13 @@ class OpticalFlow(FlowBase):
         power = 1.0 - self.config.boost
 
         self._optical_flow_shader.reload()
-
-        # print("Computing Optical Flow with offset:", self.config.offset)
+        self._optical_flow_shader_mm.reload()
 
         # Pass output_fbo directly since it's now a Fbo
         self._output_fbo.begin()
-        self._optical_flow_shader.use(
-            curr_frame,
+        self._optical_flow_shader_mm.use(
             prev_frame,
+            curr_frame,
             offset=self.config.offset,
             threshold=self.config.threshold,
             strength_x=self.config.strength_x,

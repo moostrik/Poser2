@@ -165,10 +165,18 @@ class FlowLayer(LayerBase):
     def update(self) -> None:
 
 
-        self.config.visualisation.element_length = 40.0
+        self.config.visualisation.element_width = 1.0 # in pixels
+        self.config.visualisation.spacing = 20 # in pixels
+        self.config.visualisation.element_length = 40.0 # in pixels
+        self.config.visualisation.scale = 1.0
         self.config.visualisation.toggle_scalar = False
 
-        self.config.optical_flow.offset = 10
+        self.config.optical_flow.offset = 8
+        self.config.optical_flow.threshold = 0.0
+        self.config.optical_flow.strength_x = 3.3
+        self.config.optical_flow.strength_y = 3.3
+        self.config.optical_flow.boost = 0.3
+
         self.config.velocity_trail.scale = 1.0
         self.config.velocity_trail.trail_weight = 0.9
         self.config.velocity_trail.blur_steps = 2
@@ -177,8 +185,8 @@ class FlowLayer(LayerBase):
         self.config.density_bridge.brightness = 2.0
 
 
-        self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
-        self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
+        # self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
+        # self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_INPUT
         self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE
@@ -211,6 +219,11 @@ class FlowLayer(LayerBase):
             curr_tex: Texture = self._source.texture
             self._optical_flow.set_color(curr_tex)
             self._optical_flow.update()
+
+        img = self._optical_flow.velocity.read_to_numpy()
+        # if img is not None:
+        #     print("Optical Flow Velocity Stats: min =", img.min(), "max =", img.max())
+
 
         # Stage 2: Bridge
         self._velocity_trail.set_velocity(self._optical_flow.velocity)

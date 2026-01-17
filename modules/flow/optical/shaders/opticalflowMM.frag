@@ -1,31 +1,40 @@
 #version 460 core
 
-// Optical Flow Shader with multi-scale detection using explicit offsets
+// Optical Flow Shader - Multi-Scale via Mipmaps
+// Computes Lucas-Kanade style optical flow at multiple scales
 
-uniform sampler2D tex0;
-uniform sampler2D tex1;
+uniform sampler2D tex0;  // Current frame (luminance) - needs mipmaps!
+uniform sampler2D tex1;  // Previous frame (luminance) - needs mipmaps!
 
-uniform vec2 offset;
-uniform float threshold;
-uniform vec2 force;
-uniform float power;
+uniform vec2 offset;     // Gradient sample offset (normalized)
+uniform float threshold; // Motion threshold
+uniform vec2 force;      // Force/strength multiplier
+uniform float power;     // Power curve for magnitude
+
+const int numLevels = 3;   // Number of mip levels to sample (1-4)
+// const vec4 levelWeights = vec4(1.0f, 0.5f, 0.25f, 0.125f); // Weights for each level
+// const vec4 levelWeights = vec4(0.125f, 0.5f, 1.0f, 1.0f); // Weights for each level
+const vec4 levelWeights = vec4(1.f, 1.f, 1.0f, 1.0f); // Weights for each level
+
 
 in vec2 texCoord;
 out vec4 fragColor;
 
 #define TINY 0.0001
 
-vec2 compute_flow_at_offset(vec2 st, vec2 off) {
+vec2 computeFlowAtLod(vec2 st, vec2 off, float lod) {
     vec2 off_x = vec2(off.x, 0.0);
     vec2 off_y = vec2(0.0, off.y);
 
-    float scr_dif = texture(tex0, st).x - texture(tex1, st).x;
+    // Temporal difference at this LOD
+    float scr_dif = textureLod(tex0, st, lod).x - textureLod(tex1, st, lod).x;
 
-    float gradx = texture(tex1, st + off_x).x - texture(tex1, st - off_x).x;
-    gradx += texture(tex0, st + off_x).x - texture(tex0, st - off_x).x;
+    // Spatial gradient at this LOD
+    float gradx = textureLod(tex1, st + off_x, lod).x - textureLod(tex1, st - off_x, lod).x;
+    gradx += textureLod(tex0, st + off_x, lod).x - textureLod(tex0, st - off_x, lod).x;
 
-    float grady = texture(tex1, st + off_y).x - texture(tex1, st - off_y).x;
-    grady += texture(tex0, st + off_y).x - texture(tex0, st - off_y).x;
+    float grady = textureLod(tex1, st + off_y, lod).x - textureLod(tex1, st - off_y, lod).x;
+    grady += textureLod(tex0, st + off_y, lod).x - textureLod(tex0, st - off_y, lod).x;
 
     float gradmag = sqrt(gradx * gradx + grady * grady + TINY);
 
@@ -33,42 +42,40 @@ vec2 compute_flow_at_offset(vec2 st, vec2 off) {
     flow.x = scr_dif * (gradx / gradmag);
     flow.y = scr_dif * (grady / gradmag);
 
-    return flow * force;
+    return flow;
 }
 
 void main() {
     vec2 st = texCoord;
+    vec2 totalFlow = vec2(0.0);
+    float totalWeight = 0.0;
 
-    // Multi-scale with explicit offsets (clear and controllable)
-    vec2 flow_fine = compute_flow_at_offset(st, offset);   // Small motions
-    vec2 flow_medium = compute_flow_at_offset(st, offset * 2.0);       // Medium motions
-    vec2 flow_coarse = compute_flow_at_offset(st, offset * 4.0); // Large motions
+    // Sample multiple mip levels
+    // LOD 0 = full res, LOD 1 = half, LOD 2 = quarter, etc.
+    for (int i = 0; i < numLevels && i < 4; i++) {
+        float lod = float(i);
+        float scale = pow(2.0, lod);  // Offset scales with LOD
 
-    float mag_fine = length(flow_fine);
-    float mag_medium = length(flow_medium);
-    float mag_coarse = length(flow_coarse);
+        vec2 flow = computeFlowAtLod(st, offset * scale, lod);
+        float weight = levelWeights[i];
 
-    // Pick strongest
-    vec2 flow;
-    if (mag_coarse > mag_medium && mag_coarse > mag_fine) {
-        flow = flow_coarse;
-    } else if (mag_medium > mag_fine) {
-        flow = flow_medium;
-    } else {
-        flow = flow_fine;
+        totalFlow += flow * weight;
+        totalWeight += weight;
     }
 
-    // flow = flow_fine;
+    vec2 flow = totalFlow / (totalWeight + TINY);
 
-    // Threshold and normalize
+    // Apply force
+    flow *= force;
+
+    // Apply threshold and power curve
     float magnitude = length(flow);
-    magnitude = max(magnitude, threshold);
-    magnitude -= threshold;
-    magnitude /= (1.0 - threshold + TINY);
+    magnitude = max(magnitude - threshold, 0.0);  // Simpler threshold
     magnitude = pow(magnitude, power);
 
-    flow += TINY;
-    flow = normalize(flow) * clamp(magnitude, 0.0, 1.0);
+    // Scale flow by new magnitude, then clamp
+    flow = (length(flow) > TINY) ? (flow / length(flow)) * magnitude : vec2(0.0);
+    flow = clamp(flow, vec2(-1.0), vec2(1.0));
 
     fragColor = vec4(flow, 0.0, 1.0);
 }

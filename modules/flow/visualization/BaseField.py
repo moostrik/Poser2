@@ -27,12 +27,11 @@ class VisualisationFieldConfig(FlowConfigBase):
                   "description": "Visualization scale multiplier"}
     )
     spacing: float = field(
-        default=8.0,
-        metadata={"min": 4.0, "max": 16.0, "label": "Grid Spacing", "description": "Distance between elements (pixels)"}
+        default=20.0,
+        metadata={"min": 4.0, "max": 64.0, "label": "Grid Spacing", "description": "Distance between elements (pixels)"}
     )
     element_length: float = field(
-        default=8.0,
-        metadata={"min": 0.5, "max": 64.0, "label": "Element Length", "description": "Element length in pixels"}
+        default=40.0,
     )
     element_width: float = field(
         default=0.8,
