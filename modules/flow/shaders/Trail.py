@@ -1,6 +1,6 @@
-"""Bridge Trail shader.
+"""Trail shader.
 
-Blends current velocity with previous frame for temporal smoothing.
+Blends current input with previous frame for temporal smoothing.
 Ported from ofxFlowTools ftBridgeShader.h
 """
 
@@ -9,19 +9,20 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
 
-class BridgeTrail(Shader):
-    """Temporal smoothing shader for velocity fields.
+class Trail(Shader):
+    """Temporal smoothing shader for any field.
 
-    Blends previous trail with new input, normalized to prevent accumulation.
+    Blends previous trail with new input, with optional scaling on new input.
     """
 
-    def use(self, prev_trail: Texture, new_input: Texture, weight: float) -> None:
+    def use(self, prev_trail: Texture, new_input: Texture, trail_weight: float, new_weight: float = 1.0) -> None:
         """Blend previous trail with new input.
 
         Args:
             prev_trail: Previous trail texture
-            new_input: New velocity input texture
-            weight: Trail weight (0.0=replace, 0.99=keep trail)
+            new_input: New input texture
+            trail_weight: Trail weight (0.0=replace, 0.99=keep trail)
+            new_weight: New input scale/weight (default 1.0)
         """
         if not self.allocated or not self.shader_program:
             return
@@ -39,7 +40,8 @@ class BridgeTrail(Shader):
         # Set uniforms
         glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
         glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
-        glUniform1f(glGetUniformLocation(self.shader_program, "weight"), weight)
+        glUniform1f(glGetUniformLocation(self.shader_program, "trailWeight"), trail_weight)
+        glUniform1f(glGetUniformLocation(self.shader_program, "newWeight"), new_weight)
 
         draw_quad()
 

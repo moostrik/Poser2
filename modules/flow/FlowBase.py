@@ -88,17 +88,17 @@ class FlowBase(ABC):
             self._visualization_field.deallocate()
         self._allocated = False
 
-    def _set(self, texture: Texture) -> None:
-        """Protected: Replace input buffer. Wrap with semantic method in derived class."""
-        if not self._allocated:
-            return
-        FlowUtil.blit(self._input_fbo, texture)
+    # def _set(self, texture: Texture, strength: float = 1.0) -> None:
+    #     """Protected: Replace input buffer. Wrap with semantic method in derived class."""
+    #     if not self._allocated:
+    #         return
+    #     FlowUtil.set(self._input_fbo, texture, strength)
 
-    def _add(self, texture: Texture, strength: float = 1.0) -> None:
-        """Protected: Add to input buffer. Wrap with semantic method in derived class."""
-        if not self._allocated:
-            return
-        FlowUtil.add(self._input_fbo, texture, strength)
+    # def _add(self, texture: Texture, strength: float = 1.0) -> None:
+    #     """Protected: Add to input buffer. Wrap with semantic method in derived class."""
+    #     if not self._allocated:
+    #         return
+    #     FlowUtil.add(self._input_fbo, texture, strength)
 
     def reset(self) -> None:
         """Clear input and output buffers to zero."""

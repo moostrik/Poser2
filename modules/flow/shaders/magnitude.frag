@@ -7,7 +7,7 @@ out vec4 fragColor;
 
 void main() {
     vec4 v = texture(tex, texCoord);
-    float mag = length(v);
+    float mag = length(v.xyz);
     // Output to R channel (for R32F textures)
-    fragColor = vec4(mag, 0.0, 0.0, 0.0);
+    fragColor = vec4(mag, mag, mag, 1.0);
 }
