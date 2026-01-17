@@ -14,7 +14,7 @@ from .. import FlowBase, FlowConfigBase
 from .VelocityBridge import VelocityBridge, VelocityBridgeConfig
 from .shaders.DensityBridgeShader import DensityBridgeShader
 from ..shaders.HSV import HSV
-from ..shaders.MultiplyForce import MultiplyForce
+from ..shaders.Scale import Scale
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -26,21 +26,7 @@ class DensityBridgeConfig(FlowConfigBase):
     Velocity parameters propagate to internal VelocityProcessor.
     """
     # Velocity processing parameters
-    velocity_trail_weight: float = field(
-        default=0.3,
-        metadata={"min": 0.0, "max": 0.99, "label": "Velocity Trail Weight",
-                  "description": "Temporal smoothing for velocity"}
-    )
-    velocity_blur_radius: float = field(
-        default=3.0,
-        metadata={"min": 0.0, "max": 10.0, "label": "Velocity Blur Radius",
-                  "description": "Spatial smoothing for velocity"}
-    )
-    velocity_blur_steps: int = field(
-        default=1,
-        metadata={"min": 0, "max": 8, "label": "Velocity Blur Steps",
-                  "description": "Number of blur passes for velocity"}
-    )
+    velocity: VelocityBridgeConfig = field(default_factory=VelocityBridgeConfig)
 
     # Density-specific parameters
     time_scale: float = field(
@@ -76,26 +62,22 @@ class DensityBridge(FlowBase):
         Scale → _output_delta (RGBA32F)
     """
 
-    def __init__(self, config: DensityBridgeConfig | None = None) -> None:
+    def __init__(self, velocity_bridge: VelocityBridge | None = None, config: DensityBridgeConfig | None = None) -> None:
         super().__init__()
 
         self.config: DensityBridgeConfig = config or DensityBridgeConfig()
 
+        if velocity_bridge is None:
+            # Create and link to nested config
+            self._velocity_bridge = VelocityBridge()
+            self._velocity_bridge.config = self.config.velocity
+        else:
+            # Use provided (shared) velocity bridge
+            self._velocity_bridge: VelocityBridge = velocity_bridge
+
         # Define internal formats
-        self.input_internal_format = GL_RGBA32F   # RGB density input
-        self.output_internal_format = GL_RGBA32F  # RGBA density output
-
-        # Compose VelocityProcessor with initial config
-        self.velocity_processor = VelocityBridge(
-            VelocityBridgeConfig(
-                trail_weight=self.config.velocity_trail_weight,
-                blur_radius=self.config.velocity_blur_radius,
-                blur_steps=self.config.velocity_blur_steps
-            )
-        )
-
-        # Listen for config changes to propagate to VelocityProcessor
-        self.config.add_listener(self._on_config_changed)
+        self._input_internal_format = GL_RGBA32F   # RGB density input
+        self._output_internal_format = GL_RGBA32F  # RGBA density output
 
         # Output delta FBO (scaled density)
         self._output_delta: Fbo = Fbo()
@@ -103,20 +85,14 @@ class DensityBridge(FlowBase):
         # Shaders
         self._density_bridge_shader: DensityBridgeShader = DensityBridgeShader()
         self._hsv_shader: HSV = HSV()
-        self._multiply_shader: MultiplyForce = MultiplyForce()
+        self._multiply_shader: Scale = Scale()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
-
-    def _on_config_changed(self) -> None:
-        """Propagate relevant config changes to VelocityProcessor."""
-        self.velocity_processor.config.trail_weight = self.config.velocity_trail_weight
-        self.velocity_processor.config.blur_radius = self.config.velocity_blur_radius
-        self.velocity_processor.config.blur_steps = self.config.velocity_blur_steps
 
     @property
     def density(self) -> Texture:
         """RGBA density output (main result)."""
-        return self.output
+        return self._output
 
     @property
     def density_delta(self) -> Texture:
@@ -124,19 +100,24 @@ class DensityBridge(FlowBase):
         return self._output_delta
 
     @property
+    def density_input(self) -> Texture:
+        """Density scaled by timestep for simulation."""
+        return self._input
+
+    @property
     def velocity(self) -> Texture:
         """Smoothed velocity from VelocityProcessor."""
-        return self.velocity_processor.velocity
+        return self._velocity_bridge.velocity
 
     @property
     def velocity_delta(self) -> Texture:
         """Smoothed velocity from VelocityProcessor."""
-        return self.velocity_processor.velocity_delta
+        return self._velocity_bridge.velocity_delta
 
     @property
     def velocity_input(self) -> Texture:
         """Velocity input to VelocityProcessor."""
-        return self.velocity_processor.input
+        return self._velocity_bridge.velocity_input
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate density bridge FBOs.
@@ -151,10 +132,10 @@ class DensityBridge(FlowBase):
         super().allocate(width, height, output_width, output_height)
 
         # Allocate VelocityProcessor
-        self.velocity_processor.allocate(width, height, output_width, output_height)
+        self._velocity_bridge.allocate(width, height, output_width, output_height)
 
         # Allocate output delta
-        self._output_delta.allocate(width, height, self.output_internal_format)
+        self._output_delta.allocate(width, height, self._output_internal_format)
 
         # Allocate shaders
         self._density_bridge_shader.allocate()
@@ -164,7 +145,7 @@ class DensityBridge(FlowBase):
     def deallocate(self) -> None:
         """Release all FBO resources."""
         super().deallocate()
-        self.velocity_processor.deallocate()
+        self._velocity_bridge.deallocate()
         self._output_delta.deallocate()
         self._density_bridge_shader.deallocate()
         self._hsv_shader.deallocate()
@@ -176,7 +157,7 @@ class DensityBridge(FlowBase):
         Args:
             density: RGB or RGBA density texture
         """
-        self.set(density)
+        self._set(density)
 
     def add_density(self, density: Texture, strength: float = 1.0) -> None:
         """Add RGB density input (accumulates with strength).
@@ -185,7 +166,7 @@ class DensityBridge(FlowBase):
             density: RGB or RGBA density texture
             strength: Blend strength multiplier
         """
-        self.add(density, strength)
+        self._add(density, strength)
 
     def set_velocity(self, velocity: Texture) -> None:
         """Set velocity input (forwards to VelocityProcessor).
@@ -193,7 +174,7 @@ class DensityBridge(FlowBase):
         Args:
             velocity: RG velocity texture
         """
-        self.velocity_processor.set(velocity)
+        self._velocity_bridge._set(velocity)
 
     def add_velocity(self, velocity: Texture, strength: float = 1.0) -> None:
         """Add velocity input (forwards to VelocityProcessor).
@@ -202,12 +183,12 @@ class DensityBridge(FlowBase):
             velocity: RG velocity texture
             strength: Blend strength multiplier
         """
-        self.velocity_processor.add(velocity, strength)
+        self._velocity_bridge._add(velocity, strength)
 
     def reset(self) -> None:
         """Reset all FBOs to zero."""
         super().reset()
-        self.velocity_processor.reset()
+        self._velocity_bridge.reset()
         self._output_delta.clear(0.0, 0.0, 0.0, 0.0)
 
     def update(self, delta_time: float) -> None:
@@ -221,30 +202,30 @@ class DensityBridge(FlowBase):
 
         # Stage 1: Process velocity through VelocityProcessor (trail + blur)
         # Config already synced via listener
-        self.velocity_processor.update(delta_time)
+        self._velocity_bridge.update(delta_time)
 
         # Stage 2: Combine density RGB + velocity magnitude
-        self.output_fbo.begin()
+        self._output_fbo.begin()
         self._density_bridge_shader.use(
-            self.input,                       # Density RGB from input_fbo
-            self.velocity_processor.velocity, # Smoothed velocity (unscaled)
+            self._input,                       # Density RGB from input_fbo
+            self._velocity_bridge.velocity, # Smoothed velocity (unscaled)
             1.0   # Speed multiplier for alpha
         )
-        self.output_fbo.end()
+        self._output_fbo.end()
 
         # Stage 3: Apply HSV saturation adjustment
-        self.output_fbo.swap()
-        self.output_fbo.begin()
+        self._output_fbo.swap()
+        self._output_fbo.begin()
         self._hsv_shader.use(
-            self.output_fbo.back_texture,
+            self._output_fbo.back_texture,
             hue=0.0,
             saturation=self.config.saturation,
             value=1.0
         )
-        self.output_fbo.end()
+        self._output_fbo.end()
 
         # Stage 4: Create density_delta (scaled output)
         timestep: float = delta_time * self.config.time_scale
         self._output_delta.begin()
-        self._multiply_shader.use(self.output_fbo, timestep)
+        self._multiply_shader.use(self._output_fbo, timestep)
         self._output_delta.end()

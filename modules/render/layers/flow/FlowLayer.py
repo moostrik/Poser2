@@ -40,7 +40,6 @@ class FlowDrawMode(IntEnum):
     DENSITY_BRIDGE_INPUT_DENSITY = auto()
     DENSITY_BRIDGE_INPUT_VELOCITY = auto()
     DENSITY_BRIDGE_OUTPUT = auto()
-    DENSITY_BRIDGE_VISIBLE = auto()
     DENSITY_BRIDGE_OUTPUT_VELOCITY = auto()
 
 DRAW_MODE_BLEND_MODES: dict[FlowDrawMode, Style.BlendMode] = {
@@ -165,8 +164,8 @@ class FlowLayer(LayerBase):
 
 
         self.visualisation_config.element_length = 40.0
-        self.visualisation_config.toggle_scalar = False
-        self.velocity_bridge_config.trail_weight = 0.9
+        self.visualisation_config.toggle_scalar = True
+        self.velocity_bridge_config.trail_weight = 0.6
         self.velocity_bridge_config.blur_steps = 2
         self.velocity_bridge_config.blur_radius = 3.0
         self.velocity_bridge_config.time_scale = 160.0
@@ -176,11 +175,10 @@ class FlowLayer(LayerBase):
         self.density_bridge_config.time_scale = 1.0
 
 
-        self.draw_mode = FlowDrawMode.VELOCITY_BRIDGE_INPUT
-        self.draw_mode = FlowDrawMode.VELOCITY_BRIDGE_OUTPUT
+        # self.draw_mode = FlowDrawMode.VELOCITY_BRIDGE_INPUT
+        # self.draw_mode = FlowDrawMode.VELOCITY_BRIDGE_OUTPUT
         # self.draw_mode = FlowDrawMode.DENSITY_BRIDGE_OUTPUT_VELOCITY
-        self.draw_mode = FlowDrawMode.DENSITY_BRIDGE_OUTPUT
-        self.draw_mode = FlowDrawMode.DENSITY_BRIDGE_VISIBLE
+        self.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
 
 
         """Update full processing pipeline."""
@@ -199,19 +197,19 @@ class FlowLayer(LayerBase):
         if dirty:
             prev_tex: Texture | None = getattr(self._source, "prev_texture", None)
             if prev_tex is not None:
-                self._optical_flow.set(prev_tex)
+                self._optical_flow._set(prev_tex)
 
             curr_tex: Texture = self._source.texture
-            self._optical_flow.set(curr_tex)
+            self._optical_flow.set_density(curr_tex)
             self._optical_flow.update()
 
         # Stage 2: Smooth velocity through bridge
-        self._velocity_bridge.set_velocity(self._optical_flow.output)
+        self._velocity_bridge.set_velocity(self._optical_flow._output)
         self._velocity_bridge.update(self._delta_time)
 
         # Stage 3: Apply density bridge (uses smoothed velocity + source RGB)
-        self._density_bridge.set_velocity(self._optical_flow.output)
-        self._density_bridge.set_density(self._source.texture)
+        self._density_bridge.set_velocity(self._optical_flow._output)
+        self._density_bridge._set(self._source.texture)
         self._density_bridge.update(self._delta_time)
 
         Style.pop_style()
@@ -230,22 +228,20 @@ class FlowLayer(LayerBase):
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
         if self.draw_mode == FlowDrawMode.OPTICAL_INPUT:
-            return self._optical_flow.input
+            return self._optical_flow._input
         elif self.draw_mode == FlowDrawMode.OPTICAL_OUTPUT:
-            return self._optical_flow.output
+            return self._optical_flow._output
         elif self.draw_mode == FlowDrawMode.VELOCITY_BRIDGE_INPUT:
-            return self._velocity_bridge.input
+            return self._velocity_bridge._input
         elif self.draw_mode == FlowDrawMode.VELOCITY_BRIDGE_OUTPUT:
-            return self._velocity_bridge.output
+            return self._velocity_bridge._output
         elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_INPUT_DENSITY:
-            return self._density_bridge.input
+            return self._density_bridge._input
         elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY:
             return self._density_bridge.velocity_input
         elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_OUTPUT:
-            return self._density_bridge.density_delta
-        elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_VISIBLE:
             return self._density_bridge.density
         elif self.draw_mode == FlowDrawMode.DENSITY_BRIDGE_OUTPUT_VELOCITY:
             return self._density_bridge.velocity
         else:
-            return self._optical_flow.output
+            return self._optical_flow._output

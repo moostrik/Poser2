@@ -10,7 +10,7 @@ from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, Fbo
 from .. import FlowBase, FlowConfigBase
-from .shaders import BridgeTrail, GaussianBlur, MultiplyForce
+from .shaders import BridgeTrail, GaussianBlur, Scale
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -79,8 +79,8 @@ class VelocityBridge(FlowBase):
         super().__init__()
 
         # Define formats for FlowBase
-        self.input_internal_format = GL_RG32F
-        self.output_internal_format = GL_RG32F
+        self._input_internal_format = GL_RG32F
+        self._output_internal_format = GL_RG32F
 
         self.config: VelocityBridgeConfig = config or VelocityBridgeConfig()
 
@@ -89,19 +89,24 @@ class VelocityBridge(FlowBase):
         # Shaders
         self._bridge_trail_shader: BridgeTrail = BridgeTrail()
         self._blur_shader: GaussianBlur = GaussianBlur()
-        self._multiply_shader: MultiplyForce = MultiplyForce()
+        self._multiply_shader: Scale = Scale()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def velocity(self) -> Texture:
         """Smoothed velocity output."""
-        return self.output
+        return self._output
 
     @property
     def velocity_delta(self) -> Texture:
         """Smoothed velocity scaled by timestep."""
         return self._output_delta
+
+    @property
+    def velocity_input(self) -> Texture:
+        """Raw velocity input."""
+        return self._input
 
     def set_velocity(self, velocity: Texture) -> None:
         """Set velocity input to VelocityProcessor.
@@ -109,7 +114,7 @@ class VelocityBridge(FlowBase):
         Args:
             velocity: Velocity texture (RG32F)
         """
-        self.set(velocity)
+        self._set(velocity)
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate velocity processor.
@@ -122,7 +127,7 @@ class VelocityBridge(FlowBase):
         """
         super().allocate(width, height, output_width, output_height)
 
-        self._output_delta.allocate(width, height, self.output_internal_format)
+        self._output_delta.allocate(width, height, self._output_internal_format)
         # Allocate shaders
         self._bridge_trail_shader.allocate()
         self._blur_shader.allocate()
@@ -145,41 +150,41 @@ class VelocityBridge(FlowBase):
             return
 
         # Stage 1: Temporal smoothing (trail blend)
-        self.output_fbo.swap()
-        self.output_fbo.begin()
+        self._output_fbo.swap()
+        self._output_fbo.begin()
         self._bridge_trail_shader.use(
-            self.output_fbo.back_texture,  # Previous trail
-            self.input_fbo.texture,        # New velocity
+            self._output_fbo.back_texture,  # Previous trail
+            self._input_fbo.texture,        # New velocity
             self.config.trail_weight
         )
-        self.output_fbo.end()
+        self._output_fbo.end()
 
         # Stage 2: Spatial smoothing (Gaussian blur)
         if self.config.blur_steps > 0 and self.config.blur_radius > 0:
             # In-place blur using swap operations (like C++ original)
             for _ in range(self.config.blur_steps):
                 # Horizontal pass
-                self.output_fbo.swap()
-                self.output_fbo.begin()
+                self._output_fbo.swap()
+                self._output_fbo.begin()
                 self._blur_shader.use(
-                    self.output_fbo.back_texture,
+                    self._output_fbo.back_texture,
                     self.config.blur_radius,
                     horizontal=True
                 )
-                self.output_fbo.end()
+                self._output_fbo.end()
 
                 # Vertical pass
-                self.output_fbo.swap()
-                self.output_fbo.begin()
+                self._output_fbo.swap()
+                self._output_fbo.begin()
                 self._blur_shader.use(
-                    self.output_fbo.back_texture,
+                    self._output_fbo.back_texture,
                     self.config.blur_radius,
                     horizontal=False
                 )
-                self.output_fbo.end()
+                self._output_fbo.end()
 
         timestep: float = delta_time * self.config.time_scale
 
         self._output_delta.begin()
-        self._multiply_shader.use(self.output_fbo, timestep)
+        self._multiply_shader.use(self._output_fbo, timestep)
         self._output_delta.end()

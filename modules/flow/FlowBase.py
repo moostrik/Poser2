@@ -14,64 +14,65 @@ from modules.utils.PointsAndRects import Rect
 class FlowBase(ABC):
     """Base class for flow processing with input/output FBOs.
 
-    All flow layers have:
-    - input_fbo: SwapFbo for receiving data
-    - output_fbo: SwapFbo for producing results
+    Provides input_fbo and output_fbo (SwapFbo) for ping-pong rendering.
 
-    Subclasses define internal formats in __init__() by setting:
-        self.input_internal_format = GL_R8
-        self.output_internal_format = GL_RG32F
+    Derived classes must:
+    1. Set _input_internal_format and _output_internal_format in __init__()
+    2. Implement update(delta_time) to process input_fbo → output_fbo
+    3. Expose domain-specific public APIs (e.g., set_velocity(), .velocity property)
+    4. Never expose _input, _output, _set(), or _add() directly
 
-    Then call allocate() to create FBOs with those formats.
+    Protected methods (_set, _add) and properties (_input, _output) are for
+    internal use only. Derived classes wrap these with semantic names.
     """
 
     def __init__(self) -> None:
-        self.input_fbo: SwapFbo = SwapFbo()
-        self.output_fbo: SwapFbo = SwapFbo()
+        self._input_fbo: SwapFbo = SwapFbo()
+        self._output_fbo: SwapFbo = SwapFbo()
         self._allocated: bool = False
 
         # Subclasses must set these in __init__
-        self.input_internal_format: int = 0
-        self.output_internal_format: int = 0
+        self._input_internal_format: int = 0
+        self._output_internal_format: int = 0
 
         # Auto-detecting visualization (lazy initialized)
         self._visualization_field = None
 
     @property
-    def input(self) -> Texture:
-        """Input texture."""
-        return self.input_fbo.texture
+    def _input(self) -> Texture:
+        """Protected: Input buffer texture. Access via domain-specific properties in derived classes."""
+        return self._input_fbo.texture
 
     @property
-    def output(self) -> Texture:
-        """Output texture."""
-        return self.output_fbo.texture
+    def _output(self) -> Texture:
+        """Protected: Output buffer texture. Access via domain-specific properties in derived classes."""
+        return self._output_fbo.texture
 
     @property
     def allocated(self) -> bool:
-        """Check if layer is allocated."""
+        """Check if buffers are allocated."""
         return self._allocated
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
-        """Allocate input/output FBOs using internal formats from subclass.
+        """Allocate input/output FBOs using formats set by derived class.
 
         Args:
-            width: Input width (or width for both if outputs not specified)
-            height: Input height (or height for both if outputs not specified)
-            output_width: Optional output width (defaults to width)
-            output_height: Optional output height (defaults to height)
+            width: Input buffer width
+            height: Input buffer height
+            output_width: Output buffer width (defaults to width)
+            output_height: Output buffer height (defaults to height)
         """
-        if self.input_internal_format == 0 or self.output_internal_format == 0:
+        if self._input_internal_format == 0 or self._output_internal_format == 0:
             raise RuntimeError(f"{self.__class__.__name__} must set input_internal_format and output_internal_format in __init__")
 
         out_w = output_width if output_width is not None else width
         out_h = output_height if output_height is not None else height
 
-        self.input_fbo.allocate(width, height, self.input_internal_format)
-        FlowUtil.zero(self.input_fbo)
+        self._input_fbo.allocate(width, height, self._input_internal_format)
+        FlowUtil.zero(self._input_fbo)
 
-        self.output_fbo.allocate(out_w, out_h, self.output_internal_format)
-        FlowUtil.zero(self.output_fbo)
+        self._output_fbo.allocate(out_w, out_h, self._output_internal_format)
+        FlowUtil.zero(self._output_fbo)
 
         self._allocated = True
 
@@ -81,55 +82,55 @@ class FlowBase(ABC):
 
     def deallocate(self) -> None:
         """Release all FBO resources."""
-        self.input_fbo.deallocate()
-        self.output_fbo.deallocate()
+        self._input_fbo.deallocate()
+        self._output_fbo.deallocate()
         if self._visualization_field is not None:
             self._visualization_field.deallocate()
         self._allocated = False
 
-    def set(self, texture: Texture) -> None:
-        """Set input texture (copies to input FBO)."""
+    def _set(self, texture: Texture) -> None:
+        """Protected: Replace input buffer. Wrap with semantic method in derived class."""
         if not self._allocated:
             return
-        FlowUtil.stretch(self.input_fbo, texture)
+        FlowUtil.blit(self._input_fbo, texture)
 
-    def add(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to input FBO with strength multiplier."""
+    def _add(self, texture: Texture, strength: float = 1.0) -> None:
+        """Protected: Add to input buffer. Wrap with semantic method in derived class."""
         if not self._allocated:
             return
-        FlowUtil.add(self.input_fbo, texture, strength)
+        FlowUtil.add(self._input_fbo, texture, strength)
 
     def reset(self) -> None:
-        """Reset both input and output FBOs to zero."""
-        FlowUtil.zero(self.input_fbo)
-        FlowUtil.zero(self.output_fbo)
+        """Clear input and output buffers to zero."""
+        FlowUtil.zero(self._input_fbo)
+        FlowUtil.zero(self._output_fbo)
 
     @abstractmethod
-    def update(self) -> None:
-        """Process input and generate output. Must be implemented by subclass."""
+    def update(self, delta_time: float = 1.0) -> None:
+        """Process input_fbo → output_fbo. Must be implemented by derived class."""
         ...
 
     # CONVENIENCE DRAW METHODS
     def draw(self, rect: Rect) -> None:
-        """Draw output FBO to screen."""
+        """Draw output buffer with auto-visualization."""
         self.draw_output(rect)
 
     def draw_input(self, rect: Rect) -> None:
-        """Draw input FBO to screen."""
-        self._draw_with_visualization_field(self.input_fbo.texture, rect)
+        """Draw input buffer with auto-visualization."""
+        self._draw_with_visualization_field(self._input_fbo.texture, rect)
 
     def draw_output(self, rect: Rect) -> None:
-        """Draw output FBO with auto-detecting visualization."""
-        self._draw_with_visualization_field(self.output_fbo.texture, rect)
+        """Draw output buffer with auto-visualization (velocity=field, RGB=direct)."""
+        self._draw_with_visualization_field(self._output_fbo.texture, rect)
 
     def _draw_with_visualization_field(self, texture: Texture, rect: Rect) -> None:
-        """Draw output FBO using visualization field."""
+        """Protected: Draw texture using auto-detecting Visualizer (lazy init)."""
         # Lazy init visualization field
         if self._visualization_field is None:
             from .visualization.Visualiser import Visualizer
             self._visualization_field = Visualizer()
             if self._allocated:
-                self._visualization_field.allocate(self.output_fbo.width, self.output_fbo.height)
+                self._visualization_field.allocate(self._output_fbo.width, self._output_fbo.height)
 
         self._visualization_field.draw(texture, rect)
 
