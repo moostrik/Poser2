@@ -1,0 +1,63 @@
+"""JacobiPressure shader - Iterative Poisson pressure solver."""
+
+from OpenGL.GL import *  # type: ignore
+from modules.gl.Shader import Shader, draw_quad
+from modules.gl import Texture
+
+
+class JacobiPressure(Shader):
+    """Jacobi iterative solver for Poisson pressure equation."""
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def use(self, source: Texture, divergence: Texture, obstacle: Texture, obstacle_offset: Texture, grid_scale: float) -> None:
+        """Apply one Jacobi iteration.
+
+        Args:
+            source: Previous pressure estimate (R32F)
+            divergence: Velocity divergence (R32F)
+            obstacle: Obstacle mask (R8/R32F)
+            obstacle_offset: Neighbor obstacle info (RGBA8)
+            grid_scale: Grid scaling factor (typically 1)
+        """
+        if not self.allocated or not self.shader_program:
+            print("JacobiPressure shader not allocated or shader program missing.")
+            return
+        if not source.allocated or not divergence.allocated or not obstacle.allocated or not obstacle_offset.allocated:
+            print("JacobiPressure shader: input texture(s) not allocated.")
+            return
+
+        # Compute Jacobi parameters
+        alpha = -(grid_scale * grid_scale)
+        beta = 0.25  # 1/4 for 4 neighbors in 2D
+
+        glUseProgram(self.shader_program)
+
+        # Bind textures
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, source.tex_id)
+        glUniform1i(glGetUniformLocation(self.shader_program, "uSource"), 0)
+
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, divergence.tex_id)
+        glUniform1i(glGetUniformLocation(self.shader_program, "uDivergence"), 1)
+
+        glActiveTexture(GL_TEXTURE2)
+        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        glUniform1i(glGetUniformLocation(self.shader_program, "uObstacle"), 2)
+
+        glActiveTexture(GL_TEXTURE3)
+        glBindTexture(GL_TEXTURE_2D, obstacle_offset.tex_id)
+        glUniform1i(glGetUniformLocation(self.shader_program, "uObstacleOffset"), 3)
+
+        # Set uniforms
+        glUniform1f(glGetUniformLocation(self.shader_program, "uAlpha"), alpha)
+        glUniform1f(glGetUniformLocation(self.shader_program, "uBeta"), beta)
+
+        draw_quad()
+
+        # Cleanup
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, 0)
+        glUseProgram(0)
