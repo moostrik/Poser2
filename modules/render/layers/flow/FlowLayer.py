@@ -70,6 +70,8 @@ class FlowConfig:
     fps: float = 60.0
     draw_mode: FlowDrawMode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
     field_mode: bool = False  # False=scalar/direction, True=arrow field
+    simulation_scale: float = 0.25
+
     visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)
     optical_flow: OpticalFlowConfig = field(default_factory=OpticalFlowConfig)
     velocity_trail: SmoothTrailConfig = field(default_factory=SmoothTrailConfig)
@@ -139,11 +141,14 @@ class FlowLayer(LayerBase):
             height: Processing height
             internal_format: Ignored (formats determined by each stage)
         """
-        self._optical_flow.allocate(width, height)
-        self._velocity_trail.allocate(width, height)
-        self._velocity_magnitude.allocate(width, height)
+        sim_width = int(width * self.config.simulation_scale)
+        sim_height = int(height * self.config.simulation_scale)
+
+        self._optical_flow.allocate(sim_width, sim_height)
+        self._velocity_trail.allocate(sim_width, sim_height)
+        self._velocity_magnitude.allocate(sim_width, sim_height)
         self._density_bridge.allocate(width, height)
-        self._temperature_bridge.allocate(width, height)
+        self._temperature_bridge.allocate(sim_width, sim_height)
         self._visualizer.allocate(width, height)
 
     def deallocate(self) -> None:
@@ -185,10 +190,10 @@ class FlowLayer(LayerBase):
         self.config.density_bridge.brightness = 2.0
 
 
-        # self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
-        # self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
+        self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
+        self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_INPUT
-        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
+        # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY

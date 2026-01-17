@@ -76,7 +76,7 @@ class Visualizer:
         # Visualize 2-channel velocity data (RG32F)
         # Always visualized since raw output can contain negatives
         # Use velocity_field.config.toggle_scalar to switch modes
-        if num_channels <= 2:
+        if num_channels == 2:
             # Sync scale with velocity visualization
             self.velocity_field.config.scale = self._config.scale
 
