@@ -3,7 +3,7 @@
 precision highp float;
 
 // Fullscreen quad texture coordinates
-in vec2 texCoordVarying;
+in vec2 texCoord;
 
 // Output
 out vec4 fragColor;
@@ -18,7 +18,7 @@ uniform float uAlpha;  // -(gridScale^2) / timestep
 uniform float uBeta;   // 1 / (4 + alpha)
 
 void main() {
-    vec2 st = texCoordVarying;
+    vec2 st = texCoord;
 
     // Check if current pixel is inside obstacle
     float oC = texture(uObstacle, st).r;

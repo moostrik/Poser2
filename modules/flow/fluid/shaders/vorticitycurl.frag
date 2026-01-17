@@ -3,7 +3,7 @@
 precision highp float;
 
 // Fullscreen quad texture coordinates
-in vec2 texCoordVarying;
+in vec2 texCoord;
 
 // Output
 out float fragColor;
@@ -16,7 +16,7 @@ uniform sampler2D uObstacle; // Obstacle mask (1.0 = obstacle, 0.0 = fluid)
 uniform float uHalfRdx; // 0.5 / gridScale
 
 void main() {
-    vec2 st = texCoordVarying;
+    vec2 st = texCoord;
 
     // Check if inside obstacle
     if (texture(uObstacle, st).r >= 0.99) {

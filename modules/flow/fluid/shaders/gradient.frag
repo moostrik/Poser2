@@ -3,7 +3,7 @@
 // Subtract pressure gradient from velocity to make divergence-free
 // v_new = v_old - ∇p
 
-in vec2 vTexCoord;
+in vec2 texCoord;
 out vec2 fragColor;
 
 uniform sampler2D uVelocity;        // Current velocity (RG32F)
@@ -14,7 +14,7 @@ uniform sampler2D uObstacleOffset;  // Neighbor obstacle info (RGBA8)
 uniform float uHalfRdx;  // 0.5 / gridScale
 
 void main() {
-    vec2 st = vTexCoord;
+    vec2 st = texCoord;
 
     float obstacle = texture(uObstacle, st).x;
     if (obstacle > 0.5) {

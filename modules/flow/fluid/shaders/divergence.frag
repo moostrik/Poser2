@@ -3,7 +3,7 @@
 // Compute divergence of velocity field
 // div(v) = ∂vx/∂x + ∂vy/∂y using central differences
 
-in vec2 vTexCoord;
+in vec2 texCoord;
 out float fragColor;
 
 uniform sampler2D uVelocity;        // Velocity field (RG32F)
@@ -13,7 +13,7 @@ uniform sampler2D uObstacleOffset;  // Neighbor obstacle info (RGBA8)
 uniform float uHalfRdx;  // 0.5 / gridScale
 
 void main() {
-    vec2 st = vTexCoord;
+    vec2 st = texCoord;
 
     float obstacle = texture(uObstacle, st).x;
     if (obstacle > 0.5) {

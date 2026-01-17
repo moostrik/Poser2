@@ -352,6 +352,10 @@ class FluidFlow(FlowBase):
         if not self._allocated:
             return
 
+        # Compute scale factor for dual-resolution support
+        # When density resolution != simulation resolution, scale velocity vectors accordingly
+        density_scale = self._density_width / self._simulation_width if self._simulation_width > 0 else 1.0
+
         # ===== STEP 1: DENSITY ADVECT & DISSIPATE =====
         advect_den_step = delta_time * self.config.den_speed * 100 * self._grid_scale
         dissipate_den = 1.0 - delta_time * self.config.den_dissipation
@@ -362,7 +366,7 @@ class FluidFlow(FlowBase):
             self._output_fbo.back_texture,  # Source density
             self._input_fbo.texture,        # Velocity
             self._obstacle_fbo.texture,     # Obstacles
-            self._grid_scale,
+            density_scale,                  # Scale for resolution mismatch
             advect_den_step,
             dissipate_den
         )

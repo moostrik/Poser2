@@ -3,7 +3,7 @@
 precision highp float;
 
 // Fullscreen quad texture coordinates
-in vec2 texCoordVarying;
+in vec2 texCoord;
 
 // Output
 out vec2 fragColor;
@@ -19,7 +19,7 @@ uniform float uWeight;             // Density weight (gravity effect)
 uniform float uAmbientTemperature; // Ambient/reference temperature
 
 void main() {
-    vec2 st = texCoordVarying;
+    vec2 st = texCoord;
 
     // Sample temperature
     float temperature = texture(uTemperature, st).r;

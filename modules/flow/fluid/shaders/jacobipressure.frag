@@ -3,7 +3,7 @@
 // Jacobi iterative solver for Poisson pressure equation
 // Solves: ∇²p = -∇·v
 
-in vec2 vTexCoord;
+in vec2 texCoord;
 out vec4 fragColor;
 
 uniform sampler2D uSource;          // Previous pressure estimate (R32F)
@@ -15,7 +15,7 @@ uniform float uAlpha;  // -(gridScale²)
 uniform float uBeta;   // 0.25 (= 1/4 for 4 neighbors)
 
 void main() {
-    vec2 st = vTexCoord;
+    vec2 st = texCoord;
 
     float obstacle = texture(uObstacle, st).x;
     if (obstacle > 0.5) {

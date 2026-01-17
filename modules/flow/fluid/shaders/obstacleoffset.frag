@@ -3,7 +3,7 @@
 precision highp float;
 
 // Fullscreen quad texture coordinates
-in vec2 texCoordVarying;
+in vec2 texCoord;
 
 // Output
 out vec4 fragColor;
@@ -12,7 +12,7 @@ out vec4 fragColor;
 uniform sampler2D uObstacle; // Obstacle mask (R8: 1.0 = obstacle, 0.0 = fluid)
 
 void main() {
-    vec2 st = texCoordVarying;
+    vec2 st = texCoord;
 
     // Sample neighbor obstacle values
     // Output RGBA encodes: R=top, G=bottom, B=right, A=left

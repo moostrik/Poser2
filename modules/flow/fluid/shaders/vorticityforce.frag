@@ -3,7 +3,7 @@
 precision highp float;
 
 // Fullscreen quad texture coordinates
-in vec2 texCoordVarying;
+in vec2 texCoord;
 
 // Output
 out vec2 fragColor;
@@ -16,7 +16,7 @@ uniform float uHalfRdx;  // 0.5 / gridScale
 uniform float uTimestep; // Vorticity confinement timestep
 
 void main() {
-    vec2 st = texCoordVarying;
+    vec2 st = texCoord;
 
     // Sample curl neighbors (take absolute value)
     float cT = abs(textureOffset(uCurl, st, ivec2(0, 1)).r);
