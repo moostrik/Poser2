@@ -39,12 +39,12 @@ class FluidFlowConfig(FlowConfigBase):
                   "description": "Velocity energy loss per frame"}
     )
     vel_vorticity: float = field(
-        default=0.5,
+        default=0.0,
         metadata={"min": 0.0, "max": 1.0, "label": "Vorticity",
                   "description": "Vortex confinement strength (turbulence)"}
     )
     vel_viscosity: float = field(
-        default=0.5,
+        default=0.0,
         metadata={"min": 0.0, "max": 1.0, "label": "Viscosity",
                   "description": "Fluid thickness/diffusion"}
     )
@@ -95,7 +95,7 @@ class FluidFlowConfig(FlowConfigBase):
                   "description": "Temperature dissipation rate"}
     )
     tmp_buoyancy: float = field(
-        default=0.6,
+        default=0.0,
         metadata={"min": 0.0, "max": 1.0, "label": "Buoyancy",
                   "description": "Buoyancy force strength (sigma)"}
     )
