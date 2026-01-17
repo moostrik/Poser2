@@ -130,6 +130,27 @@ class FlowUtil:
         dst_fbo.end()
 
     @staticmethod
+    def normalize(dst_fbo: Fbo, src: Texture) -> None:
+        """Normalize vectors to unit length.
+
+        Converts all vectors to magnitude 1 while preserving direction.
+        Zero vectors remain zero.
+
+        Args:
+            dst_fbo: Destination FBO
+            src: Source texture (any RGBA texture)
+        """
+        # Lazy init shader
+        if not hasattr(FlowUtil, '_normalize_shader'):
+            from .shaders.Normalize import Normalize
+            FlowUtil._normalize_shader = Normalize()
+            FlowUtil._normalize_shader.allocate()
+
+        dst_fbo.begin()
+        FlowUtil._normalize_shader.use(src)
+        dst_fbo.end()
+
+    @staticmethod
     def get_num_channels(internal_format) -> int:
         """Get number of channels from OpenGL internal format.
 

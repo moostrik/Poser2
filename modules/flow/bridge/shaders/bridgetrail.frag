@@ -11,7 +11,7 @@ uniform float weight;     // Trail weight (0=replace, 0.99=keep trail)
 in vec2 texCoord;
 out vec4 fragColor;
 
-#define TINY 0.0001
+#define TINY 0.000001
 
 void main() {
     vec2 prev_vel = texture(tex0, texCoord).xy;

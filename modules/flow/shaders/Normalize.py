@@ -1,6 +1,6 @@
-"""Magnitude shader.
+"""Normalize shader.
 
-Computes vector magnitude (length) for each pixel.
+Normalizes vectors to unit length.
 """
 
 from OpenGL.GL import *  # type: ignore
@@ -8,25 +8,25 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
 
-class Magnitude(Shader):
-    """Compute vector magnitude from texture."""
+class Normalize(Shader):
+    """Normalize vectors to unit length."""
 
-    def use(self, src: Texture) -> None:
-        """Compute magnitude of vector field.
+    def use(self, source: Texture) -> None:
+        """Normalize vectors in source texture.
 
         Args:
             source: Source texture
         """
         if not self.allocated or not self.shader_program:
-            print("Magnitude shader not allocated or shader program missing.")
+            print("Normalize shader not allocated or shader program missing.")
             return
-        if not src.allocated:
-            print("Magnitude shader: input texture not allocated.")
+        if not source.allocated:
+            print("Normalize shader: input texture not allocated.")
             return
 
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, src.tex_id)
+        glBindTexture(GL_TEXTURE_2D, source.tex_id)
         glUniform1i(glGetUniformLocation(self.shader_program, "tex"), 0)
         draw_quad()
         glActiveTexture(GL_TEXTURE0)
