@@ -167,7 +167,9 @@ class FlowLayer(LayerBase):
 
         self.config.visualisation.element_length = 40.0
         self.config.visualisation.toggle_scalar = False
-        self.config.velocity_trail.scale = 10.0
+
+        self.config.optical_flow.offset = 10
+        self.config.velocity_trail.scale = 1.0
         self.config.velocity_trail.trail_weight = 0.9
         self.config.velocity_trail.blur_steps = 2
         self.config.velocity_trail.blur_radius = 3.0
@@ -177,15 +179,15 @@ class FlowLayer(LayerBase):
 
         self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
         self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
-        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_INPUT
+        # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_INPUT
         self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
-        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE
+        # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_OUTPUT
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_MASK
-        self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
+        # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
 
 
         """Update full processing pipeline."""
@@ -204,10 +206,10 @@ class FlowLayer(LayerBase):
         if dirty:
             prev_tex: Texture | None = getattr(self._source, "prev_texture", None)
             if prev_tex is not None:
-                self._optical_flow.set_density(prev_tex)
+                self._optical_flow.set_color(prev_tex)
 
             curr_tex: Texture = self._source.texture
-            self._optical_flow.set_density(curr_tex)
+            self._optical_flow.set_color(curr_tex)
             self._optical_flow.update()
 
         # Stage 2: Bridge
@@ -239,7 +241,7 @@ class FlowLayer(LayerBase):
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
         if self.config.draw_mode == FlowDrawMode.OPTICAL_INPUT:
-            return self._optical_flow._input
+            return self._optical_flow.color_input
         elif self.config.draw_mode == FlowDrawMode.OPTICAL_OUTPUT:
             return self._optical_flow.velocity
         elif self.config.draw_mode == FlowDrawMode.SMOOTH_VELOCITY_INPUT:
@@ -249,16 +251,16 @@ class FlowLayer(LayerBase):
         elif self.config.draw_mode == FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE:
             return self._velocity_magnitude.magnitude
         elif self.config.draw_mode == FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR:
-            return self._density_bridge._input
+            return self._density_bridge.color_input
         elif self.config.draw_mode == FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY:
             return self._density_bridge.velocity_input
         elif self.config.draw_mode == FlowDrawMode.DENSITY_BRIDGE_OUTPUT:
             return self._density_bridge.density
         elif self.config.draw_mode == FlowDrawMode.TEMP_BRIDGE_INPUT_COLOR:
-            return self._temperature_bridge._input
+            return self._temperature_bridge.color_input
         elif self.config.draw_mode == FlowDrawMode.TEMP_BRIDGE_INPUT_MASK:
             return self._temperature_bridge.mask_input
         elif self.config.draw_mode == FlowDrawMode.TEMP_BRIDGE_OUTPUT:
             return self._temperature_bridge.temperature
         else:
-            return self._optical_flow._output
+            return self._source.texture

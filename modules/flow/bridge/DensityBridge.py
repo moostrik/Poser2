@@ -73,7 +73,7 @@ class DensityBridge(FlowBase):
         return self._output
 
     @property
-    def density_input(self) -> Texture:
+    def color_input(self) -> Texture:
         """RGB density input buffer."""
         return self._input
 

@@ -11,7 +11,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Texture import Texture
 
 from .. import FlowBase, FlowConfigBase, FlowUtil
-from .shaders import Luminance, OpticalFlow as OpticalFlowShader
+from .shaders import Luminance, OpticalFlowMM as OpticalFlowShader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -72,16 +72,24 @@ class OpticalFlow(FlowBase):
         return self._output
 
     @property
-    def density_input(self) -> Texture:
+    def color_input(self) -> Texture:
         """Density input texture (luminance)."""
         return self._input_fbo.texture
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate optical flow layer."""
-        self._optical_flow_shader.allocate()
-        self._luminance_shader.allocate()
 
         super().allocate(width, height, output_width, output_height)
+
+        for tex in [self._input_fbo.texture, self._input_fbo.back_texture]:
+            glBindTexture(GL_TEXTURE_2D, tex.tex_id)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+            glGenerateMipmap(GL_TEXTURE_2D)  # Initial generation
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+        self._optical_flow_shader.allocate()
+        self._luminance_shader.allocate()
 
         self._frame_count = 0
         self._needs_update = False
@@ -116,6 +124,8 @@ class OpticalFlow(FlowBase):
 
         self._optical_flow_shader.reload()
 
+        # print("Computing Optical Flow with offset:", self.config.offset)
+
         # Pass output_fbo directly since it's now a Fbo
         self._output_fbo.begin()
         self._optical_flow_shader.use(
@@ -129,7 +139,7 @@ class OpticalFlow(FlowBase):
         )
         self._output_fbo.end()
 
-    def set_density(self, texture: Texture) -> None:
+    def set_color(self, texture: Texture) -> None:
         """Set input frame texture.
 
         Args:
@@ -144,6 +154,11 @@ class OpticalFlow(FlowBase):
         self._input_fbo.begin()
         self._luminance_shader.use(texture)
         self._input_fbo.end()
+
+        # Generate mipmaps after rendering to FBO
+        glBindTexture(GL_TEXTURE_2D, self._input_fbo.texture.tex_id)
+        glGenerateMipmap(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, 0)
 
         self._frame_count += 1
         self._needs_update = True

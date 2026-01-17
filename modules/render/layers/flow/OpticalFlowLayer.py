@@ -63,10 +63,10 @@ class OpticalFlowLayer(LayerBase):
         if dirty:
             prev_tex: Texture | None = getattr(self._source, "prev_texture", None)
             if prev_tex is not None:
-                self._optical_flow.set_density(prev_tex)
+                self._optical_flow.set_color(prev_tex)
 
             curr_tex: Texture = self._source.texture
-            self._optical_flow.set_density(curr_tex)
+            self._optical_flow.set_color(curr_tex)
 
             self._optical_flow.update()
 
