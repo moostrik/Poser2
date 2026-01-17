@@ -34,6 +34,10 @@ class VelocityArrowField(Shader):
             print("VelocityArrowField shader: input texture not allocated.")
             return
 
+        viewport = glGetIntegerv(GL_VIEWPORT)
+        output_width = viewport[2]
+        output_height = viewport[3]
+
         # Activate shader program
         glUseProgram(self.shader_program)
 
@@ -47,7 +51,7 @@ class VelocityArrowField(Shader):
         glUniform1f(glGetUniformLocation(self.shader_program, "grid_spacing"), spacing)
         glUniform1f(glGetUniformLocation(self.shader_program, "arrow_length"), arrow_length)
         glUniform1f(glGetUniformLocation(self.shader_program, "arrow_thickness"), arrow_thickness)
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), velocity_tex.width, velocity_tex.height)
+        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), output_width, output_height)
 
         # Render
         draw_quad()

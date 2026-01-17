@@ -47,14 +47,13 @@ void main() {
 
     // Apply threshold and power curve
     float magnitude = length(flow);
-    magnitude = max(magnitude, threshold);
-    magnitude -= threshold;
-    magnitude /= (1.0 - threshold + TINY);
+    magnitude = max(magnitude - threshold, 0.0);  // Simpler threshold
     magnitude = pow(magnitude, power);
 
-    // Normalize flow direction and apply thresholded magnitude
-    flow += TINY;  // Prevent division by zero on Windows
-    flow = normalize(flow) * clamp(magnitude, 0.0, 1.0);
+    // Scale flow by new magnitude, then clamp
+    flow = (length(flow) > TINY) ? (flow / length(flow)) * magnitude : vec2(0.0);
+    flow = clamp(flow, vec2(-1.0), vec2(1.0));
+
 
     // Output: RG = velocity XY, BA unused
     fragColor = vec4(flow, 0.0, 1.0);

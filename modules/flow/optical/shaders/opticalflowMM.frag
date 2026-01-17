@@ -13,8 +13,8 @@ uniform float power;     // Power curve for magnitude
 
 const int numLevels = 3;   // Number of mip levels to sample (1-4)
 // const vec4 levelWeights = vec4(1.0f, 0.5f, 0.25f, 0.125f); // Weights for each level
-// const vec4 levelWeights = vec4(0.125f, 0.5f, 1.0f, 1.0f); // Weights for each level
-const vec4 levelWeights = vec4(1.f, 1.f, 1.0f, 1.0f); // Weights for each level
+const vec4 levelWeights = vec4(0.25f, 0.5f, 1.0f, 1.0f); // Weights for each level
+// const vec4 levelWeights = vec4(1.f, 1.f, 1.0f, 1.0f); // Weights for each level
 
 
 in vec2 texCoord;

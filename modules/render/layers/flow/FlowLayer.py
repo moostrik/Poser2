@@ -177,23 +177,23 @@ class FlowLayer(LayerBase):
         self.config.visualisation.toggle_scalar = False
 
         self.config.optical_flow.offset = 8
-        self.config.optical_flow.threshold = 0.0
+        self.config.optical_flow.threshold = 0.01
         self.config.optical_flow.strength_x = 3.3
         self.config.optical_flow.strength_y = 3.3
-        self.config.optical_flow.boost = 0.3
+        self.config.optical_flow.boost = 0.0
 
         self.config.velocity_trail.scale = 1.0
-        self.config.velocity_trail.trail_weight = 0.9
+        self.config.velocity_trail.trail_weight = 0.66
         self.config.velocity_trail.blur_steps = 2
         self.config.velocity_trail.blur_radius = 3.0
-        self.config.density_bridge.saturation = 5.2
-        self.config.density_bridge.brightness = 2.0
+        self.config.density_bridge.saturation = 1.2
+        self.config.density_bridge.brightness = 1.0
 
 
         self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
-        self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
+        # self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_INPUT
-        # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
+        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY
