@@ -22,6 +22,8 @@ from modules.flow import (
     Visualizer, VisualisationFieldConfig
 )
 
+from modules.flow.fluid import FluidFlow, FluidFlowConfig
+
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 class FlowDrawMode(IntEnum):
@@ -49,6 +51,16 @@ class FlowDrawMode(IntEnum):
     TEMP_BRIDGE_INPUT_MASK = auto()
     TEMP_BRIDGE_OUTPUT = auto()
 
+    # Fluid simulation outputs
+    FLUID_VELOCITY = auto()
+    FLUID_DENSITY = auto()
+    FLUID_PRESSURE = auto()
+    FLUID_TEMPERATURE = auto()
+    FLUID_DIVERGENCE = auto()
+    FLUID_VORTICITY = auto()
+    FLUID_BUOYANCY = auto()
+    FLUID_OBSTACLE = auto()
+
 DRAW_MODE_BLEND_MODES: dict[FlowDrawMode, Style.BlendMode] = {
     FlowDrawMode.OPTICAL_INPUT:                 Style.BlendMode.DISABLED,
     FlowDrawMode.OPTICAL_OUTPUT:                Style.BlendMode.ADDITIVE,
@@ -61,6 +73,16 @@ DRAW_MODE_BLEND_MODES: dict[FlowDrawMode, Style.BlendMode] = {
     FlowDrawMode.TEMP_BRIDGE_INPUT_COLOR:       Style.BlendMode.DISABLED,
     FlowDrawMode.TEMP_BRIDGE_INPUT_MASK:        Style.BlendMode.ADDITIVE,
     FlowDrawMode.TEMP_BRIDGE_OUTPUT:            Style.BlendMode.DISABLED,
+
+    # Fluid simulation blend modes
+    FlowDrawMode.FLUID_VELOCITY:                Style.BlendMode.ADDITIVE,
+    FlowDrawMode.FLUID_DENSITY:                 Style.BlendMode.DISABLED,
+    FlowDrawMode.FLUID_PRESSURE:                Style.BlendMode.ADDITIVE,
+    FlowDrawMode.FLUID_TEMPERATURE:             Style.BlendMode.ADDITIVE,
+    FlowDrawMode.FLUID_DIVERGENCE:              Style.BlendMode.ADDITIVE,
+    FlowDrawMode.FLUID_VORTICITY:               Style.BlendMode.ADDITIVE,
+    FlowDrawMode.FLUID_BUOYANCY:                Style.BlendMode.ADDITIVE,
+    FlowDrawMode.FLUID_OBSTACLE:                Style.BlendMode.DISABLED,
 }
 
 
@@ -78,6 +100,10 @@ class FlowConfig:
     density_bridge: DensityBridgeConfig = field(default_factory=DensityBridgeConfig)
     TemperatureBridge: TemperatureBridgeConfig = field(default_factory=TemperatureBridgeConfig)
     velocity_bridge_scale: float = 1.0 # second parameter that only applies to velocity input of the fluid simulation (scale of velocity_trail influences all the bridges)
+
+    # Fluid simulation
+    fluid_flow: FluidFlowConfig = field(default_factory=FluidFlowConfig)
+    fluid_velocity_scale: float = 1.0  # Scale factor for velocity input to fluid
 
 class FlowLayer(LayerBase):
     """Unified flow processing layer.
@@ -119,6 +145,9 @@ class FlowLayer(LayerBase):
         self._density_bridge: DensityBridge = DensityBridge(self.config.density_bridge)
         self._temperature_bridge: TemperatureBridge = TemperatureBridge(self.config.TemperatureBridge)
 
+        # Fluid simulation
+        self._fluid_flow: FluidFlow = FluidFlow(self.config.fluid_flow)
+
         # Visualization
         self._visualizer: Visualizer = Visualizer(self.config.visualisation)
 
@@ -149,6 +178,10 @@ class FlowLayer(LayerBase):
         self._velocity_magnitude.allocate(sim_width, sim_height)
         self._density_bridge.allocate(width, height)
         self._temperature_bridge.allocate(sim_width, sim_height)
+
+        # Fluid simulation: low-res simulation, high-res density output
+        self._fluid_flow.allocate(sim_width, sim_height, width, height)
+
         self._visualizer.allocate(width, height)
 
     def deallocate(self) -> None:
@@ -157,6 +190,7 @@ class FlowLayer(LayerBase):
         self._velocity_trail.deallocate()
         self._density_bridge.deallocate()
         self._temperature_bridge.deallocate()
+        self._fluid_flow.deallocate()
         self._visualizer.deallocate()
 
     def reset(self) -> None:
@@ -164,6 +198,7 @@ class FlowLayer(LayerBase):
         self._optical_flow.reset()
         self._velocity_trail.reset()
         self._density_bridge.reset()
+        self._fluid_flow.reset()
 
     # ========== Processing ==========
 
@@ -189,6 +224,15 @@ class FlowLayer(LayerBase):
         self.config.density_bridge.saturation = 1.2
         self.config.density_bridge.brightness = 1.0
 
+        self.config.fluid_velocity_scale = 60.0
+
+
+        self.config.fluid_flow.vel_speed = 0.03
+        self.config.fluid_flow.vel_dissipation = 0.01
+        self.config.fluid_flow.den_speed = 0.01
+        self.config.fluid_flow.den_dissipation = 0.1
+
+
 
         self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
         # self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
@@ -201,6 +245,14 @@ class FlowLayer(LayerBase):
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_MASK
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
+        self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
+        self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
+        # self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
+        # self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
+        # self.config.draw_mode = FlowDrawMode.FLUID_DIVERGENCE
+        # self.config.draw_mode = FlowDrawMode.FLUID_VORTICITY
+        # self.config.draw_mode = FlowDrawMode.FLUID_BUOYANCY
+        # self.config.draw_mode = FlowDrawMode.FLUID_OBSTACLE
 
 
         """Update full processing pipeline."""
@@ -243,6 +295,20 @@ class FlowLayer(LayerBase):
         self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
         self._temperature_bridge.update()
 
+        # Stage 3: Fluid simulation
+        # Add velocity with delta_time scaling
+        velocity_strength = self._delta_time * self.config.fluid_velocity_scale
+        self._fluid_flow.add_velocity(self._velocity_trail.velocity, velocity_strength)
+
+        # Add density from bridge (already has color+magnitude combined)
+        self._fluid_flow.add_density(self._density_bridge.density, self._delta_time * 10)
+
+        # Add temperature from bridge
+        self._fluid_flow.add_temperature(self._temperature_bridge.temperature, self._delta_time)
+
+        # Update fluid simulation
+        self._fluid_flow.update(self._delta_time)
+
         Style.pop_style()
 
     # ========== Rendering ==========
@@ -280,5 +346,22 @@ class FlowLayer(LayerBase):
             return self._temperature_bridge.mask_input
         elif self.config.draw_mode == FlowDrawMode.TEMP_BRIDGE_OUTPUT:
             return self._temperature_bridge.temperature
+        # Fluid simulation outputs
+        elif self.config.draw_mode == FlowDrawMode.FLUID_VELOCITY:
+            return self._fluid_flow.velocity
+        elif self.config.draw_mode == FlowDrawMode.FLUID_DENSITY:
+            return self._fluid_flow.density
+        elif self.config.draw_mode == FlowDrawMode.FLUID_PRESSURE:
+            return self._fluid_flow.pressure
+        elif self.config.draw_mode == FlowDrawMode.FLUID_TEMPERATURE:
+            return self._fluid_flow.temperature
+        elif self.config.draw_mode == FlowDrawMode.FLUID_DIVERGENCE:
+            return self._fluid_flow.divergence
+        elif self.config.draw_mode == FlowDrawMode.FLUID_VORTICITY:
+            return self._fluid_flow.vorticity_curl
+        elif self.config.draw_mode == FlowDrawMode.FLUID_BUOYANCY:
+            return self._fluid_flow.buoyancy
+        elif self.config.draw_mode == FlowDrawMode.FLUID_OBSTACLE:
+            return self._fluid_flow.obstacle
         else:
             return self._source.texture
