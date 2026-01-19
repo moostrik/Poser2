@@ -120,9 +120,9 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.motion_bar,
     # Layers.motion_sim,
 
-    # Layers.box_cam,
-    # Layers.box_pose_I,
-    # Layers.box_pose_R,
+    Layers.box_cam,
+    Layers.box_pose_I,
+    Layers.box_pose_R,
 
     # Layers.centre_mask,
     # Layers.centre_cam,
@@ -136,9 +136,9 @@ FINAL_LAYERS: list[Layers] = [
 
     # Layers.centre_cam,
     # Layers.centre_mask,
-    Layers.centre_pose,
-    Layers.sim_blend,
-    Layers.flow,
+    # Layers.centre_pose,
+    # Layers.sim_blend,
+    # Layers.flow,
 ]
 
 BOX_LAYERS: list[Layers] = [
