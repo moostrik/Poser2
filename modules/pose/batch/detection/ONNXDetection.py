@@ -250,40 +250,51 @@ class ONNXDetection(Thread):
         return batch_norm
 
     @staticmethod
-    def _decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float) -> tuple[np.ndarray, np.ndarray]:
+    def _decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float, apply_softmax: bool = False) -> tuple[np.ndarray, np.ndarray]:
         """Decode SimCC using MMPose's exact method from get_simcc_maximum.
 
         Reference: mmpose/codecs/utils/post_processing.py::get_simcc_maximum
-        Reference: projects/rtmpose/examples/onnxruntime/main.py
-        Reference: rtmpose.cpp line 150: score = MAX(score_x, score_y)
         """
-        # Get coordinates from argmax of raw logits
-        x_locs = np.argmax(simcc_x, axis=-1)
-        y_locs = np.argmax(simcc_y, axis=-1)
+        N, K, _ = simcc_x.shape
 
-        # Convert bin indices to normalized coordinates
+        # Reshape for processing: (N, K, W) -> (N*K, W)
+        simcc_x_flat = simcc_x.reshape(N * K, -1)
+        simcc_y_flat = simcc_y.reshape(N * K, -1)
+
+        if apply_softmax:
+            # Exact MMPose softmax implementation
+            simcc_x_flat = simcc_x_flat - np.max(simcc_x_flat, axis=1, keepdims=True)
+            simcc_y_flat = simcc_y_flat - np.max(simcc_y_flat, axis=1, keepdims=True)
+            ex, ey = np.exp(simcc_x_flat), np.exp(simcc_y_flat)
+            simcc_x_flat = ex / np.sum(ex, axis=1, keepdims=True)
+            simcc_y_flat = ey / np.sum(ey, axis=1, keepdims=True)
+
+        # Get coordinates from argmax
+        x_locs = np.argmax(simcc_x_flat, axis=1)
+        y_locs = np.argmax(simcc_y_flat, axis=1)
+
+        # Get max values (scores) at predicted locations
+        max_val_x = np.amax(simcc_x_flat, axis=1)
+        max_val_y = np.amax(simcc_y_flat, axis=1)
+
+        # MMPose takes MINIMUM of x and y scores
+        mask = max_val_x > max_val_y
+        max_val_x[mask] = max_val_y[mask]
+        scores = max_val_x
+
+        # Convert to coordinates
         x_coords = x_locs.astype(np.float32) / split_ratio
         y_coords = y_locs.astype(np.float32) / split_ratio
 
-        # Get max logit values at predicted locations
-        batch_size, num_keypoints = simcc_x.shape[:2]
-        x_scores = np.zeros((batch_size, num_keypoints), dtype=np.float32)
-        y_scores = np.zeros((batch_size, num_keypoints), dtype=np.float32)
+        # Reshape back to (N, K, 2) and (N, K)
+        keypoints = np.stack([x_coords, y_coords], axis=-1).reshape(N, K, 2)
+        scores = scores.reshape(N, K)
 
-        for b in range(batch_size):
-            for k in range(num_keypoints):
-                x_scores[b, k] = simcc_x[b, k, x_locs[b, k]]
-                y_scores[b, k] = simcc_y[b, k, y_locs[b, k]]
+        # Mark invalid keypoints
+        keypoints[scores <= 0.] = -1
 
-        # MMPose uses element-wise MAX not product!
-        # C++ implementation: score = MAX(score_x, score_y)
-        scores = np.maximum(x_scores, y_scores)
 
-        # Clip scores to [0, 1] range
         scores = np.clip(scores, 0.0, 1.0)
-
-        # Stack coordinates
-        keypoints = np.stack([x_coords, y_coords], axis=-1)
 
         return keypoints, scores
 

@@ -38,7 +38,7 @@
 
   "pose": {
     "max_poses": 3,
-    "model_type": "ONNX",
+    "model_type": "TRT",
     "pose_resolution": "STANDARD",
     "flow_resolution": "HIGH",
     "model_path": "models",

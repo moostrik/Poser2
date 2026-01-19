@@ -2,11 +2,14 @@
 """Convert RTMPose ONNX models to TensorRT engines.
 
 Usage:
-    # Convert RTMPose-L 256x192 with batch 3 (FP16 default)
+    # Convert RTMPose-L 256x192 with batch 3 (FP32 default)
     python modules/pose/batch/detection/export_rtm_onnx_to_trt.py --onnx models/rtmpose-l_256x192.onnx --output models/rtmpose-l_256x192_b3.trt
 
     # Convert 384x288 model with batch 3
     python modules/pose/batch/detection/export_rtm_onnx_to_trt.py --onnx models/rtmpose-l_384x288.onnx --output models/rtmpose-l_384x288_b3.trt --height 384 --width 288
+
+    # Use FP16 for faster inference (may affect accuracy)
+    python modules/pose/batch/detection/export_rtm_onnx_to_trt.py --onnx models/rtmpose-l_256x192.onnx --output models/rtmpose-l_256x192_b3.trt --fp16
 """
 
 import tensorrt as trt
@@ -24,7 +27,7 @@ def convert_rtmpose_to_tensorrt(
     min_batch: int = 1,
     opt_batch: int = 3,
     max_batch: int = 4,
-    fp16: bool = True,
+    fp16: bool = False,
     workspace_gb: int = 8
 ) -> bool:
     """Convert RTMPose ONNX model to TensorRT engine.
@@ -179,8 +182,8 @@ if __name__ == '__main__':
                         help='Optimal batch size for optimization (default: 3)')
     parser.add_argument('--max-batch', type=int, default=4,
                         help='Maximum batch size (default: 4, set to opt-batch if never exceeded)')
-    parser.add_argument('--fp32', action='store_true',
-                        help='Use FP32 precision instead of FP16 (default: FP16)')
+    parser.add_argument('--fp16', action='store_true',
+                        help='Use FP16 precision instead of FP32 (default: FP32)')
     parser.add_argument('--workspace', type=int, default=8,
                         help='Workspace size in GB (default: 8)')
 
@@ -194,7 +197,7 @@ if __name__ == '__main__':
         args.min_batch,
         args.opt_batch,
         args.max_batch,
-        not args.fp32,
+        args.fp16,
         args.workspace
     )
 
