@@ -19,6 +19,7 @@ depth cam pose synchony detection
 * create ssh key
 ```ssh-keygen -t ed25519 -C "m.oostrik@gmail.com"```
 * copy key and add to github
+* test
 
 # Python
 * Install python 3.10 from Microsoft Store (or find a better method)
@@ -85,4 +86,3 @@ If your use case has varied poses or unusual angles, aic-coco is better.)
   * https://mmpose.readthedocs.io/en/latest/installation.html
   * https://mmcv.readthedocs.io/en/latest/get_started/installation.html
   * https://mmpose.readthedocs.io/en/latest/model_zoo/body_2d_keypoint.html#coco-dataset
-
