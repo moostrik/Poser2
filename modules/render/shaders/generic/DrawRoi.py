@@ -9,7 +9,7 @@ class DrawRoi(Shader):
             print("DrawRoi shader not allocated or shader program missing.")
             return
         if not tex0.allocated:
-            print("DrawRoi shader: input texture not allocated.")
+            # print("DrawRoi shader: input texture not allocated.")
             return
 
         # Activate shader program
@@ -33,4 +33,3 @@ class DrawRoi(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)
         glUseProgram(0)
-
