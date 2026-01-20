@@ -224,13 +224,14 @@ class FlowLayer(LayerBase):
         self.config.density_bridge.saturation = 1.2
         self.config.density_bridge.brightness = 1.0
 
-        self.config.fluid_velocity_scale = 60.0
+        self.config.fluid_velocity_scale = 1.0
 
 
-        self.config.fluid_flow.vel_speed = 0.03
-        self.config.fluid_flow.vel_dissipation = 0.01
+        self.config.fluid_flow.vel_speed = 0.0033
+        self.config.fluid_flow.vel_dissipation = 3
+        self.config.fluid_flow.vel_viscosity = 0
         self.config.fluid_flow.den_speed = 0.01
-        self.config.fluid_flow.den_dissipation = 0.1
+        self.config.fluid_flow.den_dissipation = 5.0
 
 
 
@@ -246,7 +247,7 @@ class FlowLayer(LayerBase):
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_MASK
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
         self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
-        self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
+        # self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
         # self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
         # self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
         # self.config.draw_mode = FlowDrawMode.FLUID_DIVERGENCE
@@ -277,7 +278,7 @@ class FlowLayer(LayerBase):
             self._optical_flow.set_color(curr_tex)
             self._optical_flow.update()
 
-        img = self._optical_flow.velocity.read_to_numpy()
+        # img = self._optical_flow.velocity.read_to_numpy()
         # if img is not None:
         #     print("Optical Flow Velocity Stats: min =", img.min(), "max =", img.max())
 
@@ -298,16 +299,17 @@ class FlowLayer(LayerBase):
         # Stage 3: Fluid simulation
         # Add velocity with delta_time scaling
         velocity_strength = self._delta_time * self.config.fluid_velocity_scale
-        self._fluid_flow.add_velocity(self._velocity_trail.velocity, velocity_strength)
+        self._fluid_flow.add_velocity(self._velocity_trail.velocity, self.config.fluid_velocity_scale)
 
         # Add density from bridge (already has color+magnitude combined)
-        self._fluid_flow.add_density(self._density_bridge.density, self._delta_time * 10)
+        self._fluid_flow.add_density(self._density_bridge.density, 05.0) # Intentional to check what is happening
 
         # Add temperature from bridge
         self._fluid_flow.add_temperature(self._temperature_bridge.temperature, self._delta_time)
 
         # Update fluid simulation
         self._fluid_flow.update(self._delta_time)
+
 
         Style.pop_style()
 
@@ -319,6 +321,8 @@ class FlowLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(DRAW_MODE_BLEND_MODES.get(self.config.draw_mode, Style.BlendMode.DISABLED))
         self._visualizer.draw(self._get_draw_texture(), rect)
+
+
 
         Style.pop_style()
 

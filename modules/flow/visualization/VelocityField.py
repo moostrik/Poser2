@@ -62,8 +62,8 @@ class VelocityField(FieldBase):
         if not self._allocated or self._velocity_texture is None:
             return
 
-        if not self._needs_update:
-            return
+        # if not self._needs_update:
+        #     return
 
         self._needs_update = False
 

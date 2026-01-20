@@ -30,12 +30,12 @@ class FluidFlowConfig(FlowConfigBase):
     # Velocity parameters
     vel_speed: float = field(
         default=0.3,
-        metadata={"min": 0.0, "max": 1.0, "label": "Velocity Speed",
+        metadata={"min": 0.0, "max": 100.0, "label": "Velocity Speed",
                   "description": "Velocity advection speed multiplier"}
     )
     vel_dissipation: float = field(
         default=0.1,
-        metadata={"min": 0.0, "max": 1.0, "label": "Velocity Dissipation",
+        metadata={"min": 0.0, "max": 100.0, "label": "Velocity Dissipation",
                   "description": "Velocity energy loss per frame"}
     )
     vel_vorticity: float = field(
@@ -74,12 +74,12 @@ class FluidFlowConfig(FlowConfigBase):
     # Density parameters
     den_speed: float = field(
         default=0.3,
-        metadata={"min": 0.0, "max": 1.0, "label": "Density Speed",
+        metadata={"min": 0.0, "max": 100.0, "label": "Density Speed",
                   "description": "Density advection speed"}
     )
     den_dissipation: float = field(
         default=0.1,
-        metadata={"min": 0.0, "max": 1.0, "label": "Density Dissipation",
+        metadata={"min": 0.0, "max": 100.0, "label": "Density Dissipation",
                   "description": "Density fade rate"}
     )
 
