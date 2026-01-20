@@ -4,7 +4,7 @@ from typing import Union
 
 import numpy as np
 
-from modules.pose.batch.detection.MMDetection import DetectionInput, DetectionOutput
+from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput
 from modules.pose.batch.detection.ONNXDetection import ONNXDetection
 from modules.pose.batch.detection.TensorRTDetection import TensorRTDetection
 from modules.pose.features import Points2D

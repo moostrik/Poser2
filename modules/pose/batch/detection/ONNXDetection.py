@@ -12,12 +12,7 @@ from typing import Callable
 import numpy as np
 import onnxruntime as ort
 
-# Reuse dataclasses from MMDetection
-from modules.pose.batch.detection.MMDetection import (
-    DetectionInput,
-    DetectionOutput,
-    PoseDetectionOutputCallback
-)
+from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
 
 from modules.pose.Settings import Settings
 

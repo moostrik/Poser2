@@ -12,11 +12,7 @@ import tensorrt as trt
 import cupy as cp
 
 # Reuse dataclasses from MMDetection
-from modules.pose.batch.detection.MMDetection import (
-    DetectionInput,
-    DetectionOutput,
-    PoseDetectionOutputCallback
-)
+from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
 
 from modules.pose.Settings import Settings
 from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
