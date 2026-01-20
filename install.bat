@@ -28,6 +28,35 @@ if %errorlevel%==0 (
 )
 echo.
 
+echo [44m Git LFS [0m
+where git >nul 2>nul
+if %errorlevel% neq 0 (
+    echo [91mGit is not installed or not in PATH![0m
+    echo Please install Git from https://git-scm.com/download/win
+    echo And run "git lfs install" once installed.
+    goto endofscript
+)
+
+git lfs version >nul 2>nul
+if %errorlevel% neq 0 (
+    echo [91mGit LFS is not installed![0m
+    echo Did you run "git lfs install" after installing Git?
+    goto endofscript
+) else (
+    echo [92mGit LFS is installed[0m
+)
+
+echo [33mPulling LFS files...[0m
+git lfs pull
+if %errorlevel% neq 0 (
+    echo [91mFailed to pull LFS files![0m
+    goto endofscript
+) else (
+    echo [92mLFS files downloaded successfully[0m
+)
+echo.
+
+
 echo [44m Virtual Environment [0m
 set "VENV_DIR=%~dp0%.venv"
 if exist "%VENV_DIR%" (
@@ -74,6 +103,13 @@ if exist "%VENV_DIR%" (
     call %VENV_DIR%\Scripts\deactivate
 )
 echo.
+
+echo [44m Convert Models using TensorRT [0m
+call makemodels.bat
+if %errorlevel% neq 0 (
+    echo [91mModel conversion failed[0m
+    goto endofscript
+)
 
 
 :success

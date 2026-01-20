@@ -12,6 +12,8 @@ depth cam pose synchony detection
 * Configure Global User Name and Email
 ```git config --global user.name "M.Oostrik"```
 ```git config --global user.email "m.oostrik@gmail.com"```
+* Initialize Git LFS
+```git lfs install```
 
 # SSH Github
 * create ssh key
