@@ -3,12 +3,16 @@ cache/
 BACKUP/
 .venv/
 checkpoints/*
-models/*
 recordings/*
 files/audio/UMU*
 RobustVideoMatting/*
 ofxFlowTools_new/*
 openFrameworks/*
+
+# models
+models/*
+!models/*.onnx
+!models/*.blob
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
