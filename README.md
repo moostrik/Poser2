@@ -1,6 +1,5 @@
 # Poser2
 depth cam pose synchony detection
-test
 
 ## INSTALLATION
 
