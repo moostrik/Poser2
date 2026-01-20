@@ -1,5 +1,6 @@
 # Poser2
 depth cam pose synchony detection
+test
 
 ## INSTALLATION
 
@@ -83,4 +84,3 @@ If your use case has varied poses or unusual angles, aic-coco is better.)
   * https://mmpose.readthedocs.io/en/latest/installation.html
   * https://mmcv.readthedocs.io/en/latest/get_started/installation.html
   * https://mmpose.readthedocs.io/en/latest/model_zoo/body_2d_keypoint.html#coco-dataset
-
