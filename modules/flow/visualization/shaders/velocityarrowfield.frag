@@ -7,8 +7,8 @@
 
 uniform sampler2D tex0;
 uniform float scale;
-uniform float grid_spacing;
-uniform float arrow_length;
+uniform float grid_spacing;         // in pixels
+uniform float arrow_length;         // in pixels
 uniform float arrow_thickness;
 uniform vec2 resolution;
 
@@ -31,8 +31,8 @@ float arrow(vec2 p, vec2 velocity, float arrow_size, float thickness) {
     vec2 dir = velocity / len;
     vec2 perp = vec2(-dir.y, dir.x);
 
-    // Arrow length scaled by velocity magnitude (clamped to arrow_size max)
-    float arrow_len = arrow_size * min(len, 1.0);
+    // Arrow length scales with velocity, max at arrow_size
+    float arrow_len = arrow_size * len;
 
     // Arrow shaft (from center to tip)
     vec2 start = vec2(0.0);
@@ -40,8 +40,8 @@ float arrow(vec2 p, vec2 velocity, float arrow_size, float thickness) {
     float shaft = line_segment(p, start, end, thickness);
 
     // Arrow head (two lines forming a V)
-    float head_len = arrow_len * 0.25;
-    float head_angle = 0.1; // radians
+    float head_len = arrow_len * 0.35;  // Increased from 0.25 to 0.35 (longer head)
+    float head_angle = 0.4; // Increased from 0.1 to 0.4 radians (~23 degrees, wider angle)
 
     vec2 head_dir1 = vec2(
         dir.x * cos(head_angle) - dir.y * sin(head_angle),
@@ -71,7 +71,9 @@ void main() {
     float min_dist = 1e10;
 
     // Check arrows from nearby grid cells (to allow arrows longer than grid spacing)
-    int search_radius = int(ceil(arrow_length / grid_spacing)) + 1;
+    // Max arrow reach = arrow_length * scale (assuming velocity magnitude <= 1.0)
+    // Add safety margin (+1) and cap at reasonable max to avoid performance issues
+    int search_radius = min(int(ceil(arrow_length / grid_spacing)) + 1, 8);
     for (int dy = -search_radius; dy <= search_radius; dy++) {
         for (int dx = -search_radius; dx <= search_radius; dx++) {
             // Grid cell center

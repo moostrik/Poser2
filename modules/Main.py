@@ -16,6 +16,8 @@ def _print_import(msg: str) -> None:
         pid = os.getpid()
         print(f"[{ts}] PID:{pid} - {msg}")
 
+_print_import("Importing Render Manager")
+from modules.render.HDTRenderManager import HDTRenderManager
 _print_import("importing Settings, DataHub, Gui and SoundOsc modules")
 from modules.Settings import Settings
 from modules.DataHub import DataHub, DataHubType
@@ -27,8 +29,6 @@ from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 _print_import("Importing Pose modules")
 from modules.pose import batch, guis, nodes, trackers, similarity
 from modules.pose.pd_stream import PDStreamManager, PDStreamComputer
-_print_import("Importing Render Manager")
-from modules.render.HDTRenderManager import HDTRenderManager
 _print_import("imports complete")
 
 

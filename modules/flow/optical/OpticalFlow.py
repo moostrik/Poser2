@@ -11,7 +11,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Texture import Texture
 
 from .. import FlowBase, FlowConfigBase, FlowUtil
-from .shaders import Luminance, OpticalFlow as OpticalFlowShader
+from .shaders import Luminance, OpticalFlow as OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -36,7 +36,7 @@ class OpticalFlowConfig(FlowConfigBase):
     )
     boost: float = field(
         default=0.0,
-        metadata={"min": 0.0, "max": 0.9, "label": "Boost", "description": "Power boost for small motions"}
+        metadata={"min": -0.5, "max": 0.9, "label": "Boost", "description": "Power boost for small motions"}
     )
 
 
@@ -50,8 +50,8 @@ class OpticalFlow(FlowBase):
         super().__init__()
 
         # Define internal formats
-        self.input_internal_format = GL_R8      # Luminance input (current/previous frames)
-        self.output_internal_format = GL_RG32F  # Velocity output
+        self._input_internal_format = GL_R8      # Luminance input (current/previous frames)
+        self._output_internal_format = GL_RG32F  # Velocity output
 
         # Configuration with change notification
         self.config: OpticalFlowConfig = config or OpticalFlowConfig()
@@ -63,20 +63,35 @@ class OpticalFlow(FlowBase):
 
         # Shaders
         self._optical_flow_shader: OpticalFlowShader = OpticalFlowShader()
+        self._optical_flow_shader_mm: OpticalFlowMMShader = OpticalFlowMMShader()
         self._luminance_shader: Luminance = Luminance()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def velocity(self) -> Texture:
-        return self.output
+        return self._output
+
+    @property
+    def color_input(self) -> Texture:
+        """Density input texture (luminance)."""
+        return self._input_fbo.texture
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate optical flow layer."""
-        self._optical_flow_shader.allocate()
-        self._luminance_shader.allocate()
 
         super().allocate(width, height, output_width, output_height)
+
+        for tex in [self._input_fbo.texture, self._input_fbo.back_texture]:
+            glBindTexture(GL_TEXTURE_2D, tex.tex_id)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+            glGenerateMipmap(GL_TEXTURE_2D)  # Initial generation
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+        self._optical_flow_shader.allocate()
+        self._optical_flow_shader_mm.allocate()
+        self._luminance_shader.allocate()
 
         self._frame_count = 0
         self._needs_update = False
@@ -85,11 +100,14 @@ class OpticalFlow(FlowBase):
         """Release all resources."""
         super().deallocate()
         self._optical_flow_shader.deallocate()
+        self._optical_flow_shader_mm.deallocate()
         self._luminance_shader.deallocate()
 
 
-    def update(self) -> None:
-        """Compute optical flow from current and previous frames."""
+    def update(self, delta_time: float = 1.0) -> None:
+        """Compute optical flow from current and previous frames.
+        note :: delta_time parameter is unused but kept for consistency.
+        """
         if not self._allocated or not self._needs_update:
             return
 
@@ -97,32 +115,33 @@ class OpticalFlow(FlowBase):
 
         # Need at least 2 frames to compute flow
         if self._frame_count < 2:
-            FlowUtil.zero(self.output_fbo)
+            FlowUtil.zero(self._output_fbo)
             return
 
         # Get current and previous frames from input_fbo using properties
-        curr_frame = self.input_fbo.texture      # Current buffer (Fbo)
-        prev_frame = self.input_fbo.back_texture # Previous buffer (Fbo)
+        curr_frame = self._input_fbo.texture      # Current buffer (Fbo)
+        prev_frame = self._input_fbo.back_texture # Previous buffer (Fbo)
 
         # Compute optical flow using config values
         power = 1.0 - self.config.boost
 
         self._optical_flow_shader.reload()
+        self._optical_flow_shader_mm.reload()
 
         # Pass output_fbo directly since it's now a Fbo
-        self.output_fbo.begin()
+        self._output_fbo.begin()
         self._optical_flow_shader.use(
-            curr_frame,
             prev_frame,
+            curr_frame,
             offset=self.config.offset,
             threshold=self.config.threshold,
             strength_x=self.config.strength_x,
             strength_y=self.config.strength_y,
             power=power
         )
-        self.output_fbo.end()
+        self._output_fbo.end()
 
-    def set(self, texture: Texture) -> None:
+    def set_color(self, texture: Texture) -> None:
         """Set input frame texture.
 
         Args:
@@ -132,17 +151,19 @@ class OpticalFlow(FlowBase):
             return
 
         # Swap to next frame slot in input_fbo
-        self.input_fbo.swap()
+        self._input_fbo.swap()
 
-        self.input_fbo.begin()
+        self._input_fbo.begin()
         self._luminance_shader.use(texture)
-        self.input_fbo.end()
+        self._input_fbo.end()
+
+        # Generate mipmaps after rendering to FBO
+        glBindTexture(GL_TEXTURE_2D, self._input_fbo.texture.tex_id)
+        glGenerateMipmap(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, 0)
 
         self._frame_count += 1
         self._needs_update = True
-
-    def add(self, texture: Texture, strength: float = 1.0) -> None:
-        raise NotImplementedError("Optical flow uses discrete frames. Use set() instead.")
 
     def reset(self) -> None:
         """Reset optical flow state."""

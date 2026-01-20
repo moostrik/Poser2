@@ -4,13 +4,13 @@
 // Ported from ofxFlowTools ftMultiplyForceShader.h
 // Simple scalar multiplication for timestep scaling
 
-uniform sampler2D tex0;
-uniform float force;
+uniform sampler2D src;
+uniform float scale;
 
 in vec2 texCoord;
 out vec4 fragColor;
 
 void main() {
-    vec4 color = texture(tex0, texCoord) * force;
+    vec4 color = texture(src, texCoord) * scale;
     fragColor = color;
 }

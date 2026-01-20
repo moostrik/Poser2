@@ -42,7 +42,7 @@ class OpticalFlowLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        return self._optical_flow.output
+        return self._optical_flow._output
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._optical_flow.allocate(width, height)
@@ -63,10 +63,10 @@ class OpticalFlowLayer(LayerBase):
         if dirty:
             prev_tex: Texture | None = getattr(self._source, "prev_texture", None)
             if prev_tex is not None:
-                self._optical_flow.set(prev_tex)
+                self._optical_flow.set_color(prev_tex)
 
             curr_tex: Texture = self._source.texture
-            self._optical_flow.set(curr_tex)
+            self._optical_flow.set_color(curr_tex)
 
             self._optical_flow.update()
 

@@ -8,19 +8,19 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
 
-class Stretch(Shader):
+class Blit(Shader):
     """Copy/stretch texture to target FBO."""
 
-    def use(self, texture: Texture) -> None:
+    def use(self, tex: Texture) -> None:
         """Render texture to current FBO.
 
         Args:
-            texture: Source texture to copy
+            tex: Source texture to copy
         """
         if not self.allocated or not self.shader_program:
             print("Stretch shader not allocated or shader program missing.")
             return
-        if not texture.allocated:
+        if not tex.allocated:
             print("Stretch shader: input texture not allocated.")
             return
 
@@ -29,7 +29,7 @@ class Stretch(Shader):
 
         # Bind input texture
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+        glBindTexture(GL_TEXTURE_2D, tex.tex_id)
 
         # Configure shader uniform
         glUniform1i(glGetUniformLocation(self.shader_program, "tex"), 0)

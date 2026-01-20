@@ -7,7 +7,7 @@ models/*
 recordings/*
 files/audio/UMU*
 RobustVideoMatting/*
-ofxFlowTools/*
+ofxFlowTools_new/*
 openFrameworks/*
 
 # Byte-compiled / optimized / DLL files
