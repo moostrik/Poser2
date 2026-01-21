@@ -10,7 +10,7 @@ uniform sampler2D uVelocity;        // Velocity field (RG32F)
 uniform sampler2D uObstacle;        // Obstacle mask (R8/R32F)
 uniform sampler2D uObstacleOffset;  // Neighbor obstacle info (RGBA8)
 
-uniform float uHalfRdx;  // 0.5 / gridScale
+uniform vec2 uHalfRdxInv;  // (0.5/gridScale_x, 0.5/gridScale_y) for aspect correction
 
 void main() {
     vec2 st = texCoord;
@@ -36,6 +36,6 @@ void main() {
     vR = mix(vR, -vC, oN.z);
     vL = mix(vL, -vC, oN.w);
 
-    // Central difference divergence
-    fragColor = uHalfRdx * ((vR.x - vL.x) + (vT.y - vB.y));
+    // Central difference divergence (aspect-corrected)
+    fragColor = uHalfRdxInv.x * (vR.x - vL.x) + uHalfRdxInv.y * (vT.y - vB.y);
 }

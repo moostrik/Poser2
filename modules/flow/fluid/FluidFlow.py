@@ -238,6 +238,9 @@ class FluidFlow(FlowBase):
         self._density_width = output_width if output_width is not None else width
         self._density_height = output_height if output_height is not None else height
 
+        # Compute aspect ratio for isotropic simulation
+        self._aspect = width / height if height > 0 else 1.0
+
         # Allocate base FBOs (velocity RG32F, density RGBA32F)
         super().allocate(width, height, self._density_width, self._density_height)
 
@@ -415,7 +418,8 @@ class FluidFlow(FlowBase):
             self._vorticity_curl_shader.use(
                 self._input_fbo.texture,
                 self._obstacle_fbo.texture,
-                self._simulation_scale
+                self._simulation_scale,
+                self._aspect
             )
             self._vorticity_curl_fbo.end()
 
@@ -424,6 +428,7 @@ class FluidFlow(FlowBase):
             self._vorticity_force_shader.use(
                 self._vorticity_curl_fbo.texture,
                 self._simulation_scale,
+                self._aspect,
                 vorticity_step
             )
             self._vorticity_force_fbo.end()
@@ -489,7 +494,8 @@ class FluidFlow(FlowBase):
             self._input_fbo.texture,
             self._obstacle_fbo.texture,
             self._obstacle_offset_fbo.texture,
-            self._simulation_scale
+            self._simulation_scale,
+            self._aspect
         )
         self._divergence_fbo.end()
 
@@ -514,7 +520,8 @@ class FluidFlow(FlowBase):
             self._pressure_fbo.texture,
             self._obstacle_fbo.texture,
             self._obstacle_offset_fbo.texture,
-            self._simulation_scale
+            self._simulation_scale,
+            self._aspect
         )
         self._input_fbo.end()
 

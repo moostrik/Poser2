@@ -11,15 +11,17 @@ class VorticityForce(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, curl: Texture, grid_scale: float, timestep: float) -> None:
+    def use(self, curl: Texture, grid_scale: float, aspect: float, timestep: float) -> None:
         """Compute vorticity confinement force.
 
         Args:
             curl: Curl magnitude field (R32F)
-            grid_scale: Grid spacing (typically 1.0)
+            grid_scale: Grid spacing (typically simulation_scale)
+            aspect: Aspect ratio (width/height) for isotropic derivatives
             timestep: Vorticity timestep (controls turbulence strength)
         """
-        halfrdx = 0.5 / grid_scale
+        half_rdx_x = 0.5 / grid_scale
+        half_rdx_y = (0.5 / grid_scale) * aspect
 
         # Bind shader program
         glUseProgram(self.shader_program)
@@ -30,7 +32,7 @@ class VorticityForce(Shader):
         glUniform1i(glGetUniformLocation(self.shader_program, "uCurl"), 0)
 
         # Set uniforms
-        glUniform1f(glGetUniformLocation(self.shader_program, "uHalfRdx"), halfrdx)
+        glUniform2f(glGetUniformLocation(self.shader_program, "uHalfRdxInv"), half_rdx_x, half_rdx_y)
         glUniform1f(glGetUniformLocation(self.shader_program, "uTimestep"), timestep)
 
         # Draw fullscreen quad

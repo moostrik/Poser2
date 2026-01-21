@@ -12,7 +12,7 @@ out vec2 fragColor;
 uniform sampler2D uCurl; // Curl magnitude field (R32F)
 
 // Parameters
-uniform float uHalfRdx;  // 0.5 / gridScale
+uniform vec2 uHalfRdxInv;  // (0.5/gridScale_x, 0.5/gridScale_y) for aspect correction
 uniform float uTimestep; // Vorticity confinement timestep
 
 void main() {
@@ -25,8 +25,8 @@ void main() {
     float cL = abs(textureOffset(uCurl, st, ivec2(-1, 0)).r);
     float cC = texture(uCurl, st).r;
 
-    // Compute gradient of curl magnitude
-    vec2 grad = uHalfRdx * vec2(cT - cB, cR - cL);
+    // Compute gradient of curl magnitude (aspect-corrected, bug fixed)
+    vec2 grad = vec2(uHalfRdxInv.x * (cR - cL), uHalfRdxInv.y * (cT - cB));
 
     // Normalize gradient (add epsilon to avoid division by zero)
     vec2 dw = normalize(grad + 0.000001);

@@ -13,7 +13,7 @@ uniform sampler2D uVelocity; // Velocity field (RG32F)
 uniform sampler2D uObstacle; // Obstacle mask (1.0 = obstacle, 0.0 = fluid)
 
 // Parameters
-uniform float uHalfRdx; // 0.5 / gridScale
+uniform vec2 uHalfRdxInv; // (0.5/gridScale_x, 0.5/gridScale_y) for aspect correction
 
 void main() {
     vec2 st = texCoord;
@@ -30,7 +30,7 @@ void main() {
     vec2 vR = textureOffset(uVelocity, st, ivec2(1, 0)).xy;
     vec2 vL = textureOffset(uVelocity, st, ivec2(-1, 0)).xy;
 
-    // Compute curl: halfrdx * ((vT.x - vB.x) - (vR.y - vL.y))
+    // Compute curl: ∂vy/∂x - ∂vx/∂y (aspect-corrected)
     // This is the z-component of the curl (∇ × v)
-    fragColor = uHalfRdx * ((vT.x - vB.x) - (vR.y - vL.y));
+    fragColor = uHalfRdxInv.x * (vT.x - vB.x) - uHalfRdxInv.y * (vR.y - vL.y);
 }

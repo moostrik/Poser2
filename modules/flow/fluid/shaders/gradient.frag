@@ -11,7 +11,7 @@ uniform sampler2D uPressure;        // Pressure field (R32F)
 uniform sampler2D uObstacle;        // Obstacle mask (R8/R32F)
 uniform sampler2D uObstacleOffset;  // Neighbor obstacle info (RGBA8)
 
-uniform float uHalfRdx;  // 0.5 / gridScale
+uniform vec2 uHalfRdxInv;  // (0.5/gridScale_x, 0.5/gridScale_y) for aspect correction
 
 void main() {
     vec2 st = texCoord;
@@ -37,8 +37,8 @@ void main() {
     pR = mix(pR, pC, oN.z);
     pL = mix(pL, pC, oN.w);
 
-    // Compute and subtract gradient
-    vec2 grad = uHalfRdx * vec2(pR - pL, pT - pB);
+    // Compute and subtract gradient (aspect-corrected)
+    vec2 grad = vec2(uHalfRdxInv.x * (pR - pL), uHalfRdxInv.y * (pT - pB));
     vec2 vOld = texture(uVelocity, st).xy;
 
     fragColor = vOld - grad;

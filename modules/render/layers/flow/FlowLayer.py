@@ -222,7 +222,7 @@ class FlowLayer(LayerBase):
         self.config.velocity_trail.blur_steps = 2
         self.config.velocity_trail.blur_radius = 3.0
         self.config.density_bridge.saturation = 1.2
-        self.config.density_bridge.brightness = 1.0
+        self.config.density_bridge.brightness = 0.5
 
         self.config.fluid_velocity_scale = 1.0
 
@@ -253,8 +253,8 @@ class FlowLayer(LayerBase):
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
         self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
         self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
-        # self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
-        # self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
+        self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
+        self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
         # self.config.draw_mode = FlowDrawMode.FLUID_DIVERGENCE
         # self.config.draw_mode = FlowDrawMode.FLUID_VORTICITY
         # self.config.draw_mode = FlowDrawMode.FLUID_BUOYANCY
