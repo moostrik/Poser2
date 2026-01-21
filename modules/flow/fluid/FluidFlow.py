@@ -56,12 +56,12 @@ class FluidFlowConfig(FlowConfigBase):
 
     # Pressure parameters
     prs_speed: float = field(
-        default=0.0,
+        default=0.33,
         metadata={"min": 0.0, "max": 10.0, "label": "Pressure Speed",
                   "description": "Pressure advection speed (usually 0 for physical accuracy)"}
     )
     prs_decay: float = field(
-        default=0.1,  # Fast decay for pressure
+        default=0.3,  # Fast decay for pressure
         metadata={"min": 0.01, "max": 60.0, "label": "Pressure Decay Time",
                   "description": "Time in seconds for pressure to decay to 1%"}
     )
@@ -462,20 +462,23 @@ class FluidFlow(FlowBase):
             self.add_velocity(self._buoyancy_fbo.texture)
 
         # ===== STEP 7: PRESSURE ADVECT & DISSIPATE =====
-        advect_prs_step = delta_time * self.config.prs_speed * self._grid_scale
-        dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.prs_decay)
+        # # Only advect pressure for artistic effects (non-physical)
+        # When prs_speed = 0, pressure is purely from projection (physical)
+        if self.config.prs_speed > 0.0:
+            advect_prs_step = delta_time * self.config.prs_speed * self._grid_scale
+            dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.prs_decay)
 
-        self._pressure_fbo.swap()
-        self._pressure_fbo.begin()
-        self._advect_shader.use(
-            self._pressure_fbo.back_texture,  # Source pressure
-            self._input_fbo.texture,          # Velocity
-            self._obstacle_fbo.texture,       # Obstacles
-            self._grid_scale,
-            advect_prs_step,
-            dissipate_prs
-        )
-        self._pressure_fbo.end()
+            self._pressure_fbo.swap()
+            self._pressure_fbo.begin()
+            self._advect_shader.use(
+                self._pressure_fbo.back_texture,  # Source pressure
+                self._input_fbo.texture,          # Velocity
+                self._obstacle_fbo.texture,       # Obstacles
+                self._grid_scale,
+                advect_prs_step,
+                dissipate_prs
+            )
+            self._pressure_fbo.end()
 
         # ===== STEP 8: PRESSURE PROJECTION (Make divergence-free) =====
         # 8a. Compute divergence

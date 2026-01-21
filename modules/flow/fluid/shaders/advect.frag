@@ -26,7 +26,7 @@ void main() {
 
     // Backward trace along velocity
     vec2 velocity = texture(uVelocity, st).xy;
-    vec2 st_back = st - uTimestep * uRdx * velocity / uScale;
+    vec2 st_back = st - uTimestep * uRdx * velocity;
     // Clamp to avoid sampling outside texture
     st_back = clamp(st_back, vec2(0.001), vec2(0.999));
 
