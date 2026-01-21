@@ -30,84 +30,84 @@ class FluidFlowConfig(FlowConfigBase):
     # Velocity parameters
     vel_speed: float = field(
         default=0.3,
-        metadata={"min": -100, "max": 100.0, "label": "Velocity Speed",
+        metadata={"min": 0.0, "max": 10.0, "label": "Velocity Speed",
                   "description": "Velocity advection speed multiplier"}
     )
-    vel_dissipation: float = field(
-        default=0.1,
-        metadata={"min": -100, "max": 100.0, "label": "Velocity Dissipation",
-                  "description": "Velocity energy loss per frame"}
+    vel_decay: float = field(
+        default=3.0,
+        metadata={"min": 0.01, "max": 60.0, "label": "Velocity Decay Time",
+                  "description": "Time in seconds for velocity to decay to 1%"}
     )
     vel_vorticity: float = field(
         default=0.0,
-        metadata={"min": -100, "max": 100, "label": "Vorticity",
-                  "description": "Vortex confinement strength (turbulence)"}
+        metadata={"min": 0.0, "max": 10.0, "label": "Vorticity",
+                  "description": "Vortex confinement strength (adds turbulence)"}
     )
     vel_viscosity: float = field(
         default=0.0,
-        metadata={"min": -100, "max": 100, "label": "Viscosity",
-                  "description": "Fluid thickness/diffusion"}
+        metadata={"min": 0.0, "max": 10.0, "label": "Viscosity",
+                  "description": "Fluid thickness/resistance to flow"}
     )
     vel_viscosity_iter: int = field(
         default=20,
-        metadata={"min": 0, "max": 100, "label": "Viscosity Iterations",
-                  "description": "Jacobi iterations for diffusion solve"}
+        metadata={"min": 1, "max": 60, "label": "Viscosity Iterations",
+                  "description": "Solver iterations for viscosity (higher = more accurate)"}
     )
 
     # Pressure parameters
     prs_speed: float = field(
         default=0.0,
-        metadata={"min": -100, "max": 100, "label": "Pressure Speed",
-                  "description": "Pressure advection speed (usually 0)"}
+        metadata={"min": 0.0, "max": 10.0, "label": "Pressure Speed",
+                  "description": "Pressure advection speed (usually 0 for physical accuracy)"}
     )
-    prs_dissipation: float = field(
-        default=0.1,
-        metadata={"min": -100, "max": 100, "label": "Pressure Dissipation",
-                  "description": "Pressure decay rate"}
+    prs_decay: float = field(
+        default=0.1,  # Fast decay for pressure
+        metadata={"min": 0.01, "max": 60.0, "label": "Pressure Decay Time",
+                  "description": "Time in seconds for pressure to decay to 1%"}
     )
     prs_iterations: int = field(
         default=40,
-        metadata={"min": 0, "max": 100, "label": "Pressure Iterations",
-                  "description": "Jacobi iterations for pressure solve"}
+        metadata={"min": 1, "max": 60, "label": "Pressure Iterations",
+                  "description": "Solver iterations for pressure (higher = more incompressible)"}
     )
 
     # Density parameters
     den_speed: float = field(
         default=0.3,
-        metadata={"min": -100, "max": 100.0, "label": "Density Speed",
+        metadata={"min": 0.0, "max": 10.0, "label": "Density Speed",
                   "description": "Density advection speed"}
     )
-    den_dissipation: float = field(
-        default=0.1,
-        metadata={"min": -100, "max": 100.0, "label": "Density Dissipation",
-                  "description": "Density fade rate"}
+    den_decay: float = field(
+        default=3.0,
+        metadata={"min": 0.01, "max": 60.0, "label": "Density Decay Time",
+                  "description": "Time in seconds for density to decay to 1%"}
     )
 
     # Temperature parameters
     tmp_speed: float = field(
         default=0.3,
-        metadata={"min": -100, "max": 100.0, "label": "Temperature Speed",
+        metadata={"min": 0.0, "max": 10.0, "label": "Temperature Speed",
                   "description": "Temperature advection speed"}
     )
-    tmp_dissipation: float = field(
-        default=0.1,
-        metadata={"min": -100, "max": 100.0, "label": "Temperature Dissipation",
-                  "description": "Temperature dissipation rate"}
+    tmp_decay: float = field(
+        default=3.0,
+        metadata={"min": 0.01, "max": 60.0, "label": "Temperature Decay Time",
+                  "description": "Time in seconds for temperature to decay to 1%"}
     )
     tmp_buoyancy: float = field(
         default=0.0,
-        metadata={"min": -100, "max": 100, "label": "Buoyancy",
-                  "description": "Buoyancy force strength (sigma)"}
+        metadata={"min": 0.0, "max": 10.0, "label": "Buoyancy",
+                  "description": "Buoyancy force strength (hot air rises)"}
     )
     tmp_weight: float = field(
         default=0.2,
-        metadata={"min": -100, "max": 100, "label": "Temperature Weight",
-                  "description": "Density weight in buoyancy"}
+        metadata={"min": 0.0, "max": 2.0, "label": "Temperature Weight",
+                  "description": "How much density affects buoyancy"}
     )
     tmp_ambient: float = field(
         default=0.2,
-        metadata={"min": -100, "max": 100, "label": "Ambient Temperature",
-                  "description": "Reference/ambient temperature"}
+        metadata={"min": 0.0, "max": 1.0, "label": "Ambient Temperature",
+                  "description": "Reference temperature (buoyancy = 0 at this temp)"}
     )
 
 
@@ -358,7 +358,7 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 1: DENSITY ADVECT & DISSIPATE =====
         advect_den_step = delta_time * self.config.den_speed * self._grid_scale
-        dissipate_den = 1.0 - delta_time * self.config.den_dissipation
+        dissipate_den: float = FluidFlow._calculate_dissipation(delta_time, self.config.den_decay)
 
         self._output_fbo.swap()
         self._output_fbo.begin()
@@ -375,7 +375,7 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 2: VELOCITY ADVECT & DISSIPATE =====
         advect_vel_step = delta_time * self.config.vel_speed * self._grid_scale
-        dissipate_vel = 1.0 - delta_time * self.config.vel_dissipation
+        dissipate_vel: float = FluidFlow._calculate_dissipation(delta_time, self.config.vel_decay)
 
         self._input_fbo.swap()
         self._input_fbo.begin()
@@ -431,7 +431,7 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 5: TEMPERATURE ADVECT & DISSIPATE =====
         advect_tmp_step = delta_time * self.config.tmp_speed * self._grid_scale
-        dissipate_tmp = 1.0 - delta_time * self.config.tmp_dissipation
+        dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.tmp_decay)
 
         self._temperature_fbo.swap()
         self._temperature_fbo.begin()
@@ -463,7 +463,7 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 7: PRESSURE ADVECT & DISSIPATE =====
         advect_prs_step = delta_time * self.config.prs_speed * self._grid_scale
-        dissipate_prs = 1.0 - self.config.prs_dissipation * self.config.prs_dissipation
+        dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.prs_decay)
 
         self._pressure_fbo.swap()
         self._pressure_fbo.begin()
@@ -581,3 +581,16 @@ class FluidFlow(FlowBase):
         self._obstacle_offset_fbo.begin()
         self._obstacle_offset_shader.use(self._obstacle_fbo.texture)
         self._obstacle_offset_fbo.end()
+
+    @staticmethod
+    def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
+        """Calculate frame-rate independent decay multiplier.
+
+        Args:
+            delta_time: Frame delta time (1/fps)
+            decay_time: Time in seconds to reach 1% of original value
+
+        Returns:
+            Multiplier to apply to field this frame (e.g., 0.99 = 1% loss)
+        """
+        return pow(0.01, delta_time / max(0.001, decay_time))
