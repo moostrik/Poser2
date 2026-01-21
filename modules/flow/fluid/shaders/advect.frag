@@ -17,19 +17,16 @@ uniform vec2 uScale;           // Texture resolution ratio
 
 void main() {
     vec2 st = texCoord;
-    vec2 st2 = st;
 
-    float obstacle = texture(uObstacle, st2).x;
+    float obstacle = texture(uObstacle, st).x;
     if (obstacle > 0.5) {
         fragColor = vec4(0.0);
         return;
     }
 
     // Backward trace along velocity
-    vec2 velocity = texture(uVelocity, st2).xy;
-
+    vec2 velocity = texture(uVelocity, st).xy;
     vec2 st_back = st - uTimestep * uRdx * velocity / uScale;
-
     // Clamp to avoid sampling outside texture
     st_back = clamp(st_back, vec2(0.001), vec2(0.999));
 

@@ -357,23 +357,24 @@ class FluidFlow(FlowBase):
         density_scale = self._density_width / self._simulation_width if self._simulation_width > 0 else 1.0
 
         # ===== STEP 1: DENSITY ADVECT & DISSIPATE =====
-        advect_den_step = delta_time * self.config.den_speed * 100 * self._grid_scale
+        advect_den_step = delta_time * self.config.den_speed * self._grid_scale
         dissipate_den = 1.0 - delta_time * self.config.den_dissipation
 
         self._output_fbo.swap()
         self._output_fbo.begin()
+        self._advect_shader.reload()
         self._advect_shader.use(
             self._output_fbo.back_texture,  # Source density
             self._input_fbo.texture,        # Velocity
             self._obstacle_fbo.texture,     # Obstacles
-            density_scale,                  # Scale for resolution mismatch
+            self._grid_scale,
             advect_den_step,
             dissipate_den
         )
         self._output_fbo.end()
 
         # ===== STEP 2: VELOCITY ADVECT & DISSIPATE =====
-        advect_vel_step = delta_time * self.config.vel_speed * 100 * self._grid_scale
+        advect_vel_step = delta_time * self.config.vel_speed * self._grid_scale
         dissipate_vel = 1.0 - delta_time * self.config.vel_dissipation
 
         self._input_fbo.swap()
@@ -429,7 +430,7 @@ class FluidFlow(FlowBase):
             self.add_velocity(self._vorticity_force_fbo.texture)
 
         # ===== STEP 5: TEMPERATURE ADVECT & DISSIPATE =====
-        advect_tmp_step = delta_time * self.config.tmp_speed * 100 * self._grid_scale
+        advect_tmp_step = delta_time * self.config.tmp_speed * self._grid_scale
         dissipate_tmp = 1.0 - delta_time * self.config.tmp_dissipation
 
         self._temperature_fbo.swap()
@@ -461,7 +462,7 @@ class FluidFlow(FlowBase):
             self.add_velocity(self._buoyancy_fbo.texture)
 
         # ===== STEP 7: PRESSURE ADVECT & DISSIPATE =====
-        advect_prs_step = delta_time * self.config.prs_speed * 100 * self._grid_scale
+        advect_prs_step = delta_time * self.config.prs_speed * self._grid_scale
         dissipate_prs = 1.0 - self.config.prs_dissipation * self.config.prs_dissipation
 
         self._pressure_fbo.swap()

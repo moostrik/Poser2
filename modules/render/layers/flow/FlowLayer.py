@@ -227,12 +227,16 @@ class FlowLayer(LayerBase):
         self.config.fluid_velocity_scale = 1.0
 
 
-        self.config.fluid_flow.vel_speed = 0.0033
+        self.config.fluid_flow.vel_speed = 0.33
         self.config.fluid_flow.vel_dissipation = 3
         self.config.fluid_flow.vel_viscosity = 0
-        self.config.fluid_flow.den_speed = 0.01
-        self.config.fluid_flow.den_dissipation = 5.0
-
+        self.config.fluid_flow.den_speed = 0.33
+        self.config.fluid_flow.den_dissipation = 2.0
+        self.config.fluid_flow.tmp_speed = 0.33
+        self.config.fluid_flow.tmp_dissipation = 3.0
+        self.config.fluid_flow.prs_speed = 0.33
+        self.config.fluid_flow.prs_dissipation = 0.1
+        # self._fluid_flow.reset()
 
 
         self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
@@ -249,7 +253,7 @@ class FlowLayer(LayerBase):
         self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
         self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
         # self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
-        # self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
+        self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
         # self.config.draw_mode = FlowDrawMode.FLUID_DIVERGENCE
         # self.config.draw_mode = FlowDrawMode.FLUID_VORTICITY
         # self.config.draw_mode = FlowDrawMode.FLUID_BUOYANCY
@@ -298,7 +302,7 @@ class FlowLayer(LayerBase):
 
         # Stage 3: Fluid simulation
         # Add velocity with delta_time scaling
-        velocity_strength = self._delta_time * self.config.fluid_velocity_scale
+        velocity_strength: float = self._delta_time * self.config.fluid_velocity_scale
         self._fluid_flow.add_velocity(self._velocity_trail.velocity)
 
         # Add density from bridge (already has color+magnitude combined)
