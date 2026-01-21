@@ -174,7 +174,7 @@ class FlowLayer(LayerBase):
         sim_height = int(height * self.config.simulation_scale)
 
         self._optical_flow.allocate(sim_width, sim_height)
-        self._velocity_trail.allocate(sim_width, sim_height)
+        self._velocity_trail.allocate(sim_width, sim_height, width, height)
         self._velocity_magnitude.allocate(sim_width, sim_height)
         self._density_bridge.allocate(width, height)
         self._temperature_bridge.allocate(sim_width, sim_height)
@@ -209,7 +209,7 @@ class FlowLayer(LayerBase):
         self.config.visualisation.spacing = 20 # in pixels
         self.config.visualisation.element_length = 40.0 # in pixels
         self.config.visualisation.scale = 1.0
-        self.config.visualisation.toggle_scalar = False
+        self.config.visualisation.toggle_scalar = True
 
         self.config.optical_flow.offset = 8
         self.config.optical_flow.threshold = 0.01
@@ -218,7 +218,7 @@ class FlowLayer(LayerBase):
         self.config.optical_flow.boost = 0.0
 
         self.config.velocity_trail.scale = 1.0
-        self.config.velocity_trail.trail_weight = 0.66
+        self.config.velocity_trail.trail_weight = 0.6
         self.config.velocity_trail.blur_steps = 2
         self.config.velocity_trail.blur_radius = 3.0
         self.config.density_bridge.saturation = 1.2
@@ -247,7 +247,7 @@ class FlowLayer(LayerBase):
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_MASK
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
         self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
-        # self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
+        self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
         # self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
         # self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
         # self.config.draw_mode = FlowDrawMode.FLUID_DIVERGENCE
@@ -299,13 +299,13 @@ class FlowLayer(LayerBase):
         # Stage 3: Fluid simulation
         # Add velocity with delta_time scaling
         velocity_strength = self._delta_time * self.config.fluid_velocity_scale
-        self._fluid_flow.add_velocity(self._velocity_trail.velocity, self.config.fluid_velocity_scale)
+        self._fluid_flow.add_velocity(self._velocity_trail.velocity)
 
         # Add density from bridge (already has color+magnitude combined)
-        self._fluid_flow.add_density(self._density_bridge.density, 05.0) # Intentional to check what is happening
+        self._fluid_flow.add_density(self._density_bridge.density) # Intentional to check what is happening
 
         # Add temperature from bridge
-        self._fluid_flow.add_temperature(self._temperature_bridge.temperature, self._delta_time)
+        self._fluid_flow.add_temperature(self._temperature_bridge.temperature)
 
         # Update fluid simulation
         self._fluid_flow.update(self._delta_time)

@@ -30,22 +30,22 @@ class FluidFlowConfig(FlowConfigBase):
     # Velocity parameters
     vel_speed: float = field(
         default=0.3,
-        metadata={"min": 0.0, "max": 100.0, "label": "Velocity Speed",
+        metadata={"min": -100, "max": 100.0, "label": "Velocity Speed",
                   "description": "Velocity advection speed multiplier"}
     )
     vel_dissipation: float = field(
         default=0.1,
-        metadata={"min": 0.0, "max": 100.0, "label": "Velocity Dissipation",
+        metadata={"min": -100, "max": 100.0, "label": "Velocity Dissipation",
                   "description": "Velocity energy loss per frame"}
     )
     vel_vorticity: float = field(
         default=0.0,
-        metadata={"min": 0.0, "max": 1.0, "label": "Vorticity",
+        metadata={"min": -100, "max": 100, "label": "Vorticity",
                   "description": "Vortex confinement strength (turbulence)"}
     )
     vel_viscosity: float = field(
         default=0.0,
-        metadata={"min": 0.0, "max": 1.0, "label": "Viscosity",
+        metadata={"min": -100, "max": 100, "label": "Viscosity",
                   "description": "Fluid thickness/diffusion"}
     )
     vel_viscosity_iter: int = field(
@@ -57,12 +57,12 @@ class FluidFlowConfig(FlowConfigBase):
     # Pressure parameters
     prs_speed: float = field(
         default=0.0,
-        metadata={"min": 0.0, "max": 1.0, "label": "Pressure Speed",
+        metadata={"min": -100, "max": 100, "label": "Pressure Speed",
                   "description": "Pressure advection speed (usually 0)"}
     )
     prs_dissipation: float = field(
         default=0.1,
-        metadata={"min": 0.0, "max": 1.0, "label": "Pressure Dissipation",
+        metadata={"min": -100, "max": 100, "label": "Pressure Dissipation",
                   "description": "Pressure decay rate"}
     )
     prs_iterations: int = field(
@@ -74,39 +74,39 @@ class FluidFlowConfig(FlowConfigBase):
     # Density parameters
     den_speed: float = field(
         default=0.3,
-        metadata={"min": 0.0, "max": 100.0, "label": "Density Speed",
+        metadata={"min": -100, "max": 100.0, "label": "Density Speed",
                   "description": "Density advection speed"}
     )
     den_dissipation: float = field(
         default=0.1,
-        metadata={"min": 0.0, "max": 100.0, "label": "Density Dissipation",
+        metadata={"min": -100, "max": 100.0, "label": "Density Dissipation",
                   "description": "Density fade rate"}
     )
 
     # Temperature parameters
     tmp_speed: float = field(
         default=0.3,
-        metadata={"min": 0.0, "max": 1.0, "label": "Temperature Speed",
+        metadata={"min": -100, "max": 100.0, "label": "Temperature Speed",
                   "description": "Temperature advection speed"}
     )
     tmp_dissipation: float = field(
         default=0.1,
-        metadata={"min": 0.0, "max": 1.0, "label": "Temperature Dissipation",
+        metadata={"min": -100, "max": 100.0, "label": "Temperature Dissipation",
                   "description": "Temperature dissipation rate"}
     )
     tmp_buoyancy: float = field(
         default=0.0,
-        metadata={"min": 0.0, "max": 1.0, "label": "Buoyancy",
+        metadata={"min": -100, "max": 100, "label": "Buoyancy",
                   "description": "Buoyancy force strength (sigma)"}
     )
     tmp_weight: float = field(
         default=0.2,
-        metadata={"min": 0.0, "max": 1.0, "label": "Temperature Weight",
+        metadata={"min": -100, "max": 100, "label": "Temperature Weight",
                   "description": "Density weight in buoyancy"}
     )
     tmp_ambient: float = field(
         default=0.2,
-        metadata={"min": 0.0, "max": 1.0, "label": "Ambient Temperature",
+        metadata={"min": -100, "max": 100, "label": "Ambient Temperature",
                   "description": "Reference/ambient temperature"}
     )
 

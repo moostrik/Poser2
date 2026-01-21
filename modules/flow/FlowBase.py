@@ -105,11 +105,6 @@ class FlowBase(ABC):
         FlowUtil.zero(self._input_fbo)
         FlowUtil.zero(self._output_fbo)
 
-    @abstractmethod
-    def update(self, delta_time: float = 1.0) -> None:
-        """Process input_fbo → output_fbo. Must be implemented by derived class."""
-        ...
-
     # CONVENIENCE DRAW METHODS
     def draw(self, rect: Rect) -> None:
         """Draw output buffer with auto-visualization."""

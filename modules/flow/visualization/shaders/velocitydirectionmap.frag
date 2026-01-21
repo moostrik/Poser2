@@ -1,7 +1,7 @@
 #version 460 core
 
-// Velocity Field Color Visualization
-// Direction encoded as Hue, Magnitude as Saturation/Value
+#define PI 3.14159265
+#define TWO_PI 6.2831853
 
 uniform sampler2D tex0;
 uniform float scale;
@@ -20,21 +20,15 @@ void main() {
     vec2 velocity = texture(tex0, texCoord).xy * scale;
 
     // Calculate magnitude and angle
-    float magnitude = length(velocity);
-    float angle = atan(velocity.y, velocity.x);
+    float mag =     clamp(length(velocity), 0.0, 1.0);
+    float angle =   atan(velocity.y, velocity.x);
 
     // Normalize angle to 0-1 range for hue
-    float hue = (angle + 3.14159265) / (2.0 * 3.14159265);
-
-    // Clamp magnitude for saturation/value
-    float sat = clamp(magnitude, 0.0, 1.0);
-    float val = clamp(magnitude * 0.5 + 0.5, 0.0, 1.0);
+    float hue =     (angle + PI) / (TWO_PI);
+    float sat =     1.0;
+    float val =     mag;
+    float alpha =   1.0;
 
     // Convert HSV to RGB
-    vec3 color = hsv2rgb(vec3(hue, sat, val));
-
-    // Fade out when no motion
-    float alpha = smoothstep(0.0, 0.05, magnitude);
-
-    fragColor = vec4(color, alpha);
+    fragColor = vec4(hsv2rgb(vec3(hue, sat, val)), alpha);
 }

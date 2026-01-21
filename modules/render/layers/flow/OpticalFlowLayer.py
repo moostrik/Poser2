@@ -11,11 +11,15 @@ from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.flow import OpticalFlow, OpticalFlowConfig, Visualizer, VisualisationFieldConfig
-from modules.render.layers.flow.FlowDefinitions import DrawModes
 from modules.render.layers import LayerBase
 
 from modules.utils.HotReloadMethods import HotReloadMethods
+from enum import IntEnum, auto
 
+class DrawModes(IntEnum):
+    INPUT = 0
+    OUTPUT = auto()
+    FIELD = auto()
 
 class OpticalFlowLayer(LayerBase):
     def __init__(self, source: LayerBase) -> None:
