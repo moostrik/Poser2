@@ -146,7 +146,7 @@ class FlowLayer(LayerBase):
         self._temperature_bridge: TemperatureBridge = TemperatureBridge(self.config.TemperatureBridge)
 
         # Fluid simulation
-        self._fluid_flow: FluidFlow = FluidFlow(self.config.fluid_flow)
+        self._fluid_flow: FluidFlow = FluidFlow(self.config.simulation_scale, self.config.fluid_flow)
 
         # Visualization
         self._visualizer: Visualizer = Visualizer(self.config.visualisation)
@@ -180,7 +180,7 @@ class FlowLayer(LayerBase):
         self._temperature_bridge.allocate(sim_width, sim_height)
 
         # Fluid simulation: low-res simulation, high-res density output
-        self._fluid_flow.allocate(sim_width, sim_height, width, height)
+        self._fluid_flow.allocate(width, height)
 
         self._visualizer.allocate(width, height)
 

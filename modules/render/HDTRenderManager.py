@@ -96,11 +96,12 @@ PREVIEW_LAYERS: list[Layers] = [
     # Layers.centre_cam,
     # Layers.centre_pose,
     # Layers.centre_motion,
-    Layers.sim_blend,
+    # Layers.sim_blend,
     # Layers.angle_data,
     # Layers.prev_mt,
     # Layers.cam_mask,
     # Layers.centre_flow,
+    Layers.flow,
 ]
 
 FINAL_LAYERS: list[Layers] = [

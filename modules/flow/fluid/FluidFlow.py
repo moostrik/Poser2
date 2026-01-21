@@ -132,7 +132,7 @@ class FluidFlow(FlowBase):
         6. Subtract pressure gradient (make divergence-free)
     """
 
-    def __init__(self, config: FluidFlowConfig | None = None) -> None:
+    def __init__(self, sim_scale: float = 0.25,config: FluidFlowConfig | None = None) -> None:
         super().__init__()
 
         self.config: FluidFlowConfig = config or FluidFlowConfig()
@@ -154,7 +154,9 @@ class FluidFlow(FlowBase):
         self._obstacle_offset_fbo: Fbo = Fbo()
 
         # Simulation parameters
-        self._grid_scale: int = 1  # Always 1 in standard setup
+        self._width: int = 0
+        self._height: int = 0
+        self._simulation_scale: float = sim_scale
         self._simulation_width: int = 0
         self._simulation_height: int = 0
         self._density_width: int = 0
@@ -227,8 +229,12 @@ class FluidFlow(FlowBase):
             output_width: Density resolution (defaults to width for single-resolution)
             output_height: Density resolution
         """
-        self._simulation_width = width
-        self._simulation_height = height
+        self._width = width
+        self._height = height
+
+        self._simulation_width = int(width * self._simulation_scale)
+        self._simulation_height = int(height * self._simulation_scale)
+
         self._density_width = output_width if output_width is not None else width
         self._density_height = output_height if output_height is not None else height
 
@@ -352,12 +358,8 @@ class FluidFlow(FlowBase):
         if not self._allocated:
             return
 
-        # Compute scale factor for dual-resolution support
-        # When density resolution != simulation resolution, scale velocity vectors accordingly
-        density_scale = self._density_width / self._simulation_width if self._simulation_width > 0 else 1.0
-
         # ===== STEP 1: DENSITY ADVECT & DISSIPATE =====
-        advect_den_step = delta_time * self.config.den_speed * self._grid_scale
+        advect_den_step: float = delta_time * self._simulation_scale * self.config.den_speed
         dissipate_den: float = FluidFlow._calculate_dissipation(delta_time, self.config.den_decay)
 
         self._output_fbo.swap()
@@ -367,14 +369,14 @@ class FluidFlow(FlowBase):
             self._output_fbo.back_texture,  # Source density
             self._input_fbo.texture,        # Velocity
             self._obstacle_fbo.texture,     # Obstacles
-            self._grid_scale,
+            self._simulation_scale,
             advect_den_step,
             dissipate_den
         )
         self._output_fbo.end()
 
         # ===== STEP 2: VELOCITY ADVECT & DISSIPATE =====
-        advect_vel_step = delta_time * self.config.vel_speed * self._grid_scale
+        advect_vel_step: float = delta_time * self._simulation_scale * self.config.vel_speed
         dissipate_vel: float = FluidFlow._calculate_dissipation(delta_time, self.config.vel_decay)
 
         self._input_fbo.swap()
@@ -383,7 +385,7 @@ class FluidFlow(FlowBase):
             self._input_fbo.back_texture,   # Source velocity (self-advection)
             self._input_fbo.back_texture,   # Velocity
             self._obstacle_fbo.texture,     # Obstacles
-            self._grid_scale,
+            self._simulation_scale,
             advect_vel_step,
             dissipate_vel
         )
@@ -391,7 +393,7 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 3: VELOCITY DIFFUSE (viscosity) =====
         if self.config.vel_viscosity > 0.0:
-            viscosity_step = 0.25 * self.config.vel_viscosity
+            viscosity_step: float = 0.25 * self.config.vel_viscosity
             for _ in range(self.config.vel_viscosity_iter):
                 self._input_fbo.swap()
                 self._input_fbo.begin()
@@ -399,21 +401,21 @@ class FluidFlow(FlowBase):
                     self._input_fbo.back_texture,
                     self._obstacle_fbo.texture,
                     self._obstacle_offset_fbo.texture,
-                    self._grid_scale,
+                    self._simulation_scale,
                     viscosity_step
                 )
                 self._input_fbo.end()
 
         # ===== STEP 4: VELOCITY VORTICITY CONFINEMENT =====
         if self.config.vel_vorticity > 0.0:
-            vorticity_step = self.config.vel_vorticity * self._grid_scale
+            vorticity_step: float = self.config.vel_vorticity
 
             # 4a. Compute vorticity curl
             self._vorticity_curl_fbo.begin()
             self._vorticity_curl_shader.use(
                 self._input_fbo.texture,
                 self._obstacle_fbo.texture,
-                self._grid_scale
+                self._simulation_scale
             )
             self._vorticity_curl_fbo.end()
 
@@ -421,7 +423,7 @@ class FluidFlow(FlowBase):
             self._vorticity_force_fbo.begin()
             self._vorticity_force_shader.use(
                 self._vorticity_curl_fbo.texture,
-                self._grid_scale,
+                self._simulation_scale,
                 vorticity_step
             )
             self._vorticity_force_fbo.end()
@@ -430,7 +432,7 @@ class FluidFlow(FlowBase):
             self.add_velocity(self._vorticity_force_fbo.texture)
 
         # ===== STEP 5: TEMPERATURE ADVECT & DISSIPATE =====
-        advect_tmp_step = delta_time * self.config.tmp_speed * self._grid_scale
+        advect_tmp_step: float = delta_time * self._simulation_scale * self.config.tmp_speed
         dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.tmp_decay)
 
         self._temperature_fbo.swap()
@@ -439,7 +441,7 @@ class FluidFlow(FlowBase):
             self._temperature_fbo.back_texture,  # Source temperature
             self._input_fbo.texture,            # Velocity
             self._obstacle_fbo.texture,         # Obstacles
-            self._grid_scale,
+            self._simulation_scale,
             advect_tmp_step,
             dissipate_tmp
         )
@@ -465,7 +467,7 @@ class FluidFlow(FlowBase):
         # # Only advect pressure for artistic effects (non-physical)
         # When prs_speed = 0, pressure is purely from projection (physical)
         if self.config.prs_speed > 0.0:
-            advect_prs_step = delta_time * self.config.prs_speed * self._grid_scale
+            advect_prs_step: float = delta_time * self._simulation_scale * self.config.prs_speed
             dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.prs_decay)
 
             self._pressure_fbo.swap()
@@ -474,7 +476,7 @@ class FluidFlow(FlowBase):
                 self._pressure_fbo.back_texture,  # Source pressure
                 self._input_fbo.texture,          # Velocity
                 self._obstacle_fbo.texture,       # Obstacles
-                self._grid_scale,
+                self._simulation_scale,
                 advect_prs_step,
                 dissipate_prs
             )
@@ -487,7 +489,7 @@ class FluidFlow(FlowBase):
             self._input_fbo.texture,
             self._obstacle_fbo.texture,
             self._obstacle_offset_fbo.texture,
-            self._grid_scale
+            self._simulation_scale
         )
         self._divergence_fbo.end()
 
@@ -500,7 +502,7 @@ class FluidFlow(FlowBase):
                 self._divergence_fbo.texture,
                 self._obstacle_fbo.texture,
                 self._obstacle_offset_fbo.texture,
-                self._grid_scale
+                self._simulation_scale
             )
             self._pressure_fbo.end()
 
@@ -512,7 +514,7 @@ class FluidFlow(FlowBase):
             self._pressure_fbo.texture,
             self._obstacle_fbo.texture,
             self._obstacle_offset_fbo.texture,
-            self._grid_scale
+            self._simulation_scale
         )
         self._input_fbo.end()
 
@@ -525,8 +527,8 @@ class FluidFlow(FlowBase):
 
         # Draw black rectangle (0.0 = fluid) with 1-pixel border
         border = 1
-        width = self._obstacle_fbo.width
-        height = self._obstacle_fbo.height
+        width: int = self._obstacle_fbo.width
+        height: int = self._obstacle_fbo.height
 
         self._obstacle_fbo.begin()
         glColor4f(0.0, 0.0, 0.0, 1.0)
