@@ -17,7 +17,7 @@ uniform vec2 uScale;           // Texture resolution ratio
 
 void main() {
     vec2 st = texCoord;
-    vec2 st2 = st * uScale;
+    vec2 st2 = st;
 
     float obstacle = texture(uObstacle, st2).x;
     if (obstacle > 0.5) {
@@ -27,6 +27,7 @@ void main() {
 
     // Backward trace along velocity
     vec2 velocity = texture(uVelocity, st2).xy;
+
     vec2 st_back = st - uTimestep * uRdx * velocity / uScale;
 
     // Clamp to avoid sampling outside texture
