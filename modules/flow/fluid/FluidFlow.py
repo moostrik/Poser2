@@ -45,7 +45,7 @@ class FluidFlowConfig(FlowConfigBase):
     )
     vel_viscosity: float = field(
         default=0.0,
-        metadata={"min": 0.0, "max": 10.0, "label": "Viscosity",
+        metadata={"min": 0, "max": 4, "label": "Viscosity",
                   "description": "Fluid thickness/resistance to flow"}
     )
     vel_viscosity_iter: int = field(
@@ -396,7 +396,7 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 3: VELOCITY DIFFUSE (viscosity) =====
         if self.config.vel_viscosity > 0.0:
-            viscosity_step: float = 0.25 * self.config.vel_viscosity
+            viscosity_step: float = self.config.vel_viscosity * delta_time
             for _ in range(self.config.vel_viscosity_iter):
                 self._input_fbo.swap()
                 self._input_fbo.begin()
@@ -411,7 +411,7 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 4: VELOCITY VORTICITY CONFINEMENT =====
         if self.config.vel_vorticity > 0.0:
-            vorticity_step: float = self.config.vel_vorticity
+            vorticity_step: float = self.config.vel_vorticity * delta_time
 
             # 4a. Compute vorticity curl
             self._vorticity_curl_fbo.begin()

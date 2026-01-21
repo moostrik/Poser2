@@ -228,14 +228,17 @@ class FlowLayer(LayerBase):
 
 
         self.config.fluid_flow.vel_speed = 0.33
-        self.config.fluid_flow.vel_decay = 3.0
-        self.config.fluid_flow.vel_viscosity = 0
+        self.config.fluid_flow.vel_decay = 60.0
+        self.config.fluid_flow.vel_vorticity = 4.0
+        self.config.fluid_flow.vel_viscosity = 1
+        self.config.fluid_flow.vel_viscosity_iter = 20
+
         self.config.fluid_flow.den_speed = 0.33
         self.config.fluid_flow.den_decay = 3.0
         self.config.fluid_flow.tmp_speed = 0.33
         self.config.fluid_flow.tmp_decay = 3.0
         self.config.fluid_flow.prs_speed = 0.33
-        self.config.fluid_flow.prs_decay = 0.3
+        self.config.fluid_flow.prs_decay = 0.0
         self.config.fluid_flow.prs_iterations = 40
         # self._fluid_flow.reset()
 
@@ -252,9 +255,9 @@ class FlowLayer(LayerBase):
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_MASK
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
         self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
-        self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
-        self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
-        self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
+        # self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
+        # self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
+        # self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
         # self.config.draw_mode = FlowDrawMode.FLUID_DIVERGENCE
         # self.config.draw_mode = FlowDrawMode.FLUID_VORTICITY
         # self.config.draw_mode = FlowDrawMode.FLUID_BUOYANCY
