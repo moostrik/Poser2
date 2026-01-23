@@ -67,8 +67,8 @@
   "gui": {
     "title": "Poser",
     "on_top": true,
-    "location_x": 50,
-    "location_y": 500,
+    "location_x": 500,
+    "location_y": 50,
     "file_path": "files",
     "default_file": "default"
   },
@@ -88,8 +88,8 @@
     "x": 0,
     "y": 50,
     "fullscreen": false,
-    "fps": 60,
-    "v_sync": true,
+    "fps": 0,
+    "v_sync": false,
     "secondary_list": [
       0,
       0,
