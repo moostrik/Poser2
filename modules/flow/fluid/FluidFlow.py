@@ -239,7 +239,7 @@ class FluidFlow(FlowBase):
         self._density_height = output_height if output_height is not None else height
 
         # Compute aspect ratio for isotropic simulation
-        self._aspect = width / height if height > 0 else 1.0
+        self._aspect: float = width / height if height > 0 else 1.0
 
         # Allocate base FBOs (velocity RG32F, density RGBA32F)
         super().allocate(width, height, self._density_width, self._density_height)
@@ -361,6 +361,9 @@ class FluidFlow(FlowBase):
         if not self._allocated:
             return
 
+        # self._aspect = 1.0
+        self._aspect = self._width / self._height if self._height > 0 else 1.0
+
         # ===== STEP 1: DENSITY ADVECT & DISSIPATE =====
         advect_den_step: float = delta_time * self._simulation_scale * self.config.den_speed
         dissipate_den: float = FluidFlow._calculate_dissipation(delta_time, self.config.den_decay)
@@ -411,7 +414,7 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 4: VELOCITY VORTICITY CONFINEMENT =====
         if self.config.vel_vorticity > 0.0:
-            vorticity_step: float = self.config.vel_vorticity * delta_time
+            vorticity_step: float = self.config.vel_vorticity
 
             # 4a. Compute vorticity curl
             self._vorticity_curl_fbo.begin()
@@ -508,7 +511,8 @@ class FluidFlow(FlowBase):
                 self._divergence_fbo.texture,
                 self._obstacle_fbo.texture,
                 self._obstacle_offset_fbo.texture,
-                self._simulation_scale
+                self._simulation_scale,
+                self._aspect
             )
             self._pressure_fbo.end()
 

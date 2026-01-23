@@ -209,16 +209,16 @@ class FlowLayer(LayerBase):
         self.config.visualisation.spacing = 20 # in pixels
         self.config.visualisation.element_length = 40.0 # in pixels
         self.config.visualisation.scale = 1.0
-        self.config.visualisation.toggle_scalar = True
+        self.config.visualisation.toggle_scalar = False
 
-        self.config.optical_flow.offset = 8
+        self.config.optical_flow.offset = 3
         self.config.optical_flow.threshold = 0.01
         self.config.optical_flow.strength_x = 3.3
         self.config.optical_flow.strength_y = 3.3
         self.config.optical_flow.boost = 0.0
 
         self.config.velocity_trail.scale = 1.0
-        self.config.velocity_trail.trail_weight = 0.6
+        self.config.velocity_trail.trail_weight = 0.1
         self.config.velocity_trail.blur_steps = 2
         self.config.velocity_trail.blur_radius = 3.0
         self.config.density_bridge.saturation = 1.2
@@ -227,26 +227,26 @@ class FlowLayer(LayerBase):
         self.config.fluid_velocity_scale = 1.0
 
 
-        self.config.fluid_flow.vel_speed = 0.33
+        self.config.fluid_flow.vel_speed = 1.0
         self.config.fluid_flow.vel_decay = 60.0
-        self.config.fluid_flow.vel_vorticity = 4.0
-        self.config.fluid_flow.vel_viscosity = 1
+        self.config.fluid_flow.vel_vorticity = 0
+        self.config.fluid_flow.vel_viscosity = 0
         self.config.fluid_flow.vel_viscosity_iter = 20
 
-        self.config.fluid_flow.den_speed = 0.33
-        self.config.fluid_flow.den_decay = 3.0
+        self.config.fluid_flow.den_speed = 0.9
+        self.config.fluid_flow.den_decay = 6
         self.config.fluid_flow.tmp_speed = 0.33
         self.config.fluid_flow.tmp_decay = 3.0
         self.config.fluid_flow.prs_speed = 0.33
-        self.config.fluid_flow.prs_decay = 0.0
+        self.config.fluid_flow.prs_decay = 0.1
         self.config.fluid_flow.prs_iterations = 40
         # self._fluid_flow.reset()
 
 
-        self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
+        # self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
         # self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_INPUT
-        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
+        # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY
@@ -254,8 +254,8 @@ class FlowLayer(LayerBase):
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_MASK
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
-        self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
-        # self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
+        # self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
+        self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
         # self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
         # self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
         # self.config.draw_mode = FlowDrawMode.FLUID_DIVERGENCE
@@ -267,6 +267,7 @@ class FlowLayer(LayerBase):
         """Update full processing pipeline."""
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
+        Style.set_color(1.0, 1.0, 1.0, 1.0)
 
         # Check if source is active
         active: bool = getattr(self._source, "available", True)

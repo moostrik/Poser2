@@ -25,11 +25,12 @@ void main() {
     float cL = abs(textureOffset(uCurl, st, ivec2(-1, 0)).r);
     float cC = texture(uCurl, st).r;
 
-    // Compute gradient of curl magnitude (aspect-corrected, bug fixed)
-    vec2 grad = vec2(uHalfRdxInv.x * (cR - cL), uHalfRdxInv.y * (cT - cB));
+    // Compute gradient of curl magnitude (aspect-corrected)
+    // X: vertical difference (cT - cB), Y: horizontal difference (cR - cL)
+    vec2 dw = vec2(uHalfRdxInv.x * (cT - cB), uHalfRdxInv.y * (cR - cL));
 
     // Normalize gradient (add epsilon to avoid division by zero)
-    vec2 dw = normalize(grad + 0.000001);
+    dw = normalize(dw + 0.000001);
 
     // Flip X and negate Y for vorticity confinement direction
     dw *= vec2(-1.0, 1.0);

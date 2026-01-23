@@ -11,7 +11,7 @@ from modules.gl.Fbo import Fbo
 from modules.gl.Texture import Texture
 
 from .. import FlowBase, FlowConfigBase, FlowUtil
-from .shaders import Luminance, OpticalFlow as OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
+from .shaders import Luminance, MergeRGB, OpticalFlow as OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -65,6 +65,7 @@ class OpticalFlow(FlowBase):
         self._optical_flow_shader: OpticalFlowShader = OpticalFlowShader()
         self._optical_flow_shader_mm: OpticalFlowMMShader = OpticalFlowMMShader()
         self._luminance_shader: Luminance = Luminance()
+        self._merge_rgb_shader: MergeRGB = MergeRGB()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -92,6 +93,7 @@ class OpticalFlow(FlowBase):
         self._optical_flow_shader.allocate()
         self._optical_flow_shader_mm.allocate()
         self._luminance_shader.allocate()
+        self._merge_rgb_shader.allocate()
 
         self._frame_count = 0
         self._needs_update = False
@@ -102,7 +104,7 @@ class OpticalFlow(FlowBase):
         self._optical_flow_shader.deallocate()
         self._optical_flow_shader_mm.deallocate()
         self._luminance_shader.deallocate()
-
+        self._merge_rgb_shader.deallocate()
 
     def update(self, delta_time: float = 1.0) -> None:
         """Compute optical flow from current and previous frames.
@@ -130,7 +132,7 @@ class OpticalFlow(FlowBase):
 
         # Pass output_fbo directly since it's now a Fbo
         self._output_fbo.begin()
-        self._optical_flow_shader.use(
+        self._optical_flow_shader_mm.use(
             prev_frame,
             curr_frame,
             offset=self.config.offset,
@@ -152,9 +154,11 @@ class OpticalFlow(FlowBase):
 
         # Swap to next frame slot in input_fbo
         self._input_fbo.swap()
+        self._merge_rgb_shader.reload()
 
         self._input_fbo.begin()
-        self._luminance_shader.use(texture)
+        # self._luminance_shader.use(texture)
+        self._merge_rgb_shader.use(texture)
         self._input_fbo.end()
 
         # Generate mipmaps after rendering to FBO

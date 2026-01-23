@@ -11,7 +11,7 @@ uniform sampler2D uDivergence;      // Velocity divergence (R32F)
 uniform sampler2D uObstacle;        // Obstacle mask (R8/R32F)
 uniform sampler2D uObstacleOffset;  // Neighbor obstacle info (RGBA8)
 
-uniform float uAlpha;  // -(gridScale²)
+uniform vec2 uAlpha;  // -(gridScale²)
 uniform float uBeta;   // 0.25 (= 1/4 for 4 neighbors)
 
 void main() {
@@ -42,5 +42,6 @@ void main() {
     xL = mix(xL, xC, oN.w);
 
     // Jacobi iteration: x^(k+1) = (xL + xR + xB + xT + α*b) * β
-    fragColor = (xL + xR + xB + xT + uAlpha * bC) * uBeta;
+    // fragColor = (xL + xR + xB + xT + uAlpha * bC) * uBeta;
+    fragColor = (uAlpha.x * (xL + xR) + uAlpha.y * (xB + xT) - bC) * uBeta;
 }

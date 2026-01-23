@@ -137,6 +137,8 @@ FINAL_LAYERS: list[Layers] = [
 
     # Layers.centre_cam,
     # Layers.centre_mask,
+    # Layers.centre_pose,
+    # Layers.sim_blend,
     Layers.centre_pose,
     Layers.sim_blend,
     Layers.flow,

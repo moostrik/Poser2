@@ -45,7 +45,7 @@ class Divergence(Shader):
 
         # Set uniforms (aspect-corrected grid scales)
         half_rdx_x = 0.5 / grid_scale
-        half_rdx_y = (0.5 / grid_scale) * aspect
+        half_rdx_y = (0.5 / grid_scale) / aspect
         glUniform2f(glGetUniformLocation(self.shader_program, "uHalfRdxInv"), half_rdx_x, half_rdx_y)
 
         draw_quad()

@@ -11,7 +11,7 @@ class JacobiPressure(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, source: Texture, divergence: Texture, obstacle: Texture, obstacle_offset: Texture, grid_scale: float) -> None:
+    def use(self, source: Texture, divergence: Texture, obstacle: Texture, obstacle_offset: Texture, grid_scale: float, aspect: float) -> None:
         """Apply one Jacobi iteration.
 
         Args:
@@ -20,6 +20,7 @@ class JacobiPressure(Shader):
             obstacle: Obstacle mask (R8/R32F)
             obstacle_offset: Neighbor obstacle info (RGBA8)
             grid_scale: Grid scaling factor (typically 1)
+            aspect: Aspect ratio (width/height)
         """
         if not self.allocated or not self.shader_program:
             print("JacobiPressure shader not allocated or shader program missing.")
@@ -29,8 +30,14 @@ class JacobiPressure(Shader):
             return
 
         # Compute Jacobi parameters
-        alpha = -(grid_scale * grid_scale)
-        beta = 0.25  # 1/4 for 4 neighbors in 2D
+        # Anisotropic grid spacing
+        dx = grid_scale
+        dy = grid_scale * aspect
+
+        # Laplacian weights
+        alpha_x = 1.0 / (dx * dx)
+        alpha_y = 1.0 / (dy * dy)
+        beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y)
 
         glUseProgram(self.shader_program)
 
@@ -52,7 +59,7 @@ class JacobiPressure(Shader):
         glUniform1i(glGetUniformLocation(self.shader_program, "uObstacleOffset"), 3)
 
         # Set uniforms
-        glUniform1f(glGetUniformLocation(self.shader_program, "uAlpha"), alpha)
+        glUniform2f(glGetUniformLocation(self.shader_program, "uAlpha"), alpha_x, alpha_y)
         glUniform1f(glGetUniformLocation(self.shader_program, "uBeta"), beta)
 
         draw_quad()
