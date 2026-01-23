@@ -5,6 +5,7 @@ import time
 import inspect
 import threading
 import logging
+import ctypes
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -28,13 +29,60 @@ def monitor_path(path, callback):
     observer.start()
     return observer
 
-def draw_quad() -> None :
-    glBegin(GL_QUADS)
-    glTexCoord2f( 0.0,  0.0); glVertex2f(  -1.0, -1.0)
-    glTexCoord2f( 1.0,  0.0); glVertex2f(   1.0, -1.0)
-    glTexCoord2f( 1.0,  1.0); glVertex2f(   1.0,  1.0)
-    glTexCoord2f( 0.0,  1.0); glVertex2f(  -1.0,  1.0)
-    glEnd()
+# Global quad VAO/VBO - initialized once, reused by all shaders
+_quad_vao: int | None = None
+_quad_vbo: int | None = None
+
+def init_quad() -> None:
+    """Initialize the global quad VAO/VBO. Call once during setup."""
+    global _quad_vao, _quad_vbo
+
+    if _quad_vao is not None:
+        return  # Already initialized
+
+    # Vertex data: position (x, y) + texcoord (u, v)
+    quad_vertices = [
+        # x     y     u    v
+        -1.0, -1.0,  0.0, 0.0,  # Bottom-left
+         1.0, -1.0,  1.0, 0.0,  # Bottom-right
+         1.0,  1.0,  1.0, 1.0,  # Top-right
+        -1.0,  1.0,  0.0, 1.0,  # Top-left
+    ]
+
+    import numpy as np
+    vertices = np.array(quad_vertices, dtype=np.float32)
+
+    # Generate and bind VAO
+    _quad_vao = glGenVertexArrays(1)
+    glBindVertexArray(_quad_vao)
+
+    # Generate and bind VBO
+    _quad_vbo = glGenBuffers(1)
+    glBindBuffer(GL_ARRAY_BUFFER, _quad_vbo)
+    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+
+    # Position attribute (location 0)
+    glEnableVertexAttribArray(0)
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * 4, ctypes.c_void_p(0))
+
+    # Texcoord attribute (location 1)
+    glEnableVertexAttribArray(1)
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * 4, ctypes.c_void_p(2 * 4))
+
+    # Unbind
+    glBindBuffer(GL_ARRAY_BUFFER, 0)
+    glBindVertexArray(0)
+
+def draw_quad() -> None:
+    """Draw a fullscreen quad using VAO/VBO. Much faster than immediate mode."""
+    global _quad_vao
+
+    if _quad_vao is None:
+        init_quad()
+
+    glBindVertexArray(_quad_vao)
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
+    glBindVertexArray(0)
 
 class Shader():
     # Class-level hot-reload management (one observer per directory)
