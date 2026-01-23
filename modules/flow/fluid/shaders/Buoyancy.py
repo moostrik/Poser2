@@ -12,15 +12,15 @@ class Buoyancy(Shader):
         super().__init__()
 
     def use(self, velocity: Texture, temperature: Texture, density: Texture,
-            sigma: float, weight: float, ambient_temperature: float) -> None:
-        """Compute buoyancy force.
+            sigma: float, kappa: float, ambient_temperature: float) -> None:
+        """Compute buoyancy force: F = σ(T - T_ambient) - κρ
 
         Args:
             velocity: Current velocity field (RG32F) - passed for consistency but not used
             temperature: Temperature field (R32F)
             density: Density field (RGBA32F)
-            sigma: Buoyancy strength (temperature effect)
-            weight: Density weight (gravity effect)
+            sigma: Thermal buoyancy coefficient σ (already includes dt * scale)
+            kappa: Density weight coefficient κ (already includes dt * scale)
             ambient_temperature: Reference temperature
         """
         # Bind shader program
@@ -41,7 +41,7 @@ class Buoyancy(Shader):
 
         # Set uniforms
         glUniform1f(glGetUniformLocation(self.shader_program, "uSigma"), sigma)
-        glUniform1f(glGetUniformLocation(self.shader_program, "uWeight"), weight)
+        glUniform1f(glGetUniformLocation(self.shader_program, "uKappa"), kappa)
         glUniform1f(glGetUniformLocation(self.shader_program, "uAmbientTemperature"), ambient_temperature)
 
         # Draw fullscreen quad

@@ -14,9 +14,12 @@ uniform sampler2D uTemperature; // Temperature field (R32F)
 uniform sampler2D uDensity;     // Density field (RGBA32F)
 
 // Parameters
-uniform float uSigma;              // Buoyancy strength (temperature effect)
-uniform float uWeight;             // Density weight (gravity effect)
-uniform float uAmbientTemperature; // Ambient/reference temperature
+// F = sigma * (T - T_ambient) - kappa * density  (GPU Gems / Fedkiw et al.)
+// sigma = thermal buoyancy coefficient (hot rises)
+// kappa = density/gravity coefficient (dense falls), typically kappa = weight_ratio * sigma
+uniform float uSigma;              // Thermal buoyancy (already includes dt * scale)
+uniform float uKappa;              // Density weight (already includes dt * scale)
+uniform float uAmbientTemperature; // Reference temperature
 
 void main() {
     vec2 st = texCoord;
@@ -34,9 +37,9 @@ void main() {
         // Sample density (use alpha channel)
         float density = texture(uDensity, st).a;
 
-        // Buoyancy force: hot air rises (positive dtemp), dense falls (positive density)
-        // Force = temperature_effect - density_effect
-        float buoyancy_force = dtemp * uSigma - density * uWeight;
+        // Buoyancy force: F = sigma * (T - T_ambient) - kappa * density
+        // Hot air rises (positive dtemp), dense fluid falls (positive density)
+        float buoyancy_force = dtemp * uSigma - density * uKappa;
 
         // Apply force in vertical direction (negative Y = up in screen space)
         buoyancy = vec2(0.0, -1.0) * buoyancy_force;

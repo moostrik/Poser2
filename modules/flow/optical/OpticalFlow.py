@@ -132,7 +132,7 @@ class OpticalFlow(FlowBase):
 
         # Pass output_fbo directly since it's now a Fbo
         self._output_fbo.begin()
-        self._optical_flow_shader_mm.use(
+        self._optical_flow_shader.use(
             prev_frame,
             curr_frame,
             offset=self.config.offset,

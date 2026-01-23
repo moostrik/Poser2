@@ -102,12 +102,12 @@ class FluidFlowConfig(FlowConfigBase):
     tmp_buoyancy: float = field(
         default=0.0,
         metadata={"min": 0.0, "max": 10.0, "label": "Buoyancy",
-                  "description": "Buoyancy force strength (hot air rises)"}
+                  "description": "Thermal buoyancy coefficient (σ): hot air rises"}
     )
     tmp_weight: float = field(
-        default=0.2,
-        metadata={"min": 0.0, "max": 2.0, "label": "Temperature Weight",
-                  "description": "How much density affects buoyancy"}
+        default=0.25,
+        metadata={"min": 0.0, "max": 2.0, "label": "Density Weight Ratio",
+                  "description": "Ratio of gravity/settling effect vs thermal lift (0.25 = 25% of buoyancy)"}
     )
     tmp_ambient: float = field(
         default=0.2,
@@ -450,37 +450,47 @@ class FluidFlow(FlowBase):
             # 4c. Add force to velocity
             self.add_velocity(self._vorticity_force_fbo.texture)
 
-        # ===== STEP 5: TEMPERATURE ADVECT & DISSIPATE =====
-        advect_tmp_step: float = delta_time * self._simulation_scale * self.config.tmp_speed
-        dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.tmp_decay)
+        # ===== STEP 5 & 6: TEMPERATURE ADVECT & BUOYANCY =====
+        # Only compute temperature if buoyancy is enabled
+        if self.config.tmp_buoyancy == 0.0:
+            FlowUtil.zero(self._temperature_fbo)
+        else:
+            # 5a. Advect temperature
+            advect_tmp_step: float = delta_time * self._simulation_scale * self.config.tmp_speed
+            dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.tmp_decay)
 
-        self._temperature_fbo.swap()
-        self._temperature_fbo.begin()
-        self._advect_shader.use(
-            self._temperature_fbo.back_texture,  # Source temperature
-            self._input_fbo.texture,            # Velocity
-            self._obstacle_fbo.texture,         # Obstacles
-            self._simulation_scale,
-            advect_tmp_step,
-            dissipate_tmp
-        )
-        self._temperature_fbo.end()
+            self._temperature_fbo.swap()
+            self._temperature_fbo.begin()
+            self._advect_shader.use(
+                self._temperature_fbo.back_texture,  # Source temperature
+                self._input_fbo.texture,            # Velocity
+                self._obstacle_fbo.texture,         # Obstacles
+                self._simulation_scale,
+                advect_tmp_step,
+                dissipate_tmp
+            )
+            self._temperature_fbo.end()
 
-        # ===== STEP 6: TEMPERATURE BUOYANCY =====
-        if self.config.tmp_buoyancy > 0.0 and self.config.tmp_weight > 0.0:
+            # 6. Compute and apply buoyancy force
+            # F = σ(T - T_ambient) - κρ  where κ = weight_ratio * σ
+            # Both terms scaled by delta_time * simulation_scale for resolution independence
+            sigma: float = delta_time * self._simulation_scale * self.config.tmp_buoyancy
+            kappa: float = delta_time * self._simulation_scale * self.config.tmp_weight  # Weight as ratio of thermal effect
+
             self._buoyancy_fbo.begin()
             self._buoyancy_shader.use(
                 self._input_fbo.texture,
                 self._temperature_fbo.texture,
                 self._output_fbo.texture,
-                self.config.tmp_buoyancy,
-                self.config.tmp_weight,
+                sigma,
+                kappa,
                 self.config.tmp_ambient
             )
             self._buoyancy_fbo.end()
 
             # Add buoyancy force to velocity
             self.add_velocity(self._buoyancy_fbo.texture)
+            # Reset temperature when buoyancy disabled to prevent stale data
 
         # ===== STEP 7: PRESSURE ADVECT & DISSIPATE =====
         # # Only advect pressure for artistic effects (non-physical)
