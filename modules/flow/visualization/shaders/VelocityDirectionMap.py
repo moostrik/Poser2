@@ -37,9 +37,9 @@ class VelocityDirectionMap(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity_tex.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(self.shader_program, "scale"), scale)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1f(self.get_uniform_loc("scale"), scale)
 
         # Render
         draw_quad()

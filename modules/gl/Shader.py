@@ -72,6 +72,7 @@ class Shader():
         self.need_reload: bool = False
         self._reload_lock = threading.Lock()
         self._ref_count: int = 0
+        self._uniform_cache: dict[str, int] = {}  # Cached uniform locations
 
         # Discover shader files in same directory as the class file
         shader_name_normalized = self.shader_name.lower()
@@ -133,6 +134,16 @@ class Shader():
             compiled: bool = self._compile_shaders(verbose=True)
             print(f"Shader {self.shader_name} reload {'succeeded' if compiled else 'failed'}")
             return True  # We attempted reload
+
+    def get_uniform_loc(self, name: str) -> int:
+        """Get uniform location with caching.
+
+        Caches uniform locations on first access to avoid repeated
+        glGetUniformLocation calls (expensive string lookups)."""
+
+        if name not in self._uniform_cache:
+            self._uniform_cache[name] = glGetUniformLocation(self.shader_program, name)
+        return self._uniform_cache[name]
 
     def _compile_shaders(self, verbose: bool = False) -> bool:
         """Load and compile shader sources into OpenGL program. Returns True if successful."""
@@ -216,6 +227,9 @@ class Shader():
             if self.shader_program is not None:
                 glDeleteProgram(self.shader_program)
             self.shader_program = new_program
+
+            # Clear uniform cache (locations may have changed)
+            self._uniform_cache.clear()
 
             if verbose:
                 logging.info(f"{self.shader_name} loaded successfully")

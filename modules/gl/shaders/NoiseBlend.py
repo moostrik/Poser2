@@ -22,11 +22,11 @@ class NoiseBlend(Shader):
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, mask.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "src"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "dst"), 1)
-        glUniform1i(glGetUniformLocation(self.shader_program, "mask"), 2)
-        glUniform1f(glGetUniformLocation(self.shader_program, "blend"), blend)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("src"), 0)
+        glUniform1i(self.get_uniform_loc("dst"), 1)
+        glUniform1i(self.get_uniform_loc("mask"), 2)
+        glUniform1f(self.get_uniform_loc("blend"), blend)
 
         # Render
         draw_quad()

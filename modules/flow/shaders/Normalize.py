@@ -27,7 +27,7 @@ class Normalize(Shader):
         glUseProgram(self.shader_program)
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, source.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex"), 0)
+        glUniform1i(self.get_uniform_loc("tex"), 0)
         draw_quad()
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, 0)

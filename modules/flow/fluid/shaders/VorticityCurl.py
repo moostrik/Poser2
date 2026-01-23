@@ -29,15 +29,15 @@ class VorticityCurl(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uVelocity"), 0)
+        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uObstacle"), 1)
+        glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         # Set uniform
-        glUniform1f(glGetUniformLocation(self.shader_program, "uRadius"), radius)
-        glUniform2f(glGetUniformLocation(self.shader_program, "uHalfRdxInv"), half_rdx_x, half_rdx_y)
+        glUniform1f(self.get_uniform_loc("uRadius"), radius)
+        glUniform2f(self.get_uniform_loc("uHalfRdxInv"), half_rdx_x, half_rdx_y)
 
         # Draw fullscreen quad
         draw_quad()

@@ -33,10 +33,10 @@ class DensityBridgeShader(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
 
-        # Set uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
-        glUniform1f(glGetUniformLocation(self.shader_program, "speed"), speed)
+        # Set uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1i(self.get_uniform_loc("tex1"), 1)
+        glUniform1f(self.get_uniform_loc("speed"), speed)
 
         draw_quad()
 

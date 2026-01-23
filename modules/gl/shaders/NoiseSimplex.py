@@ -14,9 +14,9 @@ class NoiseSimplex(Shader):
         # Activate shader program
         glUseProgram(self.shader_program)
 
-        # Configure shader uniforms
-        glUniform1f(glGetUniformLocation(self.shader_program, "time"), t)
-        glUniform1f(glGetUniformLocation(self.shader_program, "blend"), blend)
+        # Configure shader uniforms (using cached locations)
+        glUniform1f(self.get_uniform_loc("time"), t)
+        glUniform1f(self.get_uniform_loc("blend"), blend)
 
         # Render
         draw_quad()

@@ -27,11 +27,11 @@ class AddBoolean(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, base.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uBase"), 0)
+        glUniform1i(self.get_uniform_loc("uBase"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, blend.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uBlend"), 1)
+        glUniform1i(self.get_uniform_loc("uBlend"), 1)
 
         # Draw fullscreen quad
         draw_quad()

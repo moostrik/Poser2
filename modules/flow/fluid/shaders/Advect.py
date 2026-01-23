@@ -35,25 +35,25 @@ class Advect(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uVelocity"), 0)
+        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, source.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uSource"), 1)
+        glUniform1i(self.get_uniform_loc("uSource"), 1)
 
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uObstacle"), 2)
+        glUniform1i(self.get_uniform_loc("uObstacle"), 2)
 
         # Set uniforms
-        glUniform1f(glGetUniformLocation(self.shader_program, "uTimestep"), timestep)
-        glUniform1f(glGetUniformLocation(self.shader_program, "uRdx"), 1.0 / grid_scale)
-        glUniform1f(glGetUniformLocation(self.shader_program, "uDissipation"), dissipation)
+        glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
+        glUniform1f(self.get_uniform_loc("uRdx"), 1.0 / grid_scale)
+        glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
 
         # Scale for resolution differences
         scale_x = velocity.width / source.width
         scale_y = velocity.height / source.height
-        glUniform2f(glGetUniformLocation(self.shader_program, "uScale"), scale_x, scale_y)
+        glUniform2f(self.get_uniform_loc("uScale"), scale_x, scale_y)
 
         draw_quad()
 

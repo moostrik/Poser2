@@ -45,13 +45,14 @@ class VelocityArrowField(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity_tex.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(self.shader_program, "scale"), scale)
-        glUniform1f(glGetUniformLocation(self.shader_program, "grid_spacing"), spacing)
-        glUniform1f(glGetUniformLocation(self.shader_program, "arrow_length"), arrow_length)
-        glUniform1f(glGetUniformLocation(self.shader_program, "arrow_thickness"), arrow_thickness)
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), output_width, output_height)
+        # Configure shader uniforms (using cached locations)
+
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1f(self.get_uniform_loc("scale"), scale)
+        glUniform1f(self.get_uniform_loc("grid_spacing"), spacing)
+        glUniform1f(self.get_uniform_loc("arrow_length"), arrow_length)
+        glUniform1f(self.get_uniform_loc("arrow_thickness"), arrow_thickness)
+        glUniform2f(self.get_uniform_loc("resolution"), output_width, output_height)
 
         # Render
         draw_quad()

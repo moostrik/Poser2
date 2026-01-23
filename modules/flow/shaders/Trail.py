@@ -37,11 +37,11 @@ class Trail(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, new_input.tex_id)
 
-        # Set uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
-        glUniform1f(glGetUniformLocation(self.shader_program, "trailWeight"), trail_weight)
-        glUniform1f(glGetUniformLocation(self.shader_program, "newWeight"), new_weight)
+        # Set uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1i(self.get_uniform_loc("tex1"), 1)
+        glUniform1f(self.get_uniform_loc("trailWeight"), trail_weight)
+        glUniform1f(self.get_uniform_loc("newWeight"), new_weight)
 
         draw_quad()
 

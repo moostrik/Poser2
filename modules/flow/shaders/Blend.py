@@ -39,11 +39,11 @@ class Blend(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "dst"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "src"), 1)
-        glUniform1f(glGetUniformLocation(self.shader_program, "dst_strength"), dst_strength)
-        glUniform1f(glGetUniformLocation(self.shader_program, "src_strength"), src_strength)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("dst"), 0)
+        glUniform1i(self.get_uniform_loc("src"), 1)
+        glUniform1f(self.get_uniform_loc("dst_strength"), dst_strength)
+        glUniform1f(self.get_uniform_loc("src_strength"), src_strength)
 
         # Render
         draw_quad()

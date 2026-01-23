@@ -32,9 +32,9 @@ class Scale(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
 
-        # Set uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "src"), 0)
-        glUniform1f(glGetUniformLocation(self.shader_program, "scale"), scale)
+        # Set uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("src"), 0)
+        glUniform1f(self.get_uniform_loc("scale"), scale)
 
         draw_quad()
 

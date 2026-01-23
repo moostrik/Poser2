@@ -32,9 +32,9 @@ class TextureBlit(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, texture.tex_id)
 
-        # Configure shader uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(w), float(h))
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
+        # Configure shader uniforms (using cached locations)
+        glUniform2f(self.get_uniform_loc("resolution"), float(w), float(h))
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
 
         # Render quad in pixel space
         draw_quad()

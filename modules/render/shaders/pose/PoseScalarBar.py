@@ -24,16 +24,16 @@ class PoseScalarBar(Shader):
         glUseProgram(self.shader_program)
 
         # Configure shader uniforms
-        glUniform1fv(glGetUniformLocation(self.shader_program, "values"), len(values), values)
-        glUniform1fv(glGetUniformLocation(self.shader_program, "scores"), len(scores), scores)
-        glUniform1i(glGetUniformLocation(self.shader_program, "num_joints"), len(feature))
-        glUniform1f(glGetUniformLocation(self.shader_program, "value_min"), min_range)
-        glUniform1f(glGetUniformLocation(self.shader_program, "value_max"), max_range)
-        glUniform1f(glGetUniformLocation(self.shader_program, "line_thickness"), line_thickness)
-        glUniform1f(glGetUniformLocation(self.shader_program, "line_smooth"), line_smooth)
-        glUniform4f(glGetUniformLocation(self.shader_program, "color"), *color)
-        glUniform4f(glGetUniformLocation(self.shader_program, "color_odd"), *color_odd)
-        glUniform4f(glGetUniformLocation(self.shader_program, "color_even"), *color_even)
+        glUniform1fv(self.get_uniform_loc("values"), len(values), values)
+        glUniform1fv(self.get_uniform_loc("scores"), len(scores), scores)
+        glUniform1i(self.get_uniform_loc("num_joints"), len(feature))
+        glUniform1f(self.get_uniform_loc("value_min"), min_range)
+        glUniform1f(self.get_uniform_loc("value_max"), max_range)
+        glUniform1f(self.get_uniform_loc("line_thickness"), line_thickness)
+        glUniform1f(self.get_uniform_loc("line_smooth"), line_smooth)
+        glUniform4f(self.get_uniform_loc("color"), *color)
+        glUniform4f(self.get_uniform_loc("color_odd"), *color_odd)
+        glUniform4f(self.get_uniform_loc("color_even"), *color_even)
 
         # Render
         draw_quad()

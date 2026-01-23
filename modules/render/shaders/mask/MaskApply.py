@@ -20,10 +20,10 @@ class MaskApply(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, mask.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "color"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "mask"), 1)
-        glUniform1f(glGetUniformLocation(self.shader_program, "multiply"), multiply)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("color"), 0)
+        glUniform1i(self.get_uniform_loc("mask"), 1)
+        glUniform1f(self.get_uniform_loc("multiply"), multiply)
 
         # Render
         draw_quad()

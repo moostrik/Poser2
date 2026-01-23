@@ -29,20 +29,20 @@ class Buoyancy(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uVelocity"), 0)
+        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, temperature.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uTemperature"), 1)
+        glUniform1i(self.get_uniform_loc("uTemperature"), 1)
 
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, density.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uDensity"), 2)
+        glUniform1i(self.get_uniform_loc("uDensity"), 2)
 
         # Set uniforms
-        glUniform1f(glGetUniformLocation(self.shader_program, "uSigma"), sigma)
-        glUniform1f(glGetUniformLocation(self.shader_program, "uKappa"), kappa)
-        glUniform1f(glGetUniformLocation(self.shader_program, "uAmbientTemperature"), ambient_temperature)
+        glUniform1f(self.get_uniform_loc("uSigma"), sigma)
+        glUniform1f(self.get_uniform_loc("uKappa"), kappa)
+        glUniform1f(self.get_uniform_loc("uAmbientTemperature"), ambient_temperature)
 
         # Draw fullscreen quad
         draw_quad()

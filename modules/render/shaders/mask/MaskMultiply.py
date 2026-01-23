@@ -20,9 +20,9 @@ class MaskMultiply(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, tex1.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1i(self.get_uniform_loc("tex1"), 1)
 
         # Render
         draw_quad()

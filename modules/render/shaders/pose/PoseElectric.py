@@ -32,8 +32,8 @@ class PoseElectric(Shader):
         glUseProgram(self.shader_program)
 
         # Configure shader uniforms
-        glUniform1f(glGetUniformLocation(self.shader_program, "time"), pytime.time() - self.start_time)
-        glUniform4fv(glGetUniformLocation(self.shader_program, "points"), n_points, packed_data.flatten())
+        glUniform1f(self.get_uniform_loc("time"), pytime.time() - self.start_time)
+        glUniform4fv(self.get_uniform_loc("points"), n_points, packed_data.flatten())
 
         # Render
         draw_quad()

@@ -21,11 +21,11 @@ class MaskAA(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "aaMode"), aa_mode)
-        glUniform1f(glGetUniformLocation(self.shader_program, "blurRadius"), blur_radius)
-        glUniform2f(glGetUniformLocation(self.shader_program, "texelSize"), texel_size[0], texel_size[1])
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1i(self.get_uniform_loc("aaMode"), aa_mode)
+        glUniform1f(self.get_uniform_loc("blurRadius"), blur_radius)
+        glUniform2f(self.get_uniform_loc("texelSize"), texel_size[0], texel_size[1])
 
         # Render
         draw_quad()

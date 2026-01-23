@@ -18,10 +18,10 @@ class Contrast(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(self.shader_program, "brightness"), brightness)
-        glUniform1f(glGetUniformLocation(self.shader_program, "contrast"), contrast)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1f(self.get_uniform_loc("brightness"), brightness)
+        glUniform1f(self.get_uniform_loc("contrast"), contrast)
 
         # Render
         draw_quad()

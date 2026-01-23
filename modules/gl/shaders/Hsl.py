@@ -18,11 +18,11 @@ class Hsl(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(self.shader_program, "hue"), hue)
-        glUniform1f(glGetUniformLocation(self.shader_program, "saturation"), saturation)
-        glUniform1f(glGetUniformLocation(self.shader_program, "lightness"), lightness)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1f(self.get_uniform_loc("hue"), hue)
+        glUniform1f(self.get_uniform_loc("saturation"), saturation)
+        glUniform1f(self.get_uniform_loc("lightness"), lightness)
 
         # Render
         draw_quad()

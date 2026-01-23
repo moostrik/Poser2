@@ -222,7 +222,7 @@ class FlowLayer(LayerBase):
         self.config.velocity_trail.blur_steps = 2
         self.config.velocity_trail.blur_radius = 3.0
         self.config.density_bridge.saturation = 1.2
-        self.config.density_bridge.brightness = 0.05
+        self.config.density_bridge.brightness = 0.5
 
         self.config.fluid_velocity_scale = 1.0
 
@@ -242,7 +242,7 @@ class FlowLayer(LayerBase):
         self.config.fluid_flow.prs_decay = 0.1
         self.config.fluid_flow.prs_iterations = 40
 
-        self.config.fluid_flow.tmp_buoyancy = 20.0
+        self.config.fluid_flow.tmp_buoyancy = 0.0
         self.config.fluid_flow.tmp_weight = -10.0
         # self._fluid_flow.reset()
 
@@ -260,7 +260,7 @@ class FlowLayer(LayerBase):
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
         self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
         self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
-        self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
+        # self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
         # self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
         # self.config.draw_mode = FlowDrawMode.FLUID_DIVERGENCE
         # self.config.draw_mode = FlowDrawMode.FLUID_VORTICITY
@@ -321,7 +321,7 @@ class FlowLayer(LayerBase):
         self._fluid_flow.add_temperature(self._temperature_bridge.temperature)
 
         # Update fluid simulation
-        # self._fluid_flow.update(self._delta_time)
+        self._fluid_flow.update(self._delta_time)
 
 
         Style.pop_style()

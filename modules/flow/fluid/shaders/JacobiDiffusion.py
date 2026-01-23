@@ -43,20 +43,20 @@ class JacobiDiffusion(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, source.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uSource"), 0)
+        glUniform1i(self.get_uniform_loc("uSource"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uObstacle"), 1)
+        glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, obstacle_offset.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uObstacleOffset"), 2)
+        glUniform1i(self.get_uniform_loc("uObstacleOffset"), 2)
 
         # Set uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "uAlpha"), alpha_x, alpha_y)
-        glUniform1f(glGetUniformLocation(self.shader_program, "uGamma"), gamma)
-        glUniform1f(glGetUniformLocation(self.shader_program, "uBeta"), beta)
+        glUniform2f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y)
+        glUniform1f(self.get_uniform_loc("uGamma"), gamma)
+        glUniform1f(self.get_uniform_loc("uBeta"), beta)
 
         # Draw fullscreen quad
         draw_quad()

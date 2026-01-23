@@ -26,7 +26,7 @@ class ObstacleOffset(Shader):
         # Bind texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uObstacle"), 0)
+        glUniform1i(self.get_uniform_loc("uObstacle"), 0)
 
         # Draw fullscreen quad
         draw_quad()

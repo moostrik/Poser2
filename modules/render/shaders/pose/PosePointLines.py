@@ -26,13 +26,13 @@ class PosePointLines(Shader):
         glUseProgram(self.shader_program)
 
         # Configure shader uniforms
-        glUniform1f(glGetUniformLocation(self.shader_program, "line_width"), line_width)
-        glUniform1f(glGetUniformLocation(self.shader_program, "line_smooth"), line_smooth)
+        glUniform1f(self.get_uniform_loc("line_width"), line_width)
+        glUniform1f(self.get_uniform_loc("line_smooth"), line_smooth)
         if color is not None:
-            glUniform4f(glGetUniformLocation(self.shader_program, "line_color"), *color)
+            glUniform4f(self.get_uniform_loc("line_color"), *color)
         else:
-            glUniform4f(glGetUniformLocation(self.shader_program, "line_color"), -1.0, -1.0, -1.0, -1.0)
-        glUniform4fv(glGetUniformLocation(self.shader_program, "points"), n_points, packed_data.flatten())
+            glUniform4f(self.get_uniform_loc("line_color"), -1.0, -1.0, -1.0, -1.0)
+        glUniform4fv(self.get_uniform_loc("points"), n_points, packed_data.flatten())
 
         # Render
         draw_quad()

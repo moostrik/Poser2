@@ -34,11 +34,11 @@ class StreamCorrelation(Shader):
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
         # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(self.shader_program, "sample_step"), 1.0 / num_samples)
-        glUniform1i(glGetUniformLocation(self.shader_program, "num_streams"), num_streams)
-        glUniform1f(glGetUniformLocation(self.shader_program, "stream_step"), 1.0 / num_streams)
-        glUniform1f(glGetUniformLocation(self.shader_program, "line_width"), line_width)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1f(self.get_uniform_loc("sample_step"), 1.0 / num_samples)
+        glUniform1i(self.get_uniform_loc("num_streams"), num_streams)
+        glUniform1f(self.get_uniform_loc("stream_step"), 1.0 / num_streams)
+        glUniform1f(self.get_uniform_loc("line_width"), line_width)
 
         # Render
         draw_quad()

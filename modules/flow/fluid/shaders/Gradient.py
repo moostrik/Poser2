@@ -34,24 +34,24 @@ class Gradient(Shader):
         # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uVelocity"), 0)
+        glUniform1i(self.get_uniform_loc("uVelocity"), 0)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, pressure.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uPressure"), 1)
+        glUniform1i(self.get_uniform_loc("uPressure"), 1)
 
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uObstacle"), 2)
+        glUniform1i(self.get_uniform_loc("uObstacle"), 2)
 
         glActiveTexture(GL_TEXTURE3)
         glBindTexture(GL_TEXTURE_2D, obstacle_offset.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uObstacleOffset"), 3)
+        glUniform1i(self.get_uniform_loc("uObstacleOffset"), 3)
 
         # Set uniforms (aspect-corrected grid scales)
         half_rdx_x = 0.5 / grid_scale
         half_rdx_y = (0.5 / grid_scale) / aspect
-        glUniform2f(glGetUniformLocation(self.shader_program, "uHalfRdxInv"), half_rdx_x, half_rdx_y)
+        glUniform2f(self.get_uniform_loc("uHalfRdxInv"), half_rdx_x, half_rdx_y)
 
         draw_quad()
 

@@ -41,16 +41,12 @@ class GaussianBlur(Shader):
         # Bind texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, source_texture.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
 
-        # Set uniforms
-        glUniform1f(glGetUniformLocation(self.shader_program, "radius"), radius)
-        glUniform1i(glGetUniformLocation(self.shader_program, "horizontal"), 1 if horizontal else 0)
-        glUniform2f(
-            glGetUniformLocation(self.shader_program, "resolution"),
-            float(source_texture.width),
-            float(source_texture.height)
-        )
+        # Set uniforms (using cached locations)
+        glUniform1f(self.get_uniform_loc("radius"), radius)
+        glUniform1i(self.get_uniform_loc("horizontal"), 1 if horizontal else 0)
+        glUniform2f(self.get_uniform_loc("resolution"), float(source_texture.width), float(source_texture.height))
 
         draw_quad()
 

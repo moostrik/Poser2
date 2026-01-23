@@ -18,11 +18,11 @@ class DenseFlowFilter(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(self.shader_program, "scale"), scale)
-        glUniform1f(glGetUniformLocation(self.shader_program, "gamma"), gamma)
-        glUniform1f(glGetUniformLocation(self.shader_program, "noiseThreshold"), noise_threshold)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1f(self.get_uniform_loc("scale"), scale)
+        glUniform1f(self.get_uniform_loc("gamma"), gamma)
+        glUniform1f(self.get_uniform_loc("noiseThreshold"), noise_threshold)
 
         # Render
         draw_quad()

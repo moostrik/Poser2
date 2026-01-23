@@ -42,11 +42,11 @@ class RStream(Shader):
         glUseProgram(self.shader_program)
 
         # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "correlationTexture"), 0)
-        glUniform3f(glGetUniformLocation(self.shader_program, "lineColor"), *line_color)
-        glUniform1f(glGetUniformLocation(self.shader_program, "lineWidth"), line_width)
-        glUniform1i(glGetUniformLocation(self.shader_program, "pairIndex"), pair_index)
-        glUniform1i(glGetUniformLocation(self.shader_program, "totalPairs"), total_pairs)
+        glUniform1i(self.get_uniform_loc("correlationTexture"), 0)
+        glUniform3f(self.get_uniform_loc("lineColor"), *line_color)
+        glUniform1f(self.get_uniform_loc("lineWidth"), line_width)
+        glUniform1i(self.get_uniform_loc("pairIndex"), pair_index)
+        glUniform1i(self.get_uniform_loc("totalPairs"), total_pairs)
 
         # Render
         draw_quad()

@@ -19,12 +19,12 @@ class DrawRoi(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform4f(glGetUniformLocation(self.shader_program, "roi"), roi.x, roi.y, roi.width, roi.height)
-        glUniform1f(glGetUniformLocation(self.shader_program, "rotation"), rotation_radians)
-        glUniform2f(glGetUniformLocation(self.shader_program, "rotationCenter"), *rotation_center_texture_space)
-        glUniform1f(glGetUniformLocation(self.shader_program, "aspectRatio"), texture_aspect)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform4f(self.get_uniform_loc("roi"), roi.x, roi.y, roi.width, roi.height)
+        glUniform1f(self.get_uniform_loc("rotation"), rotation_radians)
+        glUniform2f(self.get_uniform_loc("rotationCenter"), *rotation_center_texture_space)
+        glUniform1f(self.get_uniform_loc("aspectRatio"), texture_aspect)
 
         # Render
         draw_quad()

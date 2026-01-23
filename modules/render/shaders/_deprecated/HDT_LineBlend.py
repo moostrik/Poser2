@@ -20,13 +20,13 @@ class HDT_LineBlend(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, line_tex.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "line_tex"), 1)
-        glUniform4f(glGetUniformLocation(self.shader_program, "target_color"), *color)
-        glUniform1f(glGetUniformLocation(self.shader_program, "visibility"), visibility)
-        glUniform1f(glGetUniformLocation(self.shader_program, "param0"), param0)
-        glUniform1f(glGetUniformLocation(self.shader_program, "param1"), param1)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1i(self.get_uniform_loc("line_tex"), 1)
+        glUniform4f(self.get_uniform_loc("target_color"), *color)
+        glUniform1f(self.get_uniform_loc("visibility"), visibility)
+        glUniform1f(self.get_uniform_loc("param0"), param0)
+        glUniform1f(self.get_uniform_loc("param1"), param1)
 
         # Render
         draw_quad()

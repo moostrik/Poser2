@@ -24,11 +24,11 @@ class MaskBlur(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform2f(glGetUniformLocation(self.shader_program, "direction"), direction[0], direction[1])
-        glUniform2f(glGetUniformLocation(self.shader_program, "texelSize"), texel_size[0], texel_size[1])
-        glUniform1f(glGetUniformLocation(self.shader_program, "blurRadius"), radius)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform2f(self.get_uniform_loc("direction"), direction[0], direction[1])
+        glUniform2f(self.get_uniform_loc("texelSize"), texel_size[0], texel_size[1])
+        glUniform1f(self.get_uniform_loc("blurRadius"), radius)
 
         # Render
         draw_quad()

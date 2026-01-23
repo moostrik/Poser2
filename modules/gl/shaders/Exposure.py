@@ -18,11 +18,11 @@ class Exposure(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(self.shader_program, "exposure"), exposure)
-        glUniform1f(glGetUniformLocation(self.shader_program, "offset"), offset)
-        glUniform1f(glGetUniformLocation(self.shader_program, "gamma"), gamma)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1f(self.get_uniform_loc("exposure"), exposure)
+        glUniform1f(self.get_uniform_loc("offset"), offset)
+        glUniform1f(self.get_uniform_loc("gamma"), gamma)
 
         # Render
         draw_quad()

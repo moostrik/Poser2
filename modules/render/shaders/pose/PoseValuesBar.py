@@ -19,11 +19,11 @@ class PoseValuesBar(Shader):
         glUseProgram(self.shader_program)
 
         # Configure shader uniforms
-        glUniform1fv(glGetUniformLocation(self.shader_program, "values"), len(values), values)
-        glUniform4fv(glGetUniformLocation(self.shader_program, "colors"), len(colors_flat), colors_flat.flatten())
-        glUniform1i(glGetUniformLocation(self.shader_program, "num_values"), len(values))
-        glUniform1f(glGetUniformLocation(self.shader_program, "line_thickness"), line_thickness)
-        glUniform1f(glGetUniformLocation(self.shader_program, "line_smooth"), line_smooth)
+        glUniform1fv(self.get_uniform_loc("values"), len(values), values)
+        glUniform4fv(self.get_uniform_loc("colors"), len(colors_flat), colors_flat.flatten())
+        glUniform1i(self.get_uniform_loc("num_values"), len(values))
+        glUniform1f(self.get_uniform_loc("line_thickness"), line_thickness)
+        glUniform1f(self.get_uniform_loc("line_smooth"), line_smooth)
 
         # Render
         draw_quad()

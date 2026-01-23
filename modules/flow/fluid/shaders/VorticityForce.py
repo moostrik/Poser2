@@ -29,11 +29,11 @@ class VorticityForce(Shader):
         # Bind texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, curl.tex_id)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uCurl"), 0)
+        glUniform1i(self.get_uniform_loc("uCurl"), 0)
 
         # Set uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "uHalfRdxInv"), half_rdx_x, half_rdx_y)
-        glUniform1f(glGetUniformLocation(self.shader_program, "uTimestep"), timestep)
+        glUniform2f(self.get_uniform_loc("uHalfRdxInv"), half_rdx_x, half_rdx_y)
+        glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
 
         # Draw fullscreen quad
         draw_quad()

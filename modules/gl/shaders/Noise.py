@@ -12,8 +12,8 @@ class Noise(Shader):
         # Activate shader program
         glUseProgram(self.shader_program)
 
-        # Configure shader uniforms
-        glUniform1f(glGetUniformLocation(self.shader_program, "random"), random())
+        # Configure shader uniforms (using cached locations)
+        glUniform1f(self.get_uniform_loc("random"), random())
 
         # Render
         draw_quad()

@@ -35,9 +35,9 @@ class TemperatureBridge(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, mask.tex_id)
 
-        glUniform1i(glGetUniformLocation(self.shader_program, "uColor"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "uMask"), 1)
-        glUniform1f(glGetUniformLocation(self.shader_program, "uScale"), scale)
+        glUniform1i(self.get_uniform_loc("uColor"), 0)
+        glUniform1i(self.get_uniform_loc("uMask"), 1)
+        glUniform1f(self.get_uniform_loc("uScale"), scale)
 
         # Draw
         draw_quad()

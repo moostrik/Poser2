@@ -19,8 +19,8 @@ class WS_Lines(Shader):
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
         # Configure shader uniforms
-        glUniform2f(glGetUniformLocation(self.shader_program, "resolution"), float(fbo.width), float(fbo.height))
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
+        glUniform2f(self.get_uniform_loc("resolution"), float(fbo.width), float(fbo.height))
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
 
         # Render
         draw_quad()

@@ -43,18 +43,18 @@ class OpticalFlowMM(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, prev_tex.tex_id)
 
-        # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
+        # Configure shader uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1i(self.get_uniform_loc("tex1"), 1)
 
         # Convert pixel offset to normalized coordinates
         offset_x = float(offset) / curr_tex.width
         offset_y = float(offset) / curr_tex.height
-        glUniform2f(glGetUniformLocation(self.shader_program, "offset"), offset_x, offset_y)
+        glUniform2f(self.get_uniform_loc("offset"), offset_x, offset_y)
 
-        glUniform1f(glGetUniformLocation(self.shader_program, "threshold"), threshold)
-        glUniform2f(glGetUniformLocation(self.shader_program, "force"), strength_x, strength_y)
-        glUniform1f(glGetUniformLocation(self.shader_program, "power"), power)
+        glUniform1f(self.get_uniform_loc("threshold"), threshold)
+        glUniform2f(self.get_uniform_loc("force"), strength_x, strength_y)
+        glUniform1f(self.get_uniform_loc("power"), power)
 
         # Render
         draw_quad()

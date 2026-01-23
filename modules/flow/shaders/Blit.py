@@ -31,8 +31,8 @@ class Blit(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, tex.tex_id)
 
-        # Configure shader uniform
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex"), 0)
+        # Configure shader uniform (using cached location)
+        glUniform1i(self.get_uniform_loc("tex"), 0)
 
         # Render
         draw_quad()

@@ -35,11 +35,11 @@ class HSV(Shader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, source.tex_id)
 
-        # Set uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1f(glGetUniformLocation(self.shader_program, "hue"), hue)
-        glUniform1f(glGetUniformLocation(self.shader_program, "saturation"), saturation)
-        glUniform1f(glGetUniformLocation(self.shader_program, "value"), value)
+        # Set uniforms (using cached locations)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1f(self.get_uniform_loc("hue"), hue)
+        glUniform1f(self.get_uniform_loc("saturation"), saturation)
+        glUniform1f(self.get_uniform_loc("value"), value)
 
         draw_quad()
 

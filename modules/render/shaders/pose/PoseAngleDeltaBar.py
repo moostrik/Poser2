@@ -21,16 +21,16 @@ class PoseAngleDeltaBar(Shader):
         glUseProgram(self.shader_program)
 
         # Configure shader uniforms
-        glUniform1fv(glGetUniformLocation(self.shader_program, "angles"), len(angle_values), angle_values)
-        glUniform1fv(glGetUniformLocation(self.shader_program, "deltas"), len(delta_values), delta_values)
-        glUniform1fv(glGetUniformLocation(self.shader_program, "scores"), len(score_values), score_values)
-        glUniform1i(glGetUniformLocation(self.shader_program, "num_joints"), len(angles))
-        glUniform1f(glGetUniformLocation(self.shader_program, "value_min"), angles.range()[0])
-        glUniform1f(glGetUniformLocation(self.shader_program, "value_max"), angles.range()[1])
-        glUniform1f(glGetUniformLocation(self.shader_program, "line_thickness"), line_thickness)
-        glUniform1f(glGetUniformLocation(self.shader_program, "line_smooth"), line_smooth)
-        glUniform4f(glGetUniformLocation(self.shader_program, "color_odd"), *color_odd)
-        glUniform4f(glGetUniformLocation(self.shader_program, "color_even"), *color_even)
+        glUniform1fv(self.get_uniform_loc("angles"), len(angle_values), angle_values)
+        glUniform1fv(self.get_uniform_loc("deltas"), len(delta_values), delta_values)
+        glUniform1fv(self.get_uniform_loc("scores"), len(score_values), score_values)
+        glUniform1i(self.get_uniform_loc("num_joints"), len(angles))
+        glUniform1f(self.get_uniform_loc("value_min"), angles.range()[0])
+        glUniform1f(self.get_uniform_loc("value_max"), angles.range()[1])
+        glUniform1f(self.get_uniform_loc("line_thickness"), line_thickness)
+        glUniform1f(self.get_uniform_loc("line_smooth"), line_smooth)
+        glUniform4f(self.get_uniform_loc("color_odd"), *color_odd)
+        glUniform4f(self.get_uniform_loc("color_even"), *color_even)
 
         # Render
         draw_quad()

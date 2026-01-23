@@ -25,12 +25,12 @@ class HD_Sync(Shader):
         glBindTexture(GL_TEXTURE_2D, noise.tex_id)
 
         # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex0"), 0)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex1"), 1)
-        glUniform1i(glGetUniformLocation(self.shader_program, "tex2"), 2)
-        glUniform1i(glGetUniformLocation(self.shader_program, "noise"), 3)
-        glUniform1f(glGetUniformLocation(self.shader_program, "blend1"), blend1)
-        glUniform1f(glGetUniformLocation(self.shader_program, "blend2"), blend2)
+        glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform1i(self.get_uniform_loc("tex1"), 1)
+        glUniform1i(self.get_uniform_loc("tex2"), 2)
+        glUniform1i(self.get_uniform_loc("noise"), 3)
+        glUniform1f(self.get_uniform_loc("blend1"), blend1)
+        glUniform1f(self.get_uniform_loc("blend2"), blend2)
 
         # Render
         draw_quad()

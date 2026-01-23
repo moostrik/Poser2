@@ -26,10 +26,10 @@ class PosePointDots(Shader):
         glUseProgram(self.shader_program)
 
         # Configure shader uniforms
-        glUniform1i(glGetUniformLocation(self.shader_program, "num_points"), n_points)
-        glUniform1f(glGetUniformLocation(self.shader_program, "dot_size"), dot_size)
-        glUniform1f(glGetUniformLocation(self.shader_program, "dot_smooth"), dot_smooth)
-        glUniform4fv(glGetUniformLocation(self.shader_program, "points"), n_points, packed_data.flatten())
+        glUniform1i(self.get_uniform_loc("num_points"), n_points)
+        glUniform1f(self.get_uniform_loc("dot_size"), dot_size)
+        glUniform1f(self.get_uniform_loc("dot_smooth"), dot_smooth)
+        glUniform4fv(self.get_uniform_loc("points"), n_points, packed_data.flatten())
 
         # Render
         draw_quad()
