@@ -144,8 +144,8 @@ class FluidFlow(FlowBase):
         self.config: FluidFlowConfig = config or FluidFlowConfig()
 
         # Define formats for FlowBase
-        self._input_internal_format = GL_RG32F     # Velocity (inherited as _input_fbo)
-        self._output_internal_format = GL_RGBA32F  # Density (inherited as _output_fbo)
+        self._input_internal_format = GL_RG16F     # Velocity (inherited as _input_fbo)
+        self._output_internal_format = GL_RGBA16F  # Density (inherited as _output_fbo)
 
         # Additional simulation fields (SwapFbo for ping-pong)
         self._temperature_fbo: SwapFbo = SwapFbo()

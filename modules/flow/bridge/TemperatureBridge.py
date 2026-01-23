@@ -61,8 +61,8 @@ class TemperatureBridge(FlowBase):
         self.config: TemperatureBridgeConfig = config or TemperatureBridgeConfig()
 
         # Define internal formats
-        self._input_internal_format = GL_RGB32F   # RGB color interpretation
-        self._output_internal_format = GL_R32F    # R32F temperature output
+        self._input_internal_format = GL_RGB16F   # RGB color interpretation
+        self._output_internal_format = GL_R16F    # R16F temperature output
 
         # Mask storage
         self._mask_fbo: SwapFbo = SwapFbo()

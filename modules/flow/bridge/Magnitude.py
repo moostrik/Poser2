@@ -25,7 +25,7 @@ class Magnitude(FlowBase):
         Extract magnitude → output_fbo (R32F)
     """
 
-    def __init__(self, input_format: int = GL_RGBA32F) -> None:
+    def __init__(self, input_format: int = GL_RGBA16F) -> None:
         super().__init__()
 
         # Define internal formats (input configurable, output always R32F)

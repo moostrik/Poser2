@@ -51,7 +51,7 @@ class OpticalFlow(FlowBase):
 
         # Define internal formats
         self._input_internal_format = GL_R8      # Luminance input (current/previous frames)
-        self._output_internal_format = GL_RG32F  # Velocity output
+        self._output_internal_format = GL_RG16F  # Velocity output
 
         # Configuration with change notification
         self.config: OpticalFlowConfig = config or OpticalFlowConfig()

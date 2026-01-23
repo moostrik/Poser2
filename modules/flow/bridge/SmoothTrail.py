@@ -60,13 +60,8 @@ class SmoothTrail(FlowBase):
         - output_fbo: Stores smoothed output
     """
 
-    def __init__(self, format: int = GL_RGBA32F, config: SmoothTrailConfig | None = None) -> None:
-        """Initialize trail processor.
-
-        Args:
-            format: Texture format (GL_RG32F, GL_RGB32F, GL_RGBA32F)
-            config: Optional configuration
-        """
+    def __init__(self, format: int = GL_RGBA16F, config: SmoothTrailConfig | None = None) -> None:
+        """Initialize trail processor."""
         super().__init__()
 
         # Define formats
@@ -165,7 +160,7 @@ class VelocitySmoothTrail(SmoothTrail):
             scale: Velocity scale (converts optical flow to simulation velocity)
             config: Optional trail configuration
         """
-        super().__init__(GL_RG32F, config)
+        super().__init__(GL_RG16F, config)
 
     # Convenience aliases for velocity-specific usage
     @property

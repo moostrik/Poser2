@@ -55,8 +55,8 @@ class DensityBridge(FlowBase):
         self.config: DensityBridgeConfig = config or DensityBridgeConfig()
 
         # Define internal formats
-        self._input_internal_format = GL_RGBA32F   # RGB density input
-        self._output_internal_format = GL_RGBA32F  # RGBA density output
+        self._input_internal_format = GL_RGBA16F   # RGB density input
+        self._output_internal_format = GL_RGBA16F  # RGBA density output
 
         # Velocity storage
         self._velocity_fbo: SwapFbo = SwapFbo()
