@@ -92,7 +92,7 @@ class FlowConfig:
     fps: float = 60.0
     draw_mode: FlowDrawMode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
     field_mode: bool = False  # False=scalar/direction, True=arrow field
-    simulation_scale: float = 0.25
+    simulation_scale: float = 0.125
 
     visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)
     optical_flow: OpticalFlowConfig = field(default_factory=OpticalFlowConfig)
@@ -180,7 +180,7 @@ class FlowLayer(LayerBase):
         self._temperature_bridge.allocate(sim_width, sim_height)
 
         # Fluid simulation: low-res simulation, high-res density output
-        self._fluid_flow.allocate(width, height)
+        self._fluid_flow.allocate(width, height, width*2, height*2)
 
         self._visualizer.allocate(width, height)
 
@@ -227,10 +227,10 @@ class FlowLayer(LayerBase):
         self.config.fluid_velocity_scale = 1.0
 
 
-        self.config.fluid_flow.vel_speed = 1.0
+        self.config.fluid_flow.vel_speed = 0.9
         self.config.fluid_flow.vel_decay = 6.0
-        self.config.fluid_flow.vel_vorticity = 0.0
-        self.config.fluid_flow.vel_vorticity_radius = 5.0
+        self.config.fluid_flow.vel_vorticity = 5.0
+        self.config.fluid_flow.vel_vorticity_radius = 20.0
         self.config.fluid_flow.vel_viscosity = 10
         self.config.fluid_flow.vel_viscosity_iter = 20
 

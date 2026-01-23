@@ -419,11 +419,12 @@ class FluidFlow(FlowBase):
                 self._input_fbo.end()
 
         # ===== STEP 4: VELOCITY VORTICITY CONFINEMENT =====
-        if self.config.vel_vorticity > 0.0:
+        if self.config.vel_vorticity > 0.0 and self.config.vel_vorticity_radius > 0.0:
             self._vorticity_curl_shader.reload()
             self._vorticity_force_shader.reload()
 
-            vorticity_force: float = (self.config.vel_vorticity * delta_time) * self.config.vel_vorticity_radius
+            vorticity_radius: float = self.config.vel_vorticity_radius * self._simulation_scale
+            vorticity_force: float = (self.config.vel_vorticity * delta_time)
 
             # 4a. Compute vorticity curl
             self._vorticity_curl_fbo.begin()
@@ -432,7 +433,7 @@ class FluidFlow(FlowBase):
                 self._obstacle_fbo.texture,
                 self._simulation_scale,
                 self._aspect,
-                self.config.vel_vorticity_radius
+                vorticity_radius
             )
             self._vorticity_curl_fbo.end()
 
