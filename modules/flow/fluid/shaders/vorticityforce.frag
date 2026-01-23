@@ -27,14 +27,14 @@ void main() {
 
     // Compute gradient of curl magnitude (aspect-corrected)
     // X: vertical difference (cT - cB), Y: horizontal difference (cR - cL)
-    vec2 dw = vec2(uHalfRdxInv.x * (cT - cB), uHalfRdxInv.y * (cR - cL));
+    vec2 dw = vec2(uHalfRdxInv.x * (cR - cL), uHalfRdxInv.y * (cT - cB));
 
     // Normalize gradient (add epsilon to avoid division by zero)
     dw = normalize(dw + 0.000001);
 
     // Flip X and negate Y for vorticity confinement direction
-    dw *= vec2(-1.0, 1.0);
+    vec2 force = vec2(dw.y, -dw.x);
 
     // Vorticity confinement force: direction * curl * timestep
-    fragColor = dw * cC * uTimestep;
+    fragColor = force * cC * uTimestep;
 }

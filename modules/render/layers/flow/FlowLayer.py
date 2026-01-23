@@ -229,7 +229,8 @@ class FlowLayer(LayerBase):
 
         self.config.fluid_flow.vel_speed = 1.0
         self.config.fluid_flow.vel_decay = 60.0
-        self.config.fluid_flow.vel_vorticity = 0
+        self.config.fluid_flow.vel_vorticity = 2.0
+        self.config.fluid_flow.vel_vorticity_radius = 10.0
         self.config.fluid_flow.vel_viscosity = 0
         self.config.fluid_flow.vel_viscosity_iter = 20
 

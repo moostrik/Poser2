@@ -40,8 +40,13 @@ class FluidFlowConfig(FlowConfigBase):
     )
     vel_vorticity: float = field(
         default=0.0,
-        metadata={"min": 0.0, "max": 10.0, "label": "Vorticity",
+        metadata={"min": 0.0, "max": 60.0, "label": "Vorticity",
                   "description": "Vortex confinement strength (adds turbulence)"}
+    )
+    vel_vorticity_radius: float = field(
+        default=1.0,
+        metadata={"min": 1.0, "max":30.0, "label": "Vorticity Radius",
+                  "description": "Curl sampling radius in texels (larger = bigger swirls)"}
     )
     vel_viscosity: float = field(
         default=0.0,
@@ -370,7 +375,6 @@ class FluidFlow(FlowBase):
 
         self._output_fbo.swap()
         self._output_fbo.begin()
-        self._advect_shader.reload()
         self._advect_shader.use(
             self._output_fbo.back_texture,  # Source density
             self._input_fbo.texture,        # Velocity
@@ -414,7 +418,10 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 4: VELOCITY VORTICITY CONFINEMENT =====
         if self.config.vel_vorticity > 0.0:
-            vorticity_step: float = self.config.vel_vorticity
+            self._vorticity_curl_shader.reload()
+            self._vorticity_force_shader.reload()
+
+            vorticity_force: float = (self.config.vel_vorticity * delta_time) * self.config.vel_vorticity_radius
 
             # 4a. Compute vorticity curl
             self._vorticity_curl_fbo.begin()
@@ -422,7 +429,8 @@ class FluidFlow(FlowBase):
                 self._input_fbo.texture,
                 self._obstacle_fbo.texture,
                 self._simulation_scale,
-                self._aspect
+                self._aspect,
+                self.config.vel_vorticity_radius
             )
             self._vorticity_curl_fbo.end()
 
@@ -432,7 +440,7 @@ class FluidFlow(FlowBase):
                 self._vorticity_curl_fbo.texture,
                 self._simulation_scale,
                 self._aspect,
-                vorticity_step
+                vorticity_force
             )
             self._vorticity_force_fbo.end()
 

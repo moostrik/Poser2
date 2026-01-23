@@ -21,7 +21,7 @@ class VorticityForce(Shader):
             timestep: Vorticity timestep (controls turbulence strength)
         """
         half_rdx_x = 0.5 / grid_scale
-        half_rdx_y = (0.5 / grid_scale) * aspect
+        half_rdx_y = (0.5 / grid_scale) / aspect
 
         # Bind shader program
         glUseProgram(self.shader_program)

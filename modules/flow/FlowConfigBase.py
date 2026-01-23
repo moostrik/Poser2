@@ -37,17 +37,17 @@ class FlowConfigBase:
             return
 
         # Clamp based on field metadata
-        try:
-            for f in fields(self):
-                if f.name == name and f.metadata:
-                    min_val = f.metadata.get("min")
-                    max_val = f.metadata.get("max")
-                    if min_val is not None and max_val is not None:
-                        value = max(min_val, min(max_val, value))
-                    break
-        except TypeError:
-            # fields() fails if class not fully initialized
-            pass
+        # try:
+        #     for f in fields(self):
+        #         if f.name == name and f.metadata:
+        #             min_val = f.metadata.get("min")
+        #             max_val = f.metadata.get("max")
+        #             if min_val is not None and max_val is not None:
+        #                 value = max(min_val, min(max_val, value))
+        #             break
+        # except TypeError:
+        #     # fields() fails if class not fully initialized
+        #     pass
 
         object.__setattr__(self, name, value)
 
