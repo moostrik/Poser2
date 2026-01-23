@@ -238,8 +238,8 @@ class FlowLayer(LayerBase):
         self.config.fluid_flow.den_decay = 6.0
         self.config.fluid_flow.tmp_speed = 0.33
         self.config.fluid_flow.tmp_decay = 3.0
-        self.config.fluid_flow.prs_speed = 0.33
-        self.config.fluid_flow.prs_decay = 0.1
+        self.config.fluid_flow.prs_speed = 0.0
+        self.config.fluid_flow.prs_decay = 0.0
         self.config.fluid_flow.prs_iterations = 40
 
         self.config.fluid_flow.tmp_buoyancy = 0.0

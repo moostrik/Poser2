@@ -1,6 +1,7 @@
 
 from .RenderBase import RenderBase
 from .Shader import Shader
+from .ComputeShader import ComputeShader
 from .WindowManager import WindowManager
 from . import View
 from . import Style

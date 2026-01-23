@@ -16,7 +16,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, SwapFbo, Fbo
 from .. import FlowBase, FlowConfigBase, FlowUtil
 from .shaders import (
-    Advect, Divergence, Gradient, JacobiPressure, JacobiDiffusion,
+    Advect, Divergence, Gradient, JacobiPressure, JacobiPressureCompute, JacobiDiffusion,
     VorticityCurl, VorticityForce, Buoyancy, ObstacleOffset, AddBoolean
 )
 
@@ -172,7 +172,11 @@ class FluidFlow(FlowBase):
         self._divergence_shader: Divergence = Divergence()
         self._gradient_shader: Gradient = Gradient()
         self._jacobi_pressure_shader: JacobiPressure = JacobiPressure()
+        self._jacobi_pressure_compute: JacobiPressureCompute = JacobiPressureCompute()
         self._jacobi_diffusion_shader: JacobiDiffusion = JacobiDiffusion()
+
+        # Use compute shader for pressure solver (faster)
+        self._use_compute_pressure: bool = True
         self._vorticity_curl_shader: VorticityCurl = VorticityCurl()
         self._vorticity_force_shader: VorticityForce = VorticityForce()
         self._buoyancy_shader: Buoyancy = Buoyancy()
@@ -280,6 +284,7 @@ class FluidFlow(FlowBase):
         self._divergence_shader.allocate()
         self._gradient_shader.allocate()
         self._jacobi_pressure_shader.allocate()
+        self._jacobi_pressure_compute.allocate()
         self._jacobi_diffusion_shader.allocate()
         self._vorticity_curl_shader.allocate()
         self._vorticity_force_shader.allocate()
@@ -306,6 +311,7 @@ class FluidFlow(FlowBase):
         self._divergence_shader.deallocate()
         self._gradient_shader.deallocate()
         self._jacobi_pressure_shader.deallocate()
+        self._jacobi_pressure_compute.deallocate()
         self._jacobi_diffusion_shader.deallocate()
         self._vorticity_curl_shader.deallocate()
         self._vorticity_force_shader.deallocate()
@@ -523,19 +529,39 @@ class FluidFlow(FlowBase):
         )
         self._divergence_fbo.end()
 
+        self._use_compute_pressure = True
+
         # 8b. Solve Poisson equation for pressure (Jacobi iterations)
-        for _ in range(self.config.prs_iterations):
-            self._pressure_fbo.swap()
-            self._pressure_fbo.begin()
-            self._jacobi_pressure_shader.use(
+        if self._use_compute_pressure:
+            # Compute shader: multi-iteration with automatic ping-pong
+            result = self._jacobi_pressure_compute.solve(
+                self._pressure_fbo.texture,
                 self._pressure_fbo.back_texture,
                 self._divergence_fbo.texture,
                 self._obstacle_fbo.texture,
                 self._obstacle_offset_fbo.texture,
                 self._simulation_scale,
-                self._aspect
+                self._aspect,
+                total_iterations=self.config.prs_iterations,
+                iterations_per_dispatch=5
             )
-            self._pressure_fbo.end()
+            # Ensure the correct buffer is active after solve
+            if result != self._pressure_fbo.texture:
+                self._pressure_fbo.swap()
+        else:
+            # Fragment shader fallback: one iteration per FBO swap
+            for _ in range(self.config.prs_iterations):
+                self._pressure_fbo.swap()
+                self._pressure_fbo.begin()
+                self._jacobi_pressure_shader.use(
+                    self._pressure_fbo.back_texture,
+                    self._divergence_fbo.texture,
+                    self._obstacle_fbo.texture,
+                    self._obstacle_offset_fbo.texture,
+                    self._simulation_scale,
+                    self._aspect
+                )
+                self._pressure_fbo.end()
 
         # 8c. Subtract pressure gradient from velocity
         self._input_fbo.swap()
