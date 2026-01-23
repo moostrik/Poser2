@@ -403,7 +403,8 @@ class FluidFlow(FlowBase):
 
         # ===== STEP 3: VELOCITY DIFFUSE (viscosity) =====
         if self.config.vel_viscosity > 0.0:
-            viscosity_step: float = self.config.vel_viscosity * delta_time
+            # Scale viscosity by simulation_scale² for resolution independence
+            viscosity_dt: float = self.config.vel_viscosity * (self._simulation_scale ** 2) * delta_time
             for _ in range(self.config.vel_viscosity_iter):
                 self._input_fbo.swap()
                 self._input_fbo.begin()
@@ -412,7 +413,8 @@ class FluidFlow(FlowBase):
                     self._obstacle_fbo.texture,
                     self._obstacle_offset_fbo.texture,
                     self._simulation_scale,
-                    viscosity_step
+                    self._aspect,
+                    viscosity_dt
                 )
                 self._input_fbo.end()
 

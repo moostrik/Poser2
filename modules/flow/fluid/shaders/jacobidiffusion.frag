@@ -14,8 +14,9 @@ uniform sampler2D uObstacle;       // Obstacle mask (1.0 = obstacle, 0.0 = fluid
 uniform sampler2D uObstacleOffset; // Neighbor obstacle flags (RGBA)
 
 // Parameters
-uniform float uAlpha;  // -(gridScale^2) / timestep
-uniform float uBeta;   // 1 / (4 + alpha)
+uniform vec2 uAlpha;   // (1/dx², 1/dy²) Laplacian weights
+uniform float uGamma;  // 1/(ν·Δt) central coefficient
+uniform float uBeta;   // 1/(2*alpha_x + 2*alpha_y + gamma)
 
 void main() {
     vec2 st = texCoord;
@@ -41,6 +42,7 @@ void main() {
     xR = mix(xR, xC, oN.b);  // Right neighbor
     xL = mix(xL, xC, oN.a);  // Left neighbor
 
-    // Jacobi iteration for diffusion: (xL + xR + xB + xT + alpha * xC) * beta
-    fragColor = (xL + xR + xB + xT + uAlpha * xC) * uBeta;
+    // Jacobi iteration for anisotropic diffusion:
+    // (alpha_x*(xL + xR) + alpha_y*(xB + xT) + gamma*xC) * beta
+    fragColor = (uAlpha.x * (xL + xR) + uAlpha.y * (xB + xT) + uGamma * xC) * uBeta;
 }
