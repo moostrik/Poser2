@@ -6,6 +6,7 @@ from .Gradient import Gradient
 from .JacobiPressure import JacobiPressure
 from .JacobiPressureCompute import JacobiPressureCompute
 from .JacobiDiffusion import JacobiDiffusion
+from .JacobiDiffusionCompute import JacobiDiffusionCompute
 from .VorticityCurl import VorticityCurl
 from .VorticityForce import VorticityForce
 from .Buoyancy import Buoyancy
@@ -19,6 +20,7 @@ __all__ = [
     "JacobiPressure",
     "JacobiPressureCompute",
     "JacobiDiffusion",
+    "JacobiDiffusionCompute",
     "VorticityCurl",
     "VorticityForce",
     "Buoyancy",

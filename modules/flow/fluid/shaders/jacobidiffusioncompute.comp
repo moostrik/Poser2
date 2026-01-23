@@ -1,0 +1,158 @@
+#version 460 core
+
+/*
+ * JacobiDiffusionCompute - Multi-iteration diffusion solver using shared memory
+ *
+ * Performs multiple Jacobi iterations per dispatch using shared memory tiling.
+ * 16x16 workgroup with 1-pixel halo (18x18 shared memory) allows each iteration
+ * to read neighbors from fast shared memory instead of global texture memory.
+ *
+ * Solves diffusion equation for velocity viscosity:
+ * x^(k+1) = β * (αx*(xL + xR) + αy*(xB + xT) + γ*xC)
+ *
+ * where γ = 1/(ν·Δt) and β = 1/(2*αx + 2*αy + γ)
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Input textures (read via sampler for boundary handling)
+layout(binding = 0) uniform sampler2D uObstacle;        // Obstacle mask (R8/R32F)
+layout(binding = 1) uniform sampler2D uObstacleOffset;  // Neighbor obstacle info (RGBA8)
+
+// Velocity field - read/write via image (RG32F for velocity x,y)
+layout(rg32f, binding = 0) uniform image2D uVelocityIn;   // Previous velocity
+layout(rg32f, binding = 1) uniform image2D uVelocityOut;  // Output velocity
+
+// Solver parameters
+uniform vec2 uAlpha;      // Laplacian weights (1/dx², 1/dy²)
+uniform float uGamma;     // 1/(ν·Δt) central coefficient
+uniform float uBeta;      // 1 / (2*αx + 2*αy + γ)
+uniform int uIterations;  // Number of iterations to perform in this dispatch
+uniform ivec2 uSize;      // Texture dimensions
+
+// Shared memory tile: 16x16 interior + 1-pixel halo on each side = 18x18
+// We store velocity (x, y) for fast neighbor access
+shared vec2 s_velocity[18][18];
+
+// Helper to load velocity from input image with bounds checking
+vec2 loadVelocity(ivec2 coord) {
+    coord = clamp(coord, ivec2(0), uSize - 1);
+    return imageLoad(uVelocityIn, coord).rg;
+}
+
+// Helper to sample obstacle offset at pixel coords
+vec4 sampleObstacleOffset(ivec2 coord) {
+    vec2 uv = (vec2(coord) + 0.5) / vec2(uSize);
+    return texture(uObstacleOffset, uv);
+}
+
+// Helper to check if coord is obstacle
+bool isObstacle(ivec2 coord) {
+    vec2 uv = (vec2(coord) + 0.5) / vec2(uSize);
+    return texture(uObstacle, uv).r >= 0.99;
+}
+
+void main() {
+    // Global pixel coordinates
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+
+    // Local coordinates within workgroup (0-15)
+    ivec2 lid = ivec2(gl_LocalInvocationID.xy);
+
+    // Shared memory coordinates (+1 for halo offset)
+    ivec2 sid = lid + 1;
+
+    // Base coordinates of this workgroup's tile in global space
+    ivec2 tileBase = ivec2(gl_WorkGroupID.xy) * 16;
+
+    // Early exit check (but still participate in shared mem loads)
+    bool validPixel = all(lessThan(gid, uSize));
+
+    // Check if this pixel is an obstacle
+    bool obstacle = isObstacle(gid);
+
+    // Load obstacle offset for boundary conditions
+    vec4 obsOffset = sampleObstacleOffset(gid);
+
+    // ===== Initial shared memory load =====
+    // Each thread loads its center pixel
+    vec2 myVelocity = validPixel ? loadVelocity(gid) : vec2(0.0);
+    s_velocity[sid.y][sid.x] = myVelocity;
+
+    // Load halo pixels (threads on edges load extra pixels)
+    // Top halo (lid.y == 0 loads row above)
+    if (lid.y == 0) {
+        ivec2 haloCoord = tileBase + ivec2(lid.x, -1);
+        s_velocity[0][sid.x] = loadVelocity(haloCoord);
+    }
+    // Bottom halo (lid.y == 15 loads row below)
+    if (lid.y == 15) {
+        ivec2 haloCoord = tileBase + ivec2(lid.x, 16);
+        s_velocity[17][sid.x] = loadVelocity(haloCoord);
+    }
+    // Left halo (lid.x == 0 loads column left)
+    if (lid.x == 0) {
+        ivec2 haloCoord = tileBase + ivec2(-1, lid.y);
+        s_velocity[sid.y][0] = loadVelocity(haloCoord);
+    }
+    // Right halo (lid.x == 15 loads column right)
+    if (lid.x == 15) {
+        ivec2 haloCoord = tileBase + ivec2(16, lid.y);
+        s_velocity[sid.y][17] = loadVelocity(haloCoord);
+    }
+    // Corner halos
+    if (lid.x == 0 && lid.y == 0) {
+        s_velocity[0][0] = loadVelocity(tileBase + ivec2(-1, -1));
+    }
+    if (lid.x == 15 && lid.y == 0) {
+        s_velocity[0][17] = loadVelocity(tileBase + ivec2(16, -1));
+    }
+    if (lid.x == 0 && lid.y == 15) {
+        s_velocity[17][0] = loadVelocity(tileBase + ivec2(-1, 16));
+    }
+    if (lid.x == 15 && lid.y == 15) {
+        s_velocity[17][17] = loadVelocity(tileBase + ivec2(16, 16));
+    }
+
+    barrier();
+
+    // ===== Jacobi iterations in shared memory =====
+    vec2 newVelocity = myVelocity;
+
+    for (int iter = 0; iter < uIterations; iter++) {
+        if (validPixel && !obstacle) {
+            // Read neighbors from shared memory
+            vec2 vT = s_velocity[sid.y + 1][sid.x];  // Top
+            vec2 vB = s_velocity[sid.y - 1][sid.x];  // Bottom
+            vec2 vR = s_velocity[sid.y][sid.x + 1];  // Right
+            vec2 vL = s_velocity[sid.y][sid.x - 1];  // Left
+            vec2 vC = s_velocity[sid.y][sid.x];      // Center
+
+            // Apply Neumann boundary conditions (zero gradient at obstacles)
+            vT = mix(vT, vC, obsOffset.x);
+            vB = mix(vB, vC, obsOffset.y);
+            vR = mix(vR, vC, obsOffset.z);
+            vL = mix(vL, vC, obsOffset.w);
+
+            // Jacobi iteration for diffusion:
+            // x^(k+1) = β * (αx*(xL + xR) + αy*(xB + xT) + γ*xC)
+            newVelocity = uBeta * (uAlpha.x * (vL + vR) + uAlpha.y * (vB + vT) + uGamma * vC);
+        } else if (obstacle) {
+            newVelocity = vec2(0.0);
+        }
+
+        // Synchronize before updating shared memory
+        barrier();
+
+        // Update shared memory with new velocity
+        s_velocity[sid.y][sid.x] = newVelocity;
+
+        // Synchronize before next iteration reads
+        barrier();
+    }
+
+    // ===== Write final result =====
+    if (validPixel) {
+        imageStore(uVelocityOut, gid, vec4(newVelocity, 0.0, 0.0));
+    }
+}

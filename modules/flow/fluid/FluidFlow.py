@@ -16,7 +16,8 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, SwapFbo, Fbo
 from .. import FlowBase, FlowConfigBase, FlowUtil
 from .shaders import (
-    Advect, Divergence, Gradient, JacobiPressure, JacobiPressureCompute, JacobiDiffusion,
+    Advect, Divergence, Gradient, JacobiPressure, JacobiPressureCompute,
+    JacobiDiffusion, JacobiDiffusionCompute,
     VorticityCurl, VorticityForce, Buoyancy, ObstacleOffset, AddBoolean
 )
 
@@ -174,9 +175,11 @@ class FluidFlow(FlowBase):
         self._jacobi_pressure_shader: JacobiPressure = JacobiPressure()
         self._jacobi_pressure_compute: JacobiPressureCompute = JacobiPressureCompute()
         self._jacobi_diffusion_shader: JacobiDiffusion = JacobiDiffusion()
+        self._jacobi_diffusion_compute: JacobiDiffusionCompute = JacobiDiffusionCompute()
 
-        # Use compute shader for pressure solver (faster)
+        # Use compute shaders for iterative solvers (faster)
         self._use_compute_pressure: bool = True
+        self._use_compute_diffusion: bool = True
         self._vorticity_curl_shader: VorticityCurl = VorticityCurl()
         self._vorticity_force_shader: VorticityForce = VorticityForce()
         self._buoyancy_shader: Buoyancy = Buoyancy()
@@ -286,6 +289,7 @@ class FluidFlow(FlowBase):
         self._jacobi_pressure_shader.allocate()
         self._jacobi_pressure_compute.allocate()
         self._jacobi_diffusion_shader.allocate()
+        self._jacobi_diffusion_compute.allocate()
         self._vorticity_curl_shader.allocate()
         self._vorticity_force_shader.allocate()
         self._buoyancy_shader.allocate()
@@ -313,6 +317,7 @@ class FluidFlow(FlowBase):
         self._jacobi_pressure_shader.deallocate()
         self._jacobi_pressure_compute.deallocate()
         self._jacobi_diffusion_shader.deallocate()
+        self._jacobi_diffusion_compute.deallocate()
         self._vorticity_curl_shader.deallocate()
         self._vorticity_force_shader.deallocate()
         self._buoyancy_shader.deallocate()
@@ -411,18 +416,37 @@ class FluidFlow(FlowBase):
         if self.config.vel_viscosity > 0.0:
             # Scale viscosity by simulation_scale² for resolution independence
             viscosity_dt: float = self.config.vel_viscosity * (self._simulation_scale ** 2) * delta_time
-            for _ in range(self.config.vel_viscosity_iter):
-                self._input_fbo.swap()
-                self._input_fbo.begin()
-                self._jacobi_diffusion_shader.use(
+
+            if self._use_compute_diffusion:
+                # Compute shader: multi-iteration with automatic ping-pong
+                result = self._jacobi_diffusion_compute.solve(
+                    self._input_fbo.texture,
                     self._input_fbo.back_texture,
                     self._obstacle_fbo.texture,
                     self._obstacle_offset_fbo.texture,
                     self._simulation_scale,
                     self._aspect,
-                    viscosity_dt
+                    viscosity_dt,
+                    total_iterations=self.config.vel_viscosity_iter,
+                    iterations_per_dispatch=5
                 )
-                self._input_fbo.end()
+                # Ensure the correct buffer is active after solve
+                if result != self._input_fbo.texture:
+                    self._input_fbo.swap()
+            else:
+                # Fragment shader fallback: one iteration per FBO swap
+                for _ in range(self.config.vel_viscosity_iter):
+                    self._input_fbo.swap()
+                    self._input_fbo.begin()
+                    self._jacobi_diffusion_shader.use(
+                        self._input_fbo.back_texture,
+                        self._obstacle_fbo.texture,
+                        self._obstacle_offset_fbo.texture,
+                        self._simulation_scale,
+                        self._aspect,
+                        viscosity_dt
+                    )
+                    self._input_fbo.end()
 
         # ===== STEP 4: VELOCITY VORTICITY CONFINEMENT =====
         if self.config.vel_vorticity > 0.0 and self.config.vel_vorticity_radius > 0.0:
