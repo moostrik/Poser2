@@ -6,7 +6,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gl import Tensor, SwapFbo, Texture
+from modules.gl import Tensor, SwapFbo, Texture, Blit
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import MaskDilate
 
@@ -69,7 +69,7 @@ class MaskSourceLayer(LayerBase):
             glColor4f(1.0, 1.0, 1.0, 1.0)
 
             self._fbo.begin()
-            self._cuda_image.draw(0, 0, w, h)
+            Blit.use(self._cuda_image)
             self._fbo.end()
 
             for i in range(self.dilatations):

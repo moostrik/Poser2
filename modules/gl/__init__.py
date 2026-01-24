@@ -6,7 +6,7 @@ from .WindowManager import WindowManager
 from . import View
 from . import Style
 from . import shaders
-from .Utils import Blit, BlitRect, BlitRegion
+from .Utils import Blit, BlitRect, BlitRegion, viewport_rect
 
 # TEXTURE CLASSES
 from .Texture import Texture

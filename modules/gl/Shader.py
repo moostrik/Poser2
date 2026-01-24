@@ -29,37 +29,47 @@ def monitor_path(path, callback):
     observer.start()
     return observer
 
-# Global quad VAO/VBO - initialized once, reused by all shaders
-_quad_vao: int | None = None
-_quad_vbo: int | None = None
+# Global quad geometry - VAO and VBO are per-context (VAOs not shared between contexts)
+_quad_data: dict[int, tuple[int, int]] = {}  # context_id -> (VAO, VBO)
 
-def init_quad() -> None:
-    """Initialize the global quad VAO/VBO. Call once during setup."""
-    global _quad_vao, _quad_vbo
+def _get_context_id() -> int:
+    """Get a unique ID for the current OpenGL context using the raw pointer address."""
+    import glfw
+    import ctypes
+    ctx = glfw.get_current_context()
+    if ctx is None:
+        return 0
+    # Get the actual pointer address, not Python object id
+    return ctypes.cast(ctx, ctypes.c_void_p).value or 0
 
-    if _quad_vao is not None:
-        return  # Already initialized
+def _get_or_create_quad_vao() -> int:
+    """Get or create a VAO/VBO for the current context."""
+    global _quad_data
 
+    ctx_id = _get_context_id()
+
+    # Return existing VAO for this context
+    if ctx_id in _quad_data:
+        return _quad_data[ctx_id][0]
+
+    import numpy as np
     # Vertex data: position (x, y) + texcoord (u, v)
-    quad_vertices = [
+    quad_vertices = np.array([
         # x     y     u    v
         -1.0, -1.0,  0.0, 0.0,  # Bottom-left
          1.0, -1.0,  1.0, 0.0,  # Bottom-right
          1.0,  1.0,  1.0, 1.0,  # Top-right
         -1.0,  1.0,  0.0, 1.0,  # Top-left
-    ]
+    ], dtype=np.float32)
 
-    import numpy as np
-    vertices = np.array(quad_vertices, dtype=np.float32)
+    # Create VBO for this context
+    vbo = glGenBuffers(1)
+    glBindBuffer(GL_ARRAY_BUFFER, vbo)
+    glBufferData(GL_ARRAY_BUFFER, quad_vertices.nbytes, quad_vertices, GL_STATIC_DRAW)
 
-    # Generate and bind VAO
-    _quad_vao = glGenVertexArrays(1)
-    glBindVertexArray(_quad_vao)
-
-    # Generate and bind VBO
-    _quad_vbo = glGenBuffers(1)
-    glBindBuffer(GL_ARRAY_BUFFER, _quad_vbo)
-    glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+    # Create VAO for this context
+    vao = glGenVertexArrays(1)
+    glBindVertexArray(vao)
 
     # Position attribute (location 0)
     glEnableVertexAttribArray(0)
@@ -69,18 +79,20 @@ def init_quad() -> None:
     glEnableVertexAttribArray(1)
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * 4, ctypes.c_void_p(2 * 4))
 
-    # Unbind
     glBindBuffer(GL_ARRAY_BUFFER, 0)
     glBindVertexArray(0)
 
+    _quad_data[ctx_id] = (vao, vbo)
+    return vao
+
+def init_quad() -> None:
+    """Initialize quad for current context. Called automatically by draw_quad()."""
+    _get_or_create_quad_vao()
+
 def draw_quad() -> None:
     """Draw a fullscreen quad using VAO/VBO. Much faster than immediate mode."""
-    global _quad_vao
-
-    if _quad_vao is None:
-        init_quad()
-
-    glBindVertexArray(_quad_vao)
+    vao = _get_or_create_quad_vao()
+    glBindVertexArray(vao)
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
     glBindVertexArray(0)
 

@@ -6,7 +6,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl import Fbo, Texture
+from modules.gl import Fbo, Texture, Blit
 from modules.DataHub import DataHub, PoseDataHubTypes
 from modules.render.layers.LayerBase import LayerBase, Rect
 
@@ -88,7 +88,7 @@ class CamCompositeLayer(LayerBase):
 
         self._fbo.clear(0.0, 0.0, 0.0, 1.0)
         self._fbo.begin()
-        self._cam_texture.draw(full_rect.x, full_rect.y, full_rect.width, full_rect.height)
+        Blit.use(self._cam_texture)
         self._depth_track_renderer.draw(full_rect)
         self._bbox_renderer.draw(full_rect)
         self._pose_line_layer.draw(full_rect)

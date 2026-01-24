@@ -101,7 +101,9 @@ PREVIEW_LAYERS: list[Layers] = [
     # Layers.prev_mt,
     # Layers.cam_mask,
     # Layers.centre_flow,
-    Layers.flow,
+    # Layers.flow,
+
+    Layers.dense_flow,
 ]
 
 FINAL_LAYERS: list[Layers] = [
@@ -140,8 +142,8 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.centre_pose,
     # Layers.sim_blend,
     Layers.centre_pose,
-    Layers.sim_blend,
-    Layers.flow,
+    # Layers.sim_blend,
+    # Layers.flow,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -275,12 +277,15 @@ class HDTRenderManager(RenderBase):
 
         # Interface layers
         for i in range(self.num_cams):
+            View.set_view(width, height)
             track_rect: Rect = self.subdivision.get_rect('track', i)
             for layer_type in self._interface_layers:
                 self.L[layer_type][i].draw(track_rect)
 
         # Preview layers
         for i in range(self.num_cams):
+
+            View.set_view(width, height)
             preview_rect: Rect = self.subdivision.get_rect('preview', i)
             for layer_type in self._preview_layers:
                 self.L[layer_type][i].draw(preview_rect)
@@ -303,4 +308,5 @@ class HDTRenderManager(RenderBase):
         draw_rect = Rect(0, 0, width, height)
 
         for layer_type in self._draw_layers:
+            View.set_view(width, height)
             self.L[layer_type][camera_id].draw(draw_rect)

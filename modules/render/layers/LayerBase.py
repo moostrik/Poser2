@@ -6,7 +6,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.utils.PointsAndRects import Rect
-from modules.gl import Texture
+from modules.gl import Texture, Blit, viewport_rect
 
 
 class LayerBase(ABC):
@@ -29,4 +29,5 @@ class LayerBase(ABC):
     def draw(self, rect: Rect) -> None:
         """Default implementation: draw texture to rect."""
         if self.texture.allocated:
-            self.texture.draw(rect.x, rect.y, rect.width, rect.height)
+            viewport_rect(*rect.as_tuple())
+            Blit().use(self.texture)

@@ -7,8 +7,8 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
 from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.gl import Tensor, SwapFbo, Texture
-from modules.gl.Texture import draw_quad
+from modules.gl import Tensor, SwapFbo, Texture, Blit, BlitRect, viewport_rect
+
 from modules.render.shaders import DenseFlowFilter as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -55,7 +55,9 @@ class DFlowSourceLayer(LayerBase):
     def draw(self, rect: Rect) -> None:
         """Draw the flow visualization."""
         if self._fbo.allocated:
-            self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+            viewport_rect(*rect.as_tuple())
+            Blit.use(self._fbo.texture)
+            # BlitRect.use(self._fbo.texture, rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         """Update flow texture from DataHub."""
@@ -93,9 +95,7 @@ class DFlowSourceLayer(LayerBase):
             glColor4f(1.0, 1.0, 1.0, 1.0)
 
             self._fbo.begin()
-            self._flow_texture.bind()
-            draw_quad(0, 0, w, h)
-            self._flow_texture.unbind()
+            Blit.use(self._flow_texture)
             self._fbo.end()
 
             # Apply flow visualization shader with noise filtering

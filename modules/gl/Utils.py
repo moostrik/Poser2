@@ -1,6 +1,8 @@
 from time import time
 import math
 
+from OpenGL.GL import glGetIntegerv, glViewport, GL_VIEWPORT
+
 class FpsCounter:
     def __init__(self, numSamples = 120) -> None:
         self._times: list[float] = []
@@ -111,3 +113,15 @@ class BlitRegion:
             BlitRegion._shader = BlitRegionShader()
             BlitRegion._shader.allocate()
         BlitRegion._shader.use(texture, x, y, w, h)
+
+def viewport_rect(rect_x: float, rect_y: float, rect_width: float, rect_height: float) -> None:
+    """Set viewport from top-left coordinates (matches set_view's glOrtho).
+
+    Converts from top-left origin (Y-down) to OpenGL's bottom-left origin (Y-up).
+    """
+    viewport = glGetIntegerv(GL_VIEWPORT)
+    window_height = viewport[3]
+
+    # Flip Y coordinate
+    flipped_y = window_height - rect_y - rect_height
+    glViewport(int(rect_x), int(flipped_y), int(rect_width), int(rect_height))
