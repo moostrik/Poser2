@@ -7,7 +7,7 @@ from pytweening import *    # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, Blit, viewport_rect
+from modules.gl import Fbo, Texture, Blit
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.layers.generic.MotionMultiply import MotionMultiply
@@ -76,11 +76,6 @@ class SimilarityBlend(LayerBase):
         self._mask_other_2_fbo.deallocate()
 
         self._blend_shader.deallocate()
-
-    def draw(self, rect: Rect) -> None:
-        if self._fbo.allocated:
-            viewport_rect(*rect)
-            Blit.use(self._fbo)
 
     def update(self) -> None:
 

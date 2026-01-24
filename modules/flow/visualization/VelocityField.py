@@ -72,10 +72,7 @@ class VelocityField(FieldBase):
         if self.config.toggle_scalar:
             # Direction map mode
             self._direction_shader.reload()
-            self._direction_shader.use(
-                self._velocity_texture,
-                self.config.scale
-            )
+            self._direction_shader.use(self._velocity_texture, self.config.scale)
         else:
             # Arrow field mode
             self._arrow_shader.reload()

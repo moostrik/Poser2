@@ -1,3 +1,5 @@
+from .cam.DrawColoredRectangle import   DrawColoredRectangle
+
 from .generic.Blend import              Blend
 from .generic.Tint import               Tint
 from .generic.DrawRoi import            DrawRoi

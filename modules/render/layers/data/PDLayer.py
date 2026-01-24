@@ -6,7 +6,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gl import Fbo, Texture, Image, Blit, viewport_rect, draw_box_string, text_init
+from modules.gl import Fbo, Texture, Image, Blit, draw_box_string, text_init
 from modules.pose.features.Angles import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.pose.pd_stream.PDStream import PDStreamData
 from modules.render.layers.LayerBase import LayerBase, Rect
@@ -51,7 +51,6 @@ class PDLayer(LayerBase):
 
     def draw(self, rect: Rect) -> None:
         if self._fbo.allocated:
-            viewport_rect(*rect)
             Blit.use(self._fbo.texture)
             if self.draw_labels:
                 Blit.use(self._label_fbo.texture)

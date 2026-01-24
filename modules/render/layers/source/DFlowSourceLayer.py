@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
 from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.gl import Tensor, SwapFbo, Texture, Blit, BlitRect, viewport_rect
+from modules.gl import Tensor, SwapFbo, Texture, Blit
 
 from modules.render.shaders import DenseFlowFilter as shader
 
@@ -55,9 +55,7 @@ class DFlowSourceLayer(LayerBase):
     def draw(self, rect: Rect) -> None:
         """Draw the flow visualization."""
         if self._fbo.allocated:
-            viewport_rect(*rect.as_tuple())
             Blit.use(self._fbo.texture)
-            # BlitRect.use(self._fbo.texture, rect.x, rect.y, rect.width, rect.height)
 
     def update(self) -> None:
         """Update flow texture from DataHub."""

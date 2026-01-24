@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Blit, viewport_rect
+from modules.gl import Fbo, Texture, Blit, viewport_rect
 from modules.pose.features import Points2D
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
@@ -37,6 +37,10 @@ class ElectricLayer(LayerBase):
 
         self._shader: shader = shader()
         hot_reload = HotReloadMethods(self.__class__, True, True)
+
+    @property
+    def texture(self) -> Texture:
+        return self._fbo
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)

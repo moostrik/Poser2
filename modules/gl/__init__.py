@@ -3,10 +3,9 @@ from .RenderBase import RenderBase
 from .Shader import Shader
 from .ComputeShader import ComputeShader
 from .WindowManager import WindowManager
-from . import View
 from . import Style
 from . import shaders
-from .Utils import Blit, BlitRect, BlitRegion, viewport_rect
+from .Utils import Blit
 
 # TEXTURE CLASSES
 from .Texture import Texture

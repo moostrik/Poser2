@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, Blit, viewport_rect
+from modules.gl import Fbo, Texture, Blit
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import PosePointLines as shader
@@ -53,7 +53,6 @@ class PoseLineLayer(LayerBase):
             rect = box_rect.affine_transform(rect)
 
         if self._fbo.allocated:
-            viewport_rect(*rect)
             Blit.use(self._fbo.texture)
 
     def update(self) -> None:

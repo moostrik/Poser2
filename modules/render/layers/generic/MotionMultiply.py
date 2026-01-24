@@ -9,7 +9,7 @@ from pytweening import *    # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
-from modules.gl import Fbo, Texture, Blit, viewport_rect
+from modules.gl import Fbo, Texture, Blit
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import MaskApply as shader, Tint
 
@@ -73,7 +73,6 @@ class MotionMultiply(LayerBase):
         # self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
         # self._cam_fbo.draw(rect.x, rect.y, rect.width, rect.height)
         if self._mask_fbo.allocated:
-            viewport_rect(*rect)
             Blit().use(self._mask_fbo)
 
     def update(self) -> None:

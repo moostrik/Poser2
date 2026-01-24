@@ -5,7 +5,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, Blit, viewport_rect, draw_box_string, text_init
+from modules.gl import Fbo, Texture, Blit, draw_box_string, text_init
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import PoseScalarBar as shader
 from modules.pose.features import PoseFeatureType
@@ -57,7 +57,6 @@ class PoseBarScalarLayer(LayerBase):
 
     def draw(self, rect: Rect) -> None:
         if self._fbo.allocated:
-            viewport_rect(*rect)
             Blit.use(self._fbo.texture)
             if self.draw_labels:
                 Blit.use(self._label_fbo.texture)

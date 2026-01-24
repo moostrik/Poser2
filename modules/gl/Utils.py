@@ -198,15 +198,3 @@ class BlitFlip:
             BlitFlip._shader = BlitFlipShader()
             BlitFlip._shader.allocate()
         BlitFlip._shader.use(texture, flip_x, flip_y)
-
-def viewport_rect(rect_x: float, rect_y: float, rect_width: float, rect_height: float) -> None:
-    """Set viewport from top-left coordinates (matches set_view's glOrtho).
-
-    Converts from top-left origin (Y-down) to OpenGL's bottom-left origin (Y-up).
-    """
-    viewport = glGetIntegerv(GL_VIEWPORT)
-    window_height = viewport[3]
-
-    # Flip Y coordinate
-    flipped_y = window_height - rect_y - rect_height
-    glViewport(int(rect_x), int(flipped_y), int(rect_width), int(rect_height))

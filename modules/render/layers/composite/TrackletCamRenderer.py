@@ -6,8 +6,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl.Text import draw_box_string, text_init
-from modules.gl import viewport_rect
-from modules.render.shaders.cam.DrawColoredQuad import DrawColoredQuad
+from modules.render.shaders import DrawColoredRectangle
 
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 
@@ -21,7 +20,7 @@ class TrackletCamRenderer(LayerBase):
         self._data: DataHub = data
         self._cam_id: int = cam_id
         self._tracklets: list[DepthTracklet] | None = None
-        self._shader: DrawColoredQuad = DrawColoredQuad()
+        self._shader: DrawColoredRectangle = DrawColoredRectangle()
         text_init()
 
     def allocate(self) -> None:
@@ -34,20 +33,20 @@ class TrackletCamRenderer(LayerBase):
         if self._tracklets is None:
             return
         for depth_tracklet in self._tracklets or []:
-            TrackletCamRenderer.draw_depth_tracklet(depth_tracklet, rect.x, rect.y, rect.width, rect.height, self._shader)
+            TrackletCamRenderer.draw_depth_tracklet(depth_tracklet, self._shader)
 
     def update(self) -> None:
         self._tracklets: list[DepthTracklet] | None = self._data.get_item(DataHubType.depth_tracklet, self._cam_id)
 
     @staticmethod
-    def draw_depth_tracklet(tracklet: DepthTracklet, x: float, y: float, width: float, height: float, shader: DrawColoredQuad) -> None:
+    def draw_depth_tracklet(tracklet: DepthTracklet, shader: DrawColoredRectangle) -> None:
         if tracklet.status == DepthTracklet.TrackingStatus.REMOVED:
             return
 
-        t_x: float = x + tracklet.roi.x * width
-        t_y: float = y + tracklet.roi.y * height
-        t_w: float = tracklet.roi.width * width
-        t_h: float = tracklet.roi.height* height
+        t_x: float = tracklet.roi.x
+        t_y: float = tracklet.roi.y
+        t_w: float = tracklet.roi.width
+        t_h: float = tracklet.roi.height
 
         r: float = 1.0
         g: float = 1.0
@@ -66,8 +65,6 @@ class TrackletCamRenderer(LayerBase):
 
         string: str
         t_x += t_w -6
-        if t_x + 66 > width:
-            t_x: float = width - 66
         t_y += 22
         string = f'ID: {tracklet.id}'
         draw_box_string(t_x, t_y, string)

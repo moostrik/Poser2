@@ -6,7 +6,7 @@ from typing import cast
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl import RenderBase, WindowManager, Shader, View
+from modules.gl import RenderBase, WindowManager, Shader
 from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub, PoseDataHubTypes, SimilarityDataHubType
@@ -149,8 +149,8 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.centre_mask,
     # Layers.centre_pose,
     # Layers.sim_blend,
-    Layers.centre_pose,
-    Layers.sim_blend,
+    # Layers.centre_pose,
+    # Layers.sim_blend,
     Layers.flow,
 ]
 
@@ -264,6 +264,8 @@ class HDTRenderManager(RenderBase):
                 layer.deallocate()
 
     def draw_main(self, width: int, height: int) -> None:
+
+        glViewport(0, 0, width, height)
         self.data_hub.notify_update()
         self.pose_sim_layer.update()
         seen: set[Layers] = set()
@@ -275,28 +277,37 @@ class HDTRenderManager(RenderBase):
 
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
-        View.set_view(width, height)
+        glViewport(0, 0, width, height)
+
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         # Global layer
+
+        sim_rect = self.subdivision.get_rect('similarity', 0)
+        glViewport(int(sim_rect.x), int(height - sim_rect.y - sim_rect.height), int(sim_rect.width), int(sim_rect.height))
         self.pose_sim_layer.draw(self.subdivision.get_rect('similarity', 0))
 
         # Interface layers
         for i in range(self.num_cams):
-            View.set_view(width, height)
+            # View.set_view(width, height)
             track_rect: Rect = self.subdivision.get_rect('track', i)
+            glViewport(int(track_rect.x), int(height - track_rect.y - track_rect.height), int(track_rect.width), int(track_rect.height))
+
             for layer_type in self._interface_layers:
+                # glViewport(int(track_rect.x), int(height - track_rect.y - track_rect.height), int(track_rect.width), int(track_rect.height))
+
                 self.L[layer_type][i].draw(track_rect)
 
         # Preview layers
         for i in range(self.num_cams):
-            View.set_view(width, height)
             preview_rect: Rect = self.subdivision.get_rect('preview', i)
-            for layer_type in self._preview_layers:
+            glViewport(int(preview_rect.x), int(height - preview_rect.y - preview_rect.height), int(preview_rect.width), int(preview_rect.height))
 
-                View.set_view(width, height)
+            for layer_type in self._preview_layers:
+                # glViewport(int(preview_rect.x), int(height - preview_rect.y - preview_rect.height), int(preview_rect.width), int(preview_rect.height))
+
                 self.L[layer_type][i].draw(preview_rect)
             self.L[Layers.centre_cam][i].use_mask = True #type: ignore
             self.L[Layers.centre_mask][i].blur_steps = 0 #type: ignore
@@ -308,7 +319,7 @@ class HDTRenderManager(RenderBase):
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
-        View.set_view(width, height)
+        glViewport(0, 0, width, height)
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -317,5 +328,4 @@ class HDTRenderManager(RenderBase):
         draw_rect = Rect(0, 0, width, height)
 
         for layer_type in self._draw_layers:
-            View.set_view(width, height)
             self.L[layer_type][camera_id].draw(draw_rect)
