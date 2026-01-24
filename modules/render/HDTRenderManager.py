@@ -100,10 +100,18 @@ PREVIEW_LAYERS: list[Layers] = [
     # Layers.angle_data,
     # Layers.prev_mt,
     # Layers.cam_mask,
-    # Layers.centre_flow,
     # Layers.flow,
 
-    Layers.centre_motion,
+    # Layers.centre_motion,
+    # Layers.cam_image,
+    # Layers.cam_mask,
+    # Layers.dense_flow,
+
+
+    # Layers.centre_cam,
+
+    Layers.sim_blend,
+    Layers.flow,
 ]
 
 FINAL_LAYERS: list[Layers] = [
@@ -130,7 +138,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.centre_mask,
     # Layers.centre_cam,
     # Layers.centre_pose,
-    Layers.angle_bar,
+    # Layers.angle_bar,
     # Layers.centre_D_flow,
     # Layers.centre_motion,
     # Layers.centre_flow,
@@ -143,7 +151,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.sim_blend,
     # Layers.centre_pose,
     # Layers.sim_blend,
-    # Layers.flow,
+    Layers.flow,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -284,10 +292,11 @@ class HDTRenderManager(RenderBase):
 
         # Preview layers
         for i in range(self.num_cams):
-
             View.set_view(width, height)
             preview_rect: Rect = self.subdivision.get_rect('preview', i)
             for layer_type in self._preview_layers:
+
+                View.set_view(width, height)
                 self.L[layer_type][i].draw(preview_rect)
             self.L[Layers.centre_cam][i].use_mask = True #type: ignore
             self.L[Layers.centre_mask][i].blur_steps = 0 #type: ignore

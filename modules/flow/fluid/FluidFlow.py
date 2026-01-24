@@ -18,7 +18,7 @@ from .. import FlowBase, FlowConfigBase, FlowUtil
 from .shaders import (
     Advect, Divergence, Gradient, JacobiPressure, JacobiPressureCompute,
     JacobiDiffusion, JacobiDiffusionCompute,
-    VorticityCurl, VorticityForce, Buoyancy, ObstacleOffset, AddBoolean
+    VorticityCurl, VorticityForce, Buoyancy, ObstacleOffset, ObstacleBorder, AddBoolean
 )
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -184,6 +184,7 @@ class FluidFlow(FlowBase):
         self._vorticity_force_shader: VorticityForce = VorticityForce()
         self._buoyancy_shader: Buoyancy = Buoyancy()
         self._obstacle_offset_shader: ObstacleOffset = ObstacleOffset()
+        self._obstacle_border_shader: ObstacleBorder = ObstacleBorder()
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -294,6 +295,7 @@ class FluidFlow(FlowBase):
         self._vorticity_force_shader.allocate()
         self._buoyancy_shader.allocate()
         self._obstacle_offset_shader.allocate()
+        self._obstacle_border_shader.allocate()
         self._add_boolean_shader.allocate()
 
         # Initialize obstacles with border
@@ -322,6 +324,7 @@ class FluidFlow(FlowBase):
         self._vorticity_force_shader.deallocate()
         self._buoyancy_shader.deallocate()
         self._obstacle_offset_shader.deallocate()
+        self._obstacle_border_shader.deallocate()
         self._add_boolean_shader.deallocate()
 
     def reset(self) -> None:
@@ -603,23 +606,13 @@ class FluidFlow(FlowBase):
     # ========== Obstacle Initialization ==========
 
     def _init_obstacle(self) -> None:
-        """Initialize obstacles with 1-pixel border."""
-        # Fill with white (1.0 = obstacle)
-        FlowUtil.one(self._obstacle_fbo)
-
-        # Draw black rectangle (0.0 = fluid) with 1-pixel border
+        """Initialize obstacles with 1-pixel border using shader."""
         border = 1
         width: int = self._obstacle_fbo.width
         height: int = self._obstacle_fbo.height
 
         self._obstacle_fbo.begin()
-        glColor4f(0.0, 0.0, 0.0, 1.0)
-        glBegin(GL_QUADS)
-        glVertex2f(border, border)
-        glVertex2f(width - border, border)
-        glVertex2f(width - border, height - border)
-        glVertex2f(border, height - border)
-        glEnd()
+        self._obstacle_border_shader.use(width, height, border)
         self._obstacle_fbo.end()
 
         # Compute obstacle offset (neighbor flags)
