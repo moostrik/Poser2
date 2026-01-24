@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Fbo, Texture
+from modules.gl import Fbo, Texture, Blit, viewport_rect
 from modules.utils.PointsAndRects import Rect
 
 from .. import FlowConfigBase
@@ -102,4 +102,5 @@ class FieldBase(ABC):
             rect: Draw rectangle
         """
         if self._allocated:
-            self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+            viewport_rect(*rect)
+            Blit.use(self._fbo)

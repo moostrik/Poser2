@@ -8,7 +8,7 @@ from cuda.bindings import runtime # type: ignore
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Texture import Texture, draw_quad
+from modules.gl.Texture import Texture
 
 
 def get_channel_count_from_format(internal_format) -> int:

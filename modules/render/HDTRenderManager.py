@@ -130,7 +130,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.centre_mask,
     # Layers.centre_cam,
     # Layers.centre_pose,
-    # Layers.angle_bar,
+    Layers.angle_bar,
     # Layers.centre_D_flow,
     # Layers.centre_motion,
     # Layers.centre_flow,
@@ -141,7 +141,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.centre_mask,
     # Layers.centre_pose,
     # Layers.sim_blend,
-    Layers.centre_pose,
+    # Layers.centre_pose,
     # Layers.sim_blend,
     # Layers.flow,
 ]

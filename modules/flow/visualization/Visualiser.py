@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Texture
+from modules.gl import Texture, Blit, viewport_rect
 from modules.utils.PointsAndRects import Rect
 
 from .. import FlowConfigBase, FlowUtil
@@ -87,7 +87,8 @@ class Visualizer:
 
         # Direct draw for RGB/RGBA (3-4 channels) or R (1 channel)
         else:
-            texture.draw(rect.x, rect.y, rect.width, rect.height)
+            viewport_rect(*rect)
+            Blit.use(texture)
 
     def _on_config_changed(self) -> None:
         """Handle config changes."""
