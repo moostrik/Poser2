@@ -137,6 +137,10 @@ class Point2f:
         """Create a Point2f from a tuple (x, y)."""
         return Point2f(coords[0], coords[1])
 
+    def to_tuple(self) -> tuple[float, float]:
+        """Return the point as a tuple (x, y)."""
+        return (self.x, self.y)
+
 @dataclass
 class Rect:
     """Rectangle defined by top-left corner and dimensions"""
@@ -430,3 +434,32 @@ class Rect:
             width=self.width,
             height=self.height
         )
+
+    @staticmethod
+    def from_points(top_left: Point2f, bottom_right: Point2f) -> "Rect":
+        """Create a Rect from top-left and bottom-right points."""
+        return Rect(
+            x=top_left.x,
+            y=top_left.y,
+            width=bottom_right.x - top_left.x,
+            height=bottom_right.y - top_left.y
+        )
+
+    @staticmethod
+    def from_array(arr: np.ndarray) -> "Rect":
+        """Create a Rect from a numpy array [x, y, width, height]."""
+        return Rect(
+            x=float(arr[0]),
+            y=float(arr[1]),
+            width=float(arr[2]),
+            height=float(arr[3])
+        )
+
+    @staticmethod
+    def from_tuple(coords: tuple[float, float, float, float]) -> "Rect":
+        """Create a Rect from a tuple (x, y, width, height)."""
+        return Rect(coords[0], coords[1], coords[2], coords[3])
+
+    def as_tuple(self) -> tuple[float, float, float, float]:
+        """Return the rectangle as a tuple (x, y, width, height)."""
+        return (self.x, self.y, self.width, self.height)
