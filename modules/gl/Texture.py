@@ -1,6 +1,5 @@
 from OpenGL.GL import * # type: ignore
 import numpy as np
-from .View import draw_quad
 
 
 def get_numpy_dtype(data_type: Constant, internal_format: Constant) -> type | None:
@@ -167,11 +166,6 @@ class Texture():
 
     def unbind(self) -> None :
         glBindTexture(GL_TEXTURE_2D, 0)
-
-    def draw(self, x, y, w, h) -> None :
-        self.bind()
-        draw_quad(x, y, w, h)
-        self.unbind()
 
     def read_to_numpy(self, flip: bool = True) -> np.ndarray | None:
         """Read texture data back to CPU as NumPy array.

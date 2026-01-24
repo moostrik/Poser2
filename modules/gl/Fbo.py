@@ -130,14 +130,6 @@ class SwapFbo(Fbo):
         """Unbind current buffer's texture."""
         self._fbos[self._swap_state].unbind()
 
-    def draw(self, x: float, y: float, w: float, h: float) -> None:
-        """Draw current buffer."""
-        self._fbos[self._swap_state].draw(x, y, w, h)
-
-    def draw_back(self, x: float, y: float, w: float, h: float) -> None:
-        """Draw previous buffer."""
-        self._fbos[1 - self._swap_state].draw(x, y, w, h)
-
     def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
         """Clear current buffer."""
         self._fbos[self._swap_state].clear(r, g, b, a)
