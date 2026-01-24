@@ -6,6 +6,8 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl.Text import draw_box_string, text_init
+from modules.gl import viewport_rect
+from modules.render.shaders.cam.DrawColoredQuad import DrawColoredQuad
 
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 
@@ -19,22 +21,26 @@ class TrackletCamRenderer(LayerBase):
         self._data: DataHub = data
         self._cam_id: int = cam_id
         self._tracklets: list[DepthTracklet] | None = None
+        self._shader: DrawColoredQuad = DrawColoredQuad()
         text_init()
 
+    def allocate(self) -> None:
+        self._shader.allocate()
+
     def deallocate(self) -> None:
-        pass
+        self._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         if self._tracklets is None:
             return
         for depth_tracklet in self._tracklets or []:
-            TrackletCamRenderer.draw_depth_tracklet(depth_tracklet, rect.x, rect.y, rect.width, rect.height)
+            TrackletCamRenderer.draw_depth_tracklet(depth_tracklet, rect.x, rect.y, rect.width, rect.height, self._shader)
 
     def update(self) -> None:
         self._tracklets: list[DepthTracklet] | None = self._data.get_item(DataHubType.depth_tracklet, self._cam_id)
 
     @staticmethod
-    def draw_depth_tracklet(tracklet: DepthTracklet, x: float, y: float, width: float, height: float) -> None:
+    def draw_depth_tracklet(tracklet: DepthTracklet, x: float, y: float, width: float, height: float, shader: DrawColoredQuad) -> None:
         if tracklet.status == DepthTracklet.TrackingStatus.REMOVED:
             return
 
@@ -56,14 +62,7 @@ class TrackletCamRenderer(LayerBase):
         if tracklet.status == DepthTracklet.TrackingStatus.REMOVED:
             r, g, b, a = (1.0, 0.0, 0.0, 1.0)
 
-        glColor4f(r, g, b, a)   # Set color
-        glBegin(GL_QUADS)       # Start drawing a quad
-        glVertex2f(t_x, t_y)        # Bottom left
-        glVertex2f(t_x, t_y + t_h)    # Bottom right
-        glVertex2f(t_x + t_w, t_y + t_h)# Top right
-        glVertex2f(t_x + t_w, t_y)    # Top left
-        glEnd()                 # End drawing
-        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+        shader.use(t_x, t_y, t_w, t_h, r, g, b, a)
 
         string: str
         t_x += t_w -6

@@ -90,6 +90,7 @@ class CamCompositeLayer(LayerBase):
         self._fbo.begin()
         Blit.use(self._cam_texture)
         self._depth_track_renderer.draw(full_rect)
-        self._bbox_renderer.draw(full_rect)
+        # self._bbox_renderer.draw(full_rect)
+        glViewport(0, 0, self._fbo.width, self._fbo.height)
         self._pose_line_layer.draw(full_rect)
         self._fbo.end()
