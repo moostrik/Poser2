@@ -5,6 +5,7 @@ from .ComputeShader import ComputeShader
 from .WindowManager import WindowManager
 from . import View
 from . import Style
+from . import shaders
 
 # TEXTURE CLASSES
 from .Texture import Texture
