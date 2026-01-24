@@ -1,61 +1,20 @@
-from OpenGL.GL import (
-    GL_MODELVIEW, GL_PROJECTION, GL_VIEWPORT, GL_QUADS,
-    glGetIntegerv, glLoadIdentity, glMatrixMode, glOrtho, glPopMatrix, glPushMatrix, glViewport,
-    glBegin, glEnd, glTexCoord2f, glVertex2f
-)
+from OpenGL.GL import * # type: ignore
 
+_viewport_stack: list[tuple[int, int, int, int]] = []
+_current_viewport: tuple[int, int, int, int] = (0, 0, 1, 1)
 
-_viewport_stack: list = []
-
-
-def set_view(width: int, height: int) -> None:
-    """
-    Set orthographic projection with top-left origin (0,0) and Y-axis pointing down.
-
-    Args:
-        width: Viewport width in pixels
-        height: Viewport height in pixels
-    """
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-    glOrtho(0, width, height, 0, -1, 1)
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity()
-    glViewport(0, 0, width, height)
-
+def set_view(w: int, h: int) -> None:
+    # return
+    global _current_viewport
+    _current_viewport = (0, 0, w, h)
+    glViewport(0, 0, w, h)
 
 def push_view() -> None:
-    """
-    Save current view state (projection matrix, modelview matrix, and viewport).
-    Must be paired with pop_view() to restore state.
-    """
-    viewport = glGetIntegerv(GL_VIEWPORT)
-    _viewport_stack.append(viewport)
-    glMatrixMode(GL_MODELVIEW)
-    glPushMatrix()
-    glMatrixMode(GL_PROJECTION)
-    glPushMatrix()
-
+    # return
+    _viewport_stack.append(_current_viewport)
 
 def pop_view() -> None:
-    """
-    Restore previously saved view state.
-    Must be paired with push_view().
-    """
-    glMatrixMode(GL_PROJECTION)
-    glPopMatrix()
-    glMatrixMode(GL_MODELVIEW)
-    glPopMatrix()
+    global _current_viewport
     if _viewport_stack:
-        viewport = _viewport_stack.pop()
-        glViewport(viewport[0], viewport[1], viewport[2], viewport[3])
-
-def draw_quad(x: float, y: float, w: float, h: float) -> None:
-    x0, x1 = x, x + w
-    y0, y1 = y, y + h
-    glBegin(GL_QUADS)
-    glTexCoord2f(0.0, 1.0); glVertex2f(x0, y0)
-    glTexCoord2f(1.0, 1.0); glVertex2f(x1, y0)
-    glTexCoord2f(1.0, 0.0); glVertex2f(x1, y1)
-    glTexCoord2f(0.0, 0.0); glVertex2f(x0, y1)
-    glEnd()
+        _current_viewport = _viewport_stack.pop()
+        glViewport(*_current_viewport)
