@@ -74,3 +74,40 @@ def fill(src_width: int | float, src_height: int | float, dst_width: int | float
     y = (dst_height - height) / 2.0
 
     return (x, y, width, height)
+
+class Blit:
+    """Singleton lazy-loaded Blit shader for drawing textures fullscreen."""
+    _shader = None
+
+    @staticmethod
+    def use(texture) -> None:
+        """Draw texture fullscreen to current viewport/FBO."""
+        if Blit._shader is None:
+            from modules.gl.shaders.Blit import Blit as BlitShader
+            Blit._shader = BlitShader()
+            Blit._shader.allocate()
+        Blit._shader.use(texture)
+
+class BlitRect:
+    """Singleton lazy-loaded BlitRect shader."""
+    _shader = None
+
+    @staticmethod
+    def use(texture, rect_x: float, rect_y: float, rect_w: float, rect_h: float) -> None:
+        if BlitRect._shader is None:
+            from modules.gl.shaders.BlitRect import BlitRect as BlitRectShader
+            BlitRect._shader = BlitRectShader()
+            BlitRect._shader.allocate()
+        BlitRect._shader.use(texture, rect_x, rect_y, rect_w, rect_h)
+
+class BlitRegion:
+    """Singleton lazy-loaded BlitRegion shader."""
+    _shader = None
+
+    @staticmethod
+    def use(texture, x: float, y: float, w: float, h: float) -> None:
+        if BlitRegion._shader is None:
+            from modules.gl.shaders.BlitRegion import BlitRegion as BlitRegionShader
+            BlitRegion._shader = BlitRegionShader()
+            BlitRegion._shader.allocate()
+        BlitRegion._shader.use(texture, x, y, w, h)
