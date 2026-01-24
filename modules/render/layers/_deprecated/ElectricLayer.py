@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl.Fbo import Fbo
+from modules.gl import Fbo, Blit, viewport_rect
 from modules.pose.features import Points2D
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
@@ -54,7 +54,9 @@ class ElectricLayer(LayerBase):
             box_rect: Rect = self._p_pose.bbox.to_rect()
             rect = box_rect.affine_transform(rect)
 
-        self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        if self._fbo.allocated:
+            viewport_rect(*rect)
+            Blit.use(self._fbo)
 
     def update(self) -> None:
 

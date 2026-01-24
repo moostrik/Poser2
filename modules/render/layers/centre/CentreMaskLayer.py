@@ -11,7 +11,7 @@ from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # GL
-from modules.gl import Fbo, SwapFbo, Texture
+from modules.gl import Fbo, SwapFbo, Texture, Blit
 
 
 class CentreMaskLayer(LayerBase):
@@ -118,7 +118,7 @@ class CentreMaskLayer(LayerBase):
 
         # Copy AA result to blur buffer
         self._mask_blur_fbo.begin()
-        self._mask_AA_fbo.draw(0, 0, self._mask_blur_fbo.width, self._mask_blur_fbo.height)
+        Blit.use(self._mask_AA_fbo.texture)
         self._mask_blur_fbo.end()
 
         # Multi-pass blur
