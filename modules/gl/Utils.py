@@ -186,6 +186,19 @@ class BlitRegion:
             BlitRegion._shader.allocate()
         BlitRegion._shader.use(texture, x, y, w, h)
 
+class BlitFlip:
+    """Singleton lazy-loaded BlitFlip shader for flipped texture blitting."""
+    _shader = None
+
+    @staticmethod
+    def use(texture, flip_x: bool = False, flip_y: bool = False) -> None:
+        """Draw texture fullscreen with optional X/Y flip."""
+        if BlitFlip._shader is None:
+            from modules.gl.shaders.BlitFlip import BlitFlip as BlitFlipShader
+            BlitFlip._shader = BlitFlipShader()
+            BlitFlip._shader.allocate()
+        BlitFlip._shader.use(texture, flip_x, flip_y)
+
 def viewport_rect(rect_x: float, rect_y: float, rect_width: float, rect_height: float) -> None:
     """Set viewport from top-left coordinates (matches set_view's glOrtho).
 

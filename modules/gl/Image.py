@@ -1,6 +1,7 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.gl.Texture import Texture, get_data_type
+from modules.gl.Utils import BlitFlip
 import numpy as np
 from threading import Lock
 from typing import Literal
@@ -72,23 +73,6 @@ def _get_internal_format(image: np.ndarray) -> Constant:
 
     print('GL_texture', 'image format not supported')
     return GL_NONE
-
-def _draw_quad_flipped(x: float, y: float, w: float, h: float) -> None :
-    """Draw a quad with vertically flipped texture coordinates.
-
-    "Flipped" means inverted relative to View.draw_quad() - produces opposite
-    vertical orientation. Used internally by Image class to correct NumPy array
-    upload which stores data upside-down in OpenGL texture format.
-    """
-    x0, x1 = x, x + w
-    y0, y1 = y, y + h
-
-    glBegin(GL_QUADS)
-    glTexCoord2f(0.0, 0.0); glVertex2f(x0, y0)  # Lower-left
-    glTexCoord2f(1.0, 0.0); glVertex2f(x1, y0)  # Lower-right
-    glTexCoord2f(1.0, 1.0); glVertex2f(x1, y1)  # Upper-right
-    glTexCoord2f(0.0, 1.0); glVertex2f(x0, y1)  # Upper-left
-    glEnd()
 
 
 class Image(Fbo):
@@ -216,12 +200,9 @@ class Image(Fbo):
                      self._source.format, self._source.data_type, image)
         self._source.unbind()
 
-        # Render flipped to FBO
+        # Render flipped to FBO using modern shader
         self.begin()
-        glColor4f(1.0, 1.0, 1.0, 1.0)
-        self._source.bind()
-        _draw_quad_flipped(0, 0, self.width, self.height)
-        self._source.unbind()
+        BlitFlip.use(self._source, flip_y=True)
         self.end()
 
 
