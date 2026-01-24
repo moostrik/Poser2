@@ -103,7 +103,7 @@ PREVIEW_LAYERS: list[Layers] = [
     # Layers.centre_flow,
     # Layers.flow,
 
-    Layers.dense_flow,
+    Layers.centre_motion,
 ]
 
 FINAL_LAYERS: list[Layers] = [

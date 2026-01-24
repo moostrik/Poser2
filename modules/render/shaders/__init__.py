@@ -1,4 +1,5 @@
 from .generic.Blend import              Blend
+from .generic.Tint import               Tint
 from .generic.DrawRoi import            DrawRoi
 from .generic.DenseFlowFilter import    DenseFlowFilter
 

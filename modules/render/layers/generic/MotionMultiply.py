@@ -9,10 +9,9 @@ from pytweening import *    # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
-from modules.gl import Fbo, Texture
+from modules.gl import Fbo, Texture, Blit, viewport_rect
 from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.render.layers.centre.CentreMaskLayer import CentreMaskLayer
-from modules.render.shaders import MaskApply as shader
+from modules.render.shaders import MaskApply as shader, Tint
 
 from modules.pose.features import AggregationMethod
 from modules.pose.Frame import Frame
@@ -33,6 +32,7 @@ class MotionMultiply(LayerBase):
         self._motion: float = 0.0
 
         self._shader: shader = shader()
+        self._tint_shader: Tint = Tint()
 
         self.data_type: PoseDataHubTypes = data_type
 
@@ -60,21 +60,23 @@ class MotionMultiply(LayerBase):
         self._cam_fbo.allocate(width, height, internal_format)
         self._mask_fbo.allocate(width, height, GL_R32F)
         self._shader.allocate()
+        self._tint_shader.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._cam_fbo.deallocate()
         self._mask_fbo.deallocate()
         self._shader.deallocate()
+        self._tint_shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         # self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
         # self._cam_fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        self._mask_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+        if self._mask_fbo.allocated:
+            viewport_rect(*rect)
+            Blit().use(self._mask_fbo)
 
     def update(self) -> None:
-        # Check if shader needs hot-reload
-        self._shader.reload()
 
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
 
@@ -116,13 +118,11 @@ class MotionMultiply(LayerBase):
         self._motion = motion
 
         self._cam_fbo.begin()
-        glColor4f(1.0, 1.0, 1.0, motion)
-        cam.draw(0, 0, self._cam_fbo.width, self._cam_fbo.height)
+        self._tint_shader.use(cam, 1.0, 1.0, 1.0, motion)
         self._cam_fbo.end()
 
         self._mask_fbo.begin()
-        glColor4f(motion, 0.0, 0.0, 0.0)
-        mask.draw(0, 0, self._mask_fbo.width, self._mask_fbo.height)
+        self._tint_shader.use(mask, motion, 0.0, 0.0, 1.0)
         self._mask_fbo.end()
 
         self._fbo.begin()
