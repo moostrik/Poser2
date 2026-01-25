@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Image import Image, Texture
 
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 
 
 class ImageSourceLayer(LayerBase):
@@ -16,7 +16,7 @@ class ImageSourceLayer(LayerBase):
         self._cam_id: int = cam_id
         self._data: DataHub = data
         self._image: Image = Image('BGR')
-        self._p_frame: np.ndarray | None = None
+        self._data_cache: DataCache[np.ndarray]= DataCache[np.ndarray]()
 
     @property
     def texture(self) -> Texture:
@@ -28,13 +28,15 @@ class ImageSourceLayer(LayerBase):
 
     def update(self) -> None:
         frame: np.ndarray | None = self._data.get_item(DataHubType.cam_image, self._cam_id)
+        self._data_cache.update(frame)
 
-        if frame is None: # frames not initialized yet
+        if self._data_cache.lost:
+            self._image.clear()
+
+        if self._data_cache.idle or frame is None:
             return
 
-        if frame is not self._p_frame:
-            self._image.set_image(frame)
-            self._image.update()
-            self._p_frame = frame
+        self._image.set_image(frame)
+        self._image.update()
 
 

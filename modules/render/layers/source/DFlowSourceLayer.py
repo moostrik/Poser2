@@ -6,8 +6,9 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.gl import Tensor, SwapFbo, Texture, Blit
+from modules.gui.PyReallySimpleGui import Frame
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
+from modules.gl import Tensor, SwapFbo, Texture, Blit, clear_color
 
 from modules.render.shaders import DenseFlowFilter as shader
 
@@ -25,7 +26,7 @@ class DFlowSourceLayer(LayerBase):
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._flow_texture: Tensor = Tensor()
-        self._prev_tensor: torch.Tensor | None = None
+        self._data_cache: DataCache[torch.Tensor]= DataCache[torch.Tensor]()
         self._fbo: SwapFbo = SwapFbo()
 
         self.process_scale: float = 2.0
@@ -59,19 +60,14 @@ class DFlowSourceLayer(LayerBase):
 
     def update(self) -> None:
         """Update flow texture from DataHub."""
-
         flow_tensor: torch.Tensor | None = self._data_hub.get_item(DataHubType.flow_tensor, self._track_id)
 
-        # Only update if tensor changed
-        if flow_tensor is self._prev_tensor:
-            return
-        self._prev_tensor = flow_tensor
+        self._data_cache.update(flow_tensor)
 
-        if self._fbo.allocated:
+        if self._data_cache.lost:
             self._fbo.clear()
 
-        if flow_tensor is None:
-            # self._flow_texture.clear()
+        if self._data_cache.idle or flow_tensor is None:
             return
 
         self._flow_texture.set_tensor(flow_tensor)
@@ -88,8 +84,6 @@ class DFlowSourceLayer(LayerBase):
             h = int(self._flow_texture.height * self.process_scale)
             if not self._fbo.allocated or self._fbo.width != w or self._fbo.height != h:
                 self._fbo.allocate(w, h, self._flow_texture.internal_format)
-
-            self._fbo.clear()
 
             self._fbo.begin()
             Blit.use(self._flow_texture)
