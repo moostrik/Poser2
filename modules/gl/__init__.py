@@ -5,7 +5,7 @@ from .ComputeShader import ComputeShader
 from .WindowManager import WindowManager
 from . import Style
 from . import shaders
-from .Utils import Blit
+from .Utils import Blit, clear_color
 
 # TEXTURE CLASSES
 from .Texture import Texture

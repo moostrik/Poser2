@@ -20,8 +20,8 @@ class CentreMaskLayer(LayerBase):
     Reads anchor points from AnchorPointCalculator.
     """
 
-    def __init__(self, anchor_calc: CentreGeometry, cam_texture: Texture) -> None:
-        self._anchor_calc: CentreGeometry = anchor_calc
+    def __init__(self, geometry: CentreGeometry, cam_texture: Texture) -> None:
+        self._geometry: CentreGeometry = geometry
         self._cam_texture: Texture = cam_texture
 
         # FBOs
@@ -76,27 +76,26 @@ class CentreMaskLayer(LayerBase):
     def update(self) -> None:
         """Render mask crop using bbox geometry from CentreGeometry."""
         # Disable blending during FBO rendering
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
-        self._mask_fbo.clear(0.0, 0.0, 0.0, 0.0)
+        if self._geometry.lost:
+            self._mask_fbo.clear()
+            self._mask_blend_fbo.clear_all()
 
         # Check if valid anchor data exists
-        if not self._anchor_calc.has_pose:
-            self._mask_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            self._mask_blend_fbo.swap()
-            self._mask_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            Style.pop_style()
+        if self._geometry.idle or self._geometry.empty:
             return
+
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         # Use bbox geometry from CentreGeometry
         self._mask_fbo.begin()
         self._roi_shader.use(
             self._cam_texture,
-            self._anchor_calc.bbox_crop_roi,
-            self._anchor_calc.bbox_rotation,
-            self._anchor_calc.bbox_rotation_center,
-            self._anchor_calc.bbox_aspect
+            self._geometry.bbox_crop_roi,
+            self._geometry.bbox_rotation,
+            self._geometry.bbox_rotation_center,
+            self._geometry.bbox_aspect
         )
         self._mask_fbo.end()
 

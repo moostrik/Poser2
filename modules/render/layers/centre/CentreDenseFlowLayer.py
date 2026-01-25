@@ -14,8 +14,8 @@ class CentreDenseFlowLayer(LayerBase):
     Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, anchor_calc: CentreGeometry, flow_texture: Texture, mask_texture: Texture | None = None, mask_opacity: float = 1.0) -> None:
-        self._anchor_calc: CentreGeometry = anchor_calc
+    def __init__(self, geometry: CentreGeometry, flow_texture: Texture, mask_texture: Texture | None = None, mask_opacity: float = 1.0) -> None:
+        self._geometry: CentreGeometry = geometry
         self._flow_texture: Texture = flow_texture
         self._mask_texture: Texture | None = mask_texture
 
@@ -51,27 +51,27 @@ class CentreDenseFlowLayer(LayerBase):
 
     def update(self) -> None:
         """Render flow crop using anchor geometry, optionally with mask."""
-        # Disable blending during FBO rendering
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
-        self._flow_fbo.clear(0.0, 0.0, 0.0, 0.0)
-
-        # Check if valid anchor data exists
-        if not self._anchor_calc.has_pose:
+        if self._geometry.lost:
+            self._flow_fbo.clear()
             if self._mask_texture and self.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            Style.pop_style()
+
+        # Check if valid anchor data exists
+        if self._geometry.idle or self._geometry.empty:
             return
+
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         # Render flow with ROI from anchor calculator (bbox-space geometry, like mask)
         self._flow_fbo.begin()
         self._roi_shader.use(
             self._flow_texture,
-            self._anchor_calc.bbox_crop_roi,
-            self._anchor_calc.bbox_rotation,
-            self._anchor_calc.bbox_rotation_center,
-            self._anchor_calc.bbox_aspect
+            self._geometry.bbox_crop_roi,
+            self._geometry.bbox_rotation,
+            self._geometry.bbox_rotation_center,
+            self._geometry.bbox_aspect
         )
         self._flow_fbo.end()
 

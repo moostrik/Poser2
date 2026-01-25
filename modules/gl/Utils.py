@@ -2,12 +2,7 @@ from time import time
 import math
 import ctypes
 
-from OpenGL.GL import (
-    glGetIntegerv, glViewport, GL_VIEWPORT,
-    glGenBuffers, glBindBuffer, glBufferData, GL_ARRAY_BUFFER, GL_STATIC_DRAW,
-    glGenVertexArrays, glBindVertexArray, glEnableVertexAttribArray,
-    glVertexAttribPointer, GL_FLOAT, GL_FALSE, glDrawArrays, GL_TRIANGLE_FAN
-)
+from OpenGL.GL import * # type: ignore
 
 # -----------------------------------------------------------------------------
 # Quad geometry utilities (VAO/VBO per-context for multi-window support)
@@ -74,6 +69,17 @@ def draw_quad() -> None:
 # -----------------------------------------------------------------------------
 # FPS utilities
 # -----------------------------------------------------------------------------
+
+def clear_color(r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
+    """Clear framebuffer. Must be called between begin() and end()."""
+    glClearColor(r, g, b, a)
+    glClear(GL_COLOR_BUFFER_BIT)
+
+def clear_depth(depth: float = 1.0) -> None:
+    """Clear depth buffer. Must be called between begin() and end()."""
+    glClearDepth(depth)
+    glClear(GL_DEPTH_BUFFER_BIT)
+
 
 class FpsCounter:
     def __init__(self, numSamples = 120) -> None:

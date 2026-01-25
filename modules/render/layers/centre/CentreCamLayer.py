@@ -4,10 +4,9 @@
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import Blend, DrawRoi, MaskApply
-from modules.utils.PointsAndRects import Rect
 
 # GL
-from modules.gl import Fbo, SwapFbo, Texture, Style
+from modules.gl import Fbo, SwapFbo, Texture, Style, clear_color
 
 
 class CentreCamLayer(LayerBase):
@@ -17,8 +16,8 @@ class CentreCamLayer(LayerBase):
     followed by temporal blending. Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, anchor_calc: CentreGeometry, cam_texture: Texture, mask_texture: Texture | None = None, mask_opacity: float = 1.0) -> None:
-        self._anchor_calc: CentreGeometry = anchor_calc
+    def __init__(self, geometry: CentreGeometry, cam_texture: Texture, mask_texture: Texture | None = None, mask_opacity: float = 1.0) -> None:
+        self._geometry: CentreGeometry = geometry
         self._cam_texture: Texture = cam_texture
         self._mask_texture: Texture | None = mask_texture
 
@@ -63,29 +62,28 @@ class CentreCamLayer(LayerBase):
     def update(self) -> None:
         """Render camera crop using anchor geometry, optionally with mask."""
         # Disable blending during FBO rendering
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
-        self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
-
-        # Check if valid anchor data exists
-        if not self._anchor_calc.has_pose:
+        if self._geometry.lost:
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._cam_blend_fbo.swap()
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             if self._mask_texture and self.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            Style.pop_style()
+
+        if self._geometry.idle or self._geometry.empty:
             return
+
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         # Render camera image with ROI from anchor calculator
         cam_aspect: float = self._cam_texture.width / self._cam_texture.height
         self._cam_fbo.begin()
         self._roi_shader.use(
             self._cam_texture,
-            self._anchor_calc.cam_crop_roi,
-            self._anchor_calc.cam_rotation,
-            self._anchor_calc.anchor_top_tex,
+            self._geometry.cam_crop_roi,
+            self._geometry.cam_rotation,
+            self._geometry.anchor_top_tex,
             cam_aspect,
         )
         self._cam_fbo.end()

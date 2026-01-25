@@ -4,8 +4,8 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl import Fbo, Texture
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.gl import Fbo, Texture, clear_color
+from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import PosePointLines
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -14,10 +14,10 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class CentrePoseLayer(LayerBase):
     """Renders pose keypoint lines in crop space."""
 
-    def __init__(self, anchor_calc: CentreGeometry,
+    def __init__(self, geometry: CentreGeometry,
                  line_width: float = 4.0, line_smooth: float = 2.0, use_scores: bool = False,
                  color: tuple[float, float, float, float] | None = None) -> None:
-        self._anchor_calc: CentreGeometry = anchor_calc
+        self._geometry: CentreGeometry = geometry
         self._fbo: Fbo = Fbo()
         self._shader: PosePointLines = PosePointLines()
 
@@ -42,10 +42,10 @@ class CentrePoseLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
+        if self._geometry.lost:
+            self._fbo.clear()
 
-        transformed_points = self._anchor_calc.transformed_points
+        transformed_points = self._geometry.transformed_points
         if transformed_points is None:
             return
 
@@ -53,5 +53,6 @@ class CentrePoseLayer(LayerBase):
         line_smooth: float = 1.0 / self._fbo.height * self.line_smooth
 
         self._fbo.begin()
+        clear_color()
         self._shader.use(transformed_points, line_width, line_smooth, self.color, self.use_scores)
         self._fbo.end()

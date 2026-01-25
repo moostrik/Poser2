@@ -19,8 +19,8 @@ class Fbo(Texture):
         self.bind()
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.tex_id, 0)
 
-        glClearColor(0.0, 0.0, 0.0, 1.0)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # type: ignore
+        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glClear(GL_COLOR_BUFFER_BIT)
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         self.unbind()
@@ -37,7 +37,7 @@ class Fbo(Texture):
     def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
         self.begin()
         glClearColor(r, g, b, a)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) # type: ignore
+        glClear(GL_COLOR_BUFFER_BIT) # type: ignore
         self.end()
 
 class SwapFbo(Fbo):

@@ -11,7 +11,7 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
-from modules.render.layers.LayerBase import LayerBase
+from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Texture
 
@@ -31,7 +31,7 @@ class CentreGeometry(LayerBase):
         self._data_hub: DataHub = data_hub
         self._data_type: PoseDataHubTypes = data_type
         self._cam_aspect: float = cam_aspect
-        self._p_pose: Frame | None = None
+        self._data_cache: DataCache[Frame] = DataCache[Frame]()
 
         # Anchor points in bbox-relative coordinates [0,1]
         self._shoulder_midpoint: Point2f = Point2f(0.5, 0.3)
@@ -64,9 +64,24 @@ class CentreGeometry(LayerBase):
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
+    def idle(self) -> bool:
+        """Whether valid pose data exists."""
+        return self._data_cache.idle
+
+    @property
+    def empty(self) -> bool:
+        """Whether valid pose data exists."""
+        return self._data_cache.empty
+
+    @property
+    def lost(self) -> bool:
+        """Whether pose data was lost since last update."""
+        return self._data_cache.lost
+
+    @property
     def has_pose(self) -> bool:
         """Whether valid pose data exists."""
-        return self._p_pose is not None
+        return self._data_cache.has_data
 
     @property
     def shoulder_midpoint(self) -> Point2f:
@@ -103,7 +118,6 @@ class CentreGeometry(LayerBase):
         """Camera crop region of interest."""
         return self._cam_crop_roi
 
-
     @property
     def bbox(self) -> Rect:
         """Current pose bounding box."""
@@ -130,14 +144,14 @@ class CentreGeometry(LayerBase):
         return self._bbox_rotation_center
 
     @property
-    def texture(self) -> Texture:
-        """CentreGeometry does not produce a texture output."""
-        raise NotImplementedError("CentreGeometry is a computation-only layer with no texture output")
-
-    @property
     def transformed_points(self) -> Points2D | None:
         """Transformed pose points in crop space [0,1], or None if no pose."""
         return self._transformed_points
+
+    @property
+    def texture(self) -> Texture:
+        """CentreGeometry does not produce a texture output."""
+        raise NotImplementedError("CentreGeometry is a computation-only layer with no texture output")
 
     def deallocate(self) -> None:
         """No resources to deallocate."""
@@ -147,9 +161,9 @@ class CentreGeometry(LayerBase):
         """Calculate anchor points and derived geometry from current pose."""
         # Get pose data
         pose: Frame | None = self._data_hub.get_item(DataHubType(self._data_type), self._cam_id)
-        if pose is self._p_pose:
+        self._data_cache.update(pose)
+        if self._data_cache.idle:
             return
-        self._p_pose = pose
 
         if pose is None:
             self._transformed_points = None

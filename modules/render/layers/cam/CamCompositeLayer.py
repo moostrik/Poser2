@@ -75,7 +75,6 @@ class CamCompositeLayer(LayerBase):
         self._pose_line_layer.update()
         self._bbox_renderer.bbox_color = (1.0, 1.0, 1.0, 1.0)  # Example: set bbox color to red
 
-        self._fbo.clear(0.0, 0.0, 0.0, 1.0)
         self._fbo.begin()
         Blit.use(self._cam_texture)
         self._depth_track_renderer.draw()

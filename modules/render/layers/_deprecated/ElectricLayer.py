@@ -8,10 +8,10 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, Blit
+from modules.gl import Fbo, Texture, Blit, Style, clear_color
 from modules.pose.features import Points2D
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.render.shaders import PoseElectric as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -25,7 +25,8 @@ class ElectricLayer(LayerBase):
         self._track_id: int = track_id
         self._data: DataHub = data
         self._fbo: Fbo = Fbo()
-        self._p_pose: Frame | None = None
+        self._data_cache: DataCache[Frame] = DataCache[Frame]()
+        # self._p_pose: Frame | None = None
         self._points: Points2D = Points2D.create_dummy()
 
         self.data_type: PoseDataHubTypes = data_type
@@ -58,17 +59,11 @@ class ElectricLayer(LayerBase):
             Blit.use(self._fbo)
 
     def update(self) -> None:
-
         pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
-
-        if pose is self._p_pose:
-            return # no update needed
-        self._p_pose = pose
-
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
-        if pose is None:
+        self._data_cache.update(pose)
+        if self._data_cache.lost:
+            self._fbo.clear()
+        if self._data_cache.idle or pose is None:
             return
 
         centre_pose: Frame = replace(pose, points=self._points)
