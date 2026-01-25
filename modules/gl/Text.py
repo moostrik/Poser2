@@ -4,12 +4,14 @@ import OpenGL.GLUT as glut
 _glut_inited = False
 
 def text_init() -> None:
+    return
     global _glut_inited
     if not _glut_inited:
         glut.glutInit()
         _glut_inited = True
 
 def draw_string(x: float, y: float, string: str, color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0), big: bool = False)-> None:
+    return
     font=glut.GLUT_BITMAP_HELVETICA_12 # type: ignore
     if big:
         font = glut.GLUT_BITMAP_HELVETICA_18 # type: ignore
@@ -21,6 +23,7 @@ def draw_string(x: float, y: float, string: str, color: tuple[float, float, floa
     gl.glColor4f(1.0, 1.0, 1.0, 1.0)
 
 def draw_box_string(x: float, y: float, string: str, color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0), box_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6), big: bool = False)-> None: # type: ignore
+    return
     font=glut.GLUT_BITMAP_HELVETICA_12 # type: ignore
     height = 12
     expand = 2
