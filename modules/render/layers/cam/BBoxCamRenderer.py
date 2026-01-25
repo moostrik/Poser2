@@ -5,6 +5,7 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.shaders import DrawRectangleOutline
 
 
 class BBoxCamRenderer(LayerBase):
@@ -15,28 +16,25 @@ class BBoxCamRenderer(LayerBase):
         self._cam_bbox_rects: list[Rect] = []
 
         self.data_type: PoseDataHubTypes = data_type
-        self.line_width: int = int(line_width)
+        self.line_width: float = 0.05  # Fixed normalized line width for visibility
         self.bbox_color: tuple[float, float, float, float] = bbox_color
 
+        self._shader: DrawRectangleOutline = DrawRectangleOutline()
+
+    def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
+        self._shader.allocate()
+
     def deallocate(self) -> None:
-        pass
+        self._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
-        glLineWidth(self.line_width)
-        glColor4f(*self.bbox_color)
-
         for bbox_rect in self._cam_bbox_rects:
-
             draw_rect: Rect = bbox_rect.affine_transform(rect)
-
-            glBegin(GL_LINE_LOOP)
-            glVertex2f(draw_rect.x, draw_rect.y)  # Bottom left
-            glVertex2f(draw_rect.x + draw_rect.width, draw_rect.y)  # Bottom right
-            glVertex2f(draw_rect.x + draw_rect.width, draw_rect.y + draw_rect.height)  # Top right
-            glVertex2f(draw_rect.x, draw_rect.y + draw_rect.height)  # Top left
-            glEnd()
-
-        glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
+            self._shader.use(
+                draw_rect.x, draw_rect.y, draw_rect.width, draw_rect.height,
+                *self.bbox_color,
+                self.line_width
+            )
 
     def update(self) -> None:
         cam_poses: set[Frame] = self._data.get_items_for_cam(DataHubType(self.data_type), self._cam_id)

@@ -10,8 +10,8 @@ from modules.gl import Fbo, Texture, Blit
 from modules.DataHub import DataHub, PoseDataHubTypes
 from modules.render.layers.LayerBase import LayerBase, Rect
 
-from modules.render.layers.composite.BBoxCamRenderer import BBoxCamRenderer
-from modules.render.layers.composite.TrackletCamRenderer import TrackletCamRenderer
+from modules.render.layers.cam.BBoxCamRenderer import BBoxCamRenderer
+from modules.render.layers.cam.TrackletCamRenderer import TrackletCamRenderer
 from modules.render.layers.data.PoseLineLayer import PoseLineLayer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -90,7 +90,8 @@ class CamCompositeLayer(LayerBase):
         self._fbo.begin()
         Blit.use(self._cam_texture)
         self._depth_track_renderer.draw(full_rect)
-        # self._bbox_renderer.draw(full_rect)
+        glViewport(0, 0, self._fbo.width, self._fbo.height)
+        self._bbox_renderer.draw(full_rect)
         glViewport(0, 0, self._fbo.width, self._fbo.height)
         self._pose_line_layer.draw(full_rect)
         self._fbo.end()

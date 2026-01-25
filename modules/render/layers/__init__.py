@@ -1,4 +1,4 @@
-from .LayerBase import                      LayerBase
+from .LayerBase import                      LayerBase, Rect
 
 from .centre.CentreGeometry import          CentreGeometry
 from .centre.CentreCamLayer import          CentreCamLayer
@@ -22,11 +22,11 @@ from .data.SimilarityLayer import           SimilarityLayer, AggregationMethod
 from .data.PoseBarSLayer import             PoseBarSLayer
 from .data.PoseDotLayer import              PoseDotLayer
 from .data.PoseLineLayer import             PoseLineLayer
+from .data.PoseMTimeRenderer import         PoseMTimeRenderer
 
-from .composite.CamCompositeLayer import    CamCompositeLayer
-from .composite.BBoxCamRenderer import      BBoxCamRenderer
-from .composite.TrackletCamRenderer import  TrackletCamRenderer
-from .composite.PoseMTimeRenderer import    PoseMTimeRenderer
+from .cam.CamCompositeLayer import          CamCompositeLayer
+from .cam.BBoxCamRenderer import            BBoxCamRenderer
+from .cam.TrackletCamRenderer import        TrackletCamRenderer
 
 from .source.DFlowSourceLayer import        DFlowSourceLayer
 from .source.ImageSourceLayer import        ImageSourceLayer
