@@ -6,9 +6,9 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, SimilarityDataHubType
-from modules.gl import Fbo, Texture, Image, draw_box_string, text_init
+from modules.gl import Fbo, Texture, Image, clear_color, draw_box_string, text_init
 from modules.pose.similarity.features.SimilarityStream import SimilarityStream, SimilarityStreamData, SimilarityBatch , AggregationMethod
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import StreamCorrelation as shader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -19,11 +19,11 @@ class SimilarityLayer(LayerBase):
     def __init__(self, num_streams: int, capacity: int, data: DataHub, data_type: SimilarityDataHubType,
                  aggregation_method: AggregationMethod = AggregationMethod.HARMONIC_MEAN, exponent: float = 2.0) -> None:
         self._num_streams: int = num_streams
-        self._data: DataHub = data
+        self._data_hub: DataHub = data
         self._fbo: Fbo = Fbo()
         self._image: Image = Image()
         self._correlation_stream: SimilarityStream = SimilarityStream(capacity)
-        self._p_batch: SimilarityBatch | None = None
+        self._data_cache: DataCache[SimilarityBatch]= DataCache[SimilarityBatch]()
 
         self.data_type: SimilarityDataHubType = data_type
         self.exponent: float = exponent
@@ -59,19 +59,14 @@ class SimilarityLayer(LayerBase):
 
         The FBO is always cleared, even if no data is available.
         """
+        batch: SimilarityBatch  | None = self._data_hub.get_item(DataHubType(self.data_type))
+        self._data_cache.update(batch)
 
-        batch: SimilarityBatch  | None = self._data.get_item(DataHubType(self.data_type))
+        # We dont reset the FBO on lost SimilarityBatch, to keep the last valid image visible
+        # if self._data_cache.lost:
+        #     self._fbo.clear()
 
-        # print("yes", batch)
-        if batch is self._p_batch:
-            # No new data, skip update
-            return
-        self._p_batch = batch
-
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
-
-        if batch is None:
+        if self._data_cache.idle or batch is None:
             return
 
         self._correlation_stream.update(batch, self.aggregation_method, 0.0, self.exponent)
@@ -89,12 +84,13 @@ class SimilarityLayer(LayerBase):
         self._image.update()
 
         self._fbo.begin()
+        clear_color()
         self._shader.use(self._image.texture, self._image.width, self._image.height, 1.5 / self._fbo.height)
-        self._fbo.end()
+        # self._fbo.end()
 
         step: float = self._fbo.height / self._num_streams
 
-        self._fbo.begin()
+        # self._fbo.begin()
         for i, pair in enumerate(pairs):
             string: str = f'{pair[0]} | {pair[1]}'
             x: int = self._fbo.width - 100

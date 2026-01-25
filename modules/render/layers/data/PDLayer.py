@@ -6,17 +6,15 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gl import Fbo, Texture, Image, Blit, draw_box_string, text_init
+from modules.gl import Fbo, Texture, Image, Blit, clear_color, draw_box_string, text_init
 from modules.pose.features.Angles import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.pose.pd_stream.PDStream import PDStreamData
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import StreamPose as shader
+from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT, POSE_COLOR_CENTER
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-
-POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange
-POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0) # Cyan
 
 class PDLayer(LayerBase):
 
@@ -27,7 +25,7 @@ class PDLayer(LayerBase):
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
         self._image: Image = Image()
-        self._p_pd_stream: PDStreamData | None = None
+        self._data_cache: DataCache[PDStreamData] = DataCache[PDStreamData]()
 
         self.draw_labels: bool = True
 
@@ -56,17 +54,14 @@ class PDLayer(LayerBase):
                 Blit.use(self._label_fbo.texture)
 
     def update(self) -> None:
-
         pd_stream: PDStreamData | None = self._data.get_item(DataHubType.pd_stream, self._cam_id)
+        self._data_cache.update(pd_stream)
 
-        if pd_stream is self._p_pd_stream:
-            return  # no update needed
-        self._p_pd_stream = pd_stream
+        # We dont reset the FBO on lost PD stream, to keep the last valid image visible
+        # if self._data_cache.lost:
+        #     self._fbo.clear()
 
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
-        if pd_stream is None:
+        if self._data_cache.idle or pd_stream is None:
             return
 
         stream_image: np.ndarray = self._shader.pose_stream_to_image(pd_stream)
@@ -74,6 +69,7 @@ class PDLayer(LayerBase):
         self._image.update()
 
         self._fbo.begin()
+        clear_color()
         self._shader.use(self._image, self._image.width, self._image.height, line_width=1.5 / self._fbo.height)
         self._fbo.end()
 
@@ -83,9 +79,8 @@ class PDLayer(LayerBase):
 
         rect = Rect(0, 0, fbo.width, fbo.height)
 
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        fbo.clear(0.0, 0.0, 0.0, 0.0)
         fbo.begin()
+        clear_color()
 
         angle_num: int = ANGLE_NUM_LANDMARKS
         step: float = rect.height / angle_num

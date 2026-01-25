@@ -73,9 +73,6 @@ class CentreCamLayer(LayerBase):
         if self._geometry.idle or self._geometry.empty:
             return
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
-
         # Render camera image with ROI from anchor calculator
         cam_aspect: float = self._cam_texture.width / self._cam_texture.height
         self._cam_fbo.begin()
@@ -111,5 +108,3 @@ class CentreCamLayer(LayerBase):
             self._output_fbo = self._masked_fbo
         else:
             self._output_fbo = self._cam_blend_fbo
-
-        Style.pop_style()

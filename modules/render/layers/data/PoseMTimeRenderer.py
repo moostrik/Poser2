@@ -6,7 +6,7 @@ from OpenGL.GL import * # type: ignore
 
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.gl.Text import draw_box_string, text_init
 
 

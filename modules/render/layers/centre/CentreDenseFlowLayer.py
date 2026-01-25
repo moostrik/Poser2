@@ -61,9 +61,6 @@ class CentreDenseFlowLayer(LayerBase):
         if self._geometry.idle or self._geometry.empty:
             return
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
-
         # Render flow with ROI from anchor calculator (bbox-space geometry, like mask)
         self._flow_fbo.begin()
         self._roi_shader.use(
@@ -88,5 +85,3 @@ class CentreDenseFlowLayer(LayerBase):
             self._output_fbo = self._masked_fbo
         else:
             self._output_fbo = self._flow_fbo
-
-        Style.pop_style()

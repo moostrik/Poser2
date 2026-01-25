@@ -5,17 +5,14 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, Blit, draw_box_string, text_init
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.gl import Fbo, Texture, Blit, clear_color, draw_box_string, text_init
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import PoseScalarBar as shader
 from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
+from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT, POSE_COLOR_CENTER
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
-POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange
-POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0) # Cyan
 
 class PoseBarScalarLayer(LayerBase):
 
@@ -25,7 +22,7 @@ class PoseBarScalarLayer(LayerBase):
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
-        self._p_pose: Frame | None = None
+        self._data_cache: DataCache[Frame]= DataCache[Frame]()
         self._labels: list[str] = []
 
         self.data_type: PoseDataHubTypes = data_type
@@ -62,19 +59,13 @@ class PoseBarScalarLayer(LayerBase):
                 Blit.use(self._label_fbo.texture)
 
     def update(self) -> None:
+        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._track_id)
+        self._data_cache.update(pose)
 
-        key: int = self._track_id
+        if self._data_cache.lost:
+            self._fbo.clear()
 
-        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), key)
-
-        if pose is self._p_pose:
-            return # no update needed
-        self._p_pose = pose
-
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
-        if pose is None:
+        if self._data_cache.idle or pose is None:
             return
 
         feature = pose.get_feature(FrameField[self.feature_type.name])
@@ -87,6 +78,7 @@ class PoseBarScalarLayer(LayerBase):
         line_smooth = 1.0 / self._fbo.height * self.line_smooth
 
         self._fbo.begin()
+        clear_color()
         self._shader.use(feature, line_thickness, line_smooth,
                          self.color, (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
         self._fbo.end()

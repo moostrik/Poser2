@@ -7,18 +7,14 @@ import numpy as np
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, draw_box_string, text_init
-
+from modules.gl import Fbo, Texture, clear_color, draw_box_string, text_init
 from modules.pose.features import AggregationMethod
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import PoseValuesBar as shader
+from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT, POSE_COLOR_CENTER
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
-POSE_COLOR_LEFT:            tuple[float, float, float] = (1.0, 0.5, 0.0) # Orange
-POSE_COLOR_RIGHT:           tuple[float, float, float] = (0.0, 1.0, 1.0) # Cyan
 
 class PoseBarSLayer(LayerBase):
 
@@ -27,7 +23,7 @@ class PoseBarSLayer(LayerBase):
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
-        self._p_pose: Frame | None = None
+        self._data_cache: DataCache[Frame]= DataCache[Frame]()
         self._labels: list[str] = []
 
         self.data_type: PoseDataHubTypes = data_type
@@ -53,17 +49,13 @@ class PoseBarSLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._track_id)
+        self._data_cache.update(pose)
 
-        if pose is self._p_pose:
-            return # no update needed
-        self._p_pose = pose
+        if self._data_cache.lost:
+            self._fbo.clear()
 
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
-        if pose is None:
+        if self._data_cache.idle or pose is None:
             return
 
         similarity = pose.similarity.values
@@ -90,6 +82,7 @@ class PoseBarSLayer(LayerBase):
         line_smooth = 1.0 / self._fbo.height * 4.0
 
         self._fbo.begin()
+        clear_color()
         self._shader.use(similarity, sim_colors, line_thickness, line_smooth * 10)
         self._shader.use(motion_array, motion_colors, line_thickness, line_smooth)
         self._shader.use(motion_sim, motion_sim_colors, line_thickness, line_smooth)
@@ -112,11 +105,8 @@ class PoseBarSLayer(LayerBase):
 
         rect = Rect(0, 0, fbo.width, fbo.height)
 
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        fbo.clear(0.0, 0.0, 0.0, 0.0)
-
         fbo.begin()
+        clear_color()
 
         """Draw joint names at the bottom of each bar."""
         num_labels: int = len(labels)

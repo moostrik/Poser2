@@ -7,9 +7,9 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture
+from modules.gl import Fbo, Texture, clear_color
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import PosePointDots as shader
 from modules.utils.PointsAndRects import Rect
 
@@ -21,9 +21,9 @@ class PoseDotLayer(LayerBase):
                  dot_size: float = 4.0, dot_smooth: float = 2.0,
                  color: tuple[float, float, float, float] | None = None) -> None:
         self._track_id: int = track_id
-        self._data: DataHub = data
+        self._data_hub: DataHub = data
         self._fbo: Fbo = Fbo()
-        self._p_pose: Frame | None = None
+        self._data_cache: DataCache[Frame]= DataCache[Frame]()
 
         self.data_type: PoseDataHubTypes = data_type
         self.dot_size: float = dot_size
@@ -47,22 +47,19 @@ class PoseDotLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
+        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._track_id)
+        self._data_cache.update(pose)
 
-        pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
+        if self._data_cache.lost:
+            self._fbo.clear()
 
-        if pose is self._p_pose:
-            return # no update needed
-        self._p_pose = pose
-
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
-        if pose is None:
+        if self._data_cache.idle or pose is None:
             return
 
         dot_size: float = 1.0 / self._fbo.height * self.dot_size * 2
         dot_smooth: float = 1.0 / self._fbo.height * self.dot_smooth * 2
 
         self._fbo.begin()
+        clear_color()
         self._shader.use(pose.points, dot_size=dot_size, dot_smooth=dot_smooth)
         self._fbo.end()

@@ -85,9 +85,6 @@ class CentreMaskLayer(LayerBase):
         if self._geometry.idle or self._geometry.empty:
             return
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
-
         # Use bbox geometry from CentreGeometry
         self._mask_fbo.begin()
         self._roi_shader.use(
@@ -138,6 +135,4 @@ class CentreMaskLayer(LayerBase):
                 self.blur_radius
             )
             self._mask_blur_fbo.end()
-
-        Style.pop_style()
 
