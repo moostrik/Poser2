@@ -9,6 +9,7 @@ from OpenGL.GL import * # type: ignore
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, Texture, Blit
 from modules.pose.Frame import Frame
+from modules.pose.features.Points2D import Points2D
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import PosePointLines as shader
 
@@ -48,10 +49,6 @@ class PoseLineLayer(LayerBase):
         self._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
-        if self.use_bbox and self._p_pose is not None:
-            box_rect: Rect = self._p_pose.bbox.to_rect()
-            rect = box_rect.affine_transform(rect)
-
         if self._fbo.allocated:
             Blit.use(self._fbo.texture)
 
@@ -69,9 +66,22 @@ class PoseLineLayer(LayerBase):
         if pose is None:
             return
 
-        line_width: float = 1.0 / self._fbo.height * self.line_width * 2
-        line_smooth: float = 1.0 / self._fbo.height * self.line_smooth * 2
+        # Transform points to image space if use_bbox is enabled
+        points = pose.points
+        if self.use_bbox:
+            points = PoseLineLayer._transform_to_image_space(points, pose.bbox.to_rect())
+
+        line_width: float = 1.0 / self._fbo.height * self.line_width
+        line_smooth: float = 1.0 / self._fbo.height * self.line_smooth
 
         self._fbo.begin()
-        self._shader.use(pose.points, line_width=line_width, line_smooth=line_smooth, color=self.color, use_scores=self.use_scores)
+        self._shader.use(points, line_width=line_width, line_smooth=line_smooth, color=self.color, use_scores=self.use_scores)
         self._fbo.end()
+
+    @staticmethod
+    def _transform_to_image_space(points: Points2D, bbox: Rect) -> Points2D:
+        """Transform pose points from bbox-relative [0,1] to image space."""
+        x_bbox, y_bbox = points.get_xy_arrays()
+        x_image = x_bbox * bbox.width + bbox.x
+        y_image = y_bbox * bbox.height + bbox.y
+        return Points2D.from_xy_arrays(x_image, y_image, points.scores)
