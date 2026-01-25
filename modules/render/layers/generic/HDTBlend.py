@@ -2,12 +2,12 @@
 import numpy as np
 
 # Third-party imports
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import GL_R16F
 from pytweening import *    # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, Blit
+from modules.gl import Fbo, Texture, Style
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.layers.generic.MotionMultiply import MotionMultiply
@@ -61,9 +61,9 @@ class SimilarityBlend(LayerBase):
         self._cam_other_1_fbo.allocate(width, height, internal_format)
         self._cam_other_2_fbo.allocate(width, height, internal_format)
 
-        self._mask_fbo.allocate(width, height, GL_R32F)
-        self._mask_other_1_fbo.allocate(width, height, GL_R32F)
-        self._mask_other_2_fbo.allocate(width, height, GL_R32F)
+        self._mask_fbo.allocate(width, height, GL_R16F)
+        self._mask_other_1_fbo.allocate(width, height, GL_R16F)
+        self._mask_other_2_fbo.allocate(width, height, GL_R16F)
 
         self._blend_shader.allocate()
 
@@ -85,11 +85,12 @@ class SimilarityBlend(LayerBase):
             return # no update needed
         self._p_pose = pose
 
-        glDisable(GL_BLEND)
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
 
         if pose is None:
             return
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         colors: list[tuple[float, float, float, float]] = [
             (1.0, 0.0, 0.0, 1.0),
@@ -138,5 +139,4 @@ class SimilarityBlend(LayerBase):
                                )
         self._fbo.end()
 
-
-        glEnable(GL_BLEND)
+        Style.pop_style()

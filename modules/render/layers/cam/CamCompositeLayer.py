@@ -1,10 +1,5 @@
 """ Draws the full camera image, depth tracklets, pose lines, and bounding boxes."""
 
-# Standard library imports
-
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.gl import Fbo, Texture, Blit
 from modules.DataHub import DataHub, PoseDataHubTypes
@@ -79,9 +74,6 @@ class CamCompositeLayer(LayerBase):
         self._bbox_renderer.update()
         self._pose_line_layer.update()
         self._bbox_renderer.bbox_color = (1.0, 1.0, 1.0, 1.0)  # Example: set bbox color to red
-
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self._fbo.clear(0.0, 0.0, 0.0, 1.0)
         self._fbo.begin()

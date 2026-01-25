@@ -1,13 +1,10 @@
 """Renders centered and rotated optical flow visualization with optional mask."""
 
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskApply
-from modules.gl import Fbo, Texture
+from modules.gl import Fbo, Texture, Style
 
 
 class CentreDenseFlowLayer(LayerBase):
@@ -55,7 +52,8 @@ class CentreDenseFlowLayer(LayerBase):
     def update(self) -> None:
         """Render flow crop using anchor geometry, optionally with mask."""
         # Disable blending during FBO rendering
-        glDisable(GL_BLEND)
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         self._flow_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
@@ -63,7 +61,7 @@ class CentreDenseFlowLayer(LayerBase):
         if not self._anchor_calc.has_pose:
             if self._mask_texture and self.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            glEnable(GL_BLEND)
+            Style.pop_style()
             return
 
         # Render flow with ROI from anchor calculator (bbox-space geometry, like mask)
@@ -91,4 +89,4 @@ class CentreDenseFlowLayer(LayerBase):
         else:
             self._output_fbo = self._flow_fbo
 
-        glEnable(GL_BLEND)
+        Style.pop_style()

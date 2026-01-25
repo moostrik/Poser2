@@ -1,8 +1,5 @@
 """Renders centered and rotated camera view based on pose anchor points with optional mask."""
 
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
@@ -10,7 +7,7 @@ from modules.render.shaders import Blend, DrawRoi, MaskApply
 from modules.utils.PointsAndRects import Rect
 
 # GL
-from modules.gl import Fbo, SwapFbo, Texture
+from modules.gl import Fbo, SwapFbo, Texture, Style
 
 
 class CentreCamLayer(LayerBase):
@@ -66,7 +63,8 @@ class CentreCamLayer(LayerBase):
     def update(self) -> None:
         """Render camera crop using anchor geometry, optionally with mask."""
         # Disable blending during FBO rendering
-        glDisable(GL_BLEND)
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
@@ -77,7 +75,7 @@ class CentreCamLayer(LayerBase):
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             if self._mask_texture and self.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            glEnable(GL_BLEND)
+            Style.pop_style()
             return
 
         # Render camera image with ROI from anchor calculator
@@ -116,4 +114,4 @@ class CentreCamLayer(LayerBase):
         else:
             self._output_fbo = self._cam_blend_fbo
 
-        glEnable(GL_BLEND)
+        Style.pop_style()

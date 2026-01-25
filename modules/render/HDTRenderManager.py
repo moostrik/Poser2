@@ -6,7 +6,7 @@ from typing import cast
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl import RenderBase, WindowManager, Shader
+from modules.gl import RenderBase, WindowManager, Shader, Style
 from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub, PoseDataHubTypes, SimilarityDataHubType
@@ -275,12 +275,13 @@ class HDTRenderManager(RenderBase):
                 for layer in self.L[layer_type].values():
                     layer.update()
 
-        glEnable(GL_BLEND)
+        Style.reset_state()
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
+
         glViewport(0, 0, width, height)
 
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         # Global layer
 
@@ -316,11 +317,13 @@ class HDTRenderManager(RenderBase):
         self._preview_layers = PREVIEW_LAYERS
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        glEnable(GL_BLEND)
+        Style.reset_state()
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
+
         glViewport(0, 0, width, height)
+
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
 

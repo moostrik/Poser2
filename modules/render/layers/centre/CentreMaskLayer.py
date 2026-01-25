@@ -1,17 +1,16 @@
 """Renders centered and rotated mask with temporal blending and blur."""
 
 # Third-party imports
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import GL_R16F
 
 # Local application imports
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.source import MaskSourceLayer
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur
-from modules.utils.PointsAndRects import Rect, Point2f
 
 # GL
-from modules.gl import Fbo, SwapFbo, Texture, Blit
+from modules.gl import Fbo, SwapFbo, Texture, Blit, Style
 
 
 class CentreMaskLayer(LayerBase):
@@ -53,10 +52,10 @@ class CentreMaskLayer(LayerBase):
         return self._mask_blur_fbo
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
-        self._mask_fbo.allocate(width, height, GL_R32F)
-        self._mask_blend_fbo.allocate(width, height, GL_R32F)
-        self._mask_AA_fbo.allocate(width, height, GL_R32F)
-        self._mask_blur_fbo.allocate(width, height, GL_R32F)
+        self._mask_fbo.allocate(width, height, GL_R16F)
+        self._mask_blend_fbo.allocate(width, height, GL_R16F)
+        self._mask_AA_fbo.allocate(width, height, GL_R16F)
+        self._mask_blur_fbo.allocate(width, height, GL_R16F)
 
         self._roi_shader.allocate()
         self._mask_blend_shader.allocate()
@@ -77,7 +76,8 @@ class CentreMaskLayer(LayerBase):
     def update(self) -> None:
         """Render mask crop using bbox geometry from CentreGeometry."""
         # Disable blending during FBO rendering
-        glDisable(GL_BLEND)
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         self._mask_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
@@ -86,7 +86,7 @@ class CentreMaskLayer(LayerBase):
             self._mask_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._mask_blend_fbo.swap()
             self._mask_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            glEnable(GL_BLEND)
+            Style.pop_style()
             return
 
         # Use bbox geometry from CentreGeometry
@@ -140,5 +140,5 @@ class CentreMaskLayer(LayerBase):
             )
             self._mask_blur_fbo.end()
 
-        glEnable(GL_BLEND)
+        Style.pop_style()
 
