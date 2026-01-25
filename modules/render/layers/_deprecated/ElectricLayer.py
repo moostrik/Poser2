@@ -8,7 +8,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, Blit, viewport_rect
+from modules.gl import Fbo, Texture, Blit
 from modules.pose.features import Points2D
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
@@ -53,13 +53,8 @@ class ElectricLayer(LayerBase):
     def setCentrePoints(self, points: Points2D) -> None:
         self._points = points
 
-    def draw(self, rect: Rect) -> None:
-        if self.use_bbox and self._p_pose is not None:
-            box_rect: Rect = self._p_pose.bbox.to_rect()
-            rect = box_rect.affine_transform(rect)
-
+    def draw(self) -> None:
         if self._fbo.allocated:
-            viewport_rect(*rect)
             Blit.use(self._fbo)
 
     def update(self) -> None:

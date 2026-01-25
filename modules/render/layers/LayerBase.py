@@ -26,7 +26,7 @@ class LayerBase(ABC):
         """Output texture. Override in subclasses that produce texture output."""
         raise NotImplementedError(f"{self.__class__.__name__} does not produce texture output")
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self) -> None:
         """Default implementation: draw texture to rect."""
         if self.texture.allocated:
             Blit().use(self.texture)

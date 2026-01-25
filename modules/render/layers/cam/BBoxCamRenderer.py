@@ -33,7 +33,7 @@ class BBoxCamRenderer(LayerBase):
     def deallocate(self) -> None:
         self._shader.deallocate()
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self) -> None:
         for bbox_rect in self._cam_bbox_rects:
             # Convert pixel line width to normalized coordinates relative to the rectangle
             rect_w_pixels = bbox_rect.width * self._width

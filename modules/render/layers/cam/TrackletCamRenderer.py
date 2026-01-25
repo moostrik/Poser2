@@ -29,7 +29,7 @@ class TrackletCamRenderer(LayerBase):
     def deallocate(self) -> None:
         self._shader.deallocate()
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self) -> None:
         if self._tracklets is None:
             return
         for depth_tracklet in self._tracklets or []:

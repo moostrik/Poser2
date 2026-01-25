@@ -75,17 +75,17 @@ class OpticalFlowLayer(LayerBase):
             self._optical_flow.update()
 
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self) -> None:
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         if self.draw_mode == DrawModes.INPUT:
-            self._optical_flow.draw_input(rect)
+            self._optical_flow.draw_input()
         elif self.draw_mode == DrawModes.OUTPUT:
-            self._optical_flow.draw_output(rect)
+            self._optical_flow.draw_output()
         else:
             Style.set_blend_mode(Style.BlendMode.ADDITIVE)
-            self._visualizer.draw(self._optical_flow.velocity, rect)
+            self._visualizer.draw(self._optical_flow.velocity)
 
         Style.pop_style()
 

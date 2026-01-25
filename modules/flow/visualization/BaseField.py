@@ -95,11 +95,7 @@ class FieldBase(ABC):
         """Render visualization to internal FBO."""
         ...
 
-    def draw(self, rect: Rect) -> None:
-        """Draw visualization to screen.
-
-        Args:
-            rect: Draw rectangle
-        """
+    def draw(self) -> None:
+        """Draw visualization to screen."""
         if self._allocated:
             Blit.use(self._fbo)

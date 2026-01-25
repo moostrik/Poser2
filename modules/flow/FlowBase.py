@@ -106,19 +106,19 @@ class FlowBase(ABC):
         FlowUtil.zero(self._output_fbo)
 
     # CONVENIENCE DRAW METHODS
-    def draw(self, rect: Rect) -> None:
+    def draw(self) -> None:
         """Draw output buffer with auto-visualization."""
-        self.draw_output(rect)
+        self.draw_output()
 
-    def draw_input(self, rect: Rect) -> None:
+    def draw_input(self) -> None:
         """Draw input buffer with auto-visualization."""
-        self._draw_with_visualization_field(self._input_fbo.texture, rect)
+        self._draw_with_visualization_field(self._input_fbo.texture)
 
-    def draw_output(self, rect: Rect) -> None:
+    def draw_output(self) -> None:
         """Draw output buffer with auto-visualization (velocity=field, RGB=direct)."""
-        self._draw_with_visualization_field(self._output_fbo.texture, rect)
+        self._draw_with_visualization_field(self._output_fbo.texture)
 
-    def _draw_with_visualization_field(self, texture: Texture, rect: Rect) -> None:
+    def _draw_with_visualization_field(self, texture: Texture) -> None:
         """Protected: Draw texture using auto-detecting Visualizer (lazy init)."""
         # Lazy init visualization field
         if self._visualization_field is None:
@@ -127,5 +127,5 @@ class FlowBase(ABC):
             if self._allocated:
                 self._visualization_field.allocate(self._output_fbo.width, self._output_fbo.height)
 
-        self._visualization_field.draw(texture, rect)
+        self._visualization_field.draw(texture)
 

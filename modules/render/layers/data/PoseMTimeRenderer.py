@@ -24,7 +24,7 @@ class PoseMTimeRenderer(LayerBase):
     def deallocate(self) -> None:
         pass
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self) -> None:
         if self._motion_time is None:
             return
 

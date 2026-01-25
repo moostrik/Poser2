@@ -55,7 +55,7 @@ class PoseBarMLayer(LayerBase):
         self._label_fbo.deallocate()
         self._shader.deallocate()
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self) -> None:
         if self._fbo.allocated:
             Blit.use(self._fbo.texture)
             if self.draw_labels:

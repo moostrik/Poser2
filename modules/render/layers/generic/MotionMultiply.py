@@ -69,9 +69,9 @@ class MotionMultiply(LayerBase):
         self._shader.deallocate()
         self._tint_shader.deallocate()
 
-    def draw(self, rect: Rect) -> None:
-        # self._fbo.draw(rect.x, rect.y, rect.width, rect.height)
-        # self._cam_fbo.draw(rect.x, rect.y, rect.width, rect.height)
+    def draw(self) -> None:
+        # self._fbo.draw()
+        # self._cam_fbo.draw()
         if self._mask_fbo.allocated:
             Blit().use(self._mask_fbo)
 

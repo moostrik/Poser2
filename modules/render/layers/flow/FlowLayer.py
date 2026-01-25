@@ -328,12 +328,12 @@ class FlowLayer(LayerBase):
 
     # ========== Rendering ==========
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self) -> None:
 
         """Draw flow visualization based on draw_mode."""
         Style.push_style()
         Style.set_blend_mode(DRAW_MODE_BLEND_MODES.get(self.config.draw_mode, Style.BlendMode.DISABLED))
-        self._visualizer.draw(self._get_draw_texture(), rect)
+        self._visualizer.draw(self._get_draw_texture())
 
 
 

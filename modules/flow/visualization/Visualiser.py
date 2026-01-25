@@ -60,13 +60,8 @@ class Visualizer:
         self.velocity_field.deallocate()
         self._allocated = False
 
-    def draw(self, texture: Texture, rect: Rect) -> None:
-        """Auto-detect format and draw appropriately.
-
-        Args:
-            texture: Source texture to visualize
-            rect: Draw rectangle
-        """
+    def draw(self, texture: Texture) -> None:
+        """Auto-detect format and draw appropriately."""
         if not self._allocated or not texture.allocated:
             return
 
@@ -83,7 +78,7 @@ class Visualizer:
             # Render visualization
             self.velocity_field.set(texture)
             self.velocity_field.update()
-            self.velocity_field.draw(rect)
+            self.velocity_field.draw()
 
         # Direct draw for RGB/RGBA (3-4 channels) or R (1 channel)
         else:

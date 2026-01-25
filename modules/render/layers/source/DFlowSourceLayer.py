@@ -52,7 +52,7 @@ class DFlowSourceLayer(LayerBase):
         self._fbo.deallocate()
         self._shader.deallocate()
 
-    def draw(self, rect: Rect) -> None:
+    def draw(self) -> None:
         """Draw the flow visualization."""
         if self._fbo.allocated:
             Blit.use(self._fbo.texture)

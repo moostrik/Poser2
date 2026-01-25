@@ -287,7 +287,7 @@ class HDTRenderManager(RenderBase):
 
         sim_rect = self.subdivision.get_rect('similarity', 0)
         glViewport(int(sim_rect.x), int(height - sim_rect.y - sim_rect.height), int(sim_rect.width), int(sim_rect.height))
-        self.pose_sim_layer.draw(self.subdivision.get_rect('similarity', 0))
+        self.pose_sim_layer.draw()
 
         # Interface layers
         for i in range(self.num_cams):
@@ -298,7 +298,7 @@ class HDTRenderManager(RenderBase):
             for layer_type in self._interface_layers:
                 # glViewport(int(track_rect.x), int(height - track_rect.y - track_rect.height), int(track_rect.width), int(track_rect.height))
 
-                self.L[layer_type][i].draw(track_rect)
+                self.L[layer_type][i].draw()
 
         # Preview layers
         for i in range(self.num_cams):
@@ -308,7 +308,7 @@ class HDTRenderManager(RenderBase):
             for layer_type in self._preview_layers:
                 # glViewport(int(preview_rect.x), int(height - preview_rect.y - preview_rect.height), int(preview_rect.width), int(preview_rect.height))
 
-                self.L[layer_type][i].draw(preview_rect)
+                self.L[layer_type][i].draw()
             self.L[Layers.centre_cam][i].use_mask = True #type: ignore
             self.L[Layers.centre_mask][i].blur_steps = 0 #type: ignore
 
@@ -325,7 +325,6 @@ class HDTRenderManager(RenderBase):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
-        draw_rect = Rect(0, 0, width, height)
 
         for layer_type in self._draw_layers:
-            self.L[layer_type][camera_id].draw(draw_rect)
+            self.L[layer_type][camera_id].draw()

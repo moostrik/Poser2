@@ -84,14 +84,10 @@ class CamCompositeLayer(LayerBase):
         glColor4f(1.0, 1.0, 1.0, 1.0)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        full_rect = Rect(0, 0, self._fbo.width, self._fbo.height)
-
         self._fbo.clear(0.0, 0.0, 0.0, 1.0)
         self._fbo.begin()
         Blit.use(self._cam_texture)
-        self._depth_track_renderer.draw(full_rect)
-        glViewport(0, 0, self._fbo.width, self._fbo.height)
-        self._bbox_renderer.draw(full_rect)
-        glViewport(0, 0, self._fbo.width, self._fbo.height)
-        self._pose_line_layer.draw(full_rect)
+        self._depth_track_renderer.draw()
+        self._bbox_renderer.draw()
+        self._pose_line_layer.draw()
         self._fbo.end()
