@@ -9,7 +9,7 @@ from pytweening import *    # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
-from modules.gl import Fbo, Texture, Blit
+from modules.gl import Fbo, Texture, Blit, Style
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import MaskApply as shader, Tint
 
@@ -83,8 +83,6 @@ class MotionMultiply(LayerBase):
             return # no update needed
         self._p_pose = pose
 
-        glDisable(GL_BLEND)
-        # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._mask_fbo.clear(0.0, 0.0, 0.0, 0.0)
@@ -92,6 +90,9 @@ class MotionMultiply(LayerBase):
 
         if pose is None:
             return
+
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         cam = self._centre_mask
         mask = self._centre_mask  # MotionMultiply currently doesn't use mask separately
@@ -128,4 +129,4 @@ class MotionMultiply(LayerBase):
         self._shader.use(cam, mask, motion)
         self._fbo.end()
 
-        glEnable(GL_BLEND)
+        Style.pop_style()
