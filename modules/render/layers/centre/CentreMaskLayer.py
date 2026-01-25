@@ -78,7 +78,6 @@ class CentreMaskLayer(LayerBase):
         """Render mask crop using bbox geometry from CentreGeometry."""
         # Disable blending during FBO rendering
         glDisable(GL_BLEND)
-        glColor4f(1.0, 1.0, 1.0, 1.0)
 
         self._mask_fbo.clear(0.0, 0.0, 0.0, 0.0)
 

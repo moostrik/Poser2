@@ -1,5 +1,5 @@
 import OpenGL.GL as gl
-import OpenGL.GLUT as glut
+# import OpenGL.GLUT as glut
 
 _glut_inited = False
 

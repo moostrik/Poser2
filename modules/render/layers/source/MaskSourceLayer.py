@@ -66,7 +66,6 @@ class MaskSourceLayer(LayerBase):
 
             self._fbo.clear()
             # glDisable(GL_BLEND)
-            glColor4f(1.0, 1.0, 1.0, 1.0)
 
             self._fbo.begin()
             Blit.use(self._cuda_image)

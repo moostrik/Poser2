@@ -71,14 +71,12 @@ class TrackerPanoramicLayer(LayerBase):
             if tracklet.status == TrackingStatus.NEW:
                 color = [1.0, 1.0, 1.0, 1.0]
 
-            glColor4f(*color)  # Reset color
             glBegin(GL_QUADS)       # Start drawing a quad
             glVertex2f(roi_x, roi_y)        # Bottom left
             glVertex2f(roi_x, roi_y + roi_height)    # Bottom right
             glVertex2f(roi_x + roi_width, roi_y + roi_height)# Top right
             glVertex2f(roi_x + roi_width, roi_y)    # Top left
             glEnd()                 # End drawing
-            glColor4f(1.0, 1.0, 1.0, 1.0)  # Reset color
 
             string: str
             roi_x += 9

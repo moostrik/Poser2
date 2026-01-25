@@ -81,7 +81,6 @@ class CamCompositeLayer(LayerBase):
         self._bbox_renderer.bbox_color = (1.0, 1.0, 1.0, 1.0)  # Example: set bbox color to red
 
         glEnable(GL_BLEND)
-        glColor4f(1.0, 1.0, 1.0, 1.0)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self._fbo.clear(0.0, 0.0, 0.0, 1.0)

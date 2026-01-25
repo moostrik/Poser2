@@ -129,4 +129,3 @@ class MotionMultiply(LayerBase):
         self._fbo.end()
 
         glEnable(GL_BLEND)
-        glColor4f(1.0, 1.0, 1.0, 1.0)

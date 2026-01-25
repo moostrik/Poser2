@@ -140,28 +140,3 @@ class SimilarityBlend(LayerBase):
 
 
         glEnable(GL_BLEND)
-        return
-
-        glEnable(GL_BLEND)
-        # set to add
-        glBlendFunc(GL_ONE, GL_ONE)
-
-        self._fbo.begin()
-        glColor4f(*colors[self._cam_id], 1.0)
-        mask.draw(0, 0, self._fbo.width, self._fbo.height)
-        glColor4f(*colors[other_1_index], alpha_1)
-        mask_other_1.draw(0, 0, self._fbo.width, self._fbo.height)
-        glColor4f(*colors[other_2_index], alpha_2)
-        mask_other_2.draw(0, 0, self._fbo.width, self._fbo.height)
-        self._fbo.end()
-
-        return
-
-
-        self._mask_other_1_fbo.begin()
-        glColor4f(alpha_1, 0.0, 0.0, 0.0)
-        mask_other_1.draw(0, 0, self._fbo.width, self._fbo.height)
-        self._mask_other_1_fbo.end()
-
-        SimilarityBlend._mask_multiply_shader.use(
-            self._mask_fbo.fbo_id, mask_other_1.tex_id, mask.tex_id)

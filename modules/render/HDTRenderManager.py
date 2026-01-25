@@ -275,7 +275,6 @@ class HDTRenderManager(RenderBase):
                 for layer in self.L[layer_type].values():
                     layer.update()
 
-        glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
         glViewport(0, 0, width, height)
 
@@ -317,7 +316,6 @@ class HDTRenderManager(RenderBase):
         self._preview_layers = PREVIEW_LAYERS
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        glEnable(GL_TEXTURE_2D)
         glEnable(GL_BLEND)
         glViewport(0, 0, width, height)
         glClearColor(0.0, 0.0, 0.0, 0.0)

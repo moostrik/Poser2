@@ -90,7 +90,6 @@ class DFlowSourceLayer(LayerBase):
                 self._fbo.allocate(w, h, self._flow_texture.internal_format)
 
             self._fbo.clear()
-            glColor4f(1.0, 1.0, 1.0, 1.0)
 
             self._fbo.begin()
             Blit.use(self._flow_texture)

@@ -95,11 +95,9 @@ class SimilarityLayer(LayerBase):
         step: float = self._fbo.height / self._num_streams
 
         self._fbo.begin()
-        glColor4f(1.0, 0.5, 0.5, 1.0)
         for i, pair in enumerate(pairs):
             string: str = f'{pair[0]} | {pair[1]}'
             x: int = self._fbo.width - 100
             y: int = int((i + 0.5) * step) + 12
             draw_box_string(x, y, string, big=True)
-        glColor4f(1.0, 1.0, 1.0, 1.0)
         self._fbo.end()

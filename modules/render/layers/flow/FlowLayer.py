@@ -271,7 +271,6 @@ class FlowLayer(LayerBase):
         """Update full processing pipeline."""
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
-        Style.set_color(1.0, 1.0, 1.0, 1.0)
 
         # Check if source is active
         active: bool = getattr(self._source, "available", True)

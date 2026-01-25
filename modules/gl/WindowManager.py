@@ -103,7 +103,7 @@ class WindowManager():
         # Configure GLFW
         glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 4)
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 6)
-        glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_COMPAT_PROFILE)
+        glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
         glfw.window_hint(glfw.DECORATED, glfw.TRUE)
         glfw.window_hint(glfw.RESIZABLE, glfw.TRUE)
 

@@ -29,7 +29,6 @@ class _StyleState:
     """Current OpenGL rendering style state."""
     blend_enabled: bool = False
     blend_mode: BlendMode = BlendMode.ALPHA  # Intuitive blend mode
-    color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
 
 
 _style_stack: list[_StyleState] = []
@@ -52,7 +51,6 @@ def push_style() -> None:
     state = _StyleState(
         blend_enabled=bool(glIsEnabled(GL_BLEND)),
         blend_mode=blend_mode,
-        color=tuple(glGetFloatv(GL_CURRENT_COLOR)),
     )
     _style_stack.append(state)
 
@@ -75,7 +73,6 @@ def pop_style() -> None:
         glDisable(GL_BLEND)
 
     glBlendFunc(state.blend_mode.src_factor, state.blend_mode.dst_factor)
-    glColor4f(*state.color)
 
 
 def set_blend_mode(mode: BlendMode) -> None:
@@ -87,7 +84,3 @@ def set_blend_mode(mode: BlendMode) -> None:
         glEnable(GL_BLEND)
         glBlendFunc(mode.src_factor, mode.dst_factor)
 
-
-def set_color(r: float, g: float, b: float, a: float = 1.0) -> None:
-    """Set the current drawing color."""
-    glColor4f(r, g, b, a)

@@ -56,7 +56,6 @@ class CentreDenseFlowLayer(LayerBase):
         """Render flow crop using anchor geometry, optionally with mask."""
         # Disable blending during FBO rendering
         glDisable(GL_BLEND)
-        glColor4f(1.0, 1.0, 1.0, 1.0)
 
         self._flow_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
