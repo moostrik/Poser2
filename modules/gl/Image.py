@@ -89,6 +89,10 @@ class Image(Fbo):
         self._mutex: Lock = Lock()
         self._channel_order: Literal['BGR', 'RGB'] = channel_order
         self._source: Texture = Texture()  # Private texture for numpy upload
+        # Cache last uploaded dimensions/format to avoid redundant checks
+        self._cached_width: int = 0
+        self._cached_height: int = 0
+        self._cached_format: Constant = GL_NONE
 
     def set_image(self, image: np.ndarray) -> None:
         """Set image to be uploaded to texture.
@@ -179,25 +183,37 @@ class Image(Fbo):
         Args:
             image: NumPy array containing the image data
         """
-        internal_format: Constant = _get_internal_format(image)
-        if internal_format == GL_NONE:
-            return
         height: int = image.shape[0]
         width: int = image.shape[1]
 
-        # Reallocate if dimensions or format changed
-        if internal_format != self.internal_format or width != self.width or height != self.height:
-            if self.allocated:
-                self.deallocate()
-            self.allocate(width, height, internal_format)
+        # Fast path: check cached dimensions/format first
+        needs_realloc: bool = (width != self._cached_width or
+                                height != self._cached_height or
+                                self._cached_format == GL_NONE)
+
+        if needs_realloc:
+            internal_format: Constant = _get_internal_format(image)
+            if internal_format == GL_NONE:
+                return
+
+            # Reallocate if dimensions or format changed
+            if internal_format != self.internal_format or width != self.width or height != self.height:
+                if self.allocated:
+                    self.deallocate()
+                self.allocate(width, height, internal_format)
+
+            # Update cache
+            self._cached_width = width
+            self._cached_height = height
+            self._cached_format = internal_format
 
         if not self.allocated:
             return
 
-        # Upload image data to source texture
+        # Upload image data to source texture using glTexSubImage2D (faster than glTexImage2D)
         self._source.bind()
-        glTexImage2D(GL_TEXTURE_2D, 0, self._source.internal_format, width, height, 0,
-                     self._source.format, self._source.data_type, image)
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height,
+                        self._source.format, self._source.data_type, image)
         self._source.unbind()
 
         # Render flipped to FBO using modern shader
