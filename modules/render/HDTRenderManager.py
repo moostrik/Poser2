@@ -187,7 +187,7 @@ class HDTRenderManager(RenderBase):
             sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(       flow_image)
 
             cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxCamRenderer(     i, self.data_hub,   PoseDataHubTypes.pose_I)
-            cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=1.0)
+            cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=2.0)
             angle_data =    self.L[Layers.angle_data][i] =  ls.PDLayer(             i, self.data_hub)
             mtime_data =    self.L[Layers.mtime_data][i] =  ls.PoseMTimeRenderer(   i, self.data_hub,   PoseDataHubTypes.pose_I)
             field_bar_R =   self.L[Layers.field_bar_R][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_R,    FrameField.angles, line_thickness=4.0, line_smooth=16.0, color = (0.0, 0.0, 0.0, 0.33))

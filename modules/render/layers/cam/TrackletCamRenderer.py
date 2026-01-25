@@ -23,7 +23,7 @@ class TrackletCamRenderer(LayerBase):
         self._shader: DrawColoredRectangle = DrawColoredRectangle()
         text_init()
 
-    def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
+    def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._shader.allocate()
 
     def deallocate(self) -> None:

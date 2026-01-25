@@ -63,8 +63,8 @@ class CamCompositeLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
-        self._depth_track_renderer.allocate()
-        self._bbox_renderer.allocate()
+        self._depth_track_renderer.allocate(width, height, internal_format)
+        self._bbox_renderer.allocate(width, height, internal_format)
         self._pose_line_layer.allocate(width, height, internal_format)
 
     def deallocate(self) -> None:

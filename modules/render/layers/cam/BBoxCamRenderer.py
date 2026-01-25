@@ -14,26 +14,37 @@ class BBoxCamRenderer(LayerBase):
         self._data: DataHub = data
         self._cam_id: int = cam_id
         self._cam_bbox_rects: list[Rect] = []
+        self._width: int = 0
+        self._height: int = 0
 
         self.data_type: PoseDataHubTypes = data_type
-        self.line_width: float = 0.05  # Fixed normalized line width for visibility
+        self.line_width: int = line_width  # Line width in pixels
         self.bbox_color: tuple[float, float, float, float] = bbox_color
 
         self._shader: DrawRectangleOutline = DrawRectangleOutline()
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         self._shader.allocate()
+        if width is not None:
+            self._width = width
+        if height is not None:
+            self._height = height
 
     def deallocate(self) -> None:
         self._shader.deallocate()
 
     def draw(self, rect: Rect) -> None:
         for bbox_rect in self._cam_bbox_rects:
-            draw_rect: Rect = bbox_rect.affine_transform(rect)
+            # Convert pixel line width to normalized coordinates relative to the rectangle
+            rect_w_pixels = bbox_rect.width * self._width
+            rect_h_pixels = bbox_rect.height * self._height
+            line_width_x = self.line_width / rect_w_pixels
+            line_width_y = self.line_width / rect_h_pixels
+
             self._shader.use(
-                draw_rect.x, draw_rect.y, draw_rect.width, draw_rect.height,
+                bbox_rect.x, bbox_rect.y, bbox_rect.width, bbox_rect.height,
                 *self.bbox_color,
-                self.line_width
+                line_width_x, line_width_y
             )
 
     def update(self) -> None:
