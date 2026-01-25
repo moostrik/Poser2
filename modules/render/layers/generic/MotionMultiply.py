@@ -9,8 +9,8 @@ from pytweening import *    # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 
-from modules.gl import Fbo, Texture, Blit, Style
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.gl import Fbo, Texture, Blit, Style, clear_color
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import MaskApply as shader, Tint
 
 from modules.pose.features import AggregationMethod
@@ -28,7 +28,7 @@ class MotionMultiply(LayerBase):
         self._fbo: Fbo = Fbo()
         self._cam_fbo: Fbo = Fbo()
         self._mask_fbo: Fbo = Fbo()
-        self._p_pose: Frame | None = None
+        self._data_cache: DataCache[Frame]= DataCache[Frame]()
         self._motion: float = 0.0
 
         self._shader: shader = shader()
@@ -76,19 +76,16 @@ class MotionMultiply(LayerBase):
             Blit().use(self._mask_fbo)
 
     def update(self) -> None:
-
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
+        self._data_cache.update(pose)
 
-        if pose is self._p_pose:
-            return # no update needed
-        self._p_pose = pose
+        if self._data_cache.lost:
+            self._fbo.clear()
+            self._cam_fbo.clear()
+            self._mask_fbo.clear()
+            self._motion = 0.0
 
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
-        self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
-        self._mask_fbo.clear(0.0, 0.0, 0.0, 0.0)
-        self._motion = 0.0
-
-        if pose is None:
+        if self._data_cache.idle or pose is None:
             return
 
         Style.push_style()

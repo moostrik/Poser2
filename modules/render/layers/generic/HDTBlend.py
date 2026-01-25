@@ -7,9 +7,9 @@ from pytweening import *    # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, Style
+from modules.gl import Fbo, Texture, Style, clear_color
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.layers.generic.MotionMultiply import MotionMultiply
 from modules.render.shaders import MaskApply, MaskMultiply, HDTTripleBlend
 
@@ -32,12 +32,11 @@ class SimilarityBlend(LayerBase):
         self._mask_other_1_fbo: Fbo = Fbo()
         self._mask_other_2_fbo: Fbo = Fbo()
 
-
         self._mask_shader: MaskApply = MaskApply()
         self._mask_multiply_shader: MaskMultiply = MaskMultiply()
         self._blend_shader: HDTTripleBlend = HDTTripleBlend()
 
-        self._p_pose: Frame | None = None
+        self._data_cache: DataCache[Frame]= DataCache[Frame]()
 
         self.data_type: PoseDataHubTypes = data_type
 
@@ -78,17 +77,15 @@ class SimilarityBlend(LayerBase):
         self._blend_shader.deallocate()
 
     def update(self) -> None:
-
         pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
+        self._data_cache.update(pose)
 
-        if pose is self._p_pose:
-            return # no update needed
-        self._p_pose = pose
+        if self._data_cache.lost:
+            self._fbo.clear()
 
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
-
-        if pose is None:
+        if self._data_cache.idle or pose is None:
             return
+
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
@@ -132,6 +129,7 @@ class SimilarityBlend(LayerBase):
         self._blend_shader.reload()
 
         self._fbo.begin()
+        clear_color()
         self._blend_shader.use(cam,                     self._cam_other_1_fbo,  self._cam_other_2_fbo,
                                mask,                    mask_other_1,           mask_other_2,
                                alpha,                   alpha_1,                alpha_2,

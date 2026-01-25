@@ -7,10 +7,10 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub
-from modules.gl import Fbo, Texture
+from modules.gl import Fbo, Texture, clear_color
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.layers.source import ImageSourceLayer
 from modules.render.shaders import DrawRoi
 
@@ -23,7 +23,7 @@ class CamBBoxLayer(LayerBase):
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
         self._cam_texture: Texture = cam_texture
-        self._p_pose: Frame | None = None
+        self._data_cache: DataCache[Frame]= DataCache[Frame]()
 
         self.data_type: PoseDataHubTypes = data_type
 
@@ -45,18 +45,13 @@ class CamBBoxLayer(LayerBase):
         self._roi_shader.deallocate()
 
     def update(self) -> None:
-        key: int = self._cam_id
+        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
+        self._data_cache.update(pose)
 
-        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), key)
+        if self._data_cache.lost:
+            self._fbo.clear()
 
-        if pose is self._p_pose:
-            return # no update needed
-        self._p_pose = pose
-
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        self._fbo.clear(0.0, 0.0, 0.0, 0.0)
-        if pose is None:
+        if self._data_cache.idle or pose is None:
             return
 
         pose_rect: Rect = pose.bbox.to_rect()
@@ -64,5 +59,6 @@ class CamBBoxLayer(LayerBase):
         pose_rect = pose_rect.flip_y(0.5)
 
         self._fbo.begin()
+        clear_color()
         self._roi_shader.use(self._cam_texture, pose_rect)
         self._fbo.end()

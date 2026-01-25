@@ -145,13 +145,13 @@ FINAL_LAYERS: list[Layers] = [
 
     # Layers.sim_blend,
 
-    Layers.centre_cam,
+    # Layers.centre_cam,
     # Layers.centre_mask,
-    Layers.centre_pose,
-    # Layers.sim_blend,
     # Layers.centre_pose,
     # Layers.sim_blend,
-    # Layers.flow,
+    # Layers.centre_pose,
+    Layers.sim_blend,
+    Layers.flow,
 ]
 
 BOX_LAYERS: list[Layers] = [
