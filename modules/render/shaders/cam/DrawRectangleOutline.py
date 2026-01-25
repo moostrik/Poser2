@@ -28,4 +28,3 @@ class DrawRectangleOutline(Shader):
         glUniform4f(self.get_uniform_loc("color"), r, g, b, a)
         glUniform2f(self.get_uniform_loc("lineWidth"), line_width_x, line_width_y)
         draw_quad()
-        glUseProgram(0)

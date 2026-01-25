@@ -107,15 +107,6 @@ class JacobiPressureCompute(ComputeShader):
         # Dispatch compute shader
         self.dispatch(pressure_in.width, pressure_in.height)
 
-        # Cleanup
-        glActiveTexture(GL_TEXTURE2)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)
-
     def solve(
         self,
         pressure_a: Texture,

@@ -37,8 +37,3 @@ class VorticityForce(Shader):
 
         # Draw fullscreen quad
         draw_quad()
-
-        # Cleanup
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)

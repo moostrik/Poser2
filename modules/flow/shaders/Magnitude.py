@@ -29,6 +29,3 @@ class Magnitude(Shader):
         glBindTexture(GL_TEXTURE_2D, src.tex_id)
         glUniform1i(self.get_uniform_loc("tex"), 0)
         draw_quad()
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)

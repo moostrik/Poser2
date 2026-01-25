@@ -33,6 +33,3 @@ class BlitFlip(Shader):
         glUniform1i(self.get_uniform_loc("flipY"), flip_y)
 
         draw_quad()
-
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)

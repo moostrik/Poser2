@@ -25,9 +25,3 @@ class WS_Lines(Shader):
         # Render
         draw_quad()
 
-        # Cleanup
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        glUseProgram(0)
-

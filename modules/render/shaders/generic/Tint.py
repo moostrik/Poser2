@@ -23,6 +23,3 @@ class Tint(Shader):
         glUniform4f(self.get_uniform_loc("tint"), r, g, b, a)
 
         draw_quad()
-
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)

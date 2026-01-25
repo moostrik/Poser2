@@ -31,6 +31,3 @@ class HDT_Lines(Shader):
 
         # Render
         draw_quad()
-
-        # Cleanup
-        glUseProgram(0)

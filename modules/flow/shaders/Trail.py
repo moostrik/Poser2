@@ -44,10 +44,3 @@ class Trail(Shader):
         glUniform1f(self.get_uniform_loc("newWeight"), new_weight)
 
         draw_quad()
-
-        # Cleanup
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)

@@ -31,11 +31,6 @@ class StreamPose(Shader):
         # Render
         draw_quad()
 
-        # Cleanup
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)
-
 
     @staticmethod
     def pose_stream_to_image(pose_stream: PDStreamData, confidence_ceil: bool = False) -> np.ndarray:

@@ -43,11 +43,6 @@ class StreamCorrelation(Shader):
         # Render
         draw_quad()
 
-        # Cleanup
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)
-
     @staticmethod
     def r_stream_to_image(pair_arrays: list[np.ndarray], num_streams: int) -> np.ndarray:
         """Convert similarity arrays to RGB image with mask - OPTIMIZED.

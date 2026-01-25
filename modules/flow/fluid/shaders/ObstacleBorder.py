@@ -25,5 +25,3 @@ class ObstacleBorder(Shader):
         glUniform1f(self.get_uniform_loc("uBorder"), border)
 
         draw_quad()
-
-        glUseProgram(0)

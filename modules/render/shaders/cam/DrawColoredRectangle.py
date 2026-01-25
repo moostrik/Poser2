@@ -25,4 +25,3 @@ class DrawColoredRectangle(Shader):
         glUniform4f(self.get_uniform_loc("rect"), x, y, w, h)
         glUniform4f(self.get_uniform_loc("color"), r, g, b, a)
         draw_quad()
-        glUseProgram(0)

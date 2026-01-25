@@ -37,8 +37,3 @@ class Scale(Shader):
         glUniform1f(self.get_uniform_loc("scale"), scale)
 
         draw_quad()
-
-        # Cleanup
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)

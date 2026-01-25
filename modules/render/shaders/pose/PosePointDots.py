@@ -34,6 +34,3 @@ class PosePointDots(Shader):
         # Render
         draw_quad()
 
-        # Cleanup
-        glUseProgram(0)
-

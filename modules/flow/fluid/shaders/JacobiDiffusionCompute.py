@@ -103,13 +103,6 @@ class JacobiDiffusionCompute(ComputeShader):
         # Dispatch compute shader
         self.dispatch(velocity_in.width, velocity_in.height)
 
-        # Cleanup
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)
-
     def solve(
         self,
         velocity_a: Texture,

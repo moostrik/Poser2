@@ -49,6 +49,3 @@ class GaussianBlur(Shader):
         glUniform2f(self.get_uniform_loc("resolution"), float(source_texture.width), float(source_texture.height))
 
         draw_quad()
-
-        glBindTexture(GL_TEXTURE_2D, 0)
-        glUseProgram(0)
