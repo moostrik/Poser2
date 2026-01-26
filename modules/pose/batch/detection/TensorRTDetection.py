@@ -260,6 +260,53 @@ class TensorRTDetection(Thread):
         with self._callback_lock:
             self._callbacks.add(callback)
 
+    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float]:
+        """Run TensorRT inference on batch of images. Returns (keypoints, scores, inference_time_ms)."""
+
+        # Preprocess on CPU (numpy operations - safe outside lock)
+        batch = self._preprocess_batch(imgs, width, height)
+        batch_size = len(imgs)
+
+        # Run inference with global lock to prevent race conditions
+        # ALL GPU operations inside lock and on same stream for stability
+        with get_exec_lock():
+            # Start timing after acquiring lock (excludes wait time)
+            lock_acquired = time.perf_counter()
+
+            # Copy preprocessed batch into preallocated GPU buffer (on stream)
+            with self.stream:
+                self._input_buffer[:batch_size] = cp.asarray(batch)
+            batch_gpu = self._input_buffer[:batch_size]
+
+            # Get views into preallocated output buffers for actual batch size
+            output0_gpu = self._output_buffers['simcc_x'][:batch_size]
+            output1_gpu = self._output_buffers['simcc_y'][:batch_size]
+
+            # Set input shape for current batch (must be inside lock!)
+            self.context.set_input_shape(self.input_name, batch_gpu.shape)
+
+            # Set tensor addresses using preallocated buffers
+            self.context.set_tensor_address(self.input_name, batch_gpu.data.ptr)
+            self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
+            self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
+
+            # Execute inference
+            with self.stream:
+                self.context.execute_async_v3(stream_handle=self.stream.ptr)
+            self.stream.synchronize()
+
+            # Decode SimCC outputs on GPU using same stream (prevents cross-stream conflicts)
+            with self.stream:
+                keypoints_gpu, scores_gpu = TensorRTDetection._decode_simcc_gpu(output0_gpu, output1_gpu, self.simcc_split_ratio)
+                keypoints = cp.asnumpy(keypoints_gpu)
+                scores = cp.asnumpy(scores_gpu)
+            self.stream.synchronize()
+
+            # Return time spent in lock (actual inference time)
+            inference_time = (time.perf_counter() - lock_acquired) * 1000.0
+
+        return keypoints, scores, inference_time
+
     # STATIC METHODS
 
     @staticmethod
@@ -273,8 +320,48 @@ class TensorRTDetection(Thread):
         return batch_norm
 
     @staticmethod
-    def _decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float, apply_softmax: bool = False) -> tuple[np.ndarray, np.ndarray]:
-        """Decode SimCC using MMPose's exact method from get_simcc_maximum.
+    def _decode_simcc_gpu(simcc_x: cp.ndarray, simcc_y: cp.ndarray, split_ratio: float) -> tuple[cp.ndarray, cp.ndarray]:
+        """Decode SimCC on GPU using CuPy. Returns (keypoints, scores) as CuPy arrays.
+
+        Reference: mmpose/codecs/utils/post_processing.py::get_simcc_maximum
+        """
+        N, K, _ = simcc_x.shape
+
+        # Reshape for processing: (N, K, W) -> (N*K, W)
+        simcc_x_flat = simcc_x.reshape(N * K, -1)
+        simcc_y_flat = simcc_y.reshape(N * K, -1)
+
+        # Get coordinates from argmax
+        x_locs = cp.argmax(simcc_x_flat, axis=1)
+        y_locs = cp.argmax(simcc_y_flat, axis=1)
+
+        # Get max values (scores) at predicted locations
+        max_val_x = cp.amax(simcc_x_flat, axis=1)
+        max_val_y = cp.amax(simcc_y_flat, axis=1)
+
+        # MMPose takes MINIMUM of x and y scores
+        mask = max_val_x > max_val_y
+        max_val_x[mask] = max_val_y[mask]
+        scores = max_val_x
+
+        # Convert to coordinates
+        x_coords = x_locs.astype(cp.float32) / split_ratio
+        y_coords = y_locs.astype(cp.float32) / split_ratio
+
+        # Reshape back to (N, K, 2) and (N, K)
+        keypoints = cp.stack([x_coords, y_coords], axis=-1).reshape(N, K, 2)
+        scores = scores.reshape(N, K)
+
+        # Mark invalid keypoints
+        keypoints[scores <= 0.] = -1
+
+        scores = cp.clip(scores, 0.0, 1.0)
+
+        return keypoints, scores
+
+    @staticmethod
+    def _decode_simcc_cpu(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float, apply_softmax: bool = False) -> tuple[np.ndarray, np.ndarray]:
+        """Decode SimCC on CPU using NumPy. Kept as fallback.
 
         Reference: mmpose/codecs/utils/post_processing.py::get_simcc_maximum
         """
@@ -316,52 +403,6 @@ class TensorRTDetection(Thread):
         # Mark invalid keypoints
         keypoints[scores <= 0.] = -1
 
-
         scores = np.clip(scores, 0.0, 1.0)
 
         return keypoints, scores
-
-    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float]:
-        """Run TensorRT inference on batch of images. Returns (keypoints, scores, inference_time_ms)."""
-
-        # Preprocess
-        batch = self._preprocess_batch(imgs, width, height)
-        batch_size = len(imgs)
-
-        # Copy preprocessed batch into preallocated GPU buffer
-        self._input_buffer[:batch_size] = cp.asarray(batch)
-        batch_gpu = self._input_buffer[:batch_size]
-
-        # Get views into preallocated output buffers for actual batch size
-        output0_gpu = self._output_buffers['simcc_x'][:batch_size]
-        output1_gpu = self._output_buffers['simcc_y'][:batch_size]
-
-        # Run inference with global lock to prevent race conditions
-        with get_exec_lock():
-            # Start timing after acquiring lock (excludes wait time)
-            lock_acquired = time.perf_counter()
-
-            # Set input shape for current batch (must be inside lock!)
-            self.context.set_input_shape(self.input_name, batch_gpu.shape)
-
-            # Set tensor addresses using preallocated buffers
-            self.context.set_tensor_address(self.input_name, batch_gpu.data.ptr)
-            self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
-            self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
-
-            # Execute inference
-            with self.stream:
-                self.context.execute_async_v3(stream_handle=self.stream.ptr)
-            self.stream.synchronize()
-
-        # Copy back to CPU
-        simcc_x = cp.asnumpy(output0_gpu)
-        simcc_y = cp.asnumpy(output1_gpu)
-
-        # Return time spent in lock (actual inference time)
-        inference_time = (time.perf_counter() - lock_acquired) * 1000.0
-
-        # Decode SimCC outputs
-        keypoints, scores = TensorRTDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
-
-        return keypoints, scores, inference_time

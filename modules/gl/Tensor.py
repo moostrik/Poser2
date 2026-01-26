@@ -221,6 +221,10 @@ class Tensor(Texture):
         # Ensure contiguous memory for GPU copy
         tensor = tensor.contiguous()
 
+        # Synchronize to ensure all prior CUDA operations are complete
+        # This is critical when tensor comes from TensorRT/CuPy on different streams
+        torch.cuda.synchronize()
+
         # Map graphics resource to get CUDA device pointer
         (err,) = runtime.cudaGraphicsMapResources(1, self._cuda_gl_resource, torch.cuda.current_stream().cuda_stream)
         if err != runtime.cudaError_t.cudaSuccess:

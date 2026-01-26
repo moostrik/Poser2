@@ -352,37 +352,41 @@ class TensorRTSegmentation(Thread):
         """
         h, w = img.shape[:2]
 
-        # Move raw image to GPU first, then do all preprocessing on GPU
-        img_gpu = cp.asarray(img)  # (H, W, 3) uint8 BGR -> GPU
-        img_rgb_gpu = img_gpu[:, :, ::-1]  # BGR to RGB on GPU (zero-copy view)
-        img_float_gpu = img_rgb_gpu.astype(cp.float32)  # uint8 -> float32 on GPU
-        img_norm_gpu = img_float_gpu / 255.0  # Normalize to [0, 1] on GPU
-        img_chw_gpu = cp.transpose(img_norm_gpu, (2, 0, 1))  # (3, H, W) on GPU
-        img_chw_gpu = cp.ascontiguousarray(img_chw_gpu)  # Ensure contiguous memory for TensorRT
-        src_gpu = cp.expand_dims(img_chw_gpu, axis=0)  # (1, 3, H, W) on GPU
-
-        # Get or initialize recurrent state for this tracklet
+        # Get or initialize recurrent state for this tracklet (before acquiring lock)
         with self._state_lock:
             state = self._recurrent_states.get(tracklet_id)
 
-        # Prepare recurrent state inputs (dynamic shapes based on model resolution)
-        if state is not None:
-            # States are already CuPy arrays on GPU - use directly
-            r1_gpu = state.r1
-            r2_gpu = state.r2
-            r3_gpu = state.r3
-            r4_gpu = state.r4
-        else:
-            # Initialize with dynamic shapes for first frame (r1: h/2, r2: h/4, r3: h/8, r4: h/16)
-            r1_gpu = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32)
-            r2_gpu = cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32)
-            r3_gpu = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32)
-            r4_gpu = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32)
-
         # Run inference with global lock to prevent race conditions
+        # ALL GPU operations inside lock for maximum stability
         with get_exec_lock():
             # Start timing after acquiring lock (excludes wait time)
             lock_acquired = time.perf_counter()
+
+            # All CuPy operations on same stream as TensorRT
+            with self.stream:
+                # Preprocessing on GPU (inside lock to prevent CUDA conflicts)
+                img_gpu = cp.asarray(img)  # (H, W, 3) uint8 BGR -> GPU
+                img_rgb_gpu = img_gpu[:, :, ::-1]  # BGR to RGB on GPU (zero-copy view)
+                img_float_gpu = img_rgb_gpu.astype(cp.float32)  # uint8 -> float32 on GPU
+                img_norm_gpu = img_float_gpu / 255.0  # Normalize to [0, 1] on GPU
+                img_chw_gpu = cp.transpose(img_norm_gpu, (2, 0, 1))  # (3, H, W) on GPU
+                img_chw_gpu = cp.ascontiguousarray(img_chw_gpu)  # Ensure contiguous memory for TensorRT
+                src_gpu = cp.expand_dims(img_chw_gpu, axis=0)  # (1, 3, H, W) on GPU
+
+                # Prepare recurrent state inputs (dynamic shapes based on model resolution)
+                if state is not None:
+                    # States are already CuPy arrays on GPU - use directly
+                    r1_gpu = state.r1
+                    r2_gpu = state.r2
+                    r3_gpu = state.r3
+                    r4_gpu = state.r4
+                else:
+                    # Initialize with dynamic shapes for first frame (r1: h/2, r2: h/4, r3: h/8, r4: h/16)
+                    r1_gpu = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32)
+                    r2_gpu = cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32)
+                    r3_gpu = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32)
+                    r4_gpu = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32)
+            self.stream.synchronize()
 
             # Set input shapes (must be inside lock!)
             self.context.set_input_shape('src', src_gpu.shape)
@@ -399,14 +403,6 @@ class TensorRTSegmentation(Thread):
             r2o_gpu = buffers['r2o']
             r3o_gpu = buffers['r3o']
             r4o_gpu = buffers['r4o']
-
-            # Clear output buffers before inference to prevent contamination
-            fgr_gpu.fill(0)
-            pha_gpu.fill(0)
-            r1o_gpu.fill(0)
-            r2o_gpu.fill(0)
-            r3o_gpu.fill(0)
-            r4o_gpu.fill(0)
 
             # Set tensor addresses
             self.context.set_tensor_address('src', src_gpu.data.ptr)
@@ -426,22 +422,25 @@ class TensorRTSegmentation(Thread):
                 self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
 
+            # Copy recurrent states on same stream (they reference preallocated buffers)
+            with self.stream:
+                new_state = RecurrentState(
+                    r1=r1o_gpu.copy(),
+                    r2=r2o_gpu.copy(),
+                    r3=r3o_gpu.copy(),
+                    r4=r4o_gpu.copy()
+                )
+
+                # Convert CuPy array to PyTorch tensor on same stream
+                pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(0).squeeze(0).clone()
+            self.stream.synchronize()
+
             # Calculate time spent in lock (actual inference time)
             inference_time = (time.perf_counter() - lock_acquired) * 1000.0
 
-        # Update recurrent states for next frame (keep on GPU as CuPy arrays)
-        new_state = RecurrentState(
-            r1=r1o_gpu,
-            r2=r2o_gpu,
-            r3=r3o_gpu,
-            r4=r4o_gpu
-        )
+        # Update recurrent states for next frame (now safe - we have copies)
         with self._state_lock:
             self._recurrent_states[tracklet_id] = new_state
-
-        # Convert CuPy array to PyTorch tensor (zero-copy, both on CUDA)
-        pha_tensor = torch.as_tensor(pha_gpu, device='cuda')  # (1, 1, H, W)
-        pha_tensor = pha_tensor.squeeze(0).squeeze(0)  # (H, W)
 
         return pha_tensor, inference_time
 
