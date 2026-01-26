@@ -65,6 +65,11 @@ class TensorRTDetection(Thread):
         self.output_names: list[str]
         self.stream: cp.cuda.Stream
 
+        # Preallocated GPU buffers (allocated after engine loads)
+        self._max_batch: int = 8
+        self._input_buffer: cp.ndarray
+        self._output_buffers: dict[str, cp.ndarray]
+
     @property
     def is_ready(self) -> bool:
         """Check if model is loaded and ready"""
@@ -125,6 +130,20 @@ class TensorRTDetection(Thread):
                 self.input_name = name
             else:
                 self.output_names.append(name)
+
+        # Preallocate GPU buffers for max batch size
+        # SimCC output dimensions: simcc_x = (B, 17, W*2), simcc_y = (B, 17, H*2)
+        simcc_x_width = self.model_width * 2
+        simcc_y_height = self.model_height * 2
+
+        self._input_buffer = cp.zeros(
+            (self._max_batch, 3, self.model_height, self.model_width),
+            dtype=cp.float32
+        )
+        self._output_buffers = {
+            'simcc_x': cp.zeros((self._max_batch, self.num_keypoints, simcc_x_width), dtype=cp.float32),
+            'simcc_y': cp.zeros((self._max_batch, self.num_keypoints, simcc_y_height), dtype=cp.float32),
+        }
 
         self._model_ready.set()
         print(f"TensorRT Detection: {self.resolution_name} model ready ({self.model_width}x{self.model_height})")
@@ -245,9 +264,6 @@ class TensorRTDetection(Thread):
 
     @staticmethod
     def _preprocess_batch(imgs: list[np.ndarray], width: int, height: int) -> np.ndarray:
-        """Convert BGR uint8 images to normalized RGB FP32 batch (B, 3, H, W)."""
-        if not imgs:
-            return np.empty((0, 3, height, width), dtype=np.float32)
 
         batch_hwc = np.stack(imgs, axis=0).astype(np.float32)
         batch_rgb = batch_hwc[:, :, :, ::-1]
@@ -307,15 +323,18 @@ class TensorRTDetection(Thread):
 
     def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float]:
         """Run TensorRT inference on batch of images. Returns (keypoints, scores, inference_time_ms)."""
-        if not imgs:
-            return np.empty((0, 17, 2)), np.empty((0, 17)), 0.0
 
         # Preprocess
         batch = self._preprocess_batch(imgs, width, height)
+        batch_size = len(imgs)
 
+        # Copy preprocessed batch into preallocated GPU buffer
+        self._input_buffer[:batch_size] = cp.asarray(batch)
+        batch_gpu = self._input_buffer[:batch_size]
 
-        # Use CuPy for GPU arrays
-        batch_gpu = cp.asarray(batch)
+        # Get views into preallocated output buffers for actual batch size
+        output0_gpu = self._output_buffers['simcc_x'][:batch_size]
+        output1_gpu = self._output_buffers['simcc_y'][:batch_size]
 
         # Run inference with global lock to prevent race conditions
         with get_exec_lock():
@@ -325,15 +344,7 @@ class TensorRTDetection(Thread):
             # Set input shape for current batch (must be inside lock!)
             self.context.set_input_shape(self.input_name, batch_gpu.shape)
 
-            # Get output shapes from engine
-            output0_shape = self.context.get_tensor_shape(self.output_names[0])
-            output1_shape = self.context.get_tensor_shape(self.output_names[1])
-
-            # Allocate GPU output buffers
-            output0_gpu = cp.empty(output0_shape, dtype=cp.float32)
-            output1_gpu = cp.empty(output1_shape, dtype=cp.float32)
-
-            # Set tensor addresses
+            # Set tensor addresses using preallocated buffers
             self.context.set_tensor_address(self.input_name, batch_gpu.data.ptr)
             self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
             self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
