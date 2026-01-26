@@ -94,8 +94,18 @@ class TensorRTSegmentation(Thread):
         self._executor: ThreadPoolExecutor | None = None
         self._max_workers: int = min(settings.max_poses, 4)
 
-        # Preallocated GPU output buffers (allocated after engine loads)
-        self._output_buffers: list[dict[str, cp.ndarray]] = []
+        # Preallocated zero recurrent states for new tracklets (read-only, shared)
+        self._zero_r1: cp.ndarray
+        self._zero_r2: cp.ndarray
+        self._zero_r3: cp.ndarray
+        self._zero_r4: cp.ndarray
+
+        # Profiling accumulators (periodic averaging)
+        self._profile_count: int = 0
+        self._profile_interval: int = 100  # Print every N frames
+        self._profile_preprocess: float = 0.0
+        self._profile_inference: float = 0.0
+        self._profile_postprocess: float = 0.0
 
     @property
     def is_ready(self) -> bool:
@@ -184,17 +194,11 @@ class TensorRTSegmentation(Thread):
             with self._state_lock:
                 self._recurrent_states.clear()
 
-            # Preallocate output buffers per worker (now that dimensions are known)
-            self._output_buffers = []
-            for _ in range(self._max_workers):
-                self._output_buffers.append({
-                    'fgr': cp.zeros((1, 3, self.model_height, self.model_width), dtype=cp.float32),
-                    'pha': cp.zeros((1, 1, self.model_height, self.model_width), dtype=cp.float32),
-                    'r1o': cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32),
-                    'r2o': cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32),
-                    'r3o': cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32),
-                    'r4o': cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32),
-                })
+            # Preallocate zero recurrent states (read-only, shared across all new tracklets)
+            self._zero_r1 = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32)
+            self._zero_r2 = cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32)
+            self._zero_r3 = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32)
+            self._zero_r4 = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32)
 
             # Create thread pool for parallel inference
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="TRT-RVM-Worker")
@@ -298,8 +302,7 @@ class TensorRTSegmentation(Thread):
             futures = []
             inference_times = []
             for i, (img, tracklet_id) in enumerate(zip(images_to_process, tracklets_to_process)):
-                buffer_idx = i  # Direct mapping: worker i uses buffer i
-                future = self._executor.submit(self._infer_single_image, img, tracklet_id, buffer_idx)
+                future = self._executor.submit(self._infer_single_image, img, tracklet_id)
                 futures.append((future, tracklet_id))
 
             # Collect results in original order
@@ -339,18 +342,16 @@ class TensorRTSegmentation(Thread):
         except Exception:
             print("TensorRT Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_single_image(self, img: np.ndarray, tracklet_id: int, buffer_idx: int) -> tuple[torch.Tensor, float]:
+    def _infer_single_image(self, img: np.ndarray, tracklet_id: int) -> tuple[torch.Tensor, float]:
         """Run RVM TensorRT inference on single image with per-tracklet recurrent state.
 
         Args:
             img: Input image (H, W, 3) BGR uint8
             tracklet_id: Unique identifier for tracking temporal state
-            buffer_idx: Index into _output_buffers for this worker
 
         Returns:
             Tuple of (alpha matte tensor (H, W) FP32 on CUDA [0, 1], inference_time_ms)
         """
-        h, w = img.shape[:2]
 
         # Get or initialize recurrent state for this tracklet (before acquiring lock)
         with self._state_lock:
@@ -373,7 +374,7 @@ class TensorRTSegmentation(Thread):
                 img_chw_gpu = cp.ascontiguousarray(img_chw_gpu)  # Ensure contiguous memory for TensorRT
                 src_gpu = cp.expand_dims(img_chw_gpu, axis=0)  # (1, 3, H, W) on GPU
 
-                # Prepare recurrent state inputs (dynamic shapes based on model resolution)
+                # Prepare recurrent state inputs
                 if state is not None:
                     # States are already CuPy arrays on GPU - use directly
                     r1_gpu = state.r1
@@ -381,12 +382,11 @@ class TensorRTSegmentation(Thread):
                     r3_gpu = state.r3
                     r4_gpu = state.r4
                 else:
-                    # Initialize with dynamic shapes for first frame (r1: h/2, r2: h/4, r3: h/8, r4: h/16)
-                    r1_gpu = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32)
-                    r2_gpu = cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32)
-                    r3_gpu = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32)
-                    r4_gpu = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32)
-            self.stream.synchronize()
+                    # Use shared zero states for first frame (read-only)
+                    r1_gpu = self._zero_r1
+                    r2_gpu = self._zero_r2
+                    r3_gpu = self._zero_r3
+                    r4_gpu = self._zero_r4
 
             # Set input shapes (must be inside lock!)
             self.context.set_input_shape('src', src_gpu.shape)
@@ -395,14 +395,14 @@ class TensorRTSegmentation(Thread):
             self.context.set_input_shape('r3i', r3_gpu.shape)
             self.context.set_input_shape('r4i', r4_gpu.shape)
 
-            # Use preallocated GPU output buffers for this worker (reused across frames)
-            buffers = self._output_buffers[buffer_idx]
-            fgr_gpu = buffers['fgr']
-            pha_gpu = buffers['pha']
-            r1o_gpu = buffers['r1o']
-            r2o_gpu = buffers['r2o']
-            r3o_gpu = buffers['r3o']
-            r4o_gpu = buffers['r4o']
+            # Allocate fresh output buffers (CuPy memory pool handles caching)
+            # These are kept directly without copying - no preallocation needed
+            fgr_gpu = cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float32)
+            pha_gpu = cp.empty((1, 1, self.model_height, self.model_width), dtype=cp.float32)
+            r1o_gpu = cp.empty((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32)
+            r2o_gpu = cp.empty((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32)
+            r3o_gpu = cp.empty((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32)
+            r4o_gpu = cp.empty((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32)
 
             # Set tensor addresses
             self.context.set_tensor_address('src', src_gpu.data.ptr)
@@ -417,32 +417,59 @@ class TensorRTSegmentation(Thread):
             self.context.set_tensor_address('r3o', r3o_gpu.data.ptr)
             self.context.set_tensor_address('r4o', r4o_gpu.data.ptr)
 
+            # Sync to measure preprocessing time (includes setup)
+            self.stream.synchronize()
+            preprocess_done = time.perf_counter()
+
             # Execute inference
             with self.stream:
                 self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
 
-            # Copy recurrent states on same stream (they reference preallocated buffers)
-            with self.stream:
-                new_state = RecurrentState(
-                    r1=r1o_gpu.copy(),
-                    r2=r2o_gpu.copy(),
-                    r3=r3o_gpu.copy(),
-                    r4=r4o_gpu.copy()
-                )
+            inference_done = time.perf_counter()
 
-                # Convert CuPy array to PyTorch tensor on same stream
-                pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(0).squeeze(0).clone()
-            self.stream.synchronize()
+            # Keep output buffers directly (no copy needed - they're fresh allocations)
+            new_state = RecurrentState(
+                r1=r1o_gpu,
+                r2=r2o_gpu,
+                r3=r3o_gpu,
+                r4=r4o_gpu
+            )
 
-            # Calculate time spent in lock (actual inference time)
-            inference_time = (time.perf_counter() - lock_acquired) * 1000.0
+            # Convert CuPy array to PyTorch tensor (no clone needed - buffer is owned)
+            pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(0).squeeze(0)
+
+            postprocess_done = time.perf_counter()
+
+            # Calculate timing breakdown
+            preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
+            inference_ms = (inference_done - preprocess_done) * 1000.0
+            postprocess_ms = (postprocess_done - inference_done) * 1000.0
+            total_ms = (postprocess_done - lock_acquired) * 1000.0
+
+            # Accumulate for periodic reporting
+            self._profile_preprocess += preprocess_ms
+            self._profile_inference += inference_ms
+            self._profile_postprocess += postprocess_ms
+            self._profile_count += 1
+
+            if self._profile_count >= self._profile_interval:
+                n = self._profile_count
+                print(f"TensorRT Segmentation avg ({n} frames): "
+                      f"preprocess={self._profile_preprocess/n:.2f}ms, "
+                      f"inference={self._profile_inference/n:.2f}ms, "
+                      f"postprocess={self._profile_postprocess/n:.2f}ms, "
+                      f"total={(self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
+                self._profile_count = 0
+                self._profile_preprocess = 0.0
+                self._profile_inference = 0.0
+                self._profile_postprocess = 0.0
 
         # Update recurrent states for next frame (now safe - we have copies)
         with self._state_lock:
             self._recurrent_states[tracklet_id] = new_state
 
-        return pha_tensor, inference_time
+        return pha_tensor, total_ms
 
     def clear_tracklet_state(self, tracklet_id: int) -> None:
         """Clear recurrent state for a specific tracklet (e.g., when person leaves frame)."""
