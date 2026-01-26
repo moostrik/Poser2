@@ -331,12 +331,14 @@ class TensorRTSegmentation(Thread):
         """
         h, w = img.shape[:2]
 
-        # Preprocess: BGR -> RGB, normalize to [0, 1], HWC -> NCHW
-        img_rgb = img[:, :, ::-1].astype(np.float32)  # BGR to RGB, FP32
-        img_norm = img_rgb / 255.0  # Normalize to [0, 1]
-        img_chw = np.transpose(img_norm, (2, 0, 1))  # (H, W, 3) -> (3, H, W)
-        img_nchw = np.expand_dims(img_chw, axis=0)  # (1, 3, H, W)
-        src_gpu = cp.asarray(img_nchw)  # Move to GPU
+        # Move raw image to GPU first, then do all preprocessing on GPU
+        img_gpu = cp.asarray(img)  # (H, W, 3) uint8 BGR -> GPU
+        img_rgb_gpu = img_gpu[:, :, ::-1]  # BGR to RGB on GPU (zero-copy view)
+        img_float_gpu = img_rgb_gpu.astype(cp.float32)  # uint8 -> float32 on GPU
+        img_norm_gpu = img_float_gpu / 255.0  # Normalize to [0, 1] on GPU
+        img_chw_gpu = cp.transpose(img_norm_gpu, (2, 0, 1))  # (3, H, W) on GPU
+        img_chw_gpu = cp.ascontiguousarray(img_chw_gpu)  # Ensure contiguous memory for TensorRT
+        src_gpu = cp.expand_dims(img_chw_gpu, axis=0)  # (1, 3, H, W) on GPU
 
         # Get or initialize recurrent state for this tracklet
         with self._state_lock:
