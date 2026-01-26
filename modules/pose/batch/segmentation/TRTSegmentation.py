@@ -105,7 +105,7 @@ class TRTSegmentation(Thread):
 
         # Profiling accumulators (periodic averaging)
         self._profile_count: int = 0
-        self._profile_interval: int = 500  # Print every N frames (reduced overhead)
+        self._profile_interval: int = 100  # Print every N frames (reduced overhead)
         self._profile_lock_wait: float = 0.0
         self._profile_preprocess: float = 0.0
         self._profile_inference: float = 0.0
@@ -490,31 +490,31 @@ class TRTSegmentation(Thread):
             total_ms: float = (postprocess_done - call_start) * 1000.0  # Include lock wait
 
             # Timing breakdown
-            # lock_wait_ms = (lock_acquired - call_start) * 1000.0
-            # preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
-            # inference_ms = (inference_done - preprocess_done) * 1000.0
-            # postprocess_ms = (postprocess_done - inference_done) * 1000.0
+            lock_wait_ms = (lock_acquired - call_start) * 1000.0
+            preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
+            inference_ms = (inference_done - preprocess_done) * 1000.0
+            postprocess_ms = (postprocess_done - inference_done) * 1000.0
 
-            # # Accumulate for periodic reporting
-            # self._profile_lock_wait += lock_wait_ms
-            # self._profile_preprocess += preprocess_ms
-            # self._profile_inference += inference_ms
-            # self._profile_postprocess += postprocess_ms
-            # self._profile_count += 1
+            # Accumulate for periodic reporting
+            self._profile_lock_wait += lock_wait_ms
+            self._profile_preprocess += preprocess_ms
+            self._profile_inference += inference_ms
+            self._profile_postprocess += postprocess_ms
+            self._profile_count += 1
 
-            # if self._profile_count >= self._profile_interval:
-            #     n = self._profile_count
-            #     print(f"TensorRT Segmentation BATCHED avg ({n} batches): "
-            #           f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
-            #           f"preprocess={self._profile_preprocess/n:.2f}ms, "
-            #           f"inference={self._profile_inference/n:.2f}ms, "
-            #           f"postprocess={self._profile_postprocess/n:.2f}ms, "
-            #           f"total={(self._profile_lock_wait + self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
-            #     self._profile_count = 0
-            #     self._profile_lock_wait = 0.0
-            #     self._profile_preprocess = 0.0
-            #     self._profile_inference = 0.0
-            #     self._profile_postprocess = 0.0
+            if self._profile_count >= self._profile_interval:
+                n = self._profile_count
+                print(f"TRT Segmentation avg ({n} batches): "
+                      f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
+                      f"preprocess={self._profile_preprocess/n:.2f}ms, "
+                      f"inference={self._profile_inference/n:.2f}ms, "
+                      f"postprocess={self._profile_postprocess/n:.2f}ms, "
+                      f"total={(self._profile_lock_wait + self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
+                self._profile_count = 0
+                self._profile_lock_wait = 0.0
+                self._profile_preprocess = 0.0
+                self._profile_inference = 0.0
+                self._profile_postprocess = 0.0
 
         # Update recurrent states for all tracklets
         with self._state_lock:

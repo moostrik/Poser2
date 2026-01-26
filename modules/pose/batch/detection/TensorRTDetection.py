@@ -75,7 +75,7 @@ class TensorRTDetection(Thread):
 
         # Profiling accumulators (periodic averaging)
         self._profile_count: int = 0
-        self._profile_interval: int = 500  # Print every N frames
+        self._profile_interval: int = 100  # Print every N frames
         self._profile_lock_wait: float = 0.0
         self._profile_preprocess: float = 0.0
         self._profile_inference: float = 0.0
@@ -329,44 +329,44 @@ class TensorRTDetection(Thread):
 
             inference_done = time.perf_counter()
 
-            # Decode SimCC outputs on GPU using same stream (prevents cross-stream conflicts)
-            with self.stream:
-                keypoints_gpu, scores_gpu = TensorRTDetection._decode_simcc_gpu(output0_gpu, output1_gpu, self.simcc_split_ratio)
-                keypoints = cp.asnumpy(keypoints_gpu)
-                scores = cp.asnumpy(scores_gpu)
-            self.stream.synchronize()
+            # Transfer SimCC outputs to CPU (blocking operation - synchronizes automatically)
+            simcc_x_cpu = cp.asnumpy(output0_gpu)
+            simcc_y_cpu = cp.asnumpy(output1_gpu)
 
-            postprocess_done = time.perf_counter()
-            total_ms = (postprocess_done - call_start) * 1000.0  # Include lock wait
+        # Decode on CPU (outside lock - no GPU resource needed)
+        keypoints, scores = TensorRTDetection._decode_simcc_cpu(simcc_x_cpu, simcc_y_cpu, self.simcc_split_ratio)
 
-            # Timing breakdown
-            lock_wait_ms = (lock_acquired - call_start) * 1000.0
-            preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
-            inference_ms = (inference_done - preprocess_done) * 1000.0
-            postprocess_ms = (postprocess_done - inference_done) * 1000.0
+        postprocess_done = time.perf_counter()
+        total_ms = (postprocess_done - call_start) * 1000.0  # Include lock wait
 
-            # Accumulate for periodic reporting
-            self._profile_lock_wait += lock_wait_ms
-            self._profile_preprocess += preprocess_ms
-            self._profile_inference += inference_ms
-            self._profile_postprocess += postprocess_ms
-            self._profile_count += 1
+        # Timing breakdown
+        lock_wait_ms = (lock_acquired - call_start) * 1000.0
+        preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
+        inference_ms = (inference_done - preprocess_done) * 1000.0
+        postprocess_ms = (postprocess_done - inference_done) * 1000.0
 
-            if self._profile_count >= self._profile_interval:
-                n = self._profile_count
-                print(f"TensorRT Detection avg ({n} batches): "
-                      f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
-                      f"preprocess={self._profile_preprocess/n:.2f}ms, "
-                      f"inference={self._profile_inference/n:.2f}ms, "
-                      f"postprocess={self._profile_postprocess/n:.2f}ms, "
-                      f"total={(self._profile_lock_wait + self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
-                self._profile_count = 0
-                self._profile_lock_wait = 0.0
-                self._profile_preprocess = 0.0
-                self._profile_inference = 0.0
-                self._profile_postprocess = 0.0
+        # Accumulate for periodic reporting
+        self._profile_lock_wait += lock_wait_ms
+        self._profile_preprocess += preprocess_ms
+        self._profile_inference += inference_ms
+        self._profile_postprocess += postprocess_ms
+        self._profile_count += 1
 
-            inference_time = total_ms
+        if self._profile_count >= self._profile_interval:
+            n = self._profile_count
+            print(f"TRT Detection    avg ({n} batches): "
+                  f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
+                  f"preprocess={self._profile_preprocess/n:.2f}ms, "
+                  f"inference={self._profile_inference/n:.2f}ms, "
+                  f"postprocess={self._profile_postprocess/n:.2f}ms, "
+                  f"total={(self._profile_lock_wait + self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
+            self._profile_count = 0
+            self._profile_lock_wait = 0.0
+            self._profile_preprocess = 0.0
+            self._profile_inference = 0.0
+            self._profile_postprocess = 0.0
+
+        inference_time = total_ms
 
         return keypoints, scores, inference_time
 
