@@ -113,18 +113,19 @@ def convert_rvm_to_tensorrt(
 
     # Recurrent states: Fixed batch=1, channels fixed, spatial dims based on input resolution
     # RVM downsamples by 2, 4, 8, 16 for r1, r2, r3, r4 respectively
-    profile.set_shape("r1i", (1, 16, height // 2, width // 2),
-                              (1, 16, height // 2, width // 2),
-                              (1, 16, height // 2, width // 2))
-    profile.set_shape("r2i", (1, 20, height // 4, width // 4),
-                              (1, 20, height // 4, width // 4),
-                              (1, 20, height // 4, width // 4))
-    profile.set_shape("r3i", (1, 40, height // 8, width // 8),
-                              (1, 40, height // 8, width // 8),
-                              (1, 40, height // 8, width // 8))
-    profile.set_shape("r4i", (1, 64, height // 16, width // 16),
-                              (1, 64, height // 16, width // 16),
-                              (1, 64, height // 16, width // 16))
+    # ALL tensors have dynamic batch dimension for true batching
+    profile.set_shape("r1i", (min_batch, 16, height // 2, width // 2),
+                              (opt_batch, 16, height // 2, width // 2),
+                              (max_batch, 16, height // 2, width // 2))
+    profile.set_shape("r2i", (min_batch, 20, height // 4, width // 4),
+                              (opt_batch, 20, height // 4, width // 4),
+                              (max_batch, 20, height // 4, width // 4))
+    profile.set_shape("r3i", (min_batch, 40, height // 8, width // 8),
+                              (opt_batch, 40, height // 8, width // 8),
+                              (max_batch, 40, height // 8, width // 8))
+    profile.set_shape("r4i", (min_batch, 64, height // 16, width // 16),
+                              (opt_batch, 64, height // 16, width // 16),
+                              (max_batch, 64, height // 16, width // 16))
 
     config.add_optimization_profile(profile)
     print(f"  ├─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")

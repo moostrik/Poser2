@@ -94,10 +94,18 @@ def export_rvm_to_onnx(
             input_names=['src', 'r1i', 'r2i', 'r3i', 'r4i', 'downsample_ratio'],
             output_names=['fgr', 'pha', 'r1o', 'r2o', 'r3o', 'r4o'],
             dynamic_axes={
-                # Only batch dimension is dynamic, height/width are FIXED
+                # Batch dimension is dynamic for ALL tensors (enables true batching)
                 'src': {0: 'batch'},
+                'r1i': {0: 'batch'},
+                'r2i': {0: 'batch'},
+                'r3i': {0: 'batch'},
+                'r4i': {0: 'batch'},
                 'fgr': {0: 'batch'},
                 'pha': {0: 'batch'},
+                'r1o': {0: 'batch'},
+                'r2o': {0: 'batch'},
+                'r3o': {0: 'batch'},
+                'r4o': {0: 'batch'},
             },
             verbose=False
         )

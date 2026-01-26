@@ -214,7 +214,7 @@ class TensorRTSegmentation(Thread):
             self._zero_r3 = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16)
             self._zero_r4 = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16)
 
-            # Preallocate input buffers per worker
+            # Preallocate input buffers per worker (for single-image fallback)
             self._input_buffers = []
             for _ in range(self._max_workers):
                 self._input_buffers.append({
@@ -222,6 +222,26 @@ class TensorRTSegmentation(Thread):
                     'img_float': cp.empty((self.model_height, self.model_width, 3), dtype=cp.float16),
                     'src': cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float16),
                 })
+
+            # Preallocate BATCHED buffers for true batch inference
+            self._max_batch = self._max_workers  # Match max batch to max workers
+            self._batch_buffers = {
+                'img_uint8': cp.empty((self._max_batch, self.model_height, self.model_width, 3), dtype=cp.uint8),
+                'img_float': cp.empty((self._max_batch, self.model_height, self.model_width, 3), dtype=cp.float16),
+                'src': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=cp.float16),
+                # Batched recurrent state buffers
+                'r1i': cp.empty((self._max_batch, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16),
+                'r2i': cp.empty((self._max_batch, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16),
+                'r3i': cp.empty((self._max_batch, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16),
+                'r4i': cp.empty((self._max_batch, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16),
+                # Batched output buffers
+                'fgr': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=cp.float16),
+                'pha': cp.empty((self._max_batch, 1, self.model_height, self.model_width), dtype=cp.float16),
+                'r1o': cp.empty((self._max_batch, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16),
+                'r2o': cp.empty((self._max_batch, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16),
+                'r3o': cp.empty((self._max_batch, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16),
+                'r4o': cp.empty((self._max_batch, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16),
+            }
 
             # Create thread pool for parallel inference
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="TRT-RVM-Worker")
@@ -315,42 +335,21 @@ class TensorRTSegmentation(Thread):
 
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 
-        # Run inference
-        if batch.images and self._executor is not None:
-            # Limit processing to max_workers tracklets
-            images_to_process = batch.images[:self._max_workers]
-            tracklets_to_process = batch.tracklet_ids[:self._max_workers]
+        # Run inference using TRUE BATCHING (single TensorRT call for all tracklets)
+        if batch.images:
+            # Limit processing to max batch size
+            images_to_process = batch.images[:self._max_batch]
+            tracklets_to_process = batch.tracklet_ids[:self._max_batch]
 
-            # Process tracklets in parallel using thread pool
-            futures = []
-            inference_times = []
-            for i, (img, tracklet_id) in enumerate(zip(images_to_process, tracklets_to_process)):
-                buffer_idx = i  # Direct mapping: worker i uses buffer i
-                future = self._executor.submit(self._infer_single_image, img, tracklet_id, buffer_idx)
-                futures.append((future, tracklet_id))
-
-            # Collect results in original order
-            mask_list: list[torch.Tensor] = []
-            for future, tracklet_id in futures:
-                try:
-                    mask, inf_time = future.result()
-                    mask_list.append(mask)
-                    inference_times.append(inf_time)
-                except Exception as e:
-                    print(f"TensorRT Segmentation Error: Inference failed for tracklet {tracklet_id}: {str(e)}")
-                    # Create empty mask on error
-                    h, w = batch.images[0].shape[:2]
-                    mask_list.append(torch.zeros((h, w), dtype=torch.float32, device='cuda'))
-                    inference_times.append(0.0)
-
-            # Stack into batch tensor
-            if mask_list:
-                mask_tensor = torch.stack(mask_list)  # (B, H, W) FP32 on CUDA
-            else:
+            try:
+                # Single batched inference call
+                mask_tensor, inference_time_ms = self._infer_batch(images_to_process, tracklets_to_process)
+            except Exception as e:
+                print(f"TensorRT Segmentation Error: Batched inference failed: {str(e)}")
+                traceback.print_exc()
+                # Fallback to empty result
                 mask_tensor = torch.empty(0, dtype=torch.float32, device='cuda')
-
-            # Use max inference time from parallel workers (actual lock-held time)
-            inference_time_ms: float = max(inference_times) if inference_times else 0.0
+                inference_time_ms = 0.0
 
             output = SegmentationOutput(
                 batch_id=batch.batch_id,
@@ -365,6 +364,158 @@ class TensorRTSegmentation(Thread):
             self._callback_queue.put_nowait(output)
         except Exception:
             print("TensorRT Segmentation Warning: Callback queue full, dropping inference results")
+
+    def _infer_batch(self, images: list[np.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, float]:
+        """Run RVM TensorRT inference on BATCH of images with per-tracklet recurrent states.
+
+        This is more efficient than calling _infer_single_image multiple times because:
+        1. Single TensorRT kernel launch for all images
+        2. Better GPU utilization with FP16 tensor cores
+        3. Single lock acquisition instead of N
+
+        Args:
+            images: List of input images (H, W, 3) BGR uint8
+            tracklet_ids: List of tracklet IDs (same length as images)
+
+        Returns:
+            Tuple of (alpha matte tensor (B, H, W) FP32 on CUDA [0, 1], inference_time_ms)
+        """
+        batch_size = len(images)
+        if batch_size == 0:
+            return torch.empty(0, dtype=torch.float32, device='cuda'), 0.0
+
+        # Clamp to max batch size
+        if batch_size > self._max_batch:
+            batch_size = self._max_batch
+            images = images[:batch_size]
+            tracklet_ids = tracklet_ids[:batch_size]
+
+        # Gather recurrent states for all tracklets (before acquiring lock)
+        states: list[RecurrentState | None] = []
+        with self._state_lock:
+            for tid in tracklet_ids:
+                states.append(self._recurrent_states.get(tid))
+
+        # Run batched inference with global lock
+        with get_exec_lock():
+            lock_acquired = time.perf_counter()
+
+            # Get batched buffers (sliced to actual batch size)
+            buf = self._batch_buffers
+            src_gpu = buf['src'][:batch_size]
+            r1i_gpu = buf['r1i'][:batch_size]
+            r2i_gpu = buf['r2i'][:batch_size]
+            r3i_gpu = buf['r3i'][:batch_size]
+            r4i_gpu = buf['r4i'][:batch_size]
+            fgr_gpu = buf['fgr'][:batch_size]
+            pha_gpu = buf['pha'][:batch_size]
+            r1o_gpu = buf['r1o'][:batch_size]
+            r2o_gpu = buf['r2o'][:batch_size]
+            r3o_gpu = buf['r3o'][:batch_size]
+            r4o_gpu = buf['r4o'][:batch_size]
+
+            with self.stream:
+                # Preprocess all images into batched src buffer
+                for i, img in enumerate(images):
+                    # Copy to uint8 buffer
+                    buf['img_uint8'][i].set(img)
+                    # BGR to RGB + float16
+                    buf['img_float'][i] = buf['img_uint8'][i][:, :, ::-1].astype(cp.float16)
+                    # Normalize
+                    buf['img_float'][i] /= 255.0
+                    # Transpose HWC -> CHW
+                    src_gpu[i] = cp.ascontiguousarray(cp.transpose(buf['img_float'][i], (2, 0, 1)))
+
+                # Gather recurrent states into batched buffers
+                for i, state in enumerate(states):
+                    if state is not None:
+                        r1i_gpu[i] = state.r1[0]  # Remove batch dim from stored state
+                        r2i_gpu[i] = state.r2[0]
+                        r3i_gpu[i] = state.r3[0]
+                        r4i_gpu[i] = state.r4[0]
+                    else:
+                        # Use zeros for new tracklets
+                        r1i_gpu[i] = self._zero_r1[0]
+                        r2i_gpu[i] = self._zero_r2[0]
+                        r3i_gpu[i] = self._zero_r3[0]
+                        r4i_gpu[i] = self._zero_r4[0]
+
+            # Set batched input shapes
+            self.context.set_input_shape('src', (batch_size, 3, self.model_height, self.model_width))
+            self.context.set_input_shape('r1i', (batch_size, 16, self.model_height // 2, self.model_width // 2))
+            self.context.set_input_shape('r2i', (batch_size, 20, self.model_height // 4, self.model_width // 4))
+            self.context.set_input_shape('r3i', (batch_size, 40, self.model_height // 8, self.model_width // 8))
+            self.context.set_input_shape('r4i', (batch_size, 64, self.model_height // 16, self.model_width // 16))
+
+            # Set tensor addresses (use full buffer pointers, TensorRT uses shapes)
+            self.context.set_tensor_address('src', buf['src'].data.ptr)
+            self.context.set_tensor_address('r1i', buf['r1i'].data.ptr)
+            self.context.set_tensor_address('r2i', buf['r2i'].data.ptr)
+            self.context.set_tensor_address('r3i', buf['r3i'].data.ptr)
+            self.context.set_tensor_address('r4i', buf['r4i'].data.ptr)
+            self.context.set_tensor_address('fgr', buf['fgr'].data.ptr)
+            self.context.set_tensor_address('pha', buf['pha'].data.ptr)
+            self.context.set_tensor_address('r1o', buf['r1o'].data.ptr)
+            self.context.set_tensor_address('r2o', buf['r2o'].data.ptr)
+            self.context.set_tensor_address('r3o', buf['r3o'].data.ptr)
+            self.context.set_tensor_address('r4o', buf['r4o'].data.ptr)
+
+            self.stream.synchronize()
+            preprocess_done = time.perf_counter()
+
+            # Execute batched inference
+            with self.stream:
+                self.context.execute_async_v3(stream_handle=self.stream.ptr)
+            self.stream.synchronize()
+
+            inference_done = time.perf_counter()
+
+            # Split output states back to individual tracklets
+            new_states: list[RecurrentState] = []
+            for i in range(batch_size):
+                # Clone each slice to own the memory (detach from shared buffer)
+                new_states.append(RecurrentState(
+                    r1=r1o_gpu[i:i+1].copy(),  # Keep batch dim (1, C, H, W)
+                    r2=r2o_gpu[i:i+1].copy(),
+                    r3=r3o_gpu[i:i+1].copy(),
+                    r4=r4o_gpu[i:i+1].copy(),
+                ))
+
+            # Convert batched pha to PyTorch tensor
+            pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(1).float()  # (B, H, W)
+
+            postprocess_done = time.perf_counter()
+
+            # Timing breakdown
+            preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
+            inference_ms = (inference_done - preprocess_done) * 1000.0
+            postprocess_ms = (postprocess_done - inference_done) * 1000.0
+            total_ms = (postprocess_done - lock_acquired) * 1000.0
+
+            # Accumulate for periodic reporting
+            self._profile_preprocess += preprocess_ms
+            self._profile_inference += inference_ms
+            self._profile_postprocess += postprocess_ms
+            self._profile_count += batch_size  # Count frames, not batches
+
+            if self._profile_count >= self._profile_interval:
+                n = self._profile_count
+                print(f"TensorRT Segmentation BATCHED avg ({n} frames): "
+                      f"preprocess={self._profile_preprocess/n:.2f}ms, "
+                      f"inference={self._profile_inference/n:.2f}ms, "
+                      f"postprocess={self._profile_postprocess/n:.2f}ms, "
+                      f"total={(self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
+                self._profile_count = 0
+                self._profile_preprocess = 0.0
+                self._profile_inference = 0.0
+                self._profile_postprocess = 0.0
+
+        # Update recurrent states for all tracklets
+        with self._state_lock:
+            for tid, new_state in zip(tracklet_ids, new_states):
+                self._recurrent_states[tid] = new_state
+
+        return pha_tensor, total_ms
 
     def _infer_single_image(self, img: np.ndarray, tracklet_id: int, buffer_idx: int) -> tuple[torch.Tensor, float]:
         """Run RVM TensorRT inference on single image with per-tracklet recurrent state.
