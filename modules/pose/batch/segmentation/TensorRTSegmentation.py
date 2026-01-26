@@ -344,10 +344,11 @@ class TensorRTSegmentation(Thread):
 
         # Prepare recurrent state inputs (dynamic shapes based on model resolution)
         if state is not None:
-            r1_gpu = cp.asarray(state.r1)
-            r2_gpu = cp.asarray(state.r2)
-            r3_gpu = cp.asarray(state.r3)
-            r4_gpu = cp.asarray(state.r4)
+            # States are already CuPy arrays on GPU - use directly
+            r1_gpu = state.r1
+            r2_gpu = state.r2
+            r3_gpu = state.r3
+            r4_gpu = state.r4
         else:
             # Initialize with dynamic shapes for first frame (r1: h/2, r2: h/4, r3: h/8, r4: h/16)
             r1_gpu = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32)
@@ -404,12 +405,12 @@ class TensorRTSegmentation(Thread):
             # Calculate time spent in lock (actual inference time)
             inference_time = (time.perf_counter() - lock_acquired) * 1000.0
 
-        # Update recurrent states for next frame (convert CuPy to NumPy for storage)
+        # Update recurrent states for next frame (keep on GPU as CuPy arrays)
         new_state = RecurrentState(
-            r1=cp.asnumpy(r1o_gpu),
-            r2=cp.asnumpy(r2o_gpu),
-            r3=cp.asnumpy(r3o_gpu),
-            r4=cp.asnumpy(r4o_gpu)
+            r1=r1o_gpu,
+            r2=r2o_gpu,
+            r3=r3o_gpu,
+            r4=r4o_gpu
         )
         with self._state_lock:
             self._recurrent_states[tracklet_id] = new_state

@@ -40,12 +40,14 @@ SegmentationOutputCallback = Callable[[SegmentationOutput], None]
 
 
 class RecurrentState:
-    """Container for RVM recurrent states (r1, r2, r3, r4)."""
-    def __init__(self, r1: np.ndarray, r2: np.ndarray, r3: np.ndarray, r4: np.ndarray):
-        self.r1 = r1
-        self.r2 = r2
-        self.r3 = r3
-        self.r4 = r4
+    """Container for RVM recurrent states (r1, r2, r3, r4) - stored as CuPy arrays on GPU."""
+    def __init__(self, r1, r2, r3, r4):
+        # Accept either CuPy or NumPy arrays, always store as CuPy
+        import cupy as cp
+        self.r1 = r1 if isinstance(r1, cp.ndarray) else cp.asarray(r1)
+        self.r2 = r2 if isinstance(r2, cp.ndarray) else cp.asarray(r2)
+        self.r3 = r3 if isinstance(r3, cp.ndarray) else cp.asarray(r3)
+        self.r4 = r4 if isinstance(r4, cp.ndarray) else cp.asarray(r4)
 
 
 class ONNXSegmentation(Thread):
