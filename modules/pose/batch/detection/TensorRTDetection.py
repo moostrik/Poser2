@@ -17,7 +17,7 @@ from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, 
 from modules.pose.Settings import Settings
 from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
-# ImageNet normalization (RGB order)
+# ImageNet normalization (RGB order) - CPU constants for reference
 IMAGENET_MEAN = np.array([123.675, 116.28, 103.53], dtype=np.float32).reshape(1, 3, 1, 1)
 IMAGENET_STD = np.array([58.395, 57.12, 57.375], dtype=np.float32).reshape(1, 3, 1, 1)
 
@@ -67,8 +67,19 @@ class TensorRTDetection(Thread):
 
         # Preallocated GPU buffers (allocated after engine loads)
         self._max_batch: int = 8
-        self._input_buffer: cp.ndarray
+        self._img_uint8_buffer: cp.ndarray  # Raw uint8 images
+        self._input_buffer: cp.ndarray  # Preprocessed float32 input
         self._output_buffers: dict[str, cp.ndarray]
+        self._mean_gpu: cp.ndarray  # ImageNet mean on GPU
+        self._std_gpu: cp.ndarray  # ImageNet std on GPU
+
+        # Profiling accumulators (periodic averaging)
+        self._profile_count: int = 0
+        self._profile_interval: int = 500  # Print every N frames
+        self._profile_lock_wait: float = 0.0
+        self._profile_preprocess: float = 0.0
+        self._profile_inference: float = 0.0
+        self._profile_postprocess: float = 0.0
 
     @property
     def is_ready(self) -> bool:
@@ -136,13 +147,24 @@ class TensorRTDetection(Thread):
         simcc_x_width = self.model_width * 2
         simcc_y_height = self.model_height * 2
 
-        self._input_buffer = cp.zeros(
+        # Preprocessing buffers
+        self._img_uint8_buffer = cp.empty(
+            (self._max_batch, self.model_height, self.model_width, 3),
+            dtype=cp.uint8
+        )
+        self._input_buffer = cp.empty(
             (self._max_batch, 3, self.model_height, self.model_width),
             dtype=cp.float32
         )
+
+        # GPU constants for normalization (CHW format for broadcasting)
+        self._mean_gpu = cp.asarray(IMAGENET_MEAN, dtype=cp.float32)
+        self._std_gpu = cp.asarray(IMAGENET_STD, dtype=cp.float32)
+
+        # Output buffers
         self._output_buffers = {
-            'simcc_x': cp.zeros((self._max_batch, self.num_keypoints, simcc_x_width), dtype=cp.float32),
-            'simcc_y': cp.zeros((self._max_batch, self.num_keypoints, simcc_y_height), dtype=cp.float32),
+            'simcc_x': cp.empty((self._max_batch, self.num_keypoints, simcc_x_width), dtype=cp.float32),
+            'simcc_y': cp.empty((self._max_batch, self.num_keypoints, simcc_y_height), dtype=cp.float32),
         }
 
         self._model_ready.set()
@@ -263,19 +285,27 @@ class TensorRTDetection(Thread):
     def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float]:
         """Run TensorRT inference on batch of images. Returns (keypoints, scores, inference_time_ms)."""
 
-        # Preprocess on CPU (numpy operations - safe outside lock)
-        batch = self._preprocess_batch(imgs, width, height)
         batch_size = len(imgs)
 
         # Run inference with global lock to prevent race conditions
         # ALL GPU operations inside lock and on same stream for stability
+        call_start = time.perf_counter()  # Start before lock for true latency
         with get_exec_lock():
             # Start timing after acquiring lock (excludes wait time)
             lock_acquired = time.perf_counter()
 
-            # Copy preprocessed batch into preallocated GPU buffer (on stream)
+            # Preprocess entirely on GPU (eliminates CPU bottleneck and double-copy)
+            stacked_imgs = np.stack(imgs, axis=0)  # CPU stack (fast)
             with self.stream:
-                self._input_buffer[:batch_size] = cp.asarray(batch)
+                # Single CPU→GPU transfer of uint8 data
+                self._img_uint8_buffer[:batch_size].set(stacked_imgs)
+
+                # All operations on GPU
+                img_float = self._img_uint8_buffer[:batch_size].astype(cp.float32)
+                img_rgb = img_float[:, :, :, ::-1]  # BGR→RGB
+                img_chw = cp.ascontiguousarray(cp.transpose(img_rgb, (0, 3, 1, 2)))  # HWC→CHW
+                self._input_buffer[:batch_size] = (img_chw - self._mean_gpu) / self._std_gpu # Normalization
+
             batch_gpu = self._input_buffer[:batch_size]
 
             # Get views into preallocated output buffers for actual batch size
@@ -290,10 +320,14 @@ class TensorRTDetection(Thread):
             self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
             self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
 
+            preprocess_done = time.perf_counter()
+
             # Execute inference
             with self.stream:
                 self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
+
+            inference_done = time.perf_counter()
 
             # Decode SimCC outputs on GPU using same stream (prevents cross-stream conflicts)
             with self.stream:
@@ -302,22 +336,41 @@ class TensorRTDetection(Thread):
                 scores = cp.asnumpy(scores_gpu)
             self.stream.synchronize()
 
-            # Return time spent in lock (actual inference time)
-            inference_time = (time.perf_counter() - lock_acquired) * 1000.0
+            postprocess_done = time.perf_counter()
+            total_ms = (postprocess_done - call_start) * 1000.0  # Include lock wait
+
+            # Timing breakdown
+            lock_wait_ms = (lock_acquired - call_start) * 1000.0
+            preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
+            inference_ms = (inference_done - preprocess_done) * 1000.0
+            postprocess_ms = (postprocess_done - inference_done) * 1000.0
+
+            # Accumulate for periodic reporting
+            self._profile_lock_wait += lock_wait_ms
+            self._profile_preprocess += preprocess_ms
+            self._profile_inference += inference_ms
+            self._profile_postprocess += postprocess_ms
+            self._profile_count += 1
+
+            if self._profile_count >= self._profile_interval:
+                n = self._profile_count
+                print(f"TensorRT Detection avg ({n} batches): "
+                      f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
+                      f"preprocess={self._profile_preprocess/n:.2f}ms, "
+                      f"inference={self._profile_inference/n:.2f}ms, "
+                      f"postprocess={self._profile_postprocess/n:.2f}ms, "
+                      f"total={(self._profile_lock_wait + self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
+                self._profile_count = 0
+                self._profile_lock_wait = 0.0
+                self._profile_preprocess = 0.0
+                self._profile_inference = 0.0
+                self._profile_postprocess = 0.0
+
+            inference_time = total_ms
 
         return keypoints, scores, inference_time
 
     # STATIC METHODS
-
-    @staticmethod
-    def _preprocess_batch(imgs: list[np.ndarray], width: int, height: int) -> np.ndarray:
-
-        batch_hwc = np.stack(imgs, axis=0).astype(np.float32)
-        batch_rgb = batch_hwc[:, :, :, ::-1]
-        batch_chw = batch_rgb.transpose(0, 3, 1, 2)
-        batch_norm = (batch_chw - IMAGENET_MEAN) / IMAGENET_STD
-
-        return batch_norm
 
     @staticmethod
     def _decode_simcc_gpu(simcc_x: cp.ndarray, simcc_y: cp.ndarray, split_ratio: float) -> tuple[cp.ndarray, cp.ndarray]:

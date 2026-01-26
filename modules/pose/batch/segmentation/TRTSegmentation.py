@@ -106,6 +106,7 @@ class TRTSegmentation(Thread):
         # Profiling accumulators (periodic averaging)
         self._profile_count: int = 0
         self._profile_interval: int = 500  # Print every N frames (reduced overhead)
+        self._profile_lock_wait: float = 0.0
         self._profile_preprocess: float = 0.0
         self._profile_inference: float = 0.0
         self._profile_postprocess: float = 0.0
@@ -199,13 +200,6 @@ class TRTSegmentation(Thread):
             if len(self.output_names) != 6:
                 print(f"TensorRT Segmentation ERROR: Expected 6 outputs, got {len(self.output_names)}")
                 return
-
-            # Verify FP16 precision
-            print(f"TensorRT Segmentation tensor precisions:")
-            for name in self.input_names + self.output_names:
-                dtype = self.engine.get_tensor_dtype(name)
-                shape = self.engine.get_tensor_shape(name)
-                print(f"  {name}: {dtype} {tuple(shape)}")
 
             # Clear any existing states
             with self._state_lock:
@@ -404,6 +398,7 @@ class TRTSegmentation(Thread):
                 states.append(self._recurrent_states.get(tid))
 
         # Run batched inference with global lock
+        call_start = time.perf_counter()  # Start before lock for true latency
         with get_exec_lock():
             lock_acquired = time.perf_counter()
 
@@ -492,30 +487,34 @@ class TRTSegmentation(Thread):
             pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(1).float()  # (B, H, W)
 
             postprocess_done = time.perf_counter()
+            total_ms: float = (postprocess_done - call_start) * 1000.0  # Include lock wait
 
             # Timing breakdown
-            preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
-            inference_ms = (inference_done - preprocess_done) * 1000.0
-            postprocess_ms = (postprocess_done - inference_done) * 1000.0
-            total_ms = (postprocess_done - lock_acquired) * 1000.0
+            # lock_wait_ms = (lock_acquired - call_start) * 1000.0
+            # preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
+            # inference_ms = (inference_done - preprocess_done) * 1000.0
+            # postprocess_ms = (postprocess_done - inference_done) * 1000.0
 
-            # Accumulate for periodic reporting
-            self._profile_preprocess += preprocess_ms
-            self._profile_inference += inference_ms
-            self._profile_postprocess += postprocess_ms
-            self._profile_count += batch_size  # Count frames, not batches
+            # # Accumulate for periodic reporting
+            # self._profile_lock_wait += lock_wait_ms
+            # self._profile_preprocess += preprocess_ms
+            # self._profile_inference += inference_ms
+            # self._profile_postprocess += postprocess_ms
+            # self._profile_count += 1
 
-            if self._profile_count >= self._profile_interval:
-                n = self._profile_count
-                print(f"TensorRT Segmentation BATCHED avg ({n} frames): "
-                      f"preprocess={self._profile_preprocess/n:.2f}ms, "
-                      f"inference={self._profile_inference/n:.2f}ms, "
-                      f"postprocess={self._profile_postprocess/n:.2f}ms, "
-                      f"total={(self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
-                self._profile_count = 0
-                self._profile_preprocess = 0.0
-                self._profile_inference = 0.0
-                self._profile_postprocess = 0.0
+            # if self._profile_count >= self._profile_interval:
+            #     n = self._profile_count
+            #     print(f"TensorRT Segmentation BATCHED avg ({n} batches): "
+            #           f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
+            #           f"preprocess={self._profile_preprocess/n:.2f}ms, "
+            #           f"inference={self._profile_inference/n:.2f}ms, "
+            #           f"postprocess={self._profile_postprocess/n:.2f}ms, "
+            #           f"total={(self._profile_lock_wait + self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
+            #     self._profile_count = 0
+            #     self._profile_lock_wait = 0.0
+            #     self._profile_preprocess = 0.0
+            #     self._profile_inference = 0.0
+            #     self._profile_postprocess = 0.0
 
         # Update recurrent states for all tracklets
         with self._state_lock:
@@ -542,6 +541,7 @@ class TRTSegmentation(Thread):
 
         # Run inference with global lock to prevent race conditions
         # ALL GPU operations inside lock for maximum stability
+        call_start = time.perf_counter()  # Start before lock for true latency
         with get_exec_lock():
             # Start timing after acquiring lock (excludes wait time)
             lock_acquired = time.perf_counter()
@@ -631,12 +631,14 @@ class TRTSegmentation(Thread):
             postprocess_done = time.perf_counter()
 
             # Calculate timing breakdown
+            lock_wait_ms = (lock_acquired - call_start) * 1000.0
             preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
             inference_ms = (inference_done - preprocess_done) * 1000.0
             postprocess_ms = (postprocess_done - inference_done) * 1000.0
-            total_ms = (postprocess_done - lock_acquired) * 1000.0
+            total_ms = (postprocess_done - call_start) * 1000.0  # Include lock wait
 
             # Accumulate for periodic reporting
+            self._profile_lock_wait += lock_wait_ms
             self._profile_preprocess += preprocess_ms
             self._profile_inference += inference_ms
             self._profile_postprocess += postprocess_ms
@@ -645,11 +647,13 @@ class TRTSegmentation(Thread):
             if self._profile_count >= self._profile_interval:
                 n = self._profile_count
                 print(f"TensorRT Segmentation avg ({n} frames): "
+                      f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
                       f"preprocess={self._profile_preprocess/n:.2f}ms, "
                       f"inference={self._profile_inference/n:.2f}ms, "
                       f"postprocess={self._profile_postprocess/n:.2f}ms, "
-                      f"total={(self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
+                      f"total={(self._profile_lock_wait + self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
                 self._profile_count = 0
+                self._profile_lock_wait = 0.0
                 self._profile_preprocess = 0.0
                 self._profile_inference = 0.0
                 self._profile_postprocess = 0.0

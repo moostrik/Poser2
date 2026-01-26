@@ -37,7 +37,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         self._lock = Lock()
         self._batch_counter: int = 0
         self._waiting_batches: dict[int, tuple[FrameDict, list[int]]] = {}
-        self._timer = PerformanceTimer(name="RTM Pose", sample_count=100, report_interval=100)
+        self._timer = PerformanceTimer(name="RTM Pose Detection", sample_count=100, report_interval=100)
         self._verbose: bool = settings.verbose
 
         self._detection.register_callback(self._on_detection_result)

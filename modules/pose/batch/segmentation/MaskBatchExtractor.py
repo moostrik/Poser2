@@ -105,7 +105,7 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
             return
 
         # Track inference time
-        self._timer.add_time(output.inference_time_ms, report=self._verbose)
+        # self._timer.add_time(output.inference_time_ms, report=self._verbose)
 
         # Create dict mapping tracklet_id -> GPU tensor (H, W)
         mask_dict: dict[int, torch.Tensor] = {}
