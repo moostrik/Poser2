@@ -88,7 +88,7 @@
     "x": 0,
     "y": 1700,
     "fullscreen": false,
-    "fps": 60,
+    "fps": 0,
     "v_sync": false,
     "secondary_list": [
       1,
