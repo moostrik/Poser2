@@ -415,16 +415,16 @@ class TensorRTSegmentation(Thread):
             r4o_gpu = buf['r4o'][:batch_size]
 
             with self.stream:
-                # Preprocess all images into batched src buffer
-                for i, img in enumerate(images):
-                    # Copy to uint8 buffer
-                    buf['img_uint8'][i].set(img)
-                    # BGR to RGB + float16
-                    buf['img_float'][i] = buf['img_uint8'][i][:, :, ::-1].astype(cp.float16)
-                    # Normalize
-                    buf['img_float'][i] /= 255.0
-                    # Transpose HWC -> CHW
-                    src_gpu[i] = cp.ascontiguousarray(cp.transpose(buf['img_float'][i], (2, 0, 1)))
+                # OPTIMIZED: Stack images on CPU first, single transfer to GPU
+                # This reduces N host-to-device transfers to just 1
+                stacked_imgs = np.stack(images, axis=0)  # (B, H, W, 3) uint8
+                buf['img_uint8'][:batch_size] = cp.asarray(stacked_imgs)
+
+                # Vectorized BGR->RGB, uint8->float16, normalize (operates on full batch)
+                img_float_batch = buf['img_uint8'][:batch_size, :, :, ::-1].astype(cp.float16) / 255.0
+
+                # Vectorized transpose HWC -> CHW for full batch
+                src_gpu[:] = cp.ascontiguousarray(cp.transpose(img_float_batch, (0, 3, 1, 2)))
 
                 # Gather recurrent states into batched buffers
                 for i, state in enumerate(states):
