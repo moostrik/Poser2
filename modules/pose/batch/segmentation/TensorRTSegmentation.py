@@ -94,8 +94,8 @@ class TensorRTSegmentation(Thread):
         self._executor: ThreadPoolExecutor | None = None
         self._max_workers: int = min(settings.max_poses, 4)
 
-        # Preallocated GPU output buffers (reused across frames for efficiency)
-        self._output_buffers: dict[str, cp.ndarray] = {}
+        # Preallocated GPU output buffers (allocated after engine loads)
+        self._output_buffers: list[dict[str, cp.ndarray]] = []
 
     @property
     def is_ready(self) -> bool:
@@ -184,15 +184,17 @@ class TensorRTSegmentation(Thread):
             with self._state_lock:
                 self._recurrent_states.clear()
 
-            # Preallocate output buffers (reused across all inferences)
-            self._output_buffers = {
-                'fgr': cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float32),
-                'pha': cp.empty((1, 1, self.model_height, self.model_width), dtype=cp.float32),
-                'r1o': cp.empty((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32),
-                'r2o': cp.empty((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32),
-                'r3o': cp.empty((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32),
-                'r4o': cp.empty((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32),
-            }
+            # Preallocate output buffers per worker (now that dimensions are known)
+            self._output_buffers = []
+            for _ in range(self._max_workers):
+                self._output_buffers.append({
+                    'fgr': cp.zeros((1, 3, self.model_height, self.model_width), dtype=cp.float32),
+                    'pha': cp.zeros((1, 1, self.model_height, self.model_width), dtype=cp.float32),
+                    'r1o': cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32),
+                    'r2o': cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32),
+                    'r3o': cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32),
+                    'r4o': cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32),
+                })
 
             # Create thread pool for parallel inference
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="TRT-RVM-Worker")
@@ -288,11 +290,16 @@ class TensorRTSegmentation(Thread):
 
         # Run inference
         if batch.images and self._executor is not None:
+            # Limit processing to max_workers tracklets
+            images_to_process = batch.images[:self._max_workers]
+            tracklets_to_process = batch.tracklet_ids[:self._max_workers]
+
             # Process tracklets in parallel using thread pool
             futures = []
             inference_times = []
-            for img, tracklet_id in zip(batch.images, batch.tracklet_ids):
-                future = self._executor.submit(self._infer_single_image, img, tracklet_id)
+            for i, (img, tracklet_id) in enumerate(zip(images_to_process, tracklets_to_process)):
+                buffer_idx = i  # Direct mapping: worker i uses buffer i
+                future = self._executor.submit(self._infer_single_image, img, tracklet_id, buffer_idx)
                 futures.append((future, tracklet_id))
 
             # Collect results in original order
@@ -332,12 +339,13 @@ class TensorRTSegmentation(Thread):
         except Exception:
             print("TensorRT Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_single_image(self, img: np.ndarray, tracklet_id: int) -> tuple[torch.Tensor, float]:
+    def _infer_single_image(self, img: np.ndarray, tracklet_id: int, buffer_idx: int) -> tuple[torch.Tensor, float]:
         """Run RVM TensorRT inference on single image with per-tracklet recurrent state.
 
         Args:
             img: Input image (H, W, 3) BGR uint8
             tracklet_id: Unique identifier for tracking temporal state
+            buffer_idx: Index into _output_buffers for this worker
 
         Returns:
             Tuple of (alpha matte tensor (H, W) FP32 on CUDA [0, 1], inference_time_ms)
@@ -383,13 +391,22 @@ class TensorRTSegmentation(Thread):
             self.context.set_input_shape('r3i', r3_gpu.shape)
             self.context.set_input_shape('r4i', r4_gpu.shape)
 
-            # Use preallocated GPU output buffers (reused across frames)
-            fgr_gpu = self._output_buffers['fgr']
-            pha_gpu = self._output_buffers['pha']
-            r1o_gpu = self._output_buffers['r1o']
-            r2o_gpu = self._output_buffers['r2o']
-            r3o_gpu = self._output_buffers['r3o']
-            r4o_gpu = self._output_buffers['r4o']
+            # Use preallocated GPU output buffers for this worker (reused across frames)
+            buffers = self._output_buffers[buffer_idx]
+            fgr_gpu = buffers['fgr']
+            pha_gpu = buffers['pha']
+            r1o_gpu = buffers['r1o']
+            r2o_gpu = buffers['r2o']
+            r3o_gpu = buffers['r3o']
+            r4o_gpu = buffers['r4o']
+
+            # Clear output buffers before inference to prevent contamination
+            fgr_gpu.fill(0)
+            pha_gpu.fill(0)
+            r1o_gpu.fill(0)
+            r2o_gpu.fill(0)
+            r3o_gpu.fill(0)
+            r4o_gpu.fill(0)
 
             # Set tensor addresses
             self.context.set_tensor_address('src', src_gpu.data.ptr)
