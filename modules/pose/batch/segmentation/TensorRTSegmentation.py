@@ -94,6 +94,9 @@ class TensorRTSegmentation(Thread):
         self._executor: ThreadPoolExecutor | None = None
         self._max_workers: int = min(settings.max_poses, 4)
 
+        # Preallocated GPU output buffers (reused across frames for efficiency)
+        self._output_buffers: dict[str, cp.ndarray] = {}
+
     @property
     def is_ready(self) -> bool:
         """Check if model is loaded and system is ready to process segmentation"""
@@ -180,6 +183,16 @@ class TensorRTSegmentation(Thread):
             # Clear any existing states
             with self._state_lock:
                 self._recurrent_states.clear()
+
+            # Preallocate output buffers (reused across all inferences)
+            self._output_buffers = {
+                'fgr': cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float32),
+                'pha': cp.empty((1, 1, self.model_height, self.model_width), dtype=cp.float32),
+                'r1o': cp.empty((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32),
+                'r2o': cp.empty((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32),
+                'r3o': cp.empty((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32),
+                'r4o': cp.empty((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32),
+            }
 
             # Create thread pool for parallel inference
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="TRT-RVM-Worker")
@@ -370,21 +383,13 @@ class TensorRTSegmentation(Thread):
             self.context.set_input_shape('r3i', r3_gpu.shape)
             self.context.set_input_shape('r4i', r4_gpu.shape)
 
-            # Get output shapes
-            fgr_shape = self.context.get_tensor_shape('fgr')
-            pha_shape = self.context.get_tensor_shape('pha')
-            r1o_shape = self.context.get_tensor_shape('r1o')
-            r2o_shape = self.context.get_tensor_shape('r2o')
-            r3o_shape = self.context.get_tensor_shape('r3o')
-            r4o_shape = self.context.get_tensor_shape('r4o')
-
-            # Allocate GPU output buffers
-            fgr_gpu = cp.empty(fgr_shape, dtype=cp.float32)
-            pha_gpu = cp.empty(pha_shape, dtype=cp.float32)
-            r1o_gpu = cp.empty(r1o_shape, dtype=cp.float32)
-            r2o_gpu = cp.empty(r2o_shape, dtype=cp.float32)
-            r3o_gpu = cp.empty(r3o_shape, dtype=cp.float32)
-            r4o_gpu = cp.empty(r4o_shape, dtype=cp.float32)
+            # Use preallocated GPU output buffers (reused across frames)
+            fgr_gpu = self._output_buffers['fgr']
+            pha_gpu = self._output_buffers['pha']
+            r1o_gpu = self._output_buffers['r1o']
+            r2o_gpu = self._output_buffers['r2o']
+            r3o_gpu = self._output_buffers['r3o']
+            r4o_gpu = self._output_buffers['r4o']
 
             # Set tensor addresses
             self.context.set_tensor_address('src', src_gpu.data.ptr)
