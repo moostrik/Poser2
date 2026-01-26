@@ -57,16 +57,17 @@ def export_rvm_to_onnx(
     model = MattingNetwork(variant=variant, refiner='deep_guided_filter').eval()
     model.load_state_dict(torch.load(checkpoint_path, map_location='cpu'))
     model = model.cuda()
+    model = model.half()  # Convert to FP16 BEFORE export
     print(" ✓")
 
-    # Create dummy inputs
+    # Create dummy inputs (also FP16)
     print("🧪 Creating dummy inputs...", end='', flush=True)
-    src = torch.randn(1, 3, height, width).cuda()
-    r1 = None  # Model initializes recurrent states internally on first frame
+    src = torch.randn(1, 3, height, width, dtype=torch.float16).cuda()  # FP16
+    r1 = None
     r2 = None
     r3 = None
     r4 = None
-    downsample = torch.tensor([downsample_ratio])
+    downsample = torch.tensor([downsample_ratio], dtype=torch.float16).cuda()  # FP16
     print(" ✓")
 
     # Test forward pass

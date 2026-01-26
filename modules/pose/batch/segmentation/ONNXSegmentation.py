@@ -40,14 +40,12 @@ SegmentationOutputCallback = Callable[[SegmentationOutput], None]
 
 
 class RecurrentState:
-    """Container for RVM recurrent states (r1, r2, r3, r4) - stored as CuPy arrays on GPU."""
-    def __init__(self, r1, r2, r3, r4):
-        # Accept either CuPy or NumPy arrays, always store as CuPy
-        import cupy as cp
-        self.r1 = r1 if isinstance(r1, cp.ndarray) else cp.asarray(r1)
-        self.r2 = r2 if isinstance(r2, cp.ndarray) else cp.asarray(r2)
-        self.r3 = r3 if isinstance(r3, cp.ndarray) else cp.asarray(r3)
-        self.r4 = r4 if isinstance(r4, cp.ndarray) else cp.asarray(r4)
+    """Container for RVM recurrent states (r1, r2, r3, r4)."""
+    def __init__(self, r1: np.ndarray, r2: np.ndarray, r3: np.ndarray, r4: np.ndarray):
+        self.r1 = r1
+        self.r2 = r2
+        self.r3 = r3
+        self.r4 = r4
 
 
 class ONNXSegmentation(Thread):
@@ -137,7 +135,7 @@ class ONNXSegmentation(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            print("Warning: RVM Segmentation inference thread did not stop cleanly")
+            print("Warning: ONNX Segmentation inference thread did not stop cleanly")
 
         # Wake up callback thread with sentinel
         try:
@@ -147,7 +145,7 @@ class ONNXSegmentation(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            print("Warning: RVM Segmentation callback thread did not stop cleanly")
+            print("Warning: ONNX Segmentation callback thread did not stop cleanly")
 
     def run(self) -> None:
         """Main inference thread loop. Initializes ONNX session and processes batches."""
@@ -192,10 +190,10 @@ class ONNXSegmentation(Thread):
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="RVM-Worker")
 
             self._model_ready.set()  # Signal model is ready
-            print(f"RVM Segmentation: {self.resolution_name} model loaded ({self.model_width}x{self.model_height}, {providers_used[0]}) with {self._max_workers} workers")
+            print(f"ONNX Segmentation: {self.resolution_name} model loaded ({self.model_width}x{self.model_height}, {providers_used[0]}) with {self._max_workers} workers")
 
         except Exception as e:
-            print(f"RVM Segmentation Error: Failed to load model - {str(e)}")
+            print(f"ONNX Segmentation Error: Failed to load model - {str(e)}")
             traceback.print_exc()
             return
 
@@ -211,7 +209,7 @@ class ONNXSegmentation(Thread):
                 self._process_pending_batch()
 
             except Exception as e:
-                print(f"RVM Segmentation Error: {str(e)}")
+                print(f"ONNX Segmentation Error: {str(e)}")
                 traceback.print_exc()
 
     def submit_batch(self, input_batch: SegmentationInput) -> None:
@@ -233,7 +231,7 @@ class ONNXSegmentation(Thread):
                 dropped_batch = self._pending_batch
                 # if self.verbose:
                 lag = int((time.time() - self._input_timestamp) * 1000)
-                print(f"RVM Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                print(f"ONNX Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -250,7 +248,7 @@ class ONNXSegmentation(Thread):
                 self._callback_queue.put_nowait(dropped_output)
             except:
                 if self.verbose:
-                    print("RVM Segmentation Warning: Callback queue full, not critical for dropped notifications")
+                    print("ONNX Segmentation Warning: Callback queue full, not critical for dropped notifications")
                 pass  # Queue full, not critical for dropped notifications
 
         self._notify_update_event.set()
@@ -273,7 +271,7 @@ class ONNXSegmentation(Thread):
 
         if batch is None:
             if self.verbose:
-                print("RVM Segmentation Warning: No pending batch to process, this should not happen")
+                print("ONNX Segmentation Warning: No pending batch to process, this should not happen")
             return
 
         # Increment frame counter for periodic state reset
@@ -282,7 +280,7 @@ class ONNXSegmentation(Thread):
         # Periodic state reset as failsafe (0=disabled)
         if self._state_reset_interval > 0 and self._frame_counter % self._state_reset_interval == 0:
             if self.verbose:
-                print(f"RVM Segmentation: Periodic state reset at frame {self._frame_counter}")
+                print(f"ONNX Segmentation: Periodic state reset at frame {self._frame_counter}")
             self.clear_all_states()
 
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
@@ -304,7 +302,7 @@ class ONNXSegmentation(Thread):
                     mask = future.result()
                     mask_list.append(mask)
                 except Exception as e:
-                    print(f"RVM Segmentation Error: Inference failed for tracklet {tracklet_id}: {str(e)}")
+                    print(f"ONNX Segmentation Error: Inference failed for tracklet {tracklet_id}: {str(e)}")
                     # Create empty mask on error
                     h, w = batch.images[0].shape[:2]
                     mask_list.append(torch.zeros((h, w), dtype=torch.float16, device='cuda'))
@@ -330,7 +328,7 @@ class ONNXSegmentation(Thread):
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            print("RVM Segmentation Warning: Callback queue full, dropping inference results")
+            print("ONNX Segmentation Warning: Callback queue full, dropping inference results")
 
     def _infer_single_image(self, img: np.ndarray, tracklet_id: int) -> torch.Tensor:
         """Run RVM inference on single image with per-tracklet recurrent state.
@@ -346,19 +344,14 @@ class ONNXSegmentation(Thread):
             return torch.zeros((img.shape[0], img.shape[1]), dtype=torch.float16, device='cuda')
 
         # Preprocess: BGR -> RGB, normalize to [0, 1], HWC -> NCHW
-        img_rgb = img[:, :, ::-1].astype(np.float32)  # BGR to RGB, FP32
+        img_rgb = img[:, :, ::-1].astype(np.float16)  # BGR to RGB, FP16 (changed from float32)
         img_norm = img_rgb / 255.0  # Normalize to [0, 1]
         img_chw = np.transpose(img_norm, (2, 0, 1))  # (H, W, 3) -> (3, H, W)
-        img_nchw = np.expand_dims(img_chw, axis=0).astype(np.float32)  # (1, 3, H, W) FP32
+        img_nchw = np.expand_dims(img_chw, axis=0).astype(np.float16)  # (1, 3, H, W) FP16 (changed from float32)
 
         # Get or initialize recurrent state for this tracklet
         with self._state_lock:
             state = self._recurrent_states.get(tracklet_id)
-
-        # New TensorRT-compatible ONNX model has fixed recurrent state shapes for 256x192:
-        # r1: [1, 16, 128, 96], r2: [1, 20, 64, 48], r3: [1, 40, 32, 24], r4: [1, 64, 16, 12]
-        # No downsample_ratio input (hardcoded to 1.0 during export)
-        # Model uses FP32 inputs (ONNX Runtime, not FP16 like old model)
 
         # Prepare ONNX inputs
         if state is not None:
@@ -371,14 +364,13 @@ class ONNXSegmentation(Thread):
                 'r4i': state.r4,
             }
         else:
-            # Initialize with dynamic shapes based on model resolution (first frame)
-            # r1: h/2, r2: h/4, r3: h/8, r4: h/16
+            # Initialize with dynamic shapes based on model resolution (first frame) - FP16
             onnx_inputs = {
                 'src': img_nchw,
-                'r1i': np.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=np.float32),
-                'r2i': np.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=np.float32),
-                'r3i': np.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=np.float32),
-                'r4i': np.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=np.float32),
+                'r1i': np.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=np.float16),  # Changed from float32
+                'r2i': np.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=np.float16),  # Changed from float32
+                'r3i': np.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=np.float16),  # Changed from float32
+                'r4i': np.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=np.float16),  # Changed from float32
             }
 
         # Run ONNX inference
@@ -406,14 +398,14 @@ class ONNXSegmentation(Thread):
             if tracklet_id in self._recurrent_states:
                 del self._recurrent_states[tracklet_id]
                 if self.verbose:
-                    print(f"RVM Segmentation: Cleared state for tracklet {tracklet_id}")
+                    print(f"ONNX Segmentation: Cleared state for tracklet {tracklet_id}")
 
     def clear_all_states(self) -> None:
         """Clear all recurrent states (e.g., on scene change or reset)."""
         with self._state_lock:
             self._recurrent_states.clear()
             if self.verbose:
-                print("RVM Segmentation: Cleared all recurrent states")
+                print("ONNX Segmentation: Cleared all recurrent states")
 
     # CALLBACK
     def _callback_worker_loop(self) -> None:
@@ -421,7 +413,7 @@ class ONNXSegmentation(Thread):
         while not self._shutdown_event.is_set():
             try:
                 if self._callback_queue.qsize() > 1:
-                    print("RVM Segmentation Warning: Callback queue size > 1, consumers may be falling behind")
+                    print("ONNX Segmentation Warning: Callback queue size > 1, consumers may be falling behind")
 
                 output: SegmentationOutput | None = self._callback_queue.get(timeout=0.5)
 
@@ -435,7 +427,7 @@ class ONNXSegmentation(Thread):
                     try:
                         callback(output)
                     except Exception as e:
-                        print(f"RVM Segmentation Callback Error: {str(e)}")
+                        print(f"ONNX Segmentation Callback Error: {str(e)}")
                         traceback.print_exc()
 
                 self._callback_queue.task_done()
@@ -462,6 +454,6 @@ class ONNXSegmentation(Thread):
                 if 999 in self._recurrent_states:
                     del self._recurrent_states[999]
 
-            print("RVM Segmentation: Warmup complete")
+            print("ONNX Segmentation: Warmup complete")
         except Exception as e:
-            print(f"RVM Segmentation: Warmup failed (non-critical) - {str(e)}")
+            print(f"ONNX Segmentation: Warmup failed (non-critical) - {str(e)}")

@@ -198,18 +198,18 @@ class TensorRTSegmentation(Thread):
                 self._recurrent_states.clear()
 
             # Preallocate zero recurrent states (read-only, shared across all new tracklets)
-            self._zero_r1 = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32)
-            self._zero_r2 = cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32)
-            self._zero_r3 = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32)
-            self._zero_r4 = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32)
+            self._zero_r1 = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16)
+            self._zero_r2 = cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16)
+            self._zero_r3 = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16)
+            self._zero_r4 = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16)
 
             # Preallocate input buffers per worker
             self._input_buffers = []
             for _ in range(self._max_workers):
                 self._input_buffers.append({
                     'img_uint8': cp.empty((self.model_height, self.model_width, 3), dtype=cp.uint8),
-                    'img_float': cp.empty((self.model_height, self.model_width, 3), dtype=cp.float32),
-                    'src': cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float32),
+                    'img_float': cp.empty((self.model_height, self.model_width, 3), dtype=cp.float16),
+                    'src': cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float16),
                 })
 
             # Create thread pool for parallel inference
@@ -387,8 +387,8 @@ class TensorRTSegmentation(Thread):
             with self.stream:
                 # Copy input to preallocated uint8 buffer
                 img_uint8_gpu[:] = cp.asarray(img)
-                # BGR to RGB (in-place view flip, then copy to float buffer)
-                img_float_gpu[:] = img_uint8_gpu[:, :, ::-1].astype(cp.float32)
+                # BGR to RGB (in-place view flip, then copy to float16 buffer)
+                img_float_gpu[:] = img_uint8_gpu[:, :, ::-1].astype(cp.float16)
                 # Normalize and transpose to CHW, write directly to src buffer
                 img_float_gpu /= 255.0
                 src_gpu[0] = cp.ascontiguousarray(cp.transpose(img_float_gpu, (2, 0, 1)))
@@ -416,19 +416,19 @@ class TensorRTSegmentation(Thread):
 
             # Allocate fresh output buffers (CuPy memory pool handles caching)
             # These are kept directly without copying - no preallocation needed
-            fgr_gpu = cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float32)
-            pha_gpu = cp.empty((1, 1, self.model_height, self.model_width), dtype=cp.float32)
-            r1o_gpu = cp.empty((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float32)
-            r2o_gpu = cp.empty((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32)
-            r3o_gpu = cp.empty((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32)
-            r4o_gpu = cp.empty((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32)
+            fgr_gpu = cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float16)
+            pha_gpu = cp.empty((1, 1, self.model_height, self.model_width), dtype=cp.float16)
+            r1o_gpu = cp.empty((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16)
+            r2o_gpu = cp.empty((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16)
+            r3o_gpu = cp.empty((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16)
+            r4o_gpu = cp.empty((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16)
 
             # Set tensor addresses
             self.context.set_tensor_address('src', src_gpu.data.ptr)
-            self.context.set_tensor_address('r1i', r1_gpu.data.ptr)
-            self.context.set_tensor_address('r2i', r2_gpu.data.ptr)
-            self.context.set_tensor_address('r3i', r3_gpu.data.ptr)
-            self.context.set_tensor_address('r4i', r4_gpu.data.ptr)
+            self.context.set_tensor_address('r1i', r1_gpu.data.ptr) # type: ignore
+            self.context.set_tensor_address('r2i', r2_gpu.data.ptr) # type: ignore
+            self.context.set_tensor_address('r3i', r3_gpu.data.ptr) # type: ignore
+            self.context.set_tensor_address('r4i', r4_gpu.data.ptr) # type: ignore
             self.context.set_tensor_address('fgr', fgr_gpu.data.ptr)
             self.context.set_tensor_address('pha', pha_gpu.data.ptr)
             self.context.set_tensor_address('r1o', r1o_gpu.data.ptr)
