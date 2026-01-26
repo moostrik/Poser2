@@ -100,6 +100,9 @@ class TensorRTSegmentation(Thread):
         self._zero_r3: cp.ndarray
         self._zero_r4: cp.ndarray
 
+        # Preallocated input buffers per worker (for preprocessing)
+        self._input_buffers: list[dict[str, cp.ndarray]] = []
+
         # Profiling accumulators (periodic averaging)
         self._profile_count: int = 0
         self._profile_interval: int = 100  # Print every N frames
@@ -199,6 +202,15 @@ class TensorRTSegmentation(Thread):
             self._zero_r2 = cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float32)
             self._zero_r3 = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float32)
             self._zero_r4 = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float32)
+
+            # Preallocate input buffers per worker
+            self._input_buffers = []
+            for _ in range(self._max_workers):
+                self._input_buffers.append({
+                    'img_uint8': cp.empty((self.model_height, self.model_width, 3), dtype=cp.uint8),
+                    'img_float': cp.empty((self.model_height, self.model_width, 3), dtype=cp.float32),
+                    'src': cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float32),
+                })
 
             # Create thread pool for parallel inference
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="TRT-RVM-Worker")
@@ -302,7 +314,8 @@ class TensorRTSegmentation(Thread):
             futures = []
             inference_times = []
             for i, (img, tracklet_id) in enumerate(zip(images_to_process, tracklets_to_process)):
-                future = self._executor.submit(self._infer_single_image, img, tracklet_id)
+                buffer_idx = i  # Direct mapping: worker i uses buffer i
+                future = self._executor.submit(self._infer_single_image, img, tracklet_id, buffer_idx)
                 futures.append((future, tracklet_id))
 
             # Collect results in original order
@@ -342,12 +355,13 @@ class TensorRTSegmentation(Thread):
         except Exception:
             print("TensorRT Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_single_image(self, img: np.ndarray, tracklet_id: int) -> tuple[torch.Tensor, float]:
+    def _infer_single_image(self, img: np.ndarray, tracklet_id: int, buffer_idx: int) -> tuple[torch.Tensor, float]:
         """Run RVM TensorRT inference on single image with per-tracklet recurrent state.
 
         Args:
             img: Input image (H, W, 3) BGR uint8
             tracklet_id: Unique identifier for tracking temporal state
+            buffer_idx: Index into preallocated buffers for this worker
 
         Returns:
             Tuple of (alpha matte tensor (H, W) FP32 on CUDA [0, 1], inference_time_ms)
@@ -363,16 +377,21 @@ class TensorRTSegmentation(Thread):
             # Start timing after acquiring lock (excludes wait time)
             lock_acquired = time.perf_counter()
 
+            # Get preallocated buffers for this worker
+            buffers = self._input_buffers[buffer_idx]
+            img_uint8_gpu = buffers['img_uint8']
+            img_float_gpu = buffers['img_float']
+            src_gpu = buffers['src']
+
             # All CuPy operations on same stream as TensorRT
             with self.stream:
-                # Preprocessing on GPU (inside lock to prevent CUDA conflicts)
-                img_gpu = cp.asarray(img)  # (H, W, 3) uint8 BGR -> GPU
-                img_rgb_gpu = img_gpu[:, :, ::-1]  # BGR to RGB on GPU (zero-copy view)
-                img_float_gpu = img_rgb_gpu.astype(cp.float32)  # uint8 -> float32 on GPU
-                img_norm_gpu = img_float_gpu / 255.0  # Normalize to [0, 1] on GPU
-                img_chw_gpu = cp.transpose(img_norm_gpu, (2, 0, 1))  # (3, H, W) on GPU
-                img_chw_gpu = cp.ascontiguousarray(img_chw_gpu)  # Ensure contiguous memory for TensorRT
-                src_gpu = cp.expand_dims(img_chw_gpu, axis=0)  # (1, 3, H, W) on GPU
+                # Copy input to preallocated uint8 buffer
+                img_uint8_gpu[:] = cp.asarray(img)
+                # BGR to RGB (in-place view flip, then copy to float buffer)
+                img_float_gpu[:] = img_uint8_gpu[:, :, ::-1].astype(cp.float32)
+                # Normalize and transpose to CHW, write directly to src buffer
+                img_float_gpu /= 255.0
+                src_gpu[0] = cp.ascontiguousarray(cp.transpose(img_float_gpu, (2, 0, 1)))
 
                 # Prepare recurrent state inputs
                 if state is not None:
