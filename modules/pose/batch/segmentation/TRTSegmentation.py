@@ -29,7 +29,7 @@ from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, ge
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class TensorRTSegmentation(Thread):
+class TRTSegmentation(Thread):
     """Asynchronous GPU person segmentation using Robust Video Matting (RVM) with TensorRT.
 
     Optimized inference using TensorRT engines for maximum performance.

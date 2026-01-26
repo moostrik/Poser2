@@ -8,12 +8,13 @@ import torch
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameDict
 from modules.pose.batch.segmentation.ONNXSegmentation import ONNXSegmentation, SegmentationInput, SegmentationOutput
-from modules.pose.batch.segmentation.TensorRTSegmentation import TensorRTSegmentation
+# from modules.pose.batch.segmentation.TRTSegmentation import TRTSegmentation
+from modules.pose.batch.segmentation.TRTGraphSegmentation import TRTGraphSegmentation as TRTSegmentation
 from modules.pose.Settings import Settings, ModelType
 from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.PerformanceTimer import PerformanceTimer
 
-Segmentation = Union[ONNXSegmentation, TensorRTSegmentation]
+Segmentation = Union[ONNXSegmentation, TRTSegmentation]
 
 
 class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
@@ -35,7 +36,7 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         if settings.model_type is ModelType.ONNX:
             self._segmentation = ONNXSegmentation(settings)
         elif settings.model_type is ModelType.TRT:
-            self._segmentation = TensorRTSegmentation(settings)
+            self._segmentation = TRTSegmentation(settings)
         self._lock = Lock()
         self._batch_counter: int = 0
         self._verbose: bool = settings.verbose
