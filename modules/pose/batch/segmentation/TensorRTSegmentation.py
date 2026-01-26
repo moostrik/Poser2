@@ -110,6 +110,9 @@ class TensorRTSegmentation(Thread):
         self._profile_inference: float = 0.0
         self._profile_postprocess: float = 0.0
 
+        # Toggle between batched and single-image inference (for performance comparison)
+        self._use_batched_inference: bool = True  # Set False to use single-image mode
+
     @property
     def is_ready(self) -> bool:
         """Check if model is loaded and system is ready to process segmentation"""
@@ -223,24 +226,17 @@ class TensorRTSegmentation(Thread):
                     'src': cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float16),
                 })
 
-            # Preallocate BATCHED buffers for true batch inference
+            # Preallocate BATCHED buffers for true batch inference (inputs only)
+            # Output buffers are allocated fresh each batch to avoid .copy() overhead
             self._max_batch = self._max_workers  # Match max batch to max workers
             self._batch_buffers = {
                 'img_uint8': cp.empty((self._max_batch, self.model_height, self.model_width, 3), dtype=cp.uint8),
-                'img_float': cp.empty((self._max_batch, self.model_height, self.model_width, 3), dtype=cp.float16),
                 'src': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=cp.float16),
-                # Batched recurrent state buffers
+                # Batched recurrent state INPUT buffers
                 'r1i': cp.empty((self._max_batch, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16),
                 'r2i': cp.empty((self._max_batch, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16),
                 'r3i': cp.empty((self._max_batch, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16),
                 'r4i': cp.empty((self._max_batch, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16),
-                # Batched output buffers
-                'fgr': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=cp.float16),
-                'pha': cp.empty((self._max_batch, 1, self.model_height, self.model_width), dtype=cp.float16),
-                'r1o': cp.empty((self._max_batch, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16),
-                'r2o': cp.empty((self._max_batch, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16),
-                'r3o': cp.empty((self._max_batch, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16),
-                'r4o': cp.empty((self._max_batch, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16),
             }
 
             # Create thread pool for parallel inference
@@ -335,15 +331,26 @@ class TensorRTSegmentation(Thread):
 
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 
-        # Run inference using TRUE BATCHING (single TensorRT call for all tracklets)
+        # Run inference using selected mode
         if batch.images:
             # Limit processing to max batch size
             images_to_process = batch.images[:self._max_batch]
             tracklets_to_process = batch.tracklet_ids[:self._max_batch]
 
             try:
-                # Single batched inference call
-                mask_tensor, inference_time_ms = self._infer_batch(images_to_process, tracklets_to_process)
+                if self._use_batched_inference:
+                    # TRUE BATCHING: Single TensorRT call for all tracklets
+                    mask_tensor, inference_time_ms = self._infer_batch(images_to_process, tracklets_to_process)
+                else:
+                    # SINGLE-IMAGE MODE: Process one at a time (for comparison)
+                    mask_list: list[torch.Tensor] = []
+                    inference_times: list[float] = []
+                    for i, (img, tid) in enumerate(zip(images_to_process, tracklets_to_process)):
+                        mask, inf_time = self._infer_single_image(img, tid, i % len(self._input_buffers))
+                        mask_list.append(mask)
+                        inference_times.append(inf_time)
+                    mask_tensor = torch.stack(mask_list) if mask_list else torch.empty(0, dtype=torch.float32, device='cuda')
+                    inference_time_ms = sum(inference_times)
             except Exception as e:
                 print(f"TensorRT Segmentation Error: Batched inference failed: {str(e)}")
                 traceback.print_exc()
@@ -400,23 +407,16 @@ class TensorRTSegmentation(Thread):
         with get_exec_lock():
             lock_acquired = time.perf_counter()
 
-            # Get batched buffers (sliced to actual batch size)
+            # Get batched INPUT buffers (sliced to actual batch size)
             buf = self._batch_buffers
             src_gpu = buf['src'][:batch_size]
             r1i_gpu = buf['r1i'][:batch_size]
             r2i_gpu = buf['r2i'][:batch_size]
             r3i_gpu = buf['r3i'][:batch_size]
             r4i_gpu = buf['r4i'][:batch_size]
-            fgr_gpu = buf['fgr'][:batch_size]
-            pha_gpu = buf['pha'][:batch_size]
-            r1o_gpu = buf['r1o'][:batch_size]
-            r2o_gpu = buf['r2o'][:batch_size]
-            r3o_gpu = buf['r3o'][:batch_size]
-            r4o_gpu = buf['r4o'][:batch_size]
 
             with self.stream:
                 # OPTIMIZED: Stack images on CPU first, single transfer to GPU
-                # This reduces N host-to-device transfers to just 1
                 stacked_imgs = np.stack(images, axis=0)  # (B, H, W, 3) uint8
                 buf['img_uint8'][:batch_size] = cp.asarray(stacked_imgs)
 
@@ -440,6 +440,15 @@ class TensorRTSegmentation(Thread):
                         r3i_gpu[i] = self._zero_r3[0]
                         r4i_gpu[i] = self._zero_r4[0]
 
+            # Allocate FRESH output buffers (avoids .copy() in postprocess)
+            # CuPy memory pool makes this fast, and we keep these directly
+            fgr_gpu = cp.empty((batch_size, 3, self.model_height, self.model_width), dtype=cp.float16)
+            pha_gpu = cp.empty((batch_size, 1, self.model_height, self.model_width), dtype=cp.float16)
+            r1o_gpu = cp.empty((batch_size, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16)
+            r2o_gpu = cp.empty((batch_size, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16)
+            r3o_gpu = cp.empty((batch_size, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16)
+            r4o_gpu = cp.empty((batch_size, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16)
+
             # Set batched input shapes
             self.context.set_input_shape('src', (batch_size, 3, self.model_height, self.model_width))
             self.context.set_input_shape('r1i', (batch_size, 16, self.model_height // 2, self.model_width // 2))
@@ -447,38 +456,36 @@ class TensorRTSegmentation(Thread):
             self.context.set_input_shape('r3i', (batch_size, 40, self.model_height // 8, self.model_width // 8))
             self.context.set_input_shape('r4i', (batch_size, 64, self.model_height // 16, self.model_width // 16))
 
-            # Set tensor addresses (use full buffer pointers, TensorRT uses shapes)
+            # Set tensor addresses
             self.context.set_tensor_address('src', buf['src'].data.ptr)
             self.context.set_tensor_address('r1i', buf['r1i'].data.ptr)
             self.context.set_tensor_address('r2i', buf['r2i'].data.ptr)
             self.context.set_tensor_address('r3i', buf['r3i'].data.ptr)
             self.context.set_tensor_address('r4i', buf['r4i'].data.ptr)
-            self.context.set_tensor_address('fgr', buf['fgr'].data.ptr)
-            self.context.set_tensor_address('pha', buf['pha'].data.ptr)
-            self.context.set_tensor_address('r1o', buf['r1o'].data.ptr)
-            self.context.set_tensor_address('r2o', buf['r2o'].data.ptr)
-            self.context.set_tensor_address('r3o', buf['r3o'].data.ptr)
-            self.context.set_tensor_address('r4o', buf['r4o'].data.ptr)
+            self.context.set_tensor_address('fgr', fgr_gpu.data.ptr)
+            self.context.set_tensor_address('pha', pha_gpu.data.ptr)
+            self.context.set_tensor_address('r1o', r1o_gpu.data.ptr)
+            self.context.set_tensor_address('r2o', r2o_gpu.data.ptr)
+            self.context.set_tensor_address('r3o', r3o_gpu.data.ptr)
+            self.context.set_tensor_address('r4o', r4o_gpu.data.ptr)
 
-            self.stream.synchronize()
             preprocess_done = time.perf_counter()
 
-            # Execute batched inference
+            # Execute batched inference (no sync needed before - TensorRT waits for stream)
             with self.stream:
                 self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
 
             inference_done = time.perf_counter()
 
-            # Split output states back to individual tracklets
+            # Split output states - NO COPY needed, buffers are fresh allocations
             new_states: list[RecurrentState] = []
             for i in range(batch_size):
-                # Clone each slice to own the memory (detach from shared buffer)
                 new_states.append(RecurrentState(
-                    r1=r1o_gpu[i:i+1].copy(),  # Keep batch dim (1, C, H, W)
-                    r2=r2o_gpu[i:i+1].copy(),
-                    r3=r3o_gpu[i:i+1].copy(),
-                    r4=r4o_gpu[i:i+1].copy(),
+                    r1=r1o_gpu[i:i+1],  # View into fresh buffer - safe to keep
+                    r2=r2o_gpu[i:i+1],
+                    r3=r3o_gpu[i:i+1],
+                    r4=r4o_gpu[i:i+1],
                 ))
 
             # Convert batched pha to PyTorch tensor
