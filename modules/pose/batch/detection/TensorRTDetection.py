@@ -243,18 +243,70 @@ class TensorRTDetection(Thread):
 
     # STATIC METHODS
 
-    @staticmethod
-    def _preprocess_batch(imgs: list[np.ndarray], width: int, height: int) -> np.ndarray:
-        """Convert BGR uint8 images to normalized RGB FP32 batch (B, 3, H, W)."""
-        if not imgs:
-            return np.empty((0, 3, height, width), dtype=np.float32)
 
+    @staticmethod
+    def _preprocess_batch(imgs: list[np.ndarray], width: int, height: int) -> cp.ndarray:
+        """Convert BGR uint8 images to normalized RGB FP32 batch (B, 3, H, W)."""
         batch_hwc = np.stack(imgs, axis=0).astype(np.float32)
         batch_rgb = batch_hwc[:, :, :, ::-1]
-        batch_chw = batch_rgb.transpose(0, 3, 1, 2)
-        batch_norm = (batch_chw - IMAGENET_MEAN) / IMAGENET_STD
+        # mean = IMAGENET_MEAN.reshape(1, 1, 1, 3)
+        # std = IMAGENET_STD.reshape(1, 1, 1, 3)
+        # batch_norm = (batch_rgb - mean) / std
+        # batch_norm_gpu = cp.asarray(batch_norm)
 
-        return batch_norm
+        batch_gpu = cp.asarray(batch_rgb)
+
+        mean_gpu = cp.asarray(IMAGENET_MEAN.reshape(1, 1, 1, 3), dtype=cp.float32)
+        std_gpu = cp.asarray(IMAGENET_STD.reshape(1, 1, 1, 3), dtype=cp.float32)
+        batch_norm_gpu = (batch_gpu - mean_gpu) / std_gpu
+
+        batch_chw_gpu = batch_norm_gpu.transpose(0, 3, 1, 2)
+        batch_chw_gpu = cp.ascontiguousarray(batch_chw_gpu)  # Ensure contiguous memory for TensorRT
+        return batch_chw_gpu
+
+    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float]:
+        """Run TensorRT inference on batch of images. Returns (keypoints, scores, inference_time_ms)."""
+
+        # Preprocess
+        batch_gpu = self._preprocess_batch(imgs, width, height)
+
+        # Run inference with global lock to prevent race conditions
+        with get_exec_lock():
+            # Start timing after acquiring lock (excludes wait time)
+            lock_acquired = time.perf_counter()
+
+            # Set input shape for current batch (must be inside lock!)
+            self.context.set_input_shape(self.input_name, batch_gpu.shape)
+
+            # Get output shapes from engine
+            output0_shape = self.context.get_tensor_shape(self.output_names[0])
+            output1_shape = self.context.get_tensor_shape(self.output_names[1])
+
+            # Allocate GPU output buffers
+            output0_gpu = cp.empty(output0_shape, dtype=cp.float32)
+            output1_gpu = cp.empty(output1_shape, dtype=cp.float32)
+
+            # Set tensor addresses
+            self.context.set_tensor_address(self.input_name, batch_gpu.data.ptr)
+            self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
+            self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
+
+            # Execute inference
+            with self.stream:
+                self.context.execute_async_v3(stream_handle=self.stream.ptr)
+            self.stream.synchronize()
+
+        # Copy back to CPU
+        simcc_x = cp.asnumpy(output0_gpu)
+        simcc_y = cp.asnumpy(output1_gpu)
+
+        # Return time spent in lock (actual inference time)
+        inference_time = (time.perf_counter() - lock_acquired) * 1000.0
+
+        # Decode SimCC outputs
+        keypoints, scores = TensorRTDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
+
+        return keypoints, scores, inference_time
 
     @staticmethod
     def _decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float, apply_softmax: bool = False) -> tuple[np.ndarray, np.ndarray]:
@@ -304,53 +356,3 @@ class TensorRTDetection(Thread):
         scores = np.clip(scores, 0.0, 1.0)
 
         return keypoints, scores
-
-    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float]:
-        """Run TensorRT inference on batch of images. Returns (keypoints, scores, inference_time_ms)."""
-        if not imgs:
-            return np.empty((0, 17, 2)), np.empty((0, 17)), 0.0
-
-        # Preprocess
-        batch = self._preprocess_batch(imgs, width, height)
-
-
-        # Use CuPy for GPU arrays
-        batch_gpu = cp.asarray(batch)
-
-        # Run inference with global lock to prevent race conditions
-        with get_exec_lock():
-            # Start timing after acquiring lock (excludes wait time)
-            lock_acquired = time.perf_counter()
-
-            # Set input shape for current batch (must be inside lock!)
-            self.context.set_input_shape(self.input_name, batch_gpu.shape)
-
-            # Get output shapes from engine
-            output0_shape = self.context.get_tensor_shape(self.output_names[0])
-            output1_shape = self.context.get_tensor_shape(self.output_names[1])
-
-            # Allocate GPU output buffers
-            output0_gpu = cp.empty(output0_shape, dtype=cp.float32)
-            output1_gpu = cp.empty(output1_shape, dtype=cp.float32)
-
-            # Set tensor addresses
-            self.context.set_tensor_address(self.input_name, batch_gpu.data.ptr)
-            self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
-            self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
-
-            # Execute inference
-            with self.stream:
-                self.context.execute_async_v3(stream_handle=self.stream.ptr)
-            self.stream.synchronize()
-
-        # Copy back to CPU
-        simcc_x = cp.asnumpy(output0_gpu)
-        simcc_y = cp.asnumpy(output1_gpu)
-
-        # Return time spent in lock (actual inference time)
-        inference_time = (time.perf_counter() - lock_acquired) * 1000.0
-
-        # Decode SimCC outputs
-        keypoints, scores = TensorRTDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
-
-        return keypoints, scores, inference_time
