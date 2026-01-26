@@ -105,7 +105,8 @@ class TensorRTSegmentation(Thread):
 
         # Profiling accumulators (periodic averaging)
         self._profile_count: int = 0
-        self._profile_interval: int = 100  # Print every N frames
+        self._profile_interval: int = 500  # Print every N frames (reduced overhead)
+        self._profile_lock_wait: float = 0.0
         self._profile_preprocess: float = 0.0
         self._profile_inference: float = 0.0
         self._profile_postprocess: float = 0.0
@@ -169,6 +170,10 @@ class TensorRTSegmentation(Thread):
                 # Create dedicated CUDA stream
                 self.stream = cp.cuda.Stream(non_blocking=True)
 
+                # Tune CuPy memory pool for better performance
+                mempool = cp.get_default_memory_pool()
+                mempool.set_limit(size=2 * 1024**3)  # 2GB limit (up from 512MB default)
+
             # Lock released - continue with setup
 
             # Get input/output names
@@ -193,6 +198,13 @@ class TensorRTSegmentation(Thread):
                 print(f"TensorRT Segmentation ERROR: Expected 6 outputs, got {len(self.output_names)}")
                 return
 
+            # Verify FP16 precision
+            print(f"TensorRT Segmentation tensor precisions:")
+            for name in self.input_names + self.output_names:
+                dtype = self.engine.get_tensor_dtype(name)
+                shape = self.engine.get_tensor_shape(name)
+                print(f"  {name}: {dtype} {tuple(shape)}")
+
             # Clear any existing states
             with self._state_lock:
                 self._recurrent_states.clear()
@@ -211,6 +223,13 @@ class TensorRTSegmentation(Thread):
                     'img_float': cp.empty((self.model_height, self.model_width, 3), dtype=cp.float16),
                     'src': cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float16),
                 })
+
+            # Set fixed input shapes once (all batch=1, shapes never change)
+            self.context.set_input_shape('src', (1, 3, self.model_height, self.model_width))
+            self.context.set_input_shape('r1i', self._zero_r1.shape)
+            self.context.set_input_shape('r2i', self._zero_r2.shape)
+            self.context.set_input_shape('r3i', self._zero_r3.shape)
+            self.context.set_input_shape('r4i', self._zero_r4.shape)
 
             # Create thread pool for parallel inference
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="TRT-RVM-Worker")
@@ -373,9 +392,11 @@ class TensorRTSegmentation(Thread):
 
         # Run inference with global lock to prevent race conditions
         # ALL GPU operations inside lock for maximum stability
+        lock_wait_start = time.perf_counter()
         with get_exec_lock():
-            # Start timing after acquiring lock (excludes wait time)
+            # Start timing after acquiring lock
             lock_acquired = time.perf_counter()
+            lock_wait_ms = (lock_acquired - lock_wait_start) * 1000
 
             # Get preallocated buffers for this worker
             buffers = self._input_buffers[buffer_idx]
@@ -385,8 +406,9 @@ class TensorRTSegmentation(Thread):
 
             # All CuPy operations on same stream as TensorRT
             with self.stream:
-                # Copy input to preallocated uint8 buffer
-                img_uint8_gpu[:] = cp.asarray(img)
+                # Copy input directly to preallocated uint8 buffer (no intermediate allocation)
+                img_uint8_gpu.set(img)
+
                 # BGR to RGB (in-place view flip, then copy to float16 buffer)
                 img_float_gpu[:] = img_uint8_gpu[:, :, ::-1].astype(cp.float16)
                 # Normalize and transpose to CHW, write directly to src buffer
@@ -407,12 +429,7 @@ class TensorRTSegmentation(Thread):
                     r3_gpu = self._zero_r3
                     r4_gpu = self._zero_r4
 
-            # Set input shapes (must be inside lock!)
-            self.context.set_input_shape('src', src_gpu.shape)
-            self.context.set_input_shape('r1i', r1_gpu.shape)
-            self.context.set_input_shape('r2i', r2_gpu.shape)
-            self.context.set_input_shape('r3i', r3_gpu.shape)
-            self.context.set_input_shape('r4i', r4_gpu.shape)
+            # Shapes are fixed and set once at initialization - no need to set per frame
 
             # Allocate fresh output buffers (CuPy memory pool handles caching)
             # These are kept directly without copying - no preallocation needed
@@ -467,6 +484,7 @@ class TensorRTSegmentation(Thread):
             total_ms = (postprocess_done - lock_acquired) * 1000.0
 
             # Accumulate for periodic reporting
+            self._profile_lock_wait += lock_wait_ms
             self._profile_preprocess += preprocess_ms
             self._profile_inference += inference_ms
             self._profile_postprocess += postprocess_ms
@@ -475,11 +493,13 @@ class TensorRTSegmentation(Thread):
             if self._profile_count >= self._profile_interval:
                 n = self._profile_count
                 print(f"TensorRT Segmentation avg ({n} frames): "
+                      f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
                       f"preprocess={self._profile_preprocess/n:.2f}ms, "
                       f"inference={self._profile_inference/n:.2f}ms, "
                       f"postprocess={self._profile_postprocess/n:.2f}ms, "
                       f"total={(self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
                 self._profile_count = 0
+                self._profile_lock_wait = 0.0
                 self._profile_preprocess = 0.0
                 self._profile_inference = 0.0
                 self._profile_postprocess = 0.0

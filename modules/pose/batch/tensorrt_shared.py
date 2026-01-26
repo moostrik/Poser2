@@ -10,8 +10,8 @@ _trt_runtime_lock = Lock()
 # This prevents TensorRT Myelin graph conflicts when multiple models load simultaneously
 _trt_init_lock = Lock()
 
-# Global execution lock prevents concurrent inference
-# TensorRT Myelin graphs conflict when multiple contexts execute simultaneously
+# Global execution lock - all TensorRT inference calls are serialized
+# This prevents Myelin graph conflicts during concurrent inference
 _trt_exec_lock = Lock()
 
 
@@ -40,6 +40,6 @@ def get_exec_lock() -> Lock:
     """Get the global TensorRT execution lock.
 
     Models should acquire this lock during execute_async_v3() calls to prevent
-    concurrent inference which causes Myelin graph conflicts.
+    concurrent inference which can cause Myelin graph conflicts and incorrect results.
     """
     return _trt_exec_lock
