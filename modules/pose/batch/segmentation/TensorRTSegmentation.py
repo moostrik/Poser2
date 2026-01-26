@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from modules.pose.Settings import Settings
 
-from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from modules.pose.batch.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
