@@ -64,7 +64,6 @@ def draw_quad() -> None:
     vao = _get_or_create_quad_vao()
     glBindVertexArray(vao)
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
-    glBindVertexArray(0)
 
 # -----------------------------------------------------------------------------
 # FPS utilities
