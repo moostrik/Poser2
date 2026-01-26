@@ -8,8 +8,7 @@ import torch
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameDict
 from modules.pose.batch.segmentation.ONNXSegmentation import ONNXSegmentation, SegmentationInput, SegmentationOutput
-# from modules.pose.batch.segmentation.TRTSegmentation import TRTSegmentation
-from modules.pose.batch.segmentation.TRTGraphSegmentation import TRTGraphSegmentation as TRTSegmentation
+from modules.pose.batch.segmentation.TRTSegmentation import TRTSegmentation
 from modules.pose.Settings import Settings, ModelType
 from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.PerformanceTimer import PerformanceTimer

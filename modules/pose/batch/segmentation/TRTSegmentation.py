@@ -415,13 +415,13 @@ class TRTSegmentation(Thread):
             r3i_gpu = buf['r3i'][:batch_size]
             r4i_gpu = buf['r4i'][:batch_size]
 
+            stacked_imgs = np.stack(images, axis=0)  # (B, H, W, 3) uint8
             with self.stream:
                 # OPTIMIZED: Stack images on CPU first, single transfer to GPU
-                stacked_imgs = np.stack(images, axis=0)  # (B, H, W, 3) uint8
-                buf['img_uint8'][:batch_size] = cp.asarray(stacked_imgs)
+                buf['img_uint8'][:batch_size].set(stacked_imgs)
 
                 # Vectorized BGR->RGB, uint8->float16, normalize (operates on full batch)
-                img_float_batch = buf['img_uint8'][:batch_size, :, :, ::-1].astype(cp.float16) / 255.0
+                img_float_batch = (buf['img_uint8'][:batch_size, :, :, ::-1] / 255.0).astype(cp.float16)
 
                 # Vectorized transpose HWC -> CHW for full batch
                 src_gpu[:] = cp.ascontiguousarray(cp.transpose(img_float_batch, (0, 3, 1, 2)))
