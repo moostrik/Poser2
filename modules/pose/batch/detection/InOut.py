@@ -20,5 +20,6 @@ class DetectionOutput:
     score_batch: list[np.ndarray] = field(default_factory=list)   # List of (num_keypoints,) arrays, confidence scores [0, 1]
     processed: bool = True          # False if batch was dropped before processing
     inference_time_ms: float = 0.0  # For monitoring
+    lock_time_ms: float = 0.0       # Time spent waiting for lock
 
 PoseDetectionOutputCallback = Callable[[DetectionOutput], None]

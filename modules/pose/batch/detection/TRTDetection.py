@@ -1,10 +1,8 @@
 # Standard library imports
-from dataclasses import dataclass
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
 import traceback
-from typing import Callable
 
 # Third-party imports
 import numpy as np
@@ -72,14 +70,6 @@ class TRTDetection(Thread):
         self._output_buffers: dict[str, cp.ndarray]
         self._mean_gpu: cp.ndarray  # ImageNet mean on GPU
         self._std_gpu: cp.ndarray  # ImageNet std on GPU
-
-        # Profiling accumulators (periodic averaging)
-        self._profile_count: int = 0
-        self._profile_interval: int = 100  # Print every N frames
-        self._profile_lock_wait: float = 0.0
-        self._profile_preprocess: float = 0.0
-        self._profile_inference: float = 0.0
-        self._profile_postprocess: float = 0.0
 
     @property
     def is_ready(self) -> bool:
@@ -228,8 +218,8 @@ class TRTDetection(Thread):
 
         # Run inference
         if batch.images:
-            # Preprocess and run inference (timing done inside _infer_batch)
-            keypoints, scores, inference_time_ms = self._infer_batch(batch.images, self.model_width, self.model_height)
+            # Run inference with timing breakdown
+            keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch(batch.images, self.model_width, self.model_height)
 
             # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
@@ -244,7 +234,8 @@ class TRTDetection(Thread):
                 point_batch=point_list,
                 score_batch=score_list,
                 processed=True,
-                inference_time_ms=inference_time_ms
+                inference_time_ms=process_time_ms,
+                lock_time_ms=lock_wait_ms
             )
         else:
             output = DetectionOutput(batch_id=batch.batch_id, processed=True)
@@ -282,29 +273,38 @@ class TRTDetection(Thread):
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float]:
-        """Run TensorRT inference on batch of images. Returns (keypoints, scores, inference_time_ms)."""
+    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float, float]:
+        """Run TensorRT inference on batch of images.
 
+        Args:
+            imgs: List of BGR uint8 images (H, W, 3)
+            width: Model input width
+            height: Model input height
+
+        Returns:
+            (keypoints, scores, process_time_ms, lock_wait_ms)
+        """
         batch_size = len(imgs)
 
-        # Run inference with global lock to prevent race conditions
-        # ALL GPU operations inside lock and on same stream for stability
-        call_start = time.perf_counter()  # Start before lock for true latency
-        with get_exec_lock():
-            # Start timing after acquiring lock (excludes wait time)
-            lock_acquired = time.perf_counter()
+        method_start: float = time.perf_counter()
 
-            # Preprocess entirely on GPU (eliminates CPU bottleneck and double-copy)
-            stacked_imgs = np.stack(imgs, axis=0)  # CPU stack (fast)
+        # CPU preprocessing
+        stacked_imgs = np.stack(imgs, axis=0)  # (B, H, W, 3) uint8
+
+        # Run inference with global lock
+        lock_wait_start: float = time.perf_counter()
+        with get_exec_lock():
+            lock_acquired: float = time.perf_counter()
+
             with self.stream:
                 # Single CPU→GPU transfer of uint8 data
                 self._img_uint8_buffer[:batch_size].set(stacked_imgs)
 
-                # All operations on GPU
+                # GPU preprocessing: uint8→float, BGR→RGB, HWC→CHW, normalize
                 img_float = self._img_uint8_buffer[:batch_size].astype(cp.float32)
                 img_rgb = img_float[:, :, :, ::-1]  # BGR→RGB
                 img_chw = cp.ascontiguousarray(cp.transpose(img_rgb, (0, 3, 1, 2)))  # HWC→CHW
-                self._input_buffer[:batch_size] = (img_chw - self._mean_gpu) / self._std_gpu # Normalization
+                self._input_buffer[:batch_size] = (img_chw - self._mean_gpu) / self._std_gpu
 
             batch_gpu = self._input_buffer[:batch_size]
 
@@ -312,7 +312,7 @@ class TRTDetection(Thread):
             output0_gpu = self._output_buffers['simcc_x'][:batch_size]
             output1_gpu = self._output_buffers['simcc_y'][:batch_size]
 
-            # Set input shape for current batch (must be inside lock!)
+            # Set input shape for current batch
             self.context.set_input_shape(self.input_name, batch_gpu.shape)
 
             # Set tensor addresses using preallocated buffers
@@ -320,55 +320,25 @@ class TRTDetection(Thread):
             self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
             self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
 
-            preprocess_done = time.perf_counter()
-
             # Execute inference
             with self.stream:
                 self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
 
-            inference_done = time.perf_counter()
-
-            # Transfer SimCC outputs to CPU (blocking operation - synchronizes automatically)
+            # Transfer SimCC outputs to CPU
             simcc_x_cpu = cp.asnumpy(output0_gpu)
             simcc_y_cpu = cp.asnumpy(output1_gpu)
 
         # Decode on CPU (outside lock - no GPU resource needed)
         keypoints, scores = TRTDetection._decode_simcc_cpu(simcc_x_cpu, simcc_y_cpu, self.simcc_split_ratio)
 
-        postprocess_done = time.perf_counter()
-        total_ms = (postprocess_done - call_start) * 1000.0  # Include lock wait
+        method_end = time.perf_counter()
 
-        # Timing breakdown
-        lock_wait_ms = (lock_acquired - call_start) * 1000.0
-        preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
-        inference_ms = (inference_done - preprocess_done) * 1000.0
-        postprocess_ms = (postprocess_done - inference_done) * 1000.0
+        lock_wait_ms = (lock_acquired - lock_wait_start) * 1000.0
+        total_time_ms = (method_end - method_start) * 1000.0
+        process_time_ms = total_time_ms - lock_wait_ms
 
-        # Accumulate for periodic reporting
-        self._profile_lock_wait += lock_wait_ms
-        self._profile_preprocess += preprocess_ms
-        self._profile_inference += inference_ms
-        self._profile_postprocess += postprocess_ms
-        self._profile_count += 1
-
-        if self._profile_count >= self._profile_interval:
-            n = self._profile_count
-            print(f"TRT Detection    avg ({n} batches): "
-                  f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
-                  f"preprocess={self._profile_preprocess/n:.2f}ms, "
-                  f"inference={self._profile_inference/n:.2f}ms, "
-                  f"postprocess={self._profile_postprocess/n:.2f}ms, "
-                  f"total={(self._profile_lock_wait + self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
-            self._profile_count = 0
-            self._profile_lock_wait = 0.0
-            self._profile_preprocess = 0.0
-            self._profile_inference = 0.0
-            self._profile_postprocess = 0.0
-
-        inference_time = total_ms
-
-        return keypoints, scores, inference_time
+        return keypoints, scores, process_time_ms, lock_wait_ms
 
     # STATIC METHODS
 

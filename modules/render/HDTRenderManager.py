@@ -152,8 +152,8 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.centre_pose,
     Layers.sim_blend,
     Layers.flow,
-    # Layers.centre_mask,
-    # Layers.centre_pose,
+    Layers.centre_mask,
+    Layers.centre_pose,
 ]
 
 BOX_LAYERS: list[Layers] = [
