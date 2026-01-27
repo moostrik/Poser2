@@ -16,10 +16,6 @@ from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, 
 
 from modules.pose.Settings import Settings
 
-# ImageNet normalization (RGB order)
-IMAGENET_MEAN = np.array([123.675, 116.28, 103.53], dtype=np.float32).reshape(1, 3, 1, 1)
-IMAGENET_STD = np.array([58.395, 57.12, 57.375], dtype=np.float32).reshape(1, 3, 1, 1)
-
 
 class ONNXDetection(Thread):
     """Asynchronous GPU pose detection using ONNX Runtime.
@@ -58,6 +54,14 @@ class ONNXDetection(Thread):
         self._callback_queue: Queue[DetectionOutput | None] = Queue(maxsize=2)
         self._callback_thread: Thread = Thread(target=self._callback_worker_loop, daemon=True)
 
+        # ONNX session (initialized in run thread)
+        self._session: ort.InferenceSession | None = None
+        self._model_dtype = np.float32  # Default, determined in setup
+        self.model_precision: str = "UNKNOWN"
+
+        # Batch inference settings
+        self._max_batch: int = min(settings.max_poses, 8)
+
     @property
     def is_ready(self) -> bool:
         """Check if model is loaded and ready"""
@@ -85,29 +89,7 @@ class ONNXDetection(Thread):
             print("Warning: ONNX callback thread did not stop cleanly")
 
     def run(self) -> None:
-        # Create ONNX Runtime session with CUDA
-        providers = [
-            ('CUDAExecutionProvider', {
-                'device_id': 0,
-                'arena_extend_strategy': 'kNextPowerOfTwo',
-                'gpu_mem_limit': 2 * 1024 * 1024 * 1024,
-                'cudnn_conv_algo_search': 'EXHAUSTIVE',
-                'do_copy_in_default_stream': True,
-            }),
-            'CPUExecutionProvider',
-        ]
-
-        sess_options = ort.SessionOptions()
-        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-
-        session = ort.InferenceSession(self.model_file, sess_options, providers=providers)
-
-        if 'CUDAExecutionProvider' not in session.get_providers():
-            print("ONNX Detection WARNING: CUDA not available, using CPU")
-
-        self._model_warmup(session, self.model_width, self.model_height, self.model_num_warmups)
-        self._model_ready.set()
-        print(f"ONNX Detection: {self.resolution_name} model ready ({self.model_width}x{self.model_height})")
+        self._setup()
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()
@@ -118,15 +100,86 @@ class ONNXDetection(Thread):
             self._notify_update_event.clear()
 
             try:
-                self._process_pending_batch(session)
+                self._process_pending_batch()
             except Exception as e:
                 print(f"ONNX Detection Error: {str(e)}")
                 traceback.print_exc()
+
+    def _setup(self) -> None:
+        """Initialize ONNX session and warmup. Called from run()."""
+        try:
+            # Create ONNX Runtime session with CUDA
+            providers = [
+                ('CUDAExecutionProvider', {
+                    'device_id': 0,
+                    'arena_extend_strategy': 'kNextPowerOfTwo',
+                    'gpu_mem_limit': 2 * 1024 * 1024 * 1024,
+                    'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                    'do_copy_in_default_stream': True,
+                }),
+                'CPUExecutionProvider',
+            ]
+
+            sess_options = ort.SessionOptions()
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            sess_options.intra_op_num_threads = 1
+            sess_options.log_severity_level = 3  # 0=verbose, 1=info, 2=warning, 3=error
+
+            self._session = ort.InferenceSession(self.model_file, sess_options, providers=providers)
+
+            # Verify CUDA provider is active
+            providers_used = self._session.get_providers()
+            if 'CUDAExecutionProvider' not in providers_used:
+                print("ONNX Detection WARNING: CUDA provider not available, using CPU")
+
+            # Determine model precision from 'input' tensor
+            input_tensor = self._session.get_inputs()[0]  # First input is 'input'
+            input_type = input_tensor.type
+
+            # Parse ONNX type string (e.g., 'tensor(float)', 'tensor(float16)')
+            precision_map = {
+                'tensor(float)': 'FP32',
+                'tensor(float16)': 'FP16',
+                'tensor(double)': 'FP64',
+                'tensor(int8)': 'INT8',
+            }
+            self.model_precision = precision_map.get(input_type, f"UNKNOWN({input_type})")
+
+            # Map ONNX type to numpy dtype for preprocessing
+            dtype_map = {
+                'tensor(float)': np.float32,
+                'tensor(float16)': np.float16,
+                'tensor(double)': np.float64,
+                'tensor(int8)': np.int8,
+            }
+            self._model_dtype = dtype_map.get(input_type, np.float32)
+
+            # Initialize ImageNet normalization constants with correct dtype
+            self._imagenet_mean = np.array([123.675, 116.28, 103.53], dtype=self._model_dtype).reshape(1, 3, 1, 1)
+            self._imagenet_std = np.array([58.395, 57.12, 57.375], dtype=self._model_dtype).reshape(1, 3, 1, 1)
+
+            # Warmup model
+            self._model_warmup()
+
+            self._model_ready.set()
+            print(f"ONNX Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+
+        except Exception as e:
+            print(f"ONNX Detection Error: Failed to load model - {str(e)}")
+            traceback.print_exc()
 
     def submit_batch(self, input_batch: DetectionInput) -> None:
         """Submit batch for processing. Identical to MMDetection."""
         if self._shutdown_event.is_set():
             return
+
+        if not self._model_ready.is_set():
+            return
+
+        # Validate batch size
+        if len(input_batch.images) > self._max_batch:
+            print(f"ONNX Detection Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: DetectionInput | None = None
 
@@ -157,7 +210,7 @@ class ONNXDetection(Thread):
             self._pending_batch = None
             return batch
 
-    def _process_pending_batch(self, session: ort.InferenceSession) -> None:
+    def _process_pending_batch(self) -> None:
         batch: DetectionInput | None = self._retrieve_pending_batch()
 
         if batch is None:
@@ -166,8 +219,11 @@ class ONNXDetection(Thread):
         if batch.images:
             batch_start = time.perf_counter()
 
+            # Limit processing to max batch size
+            images_to_process = batch.images[:self._max_batch]
+
             # Preprocess and run inference
-            keypoints, scores = self._infer_batch(session, batch.images)
+            keypoints, scores = self._infer_batch(images_to_process)
 
             # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
@@ -222,16 +278,13 @@ class ONNXDetection(Thread):
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    # STATIC METHODS
-
-    @staticmethod
-    def _preprocess_batch(imgs: list[np.ndarray], width: int, height: int) -> np.ndarray:
-        """Convert BGR uint8 images to normalized RGB FP32 batch (B, 3, H, W)."""
+    def _preprocess_batch(self, imgs: list[np.ndarray]) -> np.ndarray:
+        """Convert BGR uint8 images to normalized RGB batch (B, 3, H, W) with model dtype."""
         if not imgs:
-            return np.empty((0, 3, height, width), dtype=np.float32)
+            return np.empty((0, 3, self.model_height, self.model_width), dtype=self._model_dtype)
 
-        # Stack and convert to float32
-        batch_hwc = np.stack(imgs, axis=0).astype(np.float32)  # (B, H, W, 3)
+        # Stack and convert to model dtype
+        batch_hwc = np.stack(imgs, axis=0).astype(self._model_dtype)  # (B, H, W, 3)
 
         # BGR to RGB
         batch_rgb = batch_hwc[:, :, :, ::-1]
@@ -239,8 +292,8 @@ class ONNXDetection(Thread):
         # HWC to CHW
         batch_chw = batch_rgb.transpose(0, 3, 1, 2)  # (B, 3, H, W)
 
-        # Normalize with ImageNet stats
-        batch_norm = (batch_chw - IMAGENET_MEAN) / IMAGENET_STD
+        # Normalize with ImageNet stats (using model dtype)
+        batch_norm = (batch_chw - self._imagenet_mean) / self._imagenet_std
 
         return batch_norm
 
@@ -293,36 +346,56 @@ class ONNXDetection(Thread):
 
         return keypoints, scores
 
-    def _infer_batch(self, session: ort.InferenceSession, imgs: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-        """Run ONNX inference on batch of images."""
-        if not imgs:
+    def _infer_batch(self, imgs: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+        """Run ONNX inference on batch of images.
+
+        Uses fixed batch size padding to avoid ONNX Runtime dynamic shape recompilation.
+        """
+        actual_batch_size = len(imgs)
+        if actual_batch_size == 0 or self._session is None:
             return np.empty((0, 17, 2)), np.empty((0, 17))
 
-        # Preprocess
-        batch = self._preprocess_batch(imgs, self.model_width, self.model_height)
+        # Pad to fixed batch size to avoid ONNX Runtime recompilation
+        num_padding = self._max_batch - actual_batch_size
+        if num_padding > 0:
+            # Add padding with zero images
+            dummy_img = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
+            imgs = imgs + [dummy_img] * num_padding
+
+        # Preprocess (now with padded batch)
+        batch = self._preprocess_batch(imgs)
 
         # Run inference
-        input_name = session.get_inputs()[0].name
-        outputs = session.run(None, {input_name: batch})
+        input_name = self._session.get_inputs()[0].name
+        outputs = self._session.run(None, {input_name: batch})
 
         # Decode SimCC outputs
-        simcc_x, simcc_y = outputs[0], outputs[1]  # (B, 17, 384), (B, 17, 512)
+        simcc_x, simcc_y = outputs[0], outputs[1]  # (padded_batch, 17, W*2), (padded_batch, 17, H*2)
         keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)  # type: ignore
+
+        # Slice to actual batch size
+        keypoints = keypoints[:actual_batch_size]
+        scores = scores[:actual_batch_size]
 
         return keypoints, scores
 
-    @staticmethod
-    def _model_warmup(session: ort.InferenceSession, width: int, height: int, num_imgs: int) -> None:
-        """Initialize CUDA kernels with dummy batches."""
-        if num_imgs <= 0:
+    def _model_warmup(self) -> None:
+        """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
+        if self._session is None:
             return
-        if num_imgs > 8:
-            num_imgs = 8
 
-        input_name = session.get_inputs()[0].name
+        print(f"ONNX Detection: Starting warmup (fixed batch_size={self._max_batch})...")
+        try:
+            # Create realistic dummy input
+            np.random.seed(42)
+            dummy_img = (np.random.rand(self.model_height, self.model_width, 3) * 255).astype(np.uint8)
 
-        for batch_size in range(1, num_imgs + 1):
-            dummy = np.zeros((batch_size, 3, height, width), dtype=np.float32)
-            _ = session.run(None, {input_name: dummy})
+            # Warmup with max_batch size (all inference runs with this size)
+            dummy_images = [dummy_img] * self._max_batch
 
-        print("ONNX Detection: Warmup complete")
+            keypoints, scores = self._infer_batch(dummy_images)
+
+            print(f"ONNX Detection: Warmup complete")
+        except Exception as e:
+            print(f"ONNX Detection: Warmup failed (non-critical) - {str(e)}")
+            traceback.print_exc()

@@ -2,11 +2,11 @@
 """Export RTMPose PyTorch models to ONNX format.
 
 Usage:
-    # Export RTMPose-L 256x192 model (using defaults)
+    # Export RTMPose-L 256x192 model (dimensions auto-detected from config)
     python modules/pose/batch/detection/export_rtm_to_onnx.py --config models/base/rtmpose-l_8xb256-420e_aic-coco-256x192.py --checkpoint models/base/rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth --output models/rtmpose-l_256x192.onnx
 
-    # Export RTMPose-L 384x288 model
-    python modules/pose/batch/detection/export_rtm_to_onnx.py --config models/base/rtmpose-l_8xb256-420e_aic-coco-384x288.py --checkpoint models/base/rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-384x288-97d6cb0f_20230228.pth --output models/rtmpose-l_384x288.onnx --height 384 --width 288
+    # Export RTMPose-L 384x288 model (dimensions auto-detected from config)
+    python modules/pose/batch/detection/export_rtm_to_onnx.py --config models/base/rtmpose-l_8xb256-420e_aic-coco-384x288.py --checkpoint models/base/rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-384x288-97d6cb0f_20230228.pth --output models/rtmpose-l_384x288.onnx
 """
 
 import torch
@@ -26,20 +26,23 @@ torch.serialization.add_safe_globals([
 ])
 
 
-def export_rtmpose_onnx(config_file: str, checkpoint_file: str, output_file: str,
-                        height: int, width: int, opset_version: int = 11,
-                        simplify: bool = True, use_fp16: bool = True) -> bool:
+def export_rtmpose_onnx(config_file: str,
+                        checkpoint_file: str,
+                        output_file: str,
+                        batch: int = 8,
+                        opset_version: int = 11,
+                        simplify: bool = True,
+                        fp32: bool = False) -> bool:
     """Export RTMPose model to ONNX format.
 
     Args:
         config_file: Path to model config (.py)
         checkpoint_file: Path to model checkpoint (.pth)
         output_file: Output ONNX file path (.onnx)
-        height: Input image height
-        width: Input image width
+        batch: Export batch size (enables dynamic batching 1 to batch)
         opset_version: ONNX opset version (11 recommended)
         simplify: Whether to simplify ONNX graph (requires onnx-simplifier)
-        use_fp16: Whether to use FP16 precision (default: True)
+        fp32: Use FP32 precision instead of FP16 (default: False)
 
     Returns:
         bool: True if successful, False otherwise
@@ -50,9 +53,9 @@ def export_rtmpose_onnx(config_file: str, checkpoint_file: str, output_file: str
     print(f"  Config:     {config_file}")
     print(f"  Checkpoint: {checkpoint_file}")
     print(f"  Output:     {output_file}")
-    print(f"  Resolution: {height}×{width}")
+    print(f"  Batch Size: {batch} (enables dynamic batching 1-{batch})")
     print(f"  Opset:      {opset_version}")
-    print(f"  Precision:  {'FP16 (SimCC outputs FP32)' if use_fp16 else 'FP32'}")
+    print(f"  Precision:  {'FP32' if fp32 else 'FP16'}")
     print(f"  Simplify:   {'Yes' if simplify else 'No'}")
     print(f"{'═'*70}\n")
 
@@ -64,20 +67,36 @@ def export_rtmpose_onnx(config_file: str, checkpoint_file: str, output_file: str
         print(f"❌ ERROR: Checkpoint file not found: {checkpoint_file}")
         return False
 
-    # Load model (keep in FP32 for export)
+    # Load model
     print("📦 Loading model...", end='', flush=True)
     try:
         model = init_model(config_file, checkpoint_file, device='cuda:0')
         model.eval()
+        if not fp32:
+            model = model.half()  # Convert to FP16 before export
         print(" ✓")
     except Exception as e:
         print(" ✗")
         print(f"❌ ERROR: Failed to load model: {e}")
         return False
 
-    # Create dummy input (FP32 for export)
+    # Auto-detect dimensions from model config
+    print("🔍 Auto-detecting input dimensions...", end='', flush=True)
+    try:
+        # RTMPose stores input size in codec configuration
+        codec_cfg = model.cfg.codec
+        height = codec_cfg['input_size'][1]  # (width, height) format
+        width = codec_cfg['input_size'][0]
+        print(f" ✓ ({width}×{height})")
+    except Exception as e:
+        print(f" ✗")
+        print(f"❌ ERROR: Failed to auto-detect dimensions: {e}")
+        return False
+
+    # Create dummy input
     print("🧪 Creating dummy input...", end='', flush=True)
-    dummy_input = torch.randn(1, 3, height, width, dtype=torch.float32, device='cuda:0')
+    dtype = torch.float32 if fp32 else torch.float16
+    dummy_input = torch.randn(batch, 3, height, width, dtype=dtype, device='cuda:0')
     print(f" ✓ (shape={dummy_input.shape}, dtype={dummy_input.dtype})")
 
     print(f"\n💾 Exporting to ONNX...")
@@ -106,33 +125,6 @@ def export_rtmpose_onnx(config_file: str, checkpoint_file: str, output_file: str
         print("   ✗ Export failed")
         print(f"❌ ERROR: {e}")
         return False
-
-    # Convert ONNX model to mixed precision (FP16 + FP32 SimCC outputs)
-    if use_fp16:
-        print("\n🔧 Converting to mixed precision (FP16 + FP32 outputs)...", end='', flush=True)
-        try:
-            import onnx
-            from onnxconverter_common import float16
-
-            model_onnx = onnx.load(output_file)
-
-            # Convert to FP16 but keep SimCC outputs in FP32 for precision
-            model_fp16 = float16.convert_float_to_float16(
-                model_onnx,
-                keep_io_types=True,  # Keep input FP32, convert internal to FP16
-                disable_shape_infer=False,
-                op_block_list=['Softmax', 'ReduceMax', 'ArgMax'],  # Keep precision-sensitive ops in FP32
-                node_block_list=['simcc_x', 'simcc_y']  # Keep SimCC output nodes in FP32
-            )
-
-            onnx.save(model_fp16, output_file)
-            print(" ✓")
-        except ImportError:
-            print(" ⊘ (onnxconverter-common not installed, skipping)")
-            print("   Install with: pip install onnxconverter-common")
-        except Exception as e:
-            print(f" ⚠️  (failed: {e})")
-            print("   Keeping FP32 model")
 
     # Verify output file
     output_path = Path(output_file)
@@ -180,7 +172,7 @@ def export_rtmpose_onnx(config_file: str, checkpoint_file: str, output_file: str
     print(f"{'═'*70}")
     print(f"  Output:     {output_file}")
     print(f"  Resolution: {height}×{width} (dynamic batch)")
-    print(f"  Precision:  {'FP16 (SimCC FP32)' if use_fp16 else 'FP32'}")
+    print(f"  Precision:  {'FP32' if fp32 else 'FP16'}")
     print(f"  Size:       {output_path.stat().st_size / 1024 / 1024:.1f} MB")
     print(f"{'═'*70}\n")
 
@@ -208,10 +200,8 @@ if __name__ == '__main__':
                         help='Output ONNX file path (.onnx)')
 
     # Optional arguments with defaults
-    parser.add_argument('--height', type=int, default=256,
-                        help='Input image height (default: 256)')
-    parser.add_argument('--width', type=int, default=192,
-                        help='Input image width (default: 192)')
+    parser.add_argument('--batch', type=int, default=8,
+                        help='Export batch size - enables dynamic batching from 1 to batch (default: 8)')
     parser.add_argument('--opset', type=int, default=11,
                         help='ONNX opset version (default: 11)')
     parser.add_argument('--no-simplify', action='store_true',
@@ -225,11 +215,10 @@ if __name__ == '__main__':
         args.config,
         args.checkpoint,
         args.output,
-        args.height,
-        args.width,
+        args.batch,
         args.opset,
         not args.no_simplify,
-        not args.fp32  # use_fp16 = not fp32
+        args.fp32
     )
 
     sys.exit(0 if success else 1)

@@ -457,10 +457,6 @@ class TRTSegmentation(Thread):
         total_time_ms = (method_end - method_start) * 1000.0
         process_time_ms = total_time_ms - lock_wait_ms
 
-        # DEBUG: Print actual lock wait time
-        if lock_wait_ms > 0.001:  # Only print if > 1 microsecond
-            print(f"TRT Segmentation lock wait: {lock_wait_ms:.4f}ms")
-
         return pha_tensor, fgr_tensor, process_time_ms, lock_wait_ms
 
     # CALLBACK METHODS

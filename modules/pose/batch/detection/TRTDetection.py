@@ -351,10 +351,6 @@ class TRTDetection(Thread):
         total_time_ms = (method_end - method_start) * 1000.0
         process_time_ms = total_time_ms - lock_wait_ms
 
-        # DEBUG: Print actual lock wait time
-        if lock_wait_ms > 0.001:  # Only print if > 1 microsecond
-            print(f"TRT Detection lock wait: {lock_wait_ms:.4f}ms")
-
         return keypoints, scores, process_time_ms, lock_wait_ms
 
     # CALLBACK METHODS

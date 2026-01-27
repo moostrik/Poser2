@@ -1,3 +1,9 @@
+#TODO:
+# add simplification like in RTM Pose export?
+# fixed batch size padding to avoid recompilation (default to 8)
+# rename models without batch size
+# add model source from rvm repo
+
 # Standard library imports
 from dataclasses import dataclass, field
 from queue import Queue, Empty
@@ -433,6 +439,40 @@ class ONNXSegmentation(Thread):
 
         return pha_tensor, fgr_tensor, inference_time_ms
 
+    def _model_warmup(self, session: ort.InferenceSession) -> None:
+        """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
+        print(f"ONNX Segmentation: Starting warmup (fixed batch_size={self._max_batch})...")
+        try:
+            # Create realistic dummy input
+            np.random.seed(42)
+            dummy_img = (np.random.rand(self.model_height, self.model_width, 3) * 255).astype(np.uint8)
+
+            # Warmup with max_batch size (all inference runs with this size)
+            dummy_images = [dummy_img] * self._max_batch
+            dummy_ids = list(range(self._max_batch))
+
+            pha, fgr, ms = self._infer_batch(dummy_images, dummy_ids)
+
+            # Clear warmup states
+            self._recurrent_states.clear()
+
+            if self.verbose:
+                print(f"ONNX Segmentation: Warmup complete - took {ms:.1f}ms")
+        except Exception as e:
+            print(f"ONNX Segmentation: Warmup failed (non-critical) - {str(e)}")
+            traceback.print_exc()
+
+    # CALLBACK METHODS
+    def register_callback(self, callback: SegmentationOutputCallback) -> None:
+        """Register callback to receive segmentation results (success and dropped batches)."""
+        with self._callback_lock:
+            self._callbacks.add(callback)
+
+    def unregister_callback(self, callback: SegmentationOutputCallback) -> None:
+        """Unregister previously registered callback."""
+        with self._callback_lock:
+            if callback in self._callbacks:
+                self._callbacks.remove(callback)
 
     def _callback_worker_loop(self) -> None:
         """Dispatch queued results to registered callbacks on dedicated thread."""
@@ -459,30 +499,3 @@ class ONNXSegmentation(Thread):
                 self._callback_queue.task_done()
             except Empty:
                 continue
-
-    def register_callback(self, callback: SegmentationOutputCallback) -> None:
-        """Register callback to receive segmentation results (success and dropped batches)."""
-        with self._callback_lock:
-            self._callbacks.add(callback)
-
-    def _model_warmup(self, session: ort.InferenceSession) -> None:
-        """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
-        print(f"ONNX Segmentation: Starting warmup (fixed batch_size={self._max_batch})...")
-        try:
-            # Create realistic dummy input
-            np.random.seed(42)
-            dummy_img = (np.random.rand(self.model_height, self.model_width, 3) * 255).astype(np.uint8)
-
-            # Warmup with max_batch size (all inference runs with this size)
-            dummy_images = [dummy_img] * self._max_batch
-            dummy_ids = list(range(self._max_batch))
-
-            pha, fgr, ms = self._infer_batch(dummy_images, dummy_ids)
-
-            # Clear warmup states
-            self._recurrent_states.clear()
-
-            print(f"ONNX Segmentation: Warmup complete - took {ms:.1f}ms")
-        except Exception as e:
-            print(f"ONNX Segmentation: Warmup failed (non-critical) - {str(e)}")
-            traceback.print_exc()
