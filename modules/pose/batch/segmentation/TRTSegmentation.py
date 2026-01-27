@@ -488,7 +488,6 @@ class TRTSegmentation(Thread):
         new_states_dict: dict[int, RecurrentState] = {}
         for tid, new_state in zip(tracklet_ids, new_states):
             new_states_dict[tid] = new_state
-
         self._recurrent_states = new_states_dict
 
         method_end = time.perf_counter()
