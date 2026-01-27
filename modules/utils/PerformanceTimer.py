@@ -8,22 +8,23 @@ class PerformanceTimer:
 
     # ANSI color codes
     COLORS = {
-        'red': '\033[91m',
-        'green': '\033[92m',
-        'yellow': '\033[93m',
-        'blue': '\033[94m',
-        'magenta': '\033[95m',
-        'cyan': '\033[96m',
-        'white': '\033[97m',
-        'reset': '\033[0m',
+        'red':      '\033[91m',
+        'green':    '\033[92m',
+        'yellow':   '\033[93m',
+        'blue':     '\033[94m',
+        'magenta':  '\033[95m',
+        'cyan':     '\033[96m',
+        'white':    '\033[97m',
+        'reset':    '\033[0m',
     }
 
     def __init__(
         self,
         name: str = "Performance",
         sample_count: int = 100,
+        omit_init: int = 0,
         report_interval: Optional[int] = None,
-        color: Optional[str] = None
+        color: Optional[str] = None,
     ) -> None:
         """Initialize performance timer.
 
@@ -32,14 +33,20 @@ class PerformanceTimer:
             sample_count: Number of samples to track for statistics
             report_interval: Print report every N samples (None = at sample_count)
             color: Optional color name ('red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white')
+            omit_init: Number of initial samples to omit from statistics (default 0)
         """
         self.name = name
         self.sample_count = sample_count
         self.report_interval = report_interval or sample_count
         self.times: np.ndarray = np.zeros(sample_count, dtype=float)
         self.current_index: int = 0
-        self.count: int = 0
+        self.omit_init = omit_init
+
         self.mutex = threading.Lock()
+        self.count: int = 0
+        self.omit_count: int = 0
+
+
 
         # Set color codes
         if color and color.lower() in self.COLORS:
@@ -50,18 +57,15 @@ class PerformanceTimer:
             self.color_end = ''
 
     def add_time(self, time_ms: float, report: bool = True) -> None:
-        """Add timing sample and optionally print report.
-
-        Args:
-            time_ms: Timing measurement in milliseconds
-            report: Whether to print periodic reports
-        """
+        """Add timing sample and optionally print report, omitting the first omit_init samples from recording."""
         with self.mutex:
+            if self.omit_count < self.omit_init:
+                self.omit_count += 1
+                return
             self.times[self.current_index] = time_ms
             self.current_index = (self.current_index + 1) % self.sample_count
             self.count += 1
-
-            should_report = self.count % self.report_interval == 0
+            should_report = (self.count - self.omit_init) > 0 and (self.count - self.omit_init) % self.report_interval == 0
 
         # Print report OUTSIDE the lock to avoid deadlock
         if report and should_report:

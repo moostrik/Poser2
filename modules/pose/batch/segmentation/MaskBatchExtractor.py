@@ -1,4 +1,3 @@
-from collections import deque
 from threading import Lock
 from typing import Union
 
@@ -40,7 +39,7 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
             self._segmentation = ONNXSegmentation(settings)
         elif settings.model_type is ModelType.TRT:
             self._segmentation = TRTSegmentation(settings)
-        self._lock = Lock()
+        self._lock: Lock = Lock()
         self._batch_counter: int = 0
         self._verbose: bool = settings.verbose
 
@@ -48,8 +47,8 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         self._previous_tracklet_ids: set[int] = set()
 
         # Track inference times
-        self._process_timer = PerformanceTimer(name="RVM Segmentation Process", sample_count=100, report_interval=100, color='cyan')
-        self._wait_timer = PerformanceTimer(name="RVM Segmentation Wait   ", sample_count=100, report_interval=100, color='cyan')
+        self._process_timer: PerformanceTimer = PerformanceTimer(name="RVM Segmentation Process", sample_count=100, report_interval=100, color='cyan', omit_init=1)
+        self._wait_timer: PerformanceTimer = PerformanceTimer(name="RVM Segmentation Wait   ", sample_count=100, report_interval=100, color='cyan', omit_init=1)
 
         self._segmentation.register_callback(self._on_segmentation_result)
 
@@ -81,12 +80,6 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
 
         if not image_list:
             return
-
-        # Detect removed tracklets and clear their recurrent states
-        current_ids = set(tracklet_id_list)
-        removed_ids = self._previous_tracklet_ids - current_ids
-
-        self._previous_tracklet_ids = current_ids
 
         with self._lock:
             self._batch_counter += 1

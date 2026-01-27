@@ -1,6 +1,10 @@
+# Standard library imports
 from dataclasses import dataclass, field
 from typing import Callable
+
+# Third-party imports
 import numpy as np
+
 
 @dataclass
 class DetectionInput:

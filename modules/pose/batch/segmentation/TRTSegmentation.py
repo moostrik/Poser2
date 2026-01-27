@@ -9,8 +9,6 @@ import numpy as np
 import torch
 import tensorrt as trt
 import cupy as cp
-from concurrent.futures import ThreadPoolExecutor
-
 
 from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
@@ -19,9 +17,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from modules.pose.Settings import Settings
-
-
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 class RecurrentState:
     """Container for RVM recurrent states (r1, r2, r3, r4)."""
@@ -92,28 +87,13 @@ class TRTSegmentation(Thread):
         self.stream: cp.cuda.Stream
 
         # Thread pool for parallel inference
-        self._executor: ThreadPoolExecutor | None = None
-        self._max_workers: int = min(settings.max_poses, 4)
+        self._max_inputs: int = min(settings.max_poses, 4)
 
         # Preallocated zero recurrent states for new tracklets (read-only, shared)
         self._zero_r1: cp.ndarray
         self._zero_r2: cp.ndarray
         self._zero_r3: cp.ndarray
         self._zero_r4: cp.ndarray
-
-        # Preallocated input buffers per worker (for preprocessing)
-        self._input_buffers: list[dict[str, cp.ndarray]] = []
-
-        # Profiling accumulators (periodic averaging)
-        self._profile_count: int = 0
-        self._profile_interval: int = 100  # Print every N frames (reduced overhead)
-        self._profile_lock_wait: float = 0.0
-        self._profile_preprocess: float = 0.0
-        self._profile_inference: float = 0.0
-        self._profile_postprocess: float = 0.0
-
-        # Toggle between batched and single-image inference (for performance comparison)
-        self._use_batched_inference: bool = True  # Set False to use single-image mode
 
     @property
     def is_ready(self) -> bool:
@@ -131,10 +111,6 @@ class TRTSegmentation(Thread):
             return
         """Stop both inference and callback threads gracefully"""
         self._shutdown_event.set()
-
-        # Shutdown thread pool
-        if self._executor is not None:
-            self._executor.shutdown(wait=True, cancel_futures=True)
 
         # Wake up inference thread
         self._notify_update_event.set()
@@ -228,18 +204,8 @@ class TRTSegmentation(Thread):
             self._zero_r3 = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=self._model_dtype)
             self._zero_r4 = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype)
 
-            # Preallocate input buffers per worker (for single-image fallback)
-            self._input_buffers = []
-            for _ in range(self._max_workers):
-                self._input_buffers.append({
-                    'img_uint8': cp.empty((self.model_height, self.model_width, 3), dtype=cp.uint8),
-                    'img_float': cp.empty((self.model_height, self.model_width, 3), dtype=self._model_dtype),
-                    'src': cp.empty((1, 3, self.model_height, self.model_width), dtype=self._model_dtype),
-                })
-
             # Preallocate BATCHED buffers for true batch inference (inputs only)
-            # Output buffers are allocated fresh each batch to avoid .copy() overhead
-            self._max_batch = self._max_workers  # Match max batch to max workers
+            self._max_batch = self._max_inputs  # Match max batch to max workers
             self._batch_buffers = {
                 'img_uint8': cp.empty((self._max_batch, self.model_height, self.model_width, 3), dtype=cp.uint8),
                 'src': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=self._model_dtype),
@@ -249,9 +215,6 @@ class TRTSegmentation(Thread):
                 'r3i': cp.empty((self._max_batch, 40, self.model_height // 8, self.model_width // 8), dtype=self._model_dtype),
                 'r4i': cp.empty((self._max_batch, 64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype),
             }
-
-            # Create thread pool for parallel inference
-            self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="TRT-RVM-Worker")
 
             self._model_ready.set()
             print(f"TRT RVM Segmentation: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
@@ -286,6 +249,10 @@ class TRTSegmentation(Thread):
 
         if not self._model_ready.is_set():
             return
+
+        # Validate batch size
+        if len(input_batch.images) > self._max_batch:
+            print(f"TRT RVM Segmentation Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: SegmentationInput | None = None
 
@@ -340,7 +307,7 @@ class TRTSegmentation(Thread):
                 print(f"TRT RVM Segmentation: Periodic state reset at frame {self._frame_counter}")
             self._recurrent_states.clear()
 
-        output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
+        output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
 
         # Run inference using selected mode
         if batch.images:
@@ -350,25 +317,19 @@ class TRTSegmentation(Thread):
 
 
             try:
-                mask_tensor, inference_time_ms, lock_wait_ms = self._infer_batch(images_to_process, tracklets_to_process)
-                processed = True
+                mask_tensor, fgr_tensor, inference_time_ms, lock_wait_ms = self._infer_batch(images_to_process, tracklets_to_process)
+                output = SegmentationOutput(
+                    batch_id=batch.batch_id,
+                    mask_tensor=mask_tensor,
+                    fgr_tensor=fgr_tensor,
+                    tracklet_ids=batch.tracklet_ids,
+                    processed=True,
+                    inference_time_ms=inference_time_ms,
+                    lock_time_ms=lock_wait_ms
+                )
             except Exception as e:
                 print(f"TRT RVM Segmentation Error: Batched inference failed: {str(e)}")
                 traceback.print_exc()
-                # Fallback to empty result
-                mask_tensor = torch.empty(0, dtype=torch.float32, device='cuda')
-                inference_time_ms = 0.0
-                lock_wait_ms = 0.0
-                processed = False
-
-            output = SegmentationOutput(
-                batch_id=batch.batch_id,
-                mask_tensor=mask_tensor,
-                tracklet_ids=batch.tracklet_ids,
-                processed=processed,
-                inference_time_ms=inference_time_ms,
-                lock_time_ms=lock_wait_ms
-            )
 
         # Queue for callbacks
         try:
@@ -376,7 +337,7 @@ class TRTSegmentation(Thread):
         except Exception:
             print("TRT RVM Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_batch(self, images: list[np.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, float, float]:
+    def _infer_batch(self, images: list[np.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
         """Run RVM TensorRT inference on BATCH of images with per-tracklet recurrent states.
 
         Args:
@@ -384,11 +345,11 @@ class TRTSegmentation(Thread):
             tracklet_ids: List of tracklet IDs (same length as images)
 
         Returns:
-            Tuple of (alpha matte tensor (B, H, W) FP32 on CUDA [0, 1], process_time_ms, lock_wait_ms)
+            Tuple of (alpha matte tensor (B, H, W) FP32 on CUDA [0, 1], foreground tensor (B, 3, H, W) FP32 on CUDA [0, 1], process_time_ms, lock_wait_ms)
         """
         batch_size = len(images)
         if batch_size == 0:
-            return torch.empty(0, dtype=torch.float32, device='cuda'), 0.0, 0.0
+            return torch.empty(0, dtype=torch.float32, device='cuda'), torch.empty(0, 3, 0, 0, dtype=torch.float32, device='cuda'), 0.0, 0.0
 
         method_start: float = time.perf_counter()
 
@@ -481,10 +442,13 @@ class TRTSegmentation(Thread):
                     r4=r4o_gpu[i:i+1],
                 ))
 
-            # Convert batched pha to PyTorch tensor
+            # Convert batched outputs to PyTorch tensors
             pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(1).float()  # (B, H, W)
+            fgr_tensor = torch.as_tensor(fgr_gpu, device='cuda').float()  # (B, 3, H, W)
 
         # Update recurrent states - replace entire dict to remove stale IDs
+        # Note: This intentionally purges all non-current tracklets every frame to prevent
+        # memory growth. Tracklets that temporarily disappear will restart with zero states.
         new_states_dict: dict[int, RecurrentState] = {}
         for tid, new_state in zip(tracklet_ids, new_states):
             new_states_dict[tid] = new_state
@@ -496,7 +460,7 @@ class TRTSegmentation(Thread):
         total_time_ms = (method_end - method_start) * 1000.0
         process_time_ms = total_time_ms - lock_wait_ms
 
-        return pha_tensor, process_time_ms, lock_wait_ms
+        return pha_tensor, fgr_tensor, process_time_ms, lock_wait_ms
 
     def _callback_worker_loop(self) -> None:
         """Dispatch queued results to registered callbacks. Runs on separate thread."""
