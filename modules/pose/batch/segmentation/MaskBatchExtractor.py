@@ -7,11 +7,15 @@ import torch
 
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameDict
-from modules.pose.batch.segmentation.ONNXSegmentation import ONNXSegmentation, SegmentationInput, SegmentationOutput
-from modules.pose.batch.segmentation.TRTSegmentation import TRTSegmentation
 from modules.pose.Settings import Settings, ModelType
 from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.PerformanceTimer import PerformanceTimer
+
+
+from .InOut import SegmentationInput, SegmentationOutput
+from .ONNXSegmentation import ONNXSegmentation
+from .TRTSegmentation import TRTSegmentation
+
 
 Segmentation = Union[ONNXSegmentation, TRTSegmentation]
 
@@ -67,23 +71,19 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         if not self._segmentation.is_ready:
             return
 
-        tracklet_id_list: list[int] = []
         image_list: list[np.ndarray] = []
+        if not image_list:
+            return
 
+        tracklet_id_list: list[int] = []
         for tracklet_id in poses.keys():
             if tracklet_id in images:
                 tracklet_id_list.append(tracklet_id)
                 image_list.append(images[tracklet_id])
 
-        if not image_list:
-            return
-
         # Detect removed tracklets and clear their recurrent states
         current_ids = set(tracklet_id_list)
         removed_ids = self._previous_tracklet_ids - current_ids
-
-        for removed_id in removed_ids:
-            self._segmentation.clear_tracklet_state(removed_id)
 
         self._previous_tracklet_ids = current_ids
 

@@ -12,32 +12,12 @@ import torch
 import onnxruntime as ort
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from modules.pose.Settings import Settings
-
-
-@dataclass
-class SegmentationInput:
-    """Batch of images for segmentation. Images should be (H, W, 3) BGR uint8."""
-    batch_id: int
-    images: list[np.ndarray]
-    tracklet_ids: list[int] = field(default_factory=list)  # Corresponding tracklet IDs for each image
-
-
-@dataclass
-class SegmentationOutput:
-    """Results from segmentation. processed=False indicates batch was dropped."""
-    batch_id: int
-    mask_tensor: torch.Tensor | None = None    # GPU tensor (B, H, W) FP16, alpha matte [0, 1]
-    tracklet_ids: list[int] = field(default_factory=list)  # Corresponding tracklet IDs
-    processed: bool = True          # False if batch was dropped before processing
-    inference_time_ms: float = 0.0  # For monitoring
-    lock_time_ms: float = 0.0       # Time spent waiting for lock
-
-
-SegmentationOutputCallback = Callable[[SegmentationOutput], None]
 
 
 class RecurrentState:
@@ -98,7 +78,6 @@ class ONNXSegmentation(Thread):
         self._callback_thread: Thread = Thread(target=self._callback_worker_loop, daemon=True)
 
         # Per-tracklet recurrent states for temporal coherence
-        self._state_lock: Lock = Lock()
         self._recurrent_states: dict[int, RecurrentState] = {}
         self._frame_counter: int = 0  # For periodic state reset
         self._state_reset_interval: int = settings.segmentation_reset_interval  # Reset all states every N frames (0=disabled)
@@ -181,8 +160,7 @@ class ONNXSegmentation(Thread):
                 print("RVM Segmentation WARNING: CUDA provider not available, using CPU")
 
             # Clear any existing states (in case of code changes or restarts)
-            with self._state_lock:
-                self._recurrent_states.clear()
+            self._recurrent_states.clear()
 
             # Warmup: initialize CUDA kernels with dummy inference
             self._model_warmup(self._session)
@@ -282,7 +260,7 @@ class ONNXSegmentation(Thread):
         if self._state_reset_interval > 0 and self._frame_counter % self._state_reset_interval == 0:
             if self.verbose:
                 print(f"ONNX Segmentation: Periodic state reset at frame {self._frame_counter}")
-            self.clear_all_states()
+            self._recurrent_states.clear()
 
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 
@@ -296,17 +274,24 @@ class ONNXSegmentation(Thread):
                 future = self._executor.submit(self._infer_single_image, img, tracklet_id)
                 futures.append((future, tracklet_id))
 
-            # Collect results in original order
+            # Collect results in original order and gather new states
             mask_list: list[torch.Tensor] = []
+            new_states_dict: dict[int, RecurrentState] = {}
+
             for future, tracklet_id in futures:
                 try:
-                    mask = future.result()
+                    mask, new_state = future.result()  # Modified to return state too
                     mask_list.append(mask)
+                    if new_state is not None:
+                        new_states_dict[tracklet_id] = new_state
                 except Exception as e:
                     print(f"ONNX Segmentation Error: Inference failed for tracklet {tracklet_id}: {str(e)}")
                     # Create empty mask on error
                     h, w = batch.images[0].shape[:2]
                     mask_list.append(torch.zeros((h, w), dtype=torch.float16, device='cuda'))
+
+            # Replace entire state dict with only active tracklets (removes stale IDs)
+            self._recurrent_states = new_states_dict
 
             # Stack into batch tensor
             if mask_list:
@@ -331,7 +316,7 @@ class ONNXSegmentation(Thread):
         except Exception:
             print("ONNX Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_single_image(self, img: np.ndarray, tracklet_id: int) -> torch.Tensor:
+    def _infer_single_image(self, img: np.ndarray, tracklet_id: int) -> tuple[torch.Tensor, RecurrentState | None]:
         """Run RVM inference on single image with per-tracklet recurrent state.
 
         Args:
@@ -339,20 +324,19 @@ class ONNXSegmentation(Thread):
             tracklet_id: Unique identifier for tracking temporal state
 
         Returns:
-            Alpha matte tensor (H, W) FP16 on CUDA, range [0, 1]
+            Tuple of (alpha matte tensor (H, W) FP16 on CUDA [0, 1], new recurrent state)
         """
         if self._session is None:
-            return torch.zeros((img.shape[0], img.shape[1]), dtype=torch.float16, device='cuda')
+            return torch.zeros((img.shape[0], img.shape[1]), dtype=torch.float16, device='cuda'), None
 
         # Preprocess: BGR -> RGB, normalize to [0, 1], HWC -> NCHW
-        img_rgb = img[:, :, ::-1].astype(np.float16)  # BGR to RGB, FP16 (changed from float32)
+        img_rgb = img[:, :, ::-1].astype(np.float16)  # BGR to RGB, FP16
         img_norm = img_rgb / 255.0  # Normalize to [0, 1]
         img_chw = np.transpose(img_norm, (2, 0, 1))  # (H, W, 3) -> (3, H, W)
-        img_nchw = np.expand_dims(img_chw, axis=0).astype(np.float16)  # (1, 3, H, W) FP16 (changed from float32)
+        img_nchw = np.expand_dims(img_chw, axis=0).astype(np.float16)  # (1, 3, H, W) FP16
 
-        # Get or initialize recurrent state for this tracklet
-        with self._state_lock:
-            state = self._recurrent_states.get(tracklet_id)
+        # Get recurrent state for this tracklet (no lock needed - dict.get() is atomic)
+        state = self._recurrent_states.get(tracklet_id)
 
         # Prepare ONNX inputs
         if state is not None:
@@ -368,45 +352,41 @@ class ONNXSegmentation(Thread):
             # Initialize with dynamic shapes based on model resolution (first frame) - FP16
             onnx_inputs = {
                 'src': img_nchw,
-                'r1i': np.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=np.float16),  # Changed from float32
-                'r2i': np.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=np.float16),  # Changed from float32
-                'r3i': np.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=np.float16),  # Changed from float32
-                'r4i': np.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=np.float16),  # Changed from float32
+                'r1i': np.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=np.float16),
+                'r2i': np.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=np.float16),
+                'r3i': np.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=np.float16),
+                'r4i': np.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=np.float16),
             }
 
         # Run ONNX inference
         outputs = self._session.run(None, onnx_inputs)
 
         # ONNX outputs: [fgr, pha, r1o, r2o, r3o, r4o]
-        # We need: pha (alpha matte) and update recurrent states
-        pha_np = outputs[1]  # (1, 1, H, W) FP16
+        # Type assertion: ONNX Runtime returns numpy arrays for our model
+        assert isinstance(outputs[1], np.ndarray), "Expected numpy array from ONNX"
+        assert isinstance(outputs[2], np.ndarray), "Expected numpy array from ONNX"
+        assert isinstance(outputs[3], np.ndarray), "Expected numpy array from ONNX"
+        assert isinstance(outputs[4], np.ndarray), "Expected numpy array from ONNX"
+        assert isinstance(outputs[5], np.ndarray), "Expected numpy array from ONNX"
 
-        # Update recurrent states for next frame
+        pha_np: np.ndarray = outputs[1]  # (1, 1, H, W) FP16
+
+        # Create new state from outputs
+        new_state: RecurrentState | None = None
         if len(outputs) >= 6:
-            new_state = RecurrentState(r1=outputs[2], r2=outputs[3], r3=outputs[4], r4=outputs[5]) # type: ignore
-            with self._state_lock:
-                self._recurrent_states[tracklet_id] = new_state
+            new_state = RecurrentState(
+                r1=outputs[2],  # Type checker now knows these are np.ndarray
+                r2=outputs[3],
+                r3=outputs[4],
+                r4=outputs[5]
+            )
 
         # Convert numpy to PyTorch CUDA tensor for OpenGL compatibility
         pha_tensor = torch.from_numpy(pha_np).cuda()  # (1, 1, H, W) FP16
         pha_tensor = pha_tensor.squeeze(0).squeeze(0)  # (H, W)
 
-        return pha_tensor
+        return pha_tensor, new_state
 
-    def clear_tracklet_state(self, tracklet_id: int) -> None:
-        """Clear recurrent state for a specific tracklet (e.g., when person leaves frame)."""
-        with self._state_lock:
-            if tracklet_id in self._recurrent_states:
-                del self._recurrent_states[tracklet_id]
-                if self.verbose:
-                    print(f"ONNX Segmentation: Cleared state for tracklet {tracklet_id}")
-
-    def clear_all_states(self) -> None:
-        """Clear all recurrent states (e.g., on scene change or reset)."""
-        with self._state_lock:
-            self._recurrent_states.clear()
-            if self.verbose:
-                print("ONNX Segmentation: Cleared all recurrent states")
 
     # CALLBACK
     def _callback_worker_loop(self) -> None:
@@ -446,14 +426,12 @@ class ONNXSegmentation(Thread):
             # Create dummy input matching model dimensions
             dummy_img = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
 
-            # Run a few warmup inferences with tracklet ID 999 (will be cleared)
+            # Run a few warmup inferences with tracklet ID 999 (will be cleared after)
             for i in range(3):
                 _ = self._infer_single_image(dummy_img, tracklet_id=999)
 
-            # Clear warmup state
-            with self._state_lock:
-                if 999 in self._recurrent_states:
-                    del self._recurrent_states[999]
+            # Warmup state will be automatically removed on next real batch
+            # (since 999 won't be in tracklet_ids)
 
             print("ONNX Segmentation: Warmup complete")
         except Exception as e:

@@ -11,23 +11,25 @@ import tensorrt as trt
 import cupy as cp
 from concurrent.futures import ThreadPoolExecutor
 
-# Reuse dataclasses from RVMSegmentation
-from modules.pose.batch.segmentation.ONNXSegmentation import (
-    SegmentationInput,
-    SegmentationOutput,
-    SegmentationOutputCallback,
-    RecurrentState
-)
+
+from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from modules.pose.Settings import Settings
 
-from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
+class RecurrentState:
+    """Container for RVM recurrent states (r1, r2, r3, r4)."""
+    def __init__(self, r1: cp.ndarray, r2: cp.ndarray, r3: cp.ndarray, r4: cp.ndarray):
+        self.r1 = r1
+        self.r2 = r2
+        self.r3 = r3
+        self.r4 = r4
 
 class TRTSegmentation(Thread):
     """Asynchronous GPU person segmentation using Robust Video Matting (RVM) with TensorRT.
@@ -78,7 +80,6 @@ class TRTSegmentation(Thread):
         self._callback_thread: Thread = Thread(target=self._callback_worker_loop, daemon=True)
 
         # Per-tracklet recurrent states for temporal coherence
-        self._state_lock: Lock = Lock()
         self._recurrent_states: dict[int, RecurrentState] = {}
         self._frame_counter: int = 0  # For periodic state reset
         self._state_reset_interval: int = settings.segmentation_reset_interval  # Reset all states every N frames (0=disabled)
@@ -219,8 +220,7 @@ class TRTSegmentation(Thread):
             self._model_dtype = dtype_to_cupy.get(src_dtype, cp.float16)  # Default to FP16
 
             # Clear any existing states
-            with self._state_lock:
-                self._recurrent_states.clear()
+            self._recurrent_states.clear()
 
             # Preallocate zero recurrent states (read-only, shared across all new tracklets)
             self._zero_r1 = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=self._model_dtype)
@@ -338,7 +338,7 @@ class TRTSegmentation(Thread):
         if self._state_reset_interval > 0 and self._frame_counter % self._state_reset_interval == 0:
             if self.verbose:
                 print(f"TRT RVM Segmentation: Periodic state reset at frame {self._frame_counter}")
-            self.clear_all_states()
+            self._recurrent_states.clear()
 
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 
@@ -348,8 +348,10 @@ class TRTSegmentation(Thread):
             images_to_process = batch.images[:self._max_batch]
             tracklets_to_process = batch.tracklet_ids[:self._max_batch]
 
+
             try:
                 mask_tensor, inference_time_ms, lock_wait_ms = self._infer_batch(images_to_process, tracklets_to_process)
+                processed = True
             except Exception as e:
                 print(f"TRT RVM Segmentation Error: Batched inference failed: {str(e)}")
                 traceback.print_exc()
@@ -357,12 +359,13 @@ class TRTSegmentation(Thread):
                 mask_tensor = torch.empty(0, dtype=torch.float32, device='cuda')
                 inference_time_ms = 0.0
                 lock_wait_ms = 0.0
+                processed = False
 
             output = SegmentationOutput(
                 batch_id=batch.batch_id,
                 mask_tensor=mask_tensor,
                 tracklet_ids=batch.tracklet_ids,
-                processed=True,
+                processed=processed,
                 inference_time_ms=inference_time_ms,
                 lock_time_ms=lock_wait_ms
             )
@@ -376,11 +379,6 @@ class TRTSegmentation(Thread):
     def _infer_batch(self, images: list[np.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, float, float]:
         """Run RVM TensorRT inference on BATCH of images with per-tracklet recurrent states.
 
-        This is more efficient than calling _infer_single_image multiple times because:
-        1. Single TensorRT kernel launch for all images
-        2. Better GPU utilization with FP16 tensor cores
-        3. Single lock acquisition instead of N
-
         Args:
             images: List of input images (H, W, 3) BGR uint8
             tracklet_ids: List of tracklet IDs (same length as images)
@@ -392,19 +390,23 @@ class TRTSegmentation(Thread):
         if batch_size == 0:
             return torch.empty(0, dtype=torch.float32, device='cuda'), 0.0, 0.0
 
-        # Clamp to max batch size
-        if batch_size > self._max_batch:
-            batch_size = self._max_batch
-            images = images[:batch_size]
-            tracklet_ids = tracklet_ids[:batch_size]
-
         method_start: float = time.perf_counter()
 
-        # Gather recurrent states for all tracklets (before acquiring lock)
+        # Gather recurrent states for all tracklets
         states: list[RecurrentState | None] = []
-        with self._state_lock:
-            for tid in tracklet_ids:
-                states.append(self._recurrent_states.get(tid))
+        for tid in tracklet_ids:
+            states.append(self._recurrent_states.get(tid))
+
+        # CPU preprocessing
+        stacked_imgs = np.stack(images, axis=0)  # (B, H, W, 3) uint8
+
+        # Allocate output buffers
+        fgr_gpu = cp.empty((batch_size, 3, self.model_height, self.model_width), dtype=self._model_dtype)
+        pha_gpu = cp.empty((batch_size, 1, self.model_height, self.model_width), dtype=self._model_dtype)
+        r1o_gpu = cp.empty((batch_size, 16, self.model_height // 2, self.model_width // 2), dtype=self._model_dtype)
+        r2o_gpu = cp.empty((batch_size, 20, self.model_height // 4, self.model_width // 4), dtype=self._model_dtype)
+        r3o_gpu = cp.empty((batch_size, 40, self.model_height // 8, self.model_width // 8), dtype=self._model_dtype)
+        r4o_gpu = cp.empty((batch_size, 64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype)
 
         # Run batched inference with global lock
         lock_wait_start: float = time.perf_counter()
@@ -419,7 +421,6 @@ class TRTSegmentation(Thread):
             r3i_gpu = buf['r3i'][:batch_size]
             r4i_gpu = buf['r4i'][:batch_size]
 
-            stacked_imgs = np.stack(images, axis=0)  # (B, H, W, 3) uint8
             with self.stream:
                 # OPTIMIZED: Stack images on CPU first, single transfer to GPU
                 buf['img_uint8'][:batch_size].set(stacked_imgs)
@@ -443,15 +444,6 @@ class TRTSegmentation(Thread):
                         r2i_gpu[i] = self._zero_r2[0]
                         r3i_gpu[i] = self._zero_r3[0]
                         r4i_gpu[i] = self._zero_r4[0]
-
-            # Allocate FRESH output buffers (avoids .copy() in postprocess)
-            # CuPy memory pool makes this fast, and we keep these directly
-            fgr_gpu = cp.empty((batch_size, 3, self.model_height, self.model_width), dtype=self._model_dtype)
-            pha_gpu = cp.empty((batch_size, 1, self.model_height, self.model_width), dtype=self._model_dtype)
-            r1o_gpu = cp.empty((batch_size, 16, self.model_height // 2, self.model_width // 2), dtype=self._model_dtype)
-            r2o_gpu = cp.empty((batch_size, 20, self.model_height // 4, self.model_width // 4), dtype=self._model_dtype)
-            r3o_gpu = cp.empty((batch_size, 40, self.model_height // 8, self.model_width // 8), dtype=self._model_dtype)
-            r4o_gpu = cp.empty((batch_size, 64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype)
 
             # Set batched input shapes
             self.context.set_input_shape('src', (batch_size, 3, self.model_height, self.model_width))
@@ -492,10 +484,12 @@ class TRTSegmentation(Thread):
             # Convert batched pha to PyTorch tensor
             pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(1).float()  # (B, H, W)
 
-        # Update recurrent states for all tracklets
-        with self._state_lock:
-            for tid, new_state in zip(tracklet_ids, new_states):
-                self._recurrent_states[tid] = new_state
+        # Update recurrent states - replace entire dict to remove stale IDs
+        new_states_dict: dict[int, RecurrentState] = {}
+        for tid, new_state in zip(tracklet_ids, new_states):
+            new_states_dict[tid] = new_state
+
+        self._recurrent_states = new_states_dict
 
         method_end = time.perf_counter()
 
@@ -504,21 +498,6 @@ class TRTSegmentation(Thread):
         process_time_ms = total_time_ms - lock_wait_ms
 
         return pha_tensor, process_time_ms, lock_wait_ms
-
-    def clear_tracklet_state(self, tracklet_id: int) -> None:
-        """Clear recurrent state for a specific tracklet (e.g., when person leaves frame)."""
-        with self._state_lock:
-            if tracklet_id in self._recurrent_states:
-                del self._recurrent_states[tracklet_id]
-                if self.verbose:
-                    print(f"TensorRT Segmentation: Cleared state for tracklet {tracklet_id}")
-
-    def clear_all_states(self) -> None:
-        """Clear all recurrent states (e.g., on scene change or reset)."""
-        with self._state_lock:
-            self._recurrent_states.clear()
-            if self.verbose:
-                print("TRT RVM Segmentation: Cleared all recurrent states")
 
     def _callback_worker_loop(self) -> None:
         """Dispatch queued results to registered callbacks. Runs on separate thread."""
