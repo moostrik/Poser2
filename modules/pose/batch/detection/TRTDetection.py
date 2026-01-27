@@ -21,10 +21,14 @@ IMAGENET_STD = np.array([58.395, 57.12, 57.375], dtype=np.float32).reshape(1, 3,
 
 
 class TRTDetection(Thread):
-    """Asynchronous GPU pose detection using TensorRT.
+    """Asynchronous GPU pose detection using RTMPose with TensorRT.
 
-    Optimized inference using TensorRT engines for maximum performance.
-    Architecture identical to ONNXDetection for drop-in replacement.
+    TensorRT-optimized inference for maximum performance. Drop-in replacement for ONNXDetection.
+
+    Single-slot queue: only the most recent batch waits processing; older pending batches dropped.
+    Batches already processing cannot be cancelled.
+
+    All results delivered via callbacks in notification order.
     """
 
     def __init__(self, settings: 'Settings') -> None:
@@ -65,9 +69,7 @@ class TRTDetection(Thread):
 
         # Preallocated GPU buffers (allocated after engine loads)
         self._max_batch: int = 8
-        self._img_uint8_buffer: cp.ndarray  # Raw uint8 images
-        self._input_buffer: cp.ndarray  # Preprocessed float32 input
-        self._output_buffers: dict[str, cp.ndarray]
+        self._batch_buffers: dict[str, cp.ndarray]
         self._mean_gpu: cp.ndarray  # ImageNet mean on GPU
         self._std_gpu: cp.ndarray  # ImageNet std on GPU
 
@@ -113,8 +115,12 @@ class TRTDetection(Thread):
 
             self.context = self.engine.create_execution_context()
 
-            # Create dedicated CUDA stream for better performance
+            # Create dedicated CUDA stream
             self.stream = cp.cuda.Stream(non_blocking=True)
+
+            # Tune CuPy memory pool for better performance
+            mempool = cp.get_default_memory_pool()
+            mempool.set_limit(size=2 * 1024**3)  # 2GB limit (up from 512MB default)
 
         # Lock released - continue with setup
         # Initialize output names list
@@ -132,33 +138,47 @@ class TRTDetection(Thread):
             else:
                 self.output_names.append(name)
 
+        # Validate expected tensor counts
+        if len(self.output_names) != 2:
+            print(f"TensorRT Detection ERROR: Expected 2 outputs, got {len(self.output_names)}")
+            return
+
+        # Determine model precision from input tensor
+        input_dtype = self.engine.get_tensor_dtype(self.input_name)
+        precision_map = {
+            trt.DataType.FLOAT: "FP32",   # type: ignore
+            trt.DataType.HALF: "FP16",    # type: ignore
+            trt.DataType.INT8: "INT8",    # type: ignore
+        }
+        self.model_precision = precision_map.get(input_dtype, "UNKNOWN")
+
+        # Map TensorRT dtype to CuPy dtype for buffer allocations
+        dtype_to_cupy = {
+            trt.DataType.FLOAT: cp.float32, # type: ignore
+            trt.DataType.HALF: cp.float16,  # type: ignore
+            trt.DataType.INT8: cp.int8,     # type: ignore
+        }
+        self._model_dtype = dtype_to_cupy.get(input_dtype, cp.float32)  # Default to FP32
+
         # Preallocate GPU buffers for max batch size
         # SimCC output dimensions: simcc_x = (B, 17, W*2), simcc_y = (B, 17, H*2)
         simcc_x_width = self.model_width * 2
         simcc_y_height = self.model_height * 2
 
-        # Preprocessing buffers
-        self._img_uint8_buffer = cp.empty(
-            (self._max_batch, self.model_height, self.model_width, 3),
-            dtype=cp.uint8
-        )
-        self._input_buffer = cp.empty(
-            (self._max_batch, 3, self.model_height, self.model_width),
-            dtype=cp.float32
-        )
-
-        # GPU constants for normalization (CHW format for broadcasting)
-        self._mean_gpu = cp.asarray(IMAGENET_MEAN, dtype=cp.float32)
-        self._std_gpu = cp.asarray(IMAGENET_STD, dtype=cp.float32)
-
-        # Output buffers
-        self._output_buffers = {
-            'simcc_x': cp.empty((self._max_batch, self.num_keypoints, simcc_x_width), dtype=cp.float32),
-            'simcc_y': cp.empty((self._max_batch, self.num_keypoints, simcc_y_height), dtype=cp.float32),
+        # Preallocate BATCHED buffers for batch inference
+        self._batch_buffers = {
+            'img_uint8': cp.empty((self._max_batch, self.model_height, self.model_width, 3), dtype=cp.uint8),
+            'input': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=self._model_dtype),
+            'simcc_x': cp.empty((self._max_batch, self.num_keypoints, simcc_x_width), dtype=self._model_dtype),
+            'simcc_y': cp.empty((self._max_batch, self.num_keypoints, simcc_y_height), dtype=self._model_dtype),
         }
 
+        # GPU constants for normalization (CHW format for broadcasting)
+        self._mean_gpu = cp.asarray(IMAGENET_MEAN, dtype=self._model_dtype)
+        self._std_gpu = cp.asarray(IMAGENET_STD, dtype=self._model_dtype)
+
         self._model_ready.set()
-        print(f"TensorRT Detection: {self.resolution_name} model ready ({self.model_width}x{self.model_height})")
+        print(f"TensorRT Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()
@@ -175,9 +195,19 @@ class TRTDetection(Thread):
                 traceback.print_exc()
 
     def submit_batch(self, input_batch: DetectionInput) -> None:
-        """Submit batch for processing."""
+        """Submit batch for processing. Replaces pending batch if not yet started.
+
+        Dropped batches receive callbacks with processed=False.
+        """
         if self._shutdown_event.is_set():
             return
+
+        if not self._model_ready.is_set():
+            return
+
+        # Validate batch size
+        if len(input_batch.images) > self._max_batch:
+            print(f"TensorRT Detection Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: DetectionInput | None = None
 
@@ -218,8 +248,11 @@ class TRTDetection(Thread):
 
         # Run inference
         if batch.images:
+            # Limit processing to max batch size
+            images_to_process = batch.images[:self._max_batch]
+
             # Run inference with timing breakdown
-            keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch(batch.images, self.model_width, self.model_height)
+            keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch(images_to_process, self.model_width, self.model_height)
 
             # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
@@ -296,38 +329,38 @@ class TRTDetection(Thread):
         with get_exec_lock():
             lock_acquired: float = time.perf_counter()
 
+            # Get batched buffers (sliced to actual batch size)
+            buf = self._batch_buffers
+            input_gpu = buf['input'][:batch_size]
+            simcc_x_gpu = buf['simcc_x'][:batch_size]
+            simcc_y_gpu = buf['simcc_y'][:batch_size]
+
             with self.stream:
-                # Single CPU→GPU transfer of uint8 data
-                self._img_uint8_buffer[:batch_size].set(stacked_imgs)
+                # OPTIMIZED: Stack images on CPU first, single transfer to GPU
+                buf['img_uint8'][:batch_size].set(stacked_imgs)
 
-                # GPU preprocessing: uint8→float, BGR→RGB, HWC→CHW, normalize
-                img_float = self._img_uint8_buffer[:batch_size].astype(cp.float32)
-                img_rgb = img_float[:, :, :, ::-1]  # BGR→RGB
-                img_chw = cp.ascontiguousarray(cp.transpose(img_rgb, (0, 3, 1, 2)))  # HWC→CHW
-                self._input_buffer[:batch_size] = (img_chw - self._mean_gpu) / self._std_gpu
-
-            batch_gpu = self._input_buffer[:batch_size]
-
-            # Get views into preallocated output buffers for actual batch size
-            output0_gpu = self._output_buffers['simcc_x'][:batch_size]
-            output1_gpu = self._output_buffers['simcc_y'][:batch_size]
+                # Vectorized GPU preprocessing: uint8→float, BGR→RGB, HWC→CHW, normalize
+                img_float_batch = buf['img_uint8'][:batch_size].astype(self._model_dtype)
+                img_rgb_batch = img_float_batch[:, :, :, ::-1]  # BGR→RGB
+                img_chw_batch = cp.ascontiguousarray(cp.transpose(img_rgb_batch, (0, 3, 1, 2)))  # HWC→CHW
+                input_gpu[:] = (img_chw_batch - self._mean_gpu) / self._std_gpu
 
             # Set input shape for current batch
-            self.context.set_input_shape(self.input_name, batch_gpu.shape)
+            self.context.set_input_shape(self.input_name, input_gpu.shape)
 
             # Set tensor addresses using preallocated buffers
-            self.context.set_tensor_address(self.input_name, batch_gpu.data.ptr)
-            self.context.set_tensor_address(self.output_names[0], output0_gpu.data.ptr)
-            self.context.set_tensor_address(self.output_names[1], output1_gpu.data.ptr)
+            self.context.set_tensor_address(self.input_name, input_gpu.data.ptr)
+            self.context.set_tensor_address(self.output_names[0], simcc_x_gpu.data.ptr)
+            self.context.set_tensor_address(self.output_names[1], simcc_y_gpu.data.ptr)
 
-            # Execute inference
+            # Execute inference (no sync needed before - TensorRT waits for stream)
             with self.stream:
                 self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
 
             # Transfer SimCC outputs to CPU
-            simcc_x_cpu = cp.asnumpy(output0_gpu)
-            simcc_y_cpu = cp.asnumpy(output1_gpu)
+            simcc_x_cpu = cp.asnumpy(simcc_x_gpu)
+            simcc_y_cpu = cp.asnumpy(simcc_y_gpu)
 
         # Decode on CPU (outside lock - no GPU resource needed)
         keypoints, scores = TRTDetection._decode_simcc_cpu(simcc_x_cpu, simcc_y_cpu, self.simcc_split_ratio)

@@ -305,7 +305,7 @@ class TRTSegmentation(Thread):
         # Periodic state reset as failsafe (0=disabled)
         if self._state_reset_interval > 0 and self._frame_counter % self._state_reset_interval == 0:
             if self.verbose:
-                print(f"TRT RVM Segmentation: Periodic state reset at frame {self._frame_counter}")
+                print(f"RVM TRT Segmentation: Periodic state reset at frame {self._frame_counter}")
             self._recurrent_states.clear()
 
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)

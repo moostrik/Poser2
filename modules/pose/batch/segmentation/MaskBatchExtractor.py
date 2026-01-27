@@ -47,8 +47,8 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         self._previous_tracklet_ids: set[int] = set()
 
         # Track inference times
-        self._process_timer: PerformanceTimer = PerformanceTimer(name="RVM Segmentation Process", sample_count=100, report_interval=100, color='cyan', omit_init=1)
-        self._wait_timer: PerformanceTimer = PerformanceTimer(name="RVM Segmentation Wait   ", sample_count=100, report_interval=100, color='cyan', omit_init=1)
+        self._process_timer: PerformanceTimer = PerformanceTimer(name="RVM Segmentation", sample_count=100, report_interval=100, color='cyan', omit_init=2)
+        self._wait_timer: PerformanceTimer = PerformanceTimer(name="RVM Wait        ", sample_count=100, report_interval=100, color='cyan', omit_init=2)
 
         self._segmentation.register_callback(self._on_segmentation_result)
 
