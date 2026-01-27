@@ -10,7 +10,6 @@ from typing import Callable
 import numpy as np
 import torch
 import onnxruntime as ort
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
@@ -32,14 +31,14 @@ class RecurrentState:
 class ONNXSegmentation(Thread):
     """Asynchronous GPU person segmentation using Robust Video Matting (RVM) with ONNX Runtime.
 
-    RVM uses recurrent states to maintain temporal coherence across video frames,
-    eliminating flickering artifacts common in frame-independent methods like MODNet.
+    ONNX Runtime implementation for testing/validation. Use TRTSegmentation for production.
 
-    Uses a single-slot queue: only the most recent submitted batch waits to be processed.
-    Older pending batches are dropped. Batches already processing on GPU cannot be cancelled.
+    Uses recurrent states for temporal coherence, eliminating flickering artifacts.
+    Single-slot queue: only the most recent batch waits processing; older pending batches dropped.
+    Batches already processing cannot be cancelled.
 
-    Maintains per-tracklet recurrent states (r1, r2, r3, r4) for temporal consistency.
-    All results (success and dropped) are delivered via callbacks in notification order.
+    Maintains per-tracklet recurrent states (r1-r4) for temporal consistency.
+    All results delivered via callbacks in notification order.
     """
 
     def __init__(self, settings: 'Settings') -> None:
@@ -56,9 +55,6 @@ class ONNXSegmentation(Thread):
         self.model_height: int = settings.segmentation_height
         self.resolution_name: str = settings.segmentation_resolution.name
         self.verbose: bool = settings.verbose
-
-        # RVM-specific settings
-        self.downsample_ratio: float = getattr(settings, 'segmentation_downsample_ratio', 1.0)
 
         # Thread coordination
         self._shutdown_event: Event = Event()
@@ -84,10 +80,16 @@ class ONNXSegmentation(Thread):
 
         # ONNX session (initialized in run thread)
         self._session: ort.InferenceSession | None = None
+        self._model_dtype = np.float16  # Default, determined in setup
 
-        # Thread pool for parallel inference
-        self._executor: ThreadPoolExecutor | None = None
-        self._max_workers: int = min(settings.max_poses, 4)  # Limit concurrent inferences
+        # Pre-allocated zero recurrent states (reused for all new tracklets to avoid recompilation)
+        self._zero_r1: np.ndarray | None = None
+        self._zero_r2: np.ndarray | None = None
+        self._zero_r3: np.ndarray | None = None
+        self._zero_r4: np.ndarray | None = None
+
+        # Batch inference settings
+        self._max_batch: int = min(settings.max_poses, 4)
 
     @property
     def is_ready(self) -> bool:
@@ -101,14 +103,10 @@ class ONNXSegmentation(Thread):
         super().start()
 
     def stop(self) -> None:
+        """Stop both inference and callback threads gracefully."""
         if not self.enabled:
             return
-        """Stop both inference and callback threads gracefully"""
         self._shutdown_event.set()
-
-        # Shutdown thread pool
-        if self._executor is not None:
-            self._executor.shutdown(wait=True, cancel_futures=True)
 
         # Wake up inference thread
         self._notify_update_event.set()
@@ -128,53 +126,7 @@ class ONNXSegmentation(Thread):
             print("Warning: ONNX Segmentation callback thread did not stop cleanly")
 
     def run(self) -> None:
-        """Main inference thread loop. Initializes ONNX session and processes batches."""
-        try:
-            # Initialize ONNX Runtime session with CUDA provider
-            providers = [
-                ('CUDAExecutionProvider', {
-                    'device_id': 0,
-                    'arena_extend_strategy': 'kNextPowerOfTwo',
-                    'gpu_mem_limit': 2 * 1024 * 1024 * 1024,  # 2GB
-                    'cudnn_conv_algo_search': 'EXHAUSTIVE',
-                    'do_copy_in_default_stream': True,
-                }),
-                'CPUExecutionProvider',
-            ]
-
-            sess_options = ort.SessionOptions()
-            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
-            sess_options.intra_op_num_threads = 1
-            # sess_options.execution_mode = ort.ExecutionMode.ORT_PARALLEL
-            sess_options.log_severity_level = 3  # 0=verbose, 1=info, 2=warning, 3=error
-
-            self._session = ort.InferenceSession(
-                self.model_file,
-                sess_options=sess_options,
-                providers=providers
-            )
-
-            # Verify CUDA provider is active
-            providers_used = self._session.get_providers()
-            if 'CUDAExecutionProvider' not in providers_used:
-                print("RVM Segmentation WARNING: CUDA provider not available, using CPU")
-
-            # Clear any existing states (in case of code changes or restarts)
-            self._recurrent_states.clear()
-
-            # Warmup: initialize CUDA kernels with dummy inference
-            self._model_warmup(self._session)
-
-            # Create thread pool for parallel inference
-            self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="RVM-Worker")
-
-            self._model_ready.set()  # Signal model is ready
-            print(f"ONNX Segmentation: {self.resolution_name} model loaded ({self.model_width}x{self.model_height}, {providers_used[0]}) with {self._max_workers} workers")
-
-        except Exception as e:
-            print(f"ONNX Segmentation Error: Failed to load model - {str(e)}")
-            traceback.print_exc()
-            return
+        self._setup()
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()
@@ -192,16 +144,19 @@ class ONNXSegmentation(Thread):
                 traceback.print_exc()
 
     def submit_batch(self, input_batch: SegmentationInput) -> None:
-        """Submit batch for processing. Replaces any pending (not yet started) batch.
+        """Submit batch for processing. Replaces pending batch if not yet started.
 
-        Dropped batches trigger callbacks with processed=False.
+        Dropped batches receive callbacks with processed=False.
         """
         if self._shutdown_event.is_set():
             return
 
-        # Don't accept inputs until model is loaded
         if not self._model_ready.is_set():
             return
+
+        # Validate batch size
+        if len(input_batch.images) > self._max_batch:
+            print(f"ONNX Segmentation Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: SegmentationInput | None = None
 
@@ -232,25 +187,91 @@ class ONNXSegmentation(Thread):
 
         self._notify_update_event.set()
 
-    def _retrieve_pending_batch(self) -> SegmentationInput | None:
-        """Atomically get and clear pending batch. Once retrieved, batch cannot be cancelled.
+    def _setup(self) -> None:
+        """Initialize ONNX session, executor, and warmup. Called from run()."""
+        try:
+            # Initialize ONNX Runtime session with CUDA provider
+            providers = [
+                ('CUDAExecutionProvider', {
+                    'device_id': 0,
+                    'arena_extend_strategy': 'kNextPowerOfTwo',
+                    'gpu_mem_limit': 2 * 1024 * 1024 * 1024,  # 2GB
+                    'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                    'do_copy_in_default_stream': True,
+                }),
+                'CPUExecutionProvider',
+            ]
 
-        Returns:
-            The pending batch if one exists, None otherwise
-        """
+            sess_options = ort.SessionOptions()
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            sess_options.intra_op_num_threads = 1
+            sess_options.log_severity_level = 3  # 0=verbose, 1=info, 2=warning, 3=error
+
+            self._session = ort.InferenceSession(
+                self.model_file,
+                sess_options=sess_options,
+                providers=providers
+            )
+
+            # Verify CUDA provider is active
+            providers_used = self._session.get_providers()
+            if 'CUDAExecutionProvider' not in providers_used:
+                print("ONNX Segmentation WARNING: CUDA provider not available, using CPU")
+
+            # Determine model precision from 'src' input tensor
+            src_input = self._session.get_inputs()[0]  # First input is 'src'
+            input_type = src_input.type
+
+            # Parse ONNX type string (e.g., 'tensor(float)', 'tensor(float16)')
+            precision_map = {
+                'tensor(float)': 'FP32',
+                'tensor(float16)': 'FP16',
+                'tensor(double)': 'FP64',
+                'tensor(int8)': 'INT8',
+            }
+            self.model_precision = precision_map.get(input_type, f"UNKNOWN({input_type})")
+
+            # Map ONNX type to numpy dtype for preprocessing
+            dtype_map = {
+                'tensor(float)': np.float32,
+                'tensor(float16)': np.float16,
+                'tensor(double)': np.float64,
+                'tensor(int8)': np.int8,
+            }
+            self._model_dtype = dtype_map.get(input_type, np.float16)
+
+            # Pre-allocate zero recurrent states (reused for all new tracklets)
+            self._zero_r1 = np.zeros((16, self.model_height // 2, self.model_width // 2), dtype=self._model_dtype)
+            self._zero_r2 = np.zeros((20, self.model_height // 4, self.model_width // 4), dtype=self._model_dtype)
+            self._zero_r3 = np.zeros((40, self.model_height // 8, self.model_width // 8), dtype=self._model_dtype)
+            self._zero_r4 = np.zeros((64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype)
+
+            # Clear any existing states
+            self._recurrent_states.clear()
+
+            # Warmup: initialize CUDA kernels with dummy inference
+            self._model_warmup(self._session)
+
+            self._model_ready.set()
+            print(f"ONNX Segmentation: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+
+        except Exception as e:
+            print(f"ONNX Segmentation Error: Failed to load model - {str(e)}")
+            traceback.print_exc()
+
+    def _retrieve_pending_batch(self) -> SegmentationInput | None:
+        """Atomically get and clear pending batch. Once retrieved, cannot be cancelled."""
         with self._input_lock:
             batch = self._pending_batch
             self._pending_batch = None  # Clear slot - batch is now committed
             return batch
 
     def _process_pending_batch(self) -> None:
-        """Process the pending batch using RVM ONNX inference with recurrent states."""
-        # Get pending input
+        """Process pending batch using batched ONNX inference with recurrent states."""
         batch: SegmentationInput | None = self._retrieve_pending_batch()
 
         if batch is None:
-            if self.verbose:
-                print("ONNX Segmentation Warning: No pending batch to process, this should not happen")
             return
 
         # Increment frame counter for periodic state reset
@@ -262,53 +283,27 @@ class ONNXSegmentation(Thread):
                 print(f"ONNX Segmentation: Periodic state reset at frame {self._frame_counter}")
             self._recurrent_states.clear()
 
-        output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
+        output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
 
         # Run inference
-        if batch.images and self._session is not None and self._executor is not None:
-            batch_start = time.perf_counter()
+        if batch.images:
+            # Limit processing to max batch size
+            images_to_process = batch.images[:self._max_batch]
+            tracklets_to_process = batch.tracklet_ids[:self._max_batch]
 
-            # Process tracklets in parallel using thread pool
-            futures = []
-            for img, tracklet_id in zip(batch.images, batch.tracklet_ids):
-                future = self._executor.submit(self._infer_single_image, img, tracklet_id)
-                futures.append((future, tracklet_id))
-
-            # Collect results in original order and gather new states
-            mask_list: list[torch.Tensor] = []
-            new_states_dict: dict[int, RecurrentState] = {}
-
-            for future, tracklet_id in futures:
-                try:
-                    mask, new_state = future.result()  # Modified to return state too
-                    mask_list.append(mask)
-                    if new_state is not None:
-                        new_states_dict[tracklet_id] = new_state
-                except Exception as e:
-                    print(f"ONNX Segmentation Error: Inference failed for tracklet {tracklet_id}: {str(e)}")
-                    # Create empty mask on error
-                    h, w = batch.images[0].shape[:2]
-                    mask_list.append(torch.zeros((h, w), dtype=torch.float16, device='cuda'))
-
-            # Replace entire state dict with only active tracklets (removes stale IDs)
-            self._recurrent_states = new_states_dict
-
-            # Stack into batch tensor
-            if mask_list:
-                mask_tensor = torch.stack(mask_list)  # (B, H, W) FP16 on CUDA
-            else:
-                mask_tensor = torch.empty(0, dtype=torch.float16, device='cuda')
-
-            inference_time_ms: float = (time.perf_counter() - batch_start) * 1000.0
-
-            # Create output (processed=True by default) - keep tensor on GPU
-            output = SegmentationOutput(
-                batch_id=batch.batch_id,
-                mask_tensor=mask_tensor,
-                tracklet_ids=batch.tracklet_ids,
-                processed=True,
-                inference_time_ms=inference_time_ms
-            )
+            try:
+                mask_tensor, fgr_tensor, inference_time_ms = self._infer_batch(images_to_process, tracklets_to_process)
+                output = SegmentationOutput(
+                    batch_id=batch.batch_id,
+                    mask_tensor=mask_tensor,
+                    fgr_tensor=fgr_tensor,
+                    tracklet_ids=batch.tracklet_ids,
+                    processed=True,
+                    inference_time_ms=inference_time_ms
+                )
+            except Exception as e:
+                print(f"ONNX Segmentation Error: Batched inference failed: {str(e)}")
+                traceback.print_exc()
 
         # Queue for callbacks
         try:
@@ -316,81 +311,131 @@ class ONNXSegmentation(Thread):
         except Exception:
             print("ONNX Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_single_image(self, img: np.ndarray, tracklet_id: int) -> tuple[torch.Tensor, RecurrentState | None]:
-        """Run RVM inference on single image with per-tracklet recurrent state.
+    def _infer_batch(self, images: list[np.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
+        """Run batched ONNX inference with per-tracklet recurrent states.
+
+        Uses fixed batch size padding to avoid ONNX Runtime dynamic shape recompilation.
 
         Args:
-            img: Input image (H, W, 3) BGR uint8
-            tracklet_id: Unique identifier for tracking temporal state
+            images: List of BGR uint8 images (H, W, 3)
+            tracklet_ids: Tracklet IDs for each image
 
         Returns:
-            Tuple of (alpha matte tensor (H, W) FP16 on CUDA [0, 1], new recurrent state)
+            (alpha_matte (actual_batch,H,W), foreground (actual_batch,3,H,W), inference_ms)
         """
-        if self._session is None:
-            return torch.zeros((img.shape[0], img.shape[1]), dtype=torch.float16, device='cuda'), None
+        actual_batch_size = len(images)
+        if actual_batch_size == 0 or self._session is None:
+            torch_dtype = torch.float16 if self._model_dtype == np.float16 else torch.float32
+            return torch.empty(0, dtype=torch_dtype, device='cuda'), torch.empty(0, 3, 0, 0, dtype=torch_dtype, device='cuda'), 0.0
 
-        # Preprocess: BGR -> RGB, normalize to [0, 1], HWC -> NCHW
-        img_rgb = img[:, :, ::-1].astype(np.float16)  # BGR to RGB, FP16
-        img_norm = img_rgb / 255.0  # Normalize to [0, 1]
-        img_chw = np.transpose(img_norm, (2, 0, 1))  # (H, W, 3) -> (3, H, W)
-        img_nchw = np.expand_dims(img_chw, axis=0).astype(np.float16)  # (1, 3, H, W) FP16
+        batch_start = time.perf_counter()
 
-        # Get recurrent state for this tracklet (no lock needed - dict.get() is atomic)
-        state = self._recurrent_states.get(tracklet_id)
+        # Pad to fixed batch size using missing IDs to avoid ONNX Runtime recompilation
+        num_padding = self._max_batch - actual_batch_size
+        padding_ids: list[int] = []
+
+        if num_padding > 0:
+            # Find which IDs from 0 to max_batch-1 are missing
+            all_ids = set(range(self._max_batch))
+            used_ids = set(tracklet_ids)
+            available_ids = list(all_ids - used_ids)
+
+            # Add padding with dummy images and missing IDs
+            dummy_img = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
+            for i in range(num_padding):
+                padding_id = available_ids[i]
+                images.append(dummy_img)
+                tracklet_ids.append(padding_id)
+                padding_ids.append(padding_id)
+
+        # Gather recurrent states for all tracklets (padding gets zero states)
+        states: list[RecurrentState | None] = []
+        for tid in tracklet_ids:
+            states.append(self._recurrent_states.get(tid))
+
+        # Preprocess all images: BGR -> RGB, normalize, HWC -> NCHW
+        img_batch = []
+        for img in images:
+            img_rgb = img[:, :, ::-1].astype(self._model_dtype)  # BGR to RGB
+            img_norm = img_rgb / 255.0  # Normalize to [0, 1]
+            img_chw = np.transpose(img_norm, (2, 0, 1))  # (H, W, 3) -> (3, H, W)
+            img_batch.append(img_chw)
+
+        # Stack into batch (B, 3, H, W)
+        src_batch = np.stack(img_batch, axis=0).astype(self._model_dtype)
+
+        # Prepare batched recurrent state inputs
+        r1i_batch = []
+        r2i_batch = []
+        r3i_batch = []
+        r4i_batch = []
+
+        for state in states:
+            if state is not None:
+                r1i_batch.append(state.r1[0])  # Remove batch dim
+                r2i_batch.append(state.r2[0])
+                r3i_batch.append(state.r3[0])
+                r4i_batch.append(state.r4[0])
+            else:
+                # Use pre-allocated zero states (same objects avoid ONNX recompilation)
+                r1i_batch.append(self._zero_r1)
+                r2i_batch.append(self._zero_r2)
+                r3i_batch.append(self._zero_r3)
+                r4i_batch.append(self._zero_r4)
+
+        # Stack recurrent states into batches
+        r1i = np.stack(r1i_batch, axis=0)
+        r2i = np.stack(r2i_batch, axis=0)
+        r3i = np.stack(r3i_batch, axis=0)
+        r4i = np.stack(r4i_batch, axis=0)
 
         # Prepare ONNX inputs
-        if state is not None:
-            # Use existing states from previous frame
-            onnx_inputs = {
-                'src': img_nchw,
-                'r1i': state.r1,
-                'r2i': state.r2,
-                'r3i': state.r3,
-                'r4i': state.r4,
-            }
-        else:
-            # Initialize with dynamic shapes based on model resolution (first frame) - FP16
-            onnx_inputs = {
-                'src': img_nchw,
-                'r1i': np.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=np.float16),
-                'r2i': np.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=np.float16),
-                'r3i': np.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=np.float16),
-                'r4i': np.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=np.float16),
-            }
+        onnx_inputs = {
+            'src': src_batch,
+            'r1i': r1i,
+            'r2i': r2i,
+            'r3i': r3i,
+            'r4i': r4i,
+        }
 
-        # Run ONNX inference
+        # Run batched ONNX inference
         outputs = self._session.run(None, onnx_inputs)
 
         # ONNX outputs: [fgr, pha, r1o, r2o, r3o, r4o]
-        # Type assertion: ONNX Runtime returns numpy arrays for our model
-        assert isinstance(outputs[1], np.ndarray), "Expected numpy array from ONNX"
-        assert isinstance(outputs[2], np.ndarray), "Expected numpy array from ONNX"
-        assert isinstance(outputs[3], np.ndarray), "Expected numpy array from ONNX"
-        assert isinstance(outputs[4], np.ndarray), "Expected numpy array from ONNX"
-        assert isinstance(outputs[5], np.ndarray), "Expected numpy array from ONNX"
+        fgr_np = np.asarray(outputs[0])  # (padded_batch, 3, H, W)
+        pha_np = np.asarray(outputs[1])  # (padded_batch, 1, H, W)
+        r1o_np = np.asarray(outputs[2])  # (padded_batch, 16, H/2, W/2)
+        r2o_np = np.asarray(outputs[3])  # (padded_batch, 20, H/4, W/4)
+        r3o_np = np.asarray(outputs[4])  # (padded_batch, 40, H/8, W/8)
+        r4o_np = np.asarray(outputs[5])  # (padded_batch, 64, H/16, W/16)
 
-        pha_np: np.ndarray = outputs[1]  # (1, 1, H, W) FP16
+        # Create new states ONLY for real tracklets (skip padding IDs)
+        new_states_dict: dict[int, RecurrentState] = {}
+        for i, tid in enumerate(tracklet_ids):
+            if tid not in padding_ids:  # Only save states for real tracklets
+                new_states_dict[tid] = RecurrentState(
+                    r1=r1o_np[i:i+1],  # Keep batch dim for consistency
+                    r2=r2o_np[i:i+1],
+                    r3=r3o_np[i:i+1],
+                    r4=r4o_np[i:i+1]
+                )
 
-        # Create new state from outputs
-        new_state: RecurrentState | None = None
-        if len(outputs) >= 6:
-            new_state = RecurrentState(
-                r1=outputs[2],  # Type checker now knows these are np.ndarray
-                r2=outputs[3],
-                r3=outputs[4],
-                r4=outputs[5]
-            )
+        # Update recurrent states - replace entire dict to remove stale IDs
+        # Note: This intentionally purges all non-current tracklets every frame to prevent
+        # memory growth. Tracklets that temporarily disappear will restart with zero states.
+        self._recurrent_states = new_states_dict
 
-        # Convert numpy to PyTorch CUDA tensor for OpenGL compatibility
-        pha_tensor = torch.from_numpy(pha_np).cuda()  # (1, 1, H, W) FP16
-        pha_tensor = pha_tensor.squeeze(0).squeeze(0)  # (H, W)
+        # Convert numpy to PyTorch CUDA tensors (slice to actual batch size)
+        fgr_tensor = torch.from_numpy(fgr_np[:actual_batch_size]).cuda()  # (actual_batch, 3, H, W)
+        pha_tensor = torch.from_numpy(pha_np[:actual_batch_size]).cuda().squeeze(1)  # (actual_batch, H, W)
 
-        return pha_tensor, new_state
+        inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
+
+        return pha_tensor, fgr_tensor, inference_time_ms
 
 
-    # CALLBACK
     def _callback_worker_loop(self) -> None:
-        """Dispatch queued results to registered callbacks. Runs on separate thread."""
+        """Dispatch queued results to registered callbacks on dedicated thread."""
         while not self._shutdown_event.is_set():
             try:
                 if self._callback_queue.qsize() > 1:
@@ -416,23 +461,28 @@ class ONNXSegmentation(Thread):
                 continue
 
     def register_callback(self, callback: SegmentationOutputCallback) -> None:
-        """Register callback to receive segmentation results (both success and dropped batches)."""
+        """Register callback to receive segmentation results (success and dropped batches)."""
         with self._callback_lock:
             self._callbacks.add(callback)
 
     def _model_warmup(self, session: ort.InferenceSession) -> None:
-        """Initialize CUDA kernels with dummy inference to avoid cold-start errors."""
+        """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
+        print(f"ONNX Segmentation: Starting warmup (fixed batch_size={self._max_batch})...")
         try:
-            # Create dummy input matching model dimensions
-            dummy_img = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
+            # Create realistic dummy input
+            np.random.seed(42)
+            dummy_img = (np.random.rand(self.model_height, self.model_width, 3) * 255).astype(np.uint8)
 
-            # Run a few warmup inferences with tracklet ID 999 (will be cleared after)
-            for i in range(3):
-                _ = self._infer_single_image(dummy_img, tracklet_id=999)
+            # Warmup with max_batch size (all inference runs with this size)
+            dummy_images = [dummy_img] * self._max_batch
+            dummy_ids = list(range(self._max_batch))
 
-            # Warmup state will be automatically removed on next real batch
-            # (since 999 won't be in tracklet_ids)
+            pha, fgr, ms = self._infer_batch(dummy_images, dummy_ids)
 
-            print("ONNX Segmentation: Warmup complete")
+            # Clear warmup states
+            self._recurrent_states.clear()
+
+            print(f"ONNX Segmentation: Warmup complete - took {ms:.1f}ms")
         except Exception as e:
             print(f"ONNX Segmentation: Warmup failed (non-critical) - {str(e)}")
+            traceback.print_exc()

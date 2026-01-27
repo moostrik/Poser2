@@ -29,17 +29,14 @@ class RecurrentState:
 class TRTSegmentation(Thread):
     """Asynchronous GPU person segmentation using Robust Video Matting (RVM) with TensorRT.
 
-    Optimized inference using TensorRT engines for maximum performance.
-    Architecture identical to RVMSegmentation for drop-in replacement.
+    TensorRT-optimized inference for maximum performance. Drop-in replacement for ONNXSegmentation.
 
-    RVM uses recurrent states to maintain temporal coherence across video frames,
-    eliminating flickering artifacts common in frame-independent methods like MODNet.
+    Uses recurrent states for temporal coherence, eliminating flickering artifacts.
+    Single-slot queue: only the most recent batch waits processing; older pending batches dropped.
+    Batches already processing cannot be cancelled.
 
-    Uses a single-slot queue: only the most recent submitted batch waits to be processed.
-    Older pending batches are dropped. Batches already processing on GPU cannot be cancelled.
-
-    Maintains per-tracklet recurrent states (r1, r2, r3, r4) for temporal consistency.
-    All results (success and dropped) are delivered via callbacks in notification order.
+    Maintains per-tracklet recurrent states (r1-r4) for temporal consistency.
+    All results delivered via callbacks in notification order.
     """
 
     def __init__(self, settings: 'Settings') -> None:
@@ -107,9 +104,9 @@ class TRTSegmentation(Thread):
         super().start()
 
     def stop(self) -> None:
+        """Stop both inference and callback threads gracefully."""
         if not self.enabled:
             return
-        """Stop both inference and callback threads gracefully"""
         self._shutdown_event.set()
 
         # Wake up inference thread
@@ -130,7 +127,71 @@ class TRTSegmentation(Thread):
             print("Warning: TRT RVM Segmentation callback thread did not stop cleanly")
 
     def run(self) -> None:
-        """Main inference thread loop. Initializes TensorRT engine and processes batches."""
+        self._setup()
+
+        while not self._shutdown_event.is_set():
+            self._notify_update_event.wait()
+
+            if self._shutdown_event.is_set():
+                break
+
+            self._notify_update_event.clear()
+
+            try:
+                self._process_pending_batch()
+
+            except Exception as e:
+                print(f"TRT RVM Segmentation Error: {str(e)}")
+                traceback.print_exc()
+
+    def submit_batch(self, input_batch: SegmentationInput) -> None:
+        """Submit batch for processing. Replaces pending batch if not yet started.
+
+        Dropped batches receive callbacks with processed=False.
+        """
+        if self._shutdown_event.is_set():
+            return
+
+        if not self._model_ready.is_set():
+            return
+
+        # Validate batch size
+        if len(input_batch.images) > self._max_batch:
+            print(f"TRT RVM Segmentation Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+
+        dropped_batch: SegmentationInput | None = None
+
+        with self._input_lock:
+            if self._pending_batch is not None:
+                dropped_batch = self._pending_batch
+                lag = int((time.time() - self._input_timestamp) * 1000)
+                print(f"TRT RVM Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                self._last_dropped_batch_id = dropped_batch.batch_id
+
+            self._pending_batch = input_batch
+            self._input_timestamp = time.time()
+
+        # Notify about dropped batch
+        if dropped_batch is not None:
+            dropped_output = SegmentationOutput(
+                batch_id=dropped_batch.batch_id,
+                tracklet_ids=dropped_batch.tracklet_ids,
+                processed=False
+            )
+            try:
+                self._callback_queue.put_nowait(dropped_output)
+            except:
+                pass
+
+        self._notify_update_event.set()
+
+    def register_callback(self, callback: SegmentationOutputCallback) -> None:
+        """Register callback to receive segmentation results (success and dropped batches)."""
+        with self._callback_lock:
+            self._callbacks.add(callback)
+
+    def _setup(self) -> None:
+        """Initialize TensorRT engine, context, and buffers. Called from run()."""
         try:
             # Acquire global lock to prevent concurrent Myelin graph loading
             with get_init_lock():
@@ -224,75 +285,15 @@ class TRTSegmentation(Thread):
             traceback.print_exc()
             return
 
-        while not self._shutdown_event.is_set():
-            self._notify_update_event.wait()
-
-            if self._shutdown_event.is_set():
-                break
-
-            self._notify_update_event.clear()
-
-            try:
-                self._process_pending_batch()
-
-            except Exception as e:
-                print(f"TRT RVM Segmentation Error: {str(e)}")
-                traceback.print_exc()
-
-    def submit_batch(self, input_batch: SegmentationInput) -> None:
-        """Submit batch for processing. Replaces any pending (not yet started) batch.
-
-        Dropped batches trigger callbacks with processed=False.
-        """
-        if self._shutdown_event.is_set():
-            return
-
-        if not self._model_ready.is_set():
-            return
-
-        # Validate batch size
-        if len(input_batch.images) > self._max_batch:
-            print(f"TRT RVM Segmentation Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
-
-        dropped_batch: SegmentationInput | None = None
-
-        with self._input_lock:
-            if self._pending_batch is not None:
-                dropped_batch = self._pending_batch
-                lag = int((time.time() - self._input_timestamp) * 1000)
-                print(f"TRT RVM Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
-                self._last_dropped_batch_id = dropped_batch.batch_id
-
-            self._pending_batch = input_batch
-            self._input_timestamp = time.time()
-
-        # Notify about dropped batch
-        if dropped_batch is not None:
-            dropped_output = SegmentationOutput(
-                batch_id=dropped_batch.batch_id,
-                tracklet_ids=dropped_batch.tracklet_ids,
-                processed=False
-            )
-            try:
-                self._callback_queue.put_nowait(dropped_output)
-            except:
-                pass
-
-        self._notify_update_event.set()
-
     def _retrieve_pending_batch(self) -> SegmentationInput | None:
-        """Atomically get and clear pending batch. Once retrieved, batch cannot be cancelled.
-
-        Returns:
-            The pending batch if one exists, None otherwise
-        """
+        """Atomically get and clear pending batch. Once retrieved, cannot be cancelled."""
         with self._input_lock:
             batch = self._pending_batch
             self._pending_batch = None
             return batch
 
     def _process_pending_batch(self) -> None:
-        """Process the pending batch using RVM TensorRT inference with recurrent states."""
+        """Process pending batch using batched TensorRT inference with recurrent states."""
         batch: SegmentationInput | None = self._retrieve_pending_batch()
 
         if batch is None:
@@ -338,18 +339,19 @@ class TRTSegmentation(Thread):
             print("TRT RVM Segmentation Warning: Callback queue full, dropping inference results")
 
     def _infer_batch(self, images: list[np.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
-        """Run RVM TensorRT inference on BATCH of images with per-tracklet recurrent states.
+        """Run batched TensorRT inference with per-tracklet recurrent states.
 
         Args:
-            images: List of input images (H, W, 3) BGR uint8
-            tracklet_ids: List of tracklet IDs (same length as images)
+            images: List of BGR uint8 images (H, W, 3)
+            tracklet_ids: Tracklet IDs for each image
 
         Returns:
-            Tuple of (alpha matte tensor (B, H, W) FP32 on CUDA [0, 1], foreground tensor (B, 3, H, W) FP32 on CUDA [0, 1], process_time_ms, lock_wait_ms)
+            (alpha_matte (B,H,W), foreground (B,3,H,W), inference_ms, lock_wait_ms)
         """
         batch_size = len(images)
         if batch_size == 0:
-            return torch.empty(0, dtype=torch.float32, device='cuda'), torch.empty(0, 3, 0, 0, dtype=torch.float32, device='cuda'), 0.0, 0.0
+            torch_dtype = torch.float16 if self._model_dtype == cp.float16 else torch.float32
+            return torch.empty(0, dtype=torch_dtype, device='cuda'), torch.empty(0, 3, 0, 0, dtype=torch_dtype, device='cuda'), 0.0, 0.0
 
         method_start: float = time.perf_counter()
 
@@ -443,8 +445,8 @@ class TRTSegmentation(Thread):
                 ))
 
             # Convert batched outputs to PyTorch tensors
-            pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(1).float()  # (B, H, W)
-            fgr_tensor = torch.as_tensor(fgr_gpu, device='cuda').float()  # (B, 3, H, W)
+            pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(1)  # (B, H, W)
+            fgr_tensor = torch.as_tensor(fgr_gpu, device='cuda')  # (B, 3, H, W)
 
         # Update recurrent states - replace entire dict to remove stale IDs
         # Note: This intentionally purges all non-current tracklets every frame to prevent
@@ -463,7 +465,7 @@ class TRTSegmentation(Thread):
         return pha_tensor, fgr_tensor, process_time_ms, lock_wait_ms
 
     def _callback_worker_loop(self) -> None:
-        """Dispatch queued results to registered callbacks. Runs on separate thread."""
+        """Dispatch queued results to registered callbacks on dedicated thread."""
         while not self._shutdown_event.is_set():
             try:
                 if self._callback_queue.qsize() > 1:
@@ -487,8 +489,3 @@ class TRTSegmentation(Thread):
                 self._callback_queue.task_done()
             except Empty:
                 continue
-
-    def register_callback(self, callback: SegmentationOutputCallback) -> None:
-        """Register callback to receive segmentation results (both success and dropped batches)."""
-        with self._callback_lock:
-            self._callbacks.add(callback)

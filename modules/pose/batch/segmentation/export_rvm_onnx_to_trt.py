@@ -9,7 +9,7 @@ Usage:
     python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_384x288.onnx --output models/rvm_mobilenetv3_384x288_b3.trt --height 384 --width 288
 
     # Convert 512x384
-    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_512x384.onnx --output models/rvm_mobilenetv3_512x384_b3.trt --height 512 --width 384
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_512x384_b4.onnx --output models/rvm_mobilenetv3_512x384_b4.trt --height 512 --width 384
 """
 
 import tensorrt as trt
@@ -26,7 +26,7 @@ def convert_rvm_to_tensorrt(
     min_batch: int = 1,
     opt_batch: int = 3,
     max_batch: int = 4,
-    fp16: bool = True,
+    fp32: bool = False,
     workspace_gb: int = 8
 ) -> bool:
     """Convert RVM ONNX model to TensorRT engine.
@@ -39,7 +39,7 @@ def convert_rvm_to_tensorrt(
         min_batch: Minimum batch size
         opt_batch: Optimal batch size (used for optimization)
         max_batch: Maximum batch size (set to opt_batch if never exceeded)
-        fp16: Enable FP16 precision
+        fp32: Use FP32 precision instead of FP16 (default: False)
         workspace_gb: Workspace size in GB
 
     Returns:
@@ -52,7 +52,7 @@ def convert_rvm_to_tensorrt(
     print(f"  Output:     {output_path}")
     print(f"  Resolution: {height}×{width}")
     print(f"  Batch:      min={min_batch}, opt={opt_batch}, max={max_batch}")
-    print(f"  Precision:  {'FP16' if fp16 else 'FP32'}")
+    print(f"  Precision:  {'FP32' if fp32 else 'FP16'}")
     print(f"  Workspace:  {workspace_gb} GB")
     print(f"{'═'*70}\n")
 
@@ -130,8 +130,8 @@ def convert_rvm_to_tensorrt(
     config.add_optimization_profile(profile)
     print(f"  ├─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
 
-    # Enable FP16 if requested
-    if fp16:
+    # Enable FP16 unless FP32 requested
+    if not fp32:
         config.set_flag(trt.BuilderFlag.FP16)
         print(f"  └─ FP16 enabled ✓")
     else:
@@ -216,7 +216,7 @@ if __name__ == '__main__':
         args.min_batch,
         args.opt_batch,
         args.max_batch,
-        not args.fp32,
+        args.fp32,
         args.workspace
     )
     sys.exit(0 if success else 1)

@@ -30,6 +30,38 @@ def get_channel_count_from_format(internal_format) -> int:
         return 4
     return 1  # fallback
 
+def get_bytes_per_channel(internal_format) -> int:
+    """Get bytes per channel from OpenGL internal format.
+
+    Args:
+        internal_format: OpenGL internal format constant
+
+    Returns:
+        Bytes per channel (1 for uint8, 2 for FP16, 4 for FP32)
+    """
+    if internal_format in (GL_R8, GL_RG8, GL_RGB8, GL_RGBA8):
+        return 1  # uint8
+    elif internal_format in (GL_R16F, GL_RG16F, GL_RGB16F, GL_RGBA16F):
+        return 2  # FP16
+    elif internal_format in (GL_R32F, GL_RG32F, GL_RGB32F, GL_RGBA32F):
+        return 4  # FP32
+    return 4  # fallback to FP32
+
+def get_gl_type_from_format(internal_format) -> int:
+    """Get OpenGL type constant from internal format.
+
+    Args:
+        internal_format: OpenGL internal format constant
+
+    Returns:
+        GL_UNSIGNED_BYTE, GL_HALF_FLOAT, or GL_FLOAT
+    """
+    if internal_format in (GL_R8, GL_RG8, GL_RGB8, GL_RGBA8):
+        return GL_UNSIGNED_BYTE
+    elif internal_format in (GL_R16F, GL_RG16F, GL_RGB16F, GL_RGBA16F):
+        return GL_HALF_FLOAT
+    return GL_FLOAT
+
 def infer_internal_format(tensor: torch.Tensor) -> int:
     """Infer OpenGL internal format from tensor shape and dtype.
 
@@ -50,8 +82,14 @@ def infer_internal_format(tensor: torch.Tensor) -> int:
     else:
         channels = 1
 
-    # Map to float32 formats (TensorTexture always uses float32)
-    format_map = {1: GL_R32F, 2: GL_RG32F, 3: GL_RGB32F, 4: GL_RGBA32F}
+    # Determine precision from dtype
+    if tensor.dtype == torch.uint8:
+        format_map = {1: GL_R8, 2: GL_RG8, 3: GL_RGB8, 4: GL_RGBA8}
+    elif tensor.dtype == torch.float16:
+        format_map = {1: GL_R16F, 2: GL_RG16F, 3: GL_RGB16F, 4: GL_RGBA16F}
+    else:  # torch.float32 or other
+        format_map = {1: GL_R32F, 2: GL_RG32F, 3: GL_RGB32F, 4: GL_RGBA32F}
+
     return format_map.get(channels, GL_R32F)
 
 
@@ -98,7 +136,7 @@ class Tensor(Texture):
         Args:
             width: Texture width in pixels
             height: Texture height in pixels
-            internal_format: OpenGL internal format (GL_R32F, GL_RGB32F, etc.)
+            internal_format: OpenGL internal format (GL_R8, GL_R16F, GL_R32F, GL_RGB8, GL_RGB16F, GL_RGB32F, etc.)
             wrap_s: Horizontal wrap mode (default: GL_CLAMP_TO_EDGE)
             wrap_t: Vertical wrap mode (default: GL_CLAMP_TO_EDGE)
             min_filter: Minification filter (default: GL_LINEAR)
@@ -109,12 +147,13 @@ class Tensor(Texture):
         if not self.allocated:
             return
 
-        # Get channel count from internal format
+        # Get channel count and bytes per channel
         channels = get_channel_count_from_format(internal_format)
+        bytes_per_channel = get_bytes_per_channel(internal_format)
 
         # Allocate PBO
         self._pbo = glGenBuffers(1)
-        self._pbo_size = width * height * channels * 4  # float32 = 4 bytes per channel
+        self._pbo_size = width * height * channels * bytes_per_channel
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._pbo)
         glBufferData(GL_PIXEL_UNPACK_BUFFER, self._pbo_size, None, GL_STREAM_DRAW)
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
@@ -204,16 +243,31 @@ class Tensor(Texture):
         """GPU-to-GPU copy using CUDA-OpenGL interop.
 
         PyTorch CUDA tensor → PBO (device-to-device) → GL texture (all on GPU).
+        Preserves uint8, FP16, or FP32 precision based on internal format.
         """
-        # Convert to FP32
-        if tensor.dtype == torch.float16:
-            tensor = tensor.float()
-        elif tensor.dtype == torch.uint8:
-            tensor = tensor.float() / 255.0
+        # Convert to appropriate dtype based on internal format
+        bytes_per_channel = get_bytes_per_channel(self.internal_format)
 
-        # Permute multi-channel tensors from (C, H, W) to (H, W, C)
-        if len(tensor.shape) == 3 and tensor.shape[0] <= 4:
-            tensor = tensor.permute(1, 2, 0)
+        if bytes_per_channel == 1:  # uint8
+            target_dtype = torch.uint8
+            if tensor.dtype in (torch.float16, torch.float32):
+                # Convert float [0.0, 1.0] to uint8 [0, 255]
+                tensor = (tensor.clamp(0.0, 1.0) * 255.0).to(torch.uint8)
+            elif tensor.dtype != torch.uint8:
+                tensor = tensor.to(torch.uint8)
+        elif bytes_per_channel == 2:  # FP16
+            target_dtype = torch.float16
+            if tensor.dtype == torch.uint8:
+                tensor = tensor.float() / 255.0
+                tensor = tensor.half()
+            elif tensor.dtype != torch.float16:
+                tensor = tensor.half()
+        else:  # FP32
+            target_dtype = torch.float32
+            if tensor.dtype == torch.uint8:
+                tensor = tensor.float() / 255.0
+            elif tensor.dtype != torch.float32:
+                tensor = tensor.float()
 
         # Flip vertically to match OpenGL/FBO/Image convention
         tensor = torch.flip(tensor, [0])
@@ -248,8 +302,9 @@ class Tensor(Texture):
         if err != runtime.cudaError_t.cudaSuccess:
             raise RuntimeError(f"Failed to unmap graphics resource: {err}")
 
-        # Get channel count from internal format
+        # Get channel count and GL type
         channels = get_channel_count_from_format(self.internal_format)
+        gl_type = get_gl_type_from_format(self.internal_format)
 
         # Select upload format based on channel count
         format_map = {1: GL_RED, 2: GL_RG, 3: GL_RGB, 4: GL_RGBA}
@@ -258,18 +313,22 @@ class Tensor(Texture):
         # Upload PBO to texture (GPU-to-GPU via OpenGL driver)
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, self._pbo)
         self.bind()
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, upload_format, GL_FLOAT, None)
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, upload_format, gl_type, None)
 
         # Check for OpenGL errors
         err = glGetError()
         if err != 0:
-            print(f"TensorTexture: OpenGL error after glTexSubImage2D: {err} (channels={channels}, format={upload_format})")
+            type_name = 'uint8' if gl_type == GL_UNSIGNED_BYTE else ('FP16' if gl_type == GL_HALF_FLOAT else 'FP32')
+            print(f"TensorTexture: OpenGL error after glTexSubImage2D: {err} (channels={channels}, format={upload_format}, type={type_name})")
 
         self.unbind()
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0)
 
     def _update_with_cpu(self, tensor: torch.Tensor) -> None:
-        """Fallback: CPU transfer (GPU → CPU → GPU)."""
+        """Fallback: CPU transfer (GPU → CPU → GPU).
+
+        Preserves uint8, FP16, or FP32 precision based on internal format.
+        """
         # Permute multi-channel tensors from (C, H, W) to (H, W, C)
         if len(tensor.shape) == 3 and tensor.shape[0] <= 4:
             tensor = tensor.permute(1, 2, 0)
@@ -277,11 +336,29 @@ class Tensor(Texture):
         # Flip vertically to match OpenGL/FBO/Image convention
         tensor = torch.flip(tensor, [0])
 
-        # Convert to float32 and move to CPU
-        tensor_np = tensor.float().cpu().numpy()  # (H, W) or (H, W, C)
+        # Convert to appropriate dtype and move to CPU
+        bytes_per_channel = get_bytes_per_channel(self.internal_format)
 
-        # Get channel count from internal format
+        if bytes_per_channel == 1:  # uint8
+            if tensor.dtype in (torch.float16, torch.float32):
+                # Convert float [0.0, 1.0] to uint8 [0, 255]
+                tensor_np = (tensor.clamp(0.0, 1.0) * 255.0).to(torch.uint8).cpu().numpy()
+            else:
+                tensor_np = tensor.to(torch.uint8).cpu().numpy()
+        elif bytes_per_channel == 2:  # FP16
+            if tensor.dtype == torch.uint8:
+                tensor_np = (tensor.float() / 255.0).half().cpu().numpy()
+            else:
+                tensor_np = tensor.half().cpu().numpy()
+        else:  # FP32
+            if tensor.dtype == torch.uint8:
+                tensor_np = (tensor.float() / 255.0).cpu().numpy()
+            else:
+                tensor_np = tensor.float().cpu().numpy()
+
+        # Get channel count and GL type
         channels = get_channel_count_from_format(self.internal_format)
+        gl_type = get_gl_type_from_format(self.internal_format)
 
         # Select upload format based on channel count
         format_map = {1: GL_RED, 2: GL_RG, 3: GL_RGB, 4: GL_RGBA}
@@ -289,6 +366,6 @@ class Tensor(Texture):
 
         # Upload to OpenGL texture
         self.bind()
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, upload_format, GL_FLOAT, tensor_np)
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self.width, self.height, upload_format, gl_type, tensor_np)
         self.unbind()
 
