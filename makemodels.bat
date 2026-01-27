@@ -58,44 +58,60 @@ if %errorlevel% neq 0 echo [91mFailed to convert rtmpose-l_384x288.onnx[0m
 if %errorlevel%==0 echo [92mBuilt rtmpose-l_384x288_b3.trt[0m
 :after_rtmpose_l_384x288
 
+
+
 echo.
 echo [33mConverting RVM segmentation models to TensorRT engines.[0m
 
 rem rvm 256x192
-if not exist "models\rvm_mobilenetv3_256x192_b3.trt" goto build_rvm_256x192
+if not exist "models\rvm_mobilenetv3_256x192_b4.trt" goto build_rvm_256x192
 if "%FORCE_REBUILD%"=="1" goto build_rvm_256x192
-echo [90mSkipping rvm_mobilenetv3_256x192_b3.trt (already exists)[0m
+echo [90mSkipping rvm_mobilenetv3_256x192_b4.trt (already exists)[0m
 goto after_rvm_256x192
 
 :build_rvm_256x192
-python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_256x192.onnx --output models\rvm_mobilenetv3_256x192_b3.trt
-if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_256x192.onnx[0m
-if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_256x192_b3.trt[0m
+python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_256x192_b4.onnx --output models\rvm_mobilenetv3_256x192_b4.trt
+if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_256x192_b4.onnx[0m
+if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_256x192_b4.trt[0m
 :after_rvm_256x192
 
 rem rvm 384x288
-if not exist "models\rvm_mobilenetv3_384x288_b3.trt" goto build_rvm_384x288
+if not exist "models\rvm_mobilenetv3_384x288_b4.trt" goto build_rvm_384x288
 if "%FORCE_REBUILD%"=="1" goto build_rvm_384x288
-echo [90mSkipping rvm_mobilenetv3_384x288_b3.trt (already exists)[0m
+echo [90mSkipping rvm_mobilenetv3_384x288_b4.trt (already exists)[0m
 goto after_rvm_384x288
 
 :build_rvm_384x288
-python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_384x288.onnx --output models\rvm_mobilenetv3_384x288_b3.trt --height 384 --width 288
-if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_384x288.onnx[0m
-if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_384x288_b3.trt[0m
+python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_384x288_b4.onnx --output models\rvm_mobilenetv3_384x288_b4.trt --height 384 --width 288
+if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_384x288_b4.onnx[0m
+if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_384x288_b4.trt[0m
 :after_rvm_384x288
 
 rem rvm 512x384
-if not exist "models\rvm_mobilenetv3_512x384_b3.trt" goto build_rvm_512x384
+if not exist "models\rvm_mobilenetv3_512x384_b4.trt" goto build_rvm_512x384
 if "%FORCE_REBUILD%"=="1" goto build_rvm_512x384
-echo [90mSkipping rvm_mobilenetv3_512x384_b3.trt (already exists)[0m
+echo [90mSkipping rvm_mobilenetv3_512x384_b4.trt (already exists)[0m
 goto after_rvm_512x384
 
 :build_rvm_512x384
-python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_512x384.onnx --output models\rvm_mobilenetv3_512x384_b3.trt --height 512 --width 384
-if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_512x384.onnx[0m
-if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_512x384_b3.trt[0m
+python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_512x384_b4.onnx --output models\rvm_mobilenetv3_512x384_b4.trt --height 512 --width 384
+if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_512x384_b4.onnx[0m
+if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_512x384_b4.trt[0m
 :after_rvm_512x384
+
+rem rvm 1024x768
+if not exist "models\rvm_mobilenetv3_1024x768_b4.trt" goto build_rvm_1024x768
+if "%FORCE_REBUILD%"=="1" goto build_rvm_1024x768
+echo [90mSkipping rvm_mobilenetv3_1024x768_b4.trt (already exists)[0m
+goto after_rvm_1024x768
+
+:build_rvm_1024x768
+python modules\pose\batch\segmentation\export_rvm_onnx_to_trt.py --onnx models\rvm_mobilenetv3_1024x768_b4.onnx --output models\rvm_mobilenetv3_1024x768_b4.trt --height 1024 --width 768
+if %errorlevel% neq 0 echo [91mFailed to convert rvm_mobilenetv3_1024x768_b4.onnx[0m
+if %errorlevel%==0 echo [92mBuilt rvm_mobilenetv3_1024x768_b4.trt[0m
+:after_rvm_1024x768
+
+
 
 echo.
 echo [33mConverting RAFT optical flow models to TensorRT engines.[0m

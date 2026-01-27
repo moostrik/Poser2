@@ -14,6 +14,7 @@ class Resolution(IntEnum):
     STANDARD = 0
     HIGH = auto()
     ULTRA = auto()
+    EXTREME = auto()
 RESOLUTION_NAMES: list[str] = [e.name for e in Resolution]
 
 
@@ -25,11 +26,13 @@ MODEL_PATHS = {
             Resolution.STANDARD: "rtmpose-l_256x192.onnx",
             Resolution.HIGH: "rtmpose-l_384x288.onnx",
             Resolution.ULTRA: "rtmpose-l_384x288.onnx",  # Fallback
+            Resolution.EXTREME: "rtmpose-l_384x288.onnx",  # Fallback
         },
         'tensorrt': {
             Resolution.STANDARD: "rtmpose-l_256x192_b3.trt",
             Resolution.HIGH: "rtmpose-l_384x288_b3.trt",
             Resolution.ULTRA: "rtmpose-l_384x288_b3.trt",  # Fallback
+            Resolution.EXTREME: "rtmpose-l_384x288_b3.trt",  # Fallback
         }
     },
     # Segmentation models
@@ -38,11 +41,13 @@ MODEL_PATHS = {
             Resolution.STANDARD: "rvm_mobilenetv3_256x192_b4.onnx",
             Resolution.HIGH: "rvm_mobilenetv3_384x288_b4.onnx",
             Resolution.ULTRA: "rvm_mobilenetv3_512x384_b4.onnx",
+            Resolution.EXTREME: "rvm_mobilenetv3_1024x768_b4.onnx",
         },
         'tensorrt': {
             Resolution.STANDARD: "rvm_mobilenetv3_256x192_b4.trt",
             Resolution.HIGH: "rvm_mobilenetv3_384x288_b4.trt",
             Resolution.ULTRA: "rvm_mobilenetv3_512x384_b4.trt",
+            Resolution.EXTREME: "rvm_mobilenetv3_1024x768_b4.trt",
         }
     },
     # Flow models
@@ -51,11 +56,13 @@ MODEL_PATHS = {
             Resolution.STANDARD: "raft-sintel_256x192_i12.onnx",
             Resolution.HIGH: "raft-sintel_384x288_i12.onnx",
             Resolution.ULTRA: "raft-sintel_512x384_i12.onnx",
+            Resolution.EXTREME: "raft-sintel_1024x768_i12.onnx",
         },
         'tensorrt': {
             Resolution.STANDARD: "raft-sintel_256x192_i12_b3.trt",
             Resolution.HIGH: "raft-sintel_384x288_i12_b3.trt",
             Resolution.ULTRA: "raft-sintel_512x384_i12_b3.trt",
+            Resolution.EXTREME: "raft-sintel_1024x768_i12_b3.trt",
         }
     }
 }
@@ -65,6 +72,7 @@ RESOLUTION_DIMS = {
     Resolution.STANDARD: (192, 256),  # (width, height)
     Resolution.HIGH: (288, 384),
     Resolution.ULTRA: (384, 512),
+    Resolution.EXTREME: (768, 1024),
 }
 
 

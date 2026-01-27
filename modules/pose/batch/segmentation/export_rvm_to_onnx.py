@@ -2,14 +2,17 @@
 """Export RVM model to ONNX with TensorRT-compatible settings.
 
 Usage:
-    # Export RVM mobilenetv3 model at 256x192
+    # Export RVM mobilenetv3 model at 256x192 (STANDARD)
     python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_256x192_b4.onnx
 
-    # Export at custom resolution 384x288
+    # Export at custom resolution 384x288 (HIGH)
     python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_384x288_b4.onnx --height 384 --width 288
 
-    # Export at custom resolution 512x384
+    # Export at custom resolution 512x384 (ULTRA)
     python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_512x384_b4.onnx --height 512 --width 384
+
+    # Export at custom resolution 1024x768 (EXTREME)
+    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_1024x768_b4.onnx --height 1024 --width 768
 """
 import torch
 import sys
@@ -30,7 +33,7 @@ def export_rvm_to_onnx(
     variant: str = 'mobilenetv3',
     opset_version: int = 11,  # Lower opset avoids problematic Resize
     downsample_ratio: float = 1.0,
-    fp32: bool = False  # ← ADD THIS
+    fp32: bool = False  # FP32 seems to be faster in ONNX, but we want to build a FP16 TensorRT engine from it
 ):
     """Export RVM model to ONNX with fixed resolution (TensorRT-compatible).
 

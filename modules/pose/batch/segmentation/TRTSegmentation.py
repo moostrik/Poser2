@@ -242,17 +242,17 @@ class TRTSegmentation(Thread):
             # Determine model precision from 'src' input tensor
             src_dtype = self.engine.get_tensor_dtype('src')
             precision_map = {
-                trt.float32: "FP32",  # type: ignore
-                trt.float16: "FP16",  # type: ignore
-                trt.int8: "INT8",     # type: ignore
+                trt.DataType.FLOAT: "FP32",   # type: ignore
+                trt.DataType.HALF: "FP16",    # type: ignore
+                trt.DataType.INT8: "INT8",    # type: ignore
             }
             self.model_precision = precision_map.get(src_dtype, "UNKNOWN")
 
             # Map TensorRT dtype to CuPy dtype for buffer allocations
             dtype_to_cupy = {
-                trt.float32: cp.float32,  # type: ignore
-                trt.float16: cp.float16,  # type: ignore
-                trt.int8: cp.int8,        # type: ignore
+                trt.DataType.FLOAT: cp.float32, # type: ignore
+                trt.DataType.HALF: cp.float16,  # type: ignore
+                trt.DataType.INT8: cp.int8,     # type: ignore
             }
             self._model_dtype = dtype_to_cupy.get(src_dtype, cp.float16)  # Default to FP16
 
