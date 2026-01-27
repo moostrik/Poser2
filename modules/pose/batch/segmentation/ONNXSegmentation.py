@@ -34,6 +34,7 @@ class SegmentationOutput:
     tracklet_ids: list[int] = field(default_factory=list)  # Corresponding tracklet IDs
     processed: bool = True          # False if batch was dropped before processing
     inference_time_ms: float = 0.0  # For monitoring
+    lock_time_ms: float = 0.0       # Time spent waiting for lock
 
 
 SegmentationOutputCallback = Callable[[SegmentationOutput], None]

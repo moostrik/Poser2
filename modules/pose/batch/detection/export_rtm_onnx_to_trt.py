@@ -2,14 +2,12 @@
 """Convert RTMPose ONNX models to TensorRT engines.
 
 Usage:
-    # Convert RTMPose-L 256x192 with batch 3 (FP32 default)
+    # Convert RTMPose-L 256x192 with batch 3 (FP16 default)
     python modules/pose/batch/detection/export_rtm_onnx_to_trt.py --onnx models/rtmpose-l_256x192.onnx --output models/rtmpose-l_256x192_b3.trt
 
     # Convert 384x288 model with batch 3
     python modules/pose/batch/detection/export_rtm_onnx_to_trt.py --onnx models/rtmpose-l_384x288.onnx --output models/rtmpose-l_384x288_b3.trt --height 384 --width 288
 
-    # Use FP16 for faster inference (may affect accuracy)
-    python modules/pose/batch/detection/export_rtm_onnx_to_trt.py --onnx models/rtmpose-l_256x192.onnx --output models/rtmpose-l_256x192_b3.trt --fp16
 """
 
 import tensorrt as trt
@@ -40,7 +38,7 @@ def convert_rtmpose_to_tensorrt(
         min_batch: Minimum batch size
         opt_batch: Optimal batch size (used for optimization)
         max_batch: Maximum batch size (set to opt_batch if never exceeded)
-        fp16: Enable FP16 precision
+        fp16: Enable FP16 precision (SimCC outputs stay FP32 for precision)
         workspace_gb: Workspace size in GB
 
     Returns:
@@ -53,7 +51,7 @@ def convert_rtmpose_to_tensorrt(
     print(f"  Output:     {output_path}")
     print(f"  Resolution: {height}×{width}")
     print(f"  Batch:      min={min_batch}, opt={opt_batch}, max={max_batch}")
-    print(f"  Precision:  {'FP16' if fp16 else 'FP32'}")
+    print(f"  Precision:  {'FP16 (SimCC outputs FP32)' if fp16 else 'FP32'}")
     print(f"  Workspace:  {workspace_gb} GB")
     print(f"{'═'*70}\n")
 
@@ -113,10 +111,19 @@ def convert_rtmpose_to_tensorrt(
     config.add_optimization_profile(profile)
     print(f"  ├─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
 
-    # Enable FP16 if requested
+    # Enable FP16 if requested (SimCC outputs stay FP32 automatically)
     if fp16:
         config.set_flag(trt.BuilderFlag.FP16)
-        print(f"  └─ FP16 enabled ✓")
+
+        # Mark SimCC output layers as FP32 for precision
+        # TensorRT will automatically keep these in FP32 even with FP16 enabled
+        for i in range(network.num_outputs):
+            out = network.get_output(i)
+            if 'simcc' in out.name:
+                out.dtype = trt.float32
+                print(f"  ├─ Keeping {out.name} in FP32 for precision")
+
+        print(f"  └─ FP16 enabled (internal layers only) ✓")
     else:
         print(f"  └─ Using FP32")
 
@@ -182,8 +189,8 @@ if __name__ == '__main__':
                         help='Optimal batch size for optimization (default: 3)')
     parser.add_argument('--max-batch', type=int, default=4,
                         help='Maximum batch size (default: 4, set to opt-batch if never exceeded)')
-    parser.add_argument('--fp16', action='store_true',
-                        help='Use FP16 precision instead of FP32 (default: FP32)')
+    parser.add_argument('--fp32', action='store_true',
+                        help='Use FP32 precision instead of FP16 (default: FP16)')
     parser.add_argument('--workspace', type=int, default=8,
                         help='Workspace size in GB (default: 8)')
 
@@ -197,7 +204,7 @@ if __name__ == '__main__':
         args.min_batch,
         args.opt_batch,
         args.max_batch,
-        args.fp16,
+        not args.fp32,  # fp16 = not fp32 (default FP16)
         args.workspace
     )
 

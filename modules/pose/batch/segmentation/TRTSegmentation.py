@@ -50,7 +50,7 @@ class TRTSegmentation(Thread):
 
         self.enabled: bool = settings.segmentation_enabled
         if not self.enabled:
-            print('TensorRT Segmentation WARNING: Segmentation is disabled')
+            print('TRT RVM Segmentation WARNING: Segmentation is disabled')
 
         self.model_path: str = settings.model_path
         self.model_name: str = settings.segmentation_model
@@ -140,7 +140,7 @@ class TRTSegmentation(Thread):
         self.join(timeout=2.0)
 
         if self.is_alive():
-            print("Warning: TensorRT Segmentation inference thread did not stop cleanly")
+            print("Warning: TRT RVM Segmentation inference thread did not stop cleanly")
 
         # Wake up callback thread with sentinel
         try:
@@ -150,7 +150,7 @@ class TRTSegmentation(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            print("Warning: TensorRT Segmentation callback thread did not stop cleanly")
+            print("Warning: TRT RVM Segmentation callback thread did not stop cleanly")
 
     def run(self) -> None:
         """Main inference thread loop. Initializes TensorRT engine and processes batches."""
@@ -159,13 +159,13 @@ class TRTSegmentation(Thread):
             with get_init_lock():
                 runtime = get_tensorrt_runtime()
 
-                print(f"TensorRT Segmentation: Loading engine from {self.model_file}")
+                # print(f"TensorRT Segmentation: Loading engine from {self.model_file}")
                 with open(self.model_file, 'rb') as f:
                     engine_data = f.read()
 
                 self.engine = runtime.deserialize_cuda_engine(engine_data)
                 if self.engine is None:
-                    print("TensorRT Segmentation ERROR: Failed to load engine")
+                    print("TRT RVM Segmentation ERROR: Failed to load engine")
                     return
 
                 self.context = self.engine.create_execution_context()
@@ -194,30 +194,47 @@ class TRTSegmentation(Thread):
 
             # Expected: 5 inputs (src, r1i-r4i), 6 outputs (fgr, pha, r1o-r4o)
             if len(self.input_names) != 5:
-                print(f"TensorRT Segmentation ERROR: Expected 5 inputs, got {len(self.input_names)}")
+                print(f"TRT RVM Segmentation ERROR: Expected 5 inputs, got {len(self.input_names)}")
                 return
 
             if len(self.output_names) != 6:
-                print(f"TensorRT Segmentation ERROR: Expected 6 outputs, got {len(self.output_names)}")
+                print(f"TRT RVM Segmentation ERROR: Expected 6 outputs, got {len(self.output_names)}")
                 return
+
+            # Determine model precision from 'src' input tensor
+            src_dtype = self.engine.get_tensor_dtype('src')
+            precision_map = {
+                trt.float32: "FP32",  # type: ignore
+                trt.float16: "FP16",  # type: ignore
+                trt.int8: "INT8",     # type: ignore
+            }
+            self.model_precision = precision_map.get(src_dtype, "UNKNOWN")
+
+            # Map TensorRT dtype to CuPy dtype for buffer allocations
+            dtype_to_cupy = {
+                trt.float32: cp.float32,  # type: ignore
+                trt.float16: cp.float16,  # type: ignore
+                trt.int8: cp.int8,        # type: ignore
+            }
+            self._model_dtype = dtype_to_cupy.get(src_dtype, cp.float16)  # Default to FP16
 
             # Clear any existing states
             with self._state_lock:
                 self._recurrent_states.clear()
 
             # Preallocate zero recurrent states (read-only, shared across all new tracklets)
-            self._zero_r1 = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16)
-            self._zero_r2 = cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16)
-            self._zero_r3 = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16)
-            self._zero_r4 = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16)
+            self._zero_r1 = cp.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=self._model_dtype)
+            self._zero_r2 = cp.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=self._model_dtype)
+            self._zero_r3 = cp.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=self._model_dtype)
+            self._zero_r4 = cp.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype)
 
             # Preallocate input buffers per worker (for single-image fallback)
             self._input_buffers = []
             for _ in range(self._max_workers):
                 self._input_buffers.append({
                     'img_uint8': cp.empty((self.model_height, self.model_width, 3), dtype=cp.uint8),
-                    'img_float': cp.empty((self.model_height, self.model_width, 3), dtype=cp.float16),
-                    'src': cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float16),
+                    'img_float': cp.empty((self.model_height, self.model_width, 3), dtype=self._model_dtype),
+                    'src': cp.empty((1, 3, self.model_height, self.model_width), dtype=self._model_dtype),
                 })
 
             # Preallocate BATCHED buffers for true batch inference (inputs only)
@@ -225,22 +242,22 @@ class TRTSegmentation(Thread):
             self._max_batch = self._max_workers  # Match max batch to max workers
             self._batch_buffers = {
                 'img_uint8': cp.empty((self._max_batch, self.model_height, self.model_width, 3), dtype=cp.uint8),
-                'src': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=cp.float16),
+                'src': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=self._model_dtype),
                 # Batched recurrent state INPUT buffers
-                'r1i': cp.empty((self._max_batch, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16),
-                'r2i': cp.empty((self._max_batch, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16),
-                'r3i': cp.empty((self._max_batch, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16),
-                'r4i': cp.empty((self._max_batch, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16),
+                'r1i': cp.empty((self._max_batch, 16, self.model_height // 2, self.model_width // 2), dtype=self._model_dtype),
+                'r2i': cp.empty((self._max_batch, 20, self.model_height // 4, self.model_width // 4), dtype=self._model_dtype),
+                'r3i': cp.empty((self._max_batch, 40, self.model_height // 8, self.model_width // 8), dtype=self._model_dtype),
+                'r4i': cp.empty((self._max_batch, 64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype),
             }
 
             # Create thread pool for parallel inference
             self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="TRT-RVM-Worker")
 
             self._model_ready.set()
-            print(f"TensorRT Segmentation: {self.resolution_name} model loaded ({self.model_width}x{self.model_height}) with {self._max_workers} workers")
+            print(f"TRT RVM Segmentation: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
         except Exception as e:
-            print(f"TensorRT Segmentation Error: Failed to load model - {str(e)}")
+            print(f"TRT RVM Segmentation Error: Failed to load model - {str(e)}")
             traceback.print_exc()
             return
 
@@ -256,7 +273,7 @@ class TRTSegmentation(Thread):
                 self._process_pending_batch()
 
             except Exception as e:
-                print(f"TensorRT Segmentation Error: {str(e)}")
+                print(f"TRT RVM Segmentation Error: {str(e)}")
                 traceback.print_exc()
 
     def submit_batch(self, input_batch: SegmentationInput) -> None:
@@ -276,7 +293,7 @@ class TRTSegmentation(Thread):
             if self._pending_batch is not None:
                 dropped_batch = self._pending_batch
                 lag = int((time.time() - self._input_timestamp) * 1000)
-                print(f"TensorRT Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                print(f"TRT RVM Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -320,7 +337,7 @@ class TRTSegmentation(Thread):
         # Periodic state reset as failsafe (0=disabled)
         if self._state_reset_interval > 0 and self._frame_counter % self._state_reset_interval == 0:
             if self.verbose:
-                print(f"TensorRT Segmentation: Periodic state reset at frame {self._frame_counter}")
+                print(f"TRT RVM Segmentation: Periodic state reset at frame {self._frame_counter}")
             self.clear_all_states()
 
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
@@ -332,41 +349,31 @@ class TRTSegmentation(Thread):
             tracklets_to_process = batch.tracklet_ids[:self._max_batch]
 
             try:
-                if self._use_batched_inference:
-                    # TRUE BATCHING: Single TensorRT call for all tracklets
-                    mask_tensor, inference_time_ms = self._infer_batch(images_to_process, tracklets_to_process)
-                else:
-                    # SINGLE-IMAGE MODE: Process one at a time (for comparison)
-                    mask_list: list[torch.Tensor] = []
-                    inference_times: list[float] = []
-                    for i, (img, tid) in enumerate(zip(images_to_process, tracklets_to_process)):
-                        mask, inf_time = self._infer_single_image(img, tid, i % len(self._input_buffers))
-                        mask_list.append(mask)
-                        inference_times.append(inf_time)
-                    mask_tensor = torch.stack(mask_list) if mask_list else torch.empty(0, dtype=torch.float32, device='cuda')
-                    inference_time_ms = sum(inference_times)
+                mask_tensor, inference_time_ms, lock_wait_ms = self._infer_batch(images_to_process, tracklets_to_process)
             except Exception as e:
-                print(f"TensorRT Segmentation Error: Batched inference failed: {str(e)}")
+                print(f"TRT RVM Segmentation Error: Batched inference failed: {str(e)}")
                 traceback.print_exc()
                 # Fallback to empty result
                 mask_tensor = torch.empty(0, dtype=torch.float32, device='cuda')
                 inference_time_ms = 0.0
+                lock_wait_ms = 0.0
 
             output = SegmentationOutput(
                 batch_id=batch.batch_id,
                 mask_tensor=mask_tensor,
                 tracklet_ids=batch.tracklet_ids,
                 processed=True,
-                inference_time_ms=inference_time_ms
+                inference_time_ms=inference_time_ms,
+                lock_time_ms=lock_wait_ms
             )
 
         # Queue for callbacks
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            print("TensorRT Segmentation Warning: Callback queue full, dropping inference results")
+            print("TRT RVM Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_batch(self, images: list[np.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, float]:
+    def _infer_batch(self, images: list[np.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, float, float]:
         """Run RVM TensorRT inference on BATCH of images with per-tracklet recurrent states.
 
         This is more efficient than calling _infer_single_image multiple times because:
@@ -379,17 +386,19 @@ class TRTSegmentation(Thread):
             tracklet_ids: List of tracklet IDs (same length as images)
 
         Returns:
-            Tuple of (alpha matte tensor (B, H, W) FP32 on CUDA [0, 1], inference_time_ms)
+            Tuple of (alpha matte tensor (B, H, W) FP32 on CUDA [0, 1], process_time_ms, lock_wait_ms)
         """
         batch_size = len(images)
         if batch_size == 0:
-            return torch.empty(0, dtype=torch.float32, device='cuda'), 0.0
+            return torch.empty(0, dtype=torch.float32, device='cuda'), 0.0, 0.0
 
         # Clamp to max batch size
         if batch_size > self._max_batch:
             batch_size = self._max_batch
             images = images[:batch_size]
             tracklet_ids = tracklet_ids[:batch_size]
+
+        method_start: float = time.perf_counter()
 
         # Gather recurrent states for all tracklets (before acquiring lock)
         states: list[RecurrentState | None] = []
@@ -398,9 +407,9 @@ class TRTSegmentation(Thread):
                 states.append(self._recurrent_states.get(tid))
 
         # Run batched inference with global lock
-        call_start = time.perf_counter()  # Start before lock for true latency
+        lock_wait_start: float = time.perf_counter()
         with get_exec_lock():
-            lock_acquired = time.perf_counter()
+            lock_acquired: float = time.perf_counter()
 
             # Get batched INPUT buffers (sliced to actual batch size)
             buf = self._batch_buffers
@@ -415,8 +424,8 @@ class TRTSegmentation(Thread):
                 # OPTIMIZED: Stack images on CPU first, single transfer to GPU
                 buf['img_uint8'][:batch_size].set(stacked_imgs)
 
-                # Vectorized BGR->RGB, uint8->float16, normalize (operates on full batch)
-                img_float_batch = (buf['img_uint8'][:batch_size, :, :, ::-1] / 255.0).astype(cp.float16)
+                # Vectorized BGR->RGB, uint8->float, normalize (operates on full batch)
+                img_float_batch = (buf['img_uint8'][:batch_size, :, :, ::-1] / 255.0).astype(self._model_dtype)
 
                 # Vectorized transpose HWC -> CHW for full batch
                 src_gpu[:] = cp.ascontiguousarray(cp.transpose(img_float_batch, (0, 3, 1, 2)))
@@ -437,12 +446,12 @@ class TRTSegmentation(Thread):
 
             # Allocate FRESH output buffers (avoids .copy() in postprocess)
             # CuPy memory pool makes this fast, and we keep these directly
-            fgr_gpu = cp.empty((batch_size, 3, self.model_height, self.model_width), dtype=cp.float16)
-            pha_gpu = cp.empty((batch_size, 1, self.model_height, self.model_width), dtype=cp.float16)
-            r1o_gpu = cp.empty((batch_size, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16)
-            r2o_gpu = cp.empty((batch_size, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16)
-            r3o_gpu = cp.empty((batch_size, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16)
-            r4o_gpu = cp.empty((batch_size, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16)
+            fgr_gpu = cp.empty((batch_size, 3, self.model_height, self.model_width), dtype=self._model_dtype)
+            pha_gpu = cp.empty((batch_size, 1, self.model_height, self.model_width), dtype=self._model_dtype)
+            r1o_gpu = cp.empty((batch_size, 16, self.model_height // 2, self.model_width // 2), dtype=self._model_dtype)
+            r2o_gpu = cp.empty((batch_size, 20, self.model_height // 4, self.model_width // 4), dtype=self._model_dtype)
+            r3o_gpu = cp.empty((batch_size, 40, self.model_height // 8, self.model_width // 8), dtype=self._model_dtype)
+            r4o_gpu = cp.empty((batch_size, 64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype)
 
             # Set batched input shapes
             self.context.set_input_shape('src', (batch_size, 3, self.model_height, self.model_width))
@@ -464,14 +473,11 @@ class TRTSegmentation(Thread):
             self.context.set_tensor_address('r3o', r3o_gpu.data.ptr)
             self.context.set_tensor_address('r4o', r4o_gpu.data.ptr)
 
-            preprocess_done = time.perf_counter()
-
             # Execute batched inference (no sync needed before - TensorRT waits for stream)
             with self.stream:
                 self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
 
-            inference_done = time.perf_counter()
 
             # Split output states - NO COPY needed, buffers are fresh allocations
             new_states: list[RecurrentState] = []
@@ -486,183 +492,18 @@ class TRTSegmentation(Thread):
             # Convert batched pha to PyTorch tensor
             pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(1).float()  # (B, H, W)
 
-            postprocess_done = time.perf_counter()
-            total_ms: float = (postprocess_done - call_start) * 1000.0  # Include lock wait
-
-            # Timing breakdown
-            lock_wait_ms = (lock_acquired - call_start) * 1000.0
-            preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
-            inference_ms = (inference_done - preprocess_done) * 1000.0
-            postprocess_ms = (postprocess_done - inference_done) * 1000.0
-
-            # Accumulate for periodic reporting
-            self._profile_lock_wait += lock_wait_ms
-            self._profile_preprocess += preprocess_ms
-            self._profile_inference += inference_ms
-            self._profile_postprocess += postprocess_ms
-            self._profile_count += 1
-
-            if self._profile_count >= self._profile_interval:
-                n = self._profile_count
-                print(f"TRT Segmentation avg ({n} batches): "
-                      f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
-                      f"preprocess={self._profile_preprocess/n:.2f}ms, "
-                      f"inference={self._profile_inference/n:.2f}ms, "
-                      f"postprocess={self._profile_postprocess/n:.2f}ms, "
-                      f"total={(self._profile_lock_wait + self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
-                self._profile_count = 0
-                self._profile_lock_wait = 0.0
-                self._profile_preprocess = 0.0
-                self._profile_inference = 0.0
-                self._profile_postprocess = 0.0
-
         # Update recurrent states for all tracklets
         with self._state_lock:
             for tid, new_state in zip(tracklet_ids, new_states):
                 self._recurrent_states[tid] = new_state
 
-        return pha_tensor, total_ms
+        method_end = time.perf_counter()
 
-    def _infer_single_image(self, img: np.ndarray, tracklet_id: int, buffer_idx: int) -> tuple[torch.Tensor, float]:
-        """Run RVM TensorRT inference on single image with per-tracklet recurrent state.
+        lock_wait_ms = (lock_acquired - lock_wait_start) * 1000.0
+        total_time_ms = (method_end - method_start) * 1000.0
+        process_time_ms = total_time_ms - lock_wait_ms
 
-        Args:
-            img: Input image (H, W, 3) BGR uint8
-            tracklet_id: Unique identifier for tracking temporal state
-            buffer_idx: Index into preallocated buffers for this worker
-
-        Returns:
-            Tuple of (alpha matte tensor (H, W) FP32 on CUDA [0, 1], inference_time_ms)
-        """
-
-        # Get or initialize recurrent state for this tracklet (before acquiring lock)
-        with self._state_lock:
-            state = self._recurrent_states.get(tracklet_id)
-
-        # Run inference with global lock to prevent race conditions
-        # ALL GPU operations inside lock for maximum stability
-        call_start = time.perf_counter()  # Start before lock for true latency
-        with get_exec_lock():
-            # Start timing after acquiring lock (excludes wait time)
-            lock_acquired = time.perf_counter()
-
-            # Get preallocated buffers for this worker
-            buffers = self._input_buffers[buffer_idx]
-            img_uint8_gpu = buffers['img_uint8']
-            img_float_gpu = buffers['img_float']
-            src_gpu = buffers['src']
-
-            # All CuPy operations on same stream as TensorRT
-            with self.stream:
-                # Copy input directly to preallocated uint8 buffer (no intermediate allocation)
-                img_uint8_gpu.set(img)
-
-                # BGR to RGB (in-place view flip, then copy to float16 buffer)
-                img_float_gpu[:] = img_uint8_gpu[:, :, ::-1].astype(cp.float16)
-                # Normalize and transpose to CHW, write directly to src buffer
-                img_float_gpu /= 255.0
-                src_gpu[0] = cp.ascontiguousarray(cp.transpose(img_float_gpu, (2, 0, 1)))
-
-                # Prepare recurrent state inputs
-                if state is not None:
-                    # States are already CuPy arrays on GPU - use directly
-                    r1_gpu = state.r1
-                    r2_gpu = state.r2
-                    r3_gpu = state.r3
-                    r4_gpu = state.r4
-                else:
-                    # Use shared zero states for first frame (read-only)
-                    r1_gpu = self._zero_r1
-                    r2_gpu = self._zero_r2
-                    r3_gpu = self._zero_r3
-                    r4_gpu = self._zero_r4
-
-            # Set input shapes (must be inside lock!)
-            self.context.set_input_shape('src', src_gpu.shape)
-            self.context.set_input_shape('r1i', r1_gpu.shape)
-            self.context.set_input_shape('r2i', r2_gpu.shape)
-            self.context.set_input_shape('r3i', r3_gpu.shape)
-            self.context.set_input_shape('r4i', r4_gpu.shape)
-
-            # Allocate fresh output buffers (CuPy memory pool handles caching)
-            # These are kept directly without copying - no preallocation needed
-            fgr_gpu = cp.empty((1, 3, self.model_height, self.model_width), dtype=cp.float16)
-            pha_gpu = cp.empty((1, 1, self.model_height, self.model_width), dtype=cp.float16)
-            r1o_gpu = cp.empty((1, 16, self.model_height // 2, self.model_width // 2), dtype=cp.float16)
-            r2o_gpu = cp.empty((1, 20, self.model_height // 4, self.model_width // 4), dtype=cp.float16)
-            r3o_gpu = cp.empty((1, 40, self.model_height // 8, self.model_width // 8), dtype=cp.float16)
-            r4o_gpu = cp.empty((1, 64, self.model_height // 16, self.model_width // 16), dtype=cp.float16)
-
-            # Set tensor addresses
-            self.context.set_tensor_address('src', src_gpu.data.ptr)
-            self.context.set_tensor_address('r1i', r1_gpu.data.ptr) # type: ignore
-            self.context.set_tensor_address('r2i', r2_gpu.data.ptr) # type: ignore
-            self.context.set_tensor_address('r3i', r3_gpu.data.ptr) # type: ignore
-            self.context.set_tensor_address('r4i', r4_gpu.data.ptr) # type: ignore
-            self.context.set_tensor_address('fgr', fgr_gpu.data.ptr)
-            self.context.set_tensor_address('pha', pha_gpu.data.ptr)
-            self.context.set_tensor_address('r1o', r1o_gpu.data.ptr)
-            self.context.set_tensor_address('r2o', r2o_gpu.data.ptr)
-            self.context.set_tensor_address('r3o', r3o_gpu.data.ptr)
-            self.context.set_tensor_address('r4o', r4o_gpu.data.ptr)
-
-            # Sync to measure preprocessing time (includes setup)
-            self.stream.synchronize()
-            preprocess_done = time.perf_counter()
-
-            # Execute inference
-            with self.stream:
-                self.context.execute_async_v3(stream_handle=self.stream.ptr)
-            self.stream.synchronize()
-
-            inference_done = time.perf_counter()
-
-            # Keep output buffers directly (no copy needed - they're fresh allocations)
-            new_state = RecurrentState(
-                r1=r1o_gpu,
-                r2=r2o_gpu,
-                r3=r3o_gpu,
-                r4=r4o_gpu
-            )
-
-            # Convert CuPy array to PyTorch tensor (no clone needed - buffer is owned)
-            pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(0).squeeze(0)
-
-            postprocess_done = time.perf_counter()
-
-            # Calculate timing breakdown
-            lock_wait_ms = (lock_acquired - call_start) * 1000.0
-            preprocess_ms = (preprocess_done - lock_acquired) * 1000.0
-            inference_ms = (inference_done - preprocess_done) * 1000.0
-            postprocess_ms = (postprocess_done - inference_done) * 1000.0
-            total_ms = (postprocess_done - call_start) * 1000.0  # Include lock wait
-
-            # Accumulate for periodic reporting
-            self._profile_lock_wait += lock_wait_ms
-            self._profile_preprocess += preprocess_ms
-            self._profile_inference += inference_ms
-            self._profile_postprocess += postprocess_ms
-            self._profile_count += 1
-
-            if self._profile_count >= self._profile_interval:
-                n = self._profile_count
-                print(f"TensorRT Segmentation avg ({n} frames): "
-                      f"lock_wait={self._profile_lock_wait/n:.2f}ms, "
-                      f"preprocess={self._profile_preprocess/n:.2f}ms, "
-                      f"inference={self._profile_inference/n:.2f}ms, "
-                      f"postprocess={self._profile_postprocess/n:.2f}ms, "
-                      f"total={(self._profile_lock_wait + self._profile_preprocess + self._profile_inference + self._profile_postprocess)/n:.2f}ms")
-                self._profile_count = 0
-                self._profile_lock_wait = 0.0
-                self._profile_preprocess = 0.0
-                self._profile_inference = 0.0
-                self._profile_postprocess = 0.0
-
-        # Update recurrent states for next frame (now safe - we have copies)
-        with self._state_lock:
-            self._recurrent_states[tracklet_id] = new_state
-
-        return pha_tensor, total_ms
+        return pha_tensor, process_time_ms, lock_wait_ms
 
     def clear_tracklet_state(self, tracklet_id: int) -> None:
         """Clear recurrent state for a specific tracklet (e.g., when person leaves frame)."""
@@ -677,14 +518,14 @@ class TRTSegmentation(Thread):
         with self._state_lock:
             self._recurrent_states.clear()
             if self.verbose:
-                print("TensorRT Segmentation: Cleared all recurrent states")
+                print("TRT RVM Segmentation: Cleared all recurrent states")
 
     def _callback_worker_loop(self) -> None:
         """Dispatch queued results to registered callbacks. Runs on separate thread."""
         while not self._shutdown_event.is_set():
             try:
                 if self._callback_queue.qsize() > 1:
-                    print("TensorRT Segmentation Warning: Callback queue size > 1, consumers may be falling behind")
+                    print("TRT RVM Segmentation Warning: Callback queue size > 1, consumers may be falling behind")
 
                 output: SegmentationOutput | None = self._callback_queue.get(timeout=0.5)
 
