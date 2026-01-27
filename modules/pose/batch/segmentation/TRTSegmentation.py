@@ -185,11 +185,6 @@ class TRTSegmentation(Thread):
 
         self._notify_update_event.set()
 
-    def register_callback(self, callback: SegmentationOutputCallback) -> None:
-        """Register callback to receive segmentation results (success and dropped batches)."""
-        with self._callback_lock:
-            self._callbacks.add(callback)
-
     def _setup(self) -> None:
         """Initialize TensorRT engine, context, and buffers. Called from run()."""
         try:
@@ -462,7 +457,23 @@ class TRTSegmentation(Thread):
         total_time_ms = (method_end - method_start) * 1000.0
         process_time_ms = total_time_ms - lock_wait_ms
 
+        # DEBUG: Print actual lock wait time
+        if lock_wait_ms > 0.001:  # Only print if > 1 microsecond
+            print(f"TRT Segmentation lock wait: {lock_wait_ms:.4f}ms")
+
         return pha_tensor, fgr_tensor, process_time_ms, lock_wait_ms
+
+    # CALLBACK METHODS
+    def register_callback(self, callback: SegmentationOutputCallback) -> None:
+        """Register callback to receive segmentation results (success and dropped batches)."""
+        with self._callback_lock:
+            self._callbacks.add(callback)
+
+    def unregister_callback(self, callback: SegmentationOutputCallback) -> None:
+        """Unregister previously registered callback."""
+        with self._callback_lock:
+            if callback in self._callbacks:
+                self._callbacks.remove(callback)
 
     def _callback_worker_loop(self) -> None:
         """Dispatch queued results to registered callbacks on dedicated thread."""
