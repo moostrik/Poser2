@@ -22,7 +22,7 @@ IMAGENET_MEAN = np.array([123.675, 116.28, 103.53], dtype=np.float32).reshape(1,
 IMAGENET_STD = np.array([58.395, 57.12, 57.375], dtype=np.float32).reshape(1, 3, 1, 1)
 
 
-class TensorRTDetection(Thread):
+class TRTDetection(Thread):
     """Asynchronous GPU pose detection using TensorRT.
 
     Optimized inference using TensorRT engines for maximum performance.
@@ -334,7 +334,7 @@ class TensorRTDetection(Thread):
             simcc_y_cpu = cp.asnumpy(output1_gpu)
 
         # Decode on CPU (outside lock - no GPU resource needed)
-        keypoints, scores = TensorRTDetection._decode_simcc_cpu(simcc_x_cpu, simcc_y_cpu, self.simcc_split_ratio)
+        keypoints, scores = TRTDetection._decode_simcc_cpu(simcc_x_cpu, simcc_y_cpu, self.simcc_split_ratio)
 
         postprocess_done = time.perf_counter()
         total_ms = (postprocess_done - call_start) * 1000.0  # Include lock wait
