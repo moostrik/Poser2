@@ -11,6 +11,9 @@ Usage:
     # Export RAFT Sintel model at 384x288
     python modules/pose/batch/flow/export_raft_to_onnx.py --checkpoint models/base/raft-sintel.pth --output models/raft-sintel_384x288_i12.onnx --height 384 --width 288
 
+    # Export at 512x384
+    python modules/pose/batch/flow/export_raft_to_onnx.py --checkpoint models/base/raft-sintel.pth --output models/raft-sintel_512x384_i12.onnx --height 512 --width 384
+
     # Export at 512x384 with 6 iterations
     python modules/pose/batch/flow/export_raft_to_onnx.py --checkpoint models/base/raft-sintel.pth --output models/raft-sintel_512x384_i6.onnx --height 512 --width 384 --iters 6
 """
@@ -20,6 +23,15 @@ import argparse
 from pathlib import Path
 import sys
 import time
+
+# Add RAFT to path (must be imported as package to support relative imports)
+sys.path.insert(0, 'models/base/raft')
+try:
+    from core.raft import RAFT
+except ImportError:
+    print("❌ ERROR: Cannot import RAFT from models/base/raft/core")
+    print("   Ensure RAFT core module exists at: models/base/raft/core/raft.py")
+    sys.exit(1)
 
 
 # ============================================================================
@@ -44,6 +56,10 @@ class RAFTModelWrapper(torch.nn.Module):
         Returns:
             flow: Optical flow [B, 2, H, W] where flow[:, 0] is x-flow, flow[:, 1] is y-flow
         """
+        # Ensure inputs match model dtype (important for FP16)
+        image1 = image1.to(dtype=next(self.raft.parameters()).dtype)
+        image2 = image2.to(dtype=next(self.raft.parameters()).dtype)
+
         # Run with test_mode=True which returns (low_res_flow, upsampled_flow)
         flow = self.raft(image1, image2, iters=self.iters, test_mode=True)
         # test_mode returns tuple: (coords1 - coords0, flow_up)
@@ -53,150 +69,10 @@ class RAFTModelWrapper(torch.nn.Module):
         return flow
 
 
-def load_raft_model(checkpoint_path: str, device: str = 'cuda:0', small: bool = False):
-    """Load RAFT model from checkpoint.
-
-    Args:
-        checkpoint_path: Path to RAFT .pth checkpoint
-        device: Device to load model on
-        small: Whether to use RAFT-Small architecture
-
-    Returns:
-        Loaded RAFT model
-    """
-    print(f"\n{'─'*60}")
-    print(f"📦 LOADING MODEL")
-    print(f"{'─'*60}")
-
-    # Add RAFT to path
-    print(f"  ├─ Adding RAFT to Python path...", end='', flush=True)
-    raft_path = Path("c:/Developer/RAFT")
-    raft_core_path = raft_path / "core"
-
-    if not raft_path.exists():
-        print(f" ✗")
-        print(f"\n❌ ERROR: RAFT directory not found at {raft_path}")
-        print(f"   Clone with: git clone https://github.com/princeton-vl/RAFT.git c:/Developer/RAFT")
-        return False
-
-    # Add both RAFT root and core directory
-    if str(raft_path) not in sys.path:
-        sys.path.insert(0, str(raft_path))
-    if str(raft_core_path) not in sys.path:
-        sys.path.insert(0, str(raft_core_path))
-    print(f"  ├─ Importing RAFT from repository...", end='', flush=True)
-    try:
-        from core.raft import RAFT
-        print(f" ✓")
-    except ImportError as e:
-        print(f" ✗")
-        print(f"\n❌ ERROR: Cannot import RAFT")
-        print(f"   Error: {e}")
-        print(f"\n   Diagnostics:")
-        print(f"   - RAFT path exists: {raft_path.exists()}")
-        print(f"   - RAFT path added to sys.path: {str(raft_path) in sys.path}")
-        print(f"   - Looking for: {raft_path / 'core' / 'raft.py'}")
-        print(f"   - File exists: {(raft_path / 'core' / 'raft.py').exists()}")
-        print(f"   - Directory contents:")
-        if raft_path.exists():
-            for item in sorted(raft_path.iterdir())[:10]:
-                print(f"      - {item.name}")
-        print(f"\n   Try running in terminal:")
-        print(f"   cd c:\\Developer\\RAFT")
-        print(f"   dir core\\raft.py")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
-        print(f"\n   Current sys.path:")
-        for p in sys.path[:5]:
-            print(f"     - {p}")
-        if len(sys.path) > 5:
-            print(f"     ... ({len(sys.path)-5} more)")
-        return False
-
-    # Create model
-    print(f"  ├─ Creating RAFT architecture...", end='', flush=True)
-    start = time.time()
-
-    # Create args object for RAFT using argparse.Namespace for compatibility
-    from argparse import Namespace
-    args = Namespace(
-        small=small,
-        mixed_precision=False,
-        alternate_corr=False
-    )
-
-    model = RAFT(args)
-    print(f" ✓ ({time.time()-start:.2f}s)")
-
-    # Verify checkpoint file
-    print(f"  ├─ Checking checkpoint file...", end='', flush=True)
-    checkpoint_path_obj = Path(checkpoint_path)
-    if not checkpoint_path_obj.exists():
-        print(f" ✗")
-        print(f"\n❌ ERROR: Checkpoint file not found!")
-        print(f"   Path: {checkpoint_path_obj.absolute()}")
-        return False
-    file_size_mb = checkpoint_path_obj.stat().st_size / 1024 / 1024
-    print(f" ✓ ({file_size_mb:.1f} MB)")
-
-    # Load checkpoint
-    print(f"  ├─ Loading checkpoint...", end='', flush=True)
-    start = time.time()
-    checkpoint = torch.load(checkpoint_path, map_location=device)
-    load_time = time.time() - start
-    print(f" ✓ ({load_time:.2f}s)")
-
-    # Extract state dict
-    if isinstance(checkpoint, dict):
-        if 'state_dict' in checkpoint:
-            state_dict = checkpoint['state_dict']
-            print(f"  │  └─ Using checkpoint['state_dict']")
-        else:
-            state_dict = checkpoint
-            print(f"  │  └─ Using checkpoint directly ({list(checkpoint.keys())[0] if checkpoint else 'empty'}...)")
-    else:
-        state_dict = checkpoint
-        print(f"  │  └─ Direct state dict")
-
-    # Clean keys
-    original_key = list(state_dict.keys())[0] if state_dict else ''
-    state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
-    new_key = list(state_dict.keys())[0] if state_dict else ''
-
-    if original_key != new_key:
-        print(f"  │  └─ Removed 'module.' prefix from keys")
-
-    print(f"  │     ({len(state_dict)} parameters)")
-
-    # Load weights into model
-    print(f"  ├─ Loading weights into model...", end='', flush=True)
-    start = time.time()
-    try:
-        model.load_state_dict(state_dict)
-        print(f" ✓ ({time.time()-start:.2f}s)")
-    except Exception as e:
-        print(f" ✗")
-        print(f"\n❌ ERROR: Failed to load weights: {e}")
-        raise
-
-    # Move to device
-    print(f"  └─ Moving to {device}...", end='', flush=True)
-    start = time.time()
-    model = model.to(device)
-    model.eval()
-    print(f" ✓ ({time.time()-start:.2f}s)")
-
-    print(f"{'─'*60}")
-    print(f"✓ Model loaded successfully")
-    print(f"{'─'*60}")
-
-    return model
-
-
 def export_raft_onnx(checkpoint_file: str, output_file: str,
                      input_height: int = 256, input_width: int = 192,
-                     opset_version: int = 16, simplify: bool = True, iters: int = 12) -> bool:
+                     batch: int = 8, opset_version: int = 16,
+                     simplify: bool = True, iters: int = 12, fp32: bool = True) -> bool:
     """Export RAFT model to ONNX format.
 
     Args:
@@ -204,77 +80,101 @@ def export_raft_onnx(checkpoint_file: str, output_file: str,
         output_file: Output ONNX file path (.onnx)
         input_height: Input image height
         input_width: Input image width
+        batch: Export batch size (enables dynamic batching 1 to batch)
         opset_version: ONNX opset version (16+ required for grid_sampler)
         simplify: Whether to simplify ONNX graph (requires onnx-simplifier)
         iters: Number of RAFT refinement iterations (default: 12)
+        fp32: Use FP32 precision (default: True, RAFT correlation ops are FP32-only)
 
     Returns:
         bool: True if successful, False otherwise
     """
     total_start = time.time()
+    precision = "FP32" if fp32 else "FP16"
+    dtype = torch.float32 if fp32 else torch.float16
 
-    print(f"\n{'═'*60}")
-    print(f"🔄 RAFT → ONNX EXPORT")
-    print(f"{'═'*60}")
+    print(f"\n{'═'*70}")
+    print(f"🔄 RAFT → ONNX Export (TensorRT-Compatible)")
+    print(f"{'═'*70}")
     print(f"  Checkpoint:  {checkpoint_file}")
     print(f"  Output:      {output_file}")
     print(f"  Resolution:  {input_height}×{input_width}")
+    print(f"  Batch Size:  {batch} (enables dynamic batching 1-{batch})")
     print(f"  Iterations:  {iters}")
+    print(f"  Precision:   {precision}")
     print(f"  Opset:       {opset_version}")
     print(f"  Simplify:    {'Yes' if simplify else 'No'}")
-    print(f"{'═'*60}")
+    print(f"{'═'*70}")
 
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     print(f"\n🖥️  Device: {device.upper()}")
     if device == 'cpu':
         print(f"⚠️  WARNING: CUDA not available, export will be slower")
 
-    # Step 1: Load model
-    print(f"\n[1/4] 📥 LOADING MODEL")
-    is_small = 'small' in checkpoint_file.lower()
-    raft_model = load_raft_model(checkpoint_file, device, small=is_small)
-
-    if raft_model is False:
+    # Validate checkpoint file
+    checkpoint_path = Path(checkpoint_file)
+    if not checkpoint_path.exists():
+        print(f"\n❌ ERROR: Checkpoint file not found: {checkpoint_file}")
         return False
 
-    # Step 2: Wrap model
-    print(f"\n[2/4] 📦 PREPARING FOR ONNX EXPORT")
-    print(f"  └─ Wrapping model (iters={iters})...", end='', flush=True)
-    start = time.time()
-    model = RAFTModelWrapper(raft_model, iters=iters)
-    model.eval()
-    print(f" ✓ ({time.time()-start:.2f}s)")
+    # Load model
+    print(f"\n📦 Loading model...", end='', flush=True)
+    load_start = time.time()
+    try:
+        from argparse import Namespace
+        is_small = 'small' in checkpoint_file.lower()
+        args = Namespace(small=is_small, mixed_precision=False, alternate_corr=False)
 
-    # Step 3: Test forward pass
-    print(f"\n[3/4] 🧪 TESTING FORWARD PASS")
-    print(f"  ├─ Creating dummy inputs ({input_height}×{input_width})...", end='', flush=True)
-    start = time.time()
-    dummy_image1 = torch.randn(1, 3, input_height, input_width, device=device) * 255
-    dummy_image2 = torch.randn(1, 3, input_height, input_width, device=device) * 255
-    print(f" ✓ ({time.time()-start:.3f}s)")
+        raft_model = RAFT(args).eval()
+        checkpoint = torch.load(checkpoint_file, map_location=device)
+        state_dict = checkpoint.get('state_dict', checkpoint)
+        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+        raft_model.load_state_dict(state_dict)
+        raft_model = raft_model.to(device)
 
-    print(f"  └─ Running test inference...", end='', flush=True)
-    start = time.time()
+        # Wrap model for ONNX export
+        model = RAFTModelWrapper(raft_model, iters=iters)
+        model.eval()
+
+        if not fp32:
+            model = model.half()
+
+        load_time = time.time() - load_start
+        file_size_mb = checkpoint_path.stat().st_size / 1024 / 1024
+        print(f" ✓ ({load_time:.2f}s, {file_size_mb:.1f} MB)")
+    except Exception as e:
+        print(f" ✗")
+        print(f"❌ ERROR: Failed to load model: {e}")
+        return False
+
+    # Create dummy inputs
+    print(f"🧪 Creating dummy inputs...", end='', flush=True)
+    dummy_image1 = torch.randn(batch, 3, input_height, input_width, dtype=dtype, device=device) * 255
+    dummy_image2 = torch.randn(batch, 3, input_height, input_width, dtype=dtype, device=device) * 255
+    print(f" ✓")
+
+    # Test forward pass
+    print(f"🧪 Testing forward pass...", end='', flush=True)
+    test_start = time.time()
     try:
         with torch.no_grad():
             test_flow = model(dummy_image1, dummy_image2)
-        inference_time = time.time() - start
-        print(f" ✓ ({inference_time:.2f}s)")
-        print(f"     └─ Output shape: {list(test_flow.shape)} ({test_flow.dtype})")
+        inference_time = time.time() - test_start
+        print(f" ✓ ({inference_time:.2f}s, output: {list(test_flow.shape)})")
     except Exception as e:
         print(f" ✗")
-        print(f"\n❌ ERROR: Forward pass failed: {e}")
+        print(f"❌ ERROR: Forward pass failed: {e}")
         import traceback
         traceback.print_exc()
         return False
 
-    # Step 4: Export to ONNX
-    print(f"\n[4/4] 💾 EXPORTING TO ONNX")
+    # Export to ONNX
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"  └─ Running torch.onnx.export...", end='', flush=True)
-    start = time.time()
+    print(f"\n💾 Exporting to ONNX...")
+    print(f"   ⏱️  This may take 1-2 minutes...")
+    export_start = time.time()
     try:
         with torch.no_grad():
             torch.onnx.export(
@@ -293,97 +193,79 @@ def export_raft_onnx(checkpoint_file: str, output_file: str,
                 },
                 verbose=False
             )
-        export_time = time.time() - start
-        print(f" ✓ ({export_time:.2f}s)")
+        export_time = time.time() - export_start
+        print(f"   ✓ ONNX export complete ({export_time:.2f}s)")
     except Exception as e:
-        print(f" ✗")
-        print(f"\n❌ ERROR: ONNX export failed: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"   ✗ Export failed")
+        print(f"❌ ERROR: {e}")
         return False
 
     if not output_path.exists():
-        print(f"\n❌ ERROR: Output file was not created!")
+        print(f"❌ ERROR: Output file was not created!")
         return False
 
     file_size = output_path.stat().st_size / 1024 / 1024
-    print(f"     └─ File size: {file_size:.2f} MB")
+    print(f"   File size: {file_size:.1f} MB")
 
-    # Optional: Simplify ONNX graph
+    # Simplify ONNX graph
     if simplify:
-        print(f"\n🔧 SIMPLIFYING ONNX GRAPH")
+        print(f"\n🔧 Simplifying ONNX model...", end='', flush=True)
         try:
             import onnx
             from onnxsim import simplify as onnx_simplify
 
-            print(f"  ├─ Loading ONNX model...", end='', flush=True)
-            start = time.time()
             model_onnx = onnx.load(output_file)
-            print(f" ✓ ({time.time()-start:.2f}s)")
-
-            print(f"  ├─ Running simplification...", end='', flush=True)
-            start = time.time()
             model_simplified, check = onnx_simplify(model_onnx)
-            simplify_time = time.time() - start
-            print(f" ✓ ({simplify_time:.2f}s)")
 
             if check:
-                print(f"  └─ Saving simplified model...", end='', flush=True)
-                start = time.time()
                 onnx.save(model_simplified, output_file)
-                print(f" ✓ ({time.time()-start:.2f}s)")
-
                 new_size = output_path.stat().st_size / 1024 / 1024
                 reduction = ((file_size - new_size) / file_size) * 100
-                print(f"     └─ New size: {new_size:.2f} MB ({reduction:.1f}% reduction)")
+                print(f" ✓ ({file_size:.1f} MB → {new_size:.1f} MB, {reduction:.1f}% reduction)")
             else:
-                print(f"  └─ ⚠️  Simplification check failed, keeping original")
+                print(f" ⚠️  (validation failed, keeping original)")
         except ImportError:
-            print(f"  └─ ⚠️  onnx-simplifier not installed")
-            print(f"     Install with: pip install onnx-simplifier")
+            print(f" ⊘ (onnx-simplifier not installed)")
+            print(f"   Install with: pip install onnx-simplifier")
         except Exception as e:
-            print(f"  └─ ⚠️  Simplification failed: {e}")
-            print(f"     Keeping original file")
+            print(f" ⚠️  (failed: {e}, keeping original)")
 
     # Verify ONNX model
-    print(f"\n✅ VERIFYING ONNX MODEL")
+    print(f"\n🔍 Verifying ONNX model...", end='', flush=True)
     try:
         import onnx
-        print(f"  ├─ Loading and checking model...", end='', flush=True)
-        start = time.time()
         onnx_model = onnx.load(output_file)
         onnx.checker.check_model(onnx_model)
-        print(f" ✓ ({time.time()-start:.2f}s)")
-
-        print(f"  └─ Model information:")
-        print(f"     ├─ Inputs:  {[i.name for i in onnx_model.graph.input]}")
-        print(f"     ├─ Outputs: {[o.name for o in onnx_model.graph.output]}")
-        print(f"     └─ Path:    {output_path.absolute()}")
+        print(f" ✓")
+        print(f"   Inputs:  {[i.name for i in onnx_model.graph.input]}")
+        print(f"   Outputs: {[o.name for o in onnx_model.graph.output]}")
     except Exception as e:
-        print(f" ✗")
-        print(f"  └─ ⚠️  Verification failed: {e}")
+        print(f" ⚠️  (validation warning: {e})")
 
     total_time = time.time() - total_start
-    print(f"\n{'═'*60}")
-    print(f"✅ EXPORT COMPLETED SUCCESSFULLY")
-    print(f"{'═'*60}")
+    print(f"\n{'═'*70}")
+    print(f"✅ EXPORT COMPLETE")
+    print(f"{'═'*70}")
+    print(f"  Output:     {output_file}")
+    print(f"  Resolution: {input_height}×{input_width} (dynamic batch)")
+    print(f"  Precision:  {precision}")
+    print(f"  Size:       {output_path.stat().st_size / 1024 / 1024:.1f} MB")
     print(f"  Total time: {total_time:.2f}s")
-    print(f"  Output:     {output_path.absolute()}")
-    print(f"{'═'*60}\n")
+    print(f"{'═'*70}\n")
 
     return True
 
 
 if __name__ == '__main__':
-    print(f"\n{'═'*60}")
+    print(f"\n{'═'*70}")
     print(f"🚀 RAFT ONNX EXPORT TOOL")
-    print(f"{'═'*60}")
-    print(f"  Python:       {sys.version.split()[0]}")
-    print(f"  PyTorch:      {torch.__version__}")
-    print(f"  CUDA:         {'✓ ' + torch.version.cuda if torch.cuda.is_available() else '✗ Not available'}")
+    print(f"{'═'*70}")
+    print(f"  Python:  {sys.version.split()[0]}")
+    print(f"  PyTorch: {torch.__version__}")
+    print(f"  CUDA:    {'✓ ' + torch.version.cuda if torch.cuda.is_available() else '✗ Not available'}")
     if torch.cuda.is_available():
-        print(f"  GPU:          {torch.cuda.get_device_name(0)}")
-    print(f"{'═'*60}\n")
+        print(f"  GPU:     {torch.cuda.get_device_name(0)}")
+    print(f"{'═'*70}\n")
 
     parser = argparse.ArgumentParser(
         description='Export RAFT optical flow model to ONNX',
@@ -401,10 +283,14 @@ if __name__ == '__main__':
                         help='Input image height (default: 256)')
     parser.add_argument('--width', type=int, default=192,
                         help='Input image width (default: 192)')
+    parser.add_argument('--batch', type=int, default=8,
+                        help='Export batch size - enables dynamic batching from 1 to batch (default: 8)')
     parser.add_argument('--iters', type=int, default=12,
                         help='RAFT refinement iterations (default: 12)')
     parser.add_argument('--opset', type=int, default=16,
-                        help='ONNX opset version (default: 16)')
+                        help='ONNX opset version (default: 16, required for grid_sampler)')
+    parser.add_argument('--fp16', action='store_true',
+                        help='Use FP16 precision instead of FP32 (default: FP32, may have issues)')
     parser.add_argument('--no-simplify', action='store_true',
                         help='Skip ONNX graph simplification')
 
@@ -415,9 +301,11 @@ if __name__ == '__main__':
         args.output,
         args.height,
         args.width,
+        args.batch,
         args.opset,
         not args.no_simplify,
-        args.iters
+        args.iters,
+        not args.fp16  # Invert: fp16 flag means fp32=False
     )
 
     sys.exit(0 if success else 1)

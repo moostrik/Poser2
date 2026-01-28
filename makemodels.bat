@@ -164,7 +164,7 @@ if %errorlevel%==0 echo [92mBuilt raft-sintel_512x384_i12_b3.trt[0m
 echo.
 echo [92mTensorRT conversion complete[0m
 
-call "%VENV_DIR%\Scripts\deactivate"
+@REM call "%VENV_DIR%\Scripts\deactivate"
 goto endofscript
 
 :fail
