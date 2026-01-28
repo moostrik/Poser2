@@ -9,8 +9,14 @@ import numpy as np
 import torch
 import tensorrt as trt
 import cupy as cp
+from concurrent.futures import ThreadPoolExecutor
 
-from .InOut import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallback
+# Reuse dataclasses from RAFTOpticalFlow
+from modules.pose.batch.flow.ONNXOpticalFlow import (
+    OpticalFlowInput,
+    OpticalFlowOutput,
+    OpticalFlowOutputCallback
+)
 
 from typing import TYPE_CHECKING
 

@@ -153,6 +153,7 @@ FINAL_LAYERS: list[Layers] = [
     Layers.sim_blend,
     Layers.flow,
     Layers.dense_flow,
+    # Layers.centre_mask,
     Layers.centre_pose,
 ]
 
