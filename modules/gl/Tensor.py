@@ -269,6 +269,10 @@ class Tensor(Texture):
             elif tensor.dtype != torch.float32:
                 tensor = tensor.float()
 
+        # Permute multi-channel tensors from (C, H, W) to (H, W, C)
+        if len(tensor.shape) == 3 and tensor.shape[0] <= 4:
+            tensor = tensor.permute(1, 2, 0)
+
         # Flip vertically to match OpenGL/FBO/Image convention
         tensor = torch.flip(tensor, [0])
 
@@ -334,6 +338,7 @@ class Tensor(Texture):
             tensor = tensor.permute(1, 2, 0)
 
         # Flip vertically to match OpenGL/FBO/Image convention
+        # After permute, shape is (H, W) or (H, W, C), so flip dimension [0] (height)
         tensor = torch.flip(tensor, [0])
 
         # Convert to appropriate dtype and move to CPU
