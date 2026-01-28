@@ -12,7 +12,7 @@ from modules.utils.PerformanceTimer import PerformanceTimer
 
 from .InOut import SegmentationInput, SegmentationOutput
 from .ONNXSegmentation import ONNXSegmentation
-from .TRTSegmentation import TRTSegmentation
+from .TRTSegmentation_T import TRTSegmentation
 
 
 Segmentation = Union[ONNXSegmentation, TRTSegmentation]

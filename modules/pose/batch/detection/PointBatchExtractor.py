@@ -4,7 +4,7 @@ from typing import Union
 
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput
 from modules.pose.batch.detection.ONNXDetection import ONNXDetection
-from modules.pose.batch.detection.TRTDetection import TRTDetection
+from modules.pose.batch.detection.TRTDetection_T import TRTDetection
 from modules.pose.batch.GPUFrame import GPUFrameDict
 from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin

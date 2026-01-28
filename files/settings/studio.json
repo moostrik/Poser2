@@ -39,8 +39,8 @@
   "pose": {
     "max_poses": 3,
     "model_type": "TRT",
-    "pose_resolution": "STANDARD",
-    "flow_resolution": "STANDARD",
+    "pose_resolution": "HIGH",
+    "flow_resolution": "ULTRA",
     "model_path": "models",
     "confidence_high": 0.55,
     "confidence_low": 0.45,
@@ -48,7 +48,7 @@
     "crop_expansion": 0.1,
     "segmentation_enabled": true,
     "segmentation_reset_interval": 0,
-    "flow_enabled": true
+    "flow_enabled": false
   },
 
   "pd_stream": {

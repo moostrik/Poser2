@@ -8,7 +8,7 @@ from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.batch.GPUFrame import GPUFrameDict
 from modules.pose.Frame import FrameDict
 from modules.pose.batch.flow.ONNXOpticalFlow import ONNXOpticalFlow, OpticalFlowInput, OpticalFlowOutput
-from modules.pose.batch.flow.TRTOpticalFlow import TRTOpticalFlow
+from modules.pose.batch.flow.TRTOpticalFlow_T import TRTOpticalFlow
 from modules.pose.Settings import Settings, ModelType
 from modules.utils.PerformanceTimer import PerformanceTimer
 
