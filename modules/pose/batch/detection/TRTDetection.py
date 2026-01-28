@@ -231,6 +231,11 @@ class TRTDetection(Thread):
             self._mean_gpu = cp.asarray(IMAGENET_MEAN, dtype=self._model_dtype)
             self._std_gpu = cp.asarray(IMAGENET_STD, dtype=self._model_dtype)
 
+            # Set persistent tensor addresses (buffer base pointers don't change when slicing)
+            self.context.set_tensor_address(self.input_name, self._batch_buffers['input'].data.ptr)
+            self.context.set_tensor_address(self.output_names[0], self._batch_buffers['simcc_x'].data.ptr)
+            self.context.set_tensor_address(self.output_names[1], self._batch_buffers['simcc_y'].data.ptr)
+
             self._model_ready.set()
             print(f"TensorRT Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
@@ -324,10 +329,8 @@ class TRTDetection(Thread):
         with get_exec_lock():
             lock_acquired: float = time.perf_counter()
 
+            # Only set_input_shape per-call (addresses are persistent from _setup)
             self.context.set_input_shape(self.input_name, input_gpu.shape)
-            self.context.set_tensor_address(self.input_name, input_gpu.data.ptr)
-            self.context.set_tensor_address(self.output_names[0], simcc_x_gpu.data.ptr)
-            self.context.set_tensor_address(self.output_names[1], simcc_y_gpu.data.ptr)
 
             self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()

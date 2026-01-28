@@ -240,6 +240,11 @@ class TRTOpticalFlow(Thread):
             'img2_input': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=self._model_dtype),
         }
 
+        # Set persistent tensor addresses for INPUT buffers (base pointers don't change when slicing)
+        # Output address must be set per-call since it's allocated fresh each inference
+        self.context.set_tensor_address(self.input_names[0], self._batch_buffers['img1_input'].data.ptr)
+        self.context.set_tensor_address(self.input_names[1], self._batch_buffers['img2_input'].data.ptr)
+
         self._model_ready.set()
         print(f"TensorRT Optical Flow: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
@@ -335,10 +340,11 @@ class TRTOpticalFlow(Thread):
         with get_exec_lock():
             lock_acquired = time.perf_counter()
 
+            # Only set_input_shape per-call (input addresses are persistent from _setup)
             self.context.set_input_shape(self.input_names[0], image1_gpu.shape)
             self.context.set_input_shape(self.input_names[1], image2_gpu.shape)
-            self.context.set_tensor_address(self.input_names[0], image1_gpu.data.ptr)
-            self.context.set_tensor_address(self.input_names[1], image2_gpu.data.ptr)
+
+            # Output address must be set per-call (fresh allocation each inference)
             self.context.set_tensor_address(self.output_name, flow_gpu.data.ptr)
 
             self.context.execute_async_v3(stream_handle=self.stream.ptr)

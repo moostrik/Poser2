@@ -273,6 +273,14 @@ class TRTSegmentation(Thread):
                 'r4i': cp.empty((self._max_batch, 64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype),
             }
 
+            # Set persistent tensor addresses for INPUT buffers (base pointers don't change when slicing)
+            # Output addresses must be set per-call since they're allocated fresh each inference
+            self.context.set_tensor_address('src', self._batch_buffers['src'].data.ptr)
+            self.context.set_tensor_address('r1i', self._batch_buffers['r1i'].data.ptr)
+            self.context.set_tensor_address('r2i', self._batch_buffers['r2i'].data.ptr)
+            self.context.set_tensor_address('r3i', self._batch_buffers['r3i'].data.ptr)
+            self.context.set_tensor_address('r4i', self._batch_buffers['r4i'].data.ptr)
+
             self._model_ready.set()
             print(f"TRT RVM Segmentation: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
@@ -400,17 +408,14 @@ class TRTSegmentation(Thread):
         with get_exec_lock():
             lock_acquired: float = time.perf_counter()
 
+            # Only set_input_shape per-call (input addresses are persistent from _setup)
             self.context.set_input_shape('src', (batch_size, 3, self.model_height, self.model_width))
             self.context.set_input_shape('r1i', (batch_size, 16, self.model_height // 2, self.model_width // 2))
             self.context.set_input_shape('r2i', (batch_size, 20, self.model_height // 4, self.model_width // 4))
             self.context.set_input_shape('r3i', (batch_size, 40, self.model_height // 8, self.model_width // 8))
             self.context.set_input_shape('r4i', (batch_size, 64, self.model_height // 16, self.model_width // 16))
 
-            self.context.set_tensor_address('src', buf['src'].data.ptr)
-            self.context.set_tensor_address('r1i', buf['r1i'].data.ptr)
-            self.context.set_tensor_address('r2i', buf['r2i'].data.ptr)
-            self.context.set_tensor_address('r3i', buf['r3i'].data.ptr)
-            self.context.set_tensor_address('r4i', buf['r4i'].data.ptr)
+            # Output addresses must be set per-call (fresh allocation each inference)
             self.context.set_tensor_address('fgr', fgr_gpu.data.ptr)
             self.context.set_tensor_address('pha', pha_gpu.data.ptr)
             self.context.set_tensor_address('r1o', r1o_gpu.data.ptr)
