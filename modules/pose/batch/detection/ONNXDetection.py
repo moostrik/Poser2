@@ -8,6 +8,7 @@ import traceback
 import numpy as np
 import cupy as cp
 import onnxruntime as ort
+import torch
 
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
 from modules.pose.batch.cuda_resize import batched_bilinear_resize
@@ -313,60 +314,68 @@ class ONNXDetection(Thread):
         return keypoints, scores
 
     def _infer_batch_gpu(self, gpu_imgs: list[cp.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-        """Run ONNX inference on batch of GPU images using IOBinding.
+        """Run inference on GPU images using IOBinding for zero-copy."""
+        batch_size = len(gpu_imgs)
 
-        Uses DLPack for zero-copy GPU input to ONNX Runtime.
-        """
-        actual_batch_size = len(gpu_imgs)
-        if actual_batch_size == 0 or self._session is None:
+        if batch_size == 0 or self._session is None:
             return np.empty((0, 17, 2)), np.empty((0, 17))
 
         # Stack all GPU images into batch
-        batch_src = cp.stack(gpu_imgs, axis=0)  # (B, src_H, src_W, 3)
+        batch_src = cp.stack(gpu_imgs, axis=0)  # (B, H, W, 3)
 
-        # Resize if needed (crop size != model size)
+        # Resize if needed
         src_h, src_w = batch_src.shape[1:3]
         if src_h != self.model_height or src_w != self.model_width:
             resized_batch = batched_bilinear_resize(batch_src, self.model_height, self.model_width)
         else:
             resized_batch = batch_src
 
-        # Pad to fixed batch size to avoid ONNX Runtime recompilation
-        num_padding = self._max_batch - actual_batch_size
-        if num_padding > 0:
-            dummy_imgs = cp.zeros((num_padding, self.model_height, self.model_width, 3), dtype=cp.uint8)
-            resized_batch = cp.concatenate([resized_batch, dummy_imgs], axis=0)
+        # Pad batch to max_batch size for consistent tensor shapes
+        if batch_size < self._max_batch:
+            pad_size = self._max_batch - batch_size
+            padding = cp.zeros((pad_size, self.model_height, self.model_width, 3), dtype=cp.uint8)
+            resized_batch = cp.concatenate([resized_batch, padding], axis=0)
 
-        # Preprocess on GPU
-        batch_hwc = resized_batch.astype(self._cupy_dtype)  # (B, H, W, 3)
-        # Images are already RGB from GPUCropProcessor
-        batch_chw = cp.ascontiguousarray(cp.transpose(batch_hwc, (0, 3, 1, 2)))  # (B, 3, H, W)
+        # Convert HWC -> CHW and normalize on GPU
+        batch_float = resized_batch.astype(self._cupy_dtype)  # (B, H, W, 3)
+        batch_chw = cp.transpose(batch_float, (0, 3, 1, 2))  # (B, 3, H, W)
         batch_normalized = (batch_chw - self._mean_gpu) / self._std_gpu
         batch_normalized = cp.ascontiguousarray(batch_normalized)
 
-        # Convert CuPy -> OrtValue via DLPack (zero-copy)
-        input_name = self._session.get_inputs()[0].name
-        ort_input = ort.OrtValue.from_dlpack(batch_normalized.toDlpack())
+        # Convert CuPy array to PyTorch tensor (zero-copy via DLPack)
+        torch_input = torch.from_dlpack(batch_normalized) # type: ignore
 
-        # Use IOBinding for GPU I/O
+        # Get input/output names
+        input_name = self._session.get_inputs()[0].name
+        output_names = [o.name for o in self._session.get_outputs()]
+
+        # Use IOBinding for GPU input/output
         io_binding = self._session.io_binding()
-        io_binding.bind_ortvalue_input(input_name, ort_input)
-        io_binding.bind_output('simcc_x', 'cuda')
-        io_binding.bind_output('simcc_y', 'cuda')
+
+        # Bind input from PyTorch tensor
+        io_binding.bind_input(
+            name=input_name,
+            device_type='cuda',
+            device_id=0,
+            element_type=np.float16 if self._model_dtype == np.float16 else np.float32,
+            shape=tuple(torch_input.shape),
+            buffer_ptr=torch_input.data_ptr()
+        )
+
+        # Bind outputs to GPU
+        io_binding.bind_output(output_names[0], device_type='cuda', device_id=0)
+        io_binding.bind_output(output_names[1], device_type='cuda', device_id=0)
 
         # Run inference
         self._session.run_with_iobinding(io_binding)
 
-        # Get outputs (still on GPU as OrtValue, convert to numpy)
+        # Get outputs as numpy (copies from GPU)
         outputs = io_binding.copy_outputs_to_cpu()
-        simcc_x, simcc_y = outputs[0], outputs[1]
+        simcc_x = outputs[0][:batch_size]
+        simcc_y = outputs[1][:batch_size]
 
         # Decode SimCC outputs
         keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
-
-        # Slice to actual batch size
-        keypoints = keypoints[:actual_batch_size]
-        scores = scores[:actual_batch_size]
 
         return keypoints, scores
 
