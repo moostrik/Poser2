@@ -136,9 +136,9 @@ class TRTDetection(Thread):
         with self._input_lock:
             if self._pending_batch is not None:
                 dropped_batch = self._pending_batch
-                # if self.verbose:
-                lag = int((time.time() - self._input_timestamp) * 1000)
-                print(f"TensorRT Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
+                if self.verbose:
+                    lag = int((time.time() - self._input_timestamp) * 1000)
+                    print(f"TensorRT Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -362,8 +362,7 @@ class TRTDetection(Thread):
     def unregister_callback(self, callback: PoseDetectionOutputCallback) -> None:
         """Unregister previously registered callback."""
         with self._callback_lock:
-            if callback in self._callbacks:
-                self._callbacks.remove(callback)
+            self._callbacks.discard(callback)
 
     def _callback_worker_loop(self) -> None:
         """Dispatch results to callbacks."""
