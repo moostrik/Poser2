@@ -1,9 +1,3 @@
-#TODO:
-# add simplification like in RTM Pose export?
-# fixed batch size padding to avoid recompilation (default to 8)
-# rename models without batch size
-# add model source from rvm repo
-
 # Standard library imports
 from queue import Queue, Empty
 from threading import Thread, Lock, Event

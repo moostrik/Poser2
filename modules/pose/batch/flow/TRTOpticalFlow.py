@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 from modules.pose.batch.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
 
-class TensorRTOpticalFlow(Thread):
+class TRTOpticalFlow(Thread):
     """Asynchronous GPU optical flow computation using RAFT with TensorRT.
 
     Optimized inference using TensorRT engines for maximum performance.

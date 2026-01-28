@@ -8,12 +8,12 @@ import torch
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameDict
 from modules.pose.batch.flow.ONNXOpticalFlow import ONNXOpticalFlow, OpticalFlowInput, OpticalFlowOutput
-from modules.pose.batch.flow.TensorRTOpticalFlow import TensorRTOpticalFlow
+from modules.pose.batch.flow.TensorRTOpticalFlow import TRTOpticalFlow
 from modules.pose.Settings import Settings, ModelType
 from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.PerformanceTimer import PerformanceTimer
 
-OpticalFlow = Union[ONNXOpticalFlow, TensorRTOpticalFlow]
+OpticalFlow = Union[ONNXOpticalFlow, TRTOpticalFlow]
 
 
 class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
@@ -36,7 +36,7 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         if settings.model_type is ModelType.ONNX:
             self._optical_flow = ONNXOpticalFlow(settings)
         elif settings.model_type is ModelType.TRT:
-            self._optical_flow = TensorRTOpticalFlow(settings)
+            self._optical_flow = TRTOpticalFlow(settings)
         self._lock = Lock()
         self._batch_counter: int = 0
         self._verbose: bool = settings.verbose
