@@ -9,14 +9,8 @@ import numpy as np
 import torch
 import tensorrt as trt
 import cupy as cp
-from concurrent.futures import ThreadPoolExecutor
 
-# Reuse dataclasses from RAFTOpticalFlow
-from modules.pose.batch.flow.ONNXOpticalFlow import (
-    OpticalFlowInput,
-    OpticalFlowOutput,
-    OpticalFlowOutputCallback
-)
+from .InOut import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallback
 
 from typing import TYPE_CHECKING
 
@@ -29,11 +23,7 @@ from modules.pose.batch.tensorrt_shared import get_tensorrt_runtime, get_init_lo
 class TRTOpticalFlow(Thread):
     """Asynchronous GPU optical flow computation using RAFT with TensorRT.
 
-    Optimized inference using TensorRT engines for maximum performance.
-    Architecture identical to RAFTOpticalFlow for drop-in replacement.
-
-    RAFT (Recurrent All-Pairs Field Transforms) computes dense optical flow between
-    consecutive video frames using iterative refinement.
+    TensorRT-optimized inference for maximum performance. Drop-in replacement for ONNXOpticalFlow.
 
     Uses a single-slot queue: only the most recent submitted batch waits to be processed.
     Older pending batches are dropped. Batches already processing on GPU cannot be cancelled.
@@ -90,6 +80,99 @@ class TRTOpticalFlow(Thread):
     def is_ready(self) -> bool:
         """Check if model is loaded and system is ready to process optical flow"""
         return self._model_ready.is_set() and not self._shutdown_event.is_set() and self.is_alive()
+
+    def start(self) -> None:
+        if not self.enabled:
+            return
+        self._callback_thread.start()
+        super().start()
+
+    def stop(self) -> None:
+        """Stop both inference and callback threads gracefully."""
+        if not self.enabled:
+            return
+
+        self._shutdown_event.set()
+
+        # Wake up inference thread
+        self._notify_update_event.set()
+        self.join(timeout=2.0)
+
+        if self.is_alive():
+            print("Warning: TensorRT Optical Flow inference thread did not stop cleanly")
+
+        # Wake up callback thread with sentinel
+        try:
+            self._callback_queue.put_nowait(None)
+        except:
+            pass
+
+        self._callback_thread.join(timeout=2.0)
+        if self._callback_thread.is_alive():
+            print("Warning: TensorRT Optical Flow callback thread did not stop cleanly")
+
+    def run(self) -> None:
+        """Main inference thread loop. Initializes TensorRT engine and processes batches."""
+        try:
+            self._setup()
+        except Exception as e:
+            print(f"TensorRT Optical Flow Error: Failed to load model - {str(e)}")
+            traceback.print_exc()
+            return
+
+        while not self._shutdown_event.is_set():
+            self._notify_update_event.wait()
+
+            if self._shutdown_event.is_set():
+                break
+
+            self._notify_update_event.clear()
+
+            try:
+                self._process_pending_batch()
+
+            except Exception as e:
+                print(f"TensorRT Optical Flow Error: {str(e)}")
+                traceback.print_exc()
+
+    def submit_batch(self, input_batch: OpticalFlowInput) -> None:
+        """Submit batch for processing. Replaces any pending (not yet started) batch."""
+        if self._shutdown_event.is_set():
+            return
+
+        if not self._model_ready.is_set():
+            return
+
+        # Validate batch size
+        if len(input_batch.frame_pairs) > self._max_batch:
+            print(f"TensorRT Optical Flow Warning: Batch size {len(input_batch.frame_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
+
+        dropped_batch: OpticalFlowInput | None = None
+
+        with self._input_lock:
+            if self._pending_batch is not None:
+                dropped_batch = self._pending_batch
+                if self.verbose:
+                    lag = int((time.time() - self._input_timestamp) * 1000)
+                    print(f"TensorRT Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                self._last_dropped_batch_id = dropped_batch.batch_id
+
+            self._pending_batch = input_batch
+            self._input_timestamp = time.time()
+
+        # Notify about dropped batch
+        if dropped_batch is not None:
+            dropped_output = OpticalFlowOutput(
+                batch_id=dropped_batch.batch_id,
+                tracklet_ids=dropped_batch.tracklet_ids,
+                processed=False
+            )
+            try:
+                self._callback_queue.put_nowait(dropped_output)
+            except:
+                pass
+
+        self._notify_update_event.set()
 
     def _setup(self) -> None:
         """Initialize TensorRT engine, context, and buffers. Called from run()."""
@@ -149,106 +232,16 @@ class TRTOpticalFlow(Thread):
         }
         self._model_dtype = dtype_to_cupy.get(input_dtype, cp.float32)
 
-        # Preallocate BATCHED buffers for batch inference
+        # Preallocate BATCHED INPUT buffers (output allocated per-call to avoid race condition)
         self._batch_buffers = {
             'img1_uint8': cp.empty((self._max_batch, self.model_height, self.model_width, 3), dtype=cp.uint8),
             'img2_uint8': cp.empty((self._max_batch, self.model_height, self.model_width, 3), dtype=cp.uint8),
             'img1_input': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=self._model_dtype),
             'img2_input': cp.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=self._model_dtype),
-            'flow_output': cp.empty((self._max_batch, 2, self.model_height, self.model_width), dtype=self._model_dtype),
         }
 
         self._model_ready.set()
-        print(f"TensorRT Optical Flow: {self.resolution_name} model loaded ({self.model_width}x{self.model_height}) "
-              f"precision={self.model_precision} max_batch={self._max_batch}")
-
-    def start(self) -> None:
-        if not self.enabled:
-            return
-        self._callback_thread.start()
-        super().start()
-
-    def stop(self) -> None:
-        if not self.enabled:
-            return
-        """Stop both inference and callback threads gracefully"""
-        self._shutdown_event.set()
-
-        # Wake up inference thread
-        self._notify_update_event.set()
-        self.join(timeout=2.0)
-
-        if self.is_alive():
-            print("Warning: TensorRT Optical Flow inference thread did not stop cleanly")
-
-        # Wake up callback thread with sentinel
-        try:
-            self._callback_queue.put_nowait(None)
-        except:
-            pass
-
-        self._callback_thread.join(timeout=2.0)
-        if self._callback_thread.is_alive():
-            print("Warning: TensorRT Optical Flow callback thread did not stop cleanly")
-
-    def run(self) -> None:
-        """Main inference thread loop. Initializes TensorRT engine and processes batches."""
-        try:
-            self._setup()
-        except Exception as e:
-            print(f"TensorRT Optical Flow Error: Failed to load model - {str(e)}")
-            traceback.print_exc()
-            return
-
-        while not self._shutdown_event.is_set():
-            self._notify_update_event.wait()
-
-            if self._shutdown_event.is_set():
-                break
-
-            self._notify_update_event.clear()
-
-            try:
-                self._process_pending_batch()
-
-            except Exception as e:
-                print(f"TensorRT Optical Flow Error: {str(e)}")
-                traceback.print_exc()
-
-    def submit_batch(self, input_batch: OpticalFlowInput) -> None:
-        """Submit batch for processing. Replaces any pending (not yet started) batch."""
-        if self._shutdown_event.is_set():
-            return
-
-        if not self._model_ready.is_set():
-            return
-
-        dropped_batch: OpticalFlowInput | None = None
-
-        with self._input_lock:
-            if self._pending_batch is not None:
-                dropped_batch = self._pending_batch
-                lag = int((time.time() - self._input_timestamp) * 1000)
-                # if self.verbose:
-                print(f"TensorRT Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
-                self._last_dropped_batch_id = dropped_batch.batch_id
-
-            self._pending_batch = input_batch
-            self._input_timestamp = time.time()
-
-        # Notify about dropped batch
-        if dropped_batch is not None:
-            dropped_output = OpticalFlowOutput(
-                batch_id=dropped_batch.batch_id,
-                tracklet_ids=dropped_batch.tracklet_ids,
-                processed=False
-            )
-            try:
-                self._callback_queue.put_nowait(dropped_output)
-            except:
-                pass
-
-        self._notify_update_event.set()
+        print(f"TensorRT Optical Flow: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
 
     def _retrieve_pending_batch(self) -> OpticalFlowInput | None:
         """Atomically get and clear pending batch."""
@@ -264,24 +257,21 @@ class TRTOpticalFlow(Thread):
         if batch is None:
             return
 
-        output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
+        output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
 
         # Run inference
         if batch.frame_pairs:
-            # Validate batch size
-            if len(batch.frame_pairs) > self._max_batch:
-                print(f"TensorRT Optical Flow Warning: Batch size {len(batch.frame_pairs)} "
-                      f"exceeds max {self._max_batch}, will process only first {self._max_batch}")
-                batch.frame_pairs = batch.frame_pairs[:self._max_batch]
-                batch.tracklet_ids = batch.tracklet_ids[:self._max_batch]
+            # Limit processing to max batch size
+            pairs_to_process = batch.frame_pairs[:self._max_batch]
+            tracklets_to_process = batch.tracklet_ids[:self._max_batch]
 
             try:
-                flow_tensor, inference_time_ms, lock_wait_ms = self._infer_batch(batch.frame_pairs)
+                flow_tensor, inference_time_ms, lock_wait_ms = self._infer_batch(pairs_to_process)
 
                 output = OpticalFlowOutput(
                     batch_id=batch.batch_id,
                     flow_tensor=flow_tensor,
-                    tracklet_ids=batch.tracklet_ids,
+                    tracklet_ids=tracklets_to_process,
                     processed=True,
                     inference_time_ms=inference_time_ms,
                     lock_time_ms=lock_wait_ms
@@ -289,17 +279,8 @@ class TRTOpticalFlow(Thread):
             except Exception as e:
                 print(f"TensorRT Optical Flow Error: Inference failed: {str(e)}")
                 traceback.print_exc()
-                # Create zero flow on error
-                h, w = batch.frame_pairs[0][0].shape[:2]
-                flow_tensor = torch.zeros((len(batch.frame_pairs), 2, h, w), dtype=torch.float32, device='cuda')
-                output = OpticalFlowOutput(
-                    batch_id=batch.batch_id,
-                    flow_tensor=flow_tensor,
-                    tracklet_ids=batch.tracklet_ids,
-                    processed=True,
-                    inference_time_ms=0.0,
-                    lock_time_ms=0.0
-                )
+        else:
+            output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 
         # Queue for callbacks
         try:
@@ -330,6 +311,9 @@ class TRTOpticalFlow(Thread):
 
         buf = self._batch_buffers
 
+        # Allocate output buffer per-call (not preallocated to avoid race condition)
+        flow_gpu = cp.empty((batch_size, 2, self.model_height, self.model_width), dtype=self._model_dtype)
+
         lock_wait_start = time.perf_counter()
         with get_exec_lock():
             lock_acquired = time.perf_counter()
@@ -337,7 +321,6 @@ class TRTOpticalFlow(Thread):
             # Get buffer slices for current batch
             image1_gpu = buf['img1_input'][:batch_size]
             image2_gpu = buf['img2_input'][:batch_size]
-            flow_gpu = buf['flow_output'][:batch_size]
 
             with self.stream:
                 # Single GPU transfer for entire batch
@@ -370,6 +353,9 @@ class TRTOpticalFlow(Thread):
                 self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
 
+            # Convert CuPy array to PyTorch tensor inside lock (flow_gpu is fresh, safe to use after)
+            flow_tensor = torch.as_tensor(flow_gpu, device='cuda')  # (B, 2, H, W)
+
         method_end = time.perf_counter()
 
         # Calculate timing metrics
@@ -377,10 +363,18 @@ class TRTOpticalFlow(Thread):
         total_time_ms = (method_end - method_start) * 1000.0
         process_time_ms = total_time_ms - lock_wait_ms
 
-        # Convert CuPy array to PyTorch tensor (zero-copy, both on CUDA)
-        flow_tensor = torch.as_tensor(flow_gpu, device='cuda')  # (B, 2, H, W)
-
         return flow_tensor, process_time_ms, lock_wait_ms
+
+    # CALLBACK METHODS
+    def register_callback(self, callback: OpticalFlowOutputCallback) -> None:
+        """Register callback to receive optical flow results."""
+        with self._callback_lock:
+            self._callbacks.add(callback)
+
+    def unregister_callback(self, callback: OpticalFlowOutputCallback) -> None:
+        """Unregister previously registered callback."""
+        with self._callback_lock:
+            self._callbacks.discard(callback)
 
     def _callback_worker_loop(self) -> None:
         """Dispatch queued results to registered callbacks."""
@@ -404,14 +398,3 @@ class TRTOpticalFlow(Thread):
                 self._callback_queue.task_done()
             except Empty:
                 continue
-
-    def register_callback(self, callback: OpticalFlowOutputCallback) -> None:
-        """Register callback to receive optical flow results."""
-        with self._callback_lock:
-            self._callbacks.add(callback)
-
-    def unregister_callback(self, callback: OpticalFlowOutputCallback) -> None:
-        """Unregister previously registered callback."""
-        with self._callback_lock:
-            if callback in self._callbacks:
-                self._callbacks.remove(callback)
