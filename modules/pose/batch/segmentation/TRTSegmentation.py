@@ -341,11 +341,11 @@ class TRTSegmentation(Thread):
         except Exception:
             print("TRT RVM Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_batch(self, gpu_imgs: list[cp.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
+    def _infer_batch(self, gpu_imgs: list[torch.Tensor], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
         """Run batched TensorRT inference with per-tracklet recurrent states.
 
         Args:
-            gpu_imgs: List of RGB uint8 images on GPU (H, W, 3) - already correct size
+            gpu_imgs: List of RGB uint8 tensors on GPU (H, W, 3)
             tracklet_ids: Tracklet IDs for each image
 
         Returns:
@@ -381,8 +381,9 @@ class TRTSegmentation(Thread):
 
         # CuPy preprocessing on GPU (no CPU upload needed)
         with self.stream:
-            # Stack GPU images into batch (B, H, W, 3)
-            batch_hwc = cp.stack(gpu_imgs, axis=0)
+            # Stack torch tensors and convert to CuPy for preprocessing kernels
+            batch_torch = torch.stack(gpu_imgs, dim=0)  # (B, H, W, 3)
+            batch_hwc = cp.asarray(batch_torch)  # Zero-copy view
 
             # Check if resize is needed (crop size != model size)
             src_h, src_w = batch_hwc.shape[1:3]

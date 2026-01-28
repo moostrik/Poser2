@@ -249,15 +249,16 @@ class ONNXDetection(Thread):
         except Exception:
             print("ONNX Detection Warning: Callback queue full")
 
-    def _infer_batch_gpu(self, gpu_imgs: list[cp.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+    def _infer_batch_gpu(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
         """Run inference on GPU images using IOBinding for zero-copy."""
         batch_size = len(gpu_imgs)
 
         if batch_size == 0 or self._session is None:
             return np.empty((0, 17, 2)), np.empty((0, 17))
 
-        # Stack all GPU images into batch
-        batch_src = cp.stack(gpu_imgs, axis=0)  # (B, H, W, 3)
+        # Stack torch tensors and convert to CuPy for preprocessing kernels
+        batch_torch = torch.stack(gpu_imgs, dim=0)  # (B, H, W, 3)
+        batch_src = cp.asarray(batch_torch)  # Zero-copy view
 
         # Resize if needed
         src_h, src_w = batch_src.shape[1:3]
@@ -329,7 +330,7 @@ class ONNXDetection(Thread):
 
         try:
             # Create realistic dummy input on GPU
-            dummy_img = cp.zeros((self.model_height, self.model_width, 3), dtype=cp.uint8)
+            dummy_img = torch.zeros((self.model_height, self.model_width, 3), dtype=torch.uint8, device='cuda')
 
             # Warmup with max_batch size (all inference runs with this size)
             dummy_images = [dummy_img] * self._max_batch

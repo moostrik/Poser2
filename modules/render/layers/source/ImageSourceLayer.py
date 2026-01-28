@@ -4,8 +4,6 @@ import time
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
-import torch
-import cupy as cp
 
 # Local application imports
 from modules.gl import Tensor, Texture
@@ -41,8 +39,7 @@ class ImageSourceLayer(LayerBase):
         if self._data_cache.idle or gpu_frame is None:
             return
 
-        full_image_tensor: torch.Tensor = torch.as_tensor(gpu_frame.full_image, device='cuda')
-        self._cuda_image.set_tensor(full_image_tensor)
+        self._cuda_image.set_tensor(gpu_frame.full_image)
         self._cuda_image.update()
 
 

@@ -5,6 +5,7 @@ import time
 
 import numpy as np
 import cupy as cp
+import torch
 
 from modules.pose.features import BBox
 from modules.pose.Frame import FrameDict
@@ -162,11 +163,12 @@ class GPUCropProcessor:
                     normalized_roi = crop_roi.scale(Point2f(1.0 / img_width, 1.0 / img_height))
                     cropped_poses[pose_id] = replace(pose, bbox=BBox.from_rect(normalized_roi))
 
+                    # Convert CuPy arrays to PyTorch tensors (zero-copy)
                     gpu_frames[pose_id] = GPUFrame(
                         track_id=pose_id,
-                        full_image=gpu_image,
-                        crop=crop_buffer,
-                        prev_crop=prev_crop
+                        full_image=torch.as_tensor(gpu_image, device='cuda'),
+                        crop=torch.as_tensor(crop_buffer, device='cuda'),
+                        prev_crop=torch.as_tensor(prev_crop, device='cuda') if prev_crop is not None else None
                     )
 
                     pose_count += 1

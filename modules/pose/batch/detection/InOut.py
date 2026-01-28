@@ -1,12 +1,10 @@
 # Standard library imports
 from dataclasses import dataclass, field
-from typing import Callable, TYPE_CHECKING
+from typing import Callable
 
 # Third-party imports
 import numpy as np
-
-if TYPE_CHECKING:
-    import cupy as cp
+import torch
 
 
 @dataclass
@@ -16,7 +14,7 @@ class DetectionInput:
     GPU images will be resized to model dimensions on GPU.
     """
     batch_id: int
-    gpu_images: 'list[cp.ndarray]' = field(default_factory=list)  # GPU images (any size, H, W, 3) RGB uint8
+    gpu_images: list[torch.Tensor] = field(default_factory=list)  # GPU tensors (H, W, 3) RGB uint8
 
 @dataclass
 class DetectionOutput:

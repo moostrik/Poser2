@@ -6,6 +6,7 @@ import traceback
 
 # Third-party imports
 import numpy as np
+import torch
 import tensorrt as trt
 import cupy as cp
 
@@ -290,11 +291,11 @@ class TRTDetection(Thread):
         except Exception:
             print("TensorRT Detection Warning: Callback queue full")
 
-    def _infer_batch(self, gpu_imgs: list[cp.ndarray]) -> tuple[np.ndarray, np.ndarray, float, float]:
+    def _infer_batch(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray, float, float]:
         """Run TensorRT inference on batch of GPU images.
 
         Args:
-            gpu_imgs: List of RGB uint8 images on GPU (H, W, 3) - any size, will be resized
+            gpu_imgs: List of RGB uint8 tensors on GPU (H, W, 3)
 
         Returns:
             (keypoints, scores, process_time_ms, lock_wait_ms)
@@ -310,8 +311,9 @@ class TRTDetection(Thread):
 
         # CuPy preprocessing on GPU (no CPU upload needed)
         with self.stream:
-            # Stack all GPU images into batch
-            batch_src = cp.stack(gpu_imgs, axis=0)  # (B, src_H, src_W, 3)
+            # Stack torch tensors and convert to CuPy for preprocessing kernels
+            batch_torch = torch.stack(gpu_imgs, dim=0)  # (B, H, W, 3)
+            batch_src = cp.asarray(batch_torch)  # Zero-copy view
 
             # Check if resize is needed (crop size != model size)
             src_h, src_w = batch_src.shape[1:3]

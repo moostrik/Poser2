@@ -326,13 +326,13 @@ class ONNXSegmentation(Thread):
         except Exception:
             print("ONNX Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_batch_gpu(self, gpu_imgs: list[cp.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
+    def _infer_batch_gpu(self, gpu_imgs: list[torch.Tensor], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
         """Run batched ONNX inference with per-tracklet recurrent states using GPU images.
 
         Uses IOBinding for GPU input/output to minimize data transfers.
 
         Args:
-            gpu_imgs: List of RGB uint8 images on GPU (H, W, 3)
+            gpu_imgs: List of RGB uint8 tensors on GPU (H, W, 3)
             tracklet_ids: Tracklet IDs for each image
 
         Returns:
@@ -363,13 +363,14 @@ class ONNXSegmentation(Thread):
             # Add padding with zero images on GPU and missing IDs
             for i in range(num_padding):
                 padding_id = available_ids[i]
-                gpu_imgs.append(cp.zeros((self.model_height, self.model_width, 3), dtype=cp.uint8))
+                gpu_imgs.append(torch.zeros((self.model_height, self.model_width, 3), dtype=torch.uint8, device='cuda'))
                 tracklet_ids.append(padding_id)
                 padding_ids.append(padding_id)
                 states.append(None)  # Padding gets zero states
 
-        # Stack GPU images into batch and preprocess
-        batch_hwc = cp.stack(gpu_imgs, axis=0)  # (B, H, W, 3)
+        # Stack torch tensors and convert to CuPy for preprocessing kernels
+        batch_torch = torch.stack(gpu_imgs, dim=0)  # (B, H, W, 3)
+        batch_hwc = cp.asarray(batch_torch)  # Zero-copy view
 
         # Check if resize is needed (crop size != model size)
         src_h, src_w = batch_hwc.shape[1:3]
@@ -490,7 +491,7 @@ class ONNXSegmentation(Thread):
         """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
         try:
             # Create dummy GPU images
-            dummy_img = cp.zeros((self.model_height, self.model_width, 3), dtype=cp.uint8)
+            dummy_img = torch.zeros((self.model_height, self.model_width, 3), dtype=torch.uint8, device='cuda')
             dummy_images = [dummy_img] * self._max_batch
             dummy_ids = list(range(self._max_batch))
 
