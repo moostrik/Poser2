@@ -1,12 +1,37 @@
-"""CUDA kernels for fast GPU image resizing.
+"""CUDA kernels for fast GPU image processing.
 
-Provides bilinear interpolation resize using CuPy RawKernel for maximum performance.
+Provides:
+- Bilinear interpolation resize using CuPy RawKernel for maximum performance
+- BGR to RGB channel conversion (in-place)
+
 Supports both batched operations (for TRT inference classes) and single-image operations
 (for GPUCropProcessor which has variable input sizes).
 """
 
 import numpy as np
 import cupy as cp
+
+
+# CUDA kernel for fast BGR->RGB conversion (swaps channels 0 and 2 in-place)
+_BGR_TO_RGB_KERNEL = cp.RawKernel(r'''
+extern "C" __global__
+void bgr_to_rgb_inplace(
+    unsigned char* __restrict__ img,
+    const int height, const int width
+) {
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (x >= width || y >= height) return;
+
+    const int idx = (y * width + x) * 3;
+
+    // Swap B and R channels
+    const unsigned char tmp = img[idx];      // B
+    img[idx] = img[idx + 2];                 // B <- R
+    img[idx + 2] = tmp;                      // R <- B
+}
+''', 'bgr_to_rgb_inplace')
 
 
 # CUDA kernel for fast bilinear resize - handles both batched and single images
@@ -238,5 +263,34 @@ def bilinear_resize_inplace(
          np.int32(1),
          np.int32(src_h), np.int32(src_w),
          np.int32(dst_h), np.int32(dst_w)),
+        stream=stream
+    )
+
+
+def bgr_to_rgb_inplace(
+    img: cp.ndarray,
+    stream: cp.cuda.Stream | None = None
+) -> None:
+    """Convert BGR image to RGB in-place on GPU.
+
+    Swaps the B and R channels directly in memory, avoiding any copies.
+    Much faster than uploading a non-contiguous BGR→RGB view from CPU.
+
+    Args:
+        img: Image (H, W, 3) uint8 on GPU - modified in-place
+        stream: Optional CUDA stream
+    """
+    height, width = img.shape[:2]
+
+    block = (16, 16, 1)
+    grid = (
+        (width + block[0] - 1) // block[0],
+        (height + block[1] - 1) // block[1],
+        1
+    )
+
+    _BGR_TO_RGB_KERNEL(
+        grid, block,
+        (img, np.int32(height), np.int32(width)),
         stream=stream
     )

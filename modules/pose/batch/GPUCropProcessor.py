@@ -1,6 +1,7 @@
 # Standard library imports
 from dataclasses import replace
 from typing import Callable, TYPE_CHECKING
+import time
 
 import numpy as np
 import cupy as cp
@@ -8,8 +9,9 @@ import cupy as cp
 from modules.pose.features import BBox
 from modules.pose.Frame import FrameDict
 from modules.pose.batch.GPUFrame import GPUFrame, GPUFrameDict
-from modules.pose.batch.cuda_resize import bilinear_resize_inplace
+from modules.pose.batch.cuda_image_ops import bilinear_resize_inplace, bgr_to_rgb_inplace
 from modules.utils.PointsAndRects import Rect, Point2f
+from modules.utils.PerformanceTimer import PerformanceTimer
 
 if TYPE_CHECKING:
     from modules.cam.depthcam.Definitions import FrameType
@@ -61,6 +63,15 @@ class GPUCropProcessor:
         # Create dedicated CUDA stream for crop operations
         self._stream: cp.cuda.Stream = cp.cuda.Stream(non_blocking=True)
 
+        # Performance timers and accumulators
+        self._accumulated_upload_ms: float = 0.0
+        self._upload_timer: PerformanceTimer = PerformanceTimer(
+            name="GPUCrop Upload", sample_count=10000, report_interval=100, color="green", omit_init=10
+        )
+        self._process_timer: PerformanceTimer = PerformanceTimer(
+            name="GPUCrop Process", sample_count=10000, report_interval=100, color="green", omit_init=10
+        )
+
     def set_image(self, cam_id: int, frame_type: 'FrameType', image: np.ndarray) -> None:
         """Upload image from a specific camera to GPU. Only VIDEO frames are stored.
 
@@ -76,13 +87,23 @@ class GPUCropProcessor:
         if frame_type != FrameType.VIDEO:
             return
 
+        start = time.perf_counter()
+
         with self._stream:
             # Shift current to previous
             if cam_id in self._gpu_images:
                 self._prev_gpu_images[cam_id] = self._gpu_images[cam_id]
 
-            # Upload new frame to GPU and convert BGR to RGB
-            self._gpu_images[cam_id] = cp.asarray(image[:, :, ::-1])
+            # Upload BGR frame to GPU (fast - contiguous), then convert to RGB on GPU
+            gpu_img = cp.asarray(image)
+            bgr_to_rgb_inplace(gpu_img, stream=self._stream)
+            self._gpu_images[cam_id] = gpu_img
+
+        # Sync to measure actual upload time
+        # self._stream.synchronize()
+
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+        self._accumulated_upload_ms += elapsed_ms
 
     def process(self, poses: FrameDict) -> None:
         """Process all poses: crop on GPU and notify callbacks.
@@ -96,6 +117,8 @@ class GPUCropProcessor:
         Args:
             poses: Dictionary of tracklet_id -> Frame with bbox information
         """
+        start = time.perf_counter()
+
         cropped_poses: FrameDict = {}
         gpu_frames: GPUFrameDict = {}
 
@@ -154,6 +177,14 @@ class GPUCropProcessor:
 
         # Sync before callbacks access the data
         self._stream.synchronize()
+
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+        self._process_timer.add_time(elapsed_ms)
+
+        # Report accumulated upload time
+        if self._accumulated_upload_ms > 0:
+            self._upload_timer.add_time(self._accumulated_upload_ms)
+            self._accumulated_upload_ms = 0.0
 
         # Notify callbacks
         for callback in self._callbacks:

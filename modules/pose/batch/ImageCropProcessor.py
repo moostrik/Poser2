@@ -1,6 +1,7 @@
 # Standard library imports
 from dataclasses import replace
 from typing import Callable
+import time
 
 import numpy as np
 
@@ -8,6 +9,7 @@ from modules.pose.features import BBox
 from modules.pose.nodes._utils.ImageProcessor import ImageProcessor
 from modules.pose.Frame import FrameDict
 from modules.cam.depthcam.Definitions import FrameType
+from modules.utils.PerformanceTimer import PerformanceTimer
 
 
 CropCallback = Callable[[FrameDict, dict[int, np.ndarray]], None]
@@ -41,6 +43,11 @@ class ImageCropProcessor:
         self._callbacks: set[CropCallback] = set()
         self._flow_callbacks: set[PairCropCallback] = set()
 
+        # Performance timer
+        self._process_timer: PerformanceTimer = PerformanceTimer(
+            name="CPUCrop Process", sample_count=10000, report_interval=100, color="red", omit_init=10
+        )
+
     def set_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None:
         """Store image from a specific camera. Only VIDEO frames are stored.
 
@@ -57,6 +64,8 @@ class ImageCropProcessor:
         Crops current frame for regular callbacks and both previous/current frames
         at the same location (using current bbox) for flow callbacks.
         """
+        start = time.perf_counter()
+
         cropped_poses: FrameDict = {}
         cropped_images: dict[int, np.ndarray] = {}
         cropped_frame_pairs: dict[int, tuple[np.ndarray, np.ndarray]] = {}
@@ -83,6 +92,9 @@ class ImageCropProcessor:
                         cropped_frame_pairs[pose_id] = (prev_crop, result_image)
                 except Exception as e:
                     print(f"ImageCropProcessor: Error processing pose {pose_id}: {e}")
+
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+        self._process_timer.add_time(elapsed_ms)
 
         # Notify regular callbacks with cropped current frames
         for callback in self._callbacks:
