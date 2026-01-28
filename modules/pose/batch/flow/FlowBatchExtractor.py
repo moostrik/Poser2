@@ -8,7 +8,7 @@ import torch
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.Frame import FrameDict
 from modules.pose.batch.flow.ONNXOpticalFlow import ONNXOpticalFlow, OpticalFlowInput, OpticalFlowOutput
-from modules.pose.batch.flow.TensorRTOpticalFlow import TRTOpticalFlow
+from modules.pose.batch.flow.TRTOpticalFlow import TRTOpticalFlow
 from modules.pose.Settings import Settings, ModelType
 from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.PerformanceTimer import PerformanceTimer
@@ -42,7 +42,9 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         self._verbose: bool = settings.verbose
 
         # Track inference times
-        self._timer = PerformanceTimer(name="RAFT Optical Flow", sample_count=100, report_interval=100)
+        self._process_timer =   PerformanceTimer(name="RAFT Optical Flow", sample_count=100, report_interval=100, color='magenta', omit_init=2)
+        self._wait_timer =      PerformanceTimer(name="RAFT Wait        ", sample_count=100, report_interval=100, color='magenta', omit_init=2)
+
 
         self._optical_flow.register_callback(self._on_optical_flow_result)
 
@@ -96,7 +98,8 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
             return
 
         # Track inference time
-        self._timer.add_time(output.inference_time_ms, report=self._verbose)
+        self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
+        self._wait_timer.add_time(output.lock_time_ms, report=self._verbose)
 
         # Create dict mapping tracklet_id -> GPU tensor (2, H, W)
         # Flow tensor format: [0] = x-displacement, [1] = y-displacement
