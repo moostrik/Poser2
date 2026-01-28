@@ -8,6 +8,7 @@ import cupy as cp
 from modules.pose.features import BBox
 from modules.pose.Frame import FrameDict
 from modules.pose.batch.GPUFrame import GPUFrame, GPUFrameDict
+from modules.pose.batch.cuda_resize import bilinear_resize_inplace
 from modules.utils.PointsAndRects import Rect, Point2f
 
 if TYPE_CHECKING:
@@ -230,53 +231,8 @@ class GPUCropProcessor:
             # No resize needed
             dst[:] = crop
         else:
-            # Bilinear resize using coordinate mapping
-            self._bilinear_resize(crop, dst)
-
-    def _bilinear_resize(self, src: cp.ndarray, dst: cp.ndarray) -> None:
-        """Fast bilinear resize on GPU.
-
-        Uses coordinate grid generation and bilinear sampling.
-        """
-        src_h, src_w = src.shape[:2]
-        dst_h, dst_w = dst.shape[:2]
-
-        # Generate destination coordinates
-        y_dst = cp.arange(dst_h, dtype=cp.float32)
-        x_dst = cp.arange(dst_w, dtype=cp.float32)
-
-        # Map to source coordinates
-        scale_y = src_h / dst_h
-        scale_x = src_w / dst_w
-
-        y_src = y_dst * scale_y
-        x_src = x_dst * scale_x
-
-        # Get integer and fractional parts
-        y0 = cp.floor(y_src).astype(cp.int32)
-        x0 = cp.floor(x_src).astype(cp.int32)
-        y1 = cp.minimum(y0 + 1, src_h - 1)
-        x1 = cp.minimum(x0 + 1, src_w - 1)
-
-        fy = (y_src - y0).reshape(-1, 1, 1)
-        fx = (x_src - x0).reshape(1, -1, 1)
-
-        # Clamp indices
-        y0 = cp.clip(y0, 0, src_h - 1)
-        x0 = cp.clip(x0, 0, src_w - 1)
-
-        # Bilinear interpolation
-        # dst[i, j] = (1-fy)(1-fx)*src[y0,x0] + (1-fy)*fx*src[y0,x1] + fy*(1-fx)*src[y1,x0] + fy*fx*src[y1,x1]
-        top_left = src[y0][:, x0]  # (dst_h, dst_w, 3)
-        top_right = src[y0][:, x1]
-        bottom_left = src[y1][:, x0]
-        bottom_right = src[y1][:, x1]
-
-        top = top_left * (1 - fx) + top_right * fx
-        bottom = bottom_left * (1 - fx) + bottom_right * fx
-        result = top * (1 - fy) + bottom * fy
-
-        dst[:] = result.astype(cp.uint8)
+            # Bilinear resize using shared CUDA kernel
+            bilinear_resize_inplace(crop, dst, self._stream)
 
     def add_callback(self, callback: GPUCropCallback) -> None:
         """Register callback to receive cropped poses and GPU frames."""

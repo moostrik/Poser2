@@ -11,6 +11,7 @@ import cupy as cp
 
 # Reuse dataclasses from MMDetection
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
+from modules.pose.batch.cuda_resize import batched_bilinear_resize_inplace
 
 from modules.pose.Settings import Settings
 from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
@@ -231,6 +232,10 @@ class TRTDetection(Thread):
             self._mean_gpu = cp.asarray(IMAGENET_MEAN, dtype=self._model_dtype)
             self._std_gpu = cp.asarray(IMAGENET_STD, dtype=self._model_dtype)
 
+            # Resize dimensions for GPU crop -> model size
+            self._crop_src_h: int = 512  # ULTRA crop height
+            self._crop_src_w: int = 384  # ULTRA crop width
+
             # Set persistent tensor addresses (buffer base pointers don't change when slicing)
             self.context.set_tensor_address(self.input_name, self._batch_buffers['input'].data.ptr)
             self.context.set_tensor_address(self.output_names[0], self._batch_buffers['simcc_x'].data.ptr)
@@ -259,19 +264,39 @@ class TRTDetection(Thread):
 
         output = DetectionOutput(batch_id=batch.batch_id, processed=True)
 
-        # Run inference
-        if batch.images:
-            # Limit processing to max batch size
-            images_to_process = batch.images[:self._max_batch]
+        # Determine input source: GPU images take priority
+        has_gpu_images = len(batch.gpu_images) > 0
+        has_cpu_images = len(batch.images) > 0
 
-            # Run inference with timing breakdown
+        if has_gpu_images:
+            # GPU path: images already on GPU, resize to model size
+            gpu_images_to_process = batch.gpu_images[:self._max_batch]
+            keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch_gpu(gpu_images_to_process)
+
+            # Normalize coordinates to [0, 1]
+            keypoints[:, :, 0] /= self.model_width
+            keypoints[:, :, 1] /= self.model_height
+
+            point_list = [keypoints[i] for i in range(len(keypoints))]
+            score_list = [scores[i] for i in range(len(scores))]
+
+            output = DetectionOutput(
+                batch_id=batch.batch_id,
+                point_batch=point_list,
+                score_batch=score_list,
+                processed=True,
+                inference_time_ms=process_time_ms,
+                lock_time_ms=lock_wait_ms
+            )
+        elif has_cpu_images:
+            # CPU path: upload to GPU (original behavior)
+            images_to_process = batch.images[:self._max_batch]
             keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch(images_to_process, self.model_width, self.model_height)
 
             # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
             keypoints[:, :, 1] /= self.model_height
 
-            # Convert to list format
             point_list = [keypoints[i] for i in range(len(keypoints))]
             score_list = [scores[i] for i in range(len(scores))]
 
@@ -323,6 +348,69 @@ class TRTDetection(Thread):
             img_chw_batch = cp.ascontiguousarray(cp.transpose(img_rgb_batch, (0, 3, 1, 2)))  # HWC→CHW
             input_gpu[:] = (img_chw_batch - self._mean_gpu) / self._std_gpu
         # self.stream.synchronize()  # Ensure preprocessing complete before TRT reads
+
+        # TensorRT operations only - acquire global lock
+        lock_wait_start: float = time.perf_counter()
+        with get_exec_lock():
+            lock_acquired: float = time.perf_counter()
+
+            # Only set_input_shape per-call (addresses are persistent from _setup)
+            self.context.set_input_shape(self.input_name, input_gpu.shape)
+
+            self.context.execute_async_v3(stream_handle=self.stream.ptr)
+            self.stream.synchronize()
+
+        # Transfer outputs to CPU (no lock needed - our own buffers)
+        simcc_x_cpu = cp.asnumpy(simcc_x_gpu)
+        simcc_y_cpu = cp.asnumpy(simcc_y_gpu)
+
+        # Decode on CPU (outside lock - no GPU resource needed)
+        keypoints, scores = TRTDetection._decode_simcc_cpu(simcc_x_cpu, simcc_y_cpu, self.simcc_split_ratio)
+
+        method_end = time.perf_counter()
+
+        lock_wait_ms = (lock_acquired - lock_wait_start) * 1000.0
+        total_time_ms = (method_end - method_start) * 1000.0
+        process_time_ms = total_time_ms - lock_wait_ms
+
+        return keypoints, scores, process_time_ms, lock_wait_ms
+
+    def _infer_batch_gpu(self, gpu_imgs: list[cp.ndarray]) -> tuple[np.ndarray, np.ndarray, float, float]:
+        """Run TensorRT inference on batch of GPU images.
+
+        Args:
+            gpu_imgs: List of RGB uint8 images on GPU (H, W, 3) - any size, will be resized
+
+        Returns:
+            (keypoints, scores, process_time_ms, lock_wait_ms)
+        """
+        batch_size = len(gpu_imgs)
+        method_start: float = time.perf_counter()
+
+        # Get batched buffers (sliced to actual batch size)
+        buf = self._batch_buffers
+        input_gpu = buf['input'][:batch_size]
+        simcc_x_gpu = buf['simcc_x'][:batch_size]
+        simcc_y_gpu = buf['simcc_y'][:batch_size]
+
+        # CuPy preprocessing on GPU (no CPU upload needed)
+        with self.stream:
+            # Stack all GPU images into batch
+            batch_src = cp.stack(gpu_imgs, axis=0)  # (B, src_H, src_W, 3)
+
+            # Check if resize is needed (crop size != model size)
+            src_h, src_w = batch_src.shape[1:3]
+            if src_h != self.model_height or src_w != self.model_width:
+                # Batched resize directly into preallocated buffer
+                batched_bilinear_resize_inplace(batch_src, buf['img_uint8'][:batch_size], self.stream)
+            else:
+                buf['img_uint8'][:batch_size] = batch_src
+
+            # Convert to float and normalize
+            img_float_batch = buf['img_uint8'][:batch_size].astype(self._model_dtype)
+            # Images are already RGB from GPUCropProcessor
+            img_chw_batch = cp.ascontiguousarray(cp.transpose(img_float_batch, (0, 3, 1, 2)))  # HWC→CHW
+            input_gpu[:] = (img_chw_batch - self._mean_gpu) / self._std_gpu
 
         # TensorRT operations only - acquire global lock
         lock_wait_start: float = time.perf_counter()

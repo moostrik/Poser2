@@ -7,6 +7,7 @@ import numpy as np
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput
 from modules.pose.batch.detection.ONNXDetection import ONNXDetection
 from modules.pose.batch.detection.TRTDetection import TRTDetection
+from modules.pose.batch.GPUFrame import GPUFrameDict
 from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin
 from modules.pose.Frame import FrameDict
@@ -77,6 +78,31 @@ class PointBatchExtractor(PoseDictCallbackMixin):
             self._waiting_batches[batch_id] = (poses, tracklet_ids)
 
         self._detection.submit_batch(DetectionInput(batch_id=batch_id, images=image_list))
+
+    def process_gpu(self, poses: FrameDict, gpu_frames: GPUFrameDict) -> None:
+        """Submit poses with GPU images for async processing. Results broadcast via callbacks.
+
+        Args:
+            poses: Dictionary of poses keyed by tracklet ID
+            gpu_frames: GPU frames with crops already on GPU, keyed by tracklet ID
+        """
+        if not self._detection.is_ready:
+            return
+
+        tracklet_ids: list[int] = []
+        gpu_image_list: list = []  # list[cp.ndarray]
+
+        for tracklet_id in poses.keys():
+            if tracklet_id in gpu_frames:
+                tracklet_ids.append(tracklet_id)
+                gpu_image_list.append(gpu_frames[tracklet_id].crop)
+
+        with self._lock:
+            self._batch_counter += 1
+            batch_id: int = self._batch_counter
+            self._waiting_batches[batch_id] = (poses, tracklet_ids)
+
+        self._detection.submit_batch(DetectionInput(batch_id=batch_id, gpu_images=gpu_image_list))
 
     def _on_detection_result(self, output: DetectionOutput) -> None:
         """Callback from Detection thread when results are ready or dropped.

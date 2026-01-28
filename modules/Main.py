@@ -223,7 +223,8 @@ class Main():
         self.bbox_filters.add_poses_callback(self.image_flow_processor.process)
         self.bbox_filters.add_poses_callback(self.gpu_crop_processor.process)
         self.gpu_crop_processor.add_callback(self.data_hub.set_gpu_frames)
-        self.image_crop_processor.add_callback(self.point_extractor.process)
+        self.gpu_crop_processor.add_callback(self.point_extractor.process_gpu)
+        # self.image_crop_processor.add_callback(self.point_extractor.process)
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
 
         self.pose_raw_filters.add_poses_callback(self.pd_pose_streamer.submit)

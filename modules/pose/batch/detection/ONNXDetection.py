@@ -1,5 +1,3 @@
-# Create: modules/pose/detection/ONNXDetection.py
-
 # Standard library imports
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
@@ -8,9 +6,11 @@ import traceback
 
 # Third-party imports
 import numpy as np
+import cupy as cp
 import onnxruntime as ort
 
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
+from modules.pose.batch.cuda_resize import batched_bilinear_resize
 
 from modules.pose.Settings import Settings
 
@@ -191,6 +191,12 @@ class ONNXDetection(Thread):
             self._imagenet_mean = np.array([123.675, 116.28, 103.53], dtype=self._model_dtype).reshape(1, 3, 1, 1)
             self._imagenet_std = np.array([58.395, 57.12, 57.375], dtype=self._model_dtype).reshape(1, 3, 1, 1)
 
+            # GPU normalization constants (CuPy)
+            cupy_dtype = cp.float16 if self._model_dtype == np.float16 else cp.float32
+            self._mean_gpu = cp.asarray(self._imagenet_mean, dtype=cupy_dtype)
+            self._std_gpu = cp.asarray(self._imagenet_std, dtype=cupy_dtype)
+            self._cupy_dtype = cupy_dtype
+
             # Warmup model
             self._model_warmup()
 
@@ -214,22 +220,38 @@ class ONNXDetection(Thread):
         if batch is None:
             return
 
-        if batch.images:
+        # Determine input source: GPU images take priority
+        has_gpu_images = len(batch.gpu_images) > 0
+        has_cpu_images = len(batch.images) > 0
+
+        if has_gpu_images:
             batch_start = time.perf_counter()
+            gpu_images_to_process = batch.gpu_images[:self._max_batch]
+            keypoints, scores = self._infer_batch_gpu(gpu_images_to_process)
 
-            # Limit processing to max batch size
-            images_to_process = batch.images[:self._max_batch]
-
-            # Preprocess and run inference
-            keypoints, scores = self._infer_batch(images_to_process)
-
-            # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
             keypoints[:, :, 1] /= self.model_height
 
             inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
+            point_list = [keypoints[i] for i in range(len(keypoints))]
+            score_list = [scores[i] for i in range(len(scores))]
 
-            # Convert to list format matching MMDetection
+            output = DetectionOutput(
+                batch_id=batch.batch_id,
+                point_batch=point_list,
+                score_batch=score_list,
+                processed=True,
+                inference_time_ms=inference_time_ms
+            )
+        elif has_cpu_images:
+            batch_start = time.perf_counter()
+            images_to_process = batch.images[:self._max_batch]
+            keypoints, scores = self._infer_batch(images_to_process)
+
+            keypoints[:, :, 0] /= self.model_width
+            keypoints[:, :, 1] /= self.model_height
+
+            inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
             point_list = [keypoints[i] for i in range(len(keypoints))]
             score_list = [scores[i] for i in range(len(scores))]
 
@@ -283,6 +305,64 @@ class ONNXDetection(Thread):
         # Decode SimCC outputs
         simcc_x, simcc_y = outputs[0], outputs[1]  # (padded_batch, 17, W*2), (padded_batch, 17, H*2)
         keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)  # type: ignore
+
+        # Slice to actual batch size
+        keypoints = keypoints[:actual_batch_size]
+        scores = scores[:actual_batch_size]
+
+        return keypoints, scores
+
+    def _infer_batch_gpu(self, gpu_imgs: list[cp.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+        """Run ONNX inference on batch of GPU images using IOBinding.
+
+        Uses DLPack for zero-copy GPU input to ONNX Runtime.
+        """
+        actual_batch_size = len(gpu_imgs)
+        if actual_batch_size == 0 or self._session is None:
+            return np.empty((0, 17, 2)), np.empty((0, 17))
+
+        # Stack all GPU images into batch
+        batch_src = cp.stack(gpu_imgs, axis=0)  # (B, src_H, src_W, 3)
+
+        # Resize if needed (crop size != model size)
+        src_h, src_w = batch_src.shape[1:3]
+        if src_h != self.model_height or src_w != self.model_width:
+            resized_batch = batched_bilinear_resize(batch_src, self.model_height, self.model_width)
+        else:
+            resized_batch = batch_src
+
+        # Pad to fixed batch size to avoid ONNX Runtime recompilation
+        num_padding = self._max_batch - actual_batch_size
+        if num_padding > 0:
+            dummy_imgs = cp.zeros((num_padding, self.model_height, self.model_width, 3), dtype=cp.uint8)
+            resized_batch = cp.concatenate([resized_batch, dummy_imgs], axis=0)
+
+        # Preprocess on GPU
+        batch_hwc = resized_batch.astype(self._cupy_dtype)  # (B, H, W, 3)
+        # Images are already RGB from GPUCropProcessor
+        batch_chw = cp.ascontiguousarray(cp.transpose(batch_hwc, (0, 3, 1, 2)))  # (B, 3, H, W)
+        batch_normalized = (batch_chw - self._mean_gpu) / self._std_gpu
+        batch_normalized = cp.ascontiguousarray(batch_normalized)
+
+        # Convert CuPy -> OrtValue via DLPack (zero-copy)
+        input_name = self._session.get_inputs()[0].name
+        ort_input = ort.OrtValue.from_dlpack(batch_normalized.toDlpack())
+
+        # Use IOBinding for GPU I/O
+        io_binding = self._session.io_binding()
+        io_binding.bind_ortvalue_input(input_name, ort_input)
+        io_binding.bind_output('simcc_x', 'cuda')
+        io_binding.bind_output('simcc_y', 'cuda')
+
+        # Run inference
+        self._session.run_with_iobinding(io_binding)
+
+        # Get outputs (still on GPU as OrtValue, convert to numpy)
+        outputs = io_binding.copy_outputs_to_cpu()
+        simcc_x, simcc_y = outputs[0], outputs[1]
+
+        # Decode SimCC outputs
+        keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)
 
         # Slice to actual batch size
         keypoints = keypoints[:actual_batch_size]

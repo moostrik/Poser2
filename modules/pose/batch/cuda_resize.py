@@ -1,0 +1,242 @@
+"""CUDA kernels for fast GPU image resizing.
+
+Provides bilinear interpolation resize using CuPy RawKernel for maximum performance.
+Supports both batched operations (for TRT inference classes) and single-image operations
+(for GPUCropProcessor which has variable input sizes).
+"""
+
+import numpy as np
+import cupy as cp
+
+
+# CUDA kernel for fast bilinear resize - handles both batched and single images
+_BILINEAR_RESIZE_KERNEL = cp.RawKernel(r'''
+extern "C" __global__
+void bilinear_resize_batch(
+    const unsigned char* __restrict__ src,
+    unsigned char* __restrict__ dst,
+    const int batch_size,
+    const int src_h, const int src_w,
+    const int dst_h, const int dst_w
+) {
+    // Each thread handles one output pixel (x, y) across batch items
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+    const int b = blockIdx.z;  // batch index
+
+    if (x >= dst_w || y >= dst_h || b >= batch_size) return;
+
+    // Scale factors
+    const float scale_x = (float)src_w / (float)dst_w;
+    const float scale_y = (float)src_h / (float)dst_h;
+
+    // Map to source coordinates
+    const float src_x = x * scale_x;
+    const float src_y = y * scale_y;
+
+    // Integer coordinates and fractions
+    const int x0 = (int)src_x;
+    const int y0 = (int)src_y;
+    const int x1 = min(x0 + 1, src_w - 1);
+    const int y1 = min(y0 + 1, src_h - 1);
+
+    const float fx = src_x - x0;
+    const float fy = src_y - y0;
+
+    // Source and destination strides
+    const int src_stride = src_h * src_w * 3;
+    const int dst_stride = dst_h * dst_w * 3;
+
+    // Base pointers for this batch item
+    const unsigned char* src_batch = src + b * src_stride;
+    unsigned char* dst_batch = dst + b * dst_stride;
+
+    // Bilinear interpolation for each channel
+    #pragma unroll
+    for (int c = 0; c < 3; c++) {
+        const float tl = src_batch[(y0 * src_w + x0) * 3 + c];
+        const float tr = src_batch[(y0 * src_w + x1) * 3 + c];
+        const float bl = src_batch[(y1 * src_w + x0) * 3 + c];
+        const float br = src_batch[(y1 * src_w + x1) * 3 + c];
+
+        const float top = tl * (1.0f - fx) + tr * fx;
+        const float bot = bl * (1.0f - fx) + br * fx;
+        const float val = top * (1.0f - fy) + bot * fy;
+
+        dst_batch[(y * dst_w + x) * 3 + c] = (unsigned char)(val + 0.5f);
+    }
+}
+''', 'bilinear_resize_batch')
+
+
+def batched_bilinear_resize(
+    batch_src: cp.ndarray,
+    dst_h: int,
+    dst_w: int,
+    stream: cp.cuda.Stream | None = None
+) -> cp.ndarray:
+    """Resize batch of images using CUDA kernel.
+
+    Args:
+        batch_src: (B, H, W, 3) uint8 source images
+        dst_h: Target height
+        dst_w: Target width
+        stream: Optional CUDA stream (if None, uses current stream context)
+
+    Returns:
+        (B, dst_h, dst_w, 3) uint8 resized images
+    """
+    batch_size, src_h, src_w = batch_src.shape[:3]
+
+    # Ensure contiguous for kernel
+    if not batch_src.flags.c_contiguous:
+        batch_src = cp.ascontiguousarray(batch_src)
+
+    # Allocate output
+    batch_dst = cp.empty((batch_size, dst_h, dst_w, 3), dtype=cp.uint8)
+
+    # Launch kernel
+    block = (16, 16, 1)
+    grid = (
+        (dst_w + block[0] - 1) // block[0],
+        (dst_h + block[1] - 1) // block[1],
+        batch_size
+    )
+
+    # Launch on provided stream or current stream context
+    _BILINEAR_RESIZE_KERNEL(
+        grid, block,
+        (batch_src, batch_dst,
+         np.int32(batch_size),
+         np.int32(src_h), np.int32(src_w),
+         np.int32(dst_h), np.int32(dst_w)),
+        stream=stream
+    )
+
+    return batch_dst
+
+
+def batched_bilinear_resize_inplace(
+    batch_src: cp.ndarray,
+    batch_dst: cp.ndarray,
+    stream: cp.cuda.Stream | None = None
+) -> None:
+    """Resize batch of images into pre-allocated buffer using CUDA kernel.
+
+    Avoids allocation overhead when destination buffer is reused.
+
+    Args:
+        batch_src: (B, H, W, 3) uint8 source images
+        batch_dst: (B, dst_h, dst_w, 3) uint8 pre-allocated destination
+        stream: Optional CUDA stream
+    """
+    batch_size, src_h, src_w = batch_src.shape[:3]
+    dst_h, dst_w = batch_dst.shape[1:3]
+
+    # Ensure contiguous for kernel
+    if not batch_src.flags.c_contiguous:
+        batch_src = cp.ascontiguousarray(batch_src)
+
+    # Launch kernel
+    block = (16, 16, 1)
+    grid = (
+        (dst_w + block[0] - 1) // block[0],
+        (dst_h + block[1] - 1) // block[1],
+        batch_size
+    )
+
+    _BILINEAR_RESIZE_KERNEL(
+        grid, block,
+        (batch_src, batch_dst,
+         np.int32(batch_size),
+         np.int32(src_h), np.int32(src_w),
+         np.int32(dst_h), np.int32(dst_w)),
+        stream=stream
+    )
+
+
+def bilinear_resize_single(
+    src: cp.ndarray,
+    dst_h: int,
+    dst_w: int,
+    stream: cp.cuda.Stream | None = None
+) -> cp.ndarray:
+    """Fast single-image bilinear resize using CUDA kernel.
+
+    Wraps the batched kernel with batch_size=1.
+
+    Args:
+        src: Source image (H, W, 3) uint8 on GPU
+        dst_h: Target height
+        dst_w: Target width
+        stream: Optional CUDA stream (uses default if None)
+
+    Returns:
+        Resized image (dst_h, dst_w, 3) uint8 on GPU
+    """
+    src_h, src_w = src.shape[:2]
+
+    # Ensure contiguous
+    if not src.flags.c_contiguous:
+        src = cp.ascontiguousarray(src)
+
+    # Allocate output
+    dst = cp.empty((dst_h, dst_w, 3), dtype=cp.uint8)
+
+    # Launch kernel with batch_size=1
+    block = (16, 16, 1)
+    grid = (
+        (dst_w + block[0] - 1) // block[0],
+        (dst_h + block[1] - 1) // block[1],
+        1
+    )
+
+    _BILINEAR_RESIZE_KERNEL(
+        grid, block,
+        (src, dst,
+         np.int32(1),
+         np.int32(src_h), np.int32(src_w),
+         np.int32(dst_h), np.int32(dst_w)),
+        stream=stream
+    )
+
+    return dst
+
+
+def bilinear_resize_inplace(
+    src: cp.ndarray,
+    dst: cp.ndarray,
+    stream: cp.cuda.Stream | None = None
+) -> None:
+    """Fast single-image bilinear resize into pre-allocated buffer.
+
+    Useful when destination buffer is reused across frames.
+
+    Args:
+        src: Source image (H, W, 3) uint8 on GPU
+        dst: Destination buffer (dst_h, dst_w, 3) uint8 on GPU (will be overwritten)
+        stream: Optional CUDA stream (uses default if None)
+    """
+    src_h, src_w = src.shape[:2]
+    dst_h, dst_w = dst.shape[:2]
+
+    # Ensure contiguous
+    if not src.flags.c_contiguous:
+        src = cp.ascontiguousarray(src)
+
+    # Launch kernel with batch_size=1
+    block = (16, 16, 1)
+    grid = (
+        (dst_w + block[0] - 1) // block[0],
+        (dst_h + block[1] - 1) // block[1],
+        1
+    )
+
+    _BILINEAR_RESIZE_KERNEL(
+        grid, block,
+        (src, dst,
+         np.int32(1),
+         np.int32(src_h), np.int32(src_w),
+         np.int32(dst_h), np.int32(dst_w)),
+        stream=stream
+    )

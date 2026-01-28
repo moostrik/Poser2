@@ -1,16 +1,25 @@
 # Standard library imports
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
 
 # Third-party imports
 import numpy as np
 
+if TYPE_CHECKING:
+    import cupy as cp
+
 
 @dataclass
 class DetectionInput:
-    """Batch of images for pose detection. Images must be 192x256 (HxW)."""
+    """Batch of images for pose detection.
+
+    Supports both CPU (NumPy) and GPU (CuPy) images.
+    GPU images will be resized to model dimensions on GPU.
+    CPU images are uploaded and processed as before.
+    """
     batch_id: int
-    images: list[np.ndarray]
+    images: list[np.ndarray] = field(default_factory=list)  # CPU images (model H, W, 3) BGR uint8
+    gpu_images: 'list[cp.ndarray]' = field(default_factory=list)  # GPU images (any size, H, W, 3) RGB uint8
 
 @dataclass
 class DetectionOutput:
