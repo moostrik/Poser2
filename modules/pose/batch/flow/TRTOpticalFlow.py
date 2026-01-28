@@ -11,6 +11,7 @@ import tensorrt as trt
 import cupy as cp
 
 from .InOut import OpticalFlowInput, OpticalFlowOutput, OpticalFlowOutputCallback
+from ..cuda_image_ops import batched_bilinear_resize_inplace
 
 from typing import TYPE_CHECKING
 
@@ -144,8 +145,8 @@ class TRTOpticalFlow(Thread):
             return
 
         # Validate batch size
-        if len(input_batch.frame_pairs) > self._max_batch:
-            print(f"TensorRT Optical Flow Warning: Batch size {len(input_batch.frame_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
+        if len(input_batch.gpu_image_pairs) > self._max_batch:
+            print(f"TensorRT Optical Flow Warning: Batch size {len(input_batch.gpu_image_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
 
         dropped_batch: OpticalFlowInput | None = None
 
@@ -265,9 +266,9 @@ class TRTOpticalFlow(Thread):
         output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
 
         # Run inference
-        if batch.frame_pairs:
+        if batch.gpu_image_pairs:
             # Limit processing to max batch size
-            pairs_to_process = batch.frame_pairs[:self._max_batch]
+            pairs_to_process = batch.gpu_image_pairs[:self._max_batch]
             tracklets_to_process = batch.tracklet_ids[:self._max_batch]
 
             try:
@@ -293,11 +294,11 @@ class TRTOpticalFlow(Thread):
         except Exception:
             print("TensorRT Optical Flow Warning: Callback queue full, dropping results")
 
-    def _infer_batch(self, frame_pairs: list[tuple[np.ndarray, np.ndarray]]) -> tuple[torch.Tensor, float, float]:
-        """Run TensorRT RAFT inference on batch of frame pairs.
+    def _infer_batch(self, gpu_pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float, float]:
+        """Run TensorRT RAFT inference on batch of GPU frame pairs.
 
         Args:
-            frame_pairs: List of (prev_frame, curr_frame) tuples, each (H, W, 3) BGR uint8
+            gpu_pairs: List of (prev_crop, curr_crop) tuples, each (H, W, 3) RGB uint8 on GPU
 
         Returns:
             Tuple of (flow_tensor, inference_time_ms, lock_wait_ms)
@@ -306,13 +307,16 @@ class TRTOpticalFlow(Thread):
             - lock_wait_ms: Time spent waiting for lock
         """
         method_start = time.perf_counter()
-        batch_size = len(frame_pairs)
+        batch_size = len(gpu_pairs)
 
-        # CPU preprocessing: Stack and BGR -> RGB (outside lock to minimize contention)
-        prev_frames = np.stack([pair[0] for pair in frame_pairs], axis=0)  # (B, H, W, 3)
-        curr_frames = np.stack([pair[1] for pair in frame_pairs], axis=0)  # (B, H, W, 3)
-        prev_frames_rgb = prev_frames[:, :, :, ::-1]  # BGR to RGB
-        curr_frames_rgb = curr_frames[:, :, :, ::-1]
+        # Get input dimensions from first pair
+        input_h, input_w = gpu_pairs[0][0].shape[0], gpu_pairs[0][0].shape[1]
+
+        # Stack GPU tensors and convert to CuPy for preprocessing
+        prev_batch = torch.stack([p[0] for p in gpu_pairs], dim=0)  # (B, H, W, 3)
+        curr_batch = torch.stack([p[1] for p in gpu_pairs], dim=0)  # (B, H, W, 3)
+        prev_hwc = cp.asarray(prev_batch)  # Zero-copy view
+        curr_hwc = cp.asarray(curr_batch)  # Zero-copy view
 
         buf = self._batch_buffers
 
@@ -323,12 +327,19 @@ class TRTOpticalFlow(Thread):
         # Allocate output buffer per-call (not preallocated to avoid race condition)
         flow_gpu = cp.empty((batch_size, 2, self.model_height, self.model_width), dtype=self._model_dtype)
 
-        # CuPy preprocessing on our own buffers/stream (no lock needed)
+        # CuPy preprocessing on GPU (already RGB from GPUCropProcessor)
         with self.stream:
-            buf['img1_uint8'][:batch_size].set(prev_frames_rgb)
-            buf['img2_uint8'][:batch_size].set(curr_frames_rgb)
-            img1_float = buf['img1_uint8'][:batch_size].astype(self._model_dtype)
-            img2_float = buf['img2_uint8'][:batch_size].astype(self._model_dtype)
+            # Check if resize is needed (crop size != model size)
+            if input_h != self.model_height or input_w != self.model_width:
+                # Resize into preallocated uint8 buffers
+                batched_bilinear_resize_inplace(prev_hwc, buf['img1_uint8'][:batch_size], self.stream)
+                batched_bilinear_resize_inplace(curr_hwc, buf['img2_uint8'][:batch_size], self.stream)
+                prev_hwc = buf['img1_uint8'][:batch_size]
+                curr_hwc = buf['img2_uint8'][:batch_size]
+
+            # Convert to float and transpose HWC -> CHW
+            img1_float = prev_hwc.astype(self._model_dtype)
+            img2_float = curr_hwc.astype(self._model_dtype)
             img1_chw = cp.ascontiguousarray(cp.transpose(img1_float, (0, 3, 1, 2)))
             img2_chw = cp.ascontiguousarray(cp.transpose(img2_float, (0, 3, 1, 2)))
             image1_gpu[:] = img1_chw

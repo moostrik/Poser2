@@ -131,8 +131,8 @@ class ONNXOpticalFlow(Thread):
             return
 
         # Validate batch size
-        if len(input_batch.frame_pairs) > self._max_batch:
-            print(f"ONNX Optical Flow Warning: Batch size {len(input_batch.frame_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
+        if len(input_batch.gpu_image_pairs) > self._max_batch:
+            print(f"ONNX Optical Flow Warning: Batch size {len(input_batch.gpu_image_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
 
         dropped_batch: OpticalFlowInput | None = None
 
@@ -242,9 +242,9 @@ class ONNXOpticalFlow(Thread):
         output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
 
         # Run inference
-        if batch.frame_pairs:
+        if batch.gpu_image_pairs:
             # Limit processing to max batch size
-            pairs_to_process = batch.frame_pairs[:self._max_batch]
+            pairs_to_process = batch.gpu_image_pairs[:self._max_batch]
             tracklets_to_process = batch.tracklet_ids[:self._max_batch]
 
             try:
@@ -269,47 +269,53 @@ class ONNXOpticalFlow(Thread):
         except Exception:
             print("ONNX Optical Flow Warning: Callback queue full, dropping results")
 
-    def _infer_batch(self, frame_pairs: list[tuple[np.ndarray, np.ndarray]]) -> tuple[torch.Tensor, float]:
-        """Run batched ONNX inference on frame pairs.
+    def _infer_batch(self, gpu_pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float]:
+        """Run batched ONNX inference on GPU frame pairs.
 
         Uses fixed batch size padding to avoid ONNX Runtime dynamic shape recompilation.
 
         Args:
-            frame_pairs: List of (prev_frame, curr_frame) tuples, each (H, W, 3) BGR uint8
+            gpu_pairs: List of (prev_crop, curr_crop) tuples, each (H, W, 3) RGB uint8 on GPU
 
         Returns:
             (flow_tensor (actual_batch, 2, H, W) on CUDA, inference_time_ms)
         """
-        actual_batch_size = len(frame_pairs)
+        actual_batch_size = len(gpu_pairs)
         if actual_batch_size == 0 or self._session is None:
             return torch.empty(0, 2, self.model_height, self.model_width, dtype=torch.float32, device='cuda'), 0.0
 
         batch_start = time.perf_counter()
 
+        # Get input dimensions from first pair
+        input_h, input_w = gpu_pairs[0][0].shape[0], gpu_pairs[0][0].shape[1]
+
+        # Stack GPU tensors: (B, H, W, 3) and convert to float CHW format
+        prev_batch = torch.stack([p[0] for p in gpu_pairs], dim=0).float()  # (B, H, W, 3)
+        curr_batch = torch.stack([p[1] for p in gpu_pairs], dim=0).float()  # (B, H, W, 3)
+
+        # HWC -> CHW: (B, 3, H, W)
+        prev_chw = prev_batch.permute(0, 3, 1, 2).contiguous()
+        curr_chw = curr_batch.permute(0, 3, 1, 2).contiguous()
+
+        # Resize if needed (crop size != model size)
+        if input_h != self.model_height or input_w != self.model_width:
+            prev_chw = torch.nn.functional.interpolate(
+                prev_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
+            )
+            curr_chw = torch.nn.functional.interpolate(
+                curr_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
+            )
+
         # Pad to fixed batch size to avoid ONNX Runtime recompilation
         num_padding = self._max_batch - actual_batch_size
         if num_padding > 0:
-            # Add padding with zero frame pairs
-            dummy_frame = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
-            for _ in range(num_padding):
-                frame_pairs.append((dummy_frame, dummy_frame))
+            padding_shape = (num_padding, 3, self.model_height, self.model_width)
+            prev_chw = torch.cat([prev_chw, torch.zeros(padding_shape, dtype=prev_chw.dtype, device='cuda')], dim=0)
+            curr_chw = torch.cat([curr_chw, torch.zeros(padding_shape, dtype=curr_chw.dtype, device='cuda')], dim=0)
 
-        # Preprocess all frames: BGR -> RGB, HWC -> NCHW, keep in [0, 255] range (RAFT expects this)
-        image1_list = []
-        image2_list = []
-        for prev_frame, curr_frame in frame_pairs:
-            # BGR to RGB, convert to model dtype
-            prev_rgb = prev_frame[:, :, ::-1].astype(self._model_dtype)
-            curr_rgb = curr_frame[:, :, ::-1].astype(self._model_dtype)
-            # HWC to CHW
-            prev_chw = np.transpose(prev_rgb, (2, 0, 1))
-            curr_chw = np.transpose(curr_rgb, (2, 0, 1))
-            image1_list.append(prev_chw)
-            image2_list.append(curr_chw)
-
-        # Stack into batches (B, 3, H, W)
-        image1_batch = np.stack(image1_list, axis=0)
-        image2_batch = np.stack(image2_list, axis=0)
+        # Convert to CPU numpy for ONNX Runtime (it will copy to GPU internally via CUDAExecutionProvider)
+        image1_batch = prev_chw.cpu().numpy().astype(self._model_dtype)
+        image2_batch = curr_chw.cpu().numpy().astype(self._model_dtype)
 
         # Run ONNX inference
         input_names = [inp.name for inp in self._session.get_inputs()]
@@ -337,9 +343,9 @@ class ONNXOpticalFlow(Thread):
             return
 
         try:
-            # Create realistic dummy input
-            np.random.seed(42)
-            dummy_frame = (np.random.rand(self.model_height, self.model_width, 3) * 255).astype(np.uint8)
+            # Create realistic dummy GPU input (H, W, 3) RGB uint8
+            torch.manual_seed(42)
+            dummy_frame = (torch.rand(self.model_height, self.model_width, 3, device='cuda') * 255).to(torch.uint8)
 
             # Warmup with max_batch size (all inference runs with this size)
             dummy_pairs = [(dummy_frame, dummy_frame)] * self._max_batch

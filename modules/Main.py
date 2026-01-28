@@ -236,8 +236,7 @@ class Main():
         self.mask_extractor.start()
 
         # FLOW
-        # self.image_flow_processor.add_pair_callback(self.flow_extractor.process)
-        # self.image_flow_processor.add_pair_callback(self.data_hub.set_flow_images)
+        self.gpu_crop_processor.add_callback(self.flow_extractor.process)
         self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
         self.flow_extractor.start()
 

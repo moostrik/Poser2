@@ -3,15 +3,14 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 # Third-party imports
-import numpy as np
 import torch
 
 
 @dataclass
 class OpticalFlowInput:
-    """Batch of consecutive frame pairs for optical flow computation."""
+    """Batch of consecutive GPU frame pairs for optical flow computation."""
     batch_id: int
-    frame_pairs: list[tuple[np.ndarray, np.ndarray]]  # List of (prev_frame, curr_frame) pairs
+    gpu_image_pairs: list[tuple[torch.Tensor, torch.Tensor]] = field(default_factory=list)  # List of (prev_crop, curr_crop) GPU tensors
     tracklet_ids: list[int] = field(default_factory=list)
 
 

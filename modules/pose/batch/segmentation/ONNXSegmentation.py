@@ -345,6 +345,9 @@ class ONNXSegmentation(Thread):
 
         batch_start = time.perf_counter()
 
+        # Get input image dimensions from first real image
+        input_h, input_w = gpu_imgs[0].shape[0], gpu_imgs[0].shape[1]
+
         # Pad to fixed batch size using missing IDs to avoid ONNX Runtime recompilation
         num_padding = self._max_batch - actual_batch_size
         padding_ids: list[int] = []
@@ -360,10 +363,10 @@ class ONNXSegmentation(Thread):
             used_ids = set(tracklet_ids)
             available_ids = list(all_ids - used_ids)
 
-            # Add padding with zero images on GPU and missing IDs
+            # Add padding with zero images at SAME SIZE as input images (not model size)
             for i in range(num_padding):
                 padding_id = available_ids[i]
-                gpu_imgs.append(torch.zeros((self.model_height, self.model_width, 3), dtype=torch.uint8, device='cuda'))
+                gpu_imgs.append(torch.zeros((input_h, input_w, 3), dtype=torch.uint8, device='cuda'))
                 tracklet_ids.append(padding_id)
                 padding_ids.append(padding_id)
                 states.append(None)  # Padding gets zero states

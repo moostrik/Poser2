@@ -2,15 +2,14 @@ from collections import deque
 from threading import Lock
 from typing import Union
 
-import numpy as np
 import torch
 
 from modules.pose.callback.mixins import TypedCallbackMixin
+from modules.pose.batch.GPUFrame import GPUFrameDict
 from modules.pose.Frame import FrameDict
 from modules.pose.batch.flow.ONNXOpticalFlow import ONNXOpticalFlow, OpticalFlowInput, OpticalFlowOutput
 from modules.pose.batch.flow.TRTOpticalFlow import TRTOpticalFlow
 from modules.pose.Settings import Settings, ModelType
-from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 OpticalFlow = Union[ONNXOpticalFlow, TRTOpticalFlow]
@@ -56,27 +55,28 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         """Stop the optical flow processing thread."""
         self._optical_flow.stop()
 
-    def process(self, poses: FrameDict, frame_pairs: dict[int, tuple[np.ndarray, np.ndarray]]) -> None:
+    def process(self, poses: FrameDict, gpu_frames: GPUFrameDict) -> None:
         """Submit batch for async processing. Results broadcast via callbacks.
 
         Args:
             poses: Dictionary of poses keyed by tracklet ID
-            frame_pairs: Dictionary of (previous_frame, current_frame) tuples keyed by tracklet ID
+            gpu_frames: GPU frames with crop and prev_crop tensors, keyed by tracklet ID
         """
         if not self._optical_flow.is_ready:
             return
 
         tracklet_id_list: list[int] = []
-        pair_list: list[tuple[np.ndarray, np.ndarray]] = []
+        pair_list: list[tuple[torch.Tensor, torch.Tensor]] = []
 
         for tracklet_id in poses.keys():
-            if tracklet_id in frame_pairs:
-                tracklet_id_list.append(tracklet_id)
-                pair_list.append(frame_pairs[tracklet_id])
+            if tracklet_id in gpu_frames:
+                gpu_frame = gpu_frames[tracklet_id]
+                # Only add if prev_crop exists (need both frames for optical flow)
+                if gpu_frame.prev_crop is not None:
+                    tracklet_id_list.append(tracklet_id)
+                    pair_list.append((gpu_frame.prev_crop, gpu_frame.crop))
 
         if not pair_list:
-            if self._verbose and len(poses) > 0:
-                print(f"FlowBatchExtractor: No frame pairs available")
             return
 
         with self._lock:
@@ -85,7 +85,7 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
 
         self._optical_flow.submit_batch(OpticalFlowInput(
             batch_id=batch_id,
-            frame_pairs=pair_list,
+            gpu_image_pairs=pair_list,
             tracklet_ids=tracklet_id_list
         ))
 

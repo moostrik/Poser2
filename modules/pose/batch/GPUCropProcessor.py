@@ -25,11 +25,12 @@ GPUCropCallback = Callable[[FrameDict, GPUFrameDict], None]
 class GPUCropProcessorConfig:
     """Configuration for GPU-based image cropping."""
 
-    def __init__(self, expansion: float = 0.0, output_width: int = 384, output_height: int = 512, max_poses: int = 4) -> None:
+    def __init__(self, expansion: float = 0.0, output_width: int = 384, output_height: int = 512, max_poses: int = 4, enable_prev_crop: bool = True) -> None:
         self.crop_scale: float = 1.0 + expansion
         self.output_width: int = output_width
         self.output_height: int = output_height
         self.max_poses: int = max_poses
+        self.enable_prev_crop: bool = enable_prev_crop  # Enable previous frame crops for optical flow
 
 
 class GPUCropProcessor:
@@ -55,6 +56,7 @@ class GPUCropProcessor:
         self._crop_scale: float = config.crop_scale
         self._max_poses: int = config.max_poses
         self._aspect_ratio: float = config.output_width / config.output_height
+        self._enable_prev_crop: bool = config.enable_prev_crop
 
         # Per-camera GPU frame storage
         self._gpu_images: dict[int, cp.ndarray] = {}  # cam_id -> full frame on GPU
@@ -154,7 +156,7 @@ class GPUCropProcessor:
 
                     # Crop previous frame at CURRENT bbox location (for optical flow)
                     prev_crop: cp.ndarray | None = None
-                    if pose_id in self._prev_gpu_images:
+                    if self._enable_prev_crop and pose_id in self._prev_gpu_images:
                         prev_buffer = cp.empty((self._crop_height, self._crop_width, 3), dtype=cp.uint8)
                         self._gpu_crop_resize(self._prev_gpu_images[pose_id], crop_roi, prev_buffer)
                         prev_crop = prev_buffer
