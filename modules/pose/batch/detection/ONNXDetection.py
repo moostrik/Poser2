@@ -1,12 +1,10 @@
 # Create: modules/pose/detection/ONNXDetection.py
 
 # Standard library imports
-from dataclasses import dataclass
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
 import traceback
-from typing import Callable
 
 # Third-party imports
 import numpy as np
@@ -105,6 +103,40 @@ class ONNXDetection(Thread):
                 print(f"ONNX Detection Error: {str(e)}")
                 traceback.print_exc()
 
+    def submit_batch(self, input_batch: DetectionInput) -> None:
+        """Submit batch for processing. Identical to MMDetection."""
+        if self._shutdown_event.is_set():
+            return
+
+        if not self._model_ready.is_set():
+            return
+
+        # Validate batch size
+        if len(input_batch.images) > self._max_batch:
+            print(f"ONNX Detection Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+
+        dropped_batch: DetectionInput | None = None
+
+        with self._input_lock:
+            if self._pending_batch is not None:
+                dropped_batch = self._pending_batch
+                if self.verbose:
+                    lag = int((time.time() - self._input_timestamp) * 1000)
+                    print(f"ONNX Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                self._last_dropped_batch_id = dropped_batch.batch_id
+
+            self._pending_batch = input_batch
+            self._input_timestamp = time.time()
+
+        if dropped_batch is not None:
+            dropped_output = DetectionOutput(batch_id=dropped_batch.batch_id, processed=False)
+            try:
+                self._callback_queue.put_nowait(dropped_output)
+            except:
+                pass
+
+        self._notify_update_event.set()
+
     def _setup(self) -> None:
         """Initialize ONNX session and warmup. Called from run()."""
         try:
@@ -169,40 +201,6 @@ class ONNXDetection(Thread):
             print(f"ONNX Detection Error: Failed to load model - {str(e)}")
             traceback.print_exc()
 
-    def submit_batch(self, input_batch: DetectionInput) -> None:
-        """Submit batch for processing. Identical to MMDetection."""
-        if self._shutdown_event.is_set():
-            return
-
-        if not self._model_ready.is_set():
-            return
-
-        # Validate batch size
-        if len(input_batch.images) > self._max_batch:
-            print(f"ONNX Detection Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
-
-        dropped_batch: DetectionInput | None = None
-
-        with self._input_lock:
-            if self._pending_batch is not None:
-                dropped_batch = self._pending_batch
-                if self.verbose:
-                    lag = int((time.time() - self._input_timestamp) * 1000)
-                    print(f"ONNX Detection: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
-                self._last_dropped_batch_id = dropped_batch.batch_id
-
-            self._pending_batch = input_batch
-            self._input_timestamp = time.time()
-
-        if dropped_batch is not None:
-            dropped_output = DetectionOutput(batch_id=dropped_batch.batch_id, processed=False)
-            try:
-                self._callback_queue.put_nowait(dropped_output)
-            except:
-                pass
-
-        self._notify_update_event.set()
-
     def _retrieve_pending_batch(self) -> DetectionInput | None:
         """Atomically get and clear pending batch."""
         with self._input_lock:
@@ -250,6 +248,81 @@ class ONNXDetection(Thread):
         except Exception:
             print("ONNX Detection Warning: Callback queue full")
 
+    def _infer_batch(self, imgs: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
+        """Run ONNX inference on batch of images.
+
+        Uses fixed batch size padding to avoid ONNX Runtime dynamic shape recompilation.
+        """
+        actual_batch_size = len(imgs)
+        if actual_batch_size == 0 or self._session is None:
+            return np.empty((0, 17, 2)), np.empty((0, 17))
+
+        # Pad to fixed batch size to avoid ONNX Runtime recompilation
+        num_padding = self._max_batch - actual_batch_size
+        if num_padding > 0:
+            # Add padding with zero images
+            dummy_img = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
+            imgs = imgs + [dummy_img] * num_padding
+
+        # Preprocess: Stack and convert to model dtype
+        batch_hwc = np.stack(imgs, axis=0).astype(self._model_dtype)  # (B, H, W, 3)
+
+        # BGR to RGB
+        batch_rgb = batch_hwc[:, :, :, ::-1]
+
+        # HWC to CHW
+        batch_chw = batch_rgb.transpose(0, 3, 1, 2)  # (B, 3, H, W)
+
+        # Normalize with ImageNet stats (using model dtype)
+        batch = (batch_chw - self._imagenet_mean) / self._imagenet_std
+
+        # Run inference
+        input_name = self._session.get_inputs()[0].name
+        outputs = self._session.run(None, {input_name: batch})
+
+        # Decode SimCC outputs
+        simcc_x, simcc_y = outputs[0], outputs[1]  # (padded_batch, 17, W*2), (padded_batch, 17, H*2)
+        keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)  # type: ignore
+
+        # Slice to actual batch size
+        keypoints = keypoints[:actual_batch_size]
+        scores = scores[:actual_batch_size]
+
+        return keypoints, scores
+
+    def _model_warmup(self) -> None:
+        """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
+        if self._session is None:
+            return
+
+        print(f"ONNX Detection: Starting warmup (fixed batch_size={self._max_batch})...")
+        try:
+            # Create realistic dummy input
+            np.random.seed(42)
+            dummy_img = (np.random.rand(self.model_height, self.model_width, 3) * 255).astype(np.uint8)
+
+            # Warmup with max_batch size (all inference runs with this size)
+            dummy_images = [dummy_img] * self._max_batch
+
+            keypoints, scores = self._infer_batch(dummy_images)
+
+            if self.verbose:
+                print(f"ONNX Detection: Warmup complete")
+        except Exception as e:
+            print(f"ONNX Detection: Warmup failed (non-critical) - {str(e)}")
+            traceback.print_exc()
+
+    # CALLBACK METHODS
+    def register_callback(self, callback: PoseDetectionOutputCallback) -> None:
+        """Register callback to receive results."""
+        with self._callback_lock:
+            self._callbacks.add(callback)
+
+    def unregister_callback(self, callback: PoseDetectionOutputCallback) -> None:
+        """Unregister previously registered callback."""
+        with self._callback_lock:
+            self._callbacks.discard(callback)
+
     def _callback_worker_loop(self) -> None:
         """Dispatch results to callbacks. Identical to MMDetection."""
         while not self._shutdown_event.is_set():
@@ -273,30 +346,7 @@ class ONNXDetection(Thread):
             except Empty:
                 continue
 
-    def register_callback(self, callback: PoseDetectionOutputCallback) -> None:
-        """Register callback to receive results."""
-        with self._callback_lock:
-            self._callbacks.add(callback)
-
-    def _preprocess_batch(self, imgs: list[np.ndarray]) -> np.ndarray:
-        """Convert BGR uint8 images to normalized RGB batch (B, 3, H, W) with model dtype."""
-        if not imgs:
-            return np.empty((0, 3, self.model_height, self.model_width), dtype=self._model_dtype)
-
-        # Stack and convert to model dtype
-        batch_hwc = np.stack(imgs, axis=0).astype(self._model_dtype)  # (B, H, W, 3)
-
-        # BGR to RGB
-        batch_rgb = batch_hwc[:, :, :, ::-1]
-
-        # HWC to CHW
-        batch_chw = batch_rgb.transpose(0, 3, 1, 2)  # (B, 3, H, W)
-
-        # Normalize with ImageNet stats (using model dtype)
-        batch_norm = (batch_chw - self._imagenet_mean) / self._imagenet_std
-
-        return batch_norm
-
+    # STATIC METHODS
     @staticmethod
     def _decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float, apply_softmax: bool = False) -> tuple[np.ndarray, np.ndarray]:
         """Decode SimCC using MMPose's exact method from get_simcc_maximum.
@@ -345,57 +395,3 @@ class ONNXDetection(Thread):
         scores = np.clip(scores, 0.0, 1.0)
 
         return keypoints, scores
-
-    def _infer_batch(self, imgs: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-        """Run ONNX inference on batch of images.
-
-        Uses fixed batch size padding to avoid ONNX Runtime dynamic shape recompilation.
-        """
-        actual_batch_size = len(imgs)
-        if actual_batch_size == 0 or self._session is None:
-            return np.empty((0, 17, 2)), np.empty((0, 17))
-
-        # Pad to fixed batch size to avoid ONNX Runtime recompilation
-        num_padding = self._max_batch - actual_batch_size
-        if num_padding > 0:
-            # Add padding with zero images
-            dummy_img = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
-            imgs = imgs + [dummy_img] * num_padding
-
-        # Preprocess (now with padded batch)
-        batch = self._preprocess_batch(imgs)
-
-        # Run inference
-        input_name = self._session.get_inputs()[0].name
-        outputs = self._session.run(None, {input_name: batch})
-
-        # Decode SimCC outputs
-        simcc_x, simcc_y = outputs[0], outputs[1]  # (padded_batch, 17, W*2), (padded_batch, 17, H*2)
-        keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)  # type: ignore
-
-        # Slice to actual batch size
-        keypoints = keypoints[:actual_batch_size]
-        scores = scores[:actual_batch_size]
-
-        return keypoints, scores
-
-    def _model_warmup(self) -> None:
-        """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
-        if self._session is None:
-            return
-
-        print(f"ONNX Detection: Starting warmup (fixed batch_size={self._max_batch})...")
-        try:
-            # Create realistic dummy input
-            np.random.seed(42)
-            dummy_img = (np.random.rand(self.model_height, self.model_width, 3) * 255).astype(np.uint8)
-
-            # Warmup with max_batch size (all inference runs with this size)
-            dummy_images = [dummy_img] * self._max_batch
-
-            keypoints, scores = self._infer_batch(dummy_images)
-
-            print(f"ONNX Detection: Warmup complete")
-        except Exception as e:
-            print(f"ONNX Detection: Warmup failed (non-critical) - {str(e)}")
-            traceback.print_exc()

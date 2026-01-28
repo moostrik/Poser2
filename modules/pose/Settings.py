@@ -38,16 +38,16 @@ MODEL_PATHS = {
     # Segmentation models
     'segmentation': {
         'onnx': {
-            Resolution.STANDARD: "rvm_mobilenetv3_256x192_b4.onnx",
-            Resolution.HIGH: "rvm_mobilenetv3_384x288_b4.onnx",
-            Resolution.ULTRA: "rvm_mobilenetv3_512x384_b4.onnx",
-            Resolution.EXTREME: "rvm_mobilenetv3_1024x768_b4.onnx",
+            Resolution.STANDARD: "rvm_mobilenetv3_256x192.onnx",
+            Resolution.HIGH: "rvm_mobilenetv3_384x288.onnx",
+            Resolution.ULTRA: "rvm_mobilenetv3_512x384.onnx",
+            Resolution.EXTREME: "rvm_mobilenetv3_1024x768.onnx",
         },
         'tensorrt': {
-            Resolution.STANDARD: "rvm_mobilenetv3_256x192_b4.trt",
-            Resolution.HIGH: "rvm_mobilenetv3_384x288_b4.trt",
-            Resolution.ULTRA: "rvm_mobilenetv3_512x384_b4.trt",
-            Resolution.EXTREME: "rvm_mobilenetv3_1024x768_b4.trt",
+            Resolution.STANDARD: "rvm_mobilenetv3_256x192_b3.trt",
+            Resolution.HIGH: "rvm_mobilenetv3_384x288_b3.trt",
+            Resolution.ULTRA: "rvm_mobilenetv3_512x384_b3.trt",
+            Resolution.EXTREME: "rvm_mobilenetv3_1024x768_b3.trt",
         }
     },
     # Flow models

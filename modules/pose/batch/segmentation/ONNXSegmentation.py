@@ -5,12 +5,10 @@
 # add model source from rvm repo
 
 # Standard library imports
-from dataclasses import dataclass, field
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
 import traceback
-from typing import Callable
 
 # Third-party imports
 import numpy as np

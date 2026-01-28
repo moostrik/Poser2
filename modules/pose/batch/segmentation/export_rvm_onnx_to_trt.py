@@ -3,16 +3,16 @@
 
 Usage:
     # Convert RVM mobilenetv3 256x192 (STANDARD)
-    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_256x192_b4.onnx
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_256x192.onnx --output models/rvm_mobilenetv3_256x192_b3.trt
 
     # Convert 384x288 (HIGH)
-    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_384x288_b4.onnx
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_384x288.onnx --output models/rvm_mobilenetv3_384x288_b3.trt
 
     # Convert 512x384 (ULTRA)
-    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_512x384_b4.onnx
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_512x384.onnx --output models/rvm_mobilenetv3_512x384_b3.trt
 
     # Convert 1024x768 (EXTREME)
-    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_1024x768_b4.onnx
+    python modules/pose/batch/segmentation/export_rvm_onnx_to_trt.py --onnx models/rvm_mobilenetv3_1024x768.onnx --output models/rvm_mobilenetv3_1024x768_b3.trt
 """
 
 import tensorrt as trt
@@ -255,8 +255,8 @@ if __name__ == '__main__':
                         help='Minimum batch size (default: 1)')
     parser.add_argument('--opt-batch', type=int, default=3,
                         help='Optimal batch size for optimization (default: 3)')
-    parser.add_argument('--max-batch', type=int, default=4,
-                        help='Maximum batch size (default: 4, set to opt-batch if never exceeded)')
+    parser.add_argument('--max-batch', type=int, default=3,
+                        help='Maximum batch size (default: 3, set to opt-batch if never exceeded)')
     parser.add_argument('--workspace', type=int, default=8,
                         help='Workspace size in GB (default: 8)')
 

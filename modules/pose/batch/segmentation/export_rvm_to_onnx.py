@@ -3,25 +3,24 @@
 
 Usage:
     # Export RVM mobilenetv3 model at 256x192 (STANDARD)
-    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_256x192_b4.onnx
+    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_256x192.onnx
 
     # Export at custom resolution 384x288 (HIGH)
-    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_384x288_b4.onnx --height 384 --width 288
+    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_384x288.onnx --height 384 --width 288
 
     # Export at custom resolution 512x384 (ULTRA)
-    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_512x384_b4.onnx --height 512 --width 384
+    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_512x384.onnx --height 512 --width 384
 
     # Export at custom resolution 1024x768 (EXTREME)
-    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_1024x768_b4.onnx --height 1024 --width 768
+    python modules/pose/batch/segmentation/export_rvm_to_onnx.py --checkpoint models/base/rvm_mobilenetv3.pth --output models/rvm_mobilenetv3_1024x768.onnx --height 1024 --width 768
 """
 import torch
 import sys
 from pathlib import Path
 
-# Add model directory to path
-sys.path.insert(0, r'C:\Developer\RobustVideoMatting')
-
-from model import MattingNetwork
+# Add model directory to path (rvm must be imported as package to support relative imports)
+sys.path.insert(0, 'models/base')
+from rvm.model import MattingNetwork
 
 
 def export_rvm_to_onnx(
@@ -29,11 +28,12 @@ def export_rvm_to_onnx(
     output_path: str,
     height: int = 256,
     width: int = 192,
-    batch: int = 4,
+    batch: int = 8,
     variant: str = 'mobilenetv3',
     opset_version: int = 11,  # Lower opset avoids problematic Resize
     downsample_ratio: float = 1.0,
-    fp32: bool = False  # FP32 seems to be faster in ONNX, but we want to build a FP16 TensorRT engine from it
+    fp32: bool = False,  # FP32 seems to be faster in ONNX, but we want to build a FP16 TensorRT engine from it
+    simplify: bool = True
 ):
     """Export RVM model to ONNX with fixed resolution (TensorRT-compatible).
 
@@ -47,6 +47,7 @@ def export_rvm_to_onnx(
         opset_version: ONNX opset (11 is more TensorRT-compatible than 16+)
         downsample_ratio: RVM downsample ratio (1.0 = no downsampling)
         fp32: Use FP32 precision instead of FP16 (default: False)
+        simplify: Whether to simplify ONNX graph (requires onnx-simplifier)
     """
     precision = "FP32" if fp32 else "FP16"
     dtype = torch.float32 if fp32 else torch.float16
@@ -61,17 +62,28 @@ def export_rvm_to_onnx(
     print(f"  Variant:     {variant}")
     print(f"  Precision:   {precision}")  # ← UPDATE
     print(f"  Opset:       {opset_version}")
+    print(f"  Simplify:    {'Yes' if simplify else 'No'}")
     print(f"  Downsample:  {downsample_ratio}")
     print(f"{'═'*70}\n")
 
+    # Validate input files
+    if not Path(checkpoint_path).exists():
+        print(f"❌ ERROR: Checkpoint file not found: {checkpoint_path}")
+        return False
+
     # Load model
     print("📦 Loading model...", end='', flush=True)
-    model = MattingNetwork(variant=variant, refiner='deep_guided_filter').eval()
-    model.load_state_dict(torch.load(checkpoint_path, map_location='cpu'))
-    model = model.cuda()
-    if not fp32:  # ← UPDATE
-        model = model.half()  # Convert to FP16 only if not fp32
-    print(" ✓")
+    try:
+        model = MattingNetwork(variant=variant, refiner='deep_guided_filter').eval()
+        model.load_state_dict(torch.load(checkpoint_path, map_location='cpu'))
+        model = model.cuda()
+        if not fp32:
+            model = model.half()  # Convert to FP16 only if not fp32
+        print(" ✓")
+    except Exception as e:
+        print(" ✗")
+        print(f"❌ ERROR: Failed to load model: {e}")
+        return False
 
     # Create dummy inputs
     print("🧪 Creating dummy inputs...", end='', flush=True)
@@ -85,9 +97,14 @@ def export_rvm_to_onnx(
 
     # Test forward pass
     print("🧪 Testing forward pass...", end='', flush=True)
-    with torch.no_grad():
-        outputs = model(src, r1, r2, r3, r4, downsample_ratio=downsample_ratio)
-    print(f" ✓ (Output: {len(outputs)} tensors)")
+    try:
+        with torch.no_grad():
+            outputs = model(src, r1, r2, r3, r4, downsample_ratio=downsample_ratio)
+        print(f" ✓ (Output: {len(outputs)} tensors)")
+    except Exception as e:
+        print(" ✗")
+        print(f"❌ ERROR: Forward pass failed: {e}")
+        return False
 
     # Get actual recurrent state shapes from first forward pass for ONNX export
     fgr, pha, r1_out, r2_out, r3_out, r4_out = outputs
@@ -96,47 +113,87 @@ def export_rvm_to_onnx(
     print("\n💾 Exporting to ONNX...")
     print("   ⏱️  This may take 1-2 minutes...")
 
-    with torch.no_grad():
-        torch.onnx.export(
-            model,
-            (src, r1_out, r2_out, r3_out, r4_out, downsample),
-            output_path,
-            export_params=True,
-            opset_version=opset_version,
-            do_constant_folding=True,
-            input_names=['src', 'r1i', 'r2i', 'r3i', 'r4i', 'downsample_ratio'],
-            output_names=['fgr', 'pha', 'r1o', 'r2o', 'r3o', 'r4o'],
-            dynamic_axes={
-                # Batch dimension is dynamic for ALL tensors (enables true batching)
-                'src': {0: 'batch'},
-                'r1i': {0: 'batch'},
-                'r2i': {0: 'batch'},
-                'r3i': {0: 'batch'},
-                'r4i': {0: 'batch'},
-                'fgr': {0: 'batch'},
-                'pha': {0: 'batch'},
-                'r1o': {0: 'batch'},
-                'r2o': {0: 'batch'},
-                'r3o': {0: 'batch'},
-                'r4o': {0: 'batch'},
-            },
-            verbose=False
-        )
-
-    output_file = Path(output_path)
-    if output_file.exists():
-        file_size_mb = output_file.stat().st_size / 1024 / 1024
-        print(f"   ✓ Export complete ({file_size_mb:.1f} MB)")
-    else:
-        print("   ✗ Export failed - file not created")
+    try:
+        with torch.no_grad():
+            torch.onnx.export(
+                model,
+                (src, r1_out, r2_out, r3_out, r4_out, downsample),
+                output_path,
+                export_params=True,
+                opset_version=opset_version,
+                do_constant_folding=True,
+                input_names=['src', 'r1i', 'r2i', 'r3i', 'r4i', 'downsample_ratio'],
+                output_names=['fgr', 'pha', 'r1o', 'r2o', 'r3o', 'r4o'],
+                dynamic_axes={
+                    # Batch dimension is dynamic for ALL tensors (enables true batching)
+                    'src': {0: 'batch'},
+                    'r1i': {0: 'batch'},
+                    'r2i': {0: 'batch'},
+                    'r3i': {0: 'batch'},
+                    'r4i': {0: 'batch'},
+                    'fgr': {0: 'batch'},
+                    'pha': {0: 'batch'},
+                    'r1o': {0: 'batch'},
+                    'r2o': {0: 'batch'},
+                    'r3o': {0: 'batch'},
+                    'r4o': {0: 'batch'},
+                },
+                verbose=False
+            )
+        print("   ✓ ONNX export complete")
+    except Exception as e:
+        print("   ✗ Export failed")
+        print(f"❌ ERROR: {e}")
         return False
+
+    # Verify output file
+    output_file = Path(output_path)
+    if not output_file.exists():
+        print(f"❌ ERROR: Output file not created: {output_path}")
+        return False
+
+    file_size_mb = output_file.stat().st_size / 1024 / 1024
+    print(f"   File size: {file_size_mb:.1f} MB")
+
+    # Simplify ONNX model if requested
+    if simplify:
+        print("\n🔧 Simplifying ONNX model...", end='', flush=True)
+        try:
+            import onnx
+            from onnxsim import simplify as onnx_simplify
+
+            model_onnx = onnx.load(output_path)
+            model_simplified, check = onnx_simplify(model_onnx)
+
+            if check:
+                onnx.save(model_simplified, output_path)
+                simplified_size_mb = output_file.stat().st_size / 1024 / 1024
+                print(f" ✓ ({file_size_mb:.1f} MB → {simplified_size_mb:.1f} MB)")
+            else:
+                print(" ⚠️  (validation failed, keeping original)")
+        except ImportError:
+            print(" ⊘ (onnx-simplifier not installed)")
+            print("   Install with: pip install onnx-simplifier")
+        except Exception as e:
+            print(f" ⚠️  (failed: {e}, keeping original)")
+
+    # Verify ONNX model
+    print("\n🔍 Verifying ONNX model...", end='', flush=True)
+    try:
+        import onnx
+        onnx_model = onnx.load(output_path)
+        onnx.checker.check_model(onnx_model)
+        print(" ✓")
+    except Exception as e:
+        print(f" ⚠️  (validation warning: {e})")
 
     print(f"\n{'═'*70}")
     print(f"✅ EXPORT COMPLETE")
     print(f"{'═'*70}")
-    print(f"  Output: {output_path}")
-    print(f"  Size:   {file_size_mb:.1f} MB")
-    print(f"  Notes:  Fixed resolution {height}×{width} for TensorRT")
+    print(f"  Output:     {output_path}")
+    print(f"  Resolution: {height}×{width} (fixed for TensorRT)")
+    print(f"  Precision:  {precision}")
+    print(f"  Size:       {file_size_mb:.1f} MB")
     print(f"{'═'*70}\n")
 
     return True
@@ -167,8 +224,8 @@ if __name__ == '__main__':
                         help='Input image height (default: 256)')
     parser.add_argument('--width', type=int, default=192,
                         help='Input image width (default: 192)')
-    parser.add_argument('--batch', type=int, default=4,
-                        help='Export batch size - enables dynamic batching from 1 to batch (default: 4)')
+    parser.add_argument('--batch', type=int, default=8,
+                        help='Export batch size - enables dynamic batching from 1 to batch (default: 8)')
     parser.add_argument('--variant', default='mobilenetv3', choices=['mobilenetv3', 'resnet50'],
                         help='Model variant (default: mobilenetv3)')
     parser.add_argument('--opset', type=int, default=11,
@@ -177,6 +234,8 @@ if __name__ == '__main__':
                         help='Downsample ratio (default: 1.0)')
     parser.add_argument('--fp32', action='store_true',
                     help='Use FP32 precision instead of FP16 (default: FP16)')
+    parser.add_argument('--no-simplify', action='store_true',
+                        help='Skip ONNX graph simplification')
 
     args = parser.parse_args()
 
@@ -189,7 +248,8 @@ if __name__ == '__main__':
         args.variant,
         args.opset,
         args.downsample,
-        args.fp32  # ← ADD THIS
+        args.fp32,
+        not args.no_simplify
     )
 
     sys.exit(0 if success else 1)
