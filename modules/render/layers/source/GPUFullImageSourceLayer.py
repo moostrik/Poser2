@@ -1,8 +1,9 @@
 # Standard library imports
-import torch
-import cupy as cp
+
 
 # Third-party imports
+import torch
+import cupy as cp
 from OpenGL.GL import * # type: ignore
 
 # Local application imports

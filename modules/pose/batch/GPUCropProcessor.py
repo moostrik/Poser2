@@ -21,6 +21,16 @@ if TYPE_CHECKING:
 GPUCropCallback = Callable[[FrameDict, GPUFrameDict], None]
 
 
+class GPUCropProcessorConfig:
+    """Configuration for GPU-based image cropping."""
+
+    def __init__(self, expansion: float = 0.0, output_width: int = 384, output_height: int = 512, max_poses: int = 4) -> None:
+        self.crop_scale: float = 1.0 + expansion
+        self.output_width: int = output_width
+        self.output_height: int = output_height
+        self.max_poses: int = max_poses
+
+
 class GPUCropProcessor:
     """GPU-based batch processor for cropping images based on pose bounding boxes.
 
@@ -32,26 +42,18 @@ class GPUCropProcessor:
     classes are responsible for scaling to their specific model input size.
     """
 
-    def __init__(
-        self,
-        crop_width: int = 384,
-        crop_height: int = 512,
-        crop_expansion: float = 0.0,
-        max_poses: int = 4
-    ) -> None:
+    def __init__(self, config: GPUCropProcessorConfig) -> None:
         """Initialize GPU crop processor.
 
         Args:
-            crop_width: Output crop width (default 384 for ULTRA resolution)
-            crop_height: Output crop height (default 512 for ULTRA resolution)
-            crop_expansion: Fractional expansion of bounding box (0.0 = no expansion)
-            max_poses: Maximum number of simultaneous poses (for buffer pooling)
+            config: Configuration for GPU crop processor
         """
-        self._crop_width: int = crop_width
-        self._crop_height: int = crop_height
-        self._crop_scale: float = 1.0 + crop_expansion
-        self._max_poses: int = max_poses
-        self._aspect_ratio: float = crop_width / crop_height
+        self._config: GPUCropProcessorConfig = config
+        self._crop_width: int = config.output_width
+        self._crop_height: int = config.output_height
+        self._crop_scale: float = config.crop_scale
+        self._max_poses: int = config.max_poses
+        self._aspect_ratio: float = config.output_width / config.output_height
 
         # Per-camera GPU frame storage
         self._gpu_images: dict[int, cp.ndarray] = {}  # cam_id -> full frame on GPU

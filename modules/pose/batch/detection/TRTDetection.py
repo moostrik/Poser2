@@ -11,7 +11,7 @@ import cupy as cp
 
 # Reuse dataclasses from MMDetection
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
-from modules.pose.batch.cuda_image_ops import batched_bilinear_resize_inplace
+from modules.pose.batch.cuda_image_ops import batched_bilinear_resize_inplace, imagenet_normalize_hwc_to_chw_inplace
 
 from modules.pose.Settings import Settings
 from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
@@ -267,7 +267,7 @@ class TRTDetection(Thread):
         if not gpu_images:
             output = DetectionOutput(batch_id=batch.batch_id, processed=True)
         else:
-            keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch_gpu(gpu_images)
+            keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch(gpu_images)
 
             # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
@@ -290,7 +290,7 @@ class TRTDetection(Thread):
         except Exception:
             print("TensorRT Detection Warning: Callback queue full")
 
-    def _infer_batch_gpu(self, gpu_imgs: list[cp.ndarray]) -> tuple[np.ndarray, np.ndarray, float, float]:
+    def _infer_batch(self, gpu_imgs: list[cp.ndarray]) -> tuple[np.ndarray, np.ndarray, float, float]:
         """Run TensorRT inference on batch of GPU images.
 
         Args:
@@ -321,11 +321,9 @@ class TRTDetection(Thread):
             else:
                 buf['img_uint8'][:batch_size] = batch_src
 
-            # Convert to float and normalize
-            img_float_batch = buf['img_uint8'][:batch_size].astype(self._model_dtype)
+            # Fused ImageNet normalize + HWC->CHW into single kernel
             # Images are already RGB from GPUCropProcessor
-            img_chw_batch = cp.ascontiguousarray(cp.transpose(img_float_batch, (0, 3, 1, 2)))  # HWC→CHW
-            input_gpu[:] = (img_chw_batch - self._mean_gpu) / self._std_gpu
+            imagenet_normalize_hwc_to_chw_inplace(buf['img_uint8'][:batch_size], input_gpu, stream=self.stream)
 
         # TensorRT operations only - acquire global lock
         lock_wait_start: float = time.perf_counter()

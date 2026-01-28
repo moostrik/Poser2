@@ -4,52 +4,45 @@ import time
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
+import torch
+import cupy as cp
 
 # Local application imports
-from modules.gl.Image import Image, Texture
+from modules.gl import Tensor, Texture
 
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.utils.PerformanceTimer import PerformanceTimer
+from modules.render.layers.LayerBase import LayerBase, DataCache
+from modules.pose.batch.GPUFrame import GPUFrame
 
 
 class ImageSourceLayer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._cam_id: int = cam_id
-        self._data: DataHub = data
-        self._image: Image = Image('BGR')
-        self._data_cache: DataCache[np.ndarray]= DataCache[np.ndarray]()
+        self._data_hub: DataHub = data
+        self._cuda_image: Tensor = Tensor()
+        self._data_cache: DataCache[GPUFrame]= DataCache[GPUFrame]()
 
-        # Performance timer
-        self._update_timer: PerformanceTimer = PerformanceTimer(
-            name="ImageSource GL Upload", sample_count=10000, report_interval=100, color="red", omit_init=10
-        )
 
     @property
     def texture(self) -> Texture:
-        return self._image
+        return self._cuda_image
 
     def deallocate(self) -> None:
-        if self._image.allocated:
-            self._image.deallocate()
+        if self._cuda_image.allocated:
+            self._cuda_image.deallocate()
 
     def update(self) -> None:
-        start = time.perf_counter()
+        gpu_frame: GPUFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._cam_id)
+        self._data_cache.update(gpu_frame)
 
-        frame: np.ndarray | None = self._data.get_item(DataHubType.cam_image, self._cam_id)
-        self._data_cache.update(frame)
+        # if self._data_cache.lost:
+        #     self._image.clear()
 
-        if self._data_cache.lost:
-            self._image.clear()
-
-        if self._data_cache.idle or frame is None:
+        if self._data_cache.idle or gpu_frame is None:
             return
 
-        start = time.perf_counter()
-        self._image.set_image(frame)
-        self._image.update()
-
-        elapsed_ms = (time.perf_counter() - start) * 1000.0
-        self._update_timer.add_time(elapsed_ms, False)
+        full_image_tensor: torch.Tensor = torch.as_tensor(gpu_frame.full_image, device='cuda')
+        self._cuda_image.set_tensor(full_image_tensor)
+        self._cuda_image.update()
 
 

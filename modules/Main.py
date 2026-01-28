@@ -57,8 +57,7 @@ class Main():
         self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
 
         # POSE CONFIGURATION
-        self.image_crop_config =    batch.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=settings.pose.pose_width, output_height=settings.pose.pose_height)
-        self.image_flow_config =    batch.ImageCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=settings.pose.flow_width, output_height=settings.pose.flow_height)
+        self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
@@ -94,14 +93,7 @@ class Main():
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
-        self.image_crop_processor = batch.ImageCropProcessor(self.image_crop_config)
-        self.image_flow_processor = batch.ImageCropProcessor(self.image_flow_config)
-        self.gpu_crop_processor = batch.GPUCropProcessor(
-            crop_width=settings.pose.flow_width,
-            crop_height=settings.pose.flow_height,
-            crop_expansion=settings.pose.crop_expansion,
-            max_poses=settings.pose.max_poses
-        )
+        self.gpu_crop_processor = batch.GPUCropProcessor(self.gpu_crop_config)
         self.point_extractor =      batch.PointBatchExtractor(settings.pose)  # GPU-based 2D point extractor
         self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
@@ -196,8 +188,6 @@ class Main():
             camera.add_preview_callback(self.data_hub.set_cam_image)
             if self.recorder:
                 camera.add_sync_callback(self.recorder.set_synced_frames)
-            camera.add_frame_callback(self.image_crop_processor.set_image)
-            camera.add_frame_callback(self.image_flow_processor.set_image)
             camera.add_frame_callback(self.gpu_crop_processor.set_image)
             camera.add_frame_callback(self.frame_sync_bang.add_frame)
             camera.add_tracker_callback(self.tracker.add_cam_tracklets)
@@ -219,8 +209,6 @@ class Main():
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets.add_poses_callback(self.bbox_filters.process)
-        self.bbox_filters.add_poses_callback(self.image_crop_processor.process)
-        self.bbox_filters.add_poses_callback(self.image_flow_processor.process)
         self.bbox_filters.add_poses_callback(self.gpu_crop_processor.process)
         self.gpu_crop_processor.add_callback(self.data_hub.set_gpu_frames)
         self.gpu_crop_processor.add_callback(self.point_extractor.process)
@@ -248,8 +236,8 @@ class Main():
         self.mask_extractor.start()
 
         # FLOW
-        self.image_flow_processor.add_pair_callback(self.flow_extractor.process)
-        self.image_flow_processor.add_pair_callback(self.data_hub.set_flow_images)
+        # self.image_flow_processor.add_pair_callback(self.flow_extractor.process)
+        # self.image_flow_processor.add_pair_callback(self.data_hub.set_flow_images)
         self.flow_extractor.add_callback(self.data_hub.set_flow_tensors)
         self.flow_extractor.start()
 

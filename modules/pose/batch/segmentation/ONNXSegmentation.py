@@ -408,12 +408,16 @@ class ONNXSegmentation(Thread):
         r3i = cp.stack(r3i_list, axis=0)
         r4i = cp.stack(r4i_list, axis=0)
 
+        # Synchronize CuPy operations before ONNX Runtime reads the data
+        cp.cuda.Device().synchronize()
+
         # Convert CuPy arrays to PyTorch tensors (zero-copy via DLPack)
-        torch_src = torch.from_dlpack(src_batch) # type: ignore
-        torch_r1i = torch.from_dlpack(r1i) # type: ignore
-        torch_r2i = torch.from_dlpack(r2i) # type: ignore
-        torch_r3i = torch.from_dlpack(r3i) # type: ignore
-        torch_r4i = torch.from_dlpack(r4i) # type: ignore
+        torch_src = torch.as_tensor(src_batch, device='cuda:0')
+        torch_r1i = torch.as_tensor(r1i, device='cuda:0')
+        torch_r2i = torch.as_tensor(r2i, device='cuda:0')
+        torch_r3i = torch.as_tensor(r3i, device='cuda:0')
+        torch_r4i = torch.as_tensor(r4i, device='cuda:0')
+
         # Use IOBinding for GPU input/output
         io_binding = self._session.io_binding()
         element_type = np.float16 if self._model_dtype == np.float16 else np.float32
@@ -445,6 +449,9 @@ class ONNXSegmentation(Thread):
 
         # Run inference
         self._session.run_with_iobinding(io_binding)
+
+        # Synchronize to ensure outputs are ready before accessing
+        torch.cuda.synchronize()
 
         # Get outputs as OrtValues on GPU
         outputs = io_binding.get_outputs()

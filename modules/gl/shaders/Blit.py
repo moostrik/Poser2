@@ -1,4 +1,4 @@
-"""Stretch shader for copying/resizing textures.
+"""Blit shader for copying/resizing textures.
 
 Simple passthrough shader that copies texture data without modification.
 """
@@ -18,10 +18,9 @@ class Blit(Shader):
             tex: Source texture to copy
         """
         if not self.allocated or not self.shader_program:
-            print("Stretch shader not allocated or shader program missing.")
+            print("Blit shader not allocated or shader program missing.")
             return
         if not tex.allocated:
-            print("Stretch shader: input texture not allocated.")
             return
 
         # Activate shader program

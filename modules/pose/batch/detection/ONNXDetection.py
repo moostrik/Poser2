@@ -11,7 +11,7 @@ import onnxruntime as ort
 import torch
 
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
-from modules.pose.batch.cuda_image_ops import batched_bilinear_resize
+from modules.pose.batch.cuda_image_ops import batched_bilinear_resize, imagenet_normalize_hwc_to_chw_inplace
 
 from modules.pose.Settings import Settings
 
@@ -272,14 +272,18 @@ class ONNXDetection(Thread):
             padding = cp.zeros((pad_size, self.model_height, self.model_width, 3), dtype=cp.uint8)
             resized_batch = cp.concatenate([resized_batch, padding], axis=0)
 
-        # Convert HWC -> CHW and normalize on GPU
-        batch_float = resized_batch.astype(self._cupy_dtype)  # (B, H, W, 3)
-        batch_chw = cp.transpose(batch_float, (0, 3, 1, 2))  # (B, 3, H, W)
-        batch_normalized = (batch_chw - self._mean_gpu) / self._std_gpu
-        batch_normalized = cp.ascontiguousarray(batch_normalized)
+        # Fused ImageNet normalize + HWC->CHW into single kernel
+        batch_normalized = cp.empty(
+            (resized_batch.shape[0], 3, self.model_height, self.model_width),
+            dtype=self._cupy_dtype
+        )
+        imagenet_normalize_hwc_to_chw_inplace(resized_batch, batch_normalized)
+
+        # Synchronize CuPy operations before creating DLPack tensor
+        cp.cuda.Device().synchronize()
 
         # Convert CuPy array to PyTorch tensor (zero-copy via DLPack)
-        torch_input = torch.from_dlpack(batch_normalized) # type: ignore
+        torch_input = torch.as_tensor(batch_normalized, device='cuda:0')
 
         # Get input/output names
         input_name = self._session.get_inputs()[0].name
@@ -304,6 +308,9 @@ class ONNXDetection(Thread):
 
         # Run inference
         self._session.run_with_iobinding(io_binding)
+
+        # Synchronize to ensure outputs are ready before copying
+        torch.cuda.synchronize()
 
         # Get outputs as numpy (copies from GPU)
         outputs = io_binding.copy_outputs_to_cpu()
