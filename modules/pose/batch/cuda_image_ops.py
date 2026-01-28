@@ -294,3 +294,106 @@ def bgr_to_rgb_inplace(
         (img, np.int32(height), np.int32(width)),
         stream=stream
     )
+
+
+# CUDA kernel for fused normalize + HWC->CHW conversion (FP16 output)
+_NORMALIZE_HWC_TO_CHW_FP16_KERNEL = cp.RawKernel(r'''
+#include <cuda_fp16.h>
+
+extern "C" __global__
+void normalize_hwc_to_chw_fp16(
+    const unsigned char* __restrict__ src,
+    __half* __restrict__ dst,
+    const int batch_size,
+    const int height,
+    const int width
+) {
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+    const int b = blockIdx.z;
+
+    if (x >= width || y >= height || b >= batch_size) return;
+
+    const int src_idx = (b * height * width + y * width + x) * 3;
+    const int hw = height * width;
+    const int dst_base = b * 3 * hw + y * width + x;
+
+    // Read RGB, normalize to [0,1], write as CHW
+    dst[dst_base + 0 * hw] = __float2half(src[src_idx + 0] / 255.0f);  // R
+    dst[dst_base + 1 * hw] = __float2half(src[src_idx + 1] / 255.0f);  // G
+    dst[dst_base + 2 * hw] = __float2half(src[src_idx + 2] / 255.0f);  // B
+}
+''', 'normalize_hwc_to_chw_fp16')
+
+
+# CUDA kernel for fused normalize + HWC->CHW conversion (FP32 output)
+_NORMALIZE_HWC_TO_CHW_FP32_KERNEL = cp.RawKernel(r'''
+extern "C" __global__
+void normalize_hwc_to_chw_fp32(
+    const unsigned char* __restrict__ src,
+    float* __restrict__ dst,
+    const int batch_size,
+    const int height,
+    const int width
+) {
+    const int x = blockIdx.x * blockDim.x + threadIdx.x;
+    const int y = blockIdx.y * blockDim.y + threadIdx.y;
+    const int b = blockIdx.z;
+
+    if (x >= width || y >= height || b >= batch_size) return;
+
+    const int src_idx = (b * height * width + y * width + x) * 3;
+    const int hw = height * width;
+    const int dst_base = b * 3 * hw + y * width + x;
+
+    // Read RGB, normalize to [0,1], write as CHW
+    dst[dst_base + 0 * hw] = src[src_idx + 0] / 255.0f;  // R
+    dst[dst_base + 1 * hw] = src[src_idx + 1] / 255.0f;  // G
+    dst[dst_base + 2 * hw] = src[src_idx + 2] / 255.0f;  // B
+}
+''', 'normalize_hwc_to_chw_fp32')
+
+
+def normalize_hwc_to_chw_inplace(
+    batch_src: cp.ndarray,
+    batch_dst: cp.ndarray,
+    stream: cp.cuda.Stream | None = None
+) -> None:
+    """Convert uint8 HWC batch to float CHW batch with normalization.
+
+    Fused kernel: reads (B, H, W, 3) uint8, writes (B, 3, H, W) float16/float32.
+    Normalizes to [0, 1] range. Eliminates intermediate allocations.
+
+    Args:
+        batch_src: (B, H, W, 3) uint8 source
+        batch_dst: (B, 3, H, W) float16 or float32 destination (preallocated)
+        stream: Optional CUDA stream
+    """
+    batch_size, height, width = batch_src.shape[:3]
+
+    # Ensure contiguous for kernel
+    if not batch_src.flags.c_contiguous:
+        batch_src = cp.ascontiguousarray(batch_src)
+
+    block = (16, 16, 1)
+    grid = (
+        (width + block[0] - 1) // block[0],
+        (height + block[1] - 1) // block[1],
+        batch_size
+    )
+
+    # Select kernel based on output dtype
+    if batch_dst.dtype == cp.float16:
+        _NORMALIZE_HWC_TO_CHW_FP16_KERNEL(
+            grid, block,
+            (batch_src, batch_dst,
+             np.int32(batch_size), np.int32(height), np.int32(width)),
+            stream=stream
+        )
+    else:
+        _NORMALIZE_HWC_TO_CHW_FP32_KERNEL(
+            grid, block,
+            (batch_src, batch_dst,
+             np.int32(batch_size), np.int32(height), np.int32(width)),
+            stream=stream
+        )

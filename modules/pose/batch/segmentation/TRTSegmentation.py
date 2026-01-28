@@ -11,7 +11,7 @@ import tensorrt as trt
 import cupy as cp
 
 from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
-from ..cuda_image_ops import batched_bilinear_resize_inplace
+from ..cuda_image_ops import batched_bilinear_resize_inplace, normalize_hwc_to_chw_inplace
 from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
 from typing import TYPE_CHECKING
@@ -321,7 +321,7 @@ class TRTSegmentation(Thread):
 
         if gpu_images:
             try:
-                mask_tensor, fgr_tensor, inference_time_ms, lock_wait_ms = self._infer_batch_gpu(gpu_images, tracklets_to_process)
+                mask_tensor, fgr_tensor, inference_time_ms, lock_wait_ms = self._infer_batch(gpu_images, tracklets_to_process)
                 output = SegmentationOutput(
                     batch_id=batch.batch_id,
                     mask_tensor=mask_tensor,
@@ -341,7 +341,7 @@ class TRTSegmentation(Thread):
         except Exception:
             print("TRT RVM Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_batch_gpu(self, gpu_imgs: list[cp.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
+    def _infer_batch(self, gpu_imgs: list[cp.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
         """Run batched TensorRT inference with per-tracklet recurrent states.
 
         Args:
@@ -391,10 +391,9 @@ class TRTSegmentation(Thread):
                 batched_bilinear_resize_inplace(batch_hwc, buf['img_uint8'][:batch_size], self.stream)
                 batch_hwc = buf['img_uint8'][:batch_size]
 
-            # Convert to float, normalize to [0,1], HWC -> NCHW
+            # Fused normalize [0,1] + HWC->CHW directly into src buffer
             # Note: Images are already RGB from GPUCropProcessor, no BGR->RGB needed
-            img_float_batch = (batch_hwc / 255.0).astype(self._model_dtype)
-            src_gpu[:] = cp.ascontiguousarray(cp.transpose(img_float_batch, (0, 3, 1, 2)))
+            normalize_hwc_to_chw_inplace(batch_hwc, src_gpu, self.stream)
 
             # Gather recurrent states into batched buffers
             for i, state in enumerate(states):

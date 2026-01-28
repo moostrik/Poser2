@@ -10,7 +10,7 @@ import cupy as cp
 import torch
 import onnxruntime as ort
 
-from ..cuda_image_ops import batched_bilinear_resize_inplace
+from ..cuda_image_ops import batched_bilinear_resize_inplace, normalize_hwc_to_chw_inplace
 from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
 from typing import TYPE_CHECKING
@@ -379,10 +379,10 @@ class ONNXSegmentation(Thread):
             batched_bilinear_resize_inplace(batch_hwc, resized)
             batch_hwc = resized
 
-        # Convert to float, normalize to [0,1], HWC -> NCHW
+        # Fused normalize [0,1] + HWC->CHW into preallocated buffer
         # Note: Images are already RGB from GPUCropProcessor, no BGR->RGB needed
-        img_float_batch = (batch_hwc / 255.0).astype(self._cupy_dtype)
-        src_batch = cp.ascontiguousarray(cp.transpose(img_float_batch, (0, 3, 1, 2)))  # (B, 3, H, W)
+        src_batch = cp.empty((batch_hwc.shape[0], 3, self.model_height, self.model_width), dtype=self._cupy_dtype)
+        normalize_hwc_to_chw_inplace(batch_hwc, src_batch)
 
         # Prepare batched recurrent state inputs on GPU
         r1i_list = []
