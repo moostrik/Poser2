@@ -11,6 +11,7 @@ import tensorrt as trt
 import cupy as cp
 
 from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
+from ..cuda_image_ops import batched_bilinear_resize_inplace
 from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
 from typing import TYPE_CHECKING
@@ -156,8 +157,8 @@ class TRTSegmentation(Thread):
             return
 
         # Validate batch size
-        if len(input_batch.images) > self._max_batch:
-            print(f"TRT RVM Segmentation Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+        if len(input_batch.gpu_images) > self._max_batch:
+            print(f"TRT RVM Segmentation Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: SegmentationInput | None = None
 
@@ -315,14 +316,12 @@ class TRTSegmentation(Thread):
         output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
 
         # Run inference using selected mode
-        if batch.images:
-            # Limit processing to max batch size
-            images_to_process = batch.images[:self._max_batch]
-            tracklets_to_process = batch.tracklet_ids[:self._max_batch]
+        gpu_images = batch.gpu_images[:self._max_batch]
+        tracklets_to_process = batch.tracklet_ids[:self._max_batch]
 
-
+        if gpu_images:
             try:
-                mask_tensor, fgr_tensor, inference_time_ms, lock_wait_ms = self._infer_batch(images_to_process, tracklets_to_process)
+                mask_tensor, fgr_tensor, inference_time_ms, lock_wait_ms = self._infer_batch_gpu(gpu_images, tracklets_to_process)
                 output = SegmentationOutput(
                     batch_id=batch.batch_id,
                     mask_tensor=mask_tensor,
@@ -342,17 +341,17 @@ class TRTSegmentation(Thread):
         except Exception:
             print("TRT RVM Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_batch(self, images: list[np.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
+    def _infer_batch_gpu(self, gpu_imgs: list[cp.ndarray], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
         """Run batched TensorRT inference with per-tracklet recurrent states.
 
         Args:
-            images: List of BGR uint8 images (H, W, 3)
+            gpu_imgs: List of RGB uint8 images on GPU (H, W, 3) - already correct size
             tracklet_ids: Tracklet IDs for each image
 
         Returns:
             (alpha_matte (B,H,W), foreground (B,3,H,W), inference_ms, lock_wait_ms)
         """
-        batch_size = len(images)
+        batch_size = len(gpu_imgs)
         if batch_size == 0:
             torch_dtype = torch.float16 if self._model_dtype == cp.float16 else torch.float32
             return torch.empty(0, dtype=torch_dtype, device='cuda'), torch.empty(0, 3, 0, 0, dtype=torch_dtype, device='cuda'), 0.0, 0.0
@@ -363,9 +362,6 @@ class TRTSegmentation(Thread):
         states: list[RecurrentState | None] = []
         for tid in tracklet_ids:
             states.append(self._recurrent_states.get(tid))
-
-        # CPU preprocessing
-        stacked_imgs = np.stack(images, axis=0)  # (B, H, W, 3) uint8
 
         # Allocate output buffers
         fgr_gpu = cp.empty((batch_size, 3, self.model_height, self.model_width), dtype=self._model_dtype)
@@ -383,10 +379,21 @@ class TRTSegmentation(Thread):
         r3i_gpu = buf['r3i'][:batch_size]
         r4i_gpu = buf['r4i'][:batch_size]
 
-        # CuPy preprocessing on our own buffers/stream (no lock needed)
+        # CuPy preprocessing on GPU (no CPU upload needed)
         with self.stream:
-            buf['img_uint8'][:batch_size].set(stacked_imgs)
-            img_float_batch = (buf['img_uint8'][:batch_size, :, :, ::-1] / 255.0).astype(self._model_dtype)
+            # Stack GPU images into batch (B, H, W, 3)
+            batch_hwc = cp.stack(gpu_imgs, axis=0)
+
+            # Check if resize is needed (crop size != model size)
+            src_h, src_w = batch_hwc.shape[1:3]
+            if src_h != self.model_height or src_w != self.model_width:
+                # Batched resize directly into preallocated buffer
+                batched_bilinear_resize_inplace(batch_hwc, buf['img_uint8'][:batch_size], self.stream)
+                batch_hwc = buf['img_uint8'][:batch_size]
+
+            # Convert to float, normalize to [0,1], HWC -> NCHW
+            # Note: Images are already RGB from GPUCropProcessor, no BGR->RGB needed
+            img_float_batch = (batch_hwc / 255.0).astype(self._model_dtype)
             src_gpu[:] = cp.ascontiguousarray(cp.transpose(img_float_batch, (0, 3, 1, 2)))
 
             # Gather recurrent states into batched buffers

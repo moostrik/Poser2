@@ -1,17 +1,22 @@
 # Standard library imports
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
 
 # Third-party imports
-import numpy as np
 import torch
+
+if TYPE_CHECKING:
+    import cupy as cp
 
 
 @dataclass
 class SegmentationInput:
-    """Batch of images for segmentation. Images should be (H, W, 3) BGR uint8."""
+    """Batch of GPU images for segmentation.
+
+    GPU images will be processed directly on GPU.
+    """
     batch_id: int
-    images: list[np.ndarray]
+    gpu_images: 'list[cp.ndarray]' = field(default_factory=list)  # GPU images (H, W, 3) RGB uint8
     tracklet_ids: list[int] = field(default_factory=list)  # Corresponding tracklet IDs for each image
 
 

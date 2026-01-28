@@ -1,13 +1,12 @@
 from threading import Lock
 from typing import Union
 
-import numpy as np
 import torch
 
 from modules.pose.callback.mixins import TypedCallbackMixin
+from modules.pose.batch.GPUFrame import GPUFrameDict
 from modules.pose.Frame import FrameDict
 from modules.pose.Settings import Settings, ModelType
-from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 
@@ -20,7 +19,7 @@ Segmentation = Union[ONNXSegmentation, TRTSegmentation]
 
 
 class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
-    """GPU-based batch extractor for person segmentation masks using MODNet.
+    """GPU-based batch extractor for person segmentation masks using RVM.
 
     Batches are processed asynchronously on GPU. Under load, pending batches may
     be dropped by the Segmentation queue to maintain real-time performance.
@@ -60,25 +59,25 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         """Stop the segmentation processing thread."""
         self._segmentation.stop()
 
-    def process(self, poses: FrameDict, images: dict[int, np.ndarray]) -> None:
-        """Submit batch for async processing. Results broadcast via callbacks.
+    def process(self, poses: FrameDict, gpu_frames: GPUFrameDict) -> None:
+        """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:
             poses: Dictionary of poses keyed by tracklet ID
-            images: Dictionary of pre-cropped/resized images keyed by tracklet ID
+            gpu_frames: GPU frames with crops already on GPU, keyed by tracklet ID
         """
         if not self._segmentation.is_ready:
             return
 
-        image_list: list[np.ndarray] = []
+        tracklet_ids: list[int] = []
+        gpu_image_list: list = []  # list[cp.ndarray]
 
-        tracklet_id_list: list[int] = []
         for tracklet_id in poses.keys():
-            if tracklet_id in images:
-                tracklet_id_list.append(tracklet_id)
-                image_list.append(images[tracklet_id])
+            if tracklet_id in gpu_frames:
+                tracklet_ids.append(tracklet_id)
+                gpu_image_list.append(gpu_frames[tracklet_id].crop)
 
-        if not image_list:
+        if not gpu_image_list:
             return
 
         with self._lock:
@@ -87,8 +86,8 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
 
         self._segmentation.submit_batch(SegmentationInput(
             batch_id=batch_id,
-            images=image_list,
-            tracklet_ids=tracklet_id_list
+            gpu_images=gpu_image_list,
+            tracklet_ids=tracklet_ids
         ))
 
     def _on_segmentation_result(self, output: SegmentationOutput) -> None:
