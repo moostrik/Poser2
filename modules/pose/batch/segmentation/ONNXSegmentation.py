@@ -161,9 +161,9 @@ class ONNXSegmentation(Thread):
         with self._input_lock:
             if self._pending_batch is not None:
                 dropped_batch = self._pending_batch
-                # if self.verbose:
-                lag = int((time.time() - self._input_timestamp) * 1000)
-                print(f"ONNX Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
+                if self.verbose:
+                    lag = int((time.time() - self._input_timestamp) * 1000)
+                    print(f"ONNX Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -433,7 +433,6 @@ class ONNXSegmentation(Thread):
 
     def _model_warmup(self, session: ort.InferenceSession) -> None:
         """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
-        print(f"ONNX Segmentation: Starting warmup (fixed batch_size={self._max_batch})...")
         try:
             # Create realistic dummy input
             np.random.seed(42)
@@ -448,8 +447,6 @@ class ONNXSegmentation(Thread):
             # Clear warmup states
             self._recurrent_states.clear()
 
-            if self.verbose:
-                print(f"ONNX Segmentation: Warmup complete - took {ms:.1f}ms")
         except Exception as e:
             print(f"ONNX Segmentation: Warmup failed (non-critical) - {str(e)}")
             traceback.print_exc()

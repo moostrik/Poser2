@@ -62,27 +62,39 @@ depth cam pose synchony detection
 * move shortcut to startup folder
 
 
-## OPTIONAL
+## HINTS
 
-# build MMPose (for cuda 12.1, probably works for newer cuda)
-* install torch with cuda ```pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121```
-(or, i forgot what i did) ```pip install torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu121``` )
-* install openmim ```pip install openmim```
-* install mmcv ```mim install mmcv==2.1.0```   (this will build mmcv, takes abaout 15 minutes)
-* install mmdet ```mim install mmdet==3.2.0```
-* install mmpose ```mim install mmpose==1.3.2```
-* mim can be used to download the models (If your use case is controlled poses / standard humans, coco is fine.
-If your use case has varied poses or unusual angles, aic-coco is better.)
-  * mim download mmpose --config rtmpose-l_8xb256-420e_aic-coco-256x192  --dest .\models
-  * mim download mmpose --config rtmpose-l_8xb256-420e_aic-coco-384x288  --dest .\models
-  * mim download mmpose --config rtmpose-m_8xb256-420e_aic-coco-256x192  --dest .\models
-  * mim download mmpose --config rtmpose-m_8xb256-420e_aic-coco-384x288  --dest .\models
-  * mim download mmpose --config rtmpose-s_8xb256-420e_aic-coco-256x192  --dest .\models
-  * mim download mmpose --config rtmpose-t_8xb256-420e_aic-coco-256x192  --dest .\models
-* the following links are helpful:
-  * https://pytorch.org/get-started/locally/
-  * https://pypi.org/project/torchvision/
-  * https://github.com/pytorch/pytorch/wiki/PyTorch-Versions
-  * https://mmpose.readthedocs.io/en/latest/installation.html
-  * https://mmcv.readthedocs.io/en/latest/get_started/installation.html
-  * https://mmpose.readthedocs.io/en/latest/model_zoo/body_2d_keypoint.html#coco-dataset
+# shotcut vscode
+* ctrl+shift+p
+* Tasks:Open User Tasks
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Copy Python Command",
+      "type": "shell",
+      "command": "echo python launcher.py -s studio -sim | clip",
+      "presentation": {
+        "reveal": "never",
+        "panel": "dedicated",
+      },
+      "problemMatcher": []
+    }
+  ]
+}
+```
+* Preferences:Open Keyboard Shortcuts (JSON)
+```json
+[
+    {
+        "key": "ctrl+alt+d",
+        "command": "workbench.action.toggleLightDarkThemes"
+    },
+    {
+      "key": "ctrl+1",
+      "command": "workbench.action.tasks.runTask",
+      "args": "Copy Python Command"
+    }
+]
+```

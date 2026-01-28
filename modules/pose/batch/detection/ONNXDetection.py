@@ -295,7 +295,6 @@ class ONNXDetection(Thread):
         if self._session is None:
             return
 
-        print(f"ONNX Detection: Starting warmup (fixed batch_size={self._max_batch})...")
         try:
             # Create realistic dummy input
             np.random.seed(42)
@@ -306,8 +305,6 @@ class ONNXDetection(Thread):
 
             keypoints, scores = self._infer_batch(dummy_images)
 
-            if self.verbose:
-                print(f"ONNX Detection: Warmup complete")
         except Exception as e:
             print(f"ONNX Detection: Warmup failed (non-critical) - {str(e)}")
             traceback.print_exc()

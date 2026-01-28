@@ -1,16 +1,13 @@
 # Standard library imports
-from dataclasses import dataclass, field
 from queue import Queue, Empty
 from threading import Thread, Lock, Event
 import time
 import traceback
-from typing import Callable
 
 # Third-party imports
 import numpy as np
 import torch
 import onnxruntime as ort
-from concurrent.futures import ThreadPoolExecutor
 
 from typing import TYPE_CHECKING
 
@@ -66,10 +63,11 @@ class ONNXOpticalFlow(Thread):
 
         # ONNX session (initialized in run thread)
         self._session: ort.InferenceSession | None = None
+        self._model_dtype = np.float32  # Default, determined in setup
+        self.model_precision: str = "UNKNOWN"
 
-        # Thread pool for parallel inference
-        self._executor: ThreadPoolExecutor | None = None
-        self._max_workers: int = min(getattr(settings, 'max_poses', 3), 4)
+        # Batch inference settings
+        self._max_batch: int = min(settings.max_poses, 8)
 
     @property
     def is_ready(self) -> bool:
@@ -83,21 +81,18 @@ class ONNXOpticalFlow(Thread):
         super().start()
 
     def stop(self) -> None:
+        """Stop both inference and callback threads gracefully."""
         if not self.enabled:
             return
-        """Stop both inference and callback threads gracefully"""
-        self._shutdown_event.set()
 
-        # Shutdown thread pool
-        if self._executor is not None:
-            self._executor.shutdown(wait=True, cancel_futures=True)
+        self._shutdown_event.set()
 
         # Wake up inference thread
         self._notify_update_event.set()
         self.join(timeout=2.0)
 
         if self.is_alive():
-            print("Warning: RAFT Optical Flow inference thread did not stop cleanly")
+            print("Warning: ONNX Optical Flow inference thread did not stop cleanly")
 
         # Wake up callback thread with sentinel
         try:
@@ -107,52 +102,11 @@ class ONNXOpticalFlow(Thread):
 
         self._callback_thread.join(timeout=2.0)
         if self._callback_thread.is_alive():
-            print("Warning: RAFT Optical Flow callback thread did not stop cleanly")
+            print("Warning: ONNX Optical Flow callback thread did not stop cleanly")
 
     def run(self) -> None:
-        """Main inference thread loop. Initializes ONNX session and processes batches."""
-        try:
-            # Initialize ONNX Runtime session with CUDA provider
-            providers = [
-                ('CUDAExecutionProvider', {
-                    'device_id': 0,
-                    'arena_extend_strategy': 'kNextPowerOfTwo',
-                    'gpu_mem_limit': 2 * 1024 * 1024 * 1024,  # 2GB
-                    'cudnn_conv_algo_search': 'EXHAUSTIVE',
-                    'do_copy_in_default_stream': True,
-                }),
-                'CPUExecutionProvider',
-            ]
-
-            sess_options = ort.SessionOptions()
-            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            sess_options.intra_op_num_threads = 1
-            sess_options.log_severity_level = 3
-
-            self._session = ort.InferenceSession(
-                self.model_file,
-                sess_options=sess_options,
-                providers=providers
-            )
-
-            # Verify CUDA provider is active
-            providers_used = self._session.get_providers()
-            if 'CUDAExecutionProvider' not in providers_used:
-                print("RAFT Optical Flow WARNING: CUDA provider not available, using CPU")
-
-            # Warmup: initialize CUDA kernels with dummy inference
-            self._model_warmup(self._session)
-
-            # Create thread pool for parallel inference
-            self._executor = ThreadPoolExecutor(max_workers=self._max_workers, thread_name_prefix="RAFT-Worker")
-
-            self._model_ready.set()
-            print(f"RAFT Optical Flow: {self.resolution_name} model loaded ({self.model_width}x{self.model_height}, {providers_used[0]}) with {self._max_workers} workers")
-
-        except Exception as e:
-            print(f"RAFT Optical Flow Error: Failed to load model - {str(e)}")
-            traceback.print_exc()
-            return
+        """Main inference thread loop."""
+        self._setup()
 
         while not self._shutdown_event.is_set():
             self._notify_update_event.wait()
@@ -164,9 +118,8 @@ class ONNXOpticalFlow(Thread):
 
             try:
                 self._process_pending_batch()
-
             except Exception as e:
-                print(f"RAFT Optical Flow Error: {str(e)}")
+                print(f"ONNX Optical Flow Error: {str(e)}")
                 traceback.print_exc()
 
     def submit_batch(self, input_batch: OpticalFlowInput) -> None:
@@ -177,14 +130,18 @@ class ONNXOpticalFlow(Thread):
         if not self._model_ready.is_set():
             return
 
+        # Validate batch size
+        if len(input_batch.frame_pairs) > self._max_batch:
+            print(f"ONNX Optical Flow Warning: Batch size {len(input_batch.frame_pairs)} exceeds max {self._max_batch}, will process only first {self._max_batch} pairs")
+
         dropped_batch: OpticalFlowInput | None = None
 
         with self._input_lock:
             if self._pending_batch is not None:
                 dropped_batch = self._pending_batch
-                lag = int((time.time() - self._input_timestamp) * 1000)
-                # if self.verbose:
-                # print(f"RAFT Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms")
+                if self.verbose:
+                    lag = int((time.time() - self._input_timestamp) * 1000)
+                    print(f"ONNX Optical Flow: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
@@ -204,6 +161,70 @@ class ONNXOpticalFlow(Thread):
 
         self._notify_update_event.set()
 
+    def _setup(self) -> None:
+        """Initialize ONNX session and warmup. Called from run()."""
+        try:
+            # Initialize ONNX Runtime session with CUDA provider
+            providers = [
+                ('CUDAExecutionProvider', {
+                    'device_id': 0,
+                    'arena_extend_strategy': 'kNextPowerOfTwo',
+                    'gpu_mem_limit': 2 * 1024 * 1024 * 1024,  # 2GB
+                    'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                    'do_copy_in_default_stream': True,
+                }),
+                'CPUExecutionProvider',
+            ]
+
+            sess_options = ort.SessionOptions()
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            sess_options.intra_op_num_threads = 1
+            sess_options.log_severity_level = 3  # 0=verbose, 1=info, 2=warning, 3=error
+
+            self._session = ort.InferenceSession(
+                self.model_file,
+                sess_options=sess_options,
+                providers=providers
+            )
+
+            # Verify CUDA provider is active
+            providers_used = self._session.get_providers()
+            if 'CUDAExecutionProvider' not in providers_used:
+                print("ONNX Optical Flow WARNING: CUDA provider not available, using CPU")
+
+            # Determine model precision from input tensor
+            input_tensor = self._session.get_inputs()[0]
+            input_type = input_tensor.type
+
+            # Parse ONNX type string (e.g., 'tensor(float)', 'tensor(float16)')
+            precision_map = {
+                'tensor(float)': 'FP32',
+                'tensor(float16)': 'FP16',
+                'tensor(double)': 'FP64',
+                'tensor(int8)': 'INT8',
+            }
+            self.model_precision = precision_map.get(input_type, f"UNKNOWN({input_type})")
+
+            # Map ONNX type to numpy dtype for preprocessing
+            dtype_map = {
+                'tensor(float)': np.float32,
+                'tensor(float16)': np.float16,
+                'tensor(double)': np.float64,
+                'tensor(int8)': np.int8,
+            }
+            self._model_dtype = dtype_map.get(input_type, np.float32)
+
+            # Warmup model
+            self._model_warmup()
+
+            self._model_ready.set()
+            print(f"ONNX Optical Flow: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
+
+        except Exception as e:
+            print(f"ONNX Optical Flow Error: Failed to load model - {str(e)}")
+            traceback.print_exc()
+
     def _retrieve_pending_batch(self) -> OpticalFlowInput | None:
         """Atomically get and clear pending batch."""
         with self._input_lock:
@@ -212,99 +233,133 @@ class ONNXOpticalFlow(Thread):
             return batch
 
     def _process_pending_batch(self) -> None:
-        """Process the pending batch using RAFT ONNX inference."""
+        """Process the pending batch using batched ONNX inference."""
         batch: OpticalFlowInput | None = self._retrieve_pending_batch()
 
         if batch is None:
             return
 
-        output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
+        output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
 
         # Run inference
-        if batch.frame_pairs and self._session is not None and self._executor is not None:
-            batch_start = time.perf_counter()
+        if batch.frame_pairs:
+            # Limit processing to max batch size
+            pairs_to_process = batch.frame_pairs[:self._max_batch]
+            tracklets_to_process = batch.tracklet_ids[:self._max_batch]
 
-            # Process frame pairs in parallel using thread pool
-            futures = []
-            for (prev_frame, curr_frame), tracklet_id in zip(batch.frame_pairs, batch.tracklet_ids):
-                future = self._executor.submit(self._infer_optical_flow, prev_frame, curr_frame)
-                futures.append((future, tracklet_id))
+            try:
+                flow_tensor, inference_time_ms = self._infer_batch(pairs_to_process)
 
-            # Collect results in original order
-            flow_list: list[torch.Tensor] = []
-            for future, tracklet_id in futures:
-                try:
-                    flow = future.result()
-                    flow_list.append(flow)
-                except Exception as e:
-                    print(f"RAFT Optical Flow Error: Inference failed for tracklet {tracklet_id}: {str(e)}")
-                    # Create zero flow on error
-                    h, w = batch.frame_pairs[0][0].shape[:2]
-                    flow_list.append(torch.zeros((2, h, w), dtype=torch.float32, device='cuda'))
-
-            # Stack into batch tensor
-            if flow_list:
-                flow_tensor = torch.stack(flow_list)  # (B, 2, H, W) FP32 on CUDA
-            else:
-                flow_tensor = torch.empty(0, dtype=torch.float32, device='cuda')
-
-            inference_time_ms: float = (time.perf_counter() - batch_start) * 1000.0
-
-            output = OpticalFlowOutput(
-                batch_id=batch.batch_id,
-                flow_tensor=flow_tensor,
-                tracklet_ids=batch.tracklet_ids,
-                processed=True,
-                inference_time_ms=inference_time_ms
-            )
+                output = OpticalFlowOutput(
+                    batch_id=batch.batch_id,
+                    flow_tensor=flow_tensor,
+                    tracklet_ids=tracklets_to_process,
+                    processed=True,
+                    inference_time_ms=inference_time_ms
+                )
+            except Exception as e:
+                print(f"ONNX Optical Flow Error: Batched inference failed: {str(e)}")
+                traceback.print_exc()
+        else:
+            output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
 
         # Queue for callbacks
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
-            print("RAFT Optical Flow Warning: Callback queue full, dropping results")
+            print("ONNX Optical Flow Warning: Callback queue full, dropping results")
 
-    def _infer_optical_flow(self, prev_frame: np.ndarray, curr_frame: np.ndarray) -> torch.Tensor:
-        """Run RAFT inference on frame pair.
+    def _infer_batch(self, frame_pairs: list[tuple[np.ndarray, np.ndarray]]) -> tuple[torch.Tensor, float]:
+        """Run batched ONNX inference on frame pairs.
+
+        Uses fixed batch size padding to avoid ONNX Runtime dynamic shape recompilation.
 
         Args:
-            prev_frame: Previous frame (H, W, 3) BGR uint8
-            curr_frame: Current frame (H, W, 3) BGR uint8
+            frame_pairs: List of (prev_frame, curr_frame) tuples, each (H, W, 3) BGR uint8
 
         Returns:
-            Flow tensor (2, H, W) FP32 on CUDA, where [0] is x-flow, [1] is y-flow
+            (flow_tensor (actual_batch, 2, H, W) on CUDA, inference_time_ms)
         """
-        if self._session is None:
-            h, w = prev_frame.shape[:2]
-            return torch.zeros((2, h, w), dtype=torch.float32, device='cuda')
+        actual_batch_size = len(frame_pairs)
+        if actual_batch_size == 0 or self._session is None:
+            return torch.empty(0, 2, self.model_height, self.model_width, dtype=torch.float32, device='cuda'), 0.0
 
-        # Preprocess: BGR -> RGB, HWC -> NCHW, keep in [0, 255] range (RAFT expects this)
-        def preprocess(img: np.ndarray) -> np.ndarray:
-            img_rgb = img[:, :, ::-1].astype(np.float32)  # BGR to RGB, FP32
-            img_chw = np.transpose(img_rgb, (2, 0, 1))  # (H, W, 3) -> (3, H, W)
-            img_nchw = np.expand_dims(img_chw, axis=0)  # (1, 3, H, W)
-            return img_nchw
+        batch_start = time.perf_counter()
 
-        image1 = preprocess(prev_frame)
-        image2 = preprocess(curr_frame)
+        # Pad to fixed batch size to avoid ONNX Runtime recompilation
+        num_padding = self._max_batch - actual_batch_size
+        if num_padding > 0:
+            # Add padding with zero frame pairs
+            dummy_frame = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
+            for _ in range(num_padding):
+                frame_pairs.append((dummy_frame, dummy_frame))
+
+        # Preprocess all frames: BGR -> RGB, HWC -> NCHW, keep in [0, 255] range (RAFT expects this)
+        image1_list = []
+        image2_list = []
+        for prev_frame, curr_frame in frame_pairs:
+            # BGR to RGB, convert to model dtype
+            prev_rgb = prev_frame[:, :, ::-1].astype(self._model_dtype)
+            curr_rgb = curr_frame[:, :, ::-1].astype(self._model_dtype)
+            # HWC to CHW
+            prev_chw = np.transpose(prev_rgb, (2, 0, 1))
+            curr_chw = np.transpose(curr_rgb, (2, 0, 1))
+            image1_list.append(prev_chw)
+            image2_list.append(curr_chw)
+
+        # Stack into batches (B, 3, H, W)
+        image1_batch = np.stack(image1_list, axis=0)
+        image2_batch = np.stack(image2_list, axis=0)
 
         # Run ONNX inference
-        # RAFT model expects inputs: image1, image2
-        # Output: flow (1, 2, H, W)
         input_names = [inp.name for inp in self._session.get_inputs()]
         onnx_inputs = {
-            input_names[0]: image1,
-            input_names[1]: image2
+            input_names[0]: image1_batch,
+            input_names[1]: image2_batch
         }
 
         outputs = self._session.run(None, onnx_inputs)
-        flow_np = outputs[0]  # (1, 2, H, W) FP32
+        flow_np: np.ndarray = np.asarray(outputs[0])  # (padded_batch, 2, H, W)
+
+        # Slice to actual batch size
+        flow_np = flow_np[:actual_batch_size]
 
         # Convert to PyTorch CUDA tensor
-        flow_tensor = torch.from_numpy(flow_np).cuda()  # (1, 2, H, W)
-        flow_tensor = flow_tensor.squeeze(0)  # (2, H, W)
+        flow_tensor = torch.from_numpy(flow_np).cuda()  # (actual_batch, 2, H, W)
 
-        return flow_tensor
+        inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
+
+        return flow_tensor, inference_time_ms
+
+    def _model_warmup(self) -> None:
+        """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
+        if self._session is None:
+            return
+
+        try:
+            # Create realistic dummy input
+            np.random.seed(42)
+            dummy_frame = (np.random.rand(self.model_height, self.model_width, 3) * 255).astype(np.uint8)
+
+            # Warmup with max_batch size (all inference runs with this size)
+            dummy_pairs = [(dummy_frame, dummy_frame)] * self._max_batch
+
+            flow_tensor, ms = self._infer_batch(dummy_pairs)
+
+        except Exception as e:
+            print(f"ONNX Optical Flow: Warmup failed (non-critical) - {str(e)}")
+            traceback.print_exc()
+
+    # CALLBACK METHODS
+    def register_callback(self, callback: OpticalFlowOutputCallback) -> None:
+        """Register callback to receive optical flow results."""
+        with self._callback_lock:
+            self._callbacks.add(callback)
+
+    def unregister_callback(self, callback: OpticalFlowOutputCallback) -> None:
+        """Unregister previously registered callback."""
+        with self._callback_lock:
+            self._callbacks.discard(callback)
 
     def _callback_worker_loop(self) -> None:
         """Dispatch queued results to registered callbacks."""
@@ -322,26 +377,9 @@ class ONNXOpticalFlow(Thread):
                     try:
                         callback(output)
                     except Exception as e:
-                        print(f"RAFT Optical Flow Callback Error: {str(e)}")
+                        print(f"ONNX Optical Flow Callback Error: {str(e)}")
                         traceback.print_exc()
 
                 self._callback_queue.task_done()
             except Empty:
                 continue
-
-    def register_callback(self, callback: OpticalFlowOutputCallback) -> None:
-        """Register callback to receive optical flow results."""
-        with self._callback_lock:
-            self._callbacks.add(callback)
-
-    def _model_warmup(self, session: ort.InferenceSession) -> None:
-        """Initialize CUDA kernels with dummy inference."""
-        try:
-            dummy_frame = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
-
-            for i in range(2):
-                _ = self._infer_optical_flow(dummy_frame, dummy_frame)
-
-            print("RAFT Optical Flow: Warmup complete")
-        except Exception as e:
-            print(f"RAFT Optical Flow: Warmup failed (non-critical) - {str(e)}")
