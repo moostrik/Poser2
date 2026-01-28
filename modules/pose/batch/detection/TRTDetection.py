@@ -304,43 +304,37 @@ class TRTDetection(Thread):
         # CPU preprocessing
         stacked_imgs = np.stack(imgs, axis=0)  # (B, H, W, 3) uint8
 
-        # Run inference with global lock
+        # Get batched buffers (sliced to actual batch size)
+        buf = self._batch_buffers
+        input_gpu = buf['input'][:batch_size]
+        simcc_x_gpu = buf['simcc_x'][:batch_size]
+        simcc_y_gpu = buf['simcc_y'][:batch_size]
+
+        # CuPy preprocessing on our own buffers/stream (no lock needed)
+        with self.stream:
+            buf['img_uint8'][:batch_size].set(stacked_imgs)
+            img_float_batch = buf['img_uint8'][:batch_size].astype(self._model_dtype)
+            img_rgb_batch = img_float_batch[:, :, :, ::-1]  # BGR→RGB
+            img_chw_batch = cp.ascontiguousarray(cp.transpose(img_rgb_batch, (0, 3, 1, 2)))  # HWC→CHW
+            input_gpu[:] = (img_chw_batch - self._mean_gpu) / self._std_gpu
+        # self.stream.synchronize()  # Ensure preprocessing complete before TRT reads
+
+        # TensorRT operations only - acquire global lock
         lock_wait_start: float = time.perf_counter()
         with get_exec_lock():
             lock_acquired: float = time.perf_counter()
 
-            # Get batched buffers (sliced to actual batch size)
-            buf = self._batch_buffers
-            input_gpu = buf['input'][:batch_size]
-            simcc_x_gpu = buf['simcc_x'][:batch_size]
-            simcc_y_gpu = buf['simcc_y'][:batch_size]
-
-            with self.stream:
-                # OPTIMIZED: Stack images on CPU first, single transfer to GPU
-                buf['img_uint8'][:batch_size].set(stacked_imgs)
-
-                # Vectorized GPU preprocessing: uint8→float, BGR→RGB, HWC→CHW, normalize
-                img_float_batch = buf['img_uint8'][:batch_size].astype(self._model_dtype)
-                img_rgb_batch = img_float_batch[:, :, :, ::-1]  # BGR→RGB
-                img_chw_batch = cp.ascontiguousarray(cp.transpose(img_rgb_batch, (0, 3, 1, 2)))  # HWC→CHW
-                input_gpu[:] = (img_chw_batch - self._mean_gpu) / self._std_gpu
-
-            # Set input shape for current batch
             self.context.set_input_shape(self.input_name, input_gpu.shape)
-
-            # Set tensor addresses using preallocated buffers
             self.context.set_tensor_address(self.input_name, input_gpu.data.ptr)
             self.context.set_tensor_address(self.output_names[0], simcc_x_gpu.data.ptr)
             self.context.set_tensor_address(self.output_names[1], simcc_y_gpu.data.ptr)
 
-            # Execute inference (no sync needed before - TensorRT waits for stream)
-            with self.stream:
-                self.context.execute_async_v3(stream_handle=self.stream.ptr)
+            self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
 
-            # Transfer SimCC outputs to CPU
-            simcc_x_cpu = cp.asnumpy(simcc_x_gpu)
-            simcc_y_cpu = cp.asnumpy(simcc_y_gpu)
+        # Transfer outputs to CPU (no lock needed - our own buffers)
+        simcc_x_cpu = cp.asnumpy(simcc_x_gpu)
+        simcc_y_cpu = cp.asnumpy(simcc_y_gpu)
 
         # Decode on CPU (outside lock - no GPU resource needed)
         keypoints, scores = TRTDetection._decode_simcc_cpu(simcc_x_cpu, simcc_y_cpu, self.simcc_split_ratio)

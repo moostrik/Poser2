@@ -311,50 +311,41 @@ class TRTOpticalFlow(Thread):
 
         buf = self._batch_buffers
 
+        # Get buffer slices for current batch
+        image1_gpu = buf['img1_input'][:batch_size]
+        image2_gpu = buf['img2_input'][:batch_size]
+
         # Allocate output buffer per-call (not preallocated to avoid race condition)
         flow_gpu = cp.empty((batch_size, 2, self.model_height, self.model_width), dtype=self._model_dtype)
 
+        # CuPy preprocessing on our own buffers/stream (no lock needed)
+        with self.stream:
+            buf['img1_uint8'][:batch_size].set(prev_frames_rgb)
+            buf['img2_uint8'][:batch_size].set(curr_frames_rgb)
+            img1_float = buf['img1_uint8'][:batch_size].astype(self._model_dtype)
+            img2_float = buf['img2_uint8'][:batch_size].astype(self._model_dtype)
+            img1_chw = cp.ascontiguousarray(cp.transpose(img1_float, (0, 3, 1, 2)))
+            img2_chw = cp.ascontiguousarray(cp.transpose(img2_float, (0, 3, 1, 2)))
+            image1_gpu[:] = img1_chw
+            image2_gpu[:] = img2_chw
+        # self.stream.synchronize()  # Ensure preprocessing complete before TRT reads
+
+        # TensorRT operations only - acquire global lock
         lock_wait_start = time.perf_counter()
         with get_exec_lock():
             lock_acquired = time.perf_counter()
 
-            # Get buffer slices for current batch
-            image1_gpu = buf['img1_input'][:batch_size]
-            image2_gpu = buf['img2_input'][:batch_size]
-
-            with self.stream:
-                # Single GPU transfer for entire batch
-                buf['img1_uint8'][:batch_size].set(prev_frames_rgb)
-                buf['img2_uint8'][:batch_size].set(curr_frames_rgb)
-
-                # Vectorized GPU operations on entire batch
-                img1_float = buf['img1_uint8'][:batch_size].astype(self._model_dtype)
-                img2_float = buf['img2_uint8'][:batch_size].astype(self._model_dtype)
-
-                # Transpose HWC -> CHW: (B, H, W, 3) -> (B, 3, H, W)
-                img1_chw = cp.ascontiguousarray(cp.transpose(img1_float, (0, 3, 1, 2)))
-                img2_chw = cp.ascontiguousarray(cp.transpose(img2_float, (0, 3, 1, 2)))
-
-                # Store in preallocated input buffers
-                image1_gpu[:] = img1_chw
-                image2_gpu[:] = img2_chw
-
-            # Set input shapes for current batch
             self.context.set_input_shape(self.input_names[0], image1_gpu.shape)
             self.context.set_input_shape(self.input_names[1], image2_gpu.shape)
-
-            # Set tensor addresses
             self.context.set_tensor_address(self.input_names[0], image1_gpu.data.ptr)
             self.context.set_tensor_address(self.input_names[1], image2_gpu.data.ptr)
             self.context.set_tensor_address(self.output_name, flow_gpu.data.ptr)
 
-            # Execute inference
-            with self.stream:
-                self.context.execute_async_v3(stream_handle=self.stream.ptr)
+            self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
 
-            # Convert CuPy array to PyTorch tensor inside lock (flow_gpu is fresh, safe to use after)
-            flow_tensor = torch.as_tensor(flow_gpu, device='cuda')  # (B, 2, H, W)
+        # Convert to PyTorch tensor (no lock needed - fresh buffer)
+        flow_tensor = torch.as_tensor(flow_gpu, device='cuda')  # (B, 2, H, W)
 
         method_end = time.perf_counter()
 

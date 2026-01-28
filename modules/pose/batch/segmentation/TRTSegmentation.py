@@ -367,51 +367,45 @@ class TRTSegmentation(Thread):
         r3o_gpu = cp.empty((batch_size, 40, self.model_height // 8, self.model_width // 8), dtype=self._model_dtype)
         r4o_gpu = cp.empty((batch_size, 64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype)
 
-        # Run batched inference with global lock
+        # Get batched INPUT buffers (sliced to actual batch size)
+        buf = self._batch_buffers
+        src_gpu = buf['src'][:batch_size]
+        r1i_gpu = buf['r1i'][:batch_size]
+        r2i_gpu = buf['r2i'][:batch_size]
+        r3i_gpu = buf['r3i'][:batch_size]
+        r4i_gpu = buf['r4i'][:batch_size]
+
+        # CuPy preprocessing on our own buffers/stream (no lock needed)
+        with self.stream:
+            buf['img_uint8'][:batch_size].set(stacked_imgs)
+            img_float_batch = (buf['img_uint8'][:batch_size, :, :, ::-1] / 255.0).astype(self._model_dtype)
+            src_gpu[:] = cp.ascontiguousarray(cp.transpose(img_float_batch, (0, 3, 1, 2)))
+
+            # Gather recurrent states into batched buffers
+            for i, state in enumerate(states):
+                if state is not None:
+                    r1i_gpu[i] = state.r1[0]
+                    r2i_gpu[i] = state.r2[0]
+                    r3i_gpu[i] = state.r3[0]
+                    r4i_gpu[i] = state.r4[0]
+                else:
+                    r1i_gpu[i] = self._zero_r1[0]
+                    r2i_gpu[i] = self._zero_r2[0]
+                    r3i_gpu[i] = self._zero_r3[0]
+                    r4i_gpu[i] = self._zero_r4[0]
+        # self.stream.synchronize()  # Ensure preprocessing complete before TRT reads
+
+        # TensorRT operations only - acquire global lock
         lock_wait_start: float = time.perf_counter()
         with get_exec_lock():
             lock_acquired: float = time.perf_counter()
 
-            # Get batched INPUT buffers (sliced to actual batch size)
-            buf = self._batch_buffers
-            src_gpu = buf['src'][:batch_size]
-            r1i_gpu = buf['r1i'][:batch_size]
-            r2i_gpu = buf['r2i'][:batch_size]
-            r3i_gpu = buf['r3i'][:batch_size]
-            r4i_gpu = buf['r4i'][:batch_size]
-
-            with self.stream:
-                # OPTIMIZED: Stack images on CPU first, single transfer to GPU
-                buf['img_uint8'][:batch_size].set(stacked_imgs)
-
-                # Vectorized BGR->RGB, uint8->float, normalize (operates on full batch)
-                img_float_batch = (buf['img_uint8'][:batch_size, :, :, ::-1] / 255.0).astype(self._model_dtype)
-
-                # Vectorized transpose HWC -> CHW for full batch
-                src_gpu[:] = cp.ascontiguousarray(cp.transpose(img_float_batch, (0, 3, 1, 2)))
-
-                # Gather recurrent states into batched buffers
-                for i, state in enumerate(states):
-                    if state is not None:
-                        r1i_gpu[i] = state.r1[0]  # Remove batch dim from stored state
-                        r2i_gpu[i] = state.r2[0]
-                        r3i_gpu[i] = state.r3[0]
-                        r4i_gpu[i] = state.r4[0]
-                    else:
-                        # Use zeros for new tracklets
-                        r1i_gpu[i] = self._zero_r1[0]
-                        r2i_gpu[i] = self._zero_r2[0]
-                        r3i_gpu[i] = self._zero_r3[0]
-                        r4i_gpu[i] = self._zero_r4[0]
-
-            # Set batched input shapes
             self.context.set_input_shape('src', (batch_size, 3, self.model_height, self.model_width))
             self.context.set_input_shape('r1i', (batch_size, 16, self.model_height // 2, self.model_width // 2))
             self.context.set_input_shape('r2i', (batch_size, 20, self.model_height // 4, self.model_width // 4))
             self.context.set_input_shape('r3i', (batch_size, 40, self.model_height // 8, self.model_width // 8))
             self.context.set_input_shape('r4i', (batch_size, 64, self.model_height // 16, self.model_width // 16))
 
-            # Set tensor addresses
             self.context.set_tensor_address('src', buf['src'].data.ptr)
             self.context.set_tensor_address('r1i', buf['r1i'].data.ptr)
             self.context.set_tensor_address('r2i', buf['r2i'].data.ptr)
@@ -424,25 +418,21 @@ class TRTSegmentation(Thread):
             self.context.set_tensor_address('r3o', r3o_gpu.data.ptr)
             self.context.set_tensor_address('r4o', r4o_gpu.data.ptr)
 
-            # Execute batched inference (no sync needed before - TensorRT waits for stream)
-            with self.stream:
-                self.context.execute_async_v3(stream_handle=self.stream.ptr)
+            self.context.execute_async_v3(stream_handle=self.stream.ptr)
             self.stream.synchronize()
 
+        # Output handling (no lock needed - fresh buffers)
+        new_states: list[RecurrentState] = []
+        for i in range(batch_size):
+            new_states.append(RecurrentState(
+                r1=r1o_gpu[i:i+1],
+                r2=r2o_gpu[i:i+1],
+                r3=r3o_gpu[i:i+1],
+                r4=r4o_gpu[i:i+1],
+            ))
 
-            # Split output states - NO COPY needed, buffers are fresh allocations
-            new_states: list[RecurrentState] = []
-            for i in range(batch_size):
-                new_states.append(RecurrentState(
-                    r1=r1o_gpu[i:i+1],  # View into fresh buffer - safe to keep
-                    r2=r2o_gpu[i:i+1],
-                    r3=r3o_gpu[i:i+1],
-                    r4=r4o_gpu[i:i+1],
-                ))
-
-            # Convert batched outputs to PyTorch tensors
-            pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(1)  # (B, H, W)
-            fgr_tensor = torch.as_tensor(fgr_gpu, device='cuda')  # (B, 3, H, W)
+        pha_tensor = torch.as_tensor(pha_gpu, device='cuda').squeeze(1)  # (B, H, W)
+        fgr_tensor = torch.as_tensor(fgr_gpu, device='cuda')  # (B, 3, H, W)
 
         # Update recurrent states - replace entire dict to remove stale IDs
         # Note: This intentionally purges all non-current tracklets every frame to prevent
