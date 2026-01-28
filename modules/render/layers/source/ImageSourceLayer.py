@@ -50,6 +50,6 @@ class ImageSourceLayer(LayerBase):
         self._image.update()
 
         elapsed_ms = (time.perf_counter() - start) * 1000.0
-        self._update_timer.add_time(elapsed_ms)
+        self._update_timer.add_time(elapsed_ms, False)
 
 

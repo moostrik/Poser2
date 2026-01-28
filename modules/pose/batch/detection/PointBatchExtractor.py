@@ -2,8 +2,6 @@ from dataclasses import replace
 from threading import Lock
 from typing import Union
 
-import numpy as np
-
 from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput
 from modules.pose.batch.detection.ONNXDetection import ONNXDetection
 from modules.pose.batch.detection.TRTDetection import TRTDetection
@@ -54,32 +52,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         """Stop the detection processing thread."""
         self._detection.stop()
 
-    def process(self, poses: FrameDict, images: dict[int, np.ndarray]) -> None:
-        """Submit poses for async processing. Results broadcast via callbacks.
-
-        Args:
-            poses: Dictionary of poses keyed by tracklet ID
-            images: Pre-cropped/resized images (256x192) keyed by tracklet ID
-        """
-        if not self._detection.is_ready:
-            return
-
-        tracklet_ids: list[int] = []
-        image_list: list[np.ndarray] = []
-
-        for tracklet_id in poses.keys():
-            if tracklet_id in images:
-                tracklet_ids.append(tracklet_id)
-                image_list.append(images[tracklet_id])
-
-        with self._lock:
-            self._batch_counter += 1
-            batch_id: int = self._batch_counter
-            self._waiting_batches[batch_id] = (poses, tracklet_ids)
-
-        self._detection.submit_batch(DetectionInput(batch_id=batch_id, images=image_list))
-
-    def process_gpu(self, poses: FrameDict, gpu_frames: GPUFrameDict) -> None:
+    def process(self, poses: FrameDict, gpu_frames: GPUFrameDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:

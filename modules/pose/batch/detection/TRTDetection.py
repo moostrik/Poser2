@@ -129,8 +129,8 @@ class TRTDetection(Thread):
             return
 
         # Validate batch size
-        if len(input_batch.images) > self._max_batch:
-            print(f"TensorRT Detection Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+        if len(input_batch.gpu_images) > self._max_batch:
+            print(f"TensorRT Detection Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: DetectionInput | None = None
 
@@ -262,118 +262,33 @@ class TRTDetection(Thread):
         if batch is None:
             return
 
-        output = DetectionOutput(batch_id=batch.batch_id, processed=True)
+        gpu_images = batch.gpu_images[:self._max_batch]
 
-        # Determine input source: GPU images take priority
-        has_gpu_images = len(batch.gpu_images) > 0
-        has_cpu_images = len(batch.images) > 0
-
-        if has_gpu_images:
-            # GPU path: images already on GPU, resize to model size
-            gpu_images_to_process = batch.gpu_images[:self._max_batch]
-            keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch_gpu(gpu_images_to_process)
-
-            # Normalize coordinates to [0, 1]
-            keypoints[:, :, 0] /= self.model_width
-            keypoints[:, :, 1] /= self.model_height
-
-            point_list = [keypoints[i] for i in range(len(keypoints))]
-            score_list = [scores[i] for i in range(len(scores))]
-
-            output = DetectionOutput(
-                batch_id=batch.batch_id,
-                point_batch=point_list,
-                score_batch=score_list,
-                processed=True,
-                inference_time_ms=process_time_ms,
-                lock_time_ms=lock_wait_ms
-            )
-        elif has_cpu_images:
-            # CPU path: upload to GPU (original behavior)
-            images_to_process = batch.images[:self._max_batch]
-            keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch(images_to_process, self.model_width, self.model_height)
-
-            # Normalize coordinates to [0, 1]
-            keypoints[:, :, 0] /= self.model_width
-            keypoints[:, :, 1] /= self.model_height
-
-            point_list = [keypoints[i] for i in range(len(keypoints))]
-            score_list = [scores[i] for i in range(len(scores))]
-
-            output = DetectionOutput(
-                batch_id=batch.batch_id,
-                point_batch=point_list,
-                score_batch=score_list,
-                processed=True,
-                inference_time_ms=process_time_ms,
-                lock_time_ms=lock_wait_ms
-            )
-        else:
+        if not gpu_images:
             output = DetectionOutput(batch_id=batch.batch_id, processed=True)
+        else:
+            keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch_gpu(gpu_images)
+
+            # Normalize coordinates to [0, 1]
+            keypoints[:, :, 0] /= self.model_width
+            keypoints[:, :, 1] /= self.model_height
+
+            point_list = [keypoints[i] for i in range(len(keypoints))]
+            score_list = [scores[i] for i in range(len(scores))]
+
+            output = DetectionOutput(
+                batch_id=batch.batch_id,
+                point_batch=point_list,
+                score_batch=score_list,
+                processed=True,
+                inference_time_ms=process_time_ms,
+                lock_time_ms=lock_wait_ms
+            )
 
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
             print("TensorRT Detection Warning: Callback queue full")
-
-    def _infer_batch(self, imgs: list[np.ndarray], width: int, height: int) -> tuple[np.ndarray, np.ndarray, float, float]:
-        """Run TensorRT inference on batch of images.
-
-        Args:
-            imgs: List of BGR uint8 images (H, W, 3)
-            width: Model input width
-            height: Model input height
-
-        Returns:
-            (keypoints, scores, process_time_ms, lock_wait_ms)
-        """
-        batch_size = len(imgs)
-
-        method_start: float = time.perf_counter()
-
-        # CPU preprocessing
-        stacked_imgs = np.stack(imgs, axis=0)  # (B, H, W, 3) uint8
-
-        # Get batched buffers (sliced to actual batch size)
-        buf = self._batch_buffers
-        input_gpu = buf['input'][:batch_size]
-        simcc_x_gpu = buf['simcc_x'][:batch_size]
-        simcc_y_gpu = buf['simcc_y'][:batch_size]
-
-        # CuPy preprocessing on our own buffers/stream (no lock needed)
-        with self.stream:
-            buf['img_uint8'][:batch_size].set(stacked_imgs)
-            img_float_batch = buf['img_uint8'][:batch_size].astype(self._model_dtype)
-            img_rgb_batch = img_float_batch[:, :, :, ::-1]  # BGR→RGB
-            img_chw_batch = cp.ascontiguousarray(cp.transpose(img_rgb_batch, (0, 3, 1, 2)))  # HWC→CHW
-            input_gpu[:] = (img_chw_batch - self._mean_gpu) / self._std_gpu
-        # self.stream.synchronize()  # Ensure preprocessing complete before TRT reads
-
-        # TensorRT operations only - acquire global lock
-        lock_wait_start: float = time.perf_counter()
-        with get_exec_lock():
-            lock_acquired: float = time.perf_counter()
-
-            # Only set_input_shape per-call (addresses are persistent from _setup)
-            self.context.set_input_shape(self.input_name, input_gpu.shape)
-
-            self.context.execute_async_v3(stream_handle=self.stream.ptr)
-            self.stream.synchronize()
-
-        # Transfer outputs to CPU (no lock needed - our own buffers)
-        simcc_x_cpu = cp.asnumpy(simcc_x_gpu)
-        simcc_y_cpu = cp.asnumpy(simcc_y_gpu)
-
-        # Decode on CPU (outside lock - no GPU resource needed)
-        keypoints, scores = TRTDetection._decode_simcc_cpu(simcc_x_cpu, simcc_y_cpu, self.simcc_split_ratio)
-
-        method_end = time.perf_counter()
-
-        lock_wait_ms = (lock_acquired - lock_wait_start) * 1000.0
-        total_time_ms = (method_end - method_start) * 1000.0
-        process_time_ms = total_time_ms - lock_wait_ms
-
-        return keypoints, scores, process_time_ms, lock_wait_ms
 
     def _infer_batch_gpu(self, gpu_imgs: list[cp.ndarray]) -> tuple[np.ndarray, np.ndarray, float, float]:
         """Run TensorRT inference on batch of GPU images.

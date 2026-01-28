@@ -113,8 +113,8 @@ class ONNXDetection(Thread):
             return
 
         # Validate batch size
-        if len(input_batch.images) > self._max_batch:
-            print(f"ONNX Detection Warning: Batch size {len(input_batch.images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
+        if len(input_batch.gpu_images) > self._max_batch:
+            print(f"ONNX Detection Warning: Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
         dropped_batch: DetectionInput | None = None
 
@@ -221,97 +221,33 @@ class ONNXDetection(Thread):
         if batch is None:
             return
 
-        # Determine input source: GPU images take priority
-        has_gpu_images = len(batch.gpu_images) > 0
-        has_cpu_images = len(batch.images) > 0
+        gpu_images = batch.gpu_images[:self._max_batch]
 
-        if has_gpu_images:
-            batch_start = time.perf_counter()
-            gpu_images_to_process = batch.gpu_images[:self._max_batch]
-            keypoints, scores = self._infer_batch_gpu(gpu_images_to_process)
-
-            keypoints[:, :, 0] /= self.model_width
-            keypoints[:, :, 1] /= self.model_height
-
-            inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
-            point_list = [keypoints[i] for i in range(len(keypoints))]
-            score_list = [scores[i] for i in range(len(scores))]
-
-            output = DetectionOutput(
-                batch_id=batch.batch_id,
-                point_batch=point_list,
-                score_batch=score_list,
-                processed=True,
-                inference_time_ms=inference_time_ms
-            )
-        elif has_cpu_images:
-            batch_start = time.perf_counter()
-            images_to_process = batch.images[:self._max_batch]
-            keypoints, scores = self._infer_batch(images_to_process)
-
-            keypoints[:, :, 0] /= self.model_width
-            keypoints[:, :, 1] /= self.model_height
-
-            inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
-            point_list = [keypoints[i] for i in range(len(keypoints))]
-            score_list = [scores[i] for i in range(len(scores))]
-
-            output = DetectionOutput(
-                batch_id=batch.batch_id,
-                point_batch=point_list,
-                score_batch=score_list,
-                processed=True,
-                inference_time_ms=inference_time_ms
-            )
-        else:
+        if not gpu_images:
             output = DetectionOutput(batch_id=batch.batch_id, processed=True)
+        else:
+            batch_start = time.perf_counter()
+            keypoints, scores = self._infer_batch_gpu(gpu_images)
+
+            keypoints[:, :, 0] /= self.model_width
+            keypoints[:, :, 1] /= self.model_height
+
+            inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
+            point_list = [keypoints[i] for i in range(len(keypoints))]
+            score_list = [scores[i] for i in range(len(scores))]
+
+            output = DetectionOutput(
+                batch_id=batch.batch_id,
+                point_batch=point_list,
+                score_batch=score_list,
+                processed=True,
+                inference_time_ms=inference_time_ms
+            )
 
         try:
             self._callback_queue.put_nowait(output)
         except Exception:
             print("ONNX Detection Warning: Callback queue full")
-
-    def _infer_batch(self, imgs: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
-        """Run ONNX inference on batch of images.
-
-        Uses fixed batch size padding to avoid ONNX Runtime dynamic shape recompilation.
-        """
-        actual_batch_size = len(imgs)
-        if actual_batch_size == 0 or self._session is None:
-            return np.empty((0, 17, 2)), np.empty((0, 17))
-
-        # Pad to fixed batch size to avoid ONNX Runtime recompilation
-        num_padding = self._max_batch - actual_batch_size
-        if num_padding > 0:
-            # Add padding with zero images
-            dummy_img = np.zeros((self.model_height, self.model_width, 3), dtype=np.uint8)
-            imgs = imgs + [dummy_img] * num_padding
-
-        # Preprocess: Stack and convert to model dtype
-        batch_hwc = np.stack(imgs, axis=0).astype(self._model_dtype)  # (B, H, W, 3)
-
-        # BGR to RGB
-        batch_rgb = batch_hwc[:, :, :, ::-1]
-
-        # HWC to CHW
-        batch_chw = batch_rgb.transpose(0, 3, 1, 2)  # (B, 3, H, W)
-
-        # Normalize with ImageNet stats (using model dtype)
-        batch = (batch_chw - self._imagenet_mean) / self._imagenet_std
-
-        # Run inference
-        input_name = self._session.get_inputs()[0].name
-        outputs = self._session.run(None, {input_name: batch})
-
-        # Decode SimCC outputs
-        simcc_x, simcc_y = outputs[0], outputs[1]  # (padded_batch, 17, W*2), (padded_batch, 17, H*2)
-        keypoints, scores = ONNXDetection._decode_simcc(simcc_x, simcc_y, self.simcc_split_ratio)  # type: ignore
-
-        # Slice to actual batch size
-        keypoints = keypoints[:actual_batch_size]
-        scores = scores[:actual_batch_size]
-
-        return keypoints, scores
 
     def _infer_batch_gpu(self, gpu_imgs: list[cp.ndarray]) -> tuple[np.ndarray, np.ndarray]:
         """Run inference on GPU images using IOBinding for zero-copy."""
@@ -385,14 +321,13 @@ class ONNXDetection(Thread):
             return
 
         try:
-            # Create realistic dummy input
-            np.random.seed(42)
-            dummy_img = (np.random.rand(self.model_height, self.model_width, 3) * 255).astype(np.uint8)
+            # Create realistic dummy input on GPU
+            dummy_img = cp.zeros((self.model_height, self.model_width, 3), dtype=cp.uint8)
 
             # Warmup with max_batch size (all inference runs with this size)
             dummy_images = [dummy_img] * self._max_batch
 
-            keypoints, scores = self._infer_batch(dummy_images)
+            keypoints, scores = self._infer_batch_gpu(dummy_images)
 
         except Exception as e:
             print(f"ONNX Detection: Warmup failed (non-critical) - {str(e)}")

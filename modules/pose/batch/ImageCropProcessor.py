@@ -44,9 +44,8 @@ class ImageCropProcessor:
         self._flow_callbacks: set[PairCropCallback] = set()
 
         # Performance timer
-        self._process_timer: PerformanceTimer = PerformanceTimer(
-            name="CPUCrop Process", sample_count=10000, report_interval=100, color="red", omit_init=10
-        )
+        self._process_timer: PerformanceTimer = PerformanceTimer(name="CPUCrop Process", sample_count=10000, report_interval=100, color="red", omit_init=10)
+        self._verbose: bool = False
 
     def set_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None:
         """Store image from a specific camera. Only VIDEO frames are stored.
@@ -94,7 +93,7 @@ class ImageCropProcessor:
                     print(f"ImageCropProcessor: Error processing pose {pose_id}: {e}")
 
         elapsed_ms = (time.perf_counter() - start) * 1000.0
-        self._process_timer.add_time(elapsed_ms)
+        self._process_timer.add_time(elapsed_ms, report=self._verbose)
 
         # Notify regular callbacks with cropped current frames
         for callback in self._callbacks:
