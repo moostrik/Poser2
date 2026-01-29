@@ -9,8 +9,8 @@ from modules.pose.Settings import Settings, ModelType
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from .InOut import DetectionInput, DetectionOutput
-from .ONNXDetection_T import ONNXDetection
-from .TRTDetection_T import TRTDetection
+from .ONNXDetection import ONNXDetection
+from .TRTDetection import TRTDetection
 
 Detection = Union[ONNXDetection, TRTDetection]
 

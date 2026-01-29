@@ -11,8 +11,8 @@ from modules.pose.Settings import Settings, ModelType
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from .InOut import OpticalFlowInput, OpticalFlowOutput
-from .ONNXOpticalFlow_T import ONNXOpticalFlow, OpticalFlowInput, OpticalFlowOutput
-from .TRTOpticalFlow_T import TRTOpticalFlow
+from .ONNXOpticalFlow import ONNXOpticalFlow, OpticalFlowInput, OpticalFlowOutput
+from .TRTOpticalFlow import TRTOpticalFlow
 
 OpticalFlow = Union[ONNXOpticalFlow, TRTOpticalFlow]
 
