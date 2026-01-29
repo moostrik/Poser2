@@ -22,7 +22,8 @@ def convert_rtmpose_to_tensorrt(
     min_batch: int = 1,
     opt_batch: int = 3,
     max_batch: int = 4,
-    workspace_gb: int = 8
+    workspace_gb: int = 8,
+    force_fp16: bool = False
 ) -> bool:
     """Convert RTMPose ONNX model to TensorRT engine.
 
@@ -33,6 +34,7 @@ def convert_rtmpose_to_tensorrt(
         opt_batch: Optimal batch size (used for optimization)
         max_batch: Maximum batch size (set to opt_batch if never exceeded)
         workspace_gb: Workspace size in GB
+        force_fp16: Force FP16 precision even if ONNX is FP32
 
     Returns:
         bool: True if successful, False otherwise
@@ -108,10 +110,69 @@ def convert_rtmpose_to_tensorrt(
     print(f"  Resolution: {height}×{width}")
     for i in range(network.num_inputs):
         inp = network.get_input(i)
-        print(f"  Input {i}:  {inp.name} {inp.shape}")
+        print(f"  Input {i}:  {inp.name} {inp.shape} dtype={inp.dtype}")
     for i in range(network.num_outputs):
         out = network.get_output(i)
-        print(f"  Output {i}: {out.name} {out.shape}")
+        print(f"  Output {i}: {out.name} {out.shape} dtype={out.dtype}")
+
+    # Print layer precision information
+    print(f"\n🔍 Layer Precision Analysis ({network.num_layers} layers):")
+    
+    # Count layers by type and precision
+    layer_types = {}
+    precision_stats = {"FLOAT": 0, "HALF": 0, "INT32": 0, "INT64": 0, "INT8": 0, "UINT8": 0, "BOOL": 0, "UNKNOWN": 0}
+    
+    for i in range(network.num_layers):
+        layer = network.get_layer(i)
+        layer_type = str(layer.type).split('.')[-1]
+        
+        # Track layer types
+        if layer_type not in layer_types:
+            layer_types[layer_type] = 0
+        layer_types[layer_type] += 1
+        
+        # Get output precision
+        output_dtypes = []
+        if layer.num_outputs > 0:
+            for j in range(layer.num_outputs):
+                output_tensor = layer.get_output(j)
+                dtype_str = str(output_tensor.dtype).split('.')[-1]
+                output_dtypes.append(dtype_str)
+                
+                # Count precision
+                if dtype_str in precision_stats:
+                    precision_stats[dtype_str] += 1
+                else:
+                    precision_stats["UNKNOWN"] += 1
+    
+    # Print summary
+    print(f"\n  Layer Type Distribution:")
+    for layer_type, count in sorted(layer_types.items(), key=lambda x: x[1], reverse=True):
+        print(f"    {layer_type:20s}: {count:3d}")
+    
+    print(f"\n  Output Precision Distribution:")
+    for precision, count in sorted(precision_stats.items(), key=lambda x: x[1], reverse=True):
+        if count > 0:
+            print(f"    {precision:10s}: {count:3d}")
+    
+    # Optional: Print detailed layer-by-layer info (commented out by default for brevity)
+    # Uncomment this section if you want to see every single layer
+    print(f"\n  Detailed Layer Information (first 20 layers):")
+    for i in range(min(20, network.num_layers)):
+        layer = network.get_layer(i)
+        layer_type = str(layer.type).split('.')[-1]
+        
+        output_info = []
+        if layer.num_outputs > 0:
+            for j in range(layer.num_outputs):
+                output_tensor = layer.get_output(j)
+                dtype_str = str(output_tensor.dtype).split('.')[-1]
+                output_info.append(f"{output_tensor.name}:{dtype_str}")
+        
+        print(f"    Layer {i:3d}: {layer_type:20s} → {', '.join(output_info) if output_info else 'no outputs'}")
+    
+    if network.num_layers > 20:
+        print(f"    ... ({network.num_layers - 20} more layers)")
 
     # Detect ONNX model precision
     print("\n🔍 Detecting ONNX Model Precision:")
@@ -139,16 +200,22 @@ def convert_rtmpose_to_tensorrt(
             detected_precision = ", ".join(sorted(weight_dtypes))
 
         print(f"  ONNX weights: {', '.join(sorted(weight_dtypes))}")
-        print(f"  ✓ Will build TensorRT engine with: {detected_precision}")
+        print(f"  ✓ Detected precision: {detected_precision}")
     else:
         print("  ⚠️  ONNX weights: No initializers found")
         print("  Defaulting to FP32")
         detected_precision = "FP32"
         use_fp16 = False
 
+    # Override with force_fp16 if requested
+    if force_fp16 and not use_fp16:
+        print(f"  ⚙️  Force FP16 enabled: overriding {detected_precision} → FP16")
+        use_fp16 = True
+        detected_precision = "FP16 (forced)"
+
     # Show build configuration
     print("\n🎯 TensorRT Build Configuration:")
-    print(f"  Precision: {detected_precision} (auto-detected from ONNX)")
+    print(f"  Precision: {detected_precision}")
 
     # Configure builder
     print("\n⚙️  Configuring builder...")
@@ -234,6 +301,8 @@ if __name__ == '__main__':
                         help='Maximum batch size (default: 3, set to opt-batch if never exceeded)')
     parser.add_argument('--workspace', type=int, default=8,
                         help='Workspace size in GB (default: 8)')
+    parser.add_argument('--force-fp16', action='store_true',
+                        help='Force FP16 precision even if ONNX is FP32')
 
     args = parser.parse_args()
 
@@ -243,7 +312,8 @@ if __name__ == '__main__':
         args.min_batch,
         args.opt_batch,
         args.max_batch,
-        args.workspace
+        args.workspace,
+        args.force_fp16
     )
 
     sys.exit(0 if success else 1)

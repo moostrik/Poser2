@@ -4,6 +4,8 @@
 Usage:
     # Export RTMPose-L 256x192 model (dimensions auto-detected from config)
     python modules/pose/batch/detection/export_rtm_to_onnx.py --config models/base/rtmpose-l_8xb256-420e_aic-coco-256x192.py --checkpoint models/base/rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-256x192-f016ffe0_20230126.pth --output models/rtmpose-l_256x192.onnx
+    
+    python modules/pose/batch/detection/export_rtm_to_onnx.py --config models/base/end2end.py --checkpoint models/base/end2end.pth --output models/rtmpose-l_256x192.onnx
 
     # Export RTMPose-L 384x288 model (dimensions auto-detected from config)
     python modules/pose/batch/detection/export_rtm_to_onnx.py --config models/base/rtmpose-l_8xb256-420e_aic-coco-384x288.py --checkpoint models/base/rtmpose-l_simcc-aic-coco_pt-aic-coco_420e-384x288-97d6cb0f_20230228.pth --output models/rtmpose-l_384x288.onnx

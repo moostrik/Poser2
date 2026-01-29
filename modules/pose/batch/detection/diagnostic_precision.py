@@ -6,10 +6,11 @@ to identify precision-related divergence in RTMPose SimCC outputs.
 
 Usage:
     # Compare ONNX vs TRT
-    python modules/pose/batch/detection/diagnostic_precision.py --model1 models/rtmpose-l_256x192_fp16.onnx --model2 models/rtmpose-l_256x192_b3_fp16.trt
+    python modules/pose/batch/detection/diagnostic_precision.py --model1 models/rtmpose-l_256x192.onnx --model2 models/rtmpose-l_256x192_b3.trt
+    python modules/pose/batch/detection/diagnostic_precision.py --model1 models/rtmpose-l_384x288.onnx --model2 models/rtmpose-l_384x288_b3.trt
 
     # Compare two ONNX models (e.g., FP32 vs FP16)
-    python modules/pose/batch/detection/diagnostic_precision.py --model1 models/rtmpose-l_256x192_fp32.onnx --model2 models/rtmpose-l_256x192_fp16.onnx
+    python modules/pose/batch/detection/diagnostic_precision.py --model1 models/rtmpose-l_256x192.onnx --model2 models/rtmpose-l_384x288.onnx
 
     # Compare two TRT engines
     python modules/pose/batch/detection/diagnostic_precision.py --model1 models/rtmpose-l_256x192_b3_fp32.trt --model2 models/rtmpose-l_256x192_b3_fp16.trt
