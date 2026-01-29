@@ -280,7 +280,7 @@ class Tensor(Texture):
         tensor = tensor.contiguous()
 
         # Synchronize to ensure all prior CUDA operations are complete
-        # This is critical when tensor comes from TensorRT/CuPy on different streams
+        # This is critical when tensor comes from TensorRT on different streams
         torch.cuda.synchronize()
 
         # Map graphics resource to get CUDA device pointer

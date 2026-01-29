@@ -1,6 +1,5 @@
 # Standard library imports
 import torch
-import cupy as cp
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -49,8 +48,5 @@ class GPUCropSourceLayer(LayerBase):
         if self._data_cache.idle or gpu_frame is None:
             return
 
-        # Convert CuPy crop to PyTorch tensor (zero-copy via DLPack)
-        crop_tensor = torch.as_tensor(gpu_frame.crop, device='cuda')  # (H, W, 3) uint8
-
-        self._cuda_image.set_tensor(crop_tensor)
+        self._cuda_image.set_tensor(gpu_frame.crop)
         self._cuda_image.update()

@@ -2,8 +2,6 @@
 
 
 # Third-party imports
-import torch
-import cupy as cp
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
@@ -50,8 +48,5 @@ class GPUFullImageSourceLayer(LayerBase):
         if self._data_cache.idle or gpu_frame is None:
             return
 
-        # Convert CuPy full image to PyTorch tensor (zero-copy via DLPack)
-        full_image_tensor = torch.as_tensor(gpu_frame.full_image, device='cuda')  # (H, W, 3) uint8
-
-        self._cuda_image.set_tensor(full_image_tensor)
+        self._cuda_image.set_tensor(gpu_frame.full_image)
         self._cuda_image.update()
