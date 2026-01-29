@@ -13,8 +13,7 @@ from modules.pose.batch.GPUFrame import GPUFrame, GPUFrameDict
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 
-if TYPE_CHECKING:
-    from modules.cam.depthcam.Definitions import FrameType
+from modules.cam.depthcam.Definitions import FrameType
 
 
 # Type aliases for callbacks
@@ -68,6 +67,9 @@ class GPUCropProcessor:
         # Create dedicated CUDA stream for crop operations
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
 
+        # Preallocate crop buffers (reused across frames)
+        self._crop_buffers: dict[int, torch.Tensor] = {}  # track_id -> reusable crop buffer
+        self._prev_crop_buffers: dict[int, torch.Tensor] = {}  # track_id -> reusable prev crop buffer
 
         # BGR→RGB index tensor (preallocated)
         self._rgb_idx = torch.tensor([2, 1, 0], device='cuda')
@@ -101,7 +103,8 @@ class GPUCropProcessor:
 
             # Upload BGR frame to GPU, convert to float32 [0,1], and flip BGR→RGB
             gpu_img = torch.from_numpy(image).cuda(non_blocking=True).float().div_(255.0)
-            self._gpu_images[cam_id] = gpu_img.index_select(2, self._rgb_idx)
+            self._gpu_images[cam_id] = gpu_img.flip(2)  # Flip last dim: BGR→RGB
+            # self._gpu_images[cam_id] = gpu_img.index_select(2, self._rgb_idx)
 
         elapsed_ms = (time.perf_counter() - start) * 1000.0
         self._accumulated_upload_ms += elapsed_ms
@@ -127,6 +130,10 @@ class GPUCropProcessor:
         for lost_id in lost_ids:
             if lost_id in self._prev_gpu_images:
                 del self._prev_gpu_images[lost_id]
+            if lost_id in self._crop_buffers:
+                del self._crop_buffers[lost_id]
+            if lost_id in self._prev_crop_buffers:
+                del self._prev_crop_buffers[lost_id]
 
         pose_count = 0
 
@@ -147,15 +154,31 @@ class GPUCropProcessor:
                     # Calculate crop region (same logic as ImageProcessor)
                     crop_roi = self._calculate_crop_roi(bbox_rect, img_width, img_height)
 
-                    # Crop and resize using grid_sample, output is float32 RGB [0,1] HWC
-                    crop_tensor = self._gpu_crop_resize(gpu_image, crop_roi, img_width, img_height)
+                    # Get or create preallocated crop buffer for this tracklet
+                    if pose_id not in self._crop_buffers:
+                        self._crop_buffers[pose_id] = torch.empty(
+                            (self._crop_height, self._crop_width, 3),
+                            dtype=torch.float32,
+                            device='cuda'
+                        )
+                    crop_tensor = self._crop_buffers[pose_id]
+
+                    # Crop and resize into preallocated buffer, output is float32 RGB [0,1] HWC
+                    self._gpu_crop_resize_inplace(gpu_image, crop_roi, crop_tensor, img_width, img_height)
 
                     # Crop previous frame at CURRENT bbox location (for optical flow)
                     prev_crop: torch.Tensor | None = None
                     if self._enable_prev_crop and pose_id in self._prev_gpu_images:
+                        if pose_id not in self._prev_crop_buffers:
+                            self._prev_crop_buffers[pose_id] = torch.empty(
+                                (self._crop_height, self._crop_width, 3),
+                                dtype=torch.float32,
+                                device='cuda'
+                            )
+                        prev_crop = self._prev_crop_buffers[pose_id]
                         prev_img = self._prev_gpu_images[pose_id]
                         prev_h, prev_w = prev_img.shape[:2]
-                        prev_crop = self._gpu_crop_resize(prev_img, crop_roi, prev_w, prev_h)
+                        self._gpu_crop_resize_inplace(prev_img, crop_roi, prev_crop, prev_w, prev_h)
 
                     # Normalize crop ROI for output
                     normalized_roi = crop_roi.scale(Point2f(1.0 / img_width, 1.0 / img_height))
@@ -190,9 +213,11 @@ class GPUCropProcessor:
                 print(f"GPUCropProcessor: Error in callback: {e}")
 
     def reset(self) -> None:
-        """Clear all stored GPU images."""
+        """Clear all stored GPU images and buffers."""
         self._gpu_images.clear()
         self._prev_gpu_images.clear()
+        self._crop_buffers.clear()
+        self._prev_crop_buffers.clear()
 
     def _calculate_crop_roi(self, bbox_rect: Rect, img_width: int, img_height: int) -> Rect:
         """Calculate crop region maintaining aspect ratio.
@@ -217,60 +242,57 @@ class GPUCropProcessor:
 
         return crop_roi
 
-    def _gpu_crop_resize(self, src: torch.Tensor, roi: Rect, src_w: int, src_h: int) -> torch.Tensor:
-        """Crop and resize on GPU using slice + F.interpolate + F.pad.
-
-        Extracts ROI region, pads if needed, resizes using bilinear interpolation.
+    def _gpu_crop_resize_inplace(self, src: torch.Tensor, roi: Rect, dst: torch.Tensor, src_w: int, src_h: int) -> None:
+        """Crop and resize on GPU into preallocated buffer.
 
         Args:
             src: Source image on GPU (H, W, 3) float32 RGB [0,1]
             roi: Crop region in pixel coordinates
+            dst: Preallocated destination buffer (crop_height, crop_width, 3) float32
             src_w: Source image width
             src_h: Source image height
-
-        Returns:
-            Cropped and resized image (crop_height, crop_width, 3) float32 RGB [0,1]
         """
-        # Clamp ROI to image bounds for valid region extraction
+        # Clamp ROI to image bounds
         x1 = max(0, int(roi.x))
         y1 = max(0, int(roi.y))
         x2 = min(src_w, int(roi.x + roi.width))
         y2 = min(src_h, int(roi.y + roi.height))
 
-        # Check if ROI is completely outside image
         if x1 >= x2 or y1 >= y2:
-            return torch.zeros((self._crop_height, self._crop_width, 3), device='cuda')
+            dst.zero_()  # In-place zero
+            return
 
-        # Extract valid region: HWC slice
+        # Extract valid region
         crop = src[y1:y2, x1:x2, :]
 
-        # Calculate padding amounts
+        # Calculate padding
         pad_left = max(0, -int(roi.x))
         pad_right = max(0, int(roi.x + roi.width) - src_w)
         pad_top = max(0, -int(roi.y))
         pad_bottom = max(0, int(roi.y + roi.height) - src_h)
 
-        # Convert to CHW for F.pad and F.interpolate
-        crop_chw = crop.permute(2, 0, 1)  # (3, H, W)
+        # Convert to CHW
+        crop_chw = crop.permute(2, 0, 1)
 
-        # Apply padding if needed (F.pad uses reverse order: left, right, top, bottom)
+        # Apply padding if needed
         if pad_left > 0 or pad_right > 0 or pad_top > 0 or pad_bottom > 0:
             crop_chw = F.pad(crop_chw, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=0)
 
-        # Resize using bilinear interpolation
+        # Resize directly into destination view (CHW)
         crop_h, crop_w = crop_chw.shape[1], crop_chw.shape[2]
         if crop_h != self._crop_height or crop_w != self._crop_width:
-            crop_chw = F.interpolate(
+            # Use out parameter if possible, otherwise copy result
+            dst_chw = dst.permute(2, 0, 1)  # View as CHW
+            resized = F.interpolate(
                 crop_chw.unsqueeze(0),
                 size=(self._crop_height, self._crop_width),
                 mode='bilinear',
                 align_corners=False
             ).squeeze(0)
-
-        # Convert CHW -> HWC (already RGB)
-        result = crop_chw.permute(1, 2, 0)
-
-        return result
+            dst_chw.copy_(resized)  # In-place copy to preallocated buffer
+        else:
+            # Direct copy (no resize needed)
+            dst.copy_(crop_chw.permute(1, 2, 0))
 
     def add_callback(self, callback: GPUCropCallback) -> None:
         """Register callback to receive cropped poses and GPU frames."""

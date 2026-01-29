@@ -168,7 +168,6 @@ class TRTDetection(Thread):
             with get_init_lock():
                 runtime = get_tensorrt_runtime()
 
-                print(f"TensorRT Detection: Loading engine from {self.model_file}")
                 with open(self.model_file, 'rb') as f:
                     engine_data = f.read()
 
