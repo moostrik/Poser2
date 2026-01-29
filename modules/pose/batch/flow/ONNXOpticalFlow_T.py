@@ -64,7 +64,15 @@ class ONNXOpticalFlow(Thread):
         # ONNX session (initialized in run thread)
         self._session: ort.InferenceSession | None = None
         self._model_dtype = np.float32  # Default, determined in setup
+        self._torch_dtype: torch.dtype  # PyTorch dtype for preprocessing
         self.model_precision: str = "UNKNOWN"
+
+        # Dedicated CUDA stream (initialized in _setup())
+        self.stream: torch.cuda.Stream
+
+        # Preallocated input buffers (initialized in _setup())
+        self._img1_buffer: torch.Tensor  # (max_batch, 3, H, W) input 1
+        self._img2_buffer: torch.Tensor  # (max_batch, 3, H, W) input 2
 
         # Batch inference settings
         self._max_batch: int = min(settings.max_poses, 8)
@@ -215,6 +223,29 @@ class ONNXOpticalFlow(Thread):
             }
             self._model_dtype = dtype_map.get(input_type, np.float32)
 
+            # Map numpy dtype to torch dtype for preprocessing
+            torch_dtype_map = {
+                np.float32: torch.float32,
+                np.float16: torch.float16,
+            }
+            self._torch_dtype = torch_dtype_map.get(self._model_dtype, torch.float32)
+
+            # Dedicated CUDA stream for all GPU operations (preprocessing + inference)
+            self.stream = torch.cuda.Stream()
+
+            # Preallocate INPUT buffers on the dedicated stream for optimal memory placement
+            with torch.cuda.stream(self.stream):
+                self._img1_buffer = torch.empty(
+                    (self._max_batch, 3, self.model_height, self.model_width),
+                    dtype=self._torch_dtype, device='cuda'
+                )
+                self._img2_buffer = torch.empty(
+                    (self._max_batch, 3, self.model_height, self.model_width),
+                    dtype=self._torch_dtype, device='cuda'
+                )
+
+            self.stream.synchronize()
+
             # Warmup model
             self._model_warmup()
 
@@ -272,66 +303,110 @@ class ONNXOpticalFlow(Thread):
     def _infer_batch(self, gpu_pairs: list[tuple[torch.Tensor, torch.Tensor]]) -> tuple[torch.Tensor, float]:
         """Run batched ONNX inference on GPU frame pairs.
 
+        All preprocessing runs on the dedicated stream for zero sync overhead.
+        Uses preallocated buffers for zero allocation latency.
         Uses fixed batch size padding to avoid ONNX Runtime dynamic shape recompilation.
 
         Args:
-            gpu_pairs: List of (prev_crop, curr_crop) tuples, each (H, W, 3) RGB uint8 on GPU
+            gpu_pairs: List of (prev_crop, curr_crop) tuples, each (H, W, 3) RGB float32 [0,1] on GPU
 
         Returns:
             (flow_tensor (actual_batch, 2, H, W) on CUDA, inference_time_ms)
         """
         actual_batch_size = len(gpu_pairs)
         if actual_batch_size == 0 or self._session is None:
-            return torch.empty(0, 2, self.model_height, self.model_width, dtype=torch.float32, device='cuda'), 0.0
+            return torch.empty(0, 2, self.model_height, self.model_width, dtype=self._torch_dtype, device='cuda'), 0.0
 
         batch_start = time.perf_counter()
 
         # Get input dimensions from first pair
         input_h, input_w = gpu_pairs[0][0].shape[0], gpu_pairs[0][0].shape[1]
+        needs_resize = (input_h != self.model_height or input_w != self.model_width)
 
-        # Stack GPU tensors: (B, H, W, 3) and convert to float CHW format
-        prev_batch = torch.stack([p[0] for p in gpu_pairs], dim=0).float()  # (B, H, W, 3)
-        curr_batch = torch.stack([p[1] for p in gpu_pairs], dim=0).float()  # (B, H, W, 3)
+        # Get preallocated INPUT buffer slices for fixed batch
+        img1_buffer = self._img1_buffer[:self._max_batch]
+        img2_buffer = self._img2_buffer[:self._max_batch]
 
-        # HWC -> CHW: (B, 3, H, W)
-        prev_chw = prev_batch.permute(0, 3, 1, 2).contiguous()
-        curr_chw = curr_batch.permute(0, 3, 1, 2).contiguous()
+        # Allocate OUTPUT buffer fresh each call
+        flow_out = torch.empty((self._max_batch, 2, self.model_height, self.model_width), dtype=self._torch_dtype, device='cuda')
 
-        # Resize if needed (crop size != model size)
-        if input_h != self.model_height or input_w != self.model_width:
-            prev_chw = torch.nn.functional.interpolate(
-                prev_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
-            )
-            curr_chw = torch.nn.functional.interpolate(
-                curr_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
-            )
+        # All preprocessing on dedicated stream (no cross-stream sync needed)
+        with torch.cuda.stream(self.stream):
+            # Stack GPU tensors: (B, H, W, 3) float32 RGB [0,1]
+            prev_batch = torch.stack([p[0] for p in gpu_pairs], dim=0)  # (B, H, W, 3)
+            curr_batch = torch.stack([p[1] for p in gpu_pairs], dim=0)  # (B, H, W, 3)
 
-        # Pad to fixed batch size to avoid ONNX Runtime recompilation
-        num_padding = self._max_batch - actual_batch_size
-        if num_padding > 0:
-            padding_shape = (num_padding, 3, self.model_height, self.model_width)
-            prev_chw = torch.cat([prev_chw, torch.zeros(padding_shape, dtype=prev_chw.dtype, device='cuda')], dim=0)
-            curr_chw = torch.cat([curr_chw, torch.zeros(padding_shape, dtype=curr_chw.dtype, device='cuda')], dim=0)
+            # HWC -> CHW: (B, 3, H, W), convert to model dtype
+            prev_chw = prev_batch.permute(0, 3, 1, 2).mul(255.0).to(self._torch_dtype)
+            curr_chw = curr_batch.permute(0, 3, 1, 2).mul(255.0).to(self._torch_dtype)
 
-        # Convert to CPU numpy for ONNX Runtime (it will copy to GPU internally via CUDAExecutionProvider)
-        image1_batch = prev_chw.cpu().numpy().astype(self._model_dtype)
-        image2_batch = curr_chw.cpu().numpy().astype(self._model_dtype)
+            # Resize if needed (crop size != model size)
+            if needs_resize:
+                prev_chw = torch.nn.functional.interpolate(
+                    prev_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
+                )
+                curr_chw = torch.nn.functional.interpolate(
+                    curr_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
+                )
 
-        # Run ONNX inference
+            # Copy real batch into preallocated buffers first
+            img1_buffer[:actual_batch_size].copy_(prev_chw)
+            img2_buffer[:actual_batch_size].copy_(curr_chw)
+
+            # Zero out padding region to avoid ONNX Runtime recompilation
+            num_padding = self._max_batch - actual_batch_size
+            if num_padding > 0:
+                img1_buffer[actual_batch_size:].zero_()
+                img2_buffer[actual_batch_size:].zero_()
+
+        # CRITICAL: Synchronize stream before IOBinding to ensure all preprocessing is complete
+        self.stream.synchronize()
+
+        # Use preprocessed tensors directly for ONNX Runtime
+        torch_img1 = img1_buffer
+        torch_img2 = img2_buffer
+
+        # Use IOBinding for GPU input/output
+        io_binding = self._session.io_binding()
         input_names = [inp.name for inp in self._session.get_inputs()]
-        onnx_inputs = {
-            input_names[0]: image1_batch,
-            input_names[1]: image2_batch
-        }
 
-        outputs = self._session.run(None, onnx_inputs)
-        flow_np: np.ndarray = np.asarray(outputs[0])  # (padded_batch, 2, H, W)
+        # Bind inputs from PyTorch tensors
+        io_binding.bind_input(
+            name=input_names[0],
+            device_type='cuda',
+            device_id=0,
+            element_type=self._model_dtype,
+            shape=tuple(torch_img1.shape),
+            buffer_ptr=torch_img1.data_ptr()
+        )
+        io_binding.bind_input(
+            name=input_names[1],
+            device_type='cuda',
+            device_id=0,
+            element_type=self._model_dtype,
+            shape=tuple(torch_img2.shape),
+            buffer_ptr=torch_img2.data_ptr()
+        )
+
+        # Bind output from preallocated PyTorch tensor
+        output_name = self._session.get_outputs()[0].name
+        io_binding.bind_output(
+            name=output_name,
+            device_type='cuda',
+            device_id=0,
+            element_type=self._model_dtype,
+            shape=tuple(flow_out.shape),
+            buffer_ptr=flow_out.data_ptr()
+        )
+
+        # Run inference on the same stream
+        self._session.run_with_iobinding(io_binding)
+
+        # Synchronize stream to ensure outputs are ready
+        self.stream.synchronize()
 
         # Slice to actual batch size
-        flow_np = flow_np[:actual_batch_size]
-
-        # Convert to PyTorch CUDA tensor
-        flow_tensor = torch.from_numpy(flow_np).cuda()  # (actual_batch, 2, H, W)
+        flow_tensor = flow_out[:actual_batch_size]
 
         inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
 
@@ -343,12 +418,11 @@ class ONNXOpticalFlow(Thread):
             return
 
         try:
-            # Create realistic dummy GPU input (H, W, 3) RGB uint8
-            torch.manual_seed(42)
-            dummy_frame = (torch.rand(self.model_height, self.model_width, 3, device='cuda') * 255).to(torch.uint8)
+            # Create dummy GPU images (float32 RGB [0,1])
+            dummy_img = torch.zeros((self.model_height, self.model_width, 3), dtype=torch.float32, device='cuda')
 
             # Warmup with max_batch size (all inference runs with this size)
-            dummy_pairs = [(dummy_frame, dummy_frame)] * self._max_batch
+            dummy_pairs = [(dummy_img, dummy_img)] * self._max_batch
 
             flow_tensor, ms = self._infer_batch(dummy_pairs)
 

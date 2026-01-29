@@ -6,11 +6,9 @@ import traceback
 
 # Third-party imports
 import numpy as np
-import cupy as cp
 import torch
 import onnxruntime as ort
 
-from ..cuda_image_ops import batched_bilinear_resize_inplace, normalize_hwc_to_chw_inplace
 from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
 from typing import TYPE_CHECKING
@@ -21,7 +19,7 @@ if TYPE_CHECKING:
 
 class RecurrentState:
     """Container for RVM recurrent states (r1, r2, r3, r4)."""
-    def __init__(self, r1: np.ndarray, r2: np.ndarray, r3: np.ndarray, r4: np.ndarray):
+    def __init__(self, r1: torch.Tensor, r2: torch.Tensor, r3: torch.Tensor, r4: torch.Tensor):
         self.r1 = r1
         self.r2 = r2
         self.r3 = r3
@@ -81,19 +79,23 @@ class ONNXSegmentation(Thread):
         # ONNX session (initialized in run thread)
         self._session: ort.InferenceSession | None = None
         self._model_dtype = np.float16  # Default, determined in setup
-        self._cupy_dtype = cp.float16  # CuPy dtype for GPU preprocessing
+        self._torch_dtype: torch.dtype  # PyTorch dtype for preprocessing
 
-        # Pre-allocated zero recurrent states (reused for all new tracklets to avoid recompilation)
-        self._zero_r1: np.ndarray | None = None
-        self._zero_r2: np.ndarray | None = None
-        self._zero_r3: np.ndarray | None = None
-        self._zero_r4: np.ndarray | None = None
+        # Dedicated CUDA stream (initialized in _setup())
+        self.stream: torch.cuda.Stream
 
-        # GPU zero states for IOBinding path
-        self._zero_r1_gpu: cp.ndarray
-        self._zero_r2_gpu: cp.ndarray
-        self._zero_r3_gpu: cp.ndarray
-        self._zero_r4_gpu: cp.ndarray
+        # Preallocated zero recurrent states for new tracklets (read-only, shared, GPU tensors)
+        self._zero_r1: torch.Tensor
+        self._zero_r2: torch.Tensor
+        self._zero_r3: torch.Tensor
+        self._zero_r4: torch.Tensor
+
+        # Preallocated input buffers (initialized in _setup())
+        self._src_buffer: torch.Tensor    # (max_batch, 3, H, W) normalized input
+        self._r1i_buffer: torch.Tensor    # (max_batch, 16, H/2, W/2)
+        self._r2i_buffer: torch.Tensor    # (max_batch, 20, H/4, W/4)
+        self._r3i_buffer: torch.Tensor    # (max_batch, 40, H/8, W/8)
+        self._r4i_buffer: torch.Tensor    # (max_batch, 64, H/16, W/16)
 
         # Batch inference settings
         self._max_batch: int = min(settings.max_poses, 4)
@@ -248,20 +250,48 @@ class ONNXSegmentation(Thread):
             }
             self._model_dtype = dtype_map.get(input_type, np.float16)
 
-            # CuPy dtype for GPU preprocessing
-            self._cupy_dtype = cp.float16 if self._model_dtype == np.float16 else cp.float32
+            # Map numpy dtype to torch dtype for preprocessing
+            torch_dtype_map = {
+                np.float32: torch.float32,
+                np.float16: torch.float16,
+            }
+            self._torch_dtype = torch_dtype_map.get(self._model_dtype, torch.float16)
 
-            # Pre-allocate zero recurrent states on CPU (for state storage)
-            self._zero_r1 = np.zeros((16, self.model_height // 2, self.model_width // 2), dtype=self._model_dtype)
-            self._zero_r2 = np.zeros((20, self.model_height // 4, self.model_width // 4), dtype=self._model_dtype)
-            self._zero_r3 = np.zeros((40, self.model_height // 8, self.model_width // 8), dtype=self._model_dtype)
-            self._zero_r4 = np.zeros((64, self.model_height // 16, self.model_width // 16), dtype=self._model_dtype)
+            # Dedicated CUDA stream for all GPU operations (preprocessing + inference)
+            self.stream = torch.cuda.Stream()
 
-            # Pre-allocate zero recurrent states on GPU (for IOBinding input)
-            self._zero_r1_gpu = cp.zeros((16, self.model_height // 2, self.model_width // 2), dtype=self._cupy_dtype)
-            self._zero_r2_gpu = cp.zeros((20, self.model_height // 4, self.model_width // 4), dtype=self._cupy_dtype)
-            self._zero_r3_gpu = cp.zeros((40, self.model_height // 8, self.model_width // 8), dtype=self._cupy_dtype)
-            self._zero_r4_gpu = cp.zeros((64, self.model_height // 16, self.model_width // 16), dtype=self._cupy_dtype)
+            # Preallocate zero recurrent states (read-only, shared across all new tracklets, GPU tensors)
+            with torch.cuda.stream(self.stream):
+                self._zero_r1 = torch.zeros((1, 16, self.model_height // 2, self.model_width // 2), dtype=self._torch_dtype, device='cuda')
+                self._zero_r2 = torch.zeros((1, 20, self.model_height // 4, self.model_width // 4), dtype=self._torch_dtype, device='cuda')
+                self._zero_r3 = torch.zeros((1, 40, self.model_height // 8, self.model_width // 8), dtype=self._torch_dtype, device='cuda')
+                self._zero_r4 = torch.zeros((1, 64, self.model_height // 16, self.model_width // 16), dtype=self._torch_dtype, device='cuda')
+
+                # Preallocate all INPUT buffers on the dedicated stream for optimal memory placement
+                self._src_buffer = torch.empty(
+                    (self._max_batch, 3, self.model_height, self.model_width),
+                    dtype=self._torch_dtype, device='cuda'
+                )
+
+                # Recurrent input buffers
+                self._r1i_buffer = torch.empty(
+                    (self._max_batch, 16, self.model_height // 2, self.model_width // 2),
+                    dtype=self._torch_dtype, device='cuda'
+                )
+                self._r2i_buffer = torch.empty(
+                    (self._max_batch, 20, self.model_height // 4, self.model_width // 4),
+                    dtype=self._torch_dtype, device='cuda'
+                )
+                self._r3i_buffer = torch.empty(
+                    (self._max_batch, 40, self.model_height // 8, self.model_width // 8),
+                    dtype=self._torch_dtype, device='cuda'
+                )
+                self._r4i_buffer = torch.empty(
+                    (self._max_batch, 64, self.model_height // 16, self.model_width // 16),
+                    dtype=self._torch_dtype, device='cuda'
+                )
+
+            self.stream.synchronize()
 
             # Clear any existing states
             self._recurrent_states.clear()
@@ -329,10 +359,12 @@ class ONNXSegmentation(Thread):
     def _infer_batch_gpu(self, gpu_imgs: list[torch.Tensor], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
         """Run batched ONNX inference with per-tracklet recurrent states using GPU images.
 
-        Uses IOBinding for GPU input/output to minimize data transfers.
+        All preprocessing and inference runs on the dedicated stream for zero sync overhead.
+        Uses preallocated buffers for zero allocation latency.
+        Keeps states on GPU as PyTorch tensors (views into output buffers).
 
         Args:
-            gpu_imgs: List of RGB uint8 tensors on GPU (H, W, 3)
+            gpu_imgs: List of RGB float32 tensors on GPU (H, W, 3) in [0,1] range
             tracklet_ids: Tracklet IDs for each image
 
         Returns:
@@ -340,13 +372,13 @@ class ONNXSegmentation(Thread):
         """
         actual_batch_size = len(gpu_imgs)
         if actual_batch_size == 0 or self._session is None:
-            torch_dtype = torch.float16 if self._model_dtype == np.float16 else torch.float32
-            return torch.empty(0, dtype=torch_dtype, device='cuda'), torch.empty(0, 3, 0, 0, dtype=torch_dtype, device='cuda'), 0.0
+            return torch.empty(0, dtype=self._torch_dtype, device='cuda'), torch.empty(0, 3, 0, 0, dtype=self._torch_dtype, device='cuda'), 0.0
 
         batch_start = time.perf_counter()
 
         # Get input image dimensions from first real image
         input_h, input_w = gpu_imgs[0].shape[0], gpu_imgs[0].shape[1]
+        needs_resize = (input_h != self.model_height or input_w != self.model_width)
 
         # Pad to fixed batch size using missing IDs to avoid ONNX Runtime recompilation
         num_padding = self._max_batch - actual_batch_size
@@ -366,125 +398,130 @@ class ONNXSegmentation(Thread):
             # Add padding with zero images at SAME SIZE as input images (not model size)
             for i in range(num_padding):
                 padding_id = available_ids[i]
-                gpu_imgs.append(torch.zeros((input_h, input_w, 3), dtype=torch.uint8, device='cuda'))
+                gpu_imgs.append(torch.zeros((input_h, input_w, 3), dtype=torch.float32, device='cuda'))
                 tracklet_ids.append(padding_id)
                 padding_ids.append(padding_id)
                 states.append(None)  # Padding gets zero states
 
-        # Stack torch tensors and convert to CuPy for preprocessing kernels
-        batch_torch = torch.stack(gpu_imgs, dim=0)  # (B, H, W, 3)
-        batch_hwc = cp.asarray(batch_torch)  # Zero-copy view
+        # Get preallocated INPUT buffer slices for fixed batch
+        src_buffer = self._src_buffer[:self._max_batch]
+        r1i_buffer = self._r1i_buffer[:self._max_batch]
+        r2i_buffer = self._r2i_buffer[:self._max_batch]
+        r3i_buffer = self._r3i_buffer[:self._max_batch]
+        r4i_buffer = self._r4i_buffer[:self._max_batch]
 
-        # Check if resize is needed (crop size != model size)
-        src_h, src_w = batch_hwc.shape[1:3]
-        if src_h != self.model_height or src_w != self.model_width:
-            # Batched resize into new buffer
-            resized = cp.empty((batch_hwc.shape[0], self.model_height, self.model_width, 3), dtype=cp.uint8)
-            batched_bilinear_resize_inplace(batch_hwc, resized)
-            batch_hwc = resized
+        # Allocate OUTPUT buffers fresh each call (recurrent states will be views into these)
+        fgr_out = torch.empty((self._max_batch, 3, self.model_height, self.model_width), dtype=self._torch_dtype, device='cuda')
+        pha_out = torch.empty((self._max_batch, 1, self.model_height, self.model_width), dtype=self._torch_dtype, device='cuda')
+        r1o_out = torch.empty((self._max_batch, 16, self.model_height // 2, self.model_width // 2), dtype=self._torch_dtype, device='cuda')
+        r2o_out = torch.empty((self._max_batch, 20, self.model_height // 4, self.model_width // 4), dtype=self._torch_dtype, device='cuda')
+        r3o_out = torch.empty((self._max_batch, 40, self.model_height // 8, self.model_width // 8), dtype=self._torch_dtype, device='cuda')
+        r4o_out = torch.empty((self._max_batch, 64, self.model_height // 16, self.model_width // 16), dtype=self._torch_dtype, device='cuda')
 
-        # Fused normalize [0,1] + HWC->CHW into preallocated buffer
-        # Note: Images are already RGB from GPUCropProcessor, no BGR->RGB needed
-        src_batch = cp.empty((batch_hwc.shape[0], 3, self.model_height, self.model_width), dtype=self._cupy_dtype)
-        normalize_hwc_to_chw_inplace(batch_hwc, src_batch)
+        # All preprocessing on dedicated stream (no cross-stream sync needed)
+        with torch.cuda.stream(self.stream):
+            # Stack GPU tensors: (B, H, W, 3) float32 RGB [0,1]
+            batch_hwc = torch.stack(gpu_imgs, dim=0)
 
-        # Prepare batched recurrent state inputs on GPU
-        r1i_list = []
-        r2i_list = []
-        r3i_list = []
-        r4i_list = []
+            # HWC -> CHW: (B, 3, H, W), convert to model dtype if needed
+            batch_chw = batch_hwc.permute(0, 3, 1, 2).to(self._torch_dtype)
 
-        for state in states:
-            if state is not None:
-                r1i_list.append(cp.asarray(state.r1[0]))
-                r2i_list.append(cp.asarray(state.r2[0]))
-                r3i_list.append(cp.asarray(state.r3[0]))
-                r4i_list.append(cp.asarray(state.r4[0]))
-            else:
-                r1i_list.append(self._zero_r1_gpu)
-                r2i_list.append(self._zero_r2_gpu)
-                r3i_list.append(self._zero_r3_gpu)
-                r4i_list.append(self._zero_r4_gpu)
+            # Resize if needed (crop size != model size)
+            if needs_resize:
+                batch_chw = torch.nn.functional.interpolate(
+                    batch_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
+                )
 
-        # Stack recurrent states into batches
-        r1i = cp.stack(r1i_list, axis=0)
-        r2i = cp.stack(r2i_list, axis=0)
-        r3i = cp.stack(r3i_list, axis=0)
-        r4i = cp.stack(r4i_list, axis=0)
+            # Already normalized to [0, 1], just copy into preallocated buffer
+            src_buffer.copy_(batch_chw)
 
-        # Synchronize CuPy operations before ONNX Runtime reads the data
-        cp.cuda.Device().synchronize()
+            # Gather recurrent states into preallocated buffers
+            for i, state in enumerate(states):
+                if state is not None:
+                    r1i_buffer[i:i+1].copy_(state.r1)
+                    r2i_buffer[i:i+1].copy_(state.r2)
+                    r3i_buffer[i:i+1].copy_(state.r3)
+                    r4i_buffer[i:i+1].copy_(state.r4)
+                else:
+                    r1i_buffer[i:i+1].copy_(self._zero_r1)
+                    r2i_buffer[i:i+1].copy_(self._zero_r2)
+                    r3i_buffer[i:i+1].copy_(self._zero_r3)
+                    r4i_buffer[i:i+1].copy_(self._zero_r4)
 
-        # Convert CuPy arrays to PyTorch tensors (zero-copy via DLPack)
-        torch_src = torch.as_tensor(src_batch, device='cuda:0')
-        torch_r1i = torch.as_tensor(r1i, device='cuda:0')
-        torch_r2i = torch.as_tensor(r2i, device='cuda:0')
-        torch_r3i = torch.as_tensor(r3i, device='cuda:0')
-        torch_r4i = torch.as_tensor(r4i, device='cuda:0')
+        # CRITICAL: Synchronize stream before IOBinding to ensure all preprocessing is complete
+        self.stream.synchronize()
+
+        # Use preprocessed tensors directly for ONNX Runtime
+        torch_src = src_buffer
+        torch_r1i = r1i_buffer
+        torch_r2i = r2i_buffer
+        torch_r3i = r3i_buffer
+        torch_r4i = r4i_buffer
 
         # Use IOBinding for GPU input/output
         io_binding = self._session.io_binding()
-        element_type = np.float16 if self._model_dtype == np.float16 else np.float32
 
         # Bind inputs from PyTorch tensors
         io_binding.bind_input('src', device_type='cuda', device_id=0,
-                              element_type=element_type, shape=tuple(torch_src.shape),
+                              element_type=self._model_dtype, shape=tuple(torch_src.shape),
                               buffer_ptr=torch_src.data_ptr())
         io_binding.bind_input('r1i', device_type='cuda', device_id=0,
-                              element_type=element_type, shape=tuple(torch_r1i.shape),
+                              element_type=self._model_dtype, shape=tuple(torch_r1i.shape),
                               buffer_ptr=torch_r1i.data_ptr())
         io_binding.bind_input('r2i', device_type='cuda', device_id=0,
-                              element_type=element_type, shape=tuple(torch_r2i.shape),
+                              element_type=self._model_dtype, shape=tuple(torch_r2i.shape),
                               buffer_ptr=torch_r2i.data_ptr())
         io_binding.bind_input('r3i', device_type='cuda', device_id=0,
-                              element_type=element_type, shape=tuple(torch_r3i.shape),
+                              element_type=self._model_dtype, shape=tuple(torch_r3i.shape),
                               buffer_ptr=torch_r3i.data_ptr())
         io_binding.bind_input('r4i', device_type='cuda', device_id=0,
-                              element_type=element_type, shape=tuple(torch_r4i.shape),
+                              element_type=self._model_dtype, shape=tuple(torch_r4i.shape),
                               buffer_ptr=torch_r4i.data_ptr())
 
-        # Bind outputs to GPU
-        io_binding.bind_output('fgr', device_type='cuda', device_id=0)
-        io_binding.bind_output('pha', device_type='cuda', device_id=0)
-        io_binding.bind_output('r1o', device_type='cuda', device_id=0)
-        io_binding.bind_output('r2o', device_type='cuda', device_id=0)
-        io_binding.bind_output('r3o', device_type='cuda', device_id=0)
-        io_binding.bind_output('r4o', device_type='cuda', device_id=0)
+        # Bind outputs from preallocated PyTorch tensors
+        io_binding.bind_output('fgr', device_type='cuda', device_id=0,
+                               element_type=self._model_dtype, shape=tuple(fgr_out.shape),
+                               buffer_ptr=fgr_out.data_ptr())
+        io_binding.bind_output('pha', device_type='cuda', device_id=0,
+                               element_type=self._model_dtype, shape=tuple(pha_out.shape),
+                               buffer_ptr=pha_out.data_ptr())
+        io_binding.bind_output('r1o', device_type='cuda', device_id=0,
+                               element_type=self._model_dtype, shape=tuple(r1o_out.shape),
+                               buffer_ptr=r1o_out.data_ptr())
+        io_binding.bind_output('r2o', device_type='cuda', device_id=0,
+                               element_type=self._model_dtype, shape=tuple(r2o_out.shape),
+                               buffer_ptr=r2o_out.data_ptr())
+        io_binding.bind_output('r3o', device_type='cuda', device_id=0,
+                               element_type=self._model_dtype, shape=tuple(r3o_out.shape),
+                               buffer_ptr=r3o_out.data_ptr())
+        io_binding.bind_output('r4o', device_type='cuda', device_id=0,
+                               element_type=self._model_dtype, shape=tuple(r4o_out.shape),
+                               buffer_ptr=r4o_out.data_ptr())
 
-        # Run inference
+        # Run inference on the same stream
         self._session.run_with_iobinding(io_binding)
 
-        # Synchronize to ensure outputs are ready before accessing
-        torch.cuda.synchronize()
+        # Synchronize stream to ensure outputs are ready
+        self.stream.synchronize()
 
-        # Get outputs as OrtValues on GPU
-        outputs = io_binding.get_outputs()
-
-        # Convert to numpy for recurrent state storage (copies from GPU)
-        fgr_np = outputs[0].numpy()[:actual_batch_size]  # (actual_batch, 3, H, W)
-        pha_np = outputs[1].numpy()[:actual_batch_size]  # (actual_batch, 1, H, W)
-        r1o_np = outputs[2].numpy()
-        r2o_np = outputs[3].numpy()
-        r3o_np = outputs[4].numpy()
-        r4o_np = outputs[5].numpy()
-
-        # Create new states ONLY for real tracklets (skip padding IDs)
+        # Build new recurrent states from outputs ONLY for real tracklets (skip padding IDs)
+        # States are views into output buffers - keep them on GPU
         new_states_dict: dict[int, RecurrentState] = {}
         for i, tid in enumerate(tracklet_ids):
             if tid not in padding_ids:
                 new_states_dict[tid] = RecurrentState(
-                    r1=r1o_np[i:i+1],
-                    r2=r2o_np[i:i+1],
-                    r3=r3o_np[i:i+1],
-                    r4=r4o_np[i:i+1]
+                    r1=r1o_out[i:i+1],  # View into output buffer (GPU tensor)
+                    r2=r2o_out[i:i+1],
+                    r3=r3o_out[i:i+1],
+                    r4=r4o_out[i:i+1]
                 )
 
         # Update recurrent states
         self._recurrent_states = new_states_dict
 
-        # Convert to PyTorch CUDA tensors
-        fgr_tensor = torch.from_numpy(fgr_np).cuda()  # (actual_batch, 3, H, W)
-        pha_tensor = torch.from_numpy(pha_np).cuda().squeeze(1)  # (actual_batch, H, W)
+        # Squeeze alpha channel and slice to actual batch size: (B, 1, H, W) -> (actual_batch, H, W)
+        pha_tensor = pha_out[:actual_batch_size].squeeze(1)
+        fgr_tensor = fgr_out[:actual_batch_size]
 
         inference_time_ms = (time.perf_counter() - batch_start) * 1000.0
 
@@ -493,8 +530,8 @@ class ONNXSegmentation(Thread):
     def _model_warmup(self, session: ort.InferenceSession) -> None:
         """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
         try:
-            # Create dummy GPU images
-            dummy_img = torch.zeros((self.model_height, self.model_width, 3), dtype=torch.uint8, device='cuda')
+            # Create dummy GPU images (float32 RGB [0,1])
+            dummy_img = torch.zeros((self.model_height, self.model_width, 3), dtype=torch.float32, device='cuda')
             dummy_images = [dummy_img] * self._max_batch
             dummy_ids = list(range(self._max_batch))
 
