@@ -15,6 +15,7 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from modules.cam.depthcam.Definitions import FrameType
+from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class GPUCropProcessorConfig:
@@ -36,8 +37,8 @@ class GPUCropProcessor:
     Maintains previous frames for optical flow (re-cropped at current bbox location).
     Uses PyTorch for all GPU operations with F.grid_sample for efficient crop+resize.
 
-    Output crops are float32 RGB normalized to [0,1] at a fixed resolution.
-    Full frames are stored as float32 BGR [0,1] (flip happens on crop for efficiency).
+    Output crops are float16 RGB normalized to [0,1] at a fixed resolution.
+    Full frames are stored as float16 BGR [0,1] (flip happens on crop for efficiency).
     """
 
     def __init__(self, config: GPUCropProcessorConfig) -> None:
@@ -64,14 +65,11 @@ class GPUCropProcessor:
         # Create dedicated CUDA stream for crop operations
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
 
-
-        # BGR→RGB index tensor (preallocated)
-        self._rgb_idx = torch.tensor([2, 1, 0], device='cuda')
-
         # Performance timers and accumulators
         self._accumulated_upload_ms: float = 0.0
-        self._process_timer: PerformanceTimer = PerformanceTimer(name="GPU Image Upload  ", sample_count=1000, report_interval=100, color="green", omit_init=25)
+        self._process_timer: PerformanceTimer = PerformanceTimer(name="GPU Image Upload  ", sample_count=200, report_interval=100, color="green", omit_init=25)
 
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def set_image(self, cam_id: int, frame_type: 'FrameType', image: np.ndarray) -> None:
         """Upload image from a specific camera to GPU. Only VIDEO frames are stored.
@@ -96,9 +94,10 @@ class GPUCropProcessor:
             if cam_id in self._gpu_images:
                 self._prev_gpu_images[cam_id] = self._gpu_images[cam_id]
 
-            # Upload BGR frame to GPU, convert to float32 [0,1], and flip BGR→RGB
-            gpu_img = torch.from_numpy(image).cuda(non_blocking=True).float().div_(255.0)
-            self._gpu_images[cam_id] = gpu_img.index_select(2, self._rgb_idx)
+            # Upload BGR frame to GPU, fuse all ops for better memory access
+            gpu_img = torch.from_numpy(image).cuda(non_blocking=True)
+            # Fused: convert dtype, normalize, flip - all in one pass
+            self._gpu_images[cam_id] = gpu_img.flip(2).to(dtype=torch.float16).mul_(1.0/255.0)
 
         elapsed_ms = (time.perf_counter() - start) * 1000.0
         self._accumulated_upload_ms += elapsed_ms
@@ -197,6 +196,7 @@ class GPUCropProcessor:
         Returns:
             Crop region in pixel coordinates
         """
+        
         image_rect = Rect(0.0, 0.0, float(img_width), float(img_height))
 
         # Apply expansion and convert to pixel coordinates
@@ -231,7 +231,7 @@ class GPUCropProcessor:
 
         # Check if ROI is completely outside image
         if x1 >= x2 or y1 >= y2:
-            return torch.zeros((self._crop_height, self._crop_width, 3), device='cuda')
+            return torch.zeros((self._crop_height, self._crop_width, 3), device='cuda', dtype=torch.float16)
 
         # Extract valid region: HWC slice
         crop = src[y1:y2, x1:x2, :]
@@ -249,14 +249,13 @@ class GPUCropProcessor:
         if pad_left > 0 or pad_right > 0 or pad_top > 0 or pad_bottom > 0:
             crop_chw = F.pad(crop_chw, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=0)
 
-        # Resize using bilinear interpolation
+        # Resize using nearest neighbor (fast, since TRT will resize again with bilinear)
         crop_h, crop_w = crop_chw.shape[1], crop_chw.shape[2]
         if crop_h != self._crop_height or crop_w != self._crop_width:
             crop_chw = F.interpolate(
                 crop_chw.unsqueeze(0),
                 size=(self._crop_height, self._crop_width),
-                mode='bilinear',
-                align_corners=False
+                mode='nearest'
             ).squeeze(0)
 
         # Convert CHW -> HWC (already RGB)

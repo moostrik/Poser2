@@ -23,6 +23,11 @@ from modules.Settings import Settings, ModelType
 
 import multiprocessing as mp
 
+# Enable PyTorch optimizations for modern GPUs (RTX 30xx/40xx/50xx)
+import torch
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
 if __name__ == '__main__': # For Windows compatibility with multiprocessing
     mp.freeze_support()
     parser: ArgumentParser = ArgumentParser()
