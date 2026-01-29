@@ -84,7 +84,7 @@ class MaskBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
             self._batch_counter += 1
             batch_id: int = self._batch_counter
 
-        self._segmentation.submit_batch(SegmentationInput(
+        self._segmentation.submit(SegmentationInput(
             batch_id=batch_id,
             gpu_images=gpu_image_list,
             tracklet_ids=tracklet_ids

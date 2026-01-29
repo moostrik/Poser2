@@ -85,7 +85,7 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
             self._batch_counter += 1
             batch_id: int = self._batch_counter
 
-        self._optical_flow.submit_batch(OpticalFlowInput(
+        self._optical_flow.submit(OpticalFlowInput(
             batch_id=batch_id,
             gpu_image_pairs=pair_list,
             tracklet_ids=tracklet_id_list

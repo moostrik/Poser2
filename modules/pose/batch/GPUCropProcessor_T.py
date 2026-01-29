@@ -76,7 +76,6 @@ class GPUCropProcessor:
         self._accumulated_upload_ms: float = 0.0
         self._process_timer: PerformanceTimer = PerformanceTimer(name="GPU Image Upload  ", sample_count=1000, report_interval=100, color="green", omit_init=25)
 
-
     def set_image(self, cam_id: int, frame_type: 'FrameType', image: np.ndarray) -> None:
         """Upload image from a specific camera to GPU. Only VIDEO frames are stored.
 
@@ -190,6 +189,11 @@ class GPUCropProcessor:
             except Exception as e:
                 print(f"GPUCropProcessor: Error in callback: {e}")
 
+    def reset(self) -> None:
+        """Clear all stored GPU images."""
+        self._gpu_images.clear()
+        self._prev_gpu_images.clear()
+
     def _calculate_crop_roi(self, bbox_rect: Rect, img_width: int, img_height: int) -> Rect:
         """Calculate crop region maintaining aspect ratio.
 
@@ -275,8 +279,3 @@ class GPUCropProcessor:
     def remove_callback(self, callback: GPUCropCallback) -> None:
         """Unregister callback."""
         self._callbacks.discard(callback)
-
-    def reset(self) -> None:
-        """Clear all stored GPU images."""
-        self._gpu_images.clear()
-        self._prev_gpu_images.clear()

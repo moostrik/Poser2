@@ -61,7 +61,7 @@ class TRTDetection(Thread):
         self._callback_lock: Lock = Lock()
         self._callbacks: set[PoseDetectionOutputCallback] = set()
         self._callback_queue: Queue[DetectionOutput | None] = Queue(maxsize=2)
-        self._callback_thread: Thread = Thread(target=self._callback_worker_loop, daemon=True)
+        self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
         # TensorRT engine and context (initialized in run())
         self.engine: trt.ICudaEngine  # type: ignore
@@ -119,12 +119,12 @@ class TRTDetection(Thread):
             self._notify_update_event.clear()
 
             try:
-                self._process_pending_batch()
+                self._process()
             except Exception as e:
                 print(f"TensorRT Detection Error: {str(e)}")
                 traceback.print_exc()
 
-    def submit_batch(self, input_batch: DetectionInput) -> None:
+    def submit(self, input_batch: DetectionInput) -> None:
         """Submit batch for processing. Replaces pending batch if not yet started.
 
         Dropped batches receive callbacks with processed=False.
@@ -254,15 +254,15 @@ class TRTDetection(Thread):
             traceback.print_exc()
             return
 
-    def _retrieve_pending_batch(self) -> DetectionInput | None:
+    def _claim(self) -> DetectionInput | None:
         """Atomically get and clear pending batch."""
         with self._input_lock:
             batch = self._pending_batch
             self._pending_batch = None
             return batch
 
-    def _process_pending_batch(self) -> None:
-        batch: DetectionInput | None = self._retrieve_pending_batch()
+    def _process(self) -> None:
+        batch: DetectionInput | None = self._claim()
 
         if batch is None:
             return
@@ -272,7 +272,7 @@ class TRTDetection(Thread):
         if not gpu_images:
             output = DetectionOutput(batch_id=batch.batch_id, processed=True)
         else:
-            keypoints, scores, process_time_ms, lock_wait_ms = self._infer_batch(gpu_images)
+            keypoints, scores, process_time_ms, lock_wait_ms = self._infer(gpu_images)
 
             # Normalize coordinates to [0, 1]
             keypoints[:, :, 0] /= self.model_width
@@ -295,7 +295,7 @@ class TRTDetection(Thread):
         except Exception:
             print("TensorRT Detection Warning: Callback queue full")
 
-    def _infer_batch(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray, float, float]:
+    def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray, float, float]:
         """Run TensorRT inference on batch of GPU images.
 
         All preprocessing and inference runs on the dedicated stream for zero sync overhead.
@@ -387,7 +387,7 @@ class TRTDetection(Thread):
         with self._callback_lock:
             self._callbacks.discard(callback)
 
-    def _callback_worker_loop(self) -> None:
+    def _dispatch_callbacks(self) -> None:
         """Dispatch results to callbacks."""
         while not self._shutdown_event.is_set():
             try:

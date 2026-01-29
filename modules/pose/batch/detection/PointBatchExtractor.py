@@ -75,7 +75,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
             batch_id: int = self._batch_counter
             self._waiting_batches[batch_id] = (poses, tracklet_ids)
 
-        self._detection.submit_batch(DetectionInput(batch_id=batch_id, gpu_images=gpu_image_list))
+        self._detection.submit(DetectionInput(batch_id=batch_id, gpu_images=gpu_image_list))
 
     def _on_detection_result(self, output: DetectionOutput) -> None:
         """Callback from Detection thread when results are ready or dropped.

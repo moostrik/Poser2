@@ -53,7 +53,7 @@ class ONNXDetection(Thread):
         self._callback_lock: Lock = Lock()
         self._callbacks: set[PoseDetectionOutputCallback] = set()
         self._callback_queue: Queue[DetectionOutput | None] = Queue(maxsize=2)
-        self._callback_thread: Thread = Thread(target=self._callback_worker_loop, daemon=True)
+        self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
         # ONNX session (initialized in run thread)
         self._session: ort.InferenceSession | None = None
@@ -101,12 +101,12 @@ class ONNXDetection(Thread):
             self._notify_update_event.clear()
 
             try:
-                self._process_pending_batch()
+                self._process()
             except Exception as e:
                 print(f"ONNX Detection Error: {str(e)}")
                 traceback.print_exc()
 
-    def submit_batch(self, input_batch: DetectionInput) -> None:
+    def submit(self, input_batch: DetectionInput) -> None:
         """Submit batch for processing. Identical to MMDetection."""
         if self._shutdown_event.is_set():
             return
@@ -221,7 +221,7 @@ class ONNXDetection(Thread):
             self.stream.synchronize()
 
             # Warmup model
-            self._model_warmup()
+            self._warmup()
 
             self._model_ready.set()
             print(f"ONNX Detection: {self.resolution_name} model ready: {self.model_width}x{self.model_height} {self.model_precision}")
@@ -230,15 +230,15 @@ class ONNXDetection(Thread):
             print(f"ONNX Detection Error: Failed to load model - {str(e)}")
             traceback.print_exc()
 
-    def _retrieve_pending_batch(self) -> DetectionInput | None:
+    def _claim(self) -> DetectionInput | None:
         """Atomically get and clear pending batch."""
         with self._input_lock:
             batch = self._pending_batch
             self._pending_batch = None
             return batch
 
-    def _process_pending_batch(self) -> None:
-        batch: DetectionInput | None = self._retrieve_pending_batch()
+    def _process(self) -> None:
+        batch: DetectionInput | None = self._claim()
 
         if batch is None:
             return
@@ -249,7 +249,7 @@ class ONNXDetection(Thread):
             output = DetectionOutput(batch_id=batch.batch_id, processed=True)
         else:
             batch_start = time.perf_counter()
-            keypoints, scores = self._infer_batch_gpu(gpu_images)
+            keypoints, scores = self._infer(gpu_images)
 
             keypoints[:, :, 0] /= self.model_width
             keypoints[:, :, 1] /= self.model_height
@@ -271,7 +271,7 @@ class ONNXDetection(Thread):
         except Exception:
             print("ONNX Detection Warning: Callback queue full")
 
-    def _infer_batch_gpu(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
+    def _infer(self, gpu_imgs: list[torch.Tensor]) -> tuple[np.ndarray, np.ndarray]:
         """Run inference on GPU images using IOBinding for zero-copy.
 
         All preprocessing runs on the dedicated stream for zero sync overhead.
@@ -366,7 +366,7 @@ class ONNXDetection(Thread):
 
         return keypoints, scores
 
-    def _model_warmup(self) -> None:
+    def _warmup(self) -> None:
         """Initialize CUDA kernels for fixed batch size to prevent runtime recompilation."""
         if self._session is None:
             return
@@ -378,7 +378,7 @@ class ONNXDetection(Thread):
             # Warmup with max_batch size (all inference runs with this size)
             dummy_images = [dummy_img] * self._max_batch
 
-            keypoints, scores = self._infer_batch_gpu(dummy_images)
+            keypoints, scores = self._infer(dummy_images)
 
         except Exception as e:
             print(f"ONNX Detection: Warmup failed (non-critical) - {str(e)}")
@@ -395,7 +395,7 @@ class ONNXDetection(Thread):
         with self._callback_lock:
             self._callbacks.discard(callback)
 
-    def _callback_worker_loop(self) -> None:
+    def _dispatch_callbacks(self) -> None:
         """Dispatch results to callbacks. Identical to MMDetection."""
         while not self._shutdown_event.is_set():
             try:
@@ -462,7 +462,6 @@ class ONNXDetection(Thread):
 
         # Mark invalid keypoints
         keypoints[scores <= 0.] = -1
-
 
         scores = np.clip(scores, 0.0, 1.0)
 

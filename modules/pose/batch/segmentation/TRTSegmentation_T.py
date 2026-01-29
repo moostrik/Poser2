@@ -70,7 +70,7 @@ class TRTSegmentation(Thread):
         self._callback_lock: Lock = Lock()
         self._callbacks: set[SegmentationOutputCallback] = set()
         self._callback_queue: Queue[SegmentationOutput | None] = Queue(maxsize=2)
-        self._callback_thread: Thread = Thread(target=self._callback_worker_loop, daemon=True)
+        self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
         # Per-tracklet recurrent states for temporal coherence
         self._recurrent_states: dict[int, RecurrentState] = {}
@@ -148,13 +148,13 @@ class TRTSegmentation(Thread):
             self._notify_update_event.clear()
 
             try:
-                self._process_pending_batch()
+                self._process()
 
             except Exception as e:
                 print(f"TRT RVM Segmentation Error: {str(e)}")
                 traceback.print_exc()
 
-    def submit_batch(self, input_batch: SegmentationInput) -> None:
+    def submit(self, input_batch: SegmentationInput) -> None:
         """Submit batch for processing. Replaces pending batch if not yet started.
 
         Dropped batches receive callbacks with processed=False.
@@ -312,16 +312,16 @@ class TRTSegmentation(Thread):
             traceback.print_exc()
             return
 
-    def _retrieve_pending_batch(self) -> SegmentationInput | None:
+    def _claim(self) -> SegmentationInput | None:
         """Atomically get and clear pending batch. Once retrieved, cannot be cancelled."""
         with self._input_lock:
             batch = self._pending_batch
             self._pending_batch = None
             return batch
 
-    def _process_pending_batch(self) -> None:
+    def _process(self) -> None:
         """Process pending batch using batched TensorRT inference with recurrent states."""
-        batch: SegmentationInput | None = self._retrieve_pending_batch()
+        batch: SegmentationInput | None = self._claim()
 
         if batch is None:
             return
@@ -343,7 +343,7 @@ class TRTSegmentation(Thread):
 
         if gpu_images:
             try:
-                mask_tensor, fgr_tensor, inference_time_ms, lock_wait_ms = self._infer_batch(gpu_images, tracklets_to_process)
+                mask_tensor, fgr_tensor, inference_time_ms, lock_wait_ms = self._infer(gpu_images, tracklets_to_process)
                 output = SegmentationOutput(
                     batch_id=batch.batch_id,
                     mask_tensor=mask_tensor,
@@ -363,7 +363,7 @@ class TRTSegmentation(Thread):
         except Exception:
             print("TRT RVM Segmentation Warning: Callback queue full, dropping inference results")
 
-    def _infer_batch(self, gpu_imgs: list[torch.Tensor], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
+    def _infer(self, gpu_imgs: list[torch.Tensor], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
         """Run batched TensorRT inference with per-tracklet recurrent states.
 
         All preprocessing and inference runs on the dedicated stream for zero sync overhead.
@@ -491,7 +491,7 @@ class TRTSegmentation(Thread):
         with self._callback_lock:
             self._callbacks.discard(callback)
 
-    def _callback_worker_loop(self) -> None:
+    def _dispatch_callbacks(self) -> None:
         """Dispatch queued results to registered callbacks on dedicated thread."""
         while not self._shutdown_event.is_set():
             try:
