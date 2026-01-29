@@ -47,19 +47,6 @@ if %errorlevel% neq 0 echo.
 if %errorlevel%==0 echo [92mBuilt rtmpose-l_256x192_b3.trt[0m
 :after_rtmpose_l_256x192
 
-rem rtmpose-l_384x288
-if not exist "models\rtmpose-l_384x288_b3.trt" goto build_rtmpose_l_384x288
-if "%FORCE_REBUILD%"=="1" goto build_rtmpose_l_384x288
-echo [90mSkipping rtmpose-l_384x288_b3.trt (already exists)[0m
-goto after_rtmpose_l_384x288
-
-:build_rtmpose_l_384x288
-python modules\pose\batch\detection\export_rtm_onnx_to_trt.py --onnx models\rtmpose-l_384x288.onnx --output models\rtmpose-l_384x288_b3.trt
-if %errorlevel% neq 0 echo [91mFailed to convert rtmpose-l_384x288.onnx[0m
-if %errorlevel% neq 0 echo.
-if %errorlevel%==0 echo [92mBuilt rtmpose-l_384x288_b3.trt[0m
-:after_rtmpose_l_384x288
-
 
 
 echo.
