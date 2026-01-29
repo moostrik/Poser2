@@ -93,7 +93,7 @@ class Main():
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
-        self.gpu_crop_processor = batch.GPUCropProcessor(self.gpu_crop_config)
+        self.gpu_crop_processor =   batch.GPUCropProcessor(self.gpu_crop_config)
         self.point_extractor =      batch.PointBatchExtractor(settings.pose)  # GPU-based 2D point extractor
         self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor

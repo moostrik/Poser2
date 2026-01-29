@@ -15,9 +15,9 @@ from modules.pose.batch.detection.InOut import DetectionInput, DetectionOutput, 
 from modules.pose.Settings import Settings
 from modules.pose.tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 
-# ImageNet normalization constants (RGB order)
-IMAGENET_MEAN = torch.tensor([123.675, 116.28, 103.53], dtype=torch.float32).view(1, 3, 1, 1)
-IMAGENET_STD = torch.tensor([58.395, 57.12, 57.375], dtype=torch.float32).view(1, 3, 1, 1)
+# ImageNet normalization constants (RGB order) - scaled to [0,1] range
+IMAGENET_MEAN = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1)
+IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 3, 1, 1)
 
 
 class TRTDetection(Thread):
@@ -329,11 +329,11 @@ class TRTDetection(Thread):
 
         # All preprocessing on dedicated stream (no cross-stream sync needed)
         with torch.cuda.stream(self.stream):
-            # Stack GPU tensors: (B, H, W, 3)
+            # Stack GPU tensors: (B, H, W, 3) float32 RGB [0,1]
             batch_hwc = torch.stack(gpu_imgs, dim=0)
 
-            # Convert to float and HWC -> CHW: (B, 3, H, W)
-            batch_chw = batch_hwc.to(self._torch_dtype).permute(0, 3, 1, 2)
+            # HWC -> CHW: (B, 3, H, W), convert to model dtype if needed
+            batch_chw = batch_hwc.permute(0, 3, 1, 2).to(self._torch_dtype)
 
             # Resize if needed (crop size != model size)
             if needs_resize:

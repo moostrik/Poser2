@@ -404,11 +404,11 @@ class TRTSegmentation(Thread):
 
         # All preprocessing on dedicated stream (no cross-stream sync needed)
         with torch.cuda.stream(self.stream):
-            # Stack GPU tensors: (B, H, W, 3)
+            # Stack GPU tensors: (B, H, W, 3) float32 RGB [0,1]
             batch_hwc = torch.stack(gpu_imgs, dim=0)
 
-            # Convert to float and HWC -> CHW: (B, 3, H, W)
-            batch_chw = batch_hwc.to(self._torch_dtype).permute(0, 3, 1, 2)
+            # HWC -> CHW: (B, 3, H, W), convert to model dtype if needed
+            batch_chw = batch_hwc.permute(0, 3, 1, 2).to(self._torch_dtype)
 
             # Resize if needed (crop size != model size)
             if needs_resize:
@@ -416,8 +416,8 @@ class TRTSegmentation(Thread):
                     batch_chw, size=(self.model_height, self.model_width), mode='bilinear', align_corners=False
                 )
 
-            # Normalize to [0, 1] and copy into preallocated buffer
-            torch.div(batch_chw, 255.0, out=src_buffer)
+            # Already normalized to [0, 1], just copy into preallocated buffer
+            src_buffer.copy_(batch_chw)
 
             # Gather recurrent states for all tracklets into preallocated buffers
             for i, tid in enumerate(tracklet_ids):
