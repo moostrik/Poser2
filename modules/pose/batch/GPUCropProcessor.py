@@ -1,24 +1,20 @@
 # Standard library imports
 from dataclasses import replace
-from typing import Callable, TYPE_CHECKING
 import time
 
+# Third-party imports
 import numpy as np
 import torch
 import torch.nn.functional as F
 
+# Local application imports
 from modules.pose.features import BBox
 from modules.pose.Frame import FrameDict
-from modules.pose.batch.GPUFrame import GPUFrame, GPUFrameDict
+from modules.pose.batch.GPUFrame import GPUFrame, GPUFrameDict, GPUFrameCallback
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 
-if TYPE_CHECKING:
-    from modules.cam.depthcam.Definitions import FrameType
-
-
-# Type aliases for callbacks
-GPUCropCallback = Callable[[FrameDict, GPUFrameDict], None]
+from modules.cam.depthcam.Definitions import FrameType
 
 
 class GPUCropProcessorConfig:
@@ -63,7 +59,7 @@ class GPUCropProcessor:
         self._prev_gpu_images: dict[int, torch.Tensor] = {}  # cam_id -> previous frame on GPU
 
         # Callbacks
-        self._callbacks: set[GPUCropCallback] = set()
+        self._callbacks: set[GPUFrameCallback] = set()
 
         # Create dedicated CUDA stream for crop operations
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
@@ -268,11 +264,11 @@ class GPUCropProcessor:
 
         return result
 
-    def add_callback(self, callback: GPUCropCallback) -> None:
+    def add_callback(self, callback: GPUFrameCallback) -> None:
         """Register callback to receive cropped poses and GPU frames."""
         self._callbacks.add(callback)
 
-    def remove_callback(self, callback: GPUCropCallback) -> None:
+    def remove_callback(self, callback: GPUFrameCallback) -> None:
         """Unregister callback."""
         self._callbacks.discard(callback)
 

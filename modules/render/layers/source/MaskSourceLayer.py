@@ -7,6 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
 from modules.gl import Tensor, SwapFbo, Texture, Blit
+from modules.pose.batch.GPUFrame import GPUFrame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import MaskDilate
 
@@ -42,7 +43,8 @@ class MaskSourceLayer(LayerBase):
         self._dilate_shader.deallocate()
 
     def update(self) -> None:
-        mask_tensor: torch.Tensor | None = self._data_hub.get_item(DataHubType.mask_tensor, self._track_id)
+        gpu_frame: GPUFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
+        mask_tensor: torch.Tensor | None = gpu_frame.mask if gpu_frame else None
         self._data_cache.update(mask_tensor)
         if self._data_cache.lost:
             self._fbo.clear()

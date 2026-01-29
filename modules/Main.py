@@ -210,9 +210,7 @@ class Main():
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets.add_poses_callback(self.bbox_filters.process)
         self.bbox_filters.add_poses_callback(self.gpu_crop_processor.process)
-        self.gpu_crop_processor.add_callback(self.data_hub.set_gpu_frames)
         self.gpu_crop_processor.add_callback(self.point_extractor.process)
-        # self.image_crop_processor.add_callback(self.point_extractor.process)
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
 
         self.pose_raw_filters.add_poses_callback(self.pd_pose_streamer.submit)
@@ -232,7 +230,7 @@ class Main():
 
         # SEGMENTATION
         self.gpu_crop_processor.add_callback(self.mask_extractor.process)
-        self.mask_extractor.add_callback(self.data_hub.set_mask_tensors)
+        self.mask_extractor.add_callback(self.data_hub.set_gpu_frames)
         self.mask_extractor.start()
 
         # FLOW
