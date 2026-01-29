@@ -161,10 +161,11 @@ FINAL_LAYERS: list[Layers] = [
     Layers.flow,
     Layers.dense_flow,
     # Layers.centre_mask,
-    Layers.gpu_crop,
+    # Layers.gpu_crop,
     # Layers.gpu_full_image,
     # Layers.gpu_crop,
     # Layers.cam_image,
+    Layers.centre_cam,
     Layers.centre_pose,
 ]
 

@@ -37,8 +37,8 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         self._batch_counter: int = 0
         self._waiting_batches: dict[int, tuple[FrameDict, list[int]]] = {}
 
-        self._process_timer =   PerformanceTimer(name="RTM Pose Detection", sample_count=100, report_interval=100, color='yellow', omit_init=2)
-        self._wait_timer =      PerformanceTimer(name="RTM Pose Wait     ", sample_count=100, report_interval=100, color='yellow', omit_init=2)
+        self._process_timer =   PerformanceTimer(name="RTM Pose Detection", sample_count=1000, report_interval=100, color='yellow', omit_init=25)
+        self._wait_timer =      PerformanceTimer(name="RTM Pose Wait     ", sample_count=1000, report_interval=100, color='yellow', omit_init=25)
 
         self._verbose: bool = settings.verbose
 
@@ -95,7 +95,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
 
         # print(output.inference_time_ms)
         self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
-        self._wait_timer.add_time(output.lock_time_ms, report=self._verbose)
+        # self._wait_timer.add_time(output.lock_time_ms, report=self._verbose)
 
         if output.processed:
             for idx, tracklet_id in enumerate(tracklet_ids):

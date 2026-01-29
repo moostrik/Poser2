@@ -41,8 +41,8 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         self._verbose: bool = settings.verbose
 
         # Track inference times
-        self._process_timer =   PerformanceTimer(name="RAFT Optical Flow", sample_count=100, report_interval=100, color='magenta', omit_init=2)
-        self._wait_timer =      PerformanceTimer(name="RAFT Wait        ", sample_count=100, report_interval=100, color='magenta', omit_init=2)
+        self._process_timer =   PerformanceTimer(name="RAFT Optical Flow", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
+        self._wait_timer =      PerformanceTimer(name="RAFT Wait        ", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
 
 
         self._optical_flow.register_callback(self._on_optical_flow_result)

@@ -68,10 +68,13 @@ class GPUCropProcessor:
         # Create dedicated CUDA stream for crop operations
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
 
+
+        # BGR→RGB index tensor (preallocated)
+        self._rgb_idx = torch.tensor([2, 1, 0], device='cuda')
+
         # Performance timers and accumulators
         self._accumulated_upload_ms: float = 0.0
-        self._upload_timer: PerformanceTimer = PerformanceTimer(name="GPUCrop Upload", sample_count=10000, report_interval=100, color="green", omit_init=10)
-        self._process_timer: PerformanceTimer = PerformanceTimer(name="GPUCrop Process", sample_count=10000, report_interval=100, color="green", omit_init=10)
+        self._process_timer: PerformanceTimer = PerformanceTimer(name="GPU Image Upload  ", sample_count=1000, report_interval=100, color="green", omit_init=25)
 
 
     def set_image(self, cam_id: int, frame_type: 'FrameType', image: np.ndarray) -> None:
@@ -99,8 +102,7 @@ class GPUCropProcessor:
 
             # Upload BGR frame to GPU, convert to float32 [0,1], and flip BGR→RGB
             gpu_img = torch.from_numpy(image).cuda(non_blocking=True).float().div_(255.0)
-            gpu_img = gpu_img[:, :, [2, 1, 0]]  # BGR→RGB
-            self._gpu_images[cam_id] = gpu_img
+            self._gpu_images[cam_id] = gpu_img.index_select(2, self._rgb_idx)
 
         elapsed_ms = (time.perf_counter() - start) * 1000.0
         self._accumulated_upload_ms += elapsed_ms
@@ -177,12 +179,9 @@ class GPUCropProcessor:
         self._stream.synchronize()
 
         elapsed_ms = (time.perf_counter() - start) * 1000.0
+        elapsed_ms += self._accumulated_upload_ms
         self._process_timer.add_time(elapsed_ms, report=self._config.verbose)
-
-        # Report accumulated upload time
-        if self._accumulated_upload_ms > 0:
-            self._upload_timer.add_time(self._accumulated_upload_ms, report=self._config.verbose)
-            self._accumulated_upload_ms = 0.0
+        self._accumulated_upload_ms = 0.0
 
         # Notify callbacks
         for callback in self._callbacks:
