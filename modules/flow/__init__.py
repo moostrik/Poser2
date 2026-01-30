@@ -1,8 +1,13 @@
 
 # Base classes
 from .FlowBase import FlowBase
-from .FlowConfigBase import FlowConfigBase
 from .FlowUtil import FlowUtil
+
+# Import ConfigBase from parent modules
+from ..ConfigBase import ConfigBase
+
+# Re-export ConfigBase for backward compatibility
+__all__ = ['FlowBase', 'FlowUtil', 'ConfigBase']
 
 # Layers
 from .optical import OpticalFlow, OpticalFlowConfig

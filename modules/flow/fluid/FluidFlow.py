@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo, Fbo
-from .. import FlowBase, FlowConfigBase, FlowUtil
+from .. import FlowBase, FlowUtil, ConfigBase
 from .shaders import (
     Advect, Divergence, Gradient, JacobiPressure, JacobiPressureCompute,
     JacobiDiffusion, JacobiDiffusionCompute,
@@ -25,7 +25,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class FluidFlowConfig(FlowConfigBase):
+class FluidFlowConfig(ConfigBase):
     """Configuration for fluid simulation."""
 
     # Velocity parameters

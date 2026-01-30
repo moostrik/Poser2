@@ -10,7 +10,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, Blit
 from modules.utils.PointsAndRects import Rect
 
-from .. import FlowConfigBase, FlowUtil
+from .. import FlowUtil
 from .BaseField import VisualisationFieldConfig
 from .VelocityField import VelocityField
 
@@ -31,7 +31,7 @@ class Visualizer:
 
     def __init__(self, config: VisualisationFieldConfig | None = None) -> None:
         self._config: VisualisationFieldConfig = config or VisualisationFieldConfig()
-        self._config.add_listener(self._on_config_changed)
+        self._config.watch(self._on_config_changed)
 
         # Velocity visualization for 2-channel data
         self.velocity_field: VelocityField = VelocityField(self._config)

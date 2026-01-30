@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo
-from .. import FlowBase, FlowConfigBase, FlowUtil
+from .. import FlowBase, FlowUtil, ConfigBase
 from .shaders.DensityBridgeShader import DensityBridgeShader
 from ..shaders.HSV import HSV
 
@@ -17,7 +17,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class DensityBridgeConfig(FlowConfigBase):
+class DensityBridgeConfig(ConfigBase):
     """Configuration for density bridge."""
 
     saturation: float = field(

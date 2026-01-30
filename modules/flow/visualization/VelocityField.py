@@ -16,7 +16,6 @@ from .shaders import VelocityDirectionMap, VelocityArrowField
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-
 class VelocityField(FieldBase):
     """Visualize velocity/flow fields using color encoding or arrows.
 
@@ -33,7 +32,7 @@ class VelocityField(FieldBase):
 
         # Configuration with change notification
         self.config: VisualisationFieldConfig = config or VisualisationFieldConfig()
-        self.config.add_listener(self._on_config_changed)
+        self.config.watch(self._on_config_changed)
 
         self._velocity_texture: Texture | None = None
 

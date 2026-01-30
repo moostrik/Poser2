@@ -9,14 +9,14 @@ from dataclasses import dataclass, field
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture
-from .. import FlowBase, FlowConfigBase, FlowUtil
+from .. import FlowBase, FlowUtil, ConfigBase
 from .shaders import Trail, GaussianBlur
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class SmoothTrailConfig(FlowConfigBase):
+class SmoothTrailConfig(ConfigBase):
     """Configuration for trail smoothing."""
     scale: float = field(
         default=1.0,

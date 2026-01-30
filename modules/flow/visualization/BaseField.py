@@ -10,11 +10,11 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Fbo, Texture, Blit
 from modules.utils.PointsAndRects import Rect
 
-from .. import FlowConfigBase
+from .. import ConfigBase
 
 
 @dataclass
-class VisualisationFieldConfig(FlowConfigBase):
+class VisualisationFieldConfig(ConfigBase):
     """Base configuration for field visualizations."""
     toggle_scalar: bool = field(
         default=False,

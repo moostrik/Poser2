@@ -16,14 +16,14 @@ from dataclasses import dataclass, field
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo
-from .. import FlowBase, FlowConfigBase, FlowUtil
+from .. import FlowBase, FlowUtil, ConfigBase
 from .shaders.TemperatureBridge import TemperatureBridge as TemperatureBridgeShader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class TemperatureBridgeConfig(FlowConfigBase):
+class TemperatureBridgeConfig(ConfigBase):
     """Configuration for temperature bridge."""
 
     scale: float = field(

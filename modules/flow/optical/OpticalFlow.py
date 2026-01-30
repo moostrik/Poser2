@@ -10,14 +10,14 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.gl.Texture import Texture
 
-from .. import FlowBase, FlowConfigBase, FlowUtil
+from .. import FlowBase, FlowUtil, ConfigBase
 from .shaders import Luminance, MergeRGB, OpticalFlow as OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class OpticalFlowConfig(FlowConfigBase):
+class OpticalFlowConfig(ConfigBase):
     offset: int = field(
         default=3,
         metadata={"min": 1, "max": 10, "label": "Offset", "description": "Gradient sample offset in pixels"}
@@ -55,7 +55,7 @@ class OpticalFlow(FlowBase):
 
         # Configuration with change notification
         self.config: OpticalFlowConfig = config or OpticalFlowConfig()
-        self.config.add_listener(self._on_config_changed)
+        self.config.watch(self._on_config_changed)
 
         # State
         self._frame_count: int = 0  # 0=no frames, 1=first frame, 2+=can compute flow
