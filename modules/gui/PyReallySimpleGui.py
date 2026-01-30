@@ -7,6 +7,8 @@ import glob
 from queue import Queue, Empty
 from time import sleep
 
+FrameWidget = sg.Frame
+
 BASEHEIGHT = 35
 ELEMHEIGHT = 44
 FRAMEWIDTH = 700
