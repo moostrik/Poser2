@@ -115,7 +115,7 @@ class MaskBatchExtractor:
         poses, gpu_frames = pending
 
         # If batch was dropped or no masks, forward original frames without masks
-        if not output.processed or output.mask_tensor is None:
+        if not output.processed or output.mask_tensor is None or output.fgr_tensor is None:
             self._notify_callbacks(poses, gpu_frames)
             return
 
@@ -126,8 +126,10 @@ class MaskBatchExtractor:
         result_frames: GPUFrameDict = {}
         for idx, tracklet_id in enumerate(output.tracklet_ids):
             if tracklet_id in gpu_frames and idx < output.mask_tensor.shape[0]:
-                mask_tensor = output.mask_tensor[idx]  # (H, W) tensor on GPU
-                result_frames[tracklet_id] = replace(gpu_frames[tracklet_id], mask=mask_tensor)
+                mask = output.mask_tensor[idx]  # (H, W) tensor on GPU
+                foreground = output.fgr_tensor[idx]
+                # foreground = foreground * mask.unsqueeze(0) # Do in visualisation if needed
+                result_frames[tracklet_id] = replace(gpu_frames[tracklet_id], mask=mask, foreground=foreground)
             elif tracklet_id in gpu_frames:
                 # No mask for this tracklet, forward original
                 result_frames[tracklet_id] = gpu_frames[tracklet_id]

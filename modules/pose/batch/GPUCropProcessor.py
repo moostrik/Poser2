@@ -196,7 +196,7 @@ class GPUCropProcessor:
         Returns:
             Crop region in pixel coordinates
         """
-        
+
         image_rect = Rect(0.0, 0.0, float(img_width), float(img_height))
 
         # Apply expansion and convert to pixel coordinates
@@ -255,7 +255,8 @@ class GPUCropProcessor:
             crop_chw = F.interpolate(
                 crop_chw.unsqueeze(0),
                 size=(self._crop_height, self._crop_width),
-                mode='nearest'
+                mode='bilinear',
+                align_corners=False
             ).squeeze(0)
 
         # Convert CHW -> HWC (already RGB)

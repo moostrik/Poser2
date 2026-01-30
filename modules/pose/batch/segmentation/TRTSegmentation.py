@@ -11,10 +11,7 @@ import tensorrt as trt
 from ..tensorrt_shared import get_tensorrt_runtime, get_init_lock, get_exec_lock
 from .InOut import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from modules.pose.Settings import Settings
+from modules.pose.Settings import Settings
 
 class RecurrentState:
     """Container for RVM recurrent states (r1, r2, r3, r4)."""
@@ -266,7 +263,7 @@ class TRTSegmentation(Thread):
             self._max_batch = self._max_inputs
 
             # Dedicated CUDA stream for all GPU operations (preprocessing + inference)
-            self.stream = torch.cuda.Stream()
+            self.stream = torch.cuda.Stream(-1) # -1 = high priority (the lower the number, the higher the priority)
 
             # Preallocate all INPUT buffers on the dedicated stream for optimal memory placement
             with torch.cuda.stream(self.stream):

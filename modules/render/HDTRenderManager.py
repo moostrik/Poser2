@@ -66,7 +66,7 @@ class Layers(IntEnum):
 
     # GPU frame layers
     gpu_crop =      auto()
-    gpu_full_image = auto()
+    frg_src =       auto()
 
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
@@ -83,7 +83,7 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.centre_motion,
 
     Layers.gpu_crop,
-    Layers.gpu_full_image,
+    Layers.frg_src,
 ]
 
 INTERFACE_LAYERS: list[Layers] = [
@@ -166,6 +166,8 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.gpu_crop,
     # Layers.cam_image,
     Layers.centre_cam,
+    # Layers.cam_mask,
+    # Layers.frg_src,
     Layers.centre_pose,
 ]
 
@@ -225,8 +227,8 @@ class HDTRenderManager(RenderBase):
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
             flow =          self.L[Layers.flow][i] =        ls.FlowLayer(              sim_blend)
 
-            gpu_crop =      self.L[Layers.gpu_crop][i] =    ls.GPUCropSourceLayer(     i, self.data_hub)
-            gpu_full_image =self.L[Layers.gpu_full_image][i]= ls.GPUFullImageSourceLayer(i, self.data_hub)
+            gpu_crop =      self.L[Layers.gpu_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
+            frg_src =       self.L[Layers.frg_src][i]=      ls.ForegroundSourceLayer(i, self.data_hub)
 
         # global layers
         self.pose_sim_layer =   ls.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, ls.AggregationMethod.HARMONIC_MEAN, 2.0)

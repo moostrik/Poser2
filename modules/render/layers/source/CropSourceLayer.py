@@ -1,5 +1,5 @@
 # Standard library imports
-
+import torch
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -13,10 +13,10 @@ from modules.pose.batch.GPUFrame import GPUFrame
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class GPUFullImageSourceLayer(LayerBase):
-    """Renders the full source image from GPUFrame.
+class CropSourceLayer(LayerBase):
+    """Renders the cropped region from GPUFrame.
 
-    Displays the complete camera frame that was uploaded to GPU.
+    Displays the 384x512 (or configured size) crop that will be sent to TRT models.
     """
 
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
@@ -42,11 +42,8 @@ class GPUFullImageSourceLayer(LayerBase):
         gpu_frame: GPUFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
         self._data_cache.update(gpu_frame)
 
-        if self._data_cache.lost:
-            self._cuda_image.deallocate()
-
         if self._data_cache.idle or gpu_frame is None:
             return
 
-        self._cuda_image.set_tensor(gpu_frame.full_image)
+        self._cuda_image.set_tensor(gpu_frame.crop)
         self._cuda_image.update()

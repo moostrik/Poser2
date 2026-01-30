@@ -6,47 +6,39 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gl import Tensor, Texture
-from modules.render.layers.LayerBase import LayerBase, DataCache
+from modules.gl import Tensor, SwapFbo, Texture, Blit
 from modules.pose.batch.GPUFrame import GPUFrame
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
+from modules.render.shaders import MaskDilate
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class GPUCropSourceLayer(LayerBase):
-    """Renders the cropped region from GPUFrame.
-
-    Displays the 384x512 (or configured size) crop that will be sent to TRT models.
-    """
+class ForegroundSourceLayer(LayerBase):
 
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._cuda_image: Tensor = Tensor()
-        self._data_cache: DataCache[GPUFrame] = DataCache[GPUFrame]()
+        self._data_cache: DataCache[torch.Tensor]= DataCache[torch.Tensor]()
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:
-        return self._cuda_image
-
-    def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
-        pass  # Lazy allocation on first update
+        return self._cuda_image.texture
 
     def deallocate(self) -> None:
         self._cuda_image.deallocate()
 
     def update(self) -> None:
         gpu_frame: GPUFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
-        self._data_cache.update(gpu_frame)
+        foreground: torch.Tensor | None = gpu_frame.foreground if gpu_frame else None
+        self._data_cache.update(foreground)
 
-        if self._data_cache.lost:
-            self._cuda_image.deallocate()
-
-        if self._data_cache.idle or gpu_frame is None:
+        if self._data_cache.idle or foreground is None:
             return
 
-        self._cuda_image.set_tensor(gpu_frame.crop)
+        self._cuda_image.set_tensor(foreground)
         self._cuda_image.update()

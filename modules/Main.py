@@ -57,10 +57,12 @@ class Main():
         self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
 
         # POSE CONFIGURATION
-        self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
+        # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
+        self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=768, output_height=1024, max_poses=settings.pose.max_poses)
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
+        self.b_box_rate_config =    nodes.RateLimiterConfig(max_increase= 10, max_decrease= 0.2)
         self.point_smooth_config =  nodes.EuroSmootherConfig()
         self.angle_smooth_config =  nodes.EuroSmootherConfig()
         self.a_vel_smooth_config =  nodes.EuroSmootherConfig()
@@ -109,7 +111,7 @@ class Main():
             [
                 lambda: nodes.BBoxEuroSmoother(self.b_box_smooth_config),
                 lambda: nodes.BBoxPredictor(self.prediction_config),
-                #lambbda: nodes.BBoxARFilter(), # TODO: implement BBoxARFilter
+                lambda: nodes.BBoxRateLimiter(self.b_box_rate_config),
             ]
         )
 

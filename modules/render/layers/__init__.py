@@ -30,7 +30,7 @@ from .cam.TrackletCamRenderer import        TrackletCamRenderer
 
 from .source.DFlowSourceLayer import        DFlowSourceLayer
 from .source.ImageSourceLayer import        ImageSourceLayer
+from .source.CropSourceLayer import         CropSourceLayer
 from .source.MaskSourceLayer import         MaskSourceLayer
-from .source.GPUCropSourceLayer import      GPUCropSourceLayer
-from .source.GPUFullImageSourceLayer import GPUFullImageSourceLayer
+from .source.ForegroundSourceLayer import   ForegroundSourceLayer
 

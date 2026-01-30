@@ -30,6 +30,7 @@ class GPUFrame:
     crop: torch.Tensor
     prev_crop: torch.Tensor | None = None
     mask: torch.Tensor | None = None
+    foreground: torch.Tensor | None = None
 
 
 # Type aliases
