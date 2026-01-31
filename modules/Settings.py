@@ -11,7 +11,7 @@ from typing_extensions import get_args, get_origin
 from modules.cam.Config import Config as CamConfig
 from modules.gui.PyReallySimpleGui import GuiConfig
 from modules.inout import OscSoundConfig
-from modules.inout.ArtNetLet import ArtNetLedConfig
+from modules.inout.ArtNetLed import ArtNetLedConfig
 
 from modules.render.Settings import Settings as RenderSettings
 from modules.pose.Settings import Settings as PoseSettings, ModelType
