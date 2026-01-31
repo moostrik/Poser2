@@ -19,20 +19,20 @@ from modules.ConfigBase import ConfigBase
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 @dataclass
-class SoundOscConfig(ConfigBase):
+class OscSoundConfig(ConfigBase):
     ip_addresses: str = field(default_factory=lambda: "127.0.0.1", metadata={"description": "Target OSC IP address"})
     port: int = field(default=9000, metadata={"min": 1024, "max": 65535, "description": "Target OSC port"})
     num_players: int = field(default=8, metadata={"min": 1, "max": 16, "description": "Number of pose tracking slots"})
     data_type: DataHubType = field(default=DataHubType.pose_I, metadata={"description": "Data source type from DataHub"})
 
 
-class SoundOsc:
+class OscSound:
     """
     Sends smooth pose data over OSC at a configurable frame rate in its own thread.
     """
-    def __init__(self, data_hub: DataHub, settings: SoundOscConfig) -> None:
+    def __init__(self, data_hub: DataHub, settings: OscSoundConfig) -> None:
 
-        self._config: SoundOscConfig = settings
+        self._config: OscSoundConfig = settings
         self._data_hub: DataHub = data_hub
         self._client: SimpleUDPClient = SimpleUDPClient(self._config.ip_addresses, self._config.port)
 
@@ -48,7 +48,7 @@ class SoundOsc:
         self._inactive_messages: dict[int, list[OscBundle]] = {}
         for id in range(self._config.num_players):
             bundle_builder = OscBundleBuilder(IMMEDIATELY)  # type: ignore
-            SoundOsc._build_inactive_message(id, bundle_builder, self._config.num_players)
+            OscSound._build_inactive_message(id, bundle_builder, self._config.num_players)
             self._inactive_messages[id] = bundle_builder._contents
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -134,7 +134,7 @@ class SoundOsc:
             else:
                 # Reset inactive count when pose becomes active
                 self._inactive_message_counts[id] = 0
-                SoundOsc._build_active_message(poses[id], bundle_builder, motion_similarities[id])
+                OscSound._build_active_message(poses[id], bundle_builder, motion_similarities[id])
 
         # similarity: SimilarityBatch | None = self._data_hub.get_item(DataHubType.sim_P)
         # if similarity is not None:

@@ -11,7 +11,7 @@ from modules.Settings import Settings
 from modules.DataHub import DataHub, DataHubType
 from modules.gui import Gui
 from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
-from modules.inout import SoundOsc, ArtNetLed, ArtNetLedConfig, SelectedColor, ChannelOrder
+from modules.inout import OscSound, ArtNetLed, ArtNetLedConfig, SelectedColor, ChannelOrder
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers, similarity
@@ -52,7 +52,7 @@ class Main():
 
         # DATA
         self.data_hub = DataHub()
-        self.sound_osc = SoundOsc(self.data_hub, settings.sound_osc)
+        self.sound_osc = OscSound(self.data_hub, settings.sound_osc)
 
         # ARTNET LED CONTROLLERS
         self.artnet_configs = settings.artnet_leds

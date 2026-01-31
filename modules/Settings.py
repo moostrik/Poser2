@@ -10,8 +10,8 @@ from typing_extensions import get_args, get_origin
 
 from modules.cam.Config import Config as CamConfig
 from modules.gui.PyReallySimpleGui import GuiConfig
-from modules.inout import SoundOscConfig
-from modules.inout.ArtNetLed import ArtNetLedConfig
+from modules.inout import OscSoundConfig
+from modules.inout.ArtNetLet import ArtNetLedConfig
 
 from modules.render.Settings import Settings as RenderSettings
 from modules.pose.Settings import Settings as PoseSettings, ModelType
@@ -37,7 +37,7 @@ class Settings():
     gui: GuiConfig = GuiConfig()
 
     # INOUT SETTINGS
-    sound_osc: SoundOscConfig = SoundOscConfig()
+    sound_osc: OscSoundConfig = OscSoundConfig()
     artnet_leds: list[ArtNetLedConfig] = field(default_factory=list)
 
     # RENDER SETTINGS

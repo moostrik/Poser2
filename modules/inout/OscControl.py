@@ -11,7 +11,7 @@ from pythonosc.dispatcher import Dispatcher
 from modules.ConfigBase import ConfigBase
 
 @dataclass
-class ControlOscConfig(ConfigBase):
+class OscControlConfig(ConfigBase):
     port_in: int = field(default=9000, metadata={"min": 1024, "max": 65535, "description": "Incoming OSC port"})
     ip_address_in: str = field(default_factory=lambda: "127.0.0.1", metadata={"description": "Incoming OSC IP address"})
 
@@ -28,11 +28,11 @@ class ControlMessage:
 ControlMessageCallback = Callable[[ControlMessage], None]
 
 
-class ControlOsc:
+class OscControl:
 
-    def __init__(self, config: ControlOscConfig) -> None:
+    def __init__(self, config: OscControlConfig) -> None:
 
-        self.config: ControlOscConfig = config
+        self.config: OscControlConfig = config
 
         self.osc_receive: Dispatcher = Dispatcher()
         self.osc_receive.set_default_handler(self._osc_handler, needs_reply_address=True)
