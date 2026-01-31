@@ -18,6 +18,7 @@ class PosesFromTracklets(PoseDictCallbackMixin):
             track_id: None for track_id in range(num_tracks)
         }
         self._lock = Lock()
+        self._batch_id_counter = 0
 
     def submit_tracklets(self, tracklet_dict: dict[int, Tracklet]) -> None:
         """Set tracklets for pose generation.
@@ -42,6 +43,8 @@ class PosesFromTracklets(PoseDictCallbackMixin):
         # Copy tracklets under lock to avoid holding lock during processing
         with self._lock:
             tracklets_snapshot = self._tracklets.copy()
+            batch_id = self._batch_id_counter
+            self._batch_id_counter += 1
 
         generated_poses: FrameDict = {}
 
@@ -55,6 +58,7 @@ class PosesFromTracklets(PoseDictCallbackMixin):
                 generated_poses[track_id] = Frame(
                     track_id=tracklet.id,
                     cam_id=tracklet.cam_id,
+                    batch_id=batch_id,
                     bbox=bounding_box,
                     time_stamp=tracklet.time_stamp,
                     is_removed=tracklet.is_removed

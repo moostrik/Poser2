@@ -14,6 +14,7 @@ class Frame:
     """Immutable pose data structure"""
     track_id: int
     cam_id: int
+    batch_id: int
 
     is_removed: bool    # depricated, for use in stream
 

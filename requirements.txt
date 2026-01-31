@@ -1,23 +1,25 @@
 cuda-python==13.1.0
-cupy-cuda12x==13.6.0
-tensorrt-cu12==10.14.1.48.post1
-
-depthai==2.30.0                 # latest version
-ffmpeg-python==0.2.0            # latest version
-glfw==2.9.0                     # latest version
-numba==0.61.2                   # latest version
+cupy-cuda12x==13.6.0                # not used / Redundant?
+depthai==2.30.0
+ffmpeg-python==0.2.0
+glfw==2.9.0                         # Redundant, now i dont draw text the old way
+numba==0.61.2
 numpy<2.0.0                         # needed for torch?
-OneEuroFilter==0.2.1            # latest version
-onnx==1.20.0
-onnxruntime-gpu==1.23.2
-onnx_simplifier==0.4.36
-opencv-python==4.11.0.86            # highest version with numpy<2.0.0
-opencv-contrib-python==4.11.0.86    # highest version with numpy<2.0.0
-pandas==2.3.2                   # latest version
-Pillow==11.3.0                  # latest version
-psutil==7.0.0                   # latest version
-python-osc==1.9.3               # latest version
-pytweening==1.2.0               # latest version
-stupidArtnet==1.6.8             # latest version
-typing-extensions==4.15.0       # latest version for torch
-watchdog==6.0.0                 # latest version
+OneEuroFilter==0.2.1
+onnx==1.20.0                        # Redundant?
+onnx_simplifier==0.4.36             # Redundant?
+onnxruntime-gpu==1.23.2             # Redundant?
+opencv-python==4.11.0.86            # highest version with numpy<2.0.0, Redundant?
+opencv-contrib-python==4.11.0.86    # highest version with numpy<2.0.0, Redundant?
+pandas==2.3.2                       # Redundant when i remove old pd_stream
+Pillow==11.3.0                      # Redundant?
+psutil==7.0.0
+python-osc==1.9.3
+pytweening==1.2.0
+stupidArtnet==1.6.8
+tensorrt-cu12==10.14.1.48.post1
+typing-extensions==4.15.0           # latest version for torch, where is torch in here?
+watchdog==6.0.0
+
+
+# Check for updates with:   pip list --outdated

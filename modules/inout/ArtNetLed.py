@@ -14,7 +14,7 @@ from stupidArtnet import StupidArtnet
 
 from modules.ConfigBase import ConfigBase, config_field
 
-CONFIG_MODE: bool = True
+CONFIG_MODE: bool = False
 
 
 class ChannelOrder(IntEnum):

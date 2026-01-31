@@ -1,3 +1,5 @@
+#TODO: torch.nograd() where applicable
+
 # Standard library imports
 from dataclasses import replace
 import time
