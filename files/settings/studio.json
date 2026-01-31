@@ -44,7 +44,7 @@
     "model_path": "models",
     "confidence_low": 0.45,
     "confidence_high": 0.55,
-    "verbose": true,
+    "verbose": false,
     "crop_expansion": 0.1,
     "segmentation_enabled": true,
     "segmentation_reset_interval": 0,
@@ -82,7 +82,7 @@
 
   "artnet_leds": [
     {
-      "verbose": true,
+      "verbose": false,
       "ip_address": "10.0.0.2",
       "base_universe": 0,
       "fps": 40,
@@ -97,7 +97,7 @@
       "bar": 0.5
     },
     {
-      "verbose": true,
+      "verbose": false,
       "ip_address": "10.0.0.3",
       "base_universe": 0,
       "fps": 40,
@@ -112,7 +112,7 @@
       "bar": 0.5
     },
     {
-      "verbose": true,
+      "verbose": false,
       "ip_address": "10.0.0.4",
       "base_universe": 0,
       "fps": 40,

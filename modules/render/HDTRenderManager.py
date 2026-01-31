@@ -67,6 +67,7 @@ class Layers(IntEnum):
     # GPU frame layers
     gpu_crop =      auto()
     frg_src =       auto()
+    feature_buf =   auto()
 
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
@@ -119,6 +120,7 @@ PREVIEW_LAYERS: list[Layers] = [
 
     Layers.sim_blend,
     Layers.flow,
+    Layers.feature_buf,
 ]
 
 FINAL_LAYERS: list[Layers] = [
@@ -169,6 +171,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.cam_mask,
     # Layers.frg_src,
     Layers.centre_pose,
+    Layers.feature_buf,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -229,6 +232,7 @@ class HDTRenderManager(RenderBase):
 
             gpu_crop =      self.L[Layers.gpu_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
             frg_src =       self.L[Layers.frg_src][i]=      ls.ForegroundSourceLayer(i, self.data_hub)
+            feature_buf =   self.L[Layers.feature_buf][i] = ls.FeatureBufferLayer(  i, self.data_hub)
 
         # global layers
         self.pose_sim_layer =   ls.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, ls.AggregationMethod.HARMONIC_MEAN, 2.0)
@@ -276,6 +280,7 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.cam_track][i].allocate(w , h, GL_RGBA)
             w, h = self.subdivision.get_allocation_size('preview', i)
             self.L[Layers.angle_data][i].allocate(w, h, GL_RGBA)
+            # self.L[Layers.feature_buf][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
         self.pose_sim_layer.deallocate()

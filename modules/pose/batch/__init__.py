@@ -5,3 +5,4 @@ from .segmentation.MaskBatchExtractor import    MaskBatchExtractor
 from .PosesFromTracklets import                 PosesFromTracklets
 from .GPUCropProcessor import                   GPUCropProcessor, GPUCropProcessorConfig
 from .GPUFrame import                           GPUFrame, GPUFrameDict
+from .RollingFeatureBuffer import               RollingFeatureBuffer, RollingFeatureBufferConfig, BufferOutput

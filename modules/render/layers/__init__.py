@@ -23,6 +23,7 @@ from .data.PoseBarSLayer import             PoseBarSLayer
 from .data.PoseDotLayer import              PoseDotLayer
 from .data.PoseLineLayer import             PoseLineLayer
 from .data.PoseMTimeRenderer import         PoseMTimeRenderer
+from .data.FeatureBufferLayer import        FeatureBufferLayer
 
 from .cam.CamCompositeLayer import          CamCompositeLayer
 from .cam.BBoxCamRenderer import            BBoxCamRenderer

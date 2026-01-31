@@ -23,7 +23,7 @@ from .pose.PosePointDots import         PosePointDots
 from .pose.PosePointLines import        PosePointLines
 
 from .stream.StreamCorrelation import   StreamCorrelation
-from .stream.StreamPose import          StreamPose
+from .pose.PoseAngleWindow import          PoseAngleWindow
 
 from.hdt.HDTTripleBlend import          HDTTripleBlend
 

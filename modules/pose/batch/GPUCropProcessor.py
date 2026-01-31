@@ -23,13 +23,13 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class GPUCropProcessorConfig:
     """Configuration for GPU-based image cropping."""
 
-    def __init__(self, expansion: float = 0.0, output_width: int = 384, output_height: int = 512, max_poses: int = 4, enable_prev_crop: bool = True) -> None:
+    def __init__(self, expansion: float = 0.0, output_width: int = 384, output_height: int = 512, max_poses: int = 4, enable_prev_crop: bool = True, verbose: bool = False) -> None:
         self.crop_scale: float = 1.0 + expansion
         self.output_width: int = output_width
         self.output_height: int = output_height
         self.max_poses: int = max_poses
         self.enable_prev_crop: bool = enable_prev_crop  # Enable previous frame crops for optical flow
-        self.verbose: bool = True
+        self.verbose: bool = verbose
 
 
 class GPUCropProcessor:

@@ -32,6 +32,7 @@ class DataHubType(IntEnum):
     flow_tensor =      11   # sorted by track_id, GPU tensors (H, W, 2) FP16
     flow_images =      12   # sorted by track_id, flow visualization images
     gpu_frames =       13   # sorted by track_id, GPU frames with crops
+    feature_buffer =   14   # (values, mask) GPU tensors from RollingFeatureBuffer
 
 
 class PoseDataHubTypes(IntEnum):
@@ -119,6 +120,10 @@ class DataHub:
     def set_gpu_frames(self, _: FrameDict, gpu_frames) -> None:
         """Store GPU frame data. Expects GPUFrameDict from GPUCropProcessor."""
         self.set_dict(DataHubType.gpu_frames, gpu_frames)
+
+    def set_feature_buffer(self, buffer_output: tuple[Tensor, Tensor]) -> None:
+        """Store feature buffer (values, mask) GPU tensors."""
+        self.set_item(DataHubType.feature_buffer, 0, buffer_output)
 
     def set_pd_stream(self, pd_stream: PDStreamData) -> None:
         self.set_item(DataHubType.pd_stream, pd_stream.track_id, pd_stream)

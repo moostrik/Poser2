@@ -68,7 +68,7 @@ class Main():
 
         # POSE CONFIGURATION
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
-        self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=768, output_height=1024, max_poses=settings.pose.max_poses)
+        self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=768, output_height=1024, max_poses=settings.pose.max_poses, verbose=False, enable_prev_crop=False)
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
@@ -109,6 +109,10 @@ class Main():
         self.point_extractor =      batch.PointBatchExtractor(settings.pose)  # GPU-based 2D point extractor
         self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
+
+        # Rolling feature buffer for temporal accumulation
+        self.feature_buffer_config = batch.RollingFeatureBufferConfig(num_tracks=num_players, window_size= int(5 * settings.camera.fps))  # 5 seconds of history
+        self.feature_buffer =       batch.RollingFeatureBuffer(self.feature_buffer_config)
 
         self.pose_similator=        similarity.SimilarityComputer()
         self.pose_similarity_extractor = nodes.SimilarityExtractor(self.simil_config)
@@ -159,7 +163,7 @@ class Main():
                 lambda: nodes.PointPredictor(self.prediction_config),
                 lambda: nodes.AnglePredictor(self.prediction_config),
                 lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=True)),
-                # lambda: nodes.SimilarityStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
+                lambda: nodes.SimilarityStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
             ]
         )
@@ -228,14 +232,24 @@ class Main():
         self.pose_raw_filters.add_poses_callback(self.pd_pose_streamer.submit)
         self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_R)) # raw poses
 
+        # self.pose_raw_filters.add_poses_callback(self.feature_buffer.submit)
+
+        self.feature_buffer.add_callback(self.data_hub.set_feature_buffer)
+        self.feature_buffer.start()
+
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_S)) # smooth poses
 
+
+        self.pose_smooth_filters.add_poses_callback(self.feature_buffer.submit)
+
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
         self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_I)) # interpolated poses
+
+
 
         self.data_hub.add_update_callback(self.interpolator.update)
         self.point_extractor.start()
@@ -330,6 +344,7 @@ class Main():
 
         self.point_extractor.stop()
         self.pose_similator.stop()
+        self.feature_buffer.stop()
 
         self.pd_pose_streamer.stop()
         if self.pd_stream_similator:
