@@ -137,7 +137,8 @@ class ConfigBase:
 
     def __post_init__(self) -> None:
         """Initialize listeners, lock, and validate metadata."""
-        object.__setattr__(self, '_listeners', set())
+        object.__setattr__(self, '_global_listeners', set())  # Global watchers
+        object.__setattr__(self, '_field_listeners', {})      # dict[str, set[Callable]]
         object.__setattr__(self, '_lock', threading.Lock())
 
         # Track which fields are fixed
@@ -206,9 +207,15 @@ class ConfigBase:
         # Thread-safe attribute setting (after initialization)
         with self._lock:  # type: ignore
             object.__setattr__(self, name, value)
-            listeners_copy = list(self._listeners) # type: ignore
+            # Copy only relevant listeners
+            listeners_copy = []
+            # Global watchers (watching all changes)
+            listeners_copy.extend(self._global_listeners)  # type: ignore
+            # Attribute-specific watchers
+            if name in self._field_listeners:  # type: ignore
+                listeners_copy.extend(self._field_listeners[name])  # type: ignore
 
-        # Notify listeners OUTSIDE lock to prevent deadlock
+        # Notify only relevant listeners OUTSIDE lock to prevent deadlock
         for listener in listeners_copy:
             listener()
 
@@ -258,12 +265,12 @@ class ConfigBase:
         if attribute is None:
             # Watch all changes
             with self._lock:  # type: ignore
-                self._listeners.add(callback)  # type: ignore
+                self._global_listeners.add(callback)  # type: ignore
 
             # Return cleanup function
             def unwatch() -> None:
                 with self._lock:  # type: ignore
-                    self._listeners.discard(callback)  # type: ignore
+                    self._global_listeners.discard(callback)  # type: ignore
             return unwatch
         else:
             # Validate attribute exists in declared fields
@@ -279,12 +286,15 @@ class ConfigBase:
                 callback(getattr(self, attribute))
 
             with self._lock:  # type: ignore
-                self._listeners.add(wrapper)  # type: ignore
+                if attribute not in self._field_listeners:  # type: ignore
+                    self._field_listeners[attribute] = set()  # type: ignore
+                self._field_listeners[attribute].add(wrapper)  # type: ignore
 
             # Return cleanup function that removes the wrapper
             def unwatch() -> None:
                 with self._lock:  # type: ignore
-                    self._listeners.discard(wrapper)  # type: ignore
+                    if attribute in self._field_listeners:  # type: ignore
+                        self._field_listeners[attribute].discard(wrapper)  # type: ignore
             return unwatch
 
     @overload

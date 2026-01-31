@@ -11,8 +11,9 @@ from modules.ConfigBase import ConfigBase
 
 FrameWidget = sg.Frame
 
-BASEHEIGHT = 35
-ELEMHEIGHT = 44
+BASEHEIGHT = 40
+ELEMHEIGHT = 20  # Standard element height
+SLIDERHEIGHT = 30  # Slider elements are taller
 FRAMEWIDTH = 700
 
 class eType(Enum):
@@ -53,7 +54,7 @@ class GuiConfig(ConfigBase):
     file_path: str = field(default="")
     default_file: str = field(default="settings")
 
-def Element(type: eType, key: str, callback=None, value: bool| int | float | str = 1, range: tuple[int | float, int |float] | list=(0, 1), resolution: int | float =0.1, expand: bool = True , size=(None, None)):
+def Element(type: eType, key: str, callback=None, value: bool| int | float | str = 1, range: tuple[int | float, int |float] | list=(0, 1), resolution: int | float =0.1, expand: bool = True , size=(None, None), text: str | None = None):
     element = None
 
     disabled = False
@@ -72,17 +73,20 @@ def Element(type: eType, key: str, callback=None, value: bool| int | float | str
         element = sg.Button(button_text=key, key = key, expand_x = expand, metadata = callback)
 
     elif type == eType.CHCK :
-        element = sg.Checkbox(text = key, key = key, default = bool(value), metadata = callback, enable_events=enable_events, disabled=disabled)
+        # Use 'text' parameter if provided for display, otherwise fall back to 'key'
+        display_text = text if text is not None else key
+        element = sg.Checkbox(text = display_text, key = key, default = bool(value), metadata = callback, enable_events=enable_events, disabled=disabled)
 
     elif type == eType.SLDR:
-        if size == (None, None): size = (24, 8)
+        if size == (None, None): size = (20, 8)
         element = sg.Slider(key = key, default_value = value,  range = range,  resolution = resolution,
                              expand_x=expand, orientation='h', metadata = callback,
-                             enable_events=enable_events, disabled=disabled, size = (24,8))
+                             enable_events=enable_events, disabled=disabled, size = (20,8))
     elif type == eType.ITXT :
         if size == (None, None): size = (10,1)
+        # Disable live events - only trigger callback on Return key or focus loss
         element = sg.InputText(key = key, default_text = str(value), size=size, expand_x=expand, metadata = callback,
-                               enable_events=enable_events, disabled=disabled)
+                               enable_events=False, disabled=disabled)
     elif type == eType.MLTL :
         if resolution > 1:
             element = sg.Multiline(key = key, default_text = str(value), expand_x=True, expand_y=False, size=(1, resolution), metadata = callback,
@@ -108,6 +112,13 @@ def UpdateWindow(window: sg.Window, exitCallback = None) -> bool:
     event, values = window.read(timeout=33) # type: ignore
     if event == 'Escape:27' or event == sg.WIN_CLOSED:
         return False
+    elif event == 'Return:16' or event == '\r':
+        # Return key pressed - trigger callback for focused InputText element
+        focused = window.find_element_with_focus()
+        if focused and type(focused) == sg.InputText:
+            callback = focused.metadata
+            if callback:
+                callback(values[focused.Key])
     elif not type(window.find_element(event, True)) == sg.ErrorElement:
         callback = window[event].metadata
         if callback:
@@ -182,6 +193,7 @@ class Gui(Thread):
         self.exit_callback = exitCallback
         self.messageQueue: Queue = Queue()
         self.layout: list = []
+        self.element_types: dict[str, eType] = {}  # Track element types by key
         self.running: bool = False
         self.defaultFrameWidth: int = 500
         self.allElementsLoaded: bool = False
@@ -252,6 +264,8 @@ class Gui(Thread):
         if self.running:
             print("add elements before start()")
             return
+        # Track element type for height calculation
+        self.element_types[key] = type
         aElement = Element(type, key, callback, value, range, resolution)
         if type == eType.BTTN or type == eType.CHCK:
             aElement = [aElement]
@@ -315,3 +329,66 @@ class Gui(Thread):
 
     def getDefaultFrameWidth(self) -> int:
         return self.defaultFrameWidth
+
+    def get_element_height(self, elem_type: eType) -> int:
+        """Get the height for a specific element type.
+
+        Args:
+            elem_type: The element type to get height for
+
+        Returns:
+            Height in pixels (50 for sliders, 40 for everything else)
+        """
+        if elem_type == eType.SLDR:
+            return SLIDERHEIGHT
+        return ELEMHEIGHT
+
+    def calculate_total_elements_height(self) -> int:
+        """Calculate total height of all tracked elements.
+
+        Returns:
+            Total height in pixels including base height
+        """
+        total_height = BASEHEIGHT
+
+        for key, elem_type in self.element_types.items():
+            total_height += self.get_element_height(elem_type)
+
+        return total_height
+
+    def get_tracked_element_count(self) -> int:
+        """Get the number of tracked elements."""
+        return len(self.element_types)
+
+    def calculate_frame_height(self, element_list: list) -> int:
+        """Calculate the required height for a frame based on its elements.
+
+        Args:
+            element_list: List of element rows (same format passed to Frame())
+
+        Returns:
+            Total height in pixels including base height
+        """
+        total_height = BASEHEIGHT
+
+        for row in element_list:
+            if isinstance(row, list):
+                # Row of elements - check each element for type
+                row_has_slider = False
+                for elem in row:
+                    # Check if it's a slider element
+                    if hasattr(elem, 'Key') and hasattr(elem, 'Type'):
+                        # PySimpleGUI element - check metadata or type
+                        if 'Slider' in str(type(elem).__name__):
+                            row_has_slider = True
+                            break
+
+                if row_has_slider:
+                    total_height += SLIDERHEIGHT
+                else:
+                    total_height += ELEMHEIGHT
+            else:
+                # Single element
+                total_height += ELEMHEIGHT
+
+        return total_height

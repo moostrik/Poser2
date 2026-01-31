@@ -98,11 +98,25 @@ class ExampleConfig(ConfigBase):
     )
 
     def setup_watchers(self) -> None:
-        """Setup watchers to print value changes."""
+        """Setup watchers to print value changes.
+
+        Demonstrates listener optimization:
+        - Global watcher: Fires on ANY field change
+        - Specific watchers: Fire ONLY when their field changes
+
+        Example: When 'enabled' changes:
+        - Global watcher fires → prints "Something changed!"
+        - Enabled watcher fires → prints "Enabled: True/False"
+        - Strength/render_mode watchers DO NOT fire (optimization!)
+        """
         # Watch all changes
         self.watch(lambda: print(f"[ExampleConfig] Something changed!"))
 
-        # Watch normal fields
+        # Watch specific fields (only fire when their field changes)
         self.watch(lambda val: print(f"[ExampleConfig] Enabled: {val}"), 'enabled')
         self.watch(lambda val: print(f"[ExampleConfig] Strength: {val}"), 'strength')
+        self.watch(lambda val: print(f"[ExampleConfig] Threshold: {val}"), 'threshold')
+        self.watch(lambda val: print(f"[ExampleConfig] Name: {val}"), 'name')
         self.watch(lambda val: print(f"[ExampleConfig] Render mode: {val.name}"), 'render_mode')
+        self.watch(lambda val: print(f"[ExampleConfig] Quality: {val.name}"), 'quality')
+        self.watch(lambda val: print(f"[ExampleConfig] Custom value: {val}"), 'custom_value')
