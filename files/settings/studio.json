@@ -42,8 +42,8 @@
     "pose_resolution": "STANDARD",
     "flow_resolution": "EXTREME",
     "model_path": "models",
-    "confidence_high": 0.55,
     "confidence_low": 0.45,
+    "confidence_high": 0.55,
     "verbose": true,
     "crop_expansion": 0.1,
     "segmentation_enabled": true,
@@ -52,12 +52,12 @@
   },
 
   "pd_stream": {
-    "max_poses": 1,
-    "stream_capacity": 300,
+    "max_poses": 3,
+    "stream_capacity": 230,
     "stream_sample_rate": 100,
-    "corr_rate": 100,
+    "corr_rate": 23.0,
     "corr_num_workers": 8,
-    "corr_buffer_duration": 90,
+    "corr_buffer_duration": 69,
     "corr_stream_timeout": 2.0,
     "corr_max_nan_ratio": 0.15,
     "corr_dtw_band": 10,
@@ -79,6 +79,60 @@
     "num_players": 3,
     "data_type": "pose_I"
   },
+
+  "artnet_leds": [
+    {
+      "verbose": true,
+      "ip_address": "192.168.1.100",
+      "universe": 0,
+      "fps": 40,
+      "r": 1.0,
+      "g": 0.0,
+      "b": 0.0,
+      "num_pixels": 30,
+      "channel_order": "RGBW",
+      "bar_left_inverted": false,
+      "bar_right_inverted": false,
+      "enabled": true,
+      "white": 0.5,
+      "color": 0.5,
+      "bar": 0.5
+    },
+    {
+      "verbose": true,
+      "ip_address": "192.168.1.100",
+      "universe": 0,
+      "fps": 40,
+      "r": 1.0,
+      "g": 0.0,
+      "b": 0.0,
+      "num_pixels": 30,
+      "channel_order": "RGBW",
+      "bar_left_inverted": false,
+      "bar_right_inverted": false,
+      "enabled": true,
+      "white": 0.5,
+      "color": 0.5,
+      "bar": 0.5
+    },
+    {
+      "verbose": true,
+      "ip_address": "192.168.1.100",
+      "universe": 0,
+      "fps": 40,
+      "r": 1.0,
+      "g": 0.0,
+      "b": 0.0,
+      "num_pixels": 30,
+      "channel_order": "RGBW",
+      "bar_left_inverted": false,
+      "bar_right_inverted": false,
+      "enabled": true,
+      "white": 0.5,
+      "color": 0.5,
+      "bar": 0.5
+    }
+  ],
 
   "render": {
     "title": "Poser",

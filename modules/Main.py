@@ -11,8 +11,7 @@ from modules.Settings import Settings
 from modules.DataHub import DataHub, DataHubType
 from modules.gui import Gui
 from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
-from modules.inout import SoundOsc
-from modules.ExampleConfig import ExampleConfig
+from modules.inout import SoundOsc, ArtNetLed, ArtNetLedConfig, SelectedColor, ChannelOrder
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers, similarity
@@ -28,11 +27,6 @@ class Main():
 
         self.is_running: bool = False
         self.is_finished: bool = False
-
-        # EXAMPLE CONFIG - Demonstrates all ConfigBase features
-        self.example_config = ExampleConfig(device_id=1, buffer_size=2048)
-        self.example_config.setup_watchers()  # Setup watchers to print changes
-        self.example_gui = ConfigGuiGenerator(self.example_config, self.gui, "EXAMPLE CONFIG")
 
         # CAMERA
         self.cameras: list[DepthCam | DepthSimulator] = []
@@ -59,6 +53,15 @@ class Main():
         # DATA
         self.data_hub = DataHub()
         self.sound_osc = SoundOsc(self.data_hub, settings.sound_osc)
+
+        # ARTNET LED CONTROLLERS
+        self.artnet_configs = settings.artnet_leds
+        self.artnet_controllers = [ArtNetLed(cfg) for cfg in self.artnet_configs]
+        self.artnet_guis = [
+            ConfigGuiGenerator(self.artnet_configs[0], self.gui, "ArtNet Bar 1"),
+            ConfigGuiGenerator(self.artnet_configs[1], self.gui, "ArtNet Bar 2"),
+            ConfigGuiGenerator(self.artnet_configs[2], self.gui, "ArtNet Bar 3"),
+        ]
 
         # RENDER
         self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
@@ -259,6 +262,9 @@ class Main():
         self.sound_osc.start()
         self.data_hub.add_update_callback(self.sound_osc.notify_update)
 
+        for artnet in self.artnet_controllers:
+            artnet.start()
+
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
         self.gui.exit_callback = self.stop
 
@@ -269,13 +275,14 @@ class Main():
             else:
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
-        self.gui.addFrame([self.example_gui.frame])
         self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame(), self.motion_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.simil_gui.get_gui_frame()])
         self.gui.addFrame([self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame])
+        self.gui.addFrame([self.artnet_guis[2].frame])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])
@@ -317,6 +324,10 @@ class Main():
 
         self.tracker.stop()
         self.sound_osc.stop()
+
+        for artnet in self.artnet_controllers:
+            artnet.stop()
+
         self.point_extractor.stop()
         self.pose_similator.stop()
 
