@@ -10,7 +10,9 @@ from modules.render.HDTRenderManager import HDTRenderManager
 from modules.Settings import Settings
 from modules.DataHub import DataHub, DataHubType
 from modules.gui import Gui
+from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
 from modules.inout import SoundOsc
+from modules.ExampleConfig import ExampleConfig
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers, similarity
@@ -26,6 +28,11 @@ class Main():
 
         self.is_running: bool = False
         self.is_finished: bool = False
+
+        # EXAMPLE CONFIG - Demonstrates all ConfigBase features
+        self.example_config = ExampleConfig(device_id=1, buffer_size=2048)
+        self.example_config.setup_watchers()  # Setup watchers to print changes
+        self.example_gui = ConfigGuiGenerator(self.example_config, self.gui, "EXAMPLE CONFIG")
 
         # CAMERA
         self.cameras: list[DepthCam | DepthSimulator] = []
@@ -262,6 +269,7 @@ class Main():
             else:
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
+        self.gui.addFrame([self.example_gui.frame])
         self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])

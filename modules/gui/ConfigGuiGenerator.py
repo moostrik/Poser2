@@ -70,10 +70,6 @@ class ConfigGuiGenerator:
         min_val = metadata.get("min")
         max_val = metadata.get("max")
 
-        # Readonly fields → Display as text only
-        if metadata["readonly"]:
-            return [E(eT.TEXT, label), E(eT.TEXT, str(value))]
-
         # Enum → Combo box
         if isinstance(field_type, type) and issubclass(field_type, Enum):
             choices = [e.name for e in field_type]
@@ -86,7 +82,7 @@ class ConfigGuiGenerator:
         # Numeric with range → Slider
         elif field_type in (int, float) and min_val is not None and max_val is not None:
             resolution = 0.01 if field_type == float else 1
-            return [E(eT.TEXT, label), E(eT.SLDR, key, self._make_setter(field_name, field_type), value, [min_val, max_val], resolution)]
+            return [E(eT.TEXT, label), E(eT.SLDR, key, self._make_setter(field_name, field_type), value, [min_val, max_val], resolution, expand=False)]
 
         # Numeric without range → Input text
         elif field_type in (int, float):

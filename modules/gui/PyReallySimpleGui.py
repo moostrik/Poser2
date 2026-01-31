@@ -75,12 +75,12 @@ def Element(type: eType, key: str, callback=None, value: bool| int | float | str
         element = sg.Checkbox(text = key, key = key, default = bool(value), metadata = callback, enable_events=enable_events, disabled=disabled)
 
     elif type == eType.SLDR:
-        if size == (None, None): size = (12, 10)
+        if size == (None, None): size = (24, 8)
         element = sg.Slider(key = key, default_value = value,  range = range,  resolution = resolution,
                              expand_x=expand, orientation='h', metadata = callback,
-                             enable_events=enable_events, disabled=disabled, size = (12,10))
+                             enable_events=enable_events, disabled=disabled, size = (24,8))
     elif type == eType.ITXT :
-        if size == (None, None): size = (5,1)
+        if size == (None, None): size = (10,1)
         element = sg.InputText(key = key, default_text = str(value), size=size, expand_x=expand, metadata = callback,
                                enable_events=enable_events, disabled=disabled)
     elif type == eType.MLTL :

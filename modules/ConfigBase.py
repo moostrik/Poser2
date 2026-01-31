@@ -8,7 +8,9 @@ from __future__ import annotations
 import threading
 import warnings
 from dataclasses import dataclass, fields, field, Field, MISSING
-from typing import Any, Callable, overload
+from typing import Any, Callable, overload, TypeVar
+
+T = TypeVar('T')
 
 
 # Valid metadata keys for config fields
@@ -18,28 +20,29 @@ METADATA_KEYS = {
     "label",        # Custom display label (auto-generated if omitted)
     "min",          # Minimum value (GUI hint)
     "max",          # Maximum value (GUI hint)
-    "readonly",     # Field cannot be modified after __post_init__
 }
 
 
 # Helper function for creating config fields - for external use only
+# Alternative names: cfield, cfg_field, meta_field, param
 def config_field(
-    default: Any = MISSING,
+    default: T = MISSING,
     *,
     default_factory: Any = MISSING,
     description: str = "",
     label: str | None = None,
     min: float | int | None = None,
     max: float | int | None = None,
-    readonly: bool = False,
     fixed: bool = False,
     init: bool = True,
     repr: bool = True,
     hash: bool | None = None,
     compare: bool = True,
     kw_only: bool = False,
-) -> Field:
+) -> T:
     """Create a config field with metadata.
+
+    Note: Returns Field at runtime but typed as T for type checker compatibility.
 
     Args:
         default: Default value
@@ -48,7 +51,6 @@ def config_field(
         label: Custom display label (auto-generated if omitted)
         min: Minimum value hint for GUI (not enforced)
         max: Maximum value hint for GUI (not enforced)
-        readonly: Field cannot be modified via assignment
         fixed: Field can be set during __init__, then becomes locked
         init: Include field in __init__ signature
         repr: Include field in __repr__ output
@@ -71,12 +73,10 @@ def config_field(
         metadata["min"] = min
     if max is not None:
         metadata["max"] = max
-    if readonly:
-        metadata["readonly"] = True
     if fixed:
         metadata["fixed"] = True
 
-    return field(
+    return field(  # type: ignore[return-value]
         default=default,
         default_factory=default_factory,
         init=init,
@@ -123,12 +123,8 @@ class ConfigBase:
             # Fixed field - set at init, then locked
             device_id: int = config_field(0, fixed=True, description="Camera device ID")
 
-            # Readonly field - never writable via assignment
-            actual_fps: float = config_field(30.0, readonly=True, description="Measured frame rate")
-
     Metadata flags:
         - fixed: Field can be set during __init__, but becomes readonly after
-        - readonly: Field cannot be modified via assignment (use object.__setattr__)
         - min/max: Hints for GUI, not enforced
         - description: Field documentation
         - label: Custom display name (auto-generated from field name if omitted)
@@ -136,7 +132,7 @@ class ConfigBase:
     Features:
         - Thread-safe change notification via listeners
         - GUI metadata with auto-generated labels from field names
-        - Fixed and readonly fields are automatically marked as non-editable in GUI
+        - Fixed fields are automatically hidden from GUI
     """
 
     def __post_init__(self) -> None:
@@ -144,8 +140,8 @@ class ConfigBase:
         object.__setattr__(self, '_listeners', set())
         object.__setattr__(self, '_lock', threading.Lock())
 
-        # Track which fields are locked (readonly or fixed)
-        locked_fields: set[str] = set()
+        # Track which fields are fixed
+        fixed_set: set[str] = set()
         for f in fields(self):
             # Validate metadata uses only known keys
             for key in f.metadata:
@@ -157,9 +153,9 @@ class ConfigBase:
                         stacklevel=2
                     )
 
-            # Add to locked fields if readonly or fixed
-            if f.metadata.get('readonly') or f.metadata.get('fixed'):
-                locked_fields.add(f.name)
+            # Add to fixed fields if fixed
+            if f.metadata.get('fixed'):
+                fixed_set.add(f.name)
 
             # Validate metadata: check if default values are within min/max ranges
             if 'min' in f.metadata and 'max' in f.metadata:
@@ -173,18 +169,18 @@ class ConfigBase:
                         stacklevel=2
                     )
 
-        object.__setattr__(self, '_locked_fields', locked_fields)
+        object.__setattr__(self, '_fixed_fields', fixed_set)
         object.__setattr__(self, '_initialized', True)
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Intercept attribute changes for validation and notification.
 
         Only allows setting declared dataclass fields.
-        Enforces readonly and fixed constraints after __post_init__.
+        Enforces fixed constraints after __post_init__.
         Notifies listeners after successful assignment.
 
         Raises:
-            AttributeError: If field is undeclared, readonly, or fixed.
+            AttributeError: If field is undeclared, or fixed.
         """
         # Skip internal attributes
         if name.startswith('_'):
@@ -204,7 +200,7 @@ class ConfigBase:
             return
 
         # Check write constraints (after initialization)
-        if name in self._locked_fields: # type: ignore
+        if name in self._fixed_fields: # type: ignore
             raise AttributeError(f"Cannot modify field '{name}'")
 
         # Thread-safe attribute setting (after initialization)
@@ -347,7 +343,6 @@ class ConfigBase:
             result[f.name].setdefault("description", "")
             result[f.name].setdefault("min", None)
             result[f.name].setdefault("max", None)
-            result[f.name].setdefault("readonly", False)
             result[f.name].setdefault("fixed", False)
 
         # Return specific attribute or all
