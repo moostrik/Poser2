@@ -11,7 +11,7 @@ from modules.Settings import Settings
 from modules.DataHub import DataHub, DataHubType
 from modules.gui import Gui
 from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
-from modules.inout import OscSound, ArtNetLed, ArtNetLedConfig, SelectedColor, ChannelOrder
+from modules.inout import OscSound, ArtNetLed
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers, similarity

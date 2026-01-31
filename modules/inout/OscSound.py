@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from threading import Thread, Event
 from time import perf_counter
+import ipaddress
+import subprocess
 
 import numpy as np
 from pythonosc.udp_client import SimpleUDPClient
@@ -43,6 +45,10 @@ class OscSound:
         self._thread: Thread | None = None
         # Initialize inactive message counts for all players
         self._inactive_message_counts: dict[int, int] = {id: 0 for id in range(self._config.num_players)}
+
+        # Validate IP in background thread (non-blocking)
+        validation_thread = Thread(target=self._validate_ip_background, daemon=True)
+        validation_thread.start()
 
         # Pre-build inactive messages for all players
         self._inactive_messages: dict[int, list[OscBundle]] = {}
@@ -188,7 +194,6 @@ class OscSound:
             similarity_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(similarity_reset_msg.build()) # type: ignore
 
-
     @ staticmethod
     def _build_active_message(pose: Frame, bundle_builder: OscBundleBuilder, m_s: list[float] ) -> None:
         id: int = pose.track_id
@@ -234,3 +239,33 @@ class OscSound:
         for similarity in similarity_values:
             similarity_msg.add_arg(similarity, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(similarity_msg.build()) # type: ignore
+
+    # IP VALIDATION
+    def _validate_ip_background(self) -> None:
+        """Validate IP reachability in background thread (non-blocking)."""
+        if not OscSound._validate_ip(self._config.ip_addresses):
+            print(f"OscSound WARNING: Invalid IP address format: {self._config.ip_addresses}")
+        elif not OscSound._ping_ip(self._config.ip_addresses):
+            print(f"OscSound WARNING: IP {self._config.ip_addresses} is not reachable (ping failed). Device may appear later.")
+
+    @staticmethod
+    def _ping_ip(ip_address: str) -> bool:
+        """Ping IP address to check if host is reachable."""
+        try:
+            result = subprocess.run(
+                ['ping', '-n', '1', '-w', '500', ip_address],
+                capture_output=True,
+                timeout=2.0
+            )
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, Exception):
+            return False
+
+    @staticmethod
+    def _validate_ip(ip_address: str) -> bool:
+        """Validate IP address format."""
+        try:
+            ipaddress.ip_address(ip_address)
+            return True
+        except ValueError:
+            return False
