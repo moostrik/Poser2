@@ -5,13 +5,13 @@ import time
 from collections import deque
 
 from modules.cam.depthcam.Definitions import FrameType
-from modules.cam.Settings import Settings
+from modules.cam.Config import Config
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class FrameSyncBang:
 
-    def __init__(self, settings: Settings, verbose: bool = False, stream_name: str = '') -> None:
+    def __init__(self, settings: Config, verbose: bool = False, stream_name: str = '') -> None:
         num_cams: int = settings.num
         self.verbose: bool = verbose
         self.stream_name: str = stream_name

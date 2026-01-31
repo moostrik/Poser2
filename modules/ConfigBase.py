@@ -3,10 +3,89 @@
 Uses dataclasses with field metadata for range constraints and GUI integration.
 """
 
+from __future__ import annotations
+
 import threading
 import warnings
-from dataclasses import dataclass, fields, field, MISSING
+from dataclasses import dataclass, fields, field, Field, MISSING
 from typing import Any, Callable, overload
+
+
+# Valid metadata keys for config fields
+METADATA_KEYS = {
+    "description",  # Field description for tooltips/help
+    "fixed",        # Field can be set at init, then becomes readonly
+    "label",        # Custom display label (auto-generated if omitted)
+    "min",          # Minimum value (GUI hint)
+    "max",          # Maximum value (GUI hint)
+    "readonly",     # Field cannot be modified after __post_init__
+}
+
+
+# Helper function for creating config fields - for external use only
+def config_field(
+    default: Any = MISSING,
+    *,
+    default_factory: Any = MISSING,
+    description: str = "",
+    label: str | None = None,
+    min: float | int | None = None,
+    max: float | int | None = None,
+    readonly: bool = False,
+    fixed: bool = False,
+    init: bool = True,
+    repr: bool = True,
+    hash: bool | None = None,
+    compare: bool = True,
+    kw_only: bool = False,
+) -> Field:
+    """Create a config field with metadata.
+
+    Args:
+        default: Default value
+        default_factory: Factory function for mutable defaults
+        description: Field description for tooltips/help
+        label: Custom display label (auto-generated if omitted)
+        min: Minimum value hint for GUI (not enforced)
+        max: Maximum value hint for GUI (not enforced)
+        readonly: Field cannot be modified via assignment
+        fixed: Field can be set during __init__, then becomes locked
+        init: Include field in __init__ signature
+        repr: Include field in __repr__ output
+        hash: Include field in __hash__ calculation
+        compare: Include field in comparison operations
+        kw_only: Make field keyword-only in __init__
+
+    Examples:
+        >>> enabled: bool = config_field(True, description="Enable feature")
+        >>> strength: float = config_field(1.0, min=0.0, max=10.0, description="Strength")
+        >>> device_id: int = config_field(0, fixed=True, description="Camera device")
+        >>> internal: int = config_field(0, repr=False, compare=False)
+    """
+    metadata = {}
+    if description:
+        metadata["description"] = description
+    if label:
+        metadata["label"] = label
+    if min is not None:
+        metadata["min"] = min
+    if max is not None:
+        metadata["max"] = max
+    if readonly:
+        metadata["readonly"] = True
+    if fixed:
+        metadata["fixed"] = True
+
+    return field(
+        default=default,
+        default_factory=default_factory,
+        init=init,
+        repr=repr,
+        hash=hash,
+        compare=compare,
+        kw_only=kw_only,
+        metadata=metadata
+    )
 
 
 def _generate_label(name: str) -> str:
@@ -37,14 +116,27 @@ class ConfigBase:
     Example:
         @dataclass
         class MyConfig(ConfigBase):
-            enabled: bool = field(default=True)
-            strength: int = field(default=1, metadata={"min": 0, "max": 10, "description": "MyConfig strength"})
-            threshold: float = field(default=0.1, metadata={"min": 0.0, "max": 1.0, "description": "MyConfig threshold"})
+            # Normal field - can change anytime
+            enabled: bool = config_field(True, description="Enable feature")
+            strength: float = config_field(1.0, min=0.0, max=10.0, description="Strength")
+
+            # Fixed field - set at init, then locked
+            device_id: int = config_field(0, fixed=True, description="Camera device ID")
+
+            # Readonly field - never writable via assignment
+            actual_fps: float = config_field(30.0, readonly=True, description="Measured frame rate")
+
+    Metadata flags:
+        - fixed: Field can be set during __init__, but becomes readonly after
+        - readonly: Field cannot be modified via assignment (use object.__setattr__)
+        - min/max: Hints for GUI, not enforced
+        - description: Field documentation
+        - label: Custom display name (auto-generated from field name if omitted)
 
     Features:
         - Thread-safe change notification via listeners
         - GUI metadata with auto-generated labels from field names
-        - min/max values are hints for GUI, not enforced by this class
+        - Fixed and readonly fields are automatically marked as non-editable in GUI
     """
 
     def __post_init__(self) -> None:
@@ -52,8 +144,24 @@ class ConfigBase:
         object.__setattr__(self, '_listeners', set())
         object.__setattr__(self, '_lock', threading.Lock())
 
-        # Validate metadata: check if default values are within min/max ranges
+        # Track which fields are locked (readonly or fixed)
+        locked_fields: set[str] = set()
         for f in fields(self):
+            # Validate metadata uses only known keys
+            for key in f.metadata:
+                if key not in METADATA_KEYS:
+                    warnings.warn(
+                        f"{self.__class__.__name__}.{f.name}: unknown metadata key '{key}' "
+                        f"(valid keys: {', '.join(METADATA_KEYS)})",
+                        UserWarning,
+                        stacklevel=2
+                    )
+
+            # Add to locked fields if readonly or fixed
+            if f.metadata.get('readonly') or f.metadata.get('fixed'):
+                locked_fields.add(f.name)
+
+            # Validate metadata: check if default values are within min/max ranges
             if 'min' in f.metadata and 'max' in f.metadata:
                 val = getattr(self, f.name)
                 min_val, max_val = f.metadata['min'], f.metadata['max']
@@ -65,14 +173,18 @@ class ConfigBase:
                         stacklevel=2
                     )
 
-    def __setattr__(self, name: str, value: Any) -> None:
-        """Intercept attribute changes and notify listeners.
+        object.__setattr__(self, '_locked_fields', locked_fields)
+        object.__setattr__(self, '_initialized', True)
 
-        Note: Values are not clamped. min/max metadata are hints for GUI only.
-        Only declared dataclass fields can be set.
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Intercept attribute changes for validation and notification.
+
+        Only allows setting declared dataclass fields.
+        Enforces readonly and fixed constraints after __post_init__.
+        Notifies listeners after successful assignment.
 
         Raises:
-            AttributeError: If attempting to set an undeclared attribute.
+            AttributeError: If field is undeclared, readonly, or fixed.
         """
         # Skip internal attributes
         if name.startswith('_'):
@@ -84,20 +196,23 @@ class ConfigBase:
         if name not in field_names:
             raise AttributeError(
                 f"Cannot set undeclared attribute '{name}' on {self.__class__.__name__}. "
-                f"Only declared dataclass fields can be modified."
             )
 
-        object.__setattr__(self, name, value)
+        if not hasattr(self, '_initialized'):
+            # During __init__, allow setting any attribute
+            object.__setattr__(self, name, value)
+            return
 
-        # Notify listeners
-        if hasattr(self, '_listeners'):
-            self._notify()
+        # Check write constraints (after initialization)
+        if name in self._locked_fields: # type: ignore
+            raise AttributeError(f"Cannot modify field '{name}'")
 
-    def _notify(self) -> None:
-        """Notify all listeners that config has changed."""
+        # Thread-safe attribute setting (after initialization)
         with self._lock:  # type: ignore
-            listeners_copy: list[Callable] = list(self._listeners)  # type: ignore
+            object.__setattr__(self, name, value)
+            listeners_copy = list(self._listeners) # type: ignore
 
+        # Notify listeners OUTSIDE lock to prevent deadlock
         for listener in listeners_copy:
             listener()
 
@@ -128,9 +243,9 @@ class ConfigBase:
             AttributeError: If the specified attribute does not exist.
 
         Warning:
-            Avoid creating infinite loops by modifying config values inside callbacks.
-            When using with GUI frameworks like NiceGUI, prefer read-only operations
-            in callbacks (e.g., updating UI elements) rather than writing back to config.
+            Listeners are called OUTSIDE the lock to prevent deadlock.
+            Avoid infinite loops - listeners can safely modify other config fields.
+            For GUI updates, prefer read-only operations in callbacks.
 
         Examples:
             >>> # Watch all changes
@@ -160,7 +275,7 @@ class ConfigBase:
             if attribute not in field_names:
                 raise AttributeError(
                     f"Attribute '{attribute}' not found in {self.__class__.__name__}. "
-                    f"Available attributes: {', '.join(sorted(field_names))}"
+                    f"Available attributes: {', '.join(field_names)}"
                 )
 
             # Watch specific attribute
@@ -177,43 +292,41 @@ class ConfigBase:
             return unwatch
 
     @overload
-    @classmethod
-    def info(cls, attribute: None = None) -> dict[str, dict[str, Any]]:
+    def info(self, attribute: None = None) -> dict[str, dict[str, Any]]:
         """Get metadata for all attributes."""
         ...
 
     @overload
-    @classmethod
-    def info(cls, attribute: str) -> dict[str, Any]:
+    def info(self, attribute: str) -> dict[str, Any]:
         """Get metadata for a specific attribute."""
         ...
 
-    @classmethod
-    def info(cls, attribute: str | None = None) -> dict[str, Any] | dict[str, dict[str, Any]]:
-        """Get config metadata for GUI generation.
+    def info(self, attribute: str | None = None) -> dict[str, Any] | dict[str, dict[str, Any]]:
+        """Get field metadata for GUI generation.
 
         Args:
-            attribute: Optional attribute name. If provided, returns metadata for that
-                      attribute only. If None, returns metadata for all attributes.
+            attribute: Optional field name. If provided, returns metadata for that
+                      field only. If None, returns metadata for all fields.
 
         Returns:
-            If attribute is None: Dictionary mapping all attribute names to their metadata
-            If attribute given: Dictionary with metadata for that single attribute
+            Dictionary with field metadata including both user-defined metadata
+            and system-computed values (type, default, value).
 
-            Metadata includes: type, default, min, max, label, description, etc.
-            Labels are auto-generated from names (e.g., min_cutoff -> "Min Cutoff").
+            If attribute is None: {field_name: {metadata_dict}, ...}
+            If attribute given: {metadata_dict}
 
         Raises:
-            AttributeError: If the specified attribute does not exist.
+            AttributeError: If the specified field does not exist.
 
         Examples:
-            >>> OpticalFlowConfig.info()
-            {"strength": {"type": float, "default": 3.0, "min": 0.1, ...}, ...}
-            >>> OpticalFlowConfig.info('strength')
-            {"type": float, "default": 3.0, "min": 0.1, "max": 10.0, "label": "Strength", ...}
+            >>> config = OpticalFlowConfig()
+            >>> config.info()
+            {"strength": {"type": float, "default": 3.0, "value": 3.0, "min": 0.1, ...}, ...}
+            >>> config.info('strength')
+            {"type": float, "default": 3.0, "value": 3.0, "min": 0.1, "max": 10.0, ...}
         """
         result: dict[str, dict[str, Any]] = {}
-        for f in fields(cls):
+        for f in fields(self):
             # Get default value properly
             if f.default is not MISSING:
                 default_val = f.default
@@ -222,17 +335,24 @@ class ConfigBase:
             else:
                 default_val = None
 
+            # User metadata first, then protected system keys override
             result[f.name] = {
+                **f.metadata,
                 "type": f.type,
                 "default": default_val,
-                **f.metadata,
-                "label": f.metadata.get("label", _generate_label(f.name)),
-                "description": f.metadata.get("description", "")
+                "value": getattr(self, f.name),
             }
+            # Add standard keys with defaults only if not present
+            result[f.name].setdefault("label", _generate_label(f.name))
+            result[f.name].setdefault("description", "")
+            result[f.name].setdefault("min", None)
+            result[f.name].setdefault("max", None)
+            result[f.name].setdefault("readonly", False)
+            result[f.name].setdefault("fixed", False)
 
         # Return specific attribute or all
         if attribute is not None:
             if attribute not in result:
-                raise AttributeError(f"Attribute '{attribute}' not found in {cls.__name__}")
+                raise AttributeError(f"Attribute '{attribute}' not found in {self.__class__.__name__}")
             return result[attribute]
         return result

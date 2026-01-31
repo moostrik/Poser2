@@ -10,11 +10,11 @@ from pythonosc.udp_client import SimpleUDPClient
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 
-from modules.cam.Settings import Settings
+from modules.cam.Config import Config
 
 
 class SyncRecorderGui(SyncRecorder):
-    def __init__(self, gui: Gui, settings: Settings) -> None:
+    def __init__(self, gui: Gui, settings: Config) -> None:
         self.gui: Gui = gui
         super().__init__(settings)
 

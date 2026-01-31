@@ -6,7 +6,7 @@ from enum import Enum, auto
 from numpy import ndarray
 from queue import Queue, Empty
 
-from modules.cam.Settings import Settings
+from modules.cam.Config import Config
 from modules.cam.recorder.FFmpegRecorder import FFmpegRecorder
 from modules.cam.depthcam.Definitions import FrameType, FRAME_TYPE_LABEL_DICT
 
@@ -16,7 +16,7 @@ def make_file_name(c: int, t: FrameType, chunk: int, format: str) -> str:
 def make_folder_name(num_cams: int, square: bool, color: bool, stereo: bool, group_id: str ="") -> str:
     return time.strftime("%Y%m%d-%H%M%S") + '_' + str(num_cams) + ('_square' if square else '_wide') + ('_color' if color else '_mono') + ('_stereo' if stereo else '') + '_' + group_id
 
-def is_folder_for_settings(name: str, settings: Settings) -> bool:
+def is_folder_for_settings(name: str, settings: Config) -> bool:
     parts: list[str] = name.split('_')
     if len(parts) < 2:
         return False
@@ -30,16 +30,16 @@ def is_folder_for_settings(name: str, settings: Settings) -> bool:
         return True
     return False
 
-EncoderString: dict[Settings.CoderFormat, dict[Settings.CoderType, str]] = {
-    Settings.CoderFormat.H264: {
-        Settings.CoderType.CPU:  'libx264',
-        Settings.CoderType.GPU:  'h264_nvenc',
-        Settings.CoderType.iGPU: 'h264_qsv'
+EncoderString: dict[Config.CoderFormat, dict[Config.CoderType, str]] = {
+    Config.CoderFormat.H264: {
+        Config.CoderType.CPU:  'libx264',
+        Config.CoderType.GPU:  'h264_nvenc',
+        Config.CoderType.iGPU: 'h264_qsv'
     },
-    Settings.CoderFormat.H265: {
-        Settings.CoderType.CPU:  'libx265',
-        Settings.CoderType.GPU:  'hevc_nvenc',
-        Settings.CoderType.iGPU: 'hevc_qsv'
+    Config.CoderFormat.H265: {
+        Config.CoderType.CPU:  'libx265',
+        Config.CoderType.GPU:  'hevc_nvenc',
+        Config.CoderType.iGPU: 'hevc_qsv'
     }
 }
 
@@ -50,12 +50,12 @@ class RecState(Enum):
     STOP =  auto()
 
 class SyncRecorder(Thread):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Config) -> None:
         super().__init__()
         self.output_path: Path = Path(settings.video_path)
         self.temp_path: Path = Path(settings.temp_path)
 
-        self.settings: Settings = settings
+        self.settings: Config = settings
 
         self.recorders: dict[int, dict[FrameType, FFmpegRecorder]] = {}
         self.fps: dict[int, float] = {}

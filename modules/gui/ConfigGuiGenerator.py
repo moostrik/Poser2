@@ -4,6 +4,7 @@ Temporary bridge to existing PyReallySimpleGui until NiceGUI migration.
 Generates frames with automatic two-way binding.
 """
 
+from enum import Enum, IntEnum
 from typing import Any, Callable
 from modules.gui.PyReallySimpleGui import Gui, eType as eT, Element as E, Frame, BASEHEIGHT, ELEMHEIGHT, FrameWidget
 from modules.ConfigBase import ConfigBase
@@ -45,13 +46,7 @@ class ConfigGuiGenerator:
         elements = []
 
         for field_name, metadata in self.config.info().items():
-            field_type = metadata["type"]
-            label = metadata["label"]
-            min_val = metadata.get("min")
-            max_val = metadata.get("max")
-            current_value = getattr(self.config, field_name)
-
-            row = self._create_element_row(field_name, field_type, label, current_value, min_val, max_val)
+            row = self._create_element_row(field_name, metadata)
             if row:
                 elements.append(row)
 
@@ -60,14 +55,29 @@ class ConfigGuiGenerator:
     def _create_element_row(
         self,
         field_name: str,
-        field_type: type,
-        label: str,
-        value: Any,
-        min_val: Any,
-        max_val: Any
+        metadata: dict[str, Any]
     ) -> list | None:
         """Create a GUI element row for a field."""
         key = f"{self.name}_{field_name}"
+
+        # Skip fixed fields - set at init only, no runtime interaction
+        if metadata["fixed"]:
+            return None
+
+        field_type = metadata["type"]
+        label = metadata["label"]
+        value = metadata["value"]
+        min_val = metadata.get("min")
+        max_val = metadata.get("max")
+
+        # Readonly fields → Display as text only
+        if metadata["readonly"]:
+            return [E(eT.TEXT, label), E(eT.TEXT, str(value))]
+
+        # Enum → Combo box
+        if isinstance(field_type, type) and issubclass(field_type, Enum):
+            choices = [e.name for e in field_type]
+            return [E(eT.TEXT, label), E(eT.CMBO, key, self._make_setter(field_name, field_type), value.name if isinstance(value, Enum) else value, choices, expand=False)]
 
         # Boolean → Checkbox
         if field_type == bool:
@@ -94,7 +104,10 @@ class ConfigGuiGenerator:
         """Create setter callback: GUI → Config."""
         def setter(value: Any) -> None:
             # Type conversion
-            if field_type == bool:
+            if isinstance(field_type, type) and issubclass(field_type, Enum):
+                # Convert enum name back to enum member
+                converted = field_type[value]
+            elif field_type == bool:
                 converted = bool(value)
             elif field_type == int:
                 converted = int(float(value))
@@ -111,12 +124,18 @@ class ConfigGuiGenerator:
 
     def _setup_watchers(self) -> None:
         """Setup watchers: Config → GUI updates."""
-        for field_name in self.config.info().keys():
+        for field_name, metadata in self.config.info().items():
+            # Skip fixed fields - they never change after init
+            if metadata["fixed"]:
+                continue
+
             key = f"{self.name}_{field_name}"
 
-            def make_watcher(elem_key: str) -> Callable[[Any], None]:
+            def make_watcher(elem_key: str, field_type: type) -> Callable[[Any], None]:
                 def watcher(value: Any) -> None:
-                    self.gui.updateElement(elem_key, value, useCallback=False)
+                    # Convert enum to its name for GUI display
+                    display_value = value.name if isinstance(value, Enum) else value
+                    self.gui.updateElement(elem_key, display_value, useCallback=False)
                 return watcher
 
-            self.config.watch(make_watcher(key), field_name)
+            self.config.watch(make_watcher(key, metadata["type"]), field_name)

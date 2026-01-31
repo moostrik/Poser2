@@ -6,7 +6,7 @@ from enum import Enum, auto
 from queue import Queue
 from time import sleep
 
-from modules.cam.Settings import Settings
+from modules.cam.Config import Config
 from modules.cam.depthcam.Definitions import FrameType, FrameCallback
 from modules.cam.depthplayer.FFmpegPlayer import FFmpegPlayer
 from modules.cam.recorder.SyncRecorder import make_file_name, is_folder_for_settings
@@ -20,16 +20,16 @@ class State(Enum):
     STOPPING = auto()
     NEXT = auto()
 
-HwaccelString: dict[Settings.CoderType, str] = {
-    Settings.CoderType.CPU:  '',
-    Settings.CoderType.GPU:  'd3d12va',
-    Settings.CoderType.iGPU: 'd3d12va'
+HwaccelString: dict[Config.CoderType, str] = {
+    Config.CoderType.CPU:  '',
+    Config.CoderType.GPU:  'd3d12va',
+    Config.CoderType.iGPU: 'd3d12va'
 }
 
-HwaccelDeviceString: dict[Settings.CoderType, str] = {
-    Settings.CoderType.CPU:  '',
-    Settings.CoderType.GPU:  '0',
-    Settings.CoderType.iGPU: '1'
+HwaccelDeviceString: dict[Config.CoderType, str] = {
+    Config.CoderType.CPU:  '',
+    Config.CoderType.GPU:  '0',
+    Config.CoderType.iGPU: '1'
 }
 
 class MessageType(Enum):
@@ -51,7 +51,7 @@ class Folder():
 FolderDict = Dict[str, Folder]
 
 class SyncPlayer(Thread):
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Config) -> None:
         super().__init__()
         self.input_path: Path = Path(settings.video_path)
         self.num_cams: int = settings.num
@@ -362,7 +362,7 @@ class SyncPlayer(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _get_video_folders(settings: Settings) -> FolderDict :
+    def _get_video_folders(settings: Config) -> FolderDict :
         folders: FolderDict = {}
         video_path: Path = Path(settings.video_path)
         for folder in video_path.iterdir():
@@ -371,7 +371,7 @@ class SyncPlayer(Thread):
                     continue
                 max_chunk: int = -1
                 for file in folder.iterdir():
-                    if file.is_file() and (file.name.endswith(Settings.CoderFormat.H264.value) or file.name.endswith(Settings.CoderFormat.H265.value)):
+                    if file.is_file() and (file.name.endswith(Config.CoderFormat.H264.value) or file.name.endswith(Config.CoderFormat.H265.value)):
                         n: str = file.stem.split('_')[2]
                         if n.isdigit():
                             max_chunk = max(max_chunk, int(n))

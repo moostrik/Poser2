@@ -4,7 +4,7 @@ from modules.gui.PyReallySimpleGui import Element as E, Frame, BASEHEIGHT, ELEMH
 
 class SyncPlayerGui(SyncPlayer):
 
-    def __init__(self, gui: Gui | None, settings: Settings) -> None:
+    def __init__(self, gui: Gui | None, settings: Config) -> None:
         self.gui: Gui | None = gui
         super().__init__(settings)
 

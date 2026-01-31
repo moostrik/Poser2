@@ -14,15 +14,16 @@ from modules.pose.features.AngleSymmetry import SymmetryElement, AggregationMeth
 from modules.pose.similarity import SimilarityBatch, SimilarityFeature, AggregationMethod
 
 from modules.DataHub import DataHub, DataHubType
+from modules.ConfigBase import ConfigBase
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 @dataclass
-class SoundOscConfig:
-    ip_addresses: str = field(default_factory=lambda: "127.0.0.1")
-    port: int = field(default=9000)
-    num_players: int = field(default=8)
-    data_type: DataHubType = field(default=DataHubType.pose_I)
+class SoundOscConfig(ConfigBase):
+    ip_addresses: str = field(default_factory=lambda: "127.0.0.1", metadata={"description": "Target OSC IP address"})
+    port: int = field(default=9000, metadata={"min": 1024, "max": 65535, "description": "Target OSC port"})
+    num_players: int = field(default=8, metadata={"min": 1, "max": 16, "description": "Number of pose tracking slots"})
+    data_type: DataHubType = field(default=DataHubType.pose_I, metadata={"description": "Data source type from DataHub"})
 
 
 class SoundOsc:

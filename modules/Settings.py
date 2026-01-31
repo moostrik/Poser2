@@ -8,8 +8,8 @@ from typing import Any, TypeVar, cast
 from typing_extensions import get_args, get_origin
 
 
-from modules.cam.Settings import Settings as CamSettings
-from modules.gui.PyReallySimpleGui import GuiSettings
+from modules.cam.Config import Config as CamConfig
+from modules.gui.PyReallySimpleGui import GuiConfig
 from modules.inout import SoundOscConfig
 from modules.render.Settings import Settings as RenderSettings
 from modules.pose.Settings import Settings as PoseSettings, ModelType
@@ -25,14 +25,14 @@ class Settings():
     tracker_type: TrackerType = field(default=TrackerType.ONEPERCAM)
 
     # CAMERA SETTINGS
-    camera: CamSettings = CamSettings()
+    camera: CamConfig = CamConfig()
 
     # POSE SETTINGS
     pose: PoseSettings = PoseSettings()
     pd_stream: PDStreamSettings = PDStreamSettings()
 
     # GUI SETTINGS
-    gui: GuiSettings = GuiSettings()
+    gui: GuiConfig = GuiConfig()
 
     # INOUT SETTINGS
     sound_osc: SoundOscConfig = SoundOscConfig()

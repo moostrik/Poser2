@@ -8,14 +8,16 @@ from pythonosc.udp_client import SimpleUDPClient
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 
-@dataclass
-class ControlOscConfig:
-    port_in: int = field(default=9000)
-    ip_address_in: str = field(default_factory=lambda: "127.0.0.1")
+from modules.ConfigBase import ConfigBase
 
-    return_messages: bool = field(default=True)
-    port_out: int = field(default=9001)
-    ip_address_out: str = field(default_factory=lambda: "127.0.0.1")
+@dataclass
+class ControlOscConfig(ConfigBase):
+    port_in: int = field(default=9000, metadata={"min": 1024, "max": 65535, "description": "Incoming OSC port"})
+    ip_address_in: str = field(default_factory=lambda: "127.0.0.1", metadata={"description": "Incoming OSC IP address"})
+
+    return_messages: bool = field(default=True, metadata={"description": "Echo received messages back to sender"})
+    port_out: int = field(default=9001, metadata={"min": 1024, "max": 65535, "description": "Outgoing OSC port"})
+    ip_address_out: str = field(default_factory=lambda: "127.0.0.1", metadata={"description": "Outgoing OSC IP address"})
 
 
 @dataclass

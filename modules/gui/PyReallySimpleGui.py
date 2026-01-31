@@ -7,6 +7,8 @@ import glob
 from queue import Queue, Empty
 from time import sleep
 
+from modules.ConfigBase import ConfigBase
+
 FrameWidget = sg.Frame
 
 BASEHEIGHT = 35
@@ -43,7 +45,7 @@ class qMessage:
         self.useCallback = useCallback
 
 @dataclass
-class GuiSettings:
+class GuiConfig(ConfigBase):
     title: str = field(default="Unknown")
     on_top: bool = field(default=True)
     location_x: int = field(default=0)
@@ -166,7 +168,7 @@ def PopUp(window: sg.Window, text: str, duration: float = 1) -> None:
         sg.popup(text, location=location)
 
 class Gui(Thread):
-    def __init__(self, settings: GuiSettings, exitCallback = None) -> None:
+    def __init__(self, settings: GuiConfig, exitCallback = None) -> None:
         super().__init__()
         sg.theme('DarkBlack')
         sg.set_options(font=("consolas", 10))

@@ -9,7 +9,7 @@ from numpy import ndarray
 from typing import Set
 from threading import Thread, Event
 
-from modules.cam.Settings import Settings
+from modules.cam.Config import Config
 from modules.cam.depthcam.Pipeline import setup_pipeline, get_frame_types, PerspectiveConfig
 from modules.cam.depthcam.Definitions import *
 from modules.cam.depthcam.CoreSettings import CoreSettings
@@ -20,7 +20,7 @@ class Core(Thread):
     _id_counter = 0
     _pipeline: dai.Pipeline | None = None
 
-    def __init__(self, gui, device_id: str, general_settings:Settings) -> None:
+    def __init__(self, gui, device_id: str, general_settings:Config) -> None:
         super().__init__()
         self.stop_event = Event()
         self.running: bool = False
