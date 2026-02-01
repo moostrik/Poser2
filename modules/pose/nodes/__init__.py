@@ -21,4 +21,6 @@ from .filters.Validators import                 ValidatorConfig,    BBoxValidato
 from .interpolators.ChaseInterpolators import   ChaseInterpolatorConfig,    BBoxChaseInterpolator,  PointChaseInterpolator, AngleChaseInterpolator, AngleVelChaseInterpolator,  AngleSymChaseInterpolator,  SimilarityChaseInterpolator
 from .interpolators.LerpInterpolators import    LerpInterpolatorConfig,     BBoxLerpInterpolator,   PointLerpInterpolator,  AngleLerpInterpolator,  AngleVelLerpInterpolator,   AngleSymLerpInterpolator
 
+from modules.pose.nodes.windows.WindowNode import AngleMotionWindowNode, AngleSymmetryWindowNode, AngleVelocityWindowNode, AngleWindowNode, BBoxWindowNode, FeatureWindow, WindowNode, WindowNodeConfig
+
 # from .processors.ImageCropProcessor import      ImageCropProcessorConfig,   ImageCropProcessor

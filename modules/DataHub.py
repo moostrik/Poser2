@@ -144,10 +144,7 @@ class DataHub:
         """Store GPU frame data. Expects GPUFrameDict from GPUCropProcessor."""
         self.set_dict(DataHubType.gpu_frames, gpu_frames)
 
-    def set_feature_buffer(self, buffer_output: tuple[Tensor, Tensor]) -> None:
-        """Store feature buffer (values, mask) GPU tensors."""
-        self.set_item(DataHubType.feature_buffer, 0, buffer_output)
-
+    # WINDOWS
     def set_angle_windows(self, windows) -> None:
         """Store angle feature windows. Expects dict[int, FeatureWindow]."""
         self.set_dict(DataHubType.angle_window, windows)
@@ -156,8 +153,25 @@ class DataHub:
         """Store angle velocity feature windows. Expects dict[int, FeatureWindow]."""
         self.set_dict(DataHubType.angle_vel_window, windows)
 
+    def set_angle_motion_windows(self, windows) -> None:
+        """Store angle motion feature windows. Expects dict[int, FeatureWindow]."""
+        self.set_dict(DataHubType.angle_motion_window, windows)
+
+    def set_angle_symmetry_windows(self, windows) -> None:
+        """Store angle symmetry feature windows. Expects dict[int, FeatureWindow]."""
+        self.set_dict(DataHubType.angle_sym_window, windows)
+
+    def set_bbox_windows(self, windows) -> None:
+        """Store bounding box feature windows. Expects dict[int, FeatureWindow]."""
+        self.set_dict(DataHubType.bbox_window, windows)
+
+    # DEPRICATED WINDOWS
     def set_pd_stream(self, pd_stream: PDStreamData) -> None:
         self.set_item(DataHubType.pd_stream, pd_stream.track_id, pd_stream)
+
+    def set_feature_buffer(self, buffer_output: tuple[Tensor, Tensor]) -> None:
+        """Store feature buffer (values, mask) GPU tensors."""
+        self.set_item(DataHubType.feature_buffer, 0, buffer_output)
 
     # TYPE-SPECIFIC SETTERS WITHOUT KEY
     def set_pose_similarity(self, value: SimilarityBatch) -> None:

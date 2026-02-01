@@ -100,6 +100,11 @@ class Texture():
         self.format: Constant = GL_NONE
         self.data_type: Constant = GL_NONE
         self.tex_id = 0
+        # Store filter settings for reallocation
+        self._wrap_s: int = GL_CLAMP_TO_EDGE
+        self._wrap_t: int = GL_CLAMP_TO_EDGE
+        self._min_filter: int = GL_LINEAR
+        self._mag_filter: int = GL_LINEAR
 
     @property
     def texture(self) -> 'Texture':
@@ -122,6 +127,12 @@ class Texture():
             min_filter: Minification filter (default: GL_LINEAR)
             mag_filter: Magnification filter (default: GL_LINEAR)
         """
+        # Store filter settings for future reallocations
+        self._wrap_s = wrap_s
+        self._wrap_t = wrap_t
+        self._min_filter = min_filter
+        self._mag_filter = mag_filter
+        
         data_type: Constant = get_data_type(internal_format)
         if data_type == GL_NONE: return
 

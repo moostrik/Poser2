@@ -7,7 +7,7 @@ from typing import Generic, TypeVar
 import numpy as np
 
 from modules.pose.Frame import Frame, FrameField
-from modules.pose.features import BaseFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Points2D
+from modules.pose.features import BaseScalarFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Points2D
 from modules.pose.nodes.Nodes import NodeBase, NodeConfigBase
 
 
@@ -61,7 +61,7 @@ class WindowNodeConfig(NodeConfigBase):
         self.emit_partial = emit_partial  # If False, only emit when window is full
 
 
-TFeature = TypeVar('TFeature', bound=BaseFeature)
+TFeature = TypeVar('TFeature', bound=BaseScalarFeature)
 
 
 class WindowNode(NodeBase, Generic[TFeature]):
@@ -201,10 +201,6 @@ def AngleWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[Angles
 def AngleVelocityWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[AngleVelocity]:
     """Angular velocity trajectories - shape (time, 9)."""
     return WindowNode(FrameField.angle_vel, config)
-
-def Points2DWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[Points2D]:
-    """2D keypoint trajectories - shape (time, 17) for 17 body points."""
-    return WindowNode(FrameField.points, config)
 
 def AngleMotionWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[AngleMotion]:
     """Angular motion magnitude - shape (time, 9)."""

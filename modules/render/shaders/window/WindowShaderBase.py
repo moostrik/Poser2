@@ -53,6 +53,7 @@ class WindowShaderBase(Shader):
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
         glUniform1i(self.get_uniform_loc("tex0"), 0)
+        glUniform2f(self.get_uniform_loc("tex_size"), float(tex0.width), float(tex0.height))
         glUniform1f(self.get_uniform_loc("sample_step"), 1.0 / num_samples)
         glUniform1i(self.get_uniform_loc("num_streams"), num_streams)
         glUniform1f(self.get_uniform_loc("stream_step"), 1.0 / num_streams)

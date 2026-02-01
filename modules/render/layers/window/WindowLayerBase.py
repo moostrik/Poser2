@@ -8,7 +8,7 @@ from OpenGL.GL import *  # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
 from modules.gl import Fbo, Texture, Blit, Image, clear_color
-from modules.pose.nodes.windows import FeatureWindow
+from modules.pose.nodes import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.render.shaders.window import WindowShaderBase
 
@@ -30,14 +30,16 @@ class WindowLayerBase(LayerBase):
     - render_labels_static(fbo) - render feature name labels overlay
     """
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: DataHubType) -> None:
+    def __init__(self, track_id: int, data_hub: DataHub, data_type: DataHubType, line_width: float) -> None:
         """Initialize feature window layer.
 
         Args:
             track_id: Track ID to visualize
             data_hub: DataHub instance for data access
             data_type: DataHubType enum value for window data (e.g., angle_vel_window)
+            line_width: Width of the lines to draw
         """
+
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._data_type: DataHubType = data_type
@@ -48,6 +50,7 @@ class WindowLayerBase(LayerBase):
         self._data_cache: DataCache[FeatureWindow] = DataCache()
 
         self.draw_labels: bool = True
+        self.line_width: float = 3.0
 
         self._shader: WindowShaderBase = self.get_shader()
 
@@ -132,7 +135,7 @@ class WindowLayerBase(LayerBase):
             self._image.texture,
             num_samples,
             num_streams,
-            line_width=3 / self._fbo.height,
+            line_width=self.line_width / self._fbo.height,
             output_aspect_ratio=output_aspect,
             display_range=display_range
         )

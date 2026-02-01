@@ -22,8 +22,8 @@ class AngleMtnWindowLayer(WindowLayerBase):
     via DataHub per-track windows.
     """
 
-    def __init__(self, track_id: int, data_hub: DataHub) -> None:
-        super().__init__(track_id, data_hub, DataHubType.angle_motion_window)
+    def __init__(self, track_id: int, data_hub: DataHub, line_width: float) -> None:
+        super().__init__(track_id, data_hub, DataHubType.angle_motion_window, line_width)
 
     def get_shader(self) -> WindowShaderBase:
         """Return PoseAngleMotionWindow shader instance."""

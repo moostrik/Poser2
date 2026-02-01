@@ -67,9 +67,13 @@ class Layers(IntEnum):
     # GPU frame layers
     gpu_crop =      auto()
     frg_src =       auto()
+
+    # Window layers
     angle_W =       auto()
     angle_vel_W =   auto()
     angle_mtn_W =   auto()
+    angle_sym_W =   auto()
+    bbox_W =        auto()
 
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
@@ -175,7 +179,7 @@ FINAL_LAYERS: list[Layers] = [
     Layers.centre_pose,
     # Layers.angle_W,
     # Layers.angle_vel_W,
-    Layers.angle_mtn_W,
+    # Layers.angle_mtn_W,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -202,6 +206,8 @@ class HDTRenderManager(RenderBase):
 
         # camera layers
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
+
+        self.line_width: float = 3.0
 
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
@@ -237,9 +243,11 @@ class HDTRenderManager(RenderBase):
             gpu_crop =      self.L[Layers.gpu_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
             frg_src =       self.L[Layers.frg_src][i]=      ls.ForegroundSourceLayer(i, self.data_hub)
 
-            angle_W =       self.L[Layers.angle_W][i] =     ls.AngleWindowLayer(  i, self.data_hub)
-            angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer(  i, self.data_hub)
-            angle_mtn_W =   self.L[Layers.angle_mtn_W][i] = ls.AngleMtnWindowLayer(  i, self.data_hub)
+            angle_W =       self.L[Layers.angle_W][i] =     ls.AngleWindowLayer(  i, self.data_hub, self.line_width)
+            angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer(  i, self.data_hub, self.line_width)
+            angle_mtn_W =   self.L[Layers.angle_mtn_W][i] = ls.AngleMtnWindowLayer(  i, self.data_hub, self.line_width)
+            # angle_sym_W =   self.L[Layers.angle_sym_W][i] = ls.AngleSymWindowLayer(  i, self.data_hub)
+            # bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub)
 
         # global layers
         self.pose_sim_layer =   ls.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, ls.AggregationMethod.MAX, 2.0)
@@ -306,6 +314,7 @@ class HDTRenderManager(RenderBase):
                     layer.update()
 
 
+
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
@@ -340,11 +349,14 @@ class HDTRenderManager(RenderBase):
                 self.L[layer_type][i].draw()
             self.L[Layers.centre_cam][i].use_mask = True #type: ignore
             self.L[Layers.centre_mask][i].blur_steps = 0 #type: ignore
+            self.L[Layers.angle_W][i].line_width = 1.0 #type: ignore
 
         self._draw_layers = FINAL_LAYERS
         # self._draw_layers = BOX_LAYERS
         self._preview_layers = PREVIEW_LAYERS
 
+
+        # self.line_width = 100.0
 
         # self.pose_sim_layer.aggregation_method = ls.AggregationMethod.HARMONIC_MEAN
 

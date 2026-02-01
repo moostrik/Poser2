@@ -103,8 +103,7 @@ class Main():
         self.simil_gui =            guis.SimilarityExtractorGui(self.simil_config, self.gui, 'SIMILARITY')
 
         # WINDOW TRACKER CONFIGURATION
-        self.angle_window_config =      trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps), emit_partial=True)
-        self.angle_vel_window_config =  trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps), emit_partial=True)
+        self.window_config =      trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps), emit_partial=True)
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
@@ -124,9 +123,11 @@ class Main():
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
         # WINDOW TRACKERS
-        self.angle_window_tracker =     trackers.AngleWindowTracker(num_players, self.angle_window_config)
-        self.angle_vel_window_tracker = trackers.AngleVelocityWindowTracker(num_players, self.angle_vel_window_config)
-        self.angle_mot_window_tracker = trackers.AngleMotionWindowTracker(num_players, self.angle_window_config)
+        self.angle_window_tracker =     trackers.AngleWindowTracker(num_players, self.window_config)
+        self.angle_vel_window_tracker = trackers.AngleVelocityWindowTracker(num_players, self.window_config)
+        self.angle_mot_window_tracker = trackers.AngleMotionWindowTracker(num_players, self.window_config)
+        self.angle_sim_window_tracker = trackers.AngleSymmetryWindowTracker(num_players, self.window_config)
+        self.bbox_window_tracker =      trackers.BBoxWindowTracker(num_players, self.window_config)
 
         self.bbox_filters =      trackers.FilterTracker(
             settings.num_players,
@@ -154,6 +155,7 @@ class Main():
                 lambda: nodes.PointEuroSmoother(self.point_smooth_config),
                 nodes.AngleExtractor,
                 lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
+                # lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=False)),
                 nodes.AngleVelExtractor,
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
@@ -250,19 +252,25 @@ class Main():
 
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
-        self.pose_smooth_filters.add_poses_callback(self.angle_window_tracker.process)
-        self.pose_smooth_filters.add_poses_callback(self.angle_vel_window_tracker.process)
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_S)) # smooth poses
-
-        self.angle_window_tracker.add_window_callback(self.data_hub.set_angle_windows)
-        self.angle_vel_window_tracker.add_window_callback(self.data_hub.set_angle_vel_windows)
 
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
         self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_I)) # interpolated poses
 
+        # WINDOW TRACKERS
+        self.pose_smooth_filters.add_poses_callback(self.angle_window_tracker.process)
+        self.pose_smooth_filters.add_poses_callback(self.angle_vel_window_tracker.process)
+        self.pose_smooth_filters.add_poses_callback(self.angle_mot_window_tracker.process)
+        self.pose_smooth_filters.add_poses_callback(self.angle_sim_window_tracker.process)
+        self.pose_smooth_filters.add_poses_callback(self.bbox_window_tracker.process)
 
+        self.angle_window_tracker.add_window_callback(self.data_hub.set_angle_windows)
+        self.angle_vel_window_tracker.add_window_callback(self.data_hub.set_angle_vel_windows)
+        self.angle_mot_window_tracker.add_window_callback(self.data_hub.set_angle_motion_windows)
+        self.angle_sim_window_tracker.add_window_callback(self.data_hub.set_angle_symmetry_windows)
+        self.bbox_window_tracker.add_window_callback(self.data_hub.set_bbox_windows)
 
         self.data_hub.add_update_callback(self.interpolator.update)
         self.point_extractor.start()
