@@ -3,7 +3,7 @@ import numpy as np
 from modules.pose.features import Angles, AngleLandmark
 
 
-class SimilarityUtils:
+class FrameUtils:
     """Utilities for comparing poses and computing similarity metrics."""
 
     @staticmethod
@@ -89,7 +89,7 @@ class SimilarityUtils:
             ... )
         """
         # Compute similarity with confidence scores
-        sim = SimilarityUtils.compute_similarity(angles1, angles2, exponent)
+        sim = FrameUtils.compute_similarity(angles1, angles2, exponent)
 
         # Apply weights and confidence threshold
         weighted_sum = 0.0

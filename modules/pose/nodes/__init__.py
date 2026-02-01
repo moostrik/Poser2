@@ -6,7 +6,7 @@ from .extractors.AngleMotionExtractor import    AngleMotionExtractor
 from .extractors.AngleSymExtractor import       AngleSymExtractor
 from .extractors.AgeExtractor import            AgeExtractor
 from .extractors.MotionTimeExtractor import     MotionTimeExtractor
-from .extractors.SimilarityExtractor import     SimilarityExtractorConfig,  SimilarityExtractor,    AggregationMethod
+from .extractors.SimilarityExtractor import     SimilarityExtractorConfig,  SimilarityExtractor,   AggregationMethod
 
 from .filters.ConfidenceFilters import          ConfidenceFilterConfig,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfFilter
 from .filters.DualConfidenceFilters import      DualConfFilterConfig,       BBoxDualConfFilter,     PointDualConfFilter,    AngleDualConfFilter,    AngleVelDualConfFilter,     AngleSymDualConfidenceFilter

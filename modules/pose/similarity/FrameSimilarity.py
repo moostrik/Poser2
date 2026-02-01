@@ -13,13 +13,13 @@ from modules.pose.similarity.features.SimilarityFeature import SimilarityFeature
 from modules.pose.similarity.features.SimilarityBatch import SimilarityBatch, SimilarityBatchCallback
 
 
-from modules.pose.similarity._utils.SimilarityUtils import SimilarityUtils
+from modules.pose.similarity._utils.FrameUtils import FrameUtils
 from modules.pose.Frame import FrameDict
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class SimilarityComputer:
+class FrameSimilarity:
     """Computes pairwise pose similarities in a background thread.
 
     Processes pose angle data from active tracklets and computes similarity metrics
@@ -101,7 +101,7 @@ class SimilarityComputer:
         similarities: list[SimilarityFeature] = []
         for (id1, angles_1), (id2, angles_2) in combinations(angles.items(), 2):
             # Compute similarity scores
-            similarity_data: Angles = SimilarityUtils.compute_similarity(angles_1, angles_2, 1.0) # do exponent at retreival
+            similarity_data: Angles = FrameUtils.compute_similarity(angles_1, angles_2, 1.0) # do exponent at retreival
 
             # Only include pairs with at least one valid joint
             # if similarity_data.valid_count > 0:

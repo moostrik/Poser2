@@ -117,7 +117,9 @@ class Main():
         # self.rolling_angles_config = batch.RollingFeatureBufferConfig(num_tracks=num_players, window_size= int(4.5 * settings.camera.fps))  # 5 seconds of history
         # self.rolling_angles =       batch.RollingFeatureBuffer(self.rolling_angles_config)
 
-        self.pose_similator=        similarity.SimilarityComputer()
+        self.pose_similator=        similarity.FrameSimilarity()
+        self.window_similator_config = similarity.WindowSimilarityConfig(window_length=int(5), stride_length=int(0.2 * settings.camera.fps))
+        self.window_similator=      similarity.WindowSimilarity(self.window_similator_config)
         self.pose_similarity_extractor = nodes.SimilarityExtractor(self.simil_config)
 
         self.debug_tracker =        trackers.DebugTracker(num_players)
@@ -231,9 +233,14 @@ class Main():
         self.pd_pose_streamer.add_stream_callback(self.data_hub.set_pd_stream)
         self.pd_pose_streamer.start()
 
-        self.pose_similator.add_correlation_callback(self.data_hub.set_pose_similarity)
-        self.pose_similator.add_correlation_callback(self.pose_similarity_extractor.submit)
-        self.pose_similator.start()
+        # self.pose_similator.add_correlation_callback(self.data_hub.set_pose_similarity)
+        # self.pose_similator.add_correlation_callback(self.pose_similarity_extractor.submit)
+        # self.pose_similator.start()
+
+        self.window_similator.add_callback(self.data_hub.set_pose_similarity)
+        self.window_similator.add_callback(self.pose_similarity_extractor.submit)
+        self.window_similator.start()
+
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets.add_poses_callback(self.bbox_filters.process)
@@ -253,7 +260,7 @@ class Main():
 
 
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
-        self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
+        # self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_S)) # smooth poses
 
@@ -269,6 +276,8 @@ class Main():
         self.pose_smooth_filters.add_poses_callback(self.bbox_window_tracker.process)
 
         self.angle_window_tracker.add_window_callback(self.data_hub.set_angle_windows)
+        self.angle_window_tracker.add_window_callback(self.window_similator.submit)
+
         self.angle_vel_window_tracker.add_window_callback(self.data_hub.set_angle_vel_windows)
         self.angle_mot_window_tracker.add_window_callback(self.data_hub.set_angle_motion_windows)
         self.angle_sim_window_tracker.add_window_callback(self.data_hub.set_angle_symmetry_windows)
@@ -366,7 +375,8 @@ class Main():
             artnet.stop()
 
         self.point_extractor.stop()
-        self.pose_similator.stop()
+        # self.pose_similator.stop()
+        self.window_similator.stop()
         # self.rolling_angles.stop()
 
         self.pd_pose_streamer.stop()
