@@ -113,6 +113,13 @@ class WindowLayerBase(LayerBase):
         values = window.values.T.astype(np.float32)  # (feature_len, time)
         mask = window.mask.astype(np.float32).T      # (feature_len, time)
 
+        # DEBUG: Print values and mask stats
+        print(f"Track {self._track_id} {self._data_type.name}:")
+        print(f"  Values shape: {values.shape}, min: {np.nanmin(values):.3f}, max: {np.nanmax(values):.3f}, mean: {np.nanmean(values):.3f}")
+        print(f"  Mask shape: {mask.shape}, sum: {np.sum(mask)}, nonzero: {np.count_nonzero(mask)}")
+        print(f"  Values sample: {values[:, -1]}")  # Last time step
+        print(f"  Mask sample: {mask[:, -1]}")
+
         # Stack as 2-channel RG texture
         stream_image = np.stack([values, mask], axis=-1)  # (feature_len, time, 2)
 

@@ -144,7 +144,7 @@ class Main():
                 lambda: nodes.PointDualConfFilter(nodes.DualConfFilterConfig(settings.pose.confidence_low, settings.pose.confidence_high)),
                 # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerConfig()),
                 nodes.AngleExtractor,
-                nodes.AngleVelExtractor,
+                lambda: nodes.AngleVelExtractor(fps=settings.camera.fps),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
             ]
         )
@@ -154,9 +154,11 @@ class Main():
             [
                 lambda: nodes.PointEuroSmoother(self.point_smooth_config),
                 nodes.AngleExtractor,
+                lambda: nodes.AngleVelExtractor(fps=settings.camera.fps),
+                lambda: nodes.AngleVelEuroSmoother(self.angle_smooth_config),
                 lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
                 # lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=False)),
-                nodes.AngleVelExtractor,
+                nodes.AngleMotionExtractor,
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
@@ -191,7 +193,7 @@ class Main():
         self.pose_interpolation_pipeline = trackers.FilterTracker(
             settings.num_players,
             [
-                nodes.AngleVelExtractor,
+                lambda: nodes.AngleVelExtractor(fps=settings.render.fps),
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,

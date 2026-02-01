@@ -60,7 +60,7 @@ void main() {
         vec3 color_even = vec3(1.0, 0.5, 0.0);
         vec3 color_odd = vec3(0.0, 1.0, 1.0);
         vec3 dot_color = (stream_id % 2 == 0) ? color_even : color_odd;
-        fragColor = vec4(dot_color, 1.0);
+        fragColor = vec4(dot_color, 0.5);
         return;
     }
 

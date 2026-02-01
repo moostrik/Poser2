@@ -126,7 +126,7 @@ PREVIEW_LAYERS: list[Layers] = [
 
     Layers.sim_blend,
     Layers.flow,
-    Layers.angle_vel_W,
+    # Layers.angle_vel_W,
 ]
 
 FINAL_LAYERS: list[Layers] = [
@@ -177,9 +177,10 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.cam_mask,
     # Layers.frg_src,
     Layers.centre_pose,
-    Layers.angle_W,
-    Layers.angle_vel_W,
-    # Layers.angle_mtn_W,
+    # Layers.angle_W,
+    # Layers.angle_vel_W,
+    Layers.angle_mtn_W,
+    Layers.motion_bar,
 ]
 
 BOX_LAYERS: list[Layers] = [

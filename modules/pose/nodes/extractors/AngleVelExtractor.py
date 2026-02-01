@@ -18,9 +18,10 @@ class AngleVelExtractor(FilterNode):
     Handles occlusion: Sets deltas to NaN when joints reappear after being invalid.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, fps: float) -> None:
         super().__init__()
         self._prev_pose: Frame | None = None
+        self._dt = 1.0 / fps
 
     def process(self, pose: Frame) -> Frame:
         # Compute deltas (or empty if no previous pose)
@@ -28,7 +29,7 @@ class AngleVelExtractor(FilterNode):
             angle_vel: AngleVelocity = AngleVelocity.create_dummy()
         else:
             # Compute time delta
-            dt: float = pose.time_stamp - self._prev_pose.time_stamp
+            dt: float = self._dt
 
             # print(dt)
 
