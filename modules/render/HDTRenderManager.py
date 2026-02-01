@@ -171,7 +171,7 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.cam_mask,
     # Layers.frg_src,
     Layers.centre_pose,
-    Layers.feature_buf,
+    # Layers.feature_buf,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -235,7 +235,7 @@ class HDTRenderManager(RenderBase):
             feature_buf =   self.L[Layers.feature_buf][i] = ls.FeatureBufferLayer(  i, self.data_hub)
 
         # global layers
-        self.pose_sim_layer =   ls.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, ls.AggregationMethod.HARMONIC_MEAN, 2.0)
+        self.pose_sim_layer =   ls.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, ls.AggregationMethod.MAX, 2.0)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
@@ -337,6 +337,8 @@ class HDTRenderManager(RenderBase):
         self._draw_layers = FINAL_LAYERS
         # self._draw_layers = BOX_LAYERS
         self._preview_layers = PREVIEW_LAYERS
+
+        self.pose_sim_layer.aggregation_method = ls.AggregationMethod.MEDIAN
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glViewport(0, 0, width, height)

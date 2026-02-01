@@ -69,7 +69,8 @@ class SimilarityExtractor(FilterNode):
             # print(similarity_feature)
 
             if similarity_feature is not None:
-                overall_sim: float = similarity_feature.aggregate(config.method, 0.0, config.exponent)
+                # overall_sim: float = similarity_feature.aggregate(config.method, 0.0, config.exponent)
+                overall_sim: float = similarity_feature.aggregate(AggregationMethod.MEAN, 0.0, config.exponent)
 
                 if not np.isnan(overall_sim):
                     values[other_idx] = overall_sim
@@ -77,5 +78,4 @@ class SimilarityExtractor(FilterNode):
                     valid_scores: np.ndarray = similarity_feature.scores[similarity_feature.valid_mask]
                     if len(valid_scores) > 0:
                         scores[other_idx] = np.mean(valid_scores)
-
         return Similarity(values, scores)

@@ -314,7 +314,7 @@ class SimilarityBatch:
         object.__setattr__(self, '_pair_lookup', lookup)
 
     def __repr__(self) -> str:
-        return f"SimilarityFeatureBatch({len(self)} pairs, timestamp={self.timestamp:.3f})"
+        return f"SimilarityFeatureBatch({len(self)} pairs, avg similarity={np.mean([sim.mean() for sim in self.similarities if not np.isnan(sim.mean())]):.3f})"
 
     def __len__(self) -> int:
         """Number of pairs in batch."""

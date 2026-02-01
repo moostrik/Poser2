@@ -26,7 +26,6 @@ class RollingFeatureBufferConfig(ConfigBase):
 
     The feature_length is derived from frame_field.get_length().
     """
-
     frame_field: FrameField = config_field(FrameField.angle_vel, fixed=True, description="Frame field to extract (must be a BaseScalarFeature)")
     window_size: int = config_field(100, fixed=True, min=16, max=1024, description="Temporal window size (number of frames to keep)")
     num_tracks: int = config_field(3,fixed=True, min=1, max=16, description="Maximum number of concurrent tracks")
@@ -152,6 +151,24 @@ class RollingFeatureBuffer(TypedCallbackMixin[BufferOutput]):
         self._notify_thread.start()
         self._started = True
 
+    def stop(self) -> None:
+        """Stop the async notification thread.
+
+        Waits for thread to finish current work before returning.
+        Safe to call multiple times or before start().
+        """
+        if not self._started:
+            return
+
+        self._shutdown_flag = True
+        self._notify_event.set()
+
+        if self._notify_thread is not None:
+            self._notify_thread.join(timeout=1.0)
+            if self._notify_thread.is_alive():
+                print(f"WARNING: {self._notify_thread.name} did not exit cleanly within timeout")
+
+        self._started = False
 
     def submit(self, poses: FrameDict) -> None:
         """Submit new frame data to staging buffer and signal async thread.
@@ -181,6 +198,19 @@ class RollingFeatureBuffer(TypedCallbackMixin[BufferOutput]):
                 self._staging_valid[track_id] = False
 
         # Signal async thread - done, return immediately
+        self._notify_event.set()
+
+    def reset(self) -> None:
+        """Reset all buffer data to initial state.
+
+        Sets flag for worker thread to perform reset on next cycle.
+        Non-blocking - returns immediately.
+        """
+        if not self._started:
+            return
+
+        # Signal worker to reset
+        self._reset_all_flag = True
         self._notify_event.set()
 
     def _process(self) -> None:
@@ -255,38 +285,6 @@ class RollingFeatureBuffer(TypedCallbackMixin[BufferOutput]):
 
             except Exception as e:
                 print(f"RollingFeatureBuffer notify worker error: {e}")
-
-    def reset(self) -> None:
-        """Reset all buffer data to initial state.
-
-        Sets flag for worker thread to perform reset on next cycle.
-        Non-blocking - returns immediately.
-        """
-        if not self._started:
-            return
-
-        # Signal worker to reset
-        self._reset_all_flag = True
-        self._notify_event.set()
-
-    def stop(self) -> None:
-        """Stop the async notification thread.
-
-        Waits for thread to finish current work before returning.
-        Safe to call multiple times or before start().
-        """
-        if not self._started:
-            return
-
-        self._shutdown_flag = True
-        self._notify_event.set()
-
-        if self._notify_thread is not None:
-            self._notify_thread.join(timeout=1.0)
-            if self._notify_thread.is_alive():
-                print(f"WARNING: {self._notify_thread.name} did not exit cleanly within timeout")
-
-        self._started = False
 
     def __repr__(self) -> str:
         return (

@@ -21,9 +21,10 @@ from .pose.PoseScalarBar import         PoseScalarBar
 from .pose.PoseValuesBar import         PoseValuesBar
 from .pose.PosePointDots import         PosePointDots
 from .pose.PosePointLines import        PosePointLines
+from .pose.PoseAngleWindow import       PoseAngleWindow
 
 from .stream.StreamCorrelation import   StreamCorrelation
-from .pose.PoseAngleWindow import          PoseAngleWindow
+from .stream.StreamPose import          StreamPose
 
 from.hdt.HDTTripleBlend import          HDTTripleBlend
 

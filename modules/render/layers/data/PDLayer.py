@@ -10,7 +10,7 @@ from modules.gl import Fbo, Texture, Image, Blit, clear_color, draw_box_string, 
 from modules.pose.features.Angles import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.pose.pd_stream.PDStream import PDStreamData
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import PoseAngleWindow as shader
+from modules.render.shaders import StreamPose as shader
 from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT, POSE_COLOR_CENTER
 
 from modules.utils.HotReloadMethods import HotReloadMethods

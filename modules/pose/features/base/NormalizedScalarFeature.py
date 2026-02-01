@@ -286,7 +286,7 @@ class NormalizedScalarFeature(BaseScalarFeature[FeatureEnum]):
             safe_values = np.where(confident_values > _TINY, confident_values, _TINY)
 
             # Weighted harmonic mean: sum(w) / sum(w/x)
-            return float(len(confident_values) / np.sum(1.0 / confident_values))
+            return float(len(safe_values) / np.sum(1.0 / safe_values))
 
         elif method == AggregationMethod.MIN:
             # Minimum value (no weighting applicable)
