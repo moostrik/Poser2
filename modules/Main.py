@@ -111,8 +111,8 @@ class Main():
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
 
         # Rolling feature buffer for temporal accumulation
-        self.feature_buffer_config = batch.RollingFeatureBufferConfig(num_tracks=num_players, window_size= int(5 * settings.camera.fps))  # 5 seconds of history
-        self.feature_buffer =       batch.RollingFeatureBuffer(self.feature_buffer_config)
+        self.rolling_angles_config = batch.RollingFeatureBufferConfig(num_tracks=num_players, window_size= int(2.5 * settings.camera.fps))  # 5 seconds of history
+        self.rolling_angles =       batch.RollingFeatureBuffer(self.rolling_angles_config)
 
         # Temporal correlation analyzer
         self.temporal_correlator_config = batch.TemporalCorrelatorConfig()
@@ -238,11 +238,11 @@ class Main():
 
         # self.pose_raw_filters.add_poses_callback(self.feature_buffer.submit)
 
-        self.feature_buffer.add_callback(self.data_hub.set_feature_buffer)
-        self.feature_buffer.add_callback(self.temporal_correlator.submit)
+        self.rolling_angles.add_callback(self.data_hub.set_feature_buffer)
+        self.rolling_angles.add_callback(self.temporal_correlator.submit)
 
 
-        self.feature_buffer.start()
+        self.rolling_angles.start()
         self.temporal_correlator.start()
         self.temporal_correlator.add_callback(self.pose_similarity_extractor.submit)
         self.temporal_correlator.add_callback(self.data_hub.set_pose_similarity)
@@ -253,7 +253,7 @@ class Main():
         self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_S)) # smooth poses
 
 
-        self.pose_smooth_filters.add_poses_callback(self.feature_buffer.submit)
+        self.pose_smooth_filters.add_poses_callback(self.rolling_angles.submit)
 
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
@@ -355,7 +355,7 @@ class Main():
         self.point_extractor.stop()
         # self.pose_similator.stop()
         self.temporal_correlator.stop()
-        self.feature_buffer.stop()
+        self.rolling_angles.stop()
 
         self.pd_pose_streamer.stop()
         if self.pd_stream_similator:
