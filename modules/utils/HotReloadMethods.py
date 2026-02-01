@@ -164,43 +164,13 @@ class HotReloadMethods:
 
     @staticmethod
     def _load_module(module_name: str, file_path: str) -> Optional[ModuleType]:
-        """Load a module from a file path, reloading in-place if already loaded."""
-        # First, try to find the original module in sys.modules to preserve package context
-        original_module: Optional[ModuleType] = None
-        original_module_name: Optional[str] = None
-        for mod_name, mod in sys.modules.items():
-            if hasattr(mod, '__file__') and mod.__file__ is not None:
-                if os.path.abspath(os.path.normcase(mod.__file__)).lower() == os.path.abspath(os.path.normcase(file_path)).lower():
-                    original_module = mod
-                    original_module_name = mod_name
-                    break
-
-        # Use original module name if found, otherwise use generated name
-        if original_module_name is not None:
-            module_name = original_module_name
-
+        """Load a module from a file path."""
         spec: Optional[ModuleSpec] = spec_from_file_location(module_name, file_path)
         if spec is None or spec.loader is None:
             print(f"[{HotReloadMethods.__name__}] Could not load spec from {file_path}")
             return None
 
-        # Reuse the original module if it exists to preserve all references
-        if original_module is not None:
-            module = original_module
-            # Clear the module's __dict__ but keep special attributes
-            keep_attrs = {'__name__', '__file__', '__loader__', '__spec__', '__package__', '__path__', '__cached__'}
-            module_dict = {k: v for k, v in module.__dict__.items() if k in keep_attrs}
-            module.__dict__.clear()
-            module.__dict__.update(module_dict)
-        else:
-            module = module_from_spec(spec)
-            # Try to infer package from file path
-            parts = os.path.normpath(file_path).split(os.sep)
-            if 'modules' in parts:
-                modules_index = parts.index('modules')
-                package_parts = parts[modules_index:-1]  # Exclude the filename
-                module.__package__ = '.'.join(package_parts)
-
+        module: ModuleType = module_from_spec(spec)
         sys.modules[module_name] = module
 
         try:
@@ -283,11 +253,6 @@ class HotReloadMethods:
     def _update_methods(target_class: Type[Any], methods_to_update: Dict[str, MethodInfo]) -> None:
         """Update methods that have changed."""
         for name, info in methods_to_update.items():
-            # Skip methods that use super() - they have __class__ cells that break on reload
-            if info.type == MethodType.INSTANCE and info.func.__closure__ and '__class__' in info.func.__code__.co_freevars:
-                print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Skip method (uses super): {name}")
-                continue
-
             print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Patch {info.type.name} method: {name}")
             if info.type == MethodType.STATIC:
                 setattr(target_class, name, staticmethod(info.func))
@@ -300,11 +265,6 @@ class HotReloadMethods:
     def _add_methods(target_class: Type[Any], methods_to_add: Dict[str, MethodInfo]) -> None:
         """Add methods that are new in the updated code."""
         for name, info in methods_to_add.items():
-            # Skip methods that use super() - they have __class__ cells that break on reload
-            if info.type == MethodType.INSTANCE and info.func.__closure__ and '__class__' in info.func.__code__.co_freevars:
-                print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Skip new method (uses super): {name}")
-                continue
-
             print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Add {info.type.name} method: {name}")
             if info.type == MethodType.STATIC:
                 setattr(target_class, name, staticmethod(info.func))

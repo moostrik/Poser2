@@ -102,6 +102,10 @@ class Main():
                                                                     exponent=2.0)
         self.simil_gui =            guis.SimilarityExtractorGui(self.simil_config, self.gui, 'SIMILARITY')
 
+        # WINDOW TRACKER CONFIGURATION
+        self.angle_window_config =      trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps), emit_partial=True)
+        self.angle_vel_window_config =  trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps), emit_partial=True)
+
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
@@ -111,18 +115,18 @@ class Main():
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
 
         # Rolling feature buffer for temporal accumulation
-        # self.rolling_angles_config = batch.RollingFeatureBufferConfig(num_tracks=num_players, window_size= int(2.5 * settings.camera.fps))  # 5 seconds of history
+        # self.rolling_angles_config = batch.RollingFeatureBufferConfig(num_tracks=num_players, window_size= int(4.5 * settings.camera.fps))  # 5 seconds of history
         # self.rolling_angles =       batch.RollingFeatureBuffer(self.rolling_angles_config)
-
-        # # Temporal correlation analyzer
-        # self.temporal_correlator_config = batch.TemporalCorrelatorConfig()
-        # self.temporal_correlator =  batch.TemporalCorrelator(self.temporal_correlator_config)
 
         self.pose_similator=        similarity.SimilarityComputer()
         self.pose_similarity_extractor = nodes.SimilarityExtractor(self.simil_config)
 
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
+        # WINDOW TRACKERS
+        self.angle_window_tracker =     trackers.AngleWindowTracker(num_players, self.angle_window_config)
+        self.angle_vel_window_tracker = trackers.AngleVelocityWindowTracker(num_players, self.angle_vel_window_config)
+        self.angle_mot_window_tracker = trackers.AngleMotionWindowTracker(num_players, self.angle_window_config)
 
         self.bbox_filters =      trackers.FilterTracker(
             settings.num_players,
@@ -238,22 +242,21 @@ class Main():
 
         # self.pose_raw_filters.add_poses_callback(self.feature_buffer.submit)
 
+
         # self.rolling_angles.add_callback(self.data_hub.set_feature_buffer)
-        # self.rolling_angles.add_callback(self.temporal_correlator.submit)
-
-
+        # self.pose_smooth_filters.add_poses_callback(self.rolling_angles.submit)
         # self.rolling_angles.start()
-        # self.temporal_correlator.start()
-        # self.temporal_correlator.add_callback(self.pose_similarity_extractor.submit)
-        # self.temporal_correlator.add_callback(self.data_hub.set_pose_similarity)
+
 
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
         self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
+        self.pose_smooth_filters.add_poses_callback(self.angle_window_tracker.process)
+        self.pose_smooth_filters.add_poses_callback(self.angle_vel_window_tracker.process)
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_S)) # smooth poses
 
-
-        # self.pose_smooth_filters.add_poses_callback(self.rolling_angles.submit)
+        self.angle_window_tracker.add_window_callback(self.data_hub.set_angle_windows)
+        self.angle_vel_window_tracker.add_window_callback(self.data_hub.set_angle_vel_windows)
 
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
@@ -354,7 +357,6 @@ class Main():
 
         self.point_extractor.stop()
         self.pose_similator.stop()
-        # self.temporal_correlator.stop()
         # self.rolling_angles.stop()
 
         self.pd_pose_streamer.stop()

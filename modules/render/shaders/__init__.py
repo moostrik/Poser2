@@ -21,7 +21,10 @@ from .pose.PoseScalarBar import         PoseScalarBar
 from .pose.PoseValuesBar import         PoseValuesBar
 from .pose.PosePointDots import         PosePointDots
 from .pose.PosePointLines import        PosePointLines
-from .pose.PoseAngleWindow import       PoseAngleWindow
+
+from .window.PoseAngleVelocityWindow import     PoseAngleVelocityWindow
+from .window.PoseAngleWindow import             PoseAngleWindow
+from .window.PoseAngleMotionWindow import       PoseAngleMotionWindow
 
 from .stream.StreamCorrelation import   StreamCorrelation
 from .stream.StreamPose import          StreamPose

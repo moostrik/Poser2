@@ -40,6 +40,8 @@ def _get_format_bgr(internal_format, channel_order: Literal['BGR', 'RGB']) -> Co
     if internal_format == GL_R8: return GL_RED
     if internal_format == GL_R16F: return GL_RED
     if internal_format == GL_R32F: return GL_RED
+    if internal_format == GL_RG8: return GL_RG
+    if internal_format == GL_RG16F: return GL_RG
     if internal_format == GL_RG32F: return GL_RG
     print('GL_Image', 'internal format not supported')
     return GL_NONE
@@ -50,7 +52,9 @@ def _get_internal_format(image: np.ndarray) -> Constant:
         if len(image.shape) == 2:  # Grayscale image
             return GL_R8
         elif len(image.shape) == 3:
-            if image.shape[2] == 3:  # RGB image
+            if image.shape[2] == 2:  # RG image
+                return GL_RG8
+            elif image.shape[2] == 3:  # RGB image
                 return GL_RGB8
             elif image.shape[2] == 4:  # RGBA image
                 return GL_RGBA8
@@ -58,7 +62,9 @@ def _get_internal_format(image: np.ndarray) -> Constant:
         if len(image.shape) == 2:  # Grayscale image
             return GL_R16F
         elif len(image.shape) == 3:
-            if image.shape[2] == 3:  # RGB image
+            if image.shape[2] == 2:  # RG image
+                return GL_RG16F
+            elif image.shape[2] == 3:  # RGB image
                 return GL_RGB16F
             elif image.shape[2] == 4:  # RGBA image
                 return GL_RGBA16F
@@ -66,7 +72,9 @@ def _get_internal_format(image: np.ndarray) -> Constant:
         if len(image.shape) == 2:  # Grayscale image
             return GL_R32F
         elif len(image.shape) == 3:
-            if image.shape[2] == 3:  # RGB image
+            if image.shape[2] == 2:  # RG image
+                return GL_RG32F
+            elif image.shape[2] == 3:  # RGB image
                 return GL_RGB32F
             elif image.shape[2] == 4:  # RGBA image
                 return GL_RGBA32F

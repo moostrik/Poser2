@@ -33,6 +33,12 @@ class DataHubType(IntEnum):
     flow_images =      12   # sorted by track_id, flow visualization images
     gpu_frames =       13   # sorted by track_id, GPU frames with crops
     feature_buffer =   14   # (values, mask) GPU tensors from RollingFeatureBuffer
+    angle_window =     15   # sorted by track_id, FeatureWindow[AngleLandmark]
+    angle_vel_window = 16   # sorted by track_id, FeatureWindow[AngleLandmark]
+    angle_motion_window = 17  # sorted by track_id, FeatureWindow[AngleLandmark]
+    angle_sym_window =    18  # sorted by track_id, FeatureWindow[AngleLandmark]
+    points2d_window =     19  # sorted by track_id, FeatureWindow[PointLandmark]
+    bbox_window =         20  # sorted by track_id, FeatureWindow[BBoxElement]
 
 
 class PoseDataHubTypes(IntEnum):
@@ -81,6 +87,23 @@ class DataHub:
         """ this works on tracklets and poses """
         return any(self.get_filtered(data_type, lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id))
 
+    # WINDOW CONVENIENCE GETTERS
+    def get_angle_windows(self) -> dict[int, Any]:
+        """Get all angle feature windows."""
+        return self.get_dict(DataHubType.angle_window)
+
+    def get_angle_vel_windows(self) -> dict[int, Any]:
+        """Get all angle velocity feature windows."""
+        return self.get_dict(DataHubType.angle_vel_window)
+
+    def get_angle_window(self, track_id: int) -> Any | None:
+        """Get angle window for specific track."""
+        return self.get_item(DataHubType.angle_window, track_id)
+
+    def get_angle_vel_window(self, track_id: int) -> Any | None:
+        """Get angle velocity window for specific track."""
+        return self.get_item(DataHubType.angle_vel_window, track_id)
+
     # GENERIC SETTERS
     def set_item(self, data_type: DataHubType, key: int, value: object) -> None:
         """Set a single item without replacing the entire dict."""
@@ -124,6 +147,14 @@ class DataHub:
     def set_feature_buffer(self, buffer_output: tuple[Tensor, Tensor]) -> None:
         """Store feature buffer (values, mask) GPU tensors."""
         self.set_item(DataHubType.feature_buffer, 0, buffer_output)
+
+    def set_angle_windows(self, windows) -> None:
+        """Store angle feature windows. Expects dict[int, FeatureWindow]."""
+        self.set_dict(DataHubType.angle_window, windows)
+
+    def set_angle_vel_windows(self, windows) -> None:
+        """Store angle velocity feature windows. Expects dict[int, FeatureWindow]."""
+        self.set_dict(DataHubType.angle_vel_window, windows)
 
     def set_pd_stream(self, pd_stream: PDStreamData) -> None:
         self.set_item(DataHubType.pd_stream, pd_stream.track_id, pd_stream)

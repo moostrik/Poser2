@@ -67,7 +67,9 @@ class Layers(IntEnum):
     # GPU frame layers
     gpu_crop =      auto()
     frg_src =       auto()
-    feature_buf =   auto()
+    angle_W =       auto()
+    angle_vel_W =   auto()
+    angle_mtn_W =   auto()
 
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
@@ -120,7 +122,7 @@ PREVIEW_LAYERS: list[Layers] = [
 
     Layers.sim_blend,
     Layers.flow,
-    Layers.feature_buf,
+    Layers.angle_vel_W,
 ]
 
 FINAL_LAYERS: list[Layers] = [
@@ -171,7 +173,9 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.cam_mask,
     # Layers.frg_src,
     Layers.centre_pose,
-    # Layers.feature_buf,
+    # Layers.angle_W,
+    # Layers.angle_vel_W,
+    Layers.angle_mtn_W,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -232,7 +236,10 @@ class HDTRenderManager(RenderBase):
 
             gpu_crop =      self.L[Layers.gpu_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
             frg_src =       self.L[Layers.frg_src][i]=      ls.ForegroundSourceLayer(i, self.data_hub)
-            feature_buf =   self.L[Layers.feature_buf][i] = ls.FeatureBufferLayer(  i, self.data_hub)
+
+            angle_W =       self.L[Layers.angle_W][i] =     ls.AngleWindowLayer(  i, self.data_hub)
+            angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer(  i, self.data_hub)
+            angle_mtn_W =   self.L[Layers.angle_mtn_W][i] = ls.AngleMtnWindowLayer(  i, self.data_hub)
 
         # global layers
         self.pose_sim_layer =   ls.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, ls.AggregationMethod.MAX, 2.0)
@@ -337,6 +344,7 @@ class HDTRenderManager(RenderBase):
         self._draw_layers = FINAL_LAYERS
         # self._draw_layers = BOX_LAYERS
         self._preview_layers = PREVIEW_LAYERS
+
 
         # self.pose_sim_layer.aggregation_method = ls.AggregationMethod.HARMONIC_MEAN
 

@@ -35,3 +35,6 @@ from .source.CropSourceLayer import         CropSourceLayer
 from .source.MaskSourceLayer import         MaskSourceLayer
 from .source.ForegroundSourceLayer import   ForegroundSourceLayer
 
+from .window.AngleMtnWindowLayer import     AngleMtnWindowLayer
+from .window.AngleVelWindowLayer import     AngleVelWindowLayer
+from .window.AngleWindowLayer import        AngleWindowLayer
