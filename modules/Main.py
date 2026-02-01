@@ -111,12 +111,12 @@ class Main():
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
 
         # Rolling feature buffer for temporal accumulation
-        self.rolling_angles_config = batch.RollingFeatureBufferConfig(num_tracks=num_players, window_size= int(2.5 * settings.camera.fps))  # 5 seconds of history
-        self.rolling_angles =       batch.RollingFeatureBuffer(self.rolling_angles_config)
+        # self.rolling_angles_config = batch.RollingFeatureBufferConfig(num_tracks=num_players, window_size= int(2.5 * settings.camera.fps))  # 5 seconds of history
+        # self.rolling_angles =       batch.RollingFeatureBuffer(self.rolling_angles_config)
 
-        # Temporal correlation analyzer
-        self.temporal_correlator_config = batch.TemporalCorrelatorConfig()
-        self.temporal_correlator =  batch.TemporalCorrelator(self.temporal_correlator_config)
+        # # Temporal correlation analyzer
+        # self.temporal_correlator_config = batch.TemporalCorrelatorConfig()
+        # self.temporal_correlator =  batch.TemporalCorrelator(self.temporal_correlator_config)
 
         self.pose_similator=        similarity.SimilarityComputer()
         self.pose_similarity_extractor = nodes.SimilarityExtractor(self.simil_config)
@@ -223,9 +223,9 @@ class Main():
         self.pd_pose_streamer.add_stream_callback(self.data_hub.set_pd_stream)
         self.pd_pose_streamer.start()
 
-        # self.pose_similator.add_correlation_callback(self.data_hub.set_pose_similarity)
-        # self.pose_similator.add_correlation_callback(self.pose_similarity_extractor.submit)
-        # self.pose_similator.start()
+        self.pose_similator.add_correlation_callback(self.data_hub.set_pose_similarity)
+        self.pose_similator.add_correlation_callback(self.pose_similarity_extractor.submit)
+        self.pose_similator.start()
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets.add_poses_callback(self.bbox_filters.process)
@@ -238,22 +238,22 @@ class Main():
 
         # self.pose_raw_filters.add_poses_callback(self.feature_buffer.submit)
 
-        self.rolling_angles.add_callback(self.data_hub.set_feature_buffer)
-        self.rolling_angles.add_callback(self.temporal_correlator.submit)
+        # self.rolling_angles.add_callback(self.data_hub.set_feature_buffer)
+        # self.rolling_angles.add_callback(self.temporal_correlator.submit)
 
 
-        self.rolling_angles.start()
-        self.temporal_correlator.start()
-        self.temporal_correlator.add_callback(self.pose_similarity_extractor.submit)
-        self.temporal_correlator.add_callback(self.data_hub.set_pose_similarity)
+        # self.rolling_angles.start()
+        # self.temporal_correlator.start()
+        # self.temporal_correlator.add_callback(self.pose_similarity_extractor.submit)
+        # self.temporal_correlator.add_callback(self.data_hub.set_pose_similarity)
 
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
-        # self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
+        self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_S)) # smooth poses
 
 
-        self.pose_smooth_filters.add_poses_callback(self.rolling_angles.submit)
+        # self.pose_smooth_filters.add_poses_callback(self.rolling_angles.submit)
 
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
@@ -353,9 +353,9 @@ class Main():
             artnet.stop()
 
         self.point_extractor.stop()
-        # self.pose_similator.stop()
-        self.temporal_correlator.stop()
-        self.rolling_angles.stop()
+        self.pose_similator.stop()
+        # self.temporal_correlator.stop()
+        # self.rolling_angles.stop()
 
         self.pd_pose_streamer.stop()
         if self.pd_stream_similator:

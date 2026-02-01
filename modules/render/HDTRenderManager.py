@@ -338,7 +338,7 @@ class HDTRenderManager(RenderBase):
         # self._draw_layers = BOX_LAYERS
         self._preview_layers = PREVIEW_LAYERS
 
-        self.pose_sim_layer.aggregation_method = ls.AggregationMethod.MAX
+        # self.pose_sim_layer.aggregation_method = ls.AggregationMethod.HARMONIC_MEAN
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glViewport(0, 0, width, height)
