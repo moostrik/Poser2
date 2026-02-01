@@ -208,8 +208,12 @@ class Image(Fbo):
             if internal_format != self.internal_format or width != self.width or height != self.height:
                 if self.allocated:
                     self.deallocate()
-            self.allocate(width, height, internal_format, 
-                         self._wrap_s, self._wrap_t, self._min_filter, self._mag_filter)
+                self.allocate(width, height, internal_format,
+                             self._wrap_s, self._wrap_t, self._min_filter, self._mag_filter)
+
+            # Update cache to prevent unnecessary reallocations
+            self._cached_width = width
+            self._cached_height = height
             self._cached_format = internal_format
 
         if not self.allocated:
