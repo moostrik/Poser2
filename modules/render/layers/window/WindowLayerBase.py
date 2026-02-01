@@ -81,6 +81,7 @@ class WindowLayerBase(LayerBase):
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         if width is None or height is None or internal_format is None:
             return
+        # self._image.allocate(width, height, GL_RG32F, min_filter=GL_NEAREST, mag_filter=GL_NEAREST)
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
         self.render_labels_static(self._label_fbo)

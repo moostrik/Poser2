@@ -177,8 +177,8 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.cam_mask,
     # Layers.frg_src,
     Layers.centre_pose,
-    # Layers.angle_W,
-    # Layers.angle_vel_W,
+    Layers.angle_W,
+    Layers.angle_vel_W,
     # Layers.angle_mtn_W,
 ]
 
@@ -349,7 +349,7 @@ class HDTRenderManager(RenderBase):
                 self.L[layer_type][i].draw()
             self.L[Layers.centre_cam][i].use_mask = True #type: ignore
             self.L[Layers.centre_mask][i].blur_steps = 0 #type: ignore
-            self.L[Layers.angle_W][i].line_width = 1.0 #type: ignore
+            self.L[Layers.angle_W][i].line_width = 3.0 #type: ignore
 
         self._draw_layers = FINAL_LAYERS
         # self._draw_layers = BOX_LAYERS

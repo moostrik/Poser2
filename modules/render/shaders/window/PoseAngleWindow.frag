@@ -46,33 +46,22 @@ void main() {
         return;
     }
 
-    float norm = abs(value) / display_range;
+    float norm = (value / display_range + 1.0) * 0.5;  // Map [-display_range, +display_range] to [0, 1]
     vec2 point = vec2(value_uv.x, stream_top + norm * stream_step);
 
-    // Draw dots at intervals
-    float dot_spacing = sample_step;  // Adjust multiplier to control spacing
-    float nearest_dot_x = (floor(texCoord.x / dot_spacing) + 0.5) * dot_spacing;
-
-    // Sample value at the nearest dot position
-    vec2 dot_value_uv = vec2(nearest_dot_x, stream_center);
-    float dot_value = texture(tex0, dot_value_uv).r;
-    float dot_mask = texture(tex0, dot_value_uv).g;
-
-    if (dot_mask > 0.001) {
-        float dot_norm = abs(dot_value) / display_range;
-        vec2 dot_point = vec2(nearest_dot_x, stream_top + dot_norm * stream_step);
-
-        // Draw a dot at the point position (accounting for aspect ratio)
-        float dot_radius = sample_step * 0.5;  // Adjust size as needed
-        vec2 diff = frag_pos - dot_point;
-        diff.x *= output_aspect_ratio;  // Account for aspect ratio
-        float dist = length(diff);
-        if (dist < dot_radius) {
-            // Color the dot based on value sign (red for positive, blue for negative)
-            vec3 dot_color = dot_value >= 0.0 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 0.0, 1.0);
-            fragColor = vec4(dot_color, 1.0);
-            return;
-        }
+    // Draw continuous dots (no spacing)
+    float dot_radius = line_width * 2.0;
+    vec2 diff = frag_pos - point;
+    // Correct for aspect ratio by dividing Y
+    diff.y /= output_aspect_ratio;
+    float dist = length(diff);
+    if (dist < dot_radius) {
+        // Alternating colors: orange for even streams, cyan for odd
+        vec3 color_even = vec3(1.0, 0.5, 0.0);
+        vec3 color_odd = vec3(0.0, 1.0, 1.0);
+        vec3 dot_color = (stream_id % 2 == 0) ? color_even : color_odd;
+        fragColor = vec4(dot_color, 1.0);
+        return;
     }
 
     fragColor = vec4(0.0);
