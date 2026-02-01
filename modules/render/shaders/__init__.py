@@ -22,9 +22,7 @@ from .pose.PoseValuesBar import         PoseValuesBar
 from .pose.PosePointDots import         PosePointDots
 from .pose.PosePointLines import        PosePointLines
 
-from .window.PoseAngleVelocityWindow import     PoseAngleVelocityWindow
-from .window.PoseAngleWindow import             PoseAngleWindow
-from .window.PoseAngleMotionWindow import       PoseAngleMotionWindow
+from .window.WindowShader import        WindowShader
 
 from .stream.StreamCorrelation import   StreamCorrelation
 from .stream.StreamPose import          StreamPose

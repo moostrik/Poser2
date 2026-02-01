@@ -3,7 +3,7 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
 
-class WindowShaderBase(Shader):
+class WindowShader(Shader):
     """Base class for feature window visualization shaders.
 
     Provides common interface for rendering temporal feature windows as horizontal time series.
@@ -28,7 +28,10 @@ class WindowShaderBase(Shader):
         num_streams: int,
         line_width: float,
         output_aspect_ratio: float = 1.0,
-        display_range: float = 3.14159,
+        display_range: tuple[float, float] = (-3.14159, 3.14159),
+        color_even: tuple[float, float, float] = (1.0, 0.5, 0.0),
+        color_odd: tuple[float, float, float] = (0.0, 1.0, 1.0),
+        alpha: float = 0.5,
     ) -> None:
         """Render feature window visualization.
 
@@ -38,7 +41,10 @@ class WindowShaderBase(Shader):
             num_streams: Number of feature elements (height)
             line_width: Line thickness in normalized coordinates
             output_aspect_ratio: Output buffer aspect ratio (width/height)
-            display_range: Max absolute value for value normalization
+            display_range: (min, max) value range for normalization
+            color_even: RGB color for even-numbered streams (default orange)
+            color_odd: RGB color for odd-numbered streams (default cyan)
+            alpha: Alpha transparency (default 0.5)
         """
         if not self.allocated or not self.shader_program:
             print(f"{self.__class__.__name__} shader not allocated or shader program missing.")
@@ -59,6 +65,10 @@ class WindowShaderBase(Shader):
         glUniform1f(self.get_uniform_loc("stream_step"), 1.0 / num_streams)
         glUniform1f(self.get_uniform_loc("line_width"), line_width)
         glUniform1f(self.get_uniform_loc("output_aspect_ratio"), output_aspect_ratio)
-        glUniform1f(self.get_uniform_loc("display_range"), display_range)
+        glUniform1f(self.get_uniform_loc("display_range_min"), display_range[0])
+        glUniform1f(self.get_uniform_loc("display_range_max"), display_range[1])
+        glUniform3f(self.get_uniform_loc("color_even"), *color_even)
+        glUniform3f(self.get_uniform_loc("color_odd"), *color_odd)
+        glUniform1f(self.get_uniform_loc("alpha"), alpha)
 
         draw_quad()

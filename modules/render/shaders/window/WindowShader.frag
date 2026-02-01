@@ -6,10 +6,15 @@ uniform int         num_streams;
 uniform float       stream_step;
 uniform float       line_width;
 uniform float       output_aspect_ratio;  // output buffer aspect ratio (width/height)
-uniform float       display_range;  // max absolute value for display (e.g., pi)
+uniform float       display_range_min;   // minimum value for display range
+uniform float       display_range_max;   // maximum value for display range
+uniform vec3        color_even;          // color for even-numbered streams
+uniform vec3        color_odd;           // color for odd-numbered streams
+uniform float       alpha;               // alpha transparency
 
 in vec2     texCoord;
 out vec4    fragColor;
+
 
 bool isBetweenStreamLine(vec2 uv, float stream_step, float line_width, int num_streams) {
     int stream_id = int(floor(uv.y / stream_step));
@@ -44,7 +49,7 @@ void main() {
         return;
     }
 
-    float norm = (value / display_range + 1.0) * 0.5;  // Map [-display_range, +display_range] to [0, 1]
+    float norm = clamp((value - display_range_min) / (display_range_max - display_range_min), 0.0, 1.0);
     vec2 point = vec2(value_uv.x, stream_top + norm * stream_step);
 
     // Draw continuous dots (no spacing)
@@ -54,11 +59,8 @@ void main() {
     diff.y /= output_aspect_ratio;
     float dist = length(diff);
     if (dist < dot_radius) {
-        // Alternating colors: orange for even streams, cyan for odd
-        vec3 color_even = vec3(1.0, 0.5, 0.0);
-        vec3 color_odd = vec3(0.0, 1.0, 1.0);
         vec3 dot_color = (stream_id % 2 == 0) ? color_even : color_odd;
-        fragColor = vec4(dot_color, 1.0);
+        fragColor = vec4(dot_color, alpha);
         return;
     }
 

@@ -11,7 +11,7 @@ from modules.gl import Fbo, Texture, Blit, clear_color, draw_box_string, text_in
 from modules.gl.Tensor import Tensor
 from modules.pose.features.Angles import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import PoseAngleVelocityWindow as shader
+from modules.render.shaders import WindowShader as shader
 from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -102,7 +102,7 @@ class FeatureBufferLayer(LayerBase):
         num_streams = stream_image.shape[0]  # feature_length (height)
         output_aspect = self._fbo.width / self._fbo.height
         display_range = DISPLAY_RANGE[1]  # max value (e.g., pi)
-        self._shader.use(self._tensor, num_samples, num_streams, line_width= 3 / self._fbo.height, output_aspect_ratio=output_aspect, display_range=display_range)
+        self._shader.use(self._tensor, num_samples, num_streams, line_width= 3 / self._fbo.height, output_aspect_ratio=output_aspect, display_range=DISPLAY_RANGE)
         self._fbo.end()
 
     @staticmethod

@@ -1,4 +1,5 @@
 # Standard library imports
+import ast
 import hashlib
 import inspect
 import os
@@ -45,7 +46,7 @@ class HotReloadMethods:
             raise ValueError(f"Could not determine module for class {target_class.__name__}")
 
         self._file_module_path: str = os.path.abspath(os.path.normcase(class_module.__file__)).lower()
-        self._file_module_name: str = f"{self._target_class.__name__}_{hashlib.md5(self._file_module_path.encode()).hexdigest()}"
+        self._file_module_name: str = class_module.__name__
 
         self._on_reload_callbacks: list[Callable[[], None]] = []
 
@@ -164,21 +165,41 @@ class HotReloadMethods:
 
     @staticmethod
     def _load_module(module_name: str, file_path: str) -> Optional[ModuleType]:
-        """Load a module from a file path."""
-        spec: Optional[ModuleSpec] = spec_from_file_location(module_name, file_path)
-        if spec is None or spec.loader is None:
-            print(f"[{HotReloadMethods.__name__}] Could not load spec from {file_path}")
-            return None
-
-        module: ModuleType = module_from_spec(spec)
-        sys.modules[module_name] = module
-
+        """Load a module from a file path, executing only class definitions (not imports)."""
         try:
-            spec.loader.exec_module(module)
-            return module
+            # Read the source code
+            with open(file_path, 'r', encoding='utf-8') as f:
+                source_code = f.read()
+
+            # Get the original module to use its namespace (for imports)
+            original_module = sys.modules.get(module_name)
+            if original_module is None:
+                print(f"[{HotReloadMethods.__name__}] Original module {module_name} not found in sys.modules")
+                return None
+
+            # Parse the source to extract only class definitions
+            tree = ast.parse(source_code, filename=file_path)
+
+            # Filter to keep only ClassDef nodes (skip imports)
+            class_nodes = [node for node in tree.body if isinstance(node, ast.ClassDef)]
+
+            if not class_nodes:
+                print(f"[{HotReloadMethods.__name__}] No class definitions found in {file_path}")
+                return None
+
+            # Create a new module with only class definitions
+            tree.body = class_nodes # type: ignore
+
+            # Compile and execute the filtered AST
+            code = compile(tree, file_path, 'exec')
+
+            # Execute in the original module's namespace directly (so imports work)
+            exec(code, original_module.__dict__)
+
+            return original_module
 
         except Exception as e:
-            print(f"[{HotReloadMethods.__name__}] Error executing module {file_path}: {e}")
+            print(f"[{HotReloadMethods.__name__}] Error loading module {file_path}: {e}")
             traceback.print_exc()
             return None
 
