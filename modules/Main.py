@@ -107,6 +107,7 @@ class Main():
 
         self.window_similator_config = batch.WindowSimilarityConfig(window_length=int(0.5 * settings.camera.fps), exponent=2.5)
         self.window_similator=      batch.WindowSimilarity(self.window_similator_config)
+        self.window_similarity_gui = guis.WindowSimilarityGui(self.window_similator_config, self.gui, 'SIMILARITY')
 
         # Feature applicators (replace SimilarityExtractor)
         self.similarity_applicator = nodes.SimilarityApplicator(max_poses=settings.pose.max_poses)
@@ -292,7 +293,9 @@ class Main():
         self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
-        self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame(), self.motion_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.motion_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.window_similarity_gui.get_gui_frame()])
         self.gui.addFrame([self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame])
         self.gui.addFrame([self.artnet_guis[2].frame])

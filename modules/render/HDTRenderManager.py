@@ -100,7 +100,6 @@ INTERFACE_LAYERS: list[Layers] = [
     Layers.cam_bbox,
 ]
 
-
 LARGE_LAYERS: list[Layers] = [
     Layers.centre_cam,
     Layers.centre_mask,
@@ -120,7 +119,13 @@ PREVIEW_LAYERS: list[Layers] = [
     # Layers.flow,
 ]
 
-FINAL_LAYERS: list[Layers] = [
+SHOW_BOX: list[Layers] = [
+    Layers.box_cam,
+    Layers.box_pose_R,
+    Layers.box_pose_I,
+]
+
+SHOW_COMP: list[Layers] = [
     Layers.sim_blend,
     Layers.flow,
     Layers.dense_flow,
@@ -129,11 +134,7 @@ FINAL_LAYERS: list[Layers] = [
     Layers.similarity_W,
 ]
 
-BOX_LAYERS: list[Layers] = [
-    Layers.box_cam,
-    Layers.box_pose_R,
-    Layers.box_pose_I,
-]
+FINAL_LAYERS: list[Layers] = SHOW_COMP
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
@@ -158,10 +159,10 @@ class HDTRenderManager(RenderBase):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
             dense_flow =    self.L[Layers.dense_flow][i] =  ls.DFlowSourceLayer(    i, self.data_hub)
-            flow_image =    self.L[Layers.sparse_images][i] =  ls.FlowSourceLayer(     i, self.data_hub)
+            flow_image =    self.L[Layers.sparse_images][i] =  ls.FlowSourceLayer(  i, self.data_hub)
             sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(       flow_image)
 
-            cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxRenderer(     i, self.data_hub,   PoseDataHubTypes.pose_I)
+            cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxRenderer(        i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=2.0)
             mtime_data =    self.L[Layers.mtime_data][i] =  ls.PoseMTimeRenderer(   i, self.data_hub,   PoseDataHubTypes.pose_I)
             field_bar_R =   self.L[Layers.field_bar_R][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_R,    FrameField.angles, line_thickness=4.0, line_smooth=16.0, color = (0.0, 0.0, 0.0, 0.33))
@@ -171,8 +172,8 @@ class HDTRenderManager(RenderBase):
             motion_sim =    self.L[Layers.motion_sim][i] =  ls.PoseBarSLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I)
 
             box_cam =       self.L[Layers.box_cam][i] =     ls.CamBBoxLayer(        i, self.data_hub,   PoseDataHubTypes.pose_I,    cam_image.texture)
-            box_pose_I =    self.L[Layers.box_pose_I][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I,    1.0, 0.0, True, False)
-            box_pose_R =    self.L[Layers.box_pose_R][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_R,    0.5, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
+            box_pose_I =    self.L[Layers.box_pose_I][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I,    6.0, 0.0, True, False)
+            box_pose_R =    self.L[Layers.box_pose_R][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_R,    3.0, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
 
             centre_math =   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,   PoseDataHubTypes.pose_I,    16/9)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_math,                                 cam_mask.texture)
@@ -185,11 +186,11 @@ class HDTRenderManager(RenderBase):
             flow =          self.L[Layers.flow][i] =        ls.FlowLayer(              sim_blend)
 
             gpu_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
-            frg_src =       self.L[Layers.cam_foreground][i]=      ls.ForegroundSourceLayer(i, self.data_hub)
+            frg_src =       self.L[Layers.cam_foreground][i]=ls.ForegroundSourceLayer(i, self.data_hub)
 
-            angle_W =       self.L[Layers.angle_W][i] =     ls.AngleWindowLayer(  i, self.data_hub, self.line_width)
-            angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer(  i, self.data_hub, self.line_width)
-            angle_mtn_W =   self.L[Layers.angle_mtn_W][i] = ls.AngleMtnWindowLayer(  i, self.data_hub, self.line_width)
+            angle_W =       self.L[Layers.angle_W][i] =     ls.AngleWindowLayer(    i, self.data_hub, self.line_width)
+            angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer( i, self.data_hub, self.line_width)
+            angle_mtn_W =   self.L[Layers.angle_mtn_W][i] = ls.AngleMtnWindowLayer( i, self.data_hub, self.line_width)
             similarity_W =  self.L[Layers.similarity_W][i] = ls.SimilarityWindowLayer(  i, self.data_hub, self.line_width)
             # bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub)
 
