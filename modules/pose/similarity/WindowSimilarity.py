@@ -1,9 +1,10 @@
 # Standard library imports
 from dataclasses import dataclass
+from enum import IntEnum
 import threading
 import time
 import traceback
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, cast
 
 # Third-party imports
 import numpy as np
@@ -12,9 +13,7 @@ import numpy as np
 from modules.ConfigBase import ConfigBase, config_field
 from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.nodes.windows.WindowNode import FeatureWindow
-from modules.pose.similarity.features.SimilarityFeature import SimilarityFeature
-from modules.pose.similarity.features.SimilarityBatch import SimilarityBatch
-from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod
+from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod, NormalizedScalarFeature
 from modules.pose.features.Similarity import configure_similarity, Similarity
 from modules.pose.features.LeaderScore import configure_leader_score, LeaderScore
 from modules.utils.PerformanceTimer import PerformanceTimer
@@ -23,6 +22,28 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 # Type alias for window dictionary (track_id -> FeatureWindow)
 WindowDict = dict[int, FeatureWindow]
+
+
+class _JointAggregator(NormalizedScalarFeature):
+    """Helper class for aggregating per-joint similarities into scalars.
+
+    This is a minimal wrapper around NormalizedScalarFeature that allows us
+    to reuse all aggregation methods (mean, harmonic mean, etc.) on arbitrary
+    length arrays without needing a specific feature class.
+    """
+    _joint_enum: type[IntEnum] | None = None
+
+    @classmethod
+    def enum(cls) -> type[IntEnum]:
+        if cls._joint_enum is None:
+            raise RuntimeError("_JointAggregator not configured")
+        return cls._joint_enum
+
+    @classmethod
+    def configure(cls, num_joints: int) -> None:
+        """Configure the aggregator with the number of joints."""
+        if cls._joint_enum is None:
+            cls._joint_enum = cast(type[IntEnum], IntEnum("JointIndex", {f"J{i}": i for i in range(num_joints)}))
 
 
 @dataclass
@@ -110,7 +131,7 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
 
                 # Process similarity and leader scores
                 start_time: float = time.perf_counter()
-                result: tuple[dict[int, 'Similarity'], dict[int, 'LeaderScore']] = self._process(windows)
+                result: tuple[dict[int, Similarity], dict[int, LeaderScore]] = self._process(windows)
                 elapsed_time: float = (time.perf_counter() - start_time) * 1000.0
                 self.Timer.add_time(elapsed_time, True)
 
@@ -123,16 +144,19 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
                 print(f"WindowSimilarity: Processing error: {e}")
                 traceback.print_exc()
 
-    def _process(self, windows: WindowDict) -> tuple[dict[int, 'Similarity'], dict[int, 'LeaderScore']]:
+    def _process(self, windows: WindowDict) -> tuple[dict[int,Similarity], dict[int, LeaderScore]]:
         """Process windows and return both Similarity and LeaderScore dicts."""
-        from modules.pose.features.Similarity import Similarity
-        from modules.pose.features.LeaderScore import LeaderScore
 
         if len(windows) < 2:
             return {}, {}
 
         # Step 1: Stack windows
         track_ids, values = self._stack_windows(windows)
+
+        # Configure aggregator with joint count
+        _, _, F = values.shape
+        _JointAggregator.configure(F)
+
         # Step 2: Compute similarity tensor
         best_sim, confidence_scores, leader_scores = self._compute_similarity_tensor(values)
         # Step 3: Build per-pose dicts
@@ -282,11 +306,10 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
                 if i == j:
                     continue  # Skip self-comparison
 
-                # Create temporary SimilarityFeature to use its aggregate method
-                temp_feature = SimilarityFeature(
+                # Use helper to aggregate per-joint similarities
+                temp_feature = _JointAggregator(
                     values=best_sim[i, j],
-                    scores=confidence_scores[i, j],
-                    pair_id=(min(track_ids[i], track_ids[j]), max(track_ids[i], track_ids[j]))
+                    scores=confidence_scores[i, j]
                 )
 
                 # Aggregate per-joint similarities into single scalar
@@ -349,35 +372,3 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
             result[track_ids[i]] = LeaderScore(values, scores)
 
         return result
-
-    def _build_similarity_batch(
-        self,
-        track_ids: list[int],
-        best_sim: np.ndarray,
-        confidence_scores: np.ndarray
-    ) -> SimilarityBatch:
-        """Build SimilarityBatch from similarity tensor.
-
-        Args:
-            track_ids: List of track IDs
-            best_sim: Best similarity per joint (N, N, F)
-            confidence_scores: Confidence scores (N, N, F)
-
-        Returns:
-            SimilarityBatch with all pairwise similarities
-        """
-        N = len(track_ids)
-        i_idx, j_idx = np.triu_indices(N, k=1)
-
-        similarities: list[SimilarityFeature] = []
-        for i, j in zip(i_idx, j_idx):
-            id1, id2 = track_ids[i], track_ids[j]
-            pair_id = (id1, id2) if id1 <= id2 else (id2, id1)
-
-            similarities.append(SimilarityFeature(
-                pair_id=pair_id,
-                values=best_sim[i, j],
-                scores=confidence_scores[i, j]
-            ))
-
-        return SimilarityBatch(similarities=similarities)

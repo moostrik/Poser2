@@ -34,9 +34,6 @@ class DataHubType(IntEnum):
     bbox_window =           auto()   # sorted by track_id, FeatureWindow[BBoxElement]
     similarity_window =     auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
 
-    similarities =          auto()   # sorted by tuple[track_id, track_id]
-    leader_scores =         auto()   # sorted by tuple[track_id, track_id]
-
 class PoseDataHubTypes(IntEnum):
     pose_R =      DataHubType.pose_R.value
     pose_S =      DataHubType.pose_S.value
@@ -156,14 +153,6 @@ class DataHub:
     def set_similarity_windows(self, windows) -> None:
         """Store angle symmetry feature windows. Expects dict[int, FeatureWindow]."""
         self.set_dict(DataHubType.similarity_window, windows)
-
-
-    # TYPE-SPECIFIC SETTERS WITHOUT KEY
-    def set_similarity(self, value: Similarity) -> None:
-        self.set_dict(DataHubType.similarities, {0: value})
-
-    def set_leader_score(self, value: LeaderScore) -> None:
-        self.set_dict(DataHubType.leader_scores, {0: value})
 
     # UPDATE CALLBACK
     def notify_update(self) -> None:
