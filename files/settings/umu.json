@@ -47,19 +47,6 @@
     "crop_expansion": 0.1
   },
 
-  "pd_stream": {
-    "max_poses": 1,
-    "stream_capacity": 300,
-    "stream_sample_rate": 100,
-    "corr_rate": 100,
-    "corr_num_workers": 8,
-    "corr_buffer_duration": 90,
-    "corr_stream_timeout": 2.0,
-    "corr_max_nan_ratio": 0.15,
-    "corr_dtw_band": 10,
-    "corr_similarity_exp": 2.0
-  },
-
   "gui": {
     "title": "Poser",
     "on_top": true,

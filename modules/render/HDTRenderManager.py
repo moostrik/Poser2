@@ -39,7 +39,6 @@ class Layers(IntEnum):
     # data layers
     cam_bbox =      auto()
     cam_track =     auto()
-    angle_data =    auto()
     mtime_data =    auto()
     field_bar_R =   auto()
     field_bar_I =   auto()
@@ -219,7 +218,6 @@ class HDTRenderManager(RenderBase):
 
             cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxCamRenderer(     i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=2.0)
-            angle_data =    self.L[Layers.angle_data][i] =  ls.PDLayer(             i, self.data_hub)
             mtime_data =    self.L[Layers.mtime_data][i] =  ls.PoseMTimeRenderer(   i, self.data_hub,   PoseDataHubTypes.pose_I)
             field_bar_R =   self.L[Layers.field_bar_R][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_R,    FrameField.angles, line_thickness=4.0, line_smooth=16.0, color = (0.0, 0.0, 0.0, 0.33))
             field_bar_I =   self.L[Layers.field_bar_I][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_I,    FrameField.angles, line_thickness=2.0, line_smooth=2.0)
@@ -250,14 +248,10 @@ class HDTRenderManager(RenderBase):
             similarity_W =  self.L[Layers.similarity_W][i] = ls.SimilarityWindowLayer(  i, self.data_hub, self.line_width)
             # bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub)
 
-        # global layers
-        # self.pose_sim_layer =   ls.SimilarityWindowLayer(num_R_streams, R_stream_capacity, self.data_hub, DataHubType.similarities, ls.AggregationMethod.MAX, 2.0)
-
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name='track',        columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name='preview',      columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name='similarity',   columns=1,                rows=1, src_aspect_ratio=6.0,  padding=Point2f(1.0, 1.0))
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.width, settings.height, False)
 
@@ -295,7 +289,7 @@ class HDTRenderManager(RenderBase):
             w, h = self.subdivision.get_allocation_size('track', i)
             self.L[Layers.cam_track][i].allocate(w , h, GL_RGBA)
             w, h = self.subdivision.get_allocation_size('preview', i)
-            self.L[Layers.angle_data][i].allocate(w, h, GL_RGBA)
+            pass
             # self.L[Layers.feature_buf][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
@@ -306,7 +300,6 @@ class HDTRenderManager(RenderBase):
 
     def draw_main(self, width: int, height: int) -> None:
         self.data_hub.notify_update()
-        # self.pose_sim_layer.update()
         seen: set[Layers] = set()
         for layer_type in self._update_layers + self._interface_layers + self._draw_layers + self._preview_layers:
             if layer_type not in seen:
@@ -314,52 +307,35 @@ class HDTRenderManager(RenderBase):
                 for layer in self.L[layer_type].values():
                     layer.update()
 
-
-
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
         glViewport(0, 0, width, height)
         clear_color()
 
-        # Global layer
-
-        sim_rect = self.subdivision.get_rect('similarity', 0)
-        glViewport(int(sim_rect.x), int(height - sim_rect.y - sim_rect.height), int(sim_rect.width), int(sim_rect.height))
-        # self.pose_sim_layer.draw()
-
         # Interface layers
         for i in range(self.num_cams):
-            # View.set_view(width, height)
             track_rect: Rect = self.subdivision.get_rect('track', i)
             glViewport(int(track_rect.x), int(height - track_rect.y - track_rect.height), int(track_rect.width), int(track_rect.height))
-
             for layer_type in self._interface_layers:
-                # glViewport(int(track_rect.x), int(height - track_rect.y - track_rect.height), int(track_rect.width), int(track_rect.height))
-
                 self.L[layer_type][i].draw()
 
         # Preview layers
         for i in range(self.num_cams):
             preview_rect: Rect = self.subdivision.get_rect('preview', i)
             glViewport(int(preview_rect.x), int(height - preview_rect.y - preview_rect.height), int(preview_rect.width), int(preview_rect.height))
-
             for layer_type in self._preview_layers:
-                # glViewport(int(preview_rect.x), int(height - preview_rect.y - preview_rect.height), int(preview_rect.width), int(preview_rect.height))
-
                 self.L[layer_type][i].draw()
-            self.L[Layers.centre_cam][i].use_mask = True #type: ignore
-            self.L[Layers.centre_mask][i].blur_steps = 0 #type: ignore
-            self.L[Layers.angle_W][i].line_width = 3.0 #type: ignore
+
+            # DO TEST SETTINGS HEREs
+            self.L[Layers.centre_cam][i].use_mask = True    #type: ignore
+            self.L[Layers.centre_mask][i].blur_steps = 0    #type: ignore
+            self.L[Layers.angle_W][i].line_width = 3.0      #type: ignore
 
         self._draw_layers = FINAL_LAYERS
         # self._draw_layers = BOX_LAYERS
         self._preview_layers = PREVIEW_LAYERS
 
-
-        # self.line_width = 100.0
-
-        # self.pose_sim_layer.aggregation_method = ls.AggregationMethod.HARMONIC_MEAN
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glViewport(0, 0, width, height)

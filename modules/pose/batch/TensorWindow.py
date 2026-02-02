@@ -21,8 +21,8 @@ BufferOutput = tuple[torch.Tensor, torch.Tensor]
 
 
 @dataclass
-class RollingFeatureBufferConfig(ConfigBase):
-    """Configuration for RollingFeatureBuffer.
+class TensorWindowConfig(ConfigBase):
+    """Configuration for TensorWindow.
 
     The feature_length is derived from frame_field.get_length().
     """
@@ -32,7 +32,7 @@ class RollingFeatureBufferConfig(ConfigBase):
     fill_value: float = config_field(0.0, min=-1000.0, max=1000.0, description="Fill value for missing/invalid data" )
 
 
-class RollingFeatureBuffer(TypedCallbackMixin[BufferOutput]):
+class TensorWindow(TypedCallbackMixin[BufferOutput]):
     """GPU-resident circular buffer with async callback dispatch.
 
     Maintains a sliding window of feature values per track on GPU using a
@@ -68,7 +68,7 @@ class RollingFeatureBuffer(TypedCallbackMixin[BufferOutput]):
         buffer.stop()
     """
 
-    def __init__(self, config: RollingFeatureBufferConfig) -> None:
+    def __init__(self, config: TensorWindowConfig) -> None:
         super().__init__()
 
         self._config = config

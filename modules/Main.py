@@ -14,7 +14,7 @@ from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
 from modules.inout import OscSound, ArtNetLed
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
-from modules.pose import batch, guis, nodes, trackers, similarity
+from modules.pose import batch, guis, nodes, trackers
 
 class Main():
     def __init__(self, settings: Settings) -> None:
@@ -105,9 +105,8 @@ class Main():
         self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
 
-        self.pose_similator=        similarity.FrameSimilarity()
-        self.window_similator_config = similarity.WindowSimilarityConfig(window_length=int(0.5 * settings.camera.fps), exponent=2.5)
-        self.window_similator=      similarity.WindowSimilarity(self.window_similator_config)
+        self.window_similator_config = batch.WindowSimilarityConfig(window_length=int(0.5 * settings.camera.fps), exponent=2.5)
+        self.window_similator=      batch.WindowSimilarity(self.window_similator_config)
 
         # Feature applicators (replace SimilarityExtractor)
         self.similarity_applicator = nodes.SimilarityApplicator(max_poses=settings.pose.max_poses)
@@ -246,10 +245,6 @@ class Main():
         self.bbox_window_tracker.add_window_callback(self.data_hub.set_bbox_windows)
 
         # SIMILARITY COMPUTATION
-        # self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
-        # self.pose_similator.add_correlation_callback(self.similarity_applicator.submit)
-        # self.pose_similator.start()
-
         self.angle_window_tracker.add_window_callback(self.window_similator.submit)
         self.window_similator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
         self.window_similator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
@@ -350,7 +345,6 @@ class Main():
         self.mask_extractor.stop()
         self.flow_extractor.stop()
 
-        # self.pose_similator.stop()
         self.window_similator.stop()
 
 

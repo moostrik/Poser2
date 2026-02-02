@@ -5,6 +5,7 @@ import threading
 import time
 import traceback
 from typing import Optional, TYPE_CHECKING, cast
+import warnings
 
 # Third-party imports
 import numpy as np
@@ -53,6 +54,7 @@ class WindowSimilarityConfig(ConfigBase):
     window_length: int = config_field(30, min=1, max=300, description="Number of frames to compare")
     method: AggregationMethod = AggregationMethod.HARMONIC_MEAN
     exponent: float = config_field(3.5, min=0.5, max=4.0, description="Similarity decay exponent")
+    verbose: bool = config_field(False, description="Enable verbose logging")
 
 
 class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int, LeaderScore]]]):
@@ -133,7 +135,7 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
                 start_time: float = time.perf_counter()
                 result: tuple[dict[int, Similarity], dict[int, LeaderScore]] = self._process(windows)
                 elapsed_time: float = (time.perf_counter() - start_time) * 1000.0
-                self.Timer.add_time(elapsed_time, True)
+                self.Timer.add_time(elapsed_time, self._config.verbose)
 
                 # Store and notify
                 with self._output_lock:
@@ -164,20 +166,21 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         leader_dict = self._build_leader_dict(track_ids, leader_scores)
 
         # Debug: Print per-pose similarities and leader scores
-        results = []
-        for track_id in track_ids:
-            sim_feature = similarity_dict[track_id]
-            leader_feature = leader_dict[track_id]
+        if self._config.verbose:
+            results = []
+            for track_id in track_ids:
+                sim_feature = similarity_dict[track_id]
+                leader_feature = leader_dict[track_id]
 
-            # Show similarities to other poses
-            for other_id in range(self._config.max_poses):
-                if not np.isnan(sim_feature.values[other_id]):
-                    sim_val = sim_feature.values[other_id]
-                    conf_val = sim_feature.scores[other_id]
-                    lead_val = leader_feature.values[other_id]
-                    results.append(f"({track_id},{other_id}):sim={sim_val:.3f},conf={conf_val:.3f},lead={lead_val:+.2f}")
+                # Show similarities to other poses
+                for other_id in range(self._config.max_poses):
+                    if not np.isnan(sim_feature.values[other_id]):
+                        sim_val = sim_feature.values[other_id]
+                        conf_val = sim_feature.scores[other_id]
+                        lead_val = leader_feature.values[other_id]
+                        results.append(f"({track_id},{other_id}):sim={sim_val:.3f},conf={conf_val:.3f},lead={lead_val:+.2f}")
 
-        print(f"Pairs: {' | '.join(results)}")
+            print(f"Pairs: {' | '.join(results)}")
 
         return similarity_dict, leader_dict
 

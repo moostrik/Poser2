@@ -13,7 +13,6 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 from modules.pose.Frame import Frame
 from modules.pose.features.Angles import AngleLandmark
 from modules.pose.features.AngleSymmetry import SymmetryElement, AggregationMethod
-from modules.pose.similarity import SimilarityBatch, SimilarityFeature, AggregationMethod
 
 from modules.DataHub import DataHub, DataHubType
 from modules.ConfigBase import ConfigBase

@@ -6,7 +6,6 @@ from .extractors.AngleMotionExtractor import    AngleMotionExtractor
 from .extractors.AngleSymExtractor import       AngleSymExtractor
 from .extractors.AgeExtractor import            AgeExtractor
 from .extractors.MotionTimeExtractor import     MotionTimeExtractor
-from .extractors.SimilarityExtractor import     SimilarityExtractorConfig,  SimilarityExtractor,   AggregationMethod
 
 from .applicators.SimilarityApplicator import   SimilarityApplicator
 from .applicators.LeaderScoreApplicator import  LeaderScoreApplicator

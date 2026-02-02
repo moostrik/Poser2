@@ -15,7 +15,6 @@ from modules.inout.ArtNetLed import ArtNetLedConfig
 
 from modules.render.Settings import Settings as RenderSettings
 from modules.pose.Settings import Settings as PoseSettings, ModelType
-from modules.pose.pd_stream.PDStreamSettings import Settings as PDStreamSettings
 from modules.tracker.TrackerBase import TrackerType
 
 T = TypeVar("T")
@@ -31,7 +30,6 @@ class Settings():
 
     # POSE SETTINGS
     pose: PoseSettings = PoseSettings()
-    pd_stream: PDStreamSettings = PDStreamSettings()
 
     # GUI SETTINGS
     gui: GuiConfig = GuiConfig()

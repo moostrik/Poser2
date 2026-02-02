@@ -24,9 +24,6 @@ from .pose.PosePointLines import        PosePointLines
 
 from .window.WindowShader import        WindowShader
 
-from .stream.StreamCorrelation import   StreamCorrelation
-from .stream.StreamPose import          StreamPose
-
 from.hdt.HDTTripleBlend import          HDTTripleBlend
 
 from .ws.WS_Angles import               WS_Angles

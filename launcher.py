@@ -60,11 +60,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     if args.nopose:
         settings.pose.model_type = ModelType.NONE
 
-    settings.pd_stream.max_poses = args.players
-    settings.pd_stream.corr_rate = args.fps
-    settings.pd_stream.stream_capacity = int(10 * args.fps)
-    settings.pd_stream.corr_buffer_duration = int(3 * args.fps)
-
     settings.sound_osc.num_players = args.players
 
     settings.render.num_players = args.players
