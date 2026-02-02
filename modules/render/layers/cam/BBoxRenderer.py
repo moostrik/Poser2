@@ -8,7 +8,7 @@ from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import DrawRectangleOutline
 
 
-class BBoxCamRenderer(LayerBase):
+class BBoxRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub, data_type: PoseDataHubTypes, line_width: int = 2,
                  bbox_color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)) -> None:
         self._data: DataHub = data

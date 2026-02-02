@@ -12,7 +12,7 @@ from modules.gl.Tensor import Tensor
 from modules.pose.features.Angles import ANGLE_NUM_LANDMARKS, ANGLE_LANDMARK_NAMES
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import WindowShader as shader
-from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
+from ..data.Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

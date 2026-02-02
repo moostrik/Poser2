@@ -5,9 +5,9 @@ from modules.gl import Fbo, Texture, Blit
 from modules.DataHub import DataHub, PoseDataHubTypes
 from modules.render.layers.LayerBase import LayerBase, Rect
 
-from modules.render.layers.cam.BBoxCamRenderer import BBoxCamRenderer
-from modules.render.layers.cam.TrackletCamRenderer import TrackletCamRenderer
-from modules.render.layers.data.PoseLineLayer import PoseLineLayer
+from modules.render.layers.cam.BBoxRenderer import BBoxRenderer
+from modules.render.layers.cam.TrackletRenderer import TrackletRenderer
+from modules.render.layers.pose.PoseLineLayer import PoseLineLayer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -21,8 +21,8 @@ class CamCompositeLayer(LayerBase):
         self._data_type: PoseDataHubTypes = data_type
 
         self._cam_texture: Texture = cam_texture
-        self._depth_track_renderer: TrackletCamRenderer = TrackletCamRenderer(cam_id, data)
-        self._bbox_renderer: BBoxCamRenderer = BBoxCamRenderer(cam_id, data, data_type, int(line_width), (1.0, 1.0, 1.0, 1.0))
+        self._depth_track_renderer: TrackletRenderer = TrackletRenderer(cam_id, data)
+        self._bbox_renderer: BBoxRenderer = BBoxRenderer(cam_id, data, data_type, int(line_width), (1.0, 1.0, 1.0, 1.0))
         # Pose Points Layer works on track id, not cam id -> fix
         self._pose_line_layer: PoseLineLayer = PoseLineLayer(cam_id, data, data_type, line_width, 0.0, False, True, None)
 

@@ -29,16 +29,28 @@ COLORS: list[tuple[float, float, float, float]] = [
 ]
 
 class Layers(IntEnum):
-    # render layers
+    # image layers
     cam_image =     0
     cam_mask =      auto()
-    dense_flow =    auto()
-    flow_image =    auto()
-    sparse_flow =   auto()
+    cam_foreground= auto()
+    cam_crop =      auto()
 
-    # data layers
+    # bbox layers
+    box_cam =       auto()
+    box_pose_I =    auto()
+    box_pose_R =    auto()
+
+    # ALTERNATIVE FLOW LAYERS
+    dense_flow =    auto()
+    centre_D_flow = auto()
+    sparse_flow =   auto()
+    sparse_images = auto()
+
+    # cam composite layers
     cam_bbox =      auto()
     cam_track =     auto()
+
+    # pose data layers
     mtime_data =    auto()
     field_bar_R =   auto()
     field_bar_I =   auto()
@@ -46,26 +58,12 @@ class Layers(IntEnum):
     motion_bar =    auto()
     motion_sim =    auto()
 
-    # bbox layers
-    box_cam =       auto()
-    box_pose_I =    auto()
-    box_pose_R =    auto()
-
     # centre layers
     centre_math=    auto()
     centre_mask =   auto()
     centre_cam =    auto()
     centre_pose =   auto()
-    centre_D_flow = auto()
     centre_motion = auto()
-
-    sim_blend =     auto()
-
-    flow =          auto()
-
-    # GPU frame layers
-    gpu_crop =      auto()
-    frg_src =       auto()
 
     # Window layers
     angle_W =       auto()
@@ -74,22 +72,27 @@ class Layers(IntEnum):
     similarity_W =  auto()
     bbox_W =        auto()
 
+    # composition layers
+    sim_blend =     auto()
+    flow =          auto()
+
+
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
     Layers.cam_mask,
-    # Layers.dense_flow,
-    # Layers.flow_image,
-    # Layers.sparse_flow,
+    Layers.cam_foreground,
+    Layers.cam_crop,
 
     Layers.centre_math,
     Layers.centre_cam,
     Layers.centre_mask,
     Layers.centre_pose,
-    Layers.centre_D_flow,
     Layers.centre_motion,
+    # Layers.centre_D_flow,
 
-    Layers.gpu_crop,
-    Layers.frg_src,
+    # Layers.dense_flow,
+    # Layers.flow_images,
+    # Layers.sparse_flow,
 ]
 
 INTERFACE_LAYERS: list[Layers] = [
@@ -106,79 +109,23 @@ LARGE_LAYERS: list[Layers] = [
 ]
 
 PREVIEW_LAYERS: list[Layers] = [
-    # Layers.centre_cam,
-    # Layers.centre_pose,
-    # Layers.centre_motion,
-    # Layers.sim_blend,
-    # Layers.angle_data,
-    # Layers.prev_mt,
-    # Layers.cam_mask,
-    # Layers.flow,
-
-    # Layers.centre_motion,
-    # Layers.cam_image,
-    # Layers.cam_mask,
-    # Layers.dense_flow,
-
-
-    # Layers.centre_cam,
-
-    Layers.sim_blend,
-    Layers.flow,
-    # Layers.angle_vel_W,
-]
-
-FINAL_LAYERS: list[Layers] = [
-    # Layers.cam_image,
-    # Layers.cam_mask,
-    # Layers.dense_flow,
-    # Layers.flow_image,
-    # Layers.sparse_flow,
-
-    # Layers.cam_bbox,
-    # Layers.cam_track,
-    # Layers.angle_data,
-    # Layers.mtime_data,
-    # Layers.field_bar_R,
-    # Layers.field_bar_I,
-    # Layers.angle_bar,
-    # Layers.motion_bar,
-    # Layers.motion_sim,
-
-    # Layers.box_cam,
-    # Layers.box_pose_I,
-    # Layers.box_pose_R,
-
-    # Layers.centre_mask,
-    # Layers.centre_cam,
-    # Layers.centre_pose,
-    # Layers.angle_bar,
-    # Layers.centre_D_flow,
-    # Layers.centre_motion,
-    # Layers.centre_flow,
-
-    # Layers.sim_blend,
-
-    # Layers.centre_cam,
-    # Layers.centre_mask,
-    # Layers.centre_pose,
-    # Layers.sim_blend,
-    # Layers.centre_pose,
-    Layers.sim_blend,
-    Layers.flow,
-    Layers.dense_flow,
-    # Layers.centre_mask,
-    # Layers.gpu_crop,
-    # Layers.gpu_full_image,
-    # Layers.gpu_crop,
-    # Layers.cam_image,
     Layers.centre_cam,
-    # Layers.cam_mask,
-    # Layers.frg_src,
     Layers.centre_pose,
+
     # Layers.angle_W,
     # Layers.angle_vel_W,
     # Layers.angle_mtn_W,
+    Layers.similarity_W,
+
+    # Layers.flow,
+]
+
+FINAL_LAYERS: list[Layers] = [
+    Layers.sim_blend,
+    Layers.flow,
+    Layers.dense_flow,
+    Layers.centre_cam,
+    Layers.centre_pose,
     Layers.similarity_W,
 ]
 
@@ -192,8 +139,6 @@ class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
         self.num_players: int = settings.num_players
         self.num_cams: int =    settings.num_cams
-        num_R_streams: int =    settings.num_R
-        R_stream_capacity: int= int(settings.stream_capacity)  # 10 seconds buffer
 
         # data
         self.data_hub: DataHub = data_hub
@@ -213,10 +158,10 @@ class HDTRenderManager(RenderBase):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
             dense_flow =    self.L[Layers.dense_flow][i] =  ls.DFlowSourceLayer(    i, self.data_hub)
-            flow_image =    self.L[Layers.flow_image][i] =  ls.FlowSourceLayer(     i, self.data_hub)
+            flow_image =    self.L[Layers.sparse_images][i] =  ls.FlowSourceLayer(     i, self.data_hub)
             sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(       flow_image)
 
-            cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxCamRenderer(     i, self.data_hub,   PoseDataHubTypes.pose_I)
+            cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxRenderer(     i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=2.0)
             mtime_data =    self.L[Layers.mtime_data][i] =  ls.PoseMTimeRenderer(   i, self.data_hub,   PoseDataHubTypes.pose_I)
             field_bar_R =   self.L[Layers.field_bar_R][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_R,    FrameField.angles, line_thickness=4.0, line_smooth=16.0, color = (0.0, 0.0, 0.0, 0.33))
@@ -239,8 +184,8 @@ class HDTRenderManager(RenderBase):
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
             flow =          self.L[Layers.flow][i] =        ls.FlowLayer(              sim_blend)
 
-            gpu_crop =      self.L[Layers.gpu_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
-            frg_src =       self.L[Layers.frg_src][i]=      ls.ForegroundSourceLayer(i, self.data_hub)
+            gpu_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
+            frg_src =       self.L[Layers.cam_foreground][i]=      ls.ForegroundSourceLayer(i, self.data_hub)
 
             angle_W =       self.L[Layers.angle_W][i] =     ls.AngleWindowLayer(  i, self.data_hub, self.line_width)
             angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer(  i, self.data_hub, self.line_width)
