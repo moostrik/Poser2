@@ -5,7 +5,7 @@ import time
 from typing import Callable, Any, get_type_hints
 
 # Pose imports
-from modules.pose.features import Points2D, Angles, AngleVelocity, AngleMotion, AngleSymmetry, BBox, Similarity
+from modules.pose.features import Points2D, Angles, AngleVelocity, AngleMotion, AngleSymmetry, BBox, Similarity, LeaderScore
 from modules.pose.features.base import BaseFeature
 
 
@@ -25,6 +25,7 @@ class Frame:
     angle_sym: AngleSymmetry =  field(default_factory=AngleSymmetry.create_dummy)
     angle_motion: AngleMotion = field(default_factory=AngleMotion.create_dummy)
     similarity: Similarity =    field(default_factory=Similarity.create_dummy)
+    leader: LeaderScore =       field(default_factory=LeaderScore.create_dummy)
     motion_time: float =        field(default=0.0)
     age: float =                field(default=0.0)
 
@@ -52,6 +53,7 @@ class FrameField(IntEnum):
     angle_motion =  auto()
     angle_sym =     auto()
     similarity =    auto()
+    leader =        auto()
     motion_time =   auto()
     age =           auto()
 

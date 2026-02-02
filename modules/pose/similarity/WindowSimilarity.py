@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import threading
 import time
 import traceback
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 # Third-party imports
 import numpy as np
@@ -14,6 +14,9 @@ from modules.pose.callback.mixins import TypedCallbackMixin
 from modules.pose.nodes.windows.WindowNode import FeatureWindow
 from modules.pose.similarity.features.SimilarityFeature import SimilarityFeature
 from modules.pose.similarity.features.SimilarityBatch import SimilarityBatch
+from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod
+from modules.pose.features.Similarity import configure_similarity, Similarity
+from modules.pose.features.LeaderScore import configure_leader_score, LeaderScore
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -25,11 +28,13 @@ WindowDict = dict[int, FeatureWindow]
 @dataclass
 class WindowSimilarityConfig(ConfigBase):
     """Configuration for WindowSimilarity."""
+    max_poses: int = config_field(4, min=1, max=10, description="Maximum number of tracked poses")
     window_length: int = config_field(30, min=1, max=300, description="Number of frames to compare")
+    method: AggregationMethod = AggregationMethod.HARMONIC_MEAN
     exponent: float = config_field(3.5, min=0.5, max=4.0, description="Similarity decay exponent")
 
 
-class WindowSimilarity(TypedCallbackMixin[SimilarityBatch]):
+class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int, LeaderScore]]]):
     """Computes pairwise window similarities in a background thread.
 
     Processes FeatureWindow data from active tracklets and computes similarity metrics
@@ -38,12 +43,21 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityBatch]):
     Unlike FrameSimilarity which compares single frames, WindowSimilarity compares
     temporal sequences (windows) using time-series similarity algorithms like DTW,
     cross-correlation, or other sequence matching methods.
+
+    Returns:
+        Tuple of (similarity_dict, leader_dict) where:
+        - similarity_dict: Maps track_id -> Similarity (magnitude of synchrony)
+        - leader_dict: Maps track_id -> LeaderScore (temporal offset/who leads)
     """
 
     def __init__(self, config: WindowSimilarityConfig | None = None) -> None:
         super().__init__()
 
         self._config = config if config is not None else WindowSimilarityConfig()
+
+        # Configure Similarity and LeaderScore modules with max_poses
+        configure_similarity(self._config.max_poses)
+        configure_leader_score(self._config.max_poses)
 
         self._correlation_thread = threading.Thread(target=self.run, daemon=True)
         self._stop_event = threading.Event()
@@ -55,7 +69,7 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityBatch]):
 
         # OUTPUT
         self._output_lock = threading.Lock()
-        self._output_data: Optional[SimilarityBatch] = None
+        self._output_data: Optional[tuple[dict[int, 'Similarity'], dict[int, 'LeaderScore']]] = None
 
         self.Timer: PerformanceTimer = PerformanceTimer(name="similarity  ", sample_count=200, report_interval=100, color="red", omit_init=0)
 
@@ -94,57 +108,54 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityBatch]):
                 with self._input_lock:
                     windows: WindowDict = self._input_windows
 
-                # Process similarity
+                # Process similarity and leader scores
                 start_time: float = time.perf_counter()
-                batch: SimilarityBatch = self._process(windows)
+                result: tuple[dict[int, 'Similarity'], dict[int, 'LeaderScore']] = self._process(windows)
                 elapsed_time: float = (time.perf_counter() - start_time) * 1000.0
                 self.Timer.add_time(elapsed_time, True)
 
                 # Store and notify
                 with self._output_lock:
-                    self._output_data = batch
-                self._notify_callbacks(batch)
+                    self._output_data = result
+                self._notify_callbacks(result)
 
             except Exception as e:
                 print(f"WindowSimilarity: Processing error: {e}")
                 traceback.print_exc()
 
-    def _process(self, windows: WindowDict) -> SimilarityBatch:
+    def _process(self, windows: WindowDict) -> tuple[dict[int, 'Similarity'], dict[int, 'LeaderScore']]:
+        """Process windows and return both Similarity and LeaderScore dicts."""
+        from modules.pose.features.Similarity import Similarity
+        from modules.pose.features.LeaderScore import LeaderScore
+
         if len(windows) < 2:
-            return SimilarityBatch(similarities=[])
+            return {}, {}
 
         # Step 1: Stack windows
         track_ids, values = self._stack_windows(windows)
         # Step 2: Compute similarity tensor
         best_sim, confidence_scores, leader_scores = self._compute_similarity_tensor(values)
-        # Step 3: Build similarity features
-        batch = self._build_similarity_batch(track_ids, best_sim, confidence_scores)
+        # Step 3: Build per-pose dicts
+        similarity_dict = self._build_similarity_dict(track_ids, best_sim, confidence_scores)
+        leader_dict = self._build_leader_dict(track_ids, leader_scores)
 
-        # Debug: Print all pairs (both directions) with all metrics
-        N = len(track_ids)
-
+        # Debug: Print per-pose similarities and leader scores
         results = []
-        for i in range(N):
-            for j in range(N):
-                if i != j:
-                    id_i = track_ids[i]
-                    id_j = track_ids[j]
+        for track_id in track_ids:
+            sim_feature = similarity_dict[track_id]
+            leader_feature = leader_dict[track_id]
 
-                    # Harmonic mean (only valid joints, replace near-zero with TINY)
-                    _TINY = 1e-5
-                    valid = confidence_scores[i, j] > 0
-                    if np.any(valid):
-                        safe_values = np.where(best_sim[i, j][valid] > _TINY, best_sim[i, j][valid], _TINY)
-                        sim = len(safe_values) / np.sum(1.0 / safe_values)
-                    else:
-                        sim = 0.0
-                    conf = np.mean(confidence_scores[i, j])
-                    lead = leader_scores[i, j]
-                    results.append(f"({id_i},{id_j}):sim={sim:.3f},conf={conf:.3f},lead={lead:+.2f}")
+            # Show similarities to other poses
+            for other_id in range(self._config.max_poses):
+                if not np.isnan(sim_feature.values[other_id]):
+                    sim_val = sim_feature.values[other_id]
+                    conf_val = sim_feature.scores[other_id]
+                    lead_val = leader_feature.values[other_id]
+                    results.append(f"({track_id},{other_id}):sim={sim_val:.3f},conf={conf_val:.3f},lead={lead_val:+.2f}")
 
         print(f"Pairs: {' | '.join(results)}")
 
-        return batch
+        return similarity_dict, leader_dict
 
 
     def _stack_windows(self, windows: WindowDict) -> tuple[list[int], np.ndarray]:
@@ -238,6 +249,106 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityBatch]):
         confidence_scores = confidence_scores.astype(np.float32)
 
         return best_sim, confidence_scores, leader_scores
+
+    def _build_similarity_dict(
+        self,
+        track_ids: list[int],
+        best_sim: np.ndarray,
+        confidence_scores: np.ndarray
+    ) -> dict[int, 'Similarity']:
+        """Build per-pose Similarity dict from similarity tensors.
+
+        Args:
+            track_ids: List of track IDs (N,)
+            best_sim: Best similarity per joint (N, N, F)
+            confidence_scores: Confidence scores (N, N, F)
+
+        Returns:
+            Dict mapping track_id -> Similarity object
+        """
+        from modules.pose.features.Similarity import Similarity
+
+        N = len(track_ids)
+        max_poses = self._config.max_poses
+        result: dict[int, Similarity] = {}
+
+        # For each pose i, build its Similarity array
+        for i in range(N):
+            values = np.full(max_poses, np.nan, dtype=np.float32)
+            scores = np.zeros(max_poses, dtype=np.float32)
+
+            # For each other pose j
+            for j in range(N):
+                if i == j:
+                    continue  # Skip self-comparison
+
+                # Create temporary SimilarityFeature to use its aggregate method
+                temp_feature = SimilarityFeature(
+                    values=best_sim[i, j],
+                    scores=confidence_scores[i, j],
+                    pair_id=(min(track_ids[i], track_ids[j]), max(track_ids[i], track_ids[j]))
+                )
+
+                # Aggregate per-joint similarities into single scalar
+                aggregated_sim = temp_feature.aggregate(
+                    method=self._config.method,
+                    min_confidence=0.0,
+                    exponent=self._config.exponent
+                )
+
+                # Store at absolute pose ID index
+                pose_id_j = track_ids[j]
+                if not np.isnan(aggregated_sim):
+                    values[pose_id_j] = aggregated_sim
+
+                    # Compute mean confidence from valid joints
+                    valid_scores = temp_feature.scores[temp_feature.valid_mask]
+                    if len(valid_scores) > 0:
+                        scores[pose_id_j] = np.mean(valid_scores)
+
+            # Create Similarity object for this pose
+            result[track_ids[i]] = Similarity(values, scores)
+
+        return result
+
+    def _build_leader_dict(
+        self,
+        track_ids: list[int],
+        leader_scores: np.ndarray
+    ) -> dict[int, 'LeaderScore']:
+        """Build per-pose LeaderScore dict from leader score tensor.
+
+        Args:
+            track_ids: List of track IDs (N,)
+            leader_scores: Temporal offset scores (N, N) in range [-1, 1]
+
+        Returns:
+            Dict mapping track_id -> LeaderScore object
+        """
+        from modules.pose.features.LeaderScore import LeaderScore
+
+        N = len(track_ids)
+        max_poses = self._config.max_poses
+        result: dict[int, LeaderScore] = {}
+
+        # For each pose i, build its LeaderScore array
+        for i in range(N):
+            values = np.zeros(max_poses, dtype=np.float32)
+            scores = np.zeros(max_poses, dtype=np.float32)
+
+            # For each other pose j
+            for j in range(N):
+                if i == j:
+                    continue  # Skip self-comparison
+
+                pose_id_j = track_ids[j]
+                values[pose_id_j] = leader_scores[i, j]
+                scores[pose_id_j] = 1.0  # Leader scores always valid when poses are compared
+
+            # Create LeaderScore object for this pose
+            result[track_ids[i]] = LeaderScore(values, scores)
+
+        return result
 
     def _build_similarity_batch(
         self,

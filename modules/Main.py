@@ -15,8 +15,6 @@ from modules.inout import OscSound, ArtNetLed
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers, similarity
-from modules.pose.pd_stream import PDStreamManager, PDStreamComputer
-
 
 class Main():
     def __init__(self, settings: Settings) -> None:
@@ -89,18 +87,12 @@ class Main():
         self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
         self.simil_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
 
-        # self.b_box_interp_gui =   gui.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBox')
         self.point_interp_gui =     guis.InterpolatorGui(self.point_interp_config, self.gui, 'POINT')
         self.angle_interp_gui =     guis.InterpolatorGui(self.angle_interp_config, self.gui, 'ANGLE')
         self.simil_interp_gui =     guis.InterpolatorGui(self.simil_interp_config, self.gui, 'SIMILARITY')
 
         self.motion_smooth_config = nodes.EmaSmootherConfig(attack=0.95, release=0.8)
         self.motion_smooth_gui =    guis.EmaSmootherGui(self.motion_smooth_config, self.gui, 'MOTION')
-
-        self.simil_config =         nodes.SimilarityExtractorConfig(max_poses=settings.pose.max_poses,
-                                                                    method=nodes.AggregationMethod.HARMONIC_MEAN,
-                                                                    exponent=2.0)
-        self.simil_gui =            guis.SimilarityExtractorGui(self.simil_config, self.gui, 'SIMILARITY')
 
         # WINDOW TRACKER CONFIGURATION
         self.window_config =      trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps), emit_partial=True)
@@ -113,14 +105,13 @@ class Main():
         self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
 
-        # Rolling feature buffer for temporal accumulation
-        # self.rolling_angles_config = batch.RollingFeatureBufferConfig(num_tracks=num_players, window_size= int(4.5 * settings.camera.fps))  # 5 seconds of history
-        # self.rolling_angles =       batch.RollingFeatureBuffer(self.rolling_angles_config)
-
         self.pose_similator=        similarity.FrameSimilarity()
         self.window_similator_config = similarity.WindowSimilarityConfig(window_length=int(0.5 * settings.camera.fps), exponent=2.5)
         self.window_similator=      similarity.WindowSimilarity(self.window_similator_config)
-        self.pose_similarity_extractor = nodes.SimilarityExtractor(self.simil_config)
+
+        # Feature applicators (replace SimilarityExtractor)
+        self.similarity_applicator = nodes.SimilarityApplicator(max_poses=settings.pose.max_poses)
+        self.leader_applicator =     nodes.LeaderScoreApplicator(max_poses=settings.pose.max_poses)
 
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
@@ -164,7 +155,8 @@ class Main():
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
-                lambda: self.pose_similarity_extractor,
+                lambda: self.similarity_applicator,
+                lambda: self.leader_applicator,
                 lambda: nodes.SimilarityEuroSmoother(self.simil_smooth_config),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
             ]
@@ -207,11 +199,6 @@ class Main():
             ]
         )
 
-         # PD STREAM
-
-        self.pd_pose_streamer = PDStreamManager(settings.pd_stream)
-        self.pd_stream_similator: Optional[PDStreamComputer] = None
-
     def start(self) -> None:
         for camera in self.cameras:
 
@@ -225,65 +212,51 @@ class Main():
             camera.add_tracker_callback(self.tracklet_sync_bang.add_frame)
             camera.start()
 
-        if self.pd_stream_similator:
-            self.pd_pose_streamer.add_stream_callback(self.pd_stream_similator.set_pose_stream)
-            self.pd_stream_similator.add_correlation_callback(self.data_hub.set_motion_similarity)
-            self.pd_stream_similator.start()
-
-        self.pd_pose_streamer.add_stream_callback(self.data_hub.set_pd_stream)
-        self.pd_pose_streamer.start()
-
-        # self.pose_similator.add_correlation_callback(self.data_hub.set_pose_similarity)
-        # self.pose_similator.add_correlation_callback(self.pose_similarity_extractor.submit)
-        # self.pose_similator.start()
-
-        self.window_similator.add_callback(self.data_hub.set_pose_similarity)
-        self.window_similator.add_callback(self.pose_similarity_extractor.submit)
-        self.window_similator.start()
-
-
-        # POSE PROCESSING PIPELINES
+        # BBOX
         self.poses_from_tracklets.add_poses_callback(self.bbox_filters.process)
         self.bbox_filters.add_poses_callback(self.gpu_crop_processor.process)
-        self.gpu_crop_processor.add_callback(self.point_extractor.process)
-        self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
 
-        self.pose_raw_filters.add_poses_callback(self.pd_pose_streamer.submit)
+        # POSE RAW
+        self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
         self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_R)) # raw poses
 
-        # self.pose_raw_filters.add_poses_callback(self.feature_buffer.submit)
-
-
-        # self.rolling_angles.add_callback(self.data_hub.set_feature_buffer)
-        # self.pose_smooth_filters.add_poses_callback(self.rolling_angles.submit)
-        # self.rolling_angles.start()
-
-
+        # POSE SMOOTH
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
-        # self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
+
+        # POSE PREDICTION
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
         self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_S)) # smooth poses
 
+        # INTERPOLATION
+        self.data_hub.add_update_callback(self.interpolator.update)
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
         self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_I)) # interpolated poses
 
         # WINDOW TRACKERS
         self.pose_smooth_filters.add_poses_callback(self.angle_window_tracker.process)
-        self.pose_smooth_filters.add_poses_callback(self.angle_vel_window_tracker.process)
-        self.pose_smooth_filters.add_poses_callback(self.angle_mot_window_tracker.process)
-        self.pose_smooth_filters.add_poses_callback(self.similarity_window_tracker.process)
-        self.pose_smooth_filters.add_poses_callback(self.bbox_window_tracker.process)
-
         self.angle_window_tracker.add_window_callback(self.data_hub.set_angle_windows)
-        self.angle_window_tracker.add_window_callback(self.window_similator.submit)
-
+        self.pose_smooth_filters.add_poses_callback(self.angle_vel_window_tracker.process)
         self.angle_vel_window_tracker.add_window_callback(self.data_hub.set_angle_vel_windows)
+        self.pose_smooth_filters.add_poses_callback(self.angle_mot_window_tracker.process)
         self.angle_mot_window_tracker.add_window_callback(self.data_hub.set_angle_motion_windows)
+        self.pose_smooth_filters.add_poses_callback(self.similarity_window_tracker.process)
         self.similarity_window_tracker.add_window_callback(self.data_hub.set_similarity_windows)
+        self.pose_smooth_filters.add_poses_callback(self.bbox_window_tracker.process)
         self.bbox_window_tracker.add_window_callback(self.data_hub.set_bbox_windows)
 
-        self.data_hub.add_update_callback(self.interpolator.update)
+        # SIMILARITY COMPUTATION
+        # self.pose_smooth_filters.add_poses_callback(self.pose_similator.submit)
+        # self.pose_similator.add_correlation_callback(self.similarity_applicator.submit)
+        # self.pose_similator.start()
+
+        self.angle_window_tracker.add_window_callback(self.window_similator.submit)
+        self.window_similator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
+        self.window_similator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
+        self.window_similator.start()
+
+        # POSE ESTIMATION
+        self.gpu_crop_processor.add_callback(self.point_extractor.process)
         self.point_extractor.start()
 
         # SEGMENTATION
@@ -325,7 +298,6 @@ class Main():
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame(), self.motion_smooth_gui.get_gui_frame()])
-        self.gui.addFrame([self.simil_gui.get_gui_frame()])
         self.gui.addFrame([self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame])
         self.gui.addFrame([self.artnet_guis[2].frame])
@@ -375,13 +347,12 @@ class Main():
             artnet.stop()
 
         self.point_extractor.stop()
+        self.mask_extractor.stop()
+        self.flow_extractor.stop()
+
         # self.pose_similator.stop()
         self.window_similator.stop()
-        # self.rolling_angles.stop()
 
-        self.pd_pose_streamer.stop()
-        if self.pd_stream_similator:
-            self.pd_stream_similator.stop()
 
         self.gui.stop()
 

@@ -8,6 +8,7 @@ from .AngleVelocity import  AngleVelocity
 from .AngleMotion import    AngleMotion
 from .AngleSymmetry import  AngleSymmetry, SymmetryElement
 from .Similarity import     Similarity
+from .LeaderScore import    LeaderScore
 from .SingleValue import    SingleValue
 
-PoseFeatureType = Union[BBox, Points2D, Angles, AngleVelocity, AngleMotion, AngleSymmetry, Similarity, SingleValue]
+PoseFeatureType = Union[BBox, Points2D, Angles, AngleVelocity, AngleMotion, AngleSymmetry, Similarity, LeaderScore, SingleValue]

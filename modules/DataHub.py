@@ -1,5 +1,5 @@
 # Standard library imports
-from enum import IntEnum
+from enum import IntEnum, auto
 from threading import Lock
 from traceback import print_exc
 from typing import Callable, Any
@@ -11,44 +11,36 @@ from torch import Tensor
 # Local application imports for setter types
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.pose.Frame import FrameDict
-from modules.pose.pd_stream.PDStream import PDStreamData
-from modules.pose.similarity import SimilarityBatch
+from modules.pose.features import Similarity, LeaderScore
 from modules.tracker.Tracklet import TrackletDict
-from modules.WS.WSOutput import WSOutput
 
 
 class DataHubType(IntEnum):
-    cam_image =         0   # sorted by cam_id
-    depth_tracklet =    1   # sorted by cam_id
-    tracklet =          2   # sorted by track_id, has cam_id
-    pose_R =            3   # sorted by track_id, has cam_id
-    pose_S =            4   # sorted by track_id, has cam_id
-    pose_I =            5   # sorted by track_id, has cam_id
-    pd_stream =         6   # sorted by track_id, (cam_id not needed)
-    sim_P =             7   # single SimilarityBatch
-    sim_M =             8   # single SimilarityBatch
-    light_image =       9   # single image
-    mask_tensor =      10   # sorted by track_id, GPU tensors (H, W) FP16
-    flow_tensor =      11   # sorted by track_id, GPU tensors (H, W, 2) FP16
-    flow_images =      12   # sorted by track_id, flow visualization images
-    gpu_frames =       13   # sorted by track_id, GPU frames with crops
-    feature_buffer =   14   # (values, mask) GPU tensors from RollingFeatureBuffer
-    angle_window =     15   # sorted by track_id, FeatureWindow[AngleLandmark]
-    angle_vel_window = 16   # sorted by track_id, FeatureWindow[AngleLandmark]
-    angle_motion_window = 17  # sorted by track_id, FeatureWindow[AngleLandmark]
-    similarity_window =    18  # sorted by track_id, FeatureWindow[AngleLandmark]
-    points2d_window =     19  # sorted by track_id, FeatureWindow[PointLandmark]
-    bbox_window =         20  # sorted by track_id, FeatureWindow[BBoxElement]
+    cam_image =             auto()   # sorted by cam_id, raw camera images
+    depth_tracklet =        auto()   # sorted by cam_id
+    tracklet =              auto()   # sorted by track_id, has cam_id
+    pose_R =                auto()   # sorted by track_id, has cam_id
+    pose_S =                auto()   # sorted by track_id, has cam_id
+    pose_I =                auto()   # sorted by track_id, has cam_id
 
+    gpu_frames =            auto()   # sorted by track_id, GPU frames with crops
+    mask_tensor =           auto()   # sorted by track_id, GPU tensors (H, W) FP16
+    flow_tensor =           auto()   # sorted by track_id, GPU tensors (H, W, 2) FP16
+    flow_images =           auto()   # sorted by track_id, flow visualization images
+
+    angle_window =          auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
+    angle_vel_window =      auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
+    angle_motion_window =   auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
+    bbox_window =           auto()   # sorted by track_id, FeatureWindow[BBoxElement]
+    similarity_window =     auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
+
+    similarities =          auto()   # sorted by tuple[track_id, track_id]
+    leader_scores =         auto()   # sorted by tuple[track_id, track_id]
 
 class PoseDataHubTypes(IntEnum):
     pose_R =      DataHubType.pose_R.value
     pose_S =      DataHubType.pose_S.value
     pose_I =      DataHubType.pose_I.value
-
-class SimilarityDataHubType(IntEnum):
-    sim_P =      DataHubType.sim_P.value
-    sim_M =      DataHubType.sim_M.value
 
 # POSE_ENUMS: set[DataType] = {DataType.pose_R, DataType.pose_S, DataType.pose_I}
 # SIMILARITY_ENUMS: set[DataType] = {DataType.sim_P, DataType.sim_M}
@@ -165,23 +157,13 @@ class DataHub:
         """Store angle symmetry feature windows. Expects dict[int, FeatureWindow]."""
         self.set_dict(DataHubType.similarity_window, windows)
 
-    # DEPRICATED WINDOWS
-    def set_pd_stream(self, pd_stream: PDStreamData) -> None:
-        self.set_item(DataHubType.pd_stream, pd_stream.track_id, pd_stream)
-
-    def set_feature_buffer(self, buffer_output: tuple[Tensor, Tensor]) -> None:
-        """Store feature buffer (values, mask) GPU tensors."""
-        self.set_item(DataHubType.feature_buffer, 0, buffer_output)
 
     # TYPE-SPECIFIC SETTERS WITHOUT KEY
-    def set_pose_similarity(self, value: SimilarityBatch) -> None:
-        self.set_dict(DataHubType.sim_P, {0: value})
+    def set_similarity(self, value: Similarity) -> None:
+        self.set_dict(DataHubType.similarities, {0: value})
 
-    def set_motion_similarity(self, value: SimilarityBatch) -> None:
-        self.set_dict(DataHubType.sim_M, {0: value})
-
-    def set_light_image(self, value: WSOutput) -> None:
-        self.set_dict(DataHubType.light_image, {0: value})
+    def set_leader_score(self, value: LeaderScore) -> None:
+        self.set_dict(DataHubType.leader_scores, {0: value})
 
     # UPDATE CALLBACK
     def notify_update(self) -> None:

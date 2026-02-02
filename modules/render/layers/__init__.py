@@ -18,7 +18,7 @@ from .data.PDLayer import                   PDLayer
 from .data.PoseBarADLayer import            PoseBarADLayer
 from .data.PoseBarMLayer import             PoseBarMLayer
 from .data.PoseBarScalarLayer import        PoseBarScalarLayer
-from .data.SimilarityLayer import           SimilarityLayer, AggregationMethod
+# from .data.SimilarityLayer import           SimilarityLayer, AggregationMethod
 from .data.PoseBarSLayer import             PoseBarSLayer
 from .data.PoseDotLayer import              PoseDotLayer
 from .data.PoseLineLayer import             PoseLineLayer

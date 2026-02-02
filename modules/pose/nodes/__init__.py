@@ -8,6 +8,9 @@ from .extractors.AgeExtractor import            AgeExtractor
 from .extractors.MotionTimeExtractor import     MotionTimeExtractor
 from .extractors.SimilarityExtractor import     SimilarityExtractorConfig,  SimilarityExtractor,   AggregationMethod
 
+from .applicators.SimilarityApplicator import   SimilarityApplicator
+from .applicators.LeaderScoreApplicator import  LeaderScoreApplicator
+
 from .filters.ConfidenceFilters import          ConfidenceFilterConfig,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfFilter
 from .filters.DualConfidenceFilters import      DualConfFilterConfig,       BBoxDualConfFilter,     PointDualConfFilter,    AngleDualConfFilter,    AngleVelDualConfFilter,     AngleSymDualConfidenceFilter
 from .filters.Predictors import                 PredictorConfig,    BBoxPredictor,      PointPredictor,     AnglePredictor,     AngleVelPredictor,      AngleSymPredictor

@@ -9,7 +9,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color
 from modules.render.layers import LayerBase
 
-from modules.DataHub import DataHub, PoseDataHubTypes, SimilarityDataHubType
+from modules.DataHub import DataHub, PoseDataHubTypes, DataHubType
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.Frame import FrameField
 from modules.render.Settings import Settings
@@ -251,7 +251,7 @@ class HDTRenderManager(RenderBase):
             # bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub)
 
         # global layers
-        self.pose_sim_layer =   ls.SimilarityLayer(num_R_streams, R_stream_capacity, self.data_hub, SimilarityDataHubType.sim_P, ls.AggregationMethod.MAX, 2.0)
+        # self.pose_sim_layer =   ls.SimilarityWindowLayer(num_R_streams, R_stream_capacity, self.data_hub, DataHubType.similarities, ls.AggregationMethod.MAX, 2.0)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
@@ -290,7 +290,7 @@ class HDTRenderManager(RenderBase):
 
     def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size('similarity', 0)
-        self.pose_sim_layer.allocate(w, h, GL_RGBA)
+        # self.pose_sim_layer.allocate(w, h, GL_RGBA)
         for i in range(self.num_cams):
             w, h = self.subdivision.get_allocation_size('track', i)
             self.L[Layers.cam_track][i].allocate(w , h, GL_RGBA)
@@ -299,14 +299,14 @@ class HDTRenderManager(RenderBase):
             # self.L[Layers.feature_buf][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
-        self.pose_sim_layer.deallocate()
+        # self.pose_sim_layer.deallocate()
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
 
     def draw_main(self, width: int, height: int) -> None:
         self.data_hub.notify_update()
-        self.pose_sim_layer.update()
+        # self.pose_sim_layer.update()
         seen: set[Layers] = set()
         for layer_type in self._update_layers + self._interface_layers + self._draw_layers + self._preview_layers:
             if layer_type not in seen:
@@ -326,7 +326,7 @@ class HDTRenderManager(RenderBase):
 
         sim_rect = self.subdivision.get_rect('similarity', 0)
         glViewport(int(sim_rect.x), int(height - sim_rect.y - sim_rect.height), int(sim_rect.width), int(sim_rect.height))
-        self.pose_sim_layer.draw()
+        # self.pose_sim_layer.draw()
 
         # Interface layers
         for i in range(self.num_cams):
