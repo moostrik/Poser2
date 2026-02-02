@@ -22,6 +22,7 @@ class MethodType(Enum):
     STATIC = auto()
     CLASS = auto()
     INSTANCE = auto()
+    CONSTANT = auto()
 
 @dataclass
 class MethodInfo:
@@ -47,6 +48,7 @@ class HotReloadMethods:
 
         self._file_module_path: str = os.path.abspath(os.path.normcase(class_module.__file__)).lower()
         self._file_module_name: str = class_module.__name__
+        self._module: ModuleType = class_module
 
         self._on_reload_callbacks: list[Callable[[], None]] = []
 
@@ -102,7 +104,7 @@ class HotReloadMethods:
 
 
     def reload_methods(self) -> None:
-        """Reload methods from the target class's file and apply changes."""
+        """Reload methods and constants from the target class's file and apply changes."""
         # print(f"[{HotReloadMethods.__name__}] Reloading methods for {self._target_class.__name__} from {self._file_module_path}")
         try:
             # Get methods from the module
@@ -114,6 +116,10 @@ class HotReloadMethods:
                 return
             # Get methods from the target class
             class_methods: MethodMap = HotReloadMethods._get_methods_from_class(self._target_class)
+
+            # Also get module-level constants
+            module_constants: MethodMap = HotReloadMethods._get_module_constants(module)
+            current_constants: MethodMap = HotReloadMethods._get_module_constants(self._module)
 
             changed = False
 
@@ -128,10 +134,16 @@ class HotReloadMethods:
             methods_to_update: MethodMap = {}
             for name, info in module_methods.items():
                 if name in class_methods and class_methods[name].type == info.type:
-                    module_code: Optional[CodeType] = getattr(info.func, "__code__", None)
-                    class_code: Optional[CodeType] = getattr(class_methods[name].func, "__code__", None)
-                    if HotReloadMethods._is_different(module_code, class_code) or self.reload_everything:
-                        methods_to_update[name] = info
+                    if info.type == MethodType.CONSTANT:
+                        # For constants, compare the values directly
+                        if info.func != class_methods[name].func or self.reload_everything:
+                            methods_to_update[name] = info
+                    else:
+                        # For methods, compare code objects
+                        module_code: Optional[CodeType] = getattr(info.func, "__code__", None)
+                        class_code: Optional[CodeType] = getattr(class_methods[name].func, "__code__", None)
+                        if HotReloadMethods._is_different(module_code, class_code) or self.reload_everything:
+                            methods_to_update[name] = info
             if methods_to_update:
                 HotReloadMethods._update_methods(self._target_class, methods_to_update)
                 changed = True
@@ -140,6 +152,20 @@ class HotReloadMethods:
             new_methods: Dict[str, MethodInfo] = {name: info for name, info in module_methods.items() if name not in class_methods or class_methods[name].type != info.type}
             if new_methods:
                 HotReloadMethods._add_methods(self._target_class, new_methods)
+                changed = True
+
+            # Update module-level constants
+            constants_to_update: MethodMap = {}
+            for name, info in module_constants.items():
+                if name in current_constants:
+                    if info.func != current_constants[name].func or self.reload_everything:
+                        constants_to_update[name] = info
+                else:
+                    # New constant
+                    constants_to_update[name] = info
+
+            if constants_to_update:
+                HotReloadMethods._update_module_constants(self._module, constants_to_update)
                 changed = True
 
             if changed:
@@ -177,18 +203,27 @@ class HotReloadMethods:
                 print(f"[{HotReloadMethods.__name__}] Original module {module_name} not found in sys.modules")
                 return None
 
-            # Parse the source to extract only class definitions
+            # Parse the source to extract class definitions and module-level assignments
             tree = ast.parse(source_code, filename=file_path)
 
-            # Filter to keep only ClassDef nodes (skip imports)
-            class_nodes = [node for node in tree.body if isinstance(node, ast.ClassDef)]
+            # Filter to keep ClassDef nodes and module-level assignments (skip imports and function defs)
+            filtered_nodes = []
+            for node in tree.body:
+                if isinstance(node, ast.ClassDef):
+                    filtered_nodes.append(node)
+                elif isinstance(node, ast.Assign):
+                    # Keep module-level assignments (constants)
+                    filtered_nodes.append(node)
+                elif isinstance(node, ast.AnnAssign):
+                    # Keep annotated assignments
+                    filtered_nodes.append(node)
 
-            if not class_nodes:
-                print(f"[{HotReloadMethods.__name__}] No class definitions found in {file_path}")
+            if not filtered_nodes:
+                print(f"[{HotReloadMethods.__name__}] No class definitions or constants found in {file_path}")
                 return None
 
-            # Create a new module with only class definitions
-            tree.body = class_nodes # type: ignore
+            # Create a new module with only class definitions and constants
+            tree.body = filtered_nodes # type: ignore
 
             # Compile and execute the filtered AST
             code = compile(tree, file_path, 'exec')
@@ -205,13 +240,13 @@ class HotReloadMethods:
 
     @staticmethod
     def _get_methods_from_class(obj: Type[Any]) -> MethodMap:
-        """Extract all methods (static, class, instance) from a class."""
+        """Extract all methods (static, class, instance) and constants from a class."""
         methods: MethodMap = {}
         for name, member in inspect.getmembers(obj):
             if name.startswith('__'):
                 continue
             if name not in obj.__dict__:
-                continue  # Skip inherited methods
+                continue  # Skip inherited members
             attr = inspect.getattr_static(obj, name)
             if isinstance(attr, staticmethod):
                 methods[name] = MethodInfo(MethodType.STATIC, member)
@@ -219,6 +254,9 @@ class HotReloadMethods:
                 methods[name] = MethodInfo(MethodType.CLASS, member)
             elif inspect.isfunction(attr):
                 methods[name] = MethodInfo(MethodType.INSTANCE, member)
+            elif not callable(attr) and not inspect.ismethod(attr):
+                # It's a constant (class variable)
+                methods[name] = MethodInfo(MethodType.CONSTANT, attr)
         return methods
 
     @staticmethod
@@ -232,6 +270,33 @@ class HotReloadMethods:
             print(f"[{HotReloadMethods.__name__}] {class_name} is not a class in module {module.__name__}")
             return None
         return HotReloadMethods._get_methods_from_class(class_obj)
+
+    @staticmethod
+    def _get_module_constants(module: ModuleType) -> MethodMap:
+        """Extract module-level constants (non-callable, non-class, non-module attributes)."""
+        constants: MethodMap = {}
+        for name in dir(module):
+            if name.startswith('_'):
+                continue
+            attr = getattr(module, name, None)
+            if attr is None:
+                continue
+            # Skip imports, classes, functions, and modules
+            if inspect.isclass(attr) or inspect.isfunction(attr) or inspect.ismodule(attr) or inspect.ismethod(attr):
+                continue
+            # Skip callable objects
+            if callable(attr):
+                continue
+            # It's a module-level constant
+            constants[name] = MethodInfo(MethodType.CONSTANT, attr)
+        return constants
+
+    @staticmethod
+    def _update_module_constants(module: ModuleType, constants_to_update: Dict[str, MethodInfo]) -> None:
+        """Update module-level constants."""
+        for name, info in constants_to_update.items():
+            print(f"[{HotReloadMethods.__name__}] {module.__name__} Update module constant: {name}")
+            setattr(module, name, info.func)
 
     @staticmethod
     def _is_different(new_code: Optional[CodeType], last_code: Optional[CodeType]) -> bool:
@@ -264,33 +329,37 @@ class HotReloadMethods:
 
     @staticmethod
     def _remove_methods(target_class: Type[Any], deleted_methods: Dict[str, MethodInfo]) -> None:
-        """Remove methods that no longer exist in the updated code."""
+        """Remove methods and constants that no longer exist in the updated code."""
         for name, info in deleted_methods.items():
             if hasattr(target_class, name):
-                print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Remove {info.type.name} method: {name}")
+                print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Remove {info.type.name} {'constant' if info.type == MethodType.CONSTANT else 'method'}: {name}")
                 delattr(target_class, name)
 
     @staticmethod
     def _update_methods(target_class: Type[Any], methods_to_update: Dict[str, MethodInfo]) -> None:
-        """Update methods that have changed."""
+        """Update methods and constants that have changed."""
         for name, info in methods_to_update.items():
-            print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Patch {info.type.name} method: {name}")
+            print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Patch {info.type.name} {'constant' if info.type == MethodType.CONSTANT else 'method'}: {name}")
             if info.type == MethodType.STATIC:
                 setattr(target_class, name, staticmethod(info.func))
             elif info.type == MethodType.CLASS:
                 setattr(target_class, name, classmethod(info.func))
+            elif info.type == MethodType.CONSTANT:
+                setattr(target_class, name, info.func)
             else:
                 setattr(target_class, name, info.func)
 
     @staticmethod
     def _add_methods(target_class: Type[Any], methods_to_add: Dict[str, MethodInfo]) -> None:
-        """Add methods that are new in the updated code."""
+        """Add methods and constants that are new in the updated code."""
         for name, info in methods_to_add.items():
-            print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Add {info.type.name} method: {name}")
+            print(f"[{HotReloadMethods.__name__}] {target_class.__name__} Add {info.type.name} {'constant' if info.type == MethodType.CONSTANT else 'method'}: {name}")
             if info.type == MethodType.STATIC:
                 setattr(target_class, name, staticmethod(info.func))
             elif info.type == MethodType.CLASS:
                 setattr(target_class, name, classmethod(info.func))
+            elif info.type == MethodType.CONSTANT:
+                setattr(target_class, name, info.func)
             else:
                 setattr(target_class, name, info.func)
 
