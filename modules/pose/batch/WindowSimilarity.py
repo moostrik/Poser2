@@ -253,7 +253,8 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         confidence_penalty = joint_count / F  # [0, 1]
 
         # Suppress warning for all-NaN slices (handled by nanmean returning NaN)
-        with np.errstate(invalid='ignore'):
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='Mean of empty slice')
             whole_body_sim = np.nanmean(similarity, axis=4) * confidence_penalty
 
         # Find best (t_a, t_b) alignment per pair
