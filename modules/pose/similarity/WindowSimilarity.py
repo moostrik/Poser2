@@ -116,16 +116,35 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityBatch]):
         # Step 1: Stack windows
         track_ids, values = self._stack_windows(windows)
         # Step 2: Compute similarity tensor
-        best_sim, scores = self._compute_similarity_tensor(values)
+        best_sim, confidence_scores, leader_scores = self._compute_similarity_tensor(values)
         # Step 3: Build similarity features
-        batch = self._build_similarity_batch(track_ids, best_sim, scores)
+        batch = self._build_similarity_batch(track_ids, best_sim, confidence_scores)
 
-        # Debug: Print aggregate similarity for each pair in one line
-        # pairs_str = " | ".join([f"{sim.pair_id}:{sim.harmonic_mean():.3f}" for sim in batch])
-        # print(f"Similarities: {pairs_str}")
+        # Debug: Print all pairs (both directions) with all metrics
+        N = len(track_ids)
+
+        results = []
+        for i in range(N):
+            for j in range(N):
+                if i != j:
+                    id_i = track_ids[i]
+                    id_j = track_ids[j]
+
+                    # Harmonic mean (only valid joints, replace near-zero with TINY)
+                    _TINY = 1e-5
+                    valid = confidence_scores[i, j] > 0
+                    if np.any(valid):
+                        safe_values = np.where(best_sim[i, j][valid] > _TINY, best_sim[i, j][valid], _TINY)
+                        sim = len(safe_values) / np.sum(1.0 / safe_values)
+                    else:
+                        sim = 0.0
+                    conf = np.mean(confidence_scores[i, j])
+                    lead = leader_scores[i, j]
+                    results.append(f"({id_i},{id_j}):sim={sim:.3f},conf={conf:.3f},lead={lead:+.2f}")
+
+        print(f"Pairs: {' | '.join(results)}")
 
         return batch
-
 
 
     def _stack_windows(self, windows: WindowDict) -> tuple[list[int], np.ndarray]:
@@ -158,7 +177,7 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityBatch]):
         values = np.stack(slices, axis=0)
         return track_ids, values
 
-    def _compute_similarity_tensor(self, values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def _compute_similarity_tensor(self, values: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute pairwise similarity tensor using vectorized operations.
 
         Args:
@@ -166,9 +185,12 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityBatch]):
 
         Returns:
             best_sim: Best similarity per joint (N, N, F)
-            scores: Confidence scores (N, N, F)
+            confidence_scores: Confidence scores (N, N, F)
+            leader_scores: Leader score [-1, 1] (N, N) - negative=first leads, positive=second leads, 0=sync
         """
         exponent = self._config.exponent
+        window_length = self._config.window_length
+        N, T, F = values.shape
 
         # Broadcast to compute all pairwise angular differences
         # values[:, None, :, None, :] -> (N, 1, T, 1, F)
@@ -181,29 +203,54 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityBatch]):
         similarity = np.power(1.0 - np.abs(angular_diff) / np.pi, exponent)
         # NaN propagates automatically through all operations
 
+        # Compute whole-body similarity per time pair (mean across features)
+        # Weight by confidence (proportion of valid joints)
+        # (N, N, T, T, F) -> (N, N, T, T)
+
+        # Count valid joints per time pair
+        valid_mask = ~np.isnan(similarity)  # (N, N, T, T, F)
+        joint_count = np.sum(valid_mask, axis=4)  # (N, N, T, T)
+
+        # Penalize by proportion of missing joints
+        confidence_penalty = joint_count / F  # [0, 1]
+
+        # Suppress warning for all-NaN slices (handled by nanmean returning NaN)
+        with np.errstate(invalid='ignore'):
+            whole_body_sim = np.nanmean(similarity, axis=4) * confidence_penalty
+
+        # Find best (t_a, t_b) alignment per pair
+        # Reshape to (N, N, T*T) for argmax, then convert back to (t_a, t_b)
+        flat_indices = np.nanargmax(whole_body_sim.reshape(N, N, -1), axis=2)  # (N, N)
+        t_a_indices = flat_indices // T  # Row index
+        t_b_indices = flat_indices % T   # Column index
+
+        # Compute leader scores: (t_b - t_a) / window_length → [-1, 1]
+        # Negative = first person leads, Positive = second person leads, 0 = synchronized
+        leader_scores = ((t_b_indices - t_a_indices) / window_length).astype(np.float32)  # (N, N)
+
         # Best per joint via nanmax over time axes
         # (N, N, T, T, F) -> (N, N, F)
         best_sim = np.nanmax(similarity, axis=(2, 3))
         best_sim = np.nan_to_num(best_sim, nan=0.0).astype(np.float32)
 
         # Scores from valid comparison proportion
-        scores = 1.0 - np.mean(np.isnan(similarity), axis=(2, 3))
-        scores = scores.astype(np.float32)
+        confidence_scores = 1.0 - np.mean(np.isnan(similarity), axis=(2, 3))
+        confidence_scores = confidence_scores.astype(np.float32)
 
-        return best_sim, scores
+        return best_sim, confidence_scores, leader_scores
 
     def _build_similarity_batch(
         self,
         track_ids: list[int],
         best_sim: np.ndarray,
-        scores: np.ndarray
+        confidence_scores: np.ndarray
     ) -> SimilarityBatch:
         """Build SimilarityBatch from similarity tensor.
 
         Args:
             track_ids: List of track IDs
             best_sim: Best similarity per joint (N, N, F)
-            scores: Confidence scores (N, N, F)
+            confidence_scores: Confidence scores (N, N, F)
 
         Returns:
             SimilarityBatch with all pairwise similarities
@@ -219,7 +266,7 @@ class WindowSimilarity(TypedCallbackMixin[SimilarityBatch]):
             similarities.append(SimilarityFeature(
                 pair_id=pair_id,
                 values=best_sim[i, j],
-                scores=scores[i, j]
+                scores=confidence_scores[i, j]
             ))
 
         return SimilarityBatch(similarities=similarities)
