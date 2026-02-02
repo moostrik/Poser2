@@ -118,7 +118,7 @@ class Main():
         # self.rolling_angles =       batch.RollingFeatureBuffer(self.rolling_angles_config)
 
         self.pose_similator=        similarity.FrameSimilarity()
-        self.window_similator_config = similarity.WindowSimilarityConfig(window_length=int(5), stride_length=int(0.2 * settings.camera.fps))
+        self.window_similator_config = similarity.WindowSimilarityConfig(window_length=int(0.5 * settings.camera.fps), exponent=2.5)
         self.window_similator=      similarity.WindowSimilarity(self.window_similator_config)
         self.pose_similarity_extractor = nodes.SimilarityExtractor(self.simil_config)
 
@@ -128,7 +128,7 @@ class Main():
         self.angle_window_tracker =     trackers.AngleWindowTracker(num_players, self.window_config)
         self.angle_vel_window_tracker = trackers.AngleVelocityWindowTracker(num_players, self.window_config)
         self.angle_mot_window_tracker = trackers.AngleMotionWindowTracker(num_players, self.window_config)
-        self.angle_sim_window_tracker = trackers.AngleSymmetryWindowTracker(num_players, self.window_config)
+        self.similarity_window_tracker = trackers.SimilarityWindowTracker(num_players, self.window_config)
         self.bbox_window_tracker =      trackers.BBoxWindowTracker(num_players, self.window_config)
 
         self.bbox_filters =      trackers.FilterTracker(
@@ -272,7 +272,7 @@ class Main():
         self.pose_smooth_filters.add_poses_callback(self.angle_window_tracker.process)
         self.pose_smooth_filters.add_poses_callback(self.angle_vel_window_tracker.process)
         self.pose_smooth_filters.add_poses_callback(self.angle_mot_window_tracker.process)
-        self.pose_smooth_filters.add_poses_callback(self.angle_sim_window_tracker.process)
+        self.pose_smooth_filters.add_poses_callback(self.similarity_window_tracker.process)
         self.pose_smooth_filters.add_poses_callback(self.bbox_window_tracker.process)
 
         self.angle_window_tracker.add_window_callback(self.data_hub.set_angle_windows)
@@ -280,7 +280,7 @@ class Main():
 
         self.angle_vel_window_tracker.add_window_callback(self.data_hub.set_angle_vel_windows)
         self.angle_mot_window_tracker.add_window_callback(self.data_hub.set_angle_motion_windows)
-        self.angle_sim_window_tracker.add_window_callback(self.data_hub.set_angle_symmetry_windows)
+        self.similarity_window_tracker.add_window_callback(self.data_hub.set_similarity_windows)
         self.bbox_window_tracker.add_window_callback(self.data_hub.set_bbox_windows)
 
         self.data_hub.add_update_callback(self.interpolator.update)

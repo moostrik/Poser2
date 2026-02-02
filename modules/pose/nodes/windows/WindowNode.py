@@ -7,7 +7,7 @@ from typing import Generic, TypeVar
 import numpy as np
 
 from modules.pose.Frame import Frame, FrameField
-from modules.pose.features import BaseScalarFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Points2D
+from modules.pose.features import BaseScalarFeature, Angles, AngleMotion, AngleSymmetry, AngleVelocity, BBox, Similarity
 from modules.pose.nodes.Nodes import NodeBase, NodeConfigBase
 
 
@@ -219,3 +219,7 @@ def AngleSymmetryWindowNode(config: WindowNodeConfig | None = None) -> WindowNod
 def BBoxWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[BBox]:
     """Bounding box trajectory - shape (time, 4) for [x, y, w, h]."""
     return WindowNode(FrameField.bbox, config)
+
+def SimilarityWindowNode(config: WindowNodeConfig | None = None) -> WindowNode[Similarity]:
+    """Similarity trajectory - shape (time, 1)."""
+    return WindowNode(FrameField.similarity, config)

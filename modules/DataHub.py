@@ -36,7 +36,7 @@ class DataHubType(IntEnum):
     angle_window =     15   # sorted by track_id, FeatureWindow[AngleLandmark]
     angle_vel_window = 16   # sorted by track_id, FeatureWindow[AngleLandmark]
     angle_motion_window = 17  # sorted by track_id, FeatureWindow[AngleLandmark]
-    angle_sym_window =    18  # sorted by track_id, FeatureWindow[AngleLandmark]
+    similarity_window =    18  # sorted by track_id, FeatureWindow[AngleLandmark]
     points2d_window =     19  # sorted by track_id, FeatureWindow[PointLandmark]
     bbox_window =         20  # sorted by track_id, FeatureWindow[BBoxElement]
 
@@ -157,13 +157,13 @@ class DataHub:
         """Store angle motion feature windows. Expects dict[int, FeatureWindow]."""
         self.set_dict(DataHubType.angle_motion_window, windows)
 
-    def set_angle_symmetry_windows(self, windows) -> None:
-        """Store angle symmetry feature windows. Expects dict[int, FeatureWindow]."""
-        self.set_dict(DataHubType.angle_sym_window, windows)
-
     def set_bbox_windows(self, windows) -> None:
         """Store bounding box feature windows. Expects dict[int, FeatureWindow]."""
         self.set_dict(DataHubType.bbox_window, windows)
+
+    def set_similarity_windows(self, windows) -> None:
+        """Store angle symmetry feature windows. Expects dict[int, FeatureWindow]."""
+        self.set_dict(DataHubType.similarity_window, windows)
 
     # DEPRICATED WINDOWS
     def set_pd_stream(self, pd_stream: PDStreamData) -> None:

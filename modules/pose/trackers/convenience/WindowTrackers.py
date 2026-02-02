@@ -1,7 +1,7 @@
 """Convenience tracker factories for WindowNode-based tracking."""
 
 from ..WindowTracker import WindowTracker
-from modules.pose.nodes import AngleMotionWindowNode, AngleSymmetryWindowNode, AngleVelocityWindowNode, AngleWindowNode, BBoxWindowNode, WindowNodeConfig
+from modules.pose.nodes import AngleMotionWindowNode, AngleSymmetryWindowNode, AngleVelocityWindowNode, AngleWindowNode, BBoxWindowNode, SimilarityWindowNode, WindowNodeConfig
 
 
 class AngleWindowTracker(WindowTracker):
@@ -76,4 +76,19 @@ class BBoxWindowTracker(WindowTracker):
         super().__init__(
             num_tracks=num_tracks,
             window_factory=lambda: BBoxWindowNode(config)
+        )
+
+
+class SimilarityWindowTracker(WindowTracker):
+    """Convenience tracker for Similarity feature windows.
+
+    Buffers similarity trajectories over time and returns windows with shape (time, 1).
+    """
+
+    def __init__(self, num_tracks: int, config: WindowNodeConfig | None = None) -> None:
+        if config is None:
+            config = WindowNodeConfig()
+        super().__init__(
+            num_tracks=num_tracks,
+            window_factory=lambda: SimilarityWindowNode(config)
         )

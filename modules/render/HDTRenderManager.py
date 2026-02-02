@@ -72,7 +72,7 @@ class Layers(IntEnum):
     angle_W =       auto()
     angle_vel_W =   auto()
     angle_mtn_W =   auto()
-    angle_sym_W =   auto()
+    similarity_W =  auto()
     bbox_W =        auto()
 
 UPDATE_LAYERS: list[Layers] = [
@@ -177,9 +177,10 @@ FINAL_LAYERS: list[Layers] = [
     # Layers.cam_mask,
     # Layers.frg_src,
     Layers.centre_pose,
-    Layers.angle_W,
-    Layers.angle_vel_W,
-    Layers.angle_mtn_W,
+    # Layers.angle_W,
+    # Layers.angle_vel_W,
+    # Layers.angle_mtn_W,
+    Layers.similarity_W,
 ]
 
 BOX_LAYERS: list[Layers] = [
@@ -246,7 +247,7 @@ class HDTRenderManager(RenderBase):
             angle_W =       self.L[Layers.angle_W][i] =     ls.AngleWindowLayer(  i, self.data_hub, self.line_width)
             angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer(  i, self.data_hub, self.line_width)
             angle_mtn_W =   self.L[Layers.angle_mtn_W][i] = ls.AngleMtnWindowLayer(  i, self.data_hub, self.line_width)
-            # angle_sym_W =   self.L[Layers.angle_sym_W][i] = ls.AngleSymWindowLayer(  i, self.data_hub)
+            similarity_W =  self.L[Layers.similarity_W][i] = ls.SimilarityWindowLayer(  i, self.data_hub, self.line_width)
             # bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub)
 
         # global layers

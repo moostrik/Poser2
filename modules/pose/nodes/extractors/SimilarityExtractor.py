@@ -70,6 +70,7 @@ class SimilarityExtractor(FilterNode):
 
             if similarity_feature is not None:
                 overall_sim: float = similarity_feature.aggregate(config.method, 0.0, config.exponent)
+                # print(f"Similarities: {overall_sim}")
 
                 if not np.isnan(overall_sim):
                     values[other_idx] = overall_sim
