@@ -22,6 +22,7 @@ class TimerConfig(ConfigBase):
 
     fps: float = config_field(60.0, min=1.0, max=240.0, fixed=True, description="Update rate in frames per second")
     run: bool = config_field(False, description="Run the timer")
+    auto: bool = config_field(False, description="Automatically restart after intermezzo")
     intermezzo: float = config_field(0.0, min=0.0, max=60.0, description="Wait duration before going idle")
     duration: float = config_field(10.0, min=0.1, max=600.0, description="Timer duration in seconds")
 
@@ -68,6 +69,7 @@ class Timer(threading.Thread):
         self._start_timestamp: float = 0.0
         self._intermezzo_start: float = 0.0
         self._stop_event = threading.Event()
+        self._updating_run = False  # Flag to prevent circular updates
 
         # Watch config changes
         self._setup_watchers()
@@ -78,6 +80,10 @@ class Timer(threading.Thread):
 
     def _on_run_change(self, value: bool) -> None:
         """Handle run config change."""
+        # Skip if we're updating internally
+        if self._updating_run:
+            return
+            
         if value and self._state == TimerState.IDLE:
             # Start timer
             self._start_timestamp = time.time()
@@ -140,6 +146,12 @@ class Timer(threading.Thread):
         """Set timer state and notify callbacks."""
         if self._state != new_state:
             self._state = new_state
+            
+            # Sync run field with state (prevent circular updates)
+            self._updating_run = True
+            self.config.run = (new_state == TimerState.RUNNING)
+            self._updating_run = False
+            
             self._notify_state_callbacks(new_state)
 
     def _notify_state_callbacks(self, state: TimerState) -> None:
@@ -162,6 +174,8 @@ class Timer(threading.Thread):
             # Calculate current elapsed time for display
             if self._state == TimerState.RUNNING:
                 elapsed = time.time() - self._start_timestamp
+            elif self._state == TimerState.INTERMEZZO:
+                elapsed = time.time() - self._intermezzo_start
             else:
                 elapsed = 0.0
 
@@ -170,10 +184,17 @@ class Timer(threading.Thread):
 
             # Handle intermezzo state
             if self._state == TimerState.INTERMEZZO:
-                intermezzo_elapsed = time.time() - self._intermezzo_start
-                if intermezzo_elapsed >= self.config.intermezzo:
-                    # Intermezzo complete, go to idle
-                    self._set_state(TimerState.IDLE)
+                self._notify_time_callbacks(elapsed)
+
+                if elapsed >= self.config.intermezzo:
+                    # Intermezzo complete
+                    if self.config.auto:
+                        # Auto-restart: go back to running
+                        self._start_timestamp = time.time()
+                        self._set_state(TimerState.RUNNING)
+                    else:
+                        # No auto-restart: go to idle
+                        self._set_state(TimerState.IDLE)
 
             # Handle running timer
             elif self._state == TimerState.RUNNING:
