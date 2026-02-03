@@ -13,7 +13,7 @@ class EuroSmootherGui:
         elm.append([
             E(eT.TEXT, 'Smooth   '),
             E(eT.TEXT, 'minc'),
-            E(eT.SLDR, name + 'min_cutoff', self.set_min_cutoff,    1.0,    [0.1,20.0], 0.1),
+            E(eT.SLDR, name + 'min_cutoff', self.set_min_cutoff,    1.0,    [0.01,20.0], 0.01),
             E(eT.TEXT, 'beta'),
             E(eT.SLDR, name + 'beta',       self.set_beta,          0.05,   [0.0,10.0],  0.1),
             E(eT.TEXT, 'dc'),

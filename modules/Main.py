@@ -88,11 +88,13 @@ class Main():
         self.a_vel_smooth_gui =     guis.EuroSmootherGui(self.a_vel_smooth_config, self.gui, 'ANGLE VEL')
         self.simil_smooth_gui =     guis.EuroSmootherGui(self.simil_smooth_config, self.gui, 'SIMILARITY')
 
-        self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera.fps)
+        # self.b_box_interp_config =  nodes.LerpInterpolatorConfig(input_frequency=settings.camera.fps)
+        self.b_box_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
         self.point_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
         self.angle_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
         self.simil_interp_config =  nodes.ChaseInterpolatorConfig(input_frequency=settings.camera.fps)
 
+        self.b_box_interp_gui =     guis.InterpolatorGui(self.b_box_interp_config, self.gui, 'BBOX')
         self.point_interp_gui =     guis.InterpolatorGui(self.point_interp_config, self.gui, 'POINT')
         self.angle_interp_gui =     guis.InterpolatorGui(self.angle_interp_config, self.gui, 'ANGLE')
         self.simil_interp_gui =     guis.InterpolatorGui(self.simil_interp_config, self.gui, 'SIMILARITY')
@@ -183,7 +185,8 @@ class Main():
         self.interpolator = trackers.InterpolatorTracker(
             settings.num_players,
             [
-                lambda: nodes.BBoxLerpInterpolator(self.b_box_interp_config),
+                # lambda: nodes.BBoxLerpInterpolator(self.b_box_interp_config),
+                lambda: nodes.BBoxChaseInterpolator(self.b_box_interp_config),
                 lambda: nodes.PointChaseInterpolator(self.point_interp_config),
                 lambda: nodes.AngleChaseInterpolator(self.angle_interp_config),
                 lambda: nodes.SimilarityChaseInterpolator(self.simil_interp_config),
@@ -301,7 +304,7 @@ class Main():
             else:
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
-        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame()])
+        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame()])

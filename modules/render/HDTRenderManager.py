@@ -89,6 +89,8 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.centre_mask,
     Layers.centre_pose,
     Layers.centre_motion,
+
+    Layers.sim_blend,
     # Layers.centre_D_flow,
 
     # Layers.dense_flow,
@@ -133,22 +135,23 @@ SHOW_POSE: list[Layers] = [
     Layers.box_pose_I,
 ]
 
-SHOW_COMP: list[Layers] = [
-    Layers.flow,
-    Layers.centre_pose,
-    Layers.sim_blend,
-]
-
 SHOW_MASK: list[Layers] = [
     # Layers.cam_mask,
     Layers.centre_mask,
     # Layers.centre_motion,
     Layers.centre_pose,
+    # Layers.cam_crop
+]
+
+SHOW_COMP: list[Layers] = [
+    Layers.flow,
+    # Layers.centre_pose,
+    Layers.sim_blend,
 ]
 
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_MASK
+FINAL_LAYERS: list[Layers] = SHOW_COMP
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
@@ -295,10 +298,10 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.centre_mask][i].blur_steps = 0    #type: ignore
             self.L[Layers.angle_W][i].line_width = 3.0      #type: ignore
 
+        self._update_layers = UPDATE_LAYERS
         self._draw_layers = FINAL_LAYERS
         # self._draw_layers = BOX_LAYERS
         self._preview_layers = PREVIEW_LAYERS
-
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         glViewport(0, 0, width, height)

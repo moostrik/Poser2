@@ -8,6 +8,7 @@ from modules.render.shaders import Blend, DrawRoi, MaskApply
 # GL
 from modules.gl import Fbo, SwapFbo, Texture, Style, clear_color
 
+from modules.utils import HotReloadMethods
 
 class CentreCamLayer(LayerBase):
     """Renders camera image cropped and rotated around pose anchor points.
@@ -37,6 +38,8 @@ class CentreCamLayer(LayerBase):
         self.mask_opacity: float = mask_opacity
         self.use_mask: bool = True  # Toggle for mask application
 
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
+
     @property
     def texture(self) -> Texture:
         """Output texture for external use."""
@@ -62,6 +65,8 @@ class CentreCamLayer(LayerBase):
     def update(self) -> None:
         """Render camera crop using anchor geometry, optionally with mask."""
         # Disable blending during FBO rendering
+
+        self.blend_factor: float = 0.1
 
         if self._geometry.lost:
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)

@@ -238,7 +238,7 @@ class OscSound:
         bundle_builder.add_content(mean_sym_msg.build()) # type: ignore
 
         # range [0, 1]
-        similarity_values: list[float] = m_s #pose.similarity.values.tolist()
+        similarity_values: list[float] = m_s
         similarity_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
         for similarity in similarity_values:
             similarity_msg.add_arg(similarity, OscMessageBuilder.ARG_TYPE_FLOAT)

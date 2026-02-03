@@ -12,6 +12,8 @@ from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur
 # GL
 from modules.gl import Fbo, SwapFbo, Texture, Blit, Style
 
+from modules.utils import HotReloadMethods
+
 
 class CentreMaskLayer(LayerBase):
     """Renders mask image cropped and rotated with temporal blending and blur.
@@ -40,6 +42,8 @@ class CentreMaskLayer(LayerBase):
         self.blend_factor: float = 0.33
         self.blur_steps: int = 0
         self.blur_radius: float = 8.0
+
+        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:
@@ -76,6 +80,10 @@ class CentreMaskLayer(LayerBase):
     def update(self) -> None:
         """Render mask crop using bbox geometry from CentreGeometry."""
         # Disable blending during FBO rendering
+
+
+        self.blend_factor: float = 0.2
+        # print("CentreMaskLayer update - blend_factor set to", self.blend_factor)
 
         if self._geometry.lost:
             self._mask_fbo.clear()
@@ -140,4 +148,3 @@ class CentreMaskLayer(LayerBase):
             self._mask_blur_fbo.end()
 
         Style.pop_style()
-

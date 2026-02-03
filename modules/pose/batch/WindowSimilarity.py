@@ -50,7 +50,7 @@ class _JointAggregator(NormalizedScalarFeature):
 @dataclass
 class WindowSimilarityConfig(ConfigBase):
     """Configuration for WindowSimilarity."""
-    max_poses: int = config_field(4, min=1, max=10, description="Maximum number of tracked poses")
+    max_poses: int = config_field(3, min=1, max=10, description="Maximum number of tracked poses")
     window_length: int = config_field(30, min=1, max=300, description="Number of frames to compare")
     method: AggregationMethod = AggregationMethod.HARMONIC_MEAN
     exponent: float = config_field(3.5, min=0.5, max=4.0, description="Similarity decay exponent")
