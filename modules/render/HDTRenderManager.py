@@ -107,7 +107,7 @@ LARGE_LAYERS: list[Layers] = [
     Layers.centre_pose,
 ]
 
-PREVIEW_LAYERS: list[Layers] = [
+PREVIEW_CENTRE: list[Layers] = [
     Layers.centre_cam,
     Layers.centre_pose,
 
@@ -125,16 +125,23 @@ SHOW_BOX: list[Layers] = [
     Layers.box_pose_I,
 ]
 
-SHOW_COMP: list[Layers] = [
-    Layers.sim_blend,
-    Layers.flow,
-    Layers.dense_flow,
-    Layers.centre_cam,
-    Layers.centre_pose,
-    Layers.similarity_W,
+SHOW_CAM: list[Layers] = [
+    Layers.cam_image,
+    Layers.cam_bbox,
+    Layers.cam_mask
 ]
 
-FINAL_LAYERS: list[Layers] = SHOW_COMP
+SHOW_COMP: list[Layers] = [
+    Layers.flow,
+    # Layers.dense_flow,
+    # Layers.centre_cam,
+    Layers.centre_pose,
+    Layers.sim_blend,
+    # Layers.similarity_W,
+]
+
+PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
+FINAL_LAYERS: list[Layers] = SHOW_CAM
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:

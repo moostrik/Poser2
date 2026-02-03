@@ -40,7 +40,7 @@
     "max_poses": 3,
     "model_type": "TRT",
     "pose_resolution": "STANDARD",
-    "flow_resolution": "EXTREME",
+    "flow_resolution": "HIGH",
     "model_path": "models",
     "confidence_high": 0.7,
     "confidence_low": 0.5,
@@ -66,54 +66,6 @@
     "num_players": 3,
     "data_type": "pose_I"
   },
-
-  "artnet_leds": [
-    {
-      "verbose": false,
-      "ip_address": "10.0.0.4",
-      "base_universe": 0,
-      "fps": 40,
-      "r": 1.0,
-      "g": 0.0,
-      "b": 0.0,
-      "num_pixels": 94,
-      "channel_order": "GRBW",
-      "enabled": true,
-      "white": 0.66,
-      "color": 1.0,
-      "bar": 1.0
-    },
-    {
-      "verbose": false,
-      "ip_address": "10.0.0.3",
-      "base_universe": 0,
-      "fps": 40,
-      "r": 0.0,
-      "g": 0.32,
-      "b": 1.0,
-      "num_pixels": 94,
-      "channel_order": "GRBW",
-      "enabled": true,
-      "white": 0.66,
-      "color": 1.0,
-      "bar": 1.0
-    },
-    {
-      "verbose": false,
-      "ip_address": "10.0.0.5",
-      "base_universe": 0,
-      "fps": 40,
-      "r": 0.68,
-      "g": 0.34,
-      "b": 0.0,
-      "num_pixels": 94,
-      "channel_order": "GRBW",
-      "enabled": true,
-      "white": 0.66,
-      "color": 1.0,
-      "bar": 1.0
-    }
-  ],
 
   "render": {
     "title": "Poser",

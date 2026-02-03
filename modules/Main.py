@@ -127,7 +127,7 @@ class Main():
             [
                 lambda: nodes.BBoxEuroSmoother(self.b_box_smooth_config),
                 lambda: nodes.BBoxPredictor(self.prediction_config),
-                lambda: nodes.BBoxRateLimiter(self.b_box_rate_config),
+                # lambda: nodes.BBoxRateLimiter(self.b_box_rate_config),
             ]
         )
 
@@ -294,8 +294,7 @@ class Main():
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame()])
-        self.gui.addFrame([self.motion_smooth_gui.get_gui_frame()])
-        self.gui.addFrame([self.window_similarity_gui.get_gui_frame()])
+        self.gui.addFrame([self.motion_smooth_gui.get_gui_frame(), self.window_similarity_gui.get_gui_frame()])
         self.gui.addFrame([self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame])
         self.gui.addFrame([self.artnet_guis[2].frame])
