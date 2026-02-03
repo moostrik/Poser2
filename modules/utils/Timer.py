@@ -23,8 +23,9 @@ class TimerConfig(ConfigBase):
     fps: float = config_field(60.0, min=1.0, max=240.0, fixed=True, description="Update rate in frames per second")
     run: bool = config_field(False, description="Run the timer")
     auto: bool = config_field(False, description="Automatically restart after intermezzo")
-    intermezzo: float = config_field(0.0, min=0.0, max=60.0, description="Wait duration before going idle")
     duration: float = config_field(10.0, min=0.1, max=600.0, description="Timer duration in seconds")
+    intermezzo: float = config_field(0.0, min=0.0, max=60.0, description="Wait duration before going idle")
+    verbose: bool = config_field(False, description="Print timer state and time updates")
 
 
 class Timer(threading.Thread):
@@ -83,7 +84,7 @@ class Timer(threading.Thread):
         # Skip if we're updating internally
         if self._updating_run:
             return
-            
+
         if value and self._state == TimerState.IDLE:
             # Start timer
             self._start_timestamp = time.time()
@@ -146,12 +147,12 @@ class Timer(threading.Thread):
         """Set timer state and notify callbacks."""
         if self._state != new_state:
             self._state = new_state
-            
+
             # Sync run field with state (prevent circular updates)
             self._updating_run = True
             self.config.run = (new_state == TimerState.RUNNING)
             self._updating_run = False
-            
+
             self._notify_state_callbacks(new_state)
 
     def _notify_state_callbacks(self, state: TimerState) -> None:
@@ -179,8 +180,9 @@ class Timer(threading.Thread):
             else:
                 elapsed = 0.0
 
-            # Print state and time every update
-            print(f"Timer: {self._state.name} | Time: {elapsed:.2f}s")
+            # Print state and time every update (if verbose)
+            if self.config.verbose:
+                print(f"Timer: {self._state.name} | Time: {elapsed:.2f}s")
 
             # Handle intermezzo state
             if self._state == TimerState.INTERMEZZO:
