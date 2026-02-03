@@ -66,7 +66,7 @@ class CentreCamLayer(LayerBase):
         """Render camera crop using anchor geometry, optionally with mask."""
         # Disable blending during FBO rendering
 
-        self.blend_factor: float = 0.1
+        self.blend_factor: float = 0.2
 
         if self._geometry.lost:
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
