@@ -11,8 +11,8 @@ from torch import Tensor
 # Local application imports for setter types
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.pose.Frame import FrameDict
-from modules.pose.features import Similarity, LeaderScore
 from modules.tracker.Tracklet import TrackletDict
+from modules.utils.Timer import TimerState
 
 
 class DataHubType(IntEnum):
@@ -33,6 +33,9 @@ class DataHubType(IntEnum):
     angle_motion_window =   auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
     bbox_window =           auto()   # sorted by track_id, FeatureWindow[BBoxElement]
     similarity_window =     auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
+
+    timer_state =           auto()   # TimerState int value (IDLE=0, RUNNING=1, INTERMEZZO=2)
+    timer_time =            auto()   # float, elapsed time in seconds
 
 class PoseDataHubTypes(IntEnum):
     pose_R =      DataHubType.pose_R.value
@@ -153,6 +156,15 @@ class DataHub:
     def set_similarity_windows(self, windows) -> None:
         """Store angle symmetry feature windows. Expects dict[int, FeatureWindow]."""
         self.set_dict(DataHubType.similarity_window, windows)
+
+    # TIMER
+    def set_timer_state(self, state: TimerState) -> None:
+        """Store timer state as int value."""
+        self.set_item(DataHubType.timer_state, 0, state.value)
+
+    def set_timer_time(self, time: float) -> None:
+        """Store timer elapsed time in seconds."""
+        self.set_item(DataHubType.timer_time, 0, time)
 
     # UPDATE CALLBACK
     def notify_update(self) -> None:

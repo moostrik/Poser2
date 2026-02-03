@@ -16,6 +16,7 @@ from modules.pose.features.AngleSymmetry import SymmetryElement, AggregationMeth
 
 from modules.DataHub import DataHub, DataHubType
 from modules.ConfigBase import ConfigBase
+from modules.utils.Timer import TimerState
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -100,6 +101,18 @@ class OscSound:
 
         bundle_builder: OscBundleBuilder = OscBundleBuilder(IMMEDIATELY)  # type: ignore
 
+        # Timer data
+        timer_state = self._data_hub.get_item(DataHubType.timer_state, 0)
+        timer_time = self._data_hub.get_item(DataHubType.timer_time, 0)
+
+        timer_state_msg = OscMessageBuilder(address="/global/state")
+        timer_state_msg.add_arg(timer_state if timer_state is not None else 0, arg_type=OscMessageBuilder.ARG_TYPE_INT)
+        bundle_builder.add_content(timer_state_msg.build())
+
+        timer_time_msg = OscMessageBuilder(address="/global/time")
+        timer_time_msg.add_arg(timer_time if timer_time is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(timer_time_msg.build())
+
         poses: dict[int, Frame] = self._data_hub.get_dict(self._config.data_type)
         num_players = self._config.num_players
 
@@ -125,8 +138,6 @@ class OscSound:
                     similarity_values[o_id] *= min(motions[id], motions[o_id])
 
                 motion_similarities[id] = similarity_values
-        # if motion_similarities:
-        #     print(motion_similarities)
 
         for id in range(num_players):
             if id not in poses:
@@ -141,17 +152,11 @@ class OscSound:
                 self._inactive_message_counts[id] = 0
                 OscSound._build_active_message(poses[id], bundle_builder, motion_similarities[id])
 
-        # similarity: SimilarityBatch | None = self._data_hub.get_item(DataHubType.sim_P)
-        # if similarity is not None:
-        #     SoundOsc._build_similarity_message(similarity, bundle_builder, num_players)
-
         bundle: OscBundle = bundle_builder.build()
 
         # Send the bundle if it contains any messages
         if bundle_builder._contents:
             self._client.send(bundle)
-
-        # print(f"SoundOSC: Sent OSC with {len(bundle_builder._contents)} messages in {perf_counter() - t:.4f} seconds")
 
     @staticmethod
     def _build_inactive_message(id: int, bundle_builder: OscBundleBuilder, num_players: int) -> None:

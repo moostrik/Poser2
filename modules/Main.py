@@ -15,6 +15,7 @@ from modules.inout import OscSound, ArtNetLed
 from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBang
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
+from modules.utils import Timer, TimerConfig
 
 class Main():
     def __init__(self, settings: Settings) -> None:
@@ -60,6 +61,11 @@ class Main():
             ConfigGuiGenerator(self.artnet_configs[1], self.gui, "ArtNet Bar 2"),
             ConfigGuiGenerator(self.artnet_configs[2], self.gui, "ArtNet Bar 3"),
         ]
+
+        # TIMER
+        self.timer_config = TimerConfig(duration=30.0, intermezzo=5.0)
+        self.timer = Timer(self.timer_config)
+        self.timer_gui = ConfigGuiGenerator(self.timer_config, self.gui, "Timer")
 
         # RENDER
         self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
@@ -280,6 +286,11 @@ class Main():
         for artnet in self.artnet_controllers:
             artnet.start()
 
+        # TIMER
+        self.timer.start()
+        self.timer.add_time_callback(lambda t: self.data_hub.set_timer_time(t))
+        self.timer.add_state_callback(lambda s: self.data_hub.set_timer_state(s))
+
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
         self.gui.exit_callback = self.stop
 
@@ -297,7 +308,7 @@ class Main():
         self.gui.addFrame([self.motion_smooth_gui.get_gui_frame(), self.window_similarity_gui.get_gui_frame()])
         self.gui.addFrame([self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame])
-        self.gui.addFrame([self.artnet_guis[2].frame])
+        self.gui.addFrame([self.artnet_guis[2].frame, self.timer_gui.frame])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])
@@ -342,6 +353,8 @@ class Main():
 
         for artnet in self.artnet_controllers:
             artnet.stop()
+
+        self.timer.stop()
 
         self.point_extractor.stop()
         self.mask_extractor.stop()
