@@ -295,7 +295,7 @@ class HotReloadMethods:
     def _update_module_constants(module: ModuleType, constants_to_update: Dict[str, MethodInfo]) -> None:
         """Update module-level constants."""
         for name, info in constants_to_update.items():
-            print(f"[{HotReloadMethods.__name__}] {module.__name__} Update module constant: {name}")
+            # print(f"[{HotReloadMethods.__name__}] {module.__name__} Update module constant: {name}")
             setattr(module, name, info.func)
 
     @staticmethod
@@ -386,4 +386,3 @@ class HotReloadMethods:
             if event_path == watched_path:
                 self._last_modified_time = current_time
                 self._reloader.on_file_modified()
-

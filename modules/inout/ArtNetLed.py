@@ -192,8 +192,8 @@ class ArtNetLed:
             self._thread.join(timeout=1.0)
             self._thread = None
 
-        # Blackout using StupidArtnet's built-in method
-        self._artnet.blackout()
+        # Blackout using internal method
+        self._blackout()
 
         # Clean up watchers
         for unwatch in self._unwatchers:
@@ -229,7 +229,7 @@ class ArtNetLed:
     def _on_enabled_change(self, enabled: bool) -> None:
         """Called when enabled state changes."""
         if not enabled:
-            self._artnet.blackout()
+            self._blackout()
             if self._config.verbose:
                 print(f"ArtNetLed: Output disabled, LEDs blacked out")
 
@@ -309,7 +309,7 @@ class ArtNetLed:
             # Blackout and close the old ArtNet instance
             if self._artnet is not None:
                 try:
-                    self._artnet.blackout()
+                    self._blackout()
                     self._artnet.close()
                 except:
                     pass
@@ -349,6 +349,20 @@ class ArtNetLed:
                     print(f"ArtNetLed: Channel order updated to {self._config.channel_order.name}")
             except ValueError as e:
                 print(f"ArtNetLed: Invalid channel order - {e}")
+
+    def _blackout(self) -> None:
+        """Clear all pixels (set to 0) and send to both universes."""
+        with self._lock:
+            # Zero out the entire buffer
+            for i in range(len(self._buffer)):
+                self._buffer[i] = 0
+
+        # Send black frame to both universes
+        self._artnet.set_universe(self._config.base_universe)
+        self._artnet.set(self._buffer)
+        self._artnet.show()
+        self._artnet.set_universe(self._config.base_universe + 1)
+        self._artnet.show()
 
     def _set_pixel(self, pixel_index: int, r: int, g: int, b: int, w: int) -> None:
         """Set a single pixel's RGBW values in the buffer.
@@ -426,6 +440,9 @@ class ArtNetLed:
             if self._config.verbose:
                 print(f"ArtNetLed: IP {self._config.ip_address} is reachable, starting output.")
 
+        # Blackout before starting the loop
+        self._blackout()
+
         while self._running:
             if self._dirty:
                 with self._lock:
@@ -438,6 +455,9 @@ class ArtNetLed:
             frame_time: float = 1.0 / self._config.fps
             self._update_event.wait(timeout=frame_time)
             self._update_event.clear()
+
+        # Blackout after exiting the loop
+        self._blackout()
 
     def __del__(self) -> None:
         """Cleanup on deletion."""

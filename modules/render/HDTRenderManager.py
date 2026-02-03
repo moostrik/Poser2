@@ -37,8 +37,9 @@ class Layers(IntEnum):
 
     # bbox layers
     box_cam =       auto()
-    box_pose_I =    auto()
     box_pose_R =    auto()
+    box_pose_S =    auto()
+    box_pose_I =    auto()
 
     # ALTERNATIVE FLOW LAYERS
     dense_flow =    auto()
@@ -119,29 +120,35 @@ PREVIEW_CENTRE: list[Layers] = [
     # Layers.flow,
 ]
 
-SHOW_BOX: list[Layers] = [
-    Layers.box_cam,
-    Layers.box_pose_R,
-    Layers.box_pose_I,
-]
-
 SHOW_CAM: list[Layers] = [
     Layers.cam_image,
     Layers.cam_bbox,
     Layers.cam_mask
 ]
 
-SHOW_COMP: list[Layers] = [
-    Layers.flow,
-    # Layers.dense_flow,
-    # Layers.centre_cam,
-    Layers.centre_pose,
-    Layers.sim_blend,
-    # Layers.similarity_W,
+SHOW_POSE: list[Layers] = [
+    Layers.box_cam,
+    Layers.box_pose_R,
+    Layers.box_pose_S,
+    Layers.box_pose_I,
 ]
 
+SHOW_COMP: list[Layers] = [
+    Layers.flow,
+    Layers.centre_pose,
+    Layers.sim_blend,
+]
+
+SHOW_MASK: list[Layers] = [
+    # Layers.cam_mask,
+    Layers.centre_mask,
+    # Layers.centre_motion,
+    Layers.centre_pose,
+]
+
+
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_CAM
+FINAL_LAYERS: list[Layers] = SHOW_MASK
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
@@ -179,8 +186,9 @@ class HDTRenderManager(RenderBase):
             motion_sim =    self.L[Layers.motion_sim][i] =  ls.PoseBarSLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I)
 
             box_cam =       self.L[Layers.box_cam][i] =     ls.CamBBoxLayer(        i, self.data_hub,   PoseDataHubTypes.pose_I,    cam_image.texture)
-            box_pose_I =    self.L[Layers.box_pose_I][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I,    6.0, 0.0, True, False)
             box_pose_R =    self.L[Layers.box_pose_R][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_R,    3.0, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
+            box_pose_S =    self.L[Layers.box_pose_S][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_S,    3.0, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
+            box_pose_I =    self.L[Layers.box_pose_I][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I,    6.0, 0.0, True, False)
 
             centre_math =   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,   PoseDataHubTypes.pose_I,    16/9)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_math,                                 cam_mask.texture)
@@ -280,7 +288,9 @@ class HDTRenderManager(RenderBase):
             for layer_type in self._preview_layers:
                 self.L[layer_type][i].draw()
 
-            # DO TEST SETTINGS HEREs
+            # DO TEST SETTINGS HERE
+            self.L[Layers.box_pose_R][i].color = (1.0, 0.0, 0.0, 1.0)    #type: ignore
+            self.L[Layers.box_pose_S][i].color = (0.0, 1.0, 0.0, 1.0)    #type: ignore
             self.L[Layers.centre_cam][i].use_mask = True    #type: ignore
             self.L[Layers.centre_mask][i].blur_steps = 0    #type: ignore
             self.L[Layers.angle_W][i].line_width = 3.0      #type: ignore
