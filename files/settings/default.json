@@ -42,7 +42,7 @@
     "pose_resolution": "STANDARD",
     "flow_resolution": "EXTREME",
     "model_path": "models",
-    "confidence_high": 0.7,
+    "confidence_high": 0.6,
     "confidence_low": 0.5,
     "verbose": false,
     "crop_expansion": 0.1,
