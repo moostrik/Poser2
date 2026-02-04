@@ -128,6 +128,13 @@ SHOW_CAM: list[Layers] = [
     Layers.cam_mask
 ]
 
+SHOW_CENTRE: list[Layers] = [
+    Layers.centre_cam,
+    # Layers.centre_mask,
+    # Layers.centre_motion,
+    Layers.centre_pose,
+]
+
 SHOW_POSE: list[Layers] = [
     Layers.box_cam,
     Layers.box_pose_R,
@@ -147,11 +154,12 @@ SHOW_COMP: list[Layers] = [
     Layers.flow,
     # Layers.centre_pose,
     Layers.sim_blend,
+    Layers.cam_foreground,
 ]
 
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_COMP
+FINAL_LAYERS: list[Layers] = SHOW_CENTRE
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:

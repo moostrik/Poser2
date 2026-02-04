@@ -4,6 +4,7 @@ from .cam.DrawRectangleOutline import   DrawRectangleOutline
 from .generic.Blend import              Blend
 from .generic.Tint import               Tint
 from .generic.DrawRoi import            DrawRoi
+from .generic.DrawCircles import        DrawCircles
 from .generic.DenseFlowFilter import    DenseFlowFilter
 
 from .mask.MaskAA import                MaskAA
