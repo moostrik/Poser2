@@ -32,7 +32,7 @@ class Layers(IntEnum):
     # image layers
     cam_image =     0
     cam_mask =      auto()
-    cam_foreground= auto()
+    cam_frg=        auto()
     cam_crop =      auto()
 
     # bbox layers
@@ -61,8 +61,9 @@ class Layers(IntEnum):
 
     # centre layers
     centre_math=    auto()
-    centre_mask =   auto()
     centre_cam =    auto()
+    centre_mask =   auto()
+    centre_frg =    auto()
     centre_pose =   auto()
     centre_motion = auto()
 
@@ -81,12 +82,13 @@ class Layers(IntEnum):
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
     Layers.cam_mask,
-    Layers.cam_foreground,
+    Layers.cam_frg,
     Layers.cam_crop,
 
     Layers.centre_math,
     Layers.centre_cam,
     Layers.centre_mask,
+    Layers.centre_frg,
     Layers.centre_pose,
     Layers.centre_motion,
 
@@ -125,12 +127,14 @@ PREVIEW_CENTRE: list[Layers] = [
 SHOW_CAM: list[Layers] = [
     Layers.cam_image,
     Layers.cam_bbox,
-    Layers.cam_mask
+    # Layers.cam_mask,
+    # Layers.cam_frg,
 ]
 
 SHOW_CENTRE: list[Layers] = [
     Layers.centre_cam,
-    # Layers.centre_mask,
+    Layers.centre_mask,
+    Layers.centre_frg,
     # Layers.centre_motion,
     Layers.centre_pose,
 ]
@@ -154,7 +158,7 @@ SHOW_COMP: list[Layers] = [
     Layers.flow,
     # Layers.centre_pose,
     Layers.sim_blend,
-    Layers.cam_foreground,
+    Layers.cam_frg,
 ]
 
 
@@ -183,9 +187,11 @@ class HDTRenderManager(RenderBase):
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
+            cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.data_hub)
+
+            sparse_images = self.L[Layers.sparse_images][i] =  ls.FlowSourceLayer(  i, self.data_hub)
+            sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(       sparse_images)
             dense_flow =    self.L[Layers.dense_flow][i] =  ls.DFlowSourceLayer(    i, self.data_hub)
-            flow_image =    self.L[Layers.sparse_images][i] =  ls.FlowSourceLayer(  i, self.data_hub)
-            sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(       flow_image)
 
             cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxRenderer(        i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=2.0)
@@ -203,16 +209,16 @@ class HDTRenderManager(RenderBase):
 
             centre_math =   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,   PoseDataHubTypes.pose_I,    16/9)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_math,                                 cam_mask.texture)
+            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_math,                                 cam_frg.texture, centre_mask.texture)
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_math,                                 cam_image.texture,  centre_mask.texture)
-            centre_D_flow = self.L[Layers.centre_D_flow][i]=ls.CentreDenseFlowLayer(   centre_math,                                 dense_flow.texture, centre_mask.texture)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_math,                                 line_width=3.0, line_smooth=0.0, use_scores=False, color=COLORS[i % len(COLORS)])
             centre_motion = self.L[Layers.centre_motion][i]=ls.MotionMultiply(      i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
+            centre_D_flow = self.L[Layers.centre_D_flow][i]=ls.CentreDenseFlowLayer(   centre_math,                                 dense_flow.texture, centre_mask.texture)
 
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
             flow =          self.L[Layers.flow][i] =        ls.FlowLayer(              sim_blend)
 
             gpu_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
-            frg_src =       self.L[Layers.cam_foreground][i]=ls.ForegroundSourceLayer(i, self.data_hub)
 
             angle_W =       self.L[Layers.angle_W][i] =     ls.AngleWindowLayer(    i, self.data_hub, self.line_width)
             angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer( i, self.data_hub, self.line_width)
@@ -303,6 +309,7 @@ class HDTRenderManager(RenderBase):
             self.L[Layers.box_pose_R][i].color = (1.0, 0.0, 0.0, 1.0)    #type: ignore
             self.L[Layers.box_pose_S][i].color = (0.0, 1.0, 0.0, 1.0)    #type: ignore
             self.L[Layers.centre_cam][i].use_mask = True    #type: ignore
+            self.L[Layers.centre_frg][i].use_mask = True    #type: ignore
             self.L[Layers.centre_mask][i].blur_steps = 0    #type: ignore
             self.L[Layers.angle_W][i].line_width = 3.0      #type: ignore
 

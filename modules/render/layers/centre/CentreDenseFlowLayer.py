@@ -57,18 +57,18 @@ class CentreDenseFlowLayer(LayerBase):
             if self._mask_texture and self.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
-        # Check if valid anchor data exists
-        if self._geometry.idle or self._geometry.empty:
+        # Check if valid geometry exists
+        if self._geometry.crop_pose_points is None:
             return
 
         # Render flow with ROI from anchor calculator (bbox-space geometry, like mask)
         self._flow_fbo.begin()
         self._roi_shader.use(
             self._flow_texture,
-            self._geometry.bbox_crop_roi,
-            self._geometry.bbox_rotation,
-            self._geometry.bbox_rotation_center,
-            self._geometry.bbox_aspect
+            self._geometry.bbox_geometry.crop_roi,
+            self._geometry.bbox_geometry.rotation,
+            self._geometry.bbox_geometry.rotation_center,
+            self._geometry.bbox_geometry.aspect
         )
         self._flow_fbo.end()
 

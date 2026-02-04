@@ -14,7 +14,7 @@ from modules.render.shaders import MaskDilate
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class ForegroundSourceLayer(LayerBase):
+class FrgSourceLayer(LayerBase):
 
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id

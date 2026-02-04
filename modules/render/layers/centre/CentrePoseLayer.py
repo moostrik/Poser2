@@ -52,7 +52,7 @@ class CentrePoseLayer(LayerBase):
         if self._geometry.lost:
             self._fbo.clear()
 
-        transformed_points = self._geometry.transformed_points
+        transformed_points = self._geometry.crop_pose_points
         if transformed_points is None:
             return
 

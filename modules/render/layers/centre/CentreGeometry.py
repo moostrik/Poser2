@@ -3,6 +3,7 @@
 # Standard library imports
 import math
 import numpy as np
+from dataclasses import dataclass
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -16,6 +17,23 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Texture
 
 from modules.utils.HotReloadMethods import HotReloadMethods
+
+
+@dataclass
+class CamGeometry:
+    """Camera rendering geometry."""
+    crop_roi: Rect
+    rotation: float
+    rotation_center: Point2f
+
+
+@dataclass
+class BboxGeometry:
+    """Bounding box rendering geometry (for mask/flow)."""
+    crop_roi: Rect
+    rotation: float
+    rotation_center: Point2f
+    aspect: float
 
 
 class CentreGeometry(LayerBase):
@@ -33,27 +51,13 @@ class CentreGeometry(LayerBase):
         self._cam_aspect: float = cam_aspect
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
 
-        # Anchor points in bbox-relative coordinates [0,1]
-        self._shoulder_midpoint: Point2f = Point2f(0.5, 0.3)
-        self._hip_midpoint: Point2f = Point2f(0.5, 0.6)
-
-        # Anchor points in texture coordinates (shared)
-        self._anchor_top_tex: Point2f = Point2f(0.5, 0.3)
-        self._anchor_bot_tex: Point2f = Point2f(0.5, 0.6)
-        self._distance: float = 0.3
-        self._bbox: Rect = Rect(0.0, 0.0, 1.0, 1.0)
-
-        # Camera-space geometry (texture coordinates)
-        self._cam_rotation: float = 0.0
-        self._cam_crop_roi: Rect = Rect(0.0, 0.0, 1.0, 1.0)
-
-        # Bbox-space geometry (for mask and other bbox images)
-        self._bbox_aspect: float = 1.0
-        self._bbox_rotation: float = 0.0
-        self._bbox_crop_roi: Rect = Rect(0.0, 0.0, 1.0, 1.0)
-        self._bbox_rotation_center: Point2f = Point2f(0.5, 0.5)
-
-        # Transformed points
+        # Geometry results
+        self._cam_geometry: CamGeometry = CamGeometry(
+            Rect(0.0, 0.0, 1.0, 1.0), 0.0, Point2f(0.5, 0.3)
+        )
+        self._bbox_geometry: BboxGeometry = BboxGeometry(
+            Rect(0.0, 0.0, 1.0, 1.0), 0.0, Point2f(0.5, 0.5), 1.0
+        )
         self._transformed_points: Points2D | None = None
 
         # Configuration
@@ -64,14 +68,9 @@ class CentreGeometry(LayerBase):
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
-    def idle(self) -> bool:
+    def present(self) -> bool:
         """Whether valid pose data exists."""
-        return self._data_cache.idle
-
-    @property
-    def empty(self) -> bool:
-        """Whether valid pose data exists."""
-        return self._data_cache.empty
+        return self._data_cache.has_data
 
     @property
     def lost(self) -> bool:
@@ -79,73 +78,18 @@ class CentreGeometry(LayerBase):
         return self._data_cache.lost
 
     @property
-    def has_pose(self) -> bool:
-        """Whether valid pose data exists."""
-        return self._data_cache.has_data
+    def image_geometry(self) -> CamGeometry:
+        """Camera rendering geometry (crop ROI, rotation, rotation center)."""
+        return self._cam_geometry
 
     @property
-    def shoulder_midpoint(self) -> Point2f:
-        """Shoulder midpoint in bbox-relative coordinates [0,1]."""
-        return self._shoulder_midpoint
+    def bbox_geometry(self) -> BboxGeometry:
+        """Bbox rendering geometry for mask/flow (crop ROI, rotation, rotation center, aspect)."""
+        return self._bbox_geometry
 
     @property
-    def hip_midpoint(self) -> Point2f:
-        """Hip midpoint in bbox-relative coordinates [0,1]."""
-        return self._hip_midpoint
-
-    @property
-    def anchor_top_tex(self) -> Point2f:
-        """Top anchor point in texture coordinates."""
-        return self._anchor_top_tex
-
-    @property
-    def anchor_bot_tex(self) -> Point2f:
-        """Bottom anchor point in texture coordinates."""
-        return self._anchor_bot_tex
-
-    @property
-    def cam_rotation(self) -> float:
-        """Camera rotation angle in radians."""
-        return self._cam_rotation
-
-    @property
-    def distance(self) -> float:
-        """Distance between anchor points."""
-        return self._distance
-
-    @property
-    def cam_crop_roi(self) -> Rect:
-        """Camera crop region of interest."""
-        return self._cam_crop_roi
-
-    @property
-    def bbox(self) -> Rect:
-        """Current pose bounding box."""
-        return self._bbox
-
-    @property
-    def bbox_aspect(self) -> float:
-        """Bbox aspect ratio (width / height)."""
-        return self._bbox_aspect
-
-    @property
-    def bbox_rotation(self) -> float:
-        """Bbox-space rotation angle in radians (aspect-corrected)."""
-        return self._bbox_rotation
-
-    @property
-    def bbox_crop_roi(self) -> Rect:
-        """Bbox-space crop region of interest."""
-        return self._bbox_crop_roi
-
-    @property
-    def bbox_rotation_center(self) -> Point2f:
-        """Bbox-space rotation center (flipped Y for mask coordinates)."""
-        return self._bbox_rotation_center
-
-    @property
-    def transformed_points(self) -> Points2D | None:
-        """Transformed pose points in crop space [0,1], or None if no pose."""
+    def crop_pose_points(self) -> Points2D | None:
+        """Pose points in crop space [0,1], or None if no pose."""
         return self._transformed_points
 
     @property
@@ -169,68 +113,69 @@ class CentreGeometry(LayerBase):
             self._transformed_points = None
             return
 
-        # Update body landmarks (bbox-relative coordinates)
+        # Get current body landmarks (bbox-relative coordinates)
         shoulder_mid = CentreGeometry._get_midpoint(
             pose.points, PointLandmark.left_shoulder, PointLandmark.right_shoulder
         )
-        if shoulder_mid:
-            self._shoulder_midpoint = shoulder_mid
-
         hip_mid = CentreGeometry._get_midpoint(
             pose.points, PointLandmark.left_hip, PointLandmark.right_hip
         )
-        if hip_mid:
-            self._hip_midpoint = hip_mid
+
+        if not shoulder_mid or not hip_mid:
+            self._transformed_points = None
+            return
 
         # Calculate anchor points in image space (full image coordinates)
-        self._bbox = pose.bbox.to_rect()
-        anchor_top_img = self._shoulder_midpoint * self._bbox.size + self._bbox.position
-        anchor_bot_img = self._hip_midpoint * self._bbox.size + self._bbox.position
+        bbox = pose.bbox.to_rect()
+        anchor_top_img = shoulder_mid * bbox.size + bbox.position
+        anchor_bot_img = hip_mid * bbox.size + bbox.position
 
         # Convert anchor points to texture space (bottom-left origin)
-        self._anchor_top_tex = CentreGeometry._image_to_texture_point(anchor_top_img)
-        self._anchor_bot_tex = CentreGeometry._image_to_texture_point(anchor_bot_img)
+        anchor_top_tex = CentreGeometry._image_to_texture_point(anchor_top_img)
 
-        # Calculate camera-space geometry in texture space
+        # Calculate camera-space geometry
         target_distance: float = self.target_bottom.y - self.target_top.y
-        cam_rotation_img, self._distance, cam_crop_roi_img = CentreGeometry._calculate_roi(
+        cam_rotation_img, distance, cam_crop_roi_img = CentreGeometry._calculate_roi(
             anchor_top_img, anchor_bot_img, self.target_top, target_distance, self.dst_aspectratio
         )
 
-        # Convert camera geometry to texture space
-        self._cam_rotation = CentreGeometry._image_to_texture_rotation(cam_rotation_img)
-        self._cam_crop_roi = Rect(
-            cam_crop_roi_img.x,
-            CentreGeometry._image_to_texture_y(cam_crop_roi_img.y + cam_crop_roi_img.height),
-            cam_crop_roi_img.width,
-            cam_crop_roi_img.height
+        # Store camera geometry (texture space)
+        self._cam_geometry = CamGeometry(
+            crop_roi=Rect(
+                cam_crop_roi_img.x,
+                CentreGeometry._image_to_texture_y(cam_crop_roi_img.y + cam_crop_roi_img.height),
+                cam_crop_roi_img.width,
+                cam_crop_roi_img.height
+            ),
+            rotation=CentreGeometry._image_to_texture_rotation(cam_rotation_img),
+            rotation_center=anchor_top_tex
         )
 
         # Calculate bbox-space geometry (aspect-corrected for mask)
-        self._bbox_aspect = self._bbox.width / self._bbox.height if self._bbox.height > 0 else 1.0
-        mask_delta = self._hip_midpoint - self._shoulder_midpoint
-        # Negate rotation for flipped bbox coordinate system
-        self._bbox_rotation = -math.atan2(mask_delta.x * self._bbox_aspect, mask_delta.y)
-        mask_distance = math.hypot(mask_delta.x * self._bbox_aspect, mask_delta.y)
+        bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
+        mask_delta = hip_mid - shoulder_mid
+        mask_rotation = -math.atan2(mask_delta.x * bbox_aspect, mask_delta.y)
+        mask_distance = math.hypot(mask_delta.x * bbox_aspect, mask_delta.y)
 
         mask_height = mask_distance / target_distance
-        mask_width = mask_height * self._bbox_aspect
+        mask_width = mask_height * bbox_aspect
 
-        self._bbox_crop_roi = Rect(
-            x=self._shoulder_midpoint.x - mask_width * self.target_top.x,
-            y=1.0 - self._shoulder_midpoint.y - mask_height * (1.0 - self.target_top.y),
-            width=mask_width,
-            height=mask_height
-        )
-
-        self._bbox_rotation_center = Point2f(
-            self._shoulder_midpoint.x,
-            1.0 - self._shoulder_midpoint.y
+        # Store bbox geometry
+        self._bbox_geometry = BboxGeometry(
+            crop_roi=Rect(
+                x=shoulder_mid.x - mask_width * self.target_top.x,
+                y=1.0 - shoulder_mid.y - mask_height * (1.0 - self.target_top.y),
+                width=mask_width,
+                height=mask_height
+            ),
+            rotation=mask_rotation,
+            rotation_center=Point2f(shoulder_mid.x, 1.0 - shoulder_mid.y),
+            aspect=bbox_aspect
         )
 
         # Transform pose points using camera geometry (in image space)
         self._transformed_points = CentreGeometry._transform_points(
-            pose.points, self._bbox, anchor_top_img, self._cam_aspect, cam_rotation_img, cam_crop_roi_img
+            pose.points, bbox, anchor_top_img, self._cam_aspect, cam_rotation_img, cam_crop_roi_img
         )
 
     @staticmethod

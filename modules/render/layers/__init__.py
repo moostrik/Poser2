@@ -7,6 +7,7 @@ from .cam.TrackletRenderer import           TrackletRenderer
 from .centre.CentreGeometry import          CentreGeometry
 from .centre.CentreCamLayer import          CentreCamLayer
 from .centre.CentreMaskLayer import         CentreMaskLayer
+from .centre.CentreFrgLayer import          CentreFrgLayer
 from .centre.CentrePoseLayer import         CentrePoseLayer
 from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer
 
@@ -30,7 +31,7 @@ from .source.DFlowSourceLayer import        DFlowSourceLayer
 from .source.ImageSourceLayer import        ImageSourceLayer
 from .source.CropSourceLayer import         CropSourceLayer
 from .source.MaskSourceLayer import         MaskSourceLayer
-from .source.ForegroundSourceLayer import   ForegroundSourceLayer
+from .source.FrgSourceLayer import          FrgSourceLayer
 
 from .window.AngleMtnWindowLayer import     AngleMtnWindowLayer
 from .window.AngleVelWindowLayer import     AngleVelWindowLayer

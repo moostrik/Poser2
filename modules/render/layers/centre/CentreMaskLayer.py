@@ -89,8 +89,8 @@ class CentreMaskLayer(LayerBase):
             self._mask_fbo.clear()
             self._mask_blend_fbo.clear_all()
 
-        # Check if valid anchor data exists
-        if self._geometry.idle or self._geometry.empty:
+        # Check if valid geometry exists
+        if self._geometry.crop_pose_points is None:
             return
 
         Style.push_style()
@@ -100,10 +100,10 @@ class CentreMaskLayer(LayerBase):
         self._mask_fbo.begin()
         self._roi_shader.use(
             self._cam_texture,
-            self._geometry.bbox_crop_roi,
-            self._geometry.bbox_rotation,
-            self._geometry.bbox_rotation_center,
-            self._geometry.bbox_aspect
+            self._geometry.bbox_geometry.crop_roi,
+            self._geometry.bbox_geometry.rotation,
+            self._geometry.bbox_geometry.rotation_center,
+            self._geometry.bbox_geometry.aspect
         )
         self._mask_fbo.end()
 

@@ -75,7 +75,7 @@ class CentreCamLayer(LayerBase):
             if self._mask_texture and self.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
-        if self._geometry.idle or self._geometry.empty:
+        if self._geometry.crop_pose_points is None:
             return
 
         # Render camera image with ROI from anchor calculator
@@ -83,9 +83,9 @@ class CentreCamLayer(LayerBase):
         self._cam_fbo.begin()
         self._roi_shader.use(
             self._cam_texture,
-            self._geometry.cam_crop_roi,
-            self._geometry.cam_rotation,
-            self._geometry.anchor_top_tex,
+            self._geometry.image_geometry.crop_roi,
+            self._geometry.image_geometry.rotation,
+            self._geometry.image_geometry.rotation_center,
             cam_aspect,
         )
         self._cam_fbo.end()
