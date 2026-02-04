@@ -368,11 +368,11 @@ class TRTSegmentation(Thread):
         OUTPUT buffers allocated fresh each call (recurrent states are views into them).
 
         Args:
-            gpu_imgs: List of RGB uint8 tensors on GPU (H, W, 3)
+            gpu_imgs: List of RGB float32 tensors on GPU (3, H, W) CHW [0,1]
             tracklet_ids: Tracklet IDs for each image
 
         Returns:
-            (alpha_matte (B,H,W), foreground (B,3,H,W), inference_ms, lock_wait_ms)
+            (alpha_matte (B,H,W), foreground (B,3,H,W) CHW, inference_ms, lock_wait_ms)
         """
         batch_size = len(gpu_imgs)
         if batch_size == 0:
@@ -380,8 +380,8 @@ class TRTSegmentation(Thread):
 
         method_start: float = time.perf_counter()
 
-        # Get input dimensions from first image
-        input_h, input_w = gpu_imgs[0].shape[0], gpu_imgs[0].shape[1]
+        # Get input dimensions from first image (CHW format: 3, H, W)
+        input_h, input_w = gpu_imgs[0].shape[1], gpu_imgs[0].shape[2]
         needs_resize = (input_h != self.model_height or input_w != self.model_width)
 
         # Get preallocated INPUT buffer slices for current batch
@@ -401,11 +401,11 @@ class TRTSegmentation(Thread):
 
         # All preprocessing on dedicated stream (no cross-stream sync needed)
         with torch.cuda.stream(self.stream):
-            # Stack GPU tensors: (B, H, W, 3) float32 RGB [0,1]
-            batch_hwc = torch.stack(gpu_imgs, dim=0)
+            # Stack GPU tensors: (B, 3, H, W) float32 RGB CHW [0,1]
+            batch_chw = torch.stack(gpu_imgs, dim=0).to(self._torch_dtype)
 
-            # HWC -> CHW: (B, 3, H, W), convert to model dtype if needed
-            batch_chw = batch_hwc.permute(0, 3, 1, 2).to(self._torch_dtype)
+            # Keep original for foreground computation (interpolate creates new tensor, so this is safe)
+            batch_chw_original = batch_chw
 
             # Resize if needed (crop size != model size)
             if needs_resize:
@@ -469,13 +469,30 @@ class TRTSegmentation(Thread):
         # No clone needed - output buffers are fresh each call
         pha_tensor = pha_out.squeeze(1)
 
+        # Scale mask to original resolution and apply to input
+        with torch.cuda.stream(self.stream):
+            if needs_resize:
+                # Upscale mask from model resolution to original input resolution
+                mask_scaled = torch.nn.functional.interpolate(
+                    pha_tensor.unsqueeze(1),  # (B, H, W) -> (B, 1, H, W)
+                    size=(input_h, input_w),
+                    mode='bilinear',
+                    align_corners=False
+                ).squeeze(1)  # (B, 1, H, W) -> (B, H, W)
+            else:
+                mask_scaled = pha_tensor
+
+            # Apply mask to original input: foreground = original * mask
+            # batch_chw_original is (B, 3, H, W), mask_scaled is (B, H, W)
+            foreground = batch_chw_original * mask_scaled.unsqueeze(1)  # (B, 3, H, W) * (B, 1, H, W)
+
         method_end = time.perf_counter()
 
         lock_wait_ms = (lock_acquired - lock_wait_start) * 1000.0
         total_time_ms = (method_end - method_start) * 1000.0
         process_time_ms = total_time_ms - lock_wait_ms
 
-        return pha_tensor, fgr_out, process_time_ms, lock_wait_ms
+        return mask_scaled, foreground, process_time_ms, lock_wait_ms
 
     # CALLBACK METHODS
     def register_callback(self, callback: SegmentationOutputCallback) -> None:

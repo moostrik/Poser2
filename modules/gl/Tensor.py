@@ -269,9 +269,12 @@ class Tensor(Texture):
             elif tensor.dtype != torch.float32:
                 tensor = tensor.float()
 
-        # Permute multi-channel tensors from (C, H, W) to (H, W, C)
-        if len(tensor.shape) == 3 and tensor.shape[0] <= 4:
-            tensor = tensor.permute(1, 2, 0)
+        # Convert CHW to HWC (OpenGL expects interleaved channels)
+        if len(tensor.shape) == 3:
+            # Expect CHW format: (C, H, W) with C <= 4
+            if tensor.shape[0] > 4:
+                raise ValueError(f"Expected CHW format (C, H, W) with C <= 4, got shape {tensor.shape}")
+            tensor = tensor.permute(1, 2, 0)  # (C, H, W) -> (H, W, C)
 
         # Flip vertically to match OpenGL/FBO/Image convention
         tensor = torch.flip(tensor, [0])
@@ -333,9 +336,12 @@ class Tensor(Texture):
 
         Preserves uint8, FP16, or FP32 precision based on internal format.
         """
-        # Permute multi-channel tensors from (C, H, W) to (H, W, C)
-        if len(tensor.shape) == 3 and tensor.shape[0] <= 4:
-            tensor = tensor.permute(1, 2, 0)
+        # Convert CHW to HWC (OpenGL expects interleaved channels)
+        if len(tensor.shape) == 3:
+            # Expect CHW format: (C, H, W) with C <= 4
+            if tensor.shape[0] > 4:
+                raise ValueError(f"Expected CHW format (C, H, W) with C <= 4, got shape {tensor.shape}")
+            tensor = tensor.permute(1, 2, 0)  # (C, H, W) -> (H, W, C)
 
         # Flip vertically to match OpenGL/FBO/Image convention
         # After permute, shape is (H, W) or (H, W, C), so flip dimension [0] (height)

@@ -39,8 +39,9 @@ class GPUCropProcessor:
     Maintains previous frames for optical flow (re-cropped at current bbox location).
     Uses PyTorch for all GPU operations with F.grid_sample for efficient crop+resize.
 
-    Output crops are float16 RGB normalized to [0,1] at a fixed resolution.
-    Full frames are stored as float16 BGR [0,1] (flip happens on crop for efficiency).
+    All tensors use CHW format (channels-first) - the deep learning standard.
+    Output crops are float16 RGB CHW normalized to [0,1] at a fixed resolution.
+    Full frames are stored as float16 RGB CHW [0,1].
     """
 
     def __init__(self, config: GPUCropProcessorConfig) -> None:
@@ -77,7 +78,7 @@ class GPUCropProcessor:
         """Upload image from a specific camera to GPU. Only VIDEO frames are stored.
 
         Shifts current GPU image to previous before uploading new current.
-        Stores as float32 RGB [0,1] - BGR→RGB conversion done once at upload.
+        Stores as float16 RGB CHW [0,1] - BGR→RGB conversion and HWC→CHW done at upload.
 
         Args:
             cam_id: Camera identifier (used as tracklet ID in single-camera setups)
@@ -96,10 +97,10 @@ class GPUCropProcessor:
             if cam_id in self._gpu_images:
                 self._prev_gpu_images[cam_id] = self._gpu_images[cam_id]
 
-            # Upload BGR frame to GPU, fuse all ops for better memory access
+            # Upload BGR frame to GPU, convert to CHW RGB format
             gpu_img = torch.from_numpy(image).cuda(non_blocking=True)
-            # Fused: convert dtype, normalize, flip - all in one pass
-            self._gpu_images[cam_id] = gpu_img.flip(2).to(dtype=torch.float16).mul_(1.0/255.0)
+            # HWC -> CHW, BGR -> RGB, normalize to [0,1]
+            self._gpu_images[cam_id] = gpu_img.permute(2, 0, 1).flip(0).to(dtype=torch.float16).mul_(1.0/255.0)
 
         elapsed_ms = (time.perf_counter() - start) * 1000.0
         self._accumulated_upload_ms += elapsed_ms
@@ -110,7 +111,7 @@ class GPUCropProcessor:
         Crops current frame for each pose. For optical flow, also crops previous
         frame at the CURRENT bbox location (not the previous bbox).
 
-        Output crops are float32 RGB [0,1] in HWC format.
+        Output crops are float32 RGB CHW [0,1] format.
 
         Args:
             poses: Dictionary of tracklet_id -> Frame with bbox information
@@ -139,7 +140,8 @@ class GPUCropProcessor:
 
                 try:
                     gpu_image = self._gpu_images[pose_id]
-                    img_height, img_width = gpu_image.shape[:2]
+                    # CHW format: (3, H, W)
+                    img_height, img_width = gpu_image.shape[1:3]
                     bbox_rect = pose.bbox.to_rect()
 
                     # Calculate crop region (same logic as ImageProcessor)
@@ -152,7 +154,8 @@ class GPUCropProcessor:
                     prev_crop: torch.Tensor | None = None
                     if self._enable_prev_crop and pose_id in self._prev_gpu_images:
                         prev_img = self._prev_gpu_images[pose_id]
-                        prev_h, prev_w = prev_img.shape[:2]
+                        # CHW format: (3, H, W)
+                        prev_h, prev_w = prev_img.shape[1:3]
                         prev_crop = self._gpu_crop_resize(prev_img, crop_roi, prev_w, prev_h)
 
                     # Normalize crop ROI for output
@@ -162,9 +165,9 @@ class GPUCropProcessor:
                     # Build GPUFrame with PyTorch tensors
                     gpu_frames[pose_id] = GPUFrame(
                         track_id=pose_id,
-                        full_image=gpu_image,  # float32 BGR [0,1] HWC
-                        crop=crop_tensor,       # float32 RGB [0,1] HWC
-                        prev_crop=prev_crop     # float32 RGB [0,1] HWC or None
+                        full_image=gpu_image,  # float16 RGB CHW [0,1]
+                        crop=crop_tensor,       # float16 RGB CHW [0,1]
+                        prev_crop=prev_crop     # float16 RGB CHW [0,1] or None
                     )
 
                     pose_count += 1
@@ -217,13 +220,13 @@ class GPUCropProcessor:
         Extracts ROI region, pads if needed, resizes using bilinear interpolation.
 
         Args:
-            src: Source image on GPU (H, W, 3) float32 RGB [0,1]
+            src: Source image on GPU (3, H, W) float16 RGB CHW [0,1]
             roi: Crop region in pixel coordinates
             src_w: Source image width
             src_h: Source image height
 
         Returns:
-            Cropped and resized image (crop_height, crop_width, 3) float32 RGB [0,1]
+            Cropped and resized image (3, crop_height, crop_width) float16 RGB CHW [0,1]
         """
         # Clamp ROI to image bounds for valid region extraction
         x1 = max(0, int(roi.x))
@@ -233,19 +236,16 @@ class GPUCropProcessor:
 
         # Check if ROI is completely outside image
         if x1 >= x2 or y1 >= y2:
-            return torch.zeros((self._crop_height, self._crop_width, 3), device='cuda', dtype=torch.float16)
+            return torch.zeros((3, self._crop_height, self._crop_width), device='cuda', dtype=torch.float16)
 
-        # Extract valid region: HWC slice
-        crop = src[y1:y2, x1:x2, :]
+        # Extract valid region from CHW tensor: (3, H, W)
+        crop_chw = src[:, y1:y2, x1:x2]
 
         # Calculate padding amounts
         pad_left = max(0, -int(roi.x))
         pad_right = max(0, int(roi.x + roi.width) - src_w)
         pad_top = max(0, -int(roi.y))
         pad_bottom = max(0, int(roi.y + roi.height) - src_h)
-
-        # Convert to CHW for F.pad and F.interpolate
-        crop_chw = crop.permute(2, 0, 1)  # (3, H, W)
 
         # Apply padding if needed (F.pad uses reverse order: left, right, top, bottom)
         if pad_left > 0 or pad_right > 0 or pad_top > 0 or pad_bottom > 0:
@@ -261,10 +261,8 @@ class GPUCropProcessor:
                 align_corners=False
             ).squeeze(0)
 
-        # Convert CHW -> HWC (already RGB)
-        result = crop_chw.permute(1, 2, 0)
-
-        return result
+        # Keep CHW format (deep learning standard)
+        return crop_chw
 
     def add_callback(self, callback: GPUFrameCallback) -> None:
         """Register callback to receive cropped poses and GPU frames."""

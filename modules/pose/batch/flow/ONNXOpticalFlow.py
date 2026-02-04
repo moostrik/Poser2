@@ -319,8 +319,8 @@ class ONNXOpticalFlow(Thread):
 
         batch_start = time.perf_counter()
 
-        # Get input dimensions from first pair
-        input_h, input_w = gpu_pairs[0][0].shape[0], gpu_pairs[0][0].shape[1]
+        # Get input dimensions from first pair (CHW format: 3, H, W)
+        input_h, input_w = gpu_pairs[0][0].shape[1], gpu_pairs[0][0].shape[2]
         needs_resize = (input_h != self.model_height or input_w != self.model_width)
 
         # Get preallocated INPUT buffer slices for fixed batch
@@ -332,13 +332,13 @@ class ONNXOpticalFlow(Thread):
 
         # All preprocessing on dedicated stream (no cross-stream sync needed)
         with torch.cuda.stream(self.stream):
-            # Stack GPU tensors: (B, H, W, 3) float32 RGB [0,1]
-            prev_batch = torch.stack([p[0] for p in gpu_pairs], dim=0)  # (B, H, W, 3)
-            curr_batch = torch.stack([p[1] for p in gpu_pairs], dim=0)  # (B, H, W, 3)
+            # Stack GPU tensors: (B, 3, H, W) float32 RGB CHW [0,1]
+            prev_chw = torch.stack([p[0] for p in gpu_pairs], dim=0)
+            curr_chw = torch.stack([p[1] for p in gpu_pairs], dim=0)
 
-            # HWC -> CHW: (B, 3, H, W), convert to model dtype
-            prev_chw = prev_batch.permute(0, 3, 1, 2).mul(255.0).to(self._torch_dtype)
-            curr_chw = curr_batch.permute(0, 3, 1, 2).mul(255.0).to(self._torch_dtype)
+            # Scale to [0, 255] for RAFT, convert to model dtype
+            prev_chw = prev_chw.mul(255.0).to(self._torch_dtype)
+            curr_chw = curr_chw.mul(255.0).to(self._torch_dtype)
 
             # Resize if needed (crop size != model size)
             if needs_resize:

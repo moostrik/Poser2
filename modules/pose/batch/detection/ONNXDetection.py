@@ -288,8 +288,8 @@ class ONNXDetection(Thread):
         if batch_size == 0 or self._session is None:
             return np.empty((0, 17, 2)), np.empty((0, 17))
 
-        # Get input dimensions from first image
-        input_h, input_w = gpu_imgs[0].shape[0], gpu_imgs[0].shape[1]
+        # Get input dimensions from first image (CHW format: 3, H, W)
+        input_h, input_w = gpu_imgs[0].shape[1], gpu_imgs[0].shape[2]
         needs_resize = (input_h != self.model_height or input_w != self.model_width)
 
         # Get preallocated INPUT buffer slice for current batch
@@ -297,11 +297,8 @@ class ONNXDetection(Thread):
 
         # All preprocessing on dedicated stream (no cross-stream sync needed)
         with torch.cuda.stream(self.stream):
-            # Stack GPU tensors: (B, H, W, 3) float32 RGB [0,1]
-            batch_hwc = torch.stack(gpu_imgs, dim=0)
-
-            # HWC -> CHW: (B, 3, H, W), convert to model dtype
-            batch_chw = batch_hwc.permute(0, 3, 1, 2).to(self._torch_dtype)
+            # Stack GPU tensors: (B, 3, H, W) float32 RGB CHW [0,1]
+            batch_chw = torch.stack(gpu_imgs, dim=0).to(self._torch_dtype)
 
             # Resize if needed (crop size != model size)
             if needs_resize:
