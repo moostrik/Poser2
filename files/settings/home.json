@@ -40,14 +40,14 @@
     "max_poses": 3,
     "model_type": "TRT",
     "pose_resolution": "STANDARD",
-    "flow_resolution": "EXTREME",
+    "flow_resolution": "ULTRA",
     "model_path": "models",
-    "confidence_low": 0.45,
-    "confidence_high": 0.55,
+    "confidence_high": 0.6,
+    "confidence_low": 0.5,
     "verbose": false,
-    "crop_expansion": 0.1,
+    "crop_expansion": 0.3,
     "segmentation_enabled": true,
-    "segmentation_reset_interval": 0,
+    "segmentation_reset_interval": 240,
     "flow_enabled": false
   },
 
@@ -70,18 +70,18 @@
   "artnet_leds": [
     {
       "verbose": false,
-      "ip_address": "10.0.0.2",
+      "ip_address": "10.0.0.4",
       "base_universe": 0,
       "fps": 40,
       "r": 1.0,
       "g": 0.0,
       "b": 0.0,
-      "num_pixels": 90,
-      "channel_order": "RGBW",
+      "num_pixels": 94,
+      "channel_order": "GRBW",
       "enabled": true,
-      "white": 0.5,
-      "color": 0.5,
-      "bar": 0.5
+      "white": 0.66,
+      "color": 1.0,
+      "bar": 1.0
     },
     {
       "verbose": false,
@@ -91,27 +91,27 @@
       "r": 0.0,
       "g": 0.32,
       "b": 1.0,
-      "num_pixels": 90,
-      "channel_order": "RGBW",
+      "num_pixels": 94,
+      "channel_order": "GRBW",
       "enabled": true,
-      "white": 0.5,
-      "color": 0.5,
-      "bar": 0.5
+      "white": 0.66,
+      "color": 1.0,
+      "bar": 1.0
     },
     {
       "verbose": false,
-      "ip_address": "10.0.0.4",
+      "ip_address": "10.0.0.5",
       "base_universe": 0,
       "fps": 40,
-      "r": 0.34,
+      "r": 0.68,
       "g": 0.34,
       "b": 0.0,
-      "num_pixels": 90,
-      "channel_order": "RGBW",
+      "num_pixels": 94,
+      "channel_order": "GRBW",
       "enabled": true,
-      "white": 0.5,
-      "color": 0.5,
-      "bar": 0.5
+      "white": 0.66,
+      "color": 1.0,
+      "bar": 1.0
     }
   ],
 
@@ -123,7 +123,7 @@
     "x": 0,
     "y": 50,
     "fullscreen": false,
-    "fps": 0,
+    "fps": 60,
     "v_sync": false,
     "secondary_list": [
       0,

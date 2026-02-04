@@ -26,6 +26,7 @@ class WindowShader(Shader):
         tex0: Texture,
         num_samples: int,
         num_streams: int,
+        stream_step: float,
         line_width: float,
         output_aspect_ratio: float = 1.0,
         display_range: tuple[float, float] = (-3.14159, 3.14159),
@@ -39,6 +40,7 @@ class WindowShader(Shader):
             tex0: Input RG32F texture (feature_len, time, 2)
             num_samples: Number of time samples (width)
             num_streams: Number of feature elements (height)
+            stream_step: Normalized height per stream (constrained)
             line_width: Line thickness in normalized coordinates
             output_aspect_ratio: Output buffer aspect ratio (width/height)
             display_range: (min, max) value range for normalization
@@ -59,10 +61,8 @@ class WindowShader(Shader):
         glBindTexture(GL_TEXTURE_2D, tex0.tex_id)
 
         glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform2f(self.get_uniform_loc("tex_size"), float(tex0.width), float(tex0.height))
-        glUniform1f(self.get_uniform_loc("sample_step"), 1.0 / num_samples)
         glUniform1i(self.get_uniform_loc("num_streams"), num_streams)
-        glUniform1f(self.get_uniform_loc("stream_step"), 1.0 / num_streams)
+        glUniform1f(self.get_uniform_loc("stream_step"), stream_step)
         glUniform1f(self.get_uniform_loc("line_width"), line_width)
         glUniform1f(self.get_uniform_loc("output_aspect_ratio"), output_aspect_ratio)
         glUniform1f(self.get_uniform_loc("display_range_min"), display_range[0])

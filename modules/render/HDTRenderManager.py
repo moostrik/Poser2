@@ -116,12 +116,11 @@ PREVIEW_CENTRE: list[Layers] = [
     Layers.centre_frg,
     Layers.centre_pose,
 
-    Layers.angle_W,
-    Layers.angle_vel_W,
-    Layers.angle_mtn_W,
-    Layers.similarity_W,
-
-    # Layers.flow,
+    # Layers.angle_W,
+    # Layers.angle_vel_W,
+    # Layers.angle_mtn_W,
+    # Layers.similarity_W,
+    Layers.bbox_W,
 ]
 
 SHOW_CAM: list[Layers] = [
@@ -154,6 +153,8 @@ SHOW_MASK: list[Layers] = [
     # Layers.cam_crop
 ]
 
+
+
 SHOW_COMP: list[Layers] = [
     Layers.flow,
     # Layers.centre_pose,
@@ -163,7 +164,7 @@ SHOW_COMP: list[Layers] = [
 
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_CAM
+FINAL_LAYERS: list[Layers] = PREVIEW_CENTRE
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
@@ -195,7 +196,7 @@ class HDTRenderManager(RenderBase):
 
             cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxRenderer(        i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=2.0)
-            mtime_data =    self.L[Layers.mtime_data][i] =  ls.PoseMTimeRenderer(   i, self.data_hub,   PoseDataHubTypes.pose_I)
+            mtime_data =    self.L[Layers.mtime_data][i] =  ls.MTimeRenderer(   i, self.data_hub,   PoseDataHubTypes.pose_I)
             field_bar_R =   self.L[Layers.field_bar_R][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_R,    FrameField.angles, line_thickness=4.0, line_smooth=16.0, color = (0.0, 0.0, 0.0, 0.33))
             field_bar_I =   self.L[Layers.field_bar_I][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_I,    FrameField.angles, line_thickness=2.0, line_smooth=2.0)
             angle_bar =     self.L[Layers.angle_bar][i] =   ls.PoseBarADLayer(      i, self.data_hub,   PoseDataHubTypes.pose_I)
@@ -224,7 +225,7 @@ class HDTRenderManager(RenderBase):
             angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer( i, self.data_hub, self.line_width)
             angle_mtn_W =   self.L[Layers.angle_mtn_W][i] = ls.AngleMtnWindowLayer( i, self.data_hub, self.line_width)
             similarity_W =  self.L[Layers.similarity_W][i] = ls.SimilarityWindowLayer(  i, self.data_hub, self.line_width)
-            # bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub)
+            bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub, self.line_width)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [

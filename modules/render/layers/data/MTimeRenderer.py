@@ -10,7 +10,7 @@ from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.gl.Text import draw_box_string, text_init
 
 
-class PoseMTimeRenderer(LayerBase):
+class MTimeRenderer(LayerBase):
     def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes) -> None:
         self._data: DataHub = data
         self._track_id: int = track_id

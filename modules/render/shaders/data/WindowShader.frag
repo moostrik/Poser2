@@ -1,7 +1,6 @@
 #version 460 core
 
 uniform sampler2D   tex0;
-uniform float       sample_step;
 uniform int         num_streams;
 uniform float       stream_step;
 uniform float       line_width;
@@ -16,7 +15,14 @@ in vec2     texCoord;
 out vec4    fragColor;
 
 
-bool isBetweenStreamLine(vec2 uv, float stream_step, float line_width, int num_streams) {
+bool isBetweenStreamLine(vec2 uv, float stream_step, float line_width, int num_streams, float used_height) {
+    // Check top boundary (y = 0)
+    if (abs(uv.y) < line_width) return true;
+
+    // Check bottom boundary (y = used_height)
+    if (abs(uv.y - used_height) < line_width) return true;
+
+    // Check intermediate stream boundaries
     int stream_id = int(floor(uv.y / stream_step));
     if (stream_id >= num_streams - 1) return false;
 
@@ -25,12 +31,24 @@ bool isBetweenStreamLine(vec2 uv, float stream_step, float line_width, int num_s
 }
 
 void main() {
-    vec2 stream_uv = vec2(texCoord.x, 1.0 - texCoord.y);
-    vec2 frag_pos = vec2(texCoord.x, stream_uv.y);
+    // Flip Y coordinate so top of screen = 0, bottom = 1
+    float flipped_y = 1.0 - texCoord.y;
+
+    // Calculate used height for all streams
+    float used_height = stream_step * float(num_streams);
+
+    // Check if outside used vertical space (streams are at top)
+    if (flipped_y < 0.0 || flipped_y > used_height) {
+        fragColor = vec4(0.0);
+        return;
+    }
+
+    vec2 stream_uv = vec2(texCoord.x, flipped_y);
+    vec2 frag_pos = vec2(texCoord.x, flipped_y);
 
     // Draw stream separator lines
-    if (isBetweenStreamLine(stream_uv, stream_step, line_width / output_aspect_ratio * 0.5, num_streams)) {
-        fragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    if (isBetweenStreamLine(stream_uv, stream_step, line_width / output_aspect_ratio * 0.5, num_streams, used_height)) {
+        fragColor = vec4(0.5, 0.5, 0.5, 1.0);  // Grey separator lines
         return;
     }
 
@@ -39,8 +57,9 @@ void main() {
     float stream_center = (float(stream_id) + 0.5) * stream_step;
     float stream_top = stream_center - 0.5 * stream_step;
 
-    // Sample current and previous directly from texture
-    vec2 value_uv = vec2(texCoord.x, stream_center);
+    // Sample from texture using texture coordinates (not display coordinates)
+    float texture_v = (float(stream_id) + 0.5) / float(num_streams);
+    vec2 value_uv = vec2(stream_uv.x, texture_v);
     float value = texture(tex0, value_uv).r;
     float mask = texture(tex0, value_uv).g;
 

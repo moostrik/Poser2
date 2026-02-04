@@ -17,8 +17,8 @@ from .data.PoseBarScalarLayer import        PoseBarScalarLayer
 from .data.PoseBarSLayer import             PoseBarSLayer
 from .pose.PoseDotLayer import              PoseDotLayer
 from .pose.PoseLineLayer import             PoseLineLayer
-from .data.PoseMTimeRenderer import         PoseMTimeRenderer
-from .data.FeatureWindowLayer import        AngleMtnWindowLayer, AngleVelWindowLayer, AngleWindowLayer, SimilarityWindowLayer
+from .data.MTimeRenderer import         MTimeRenderer
+from .data.FeatureWindowLayer import        AngleMtnWindowLayer, AngleVelWindowLayer, AngleWindowLayer, SimilarityWindowLayer, BBoxWindowLayer
 
 from .flow.FlowSourceLayer import           FlowSourceLayer
 from .flow.OpticalFlowLayer import          OpticalFlowLayer

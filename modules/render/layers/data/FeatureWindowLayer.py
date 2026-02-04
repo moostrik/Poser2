@@ -11,7 +11,7 @@ from modules.DataHub import DataHub, DataHubType
 from modules.gl import Fbo, Texture, Blit, Image, clear_color, draw_box_string, text_init
 from modules.pose.nodes import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders.window import WindowShader
+from modules.render.shaders import WindowShader
 from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -96,9 +96,6 @@ class FeatureWindowLayer(LayerBase):
         # Stack as 2-channel RG texture
         stream_image = np.stack([values, mask], axis=-1)  # (feature_len, time, 2)
 
-        # Flip vertically for OpenGL convention (oldest at bottom)
-        stream_image = np.flip(stream_image, axis=0)
-
         # Upload to GPU via Image (numpy -> GL_RG32F texture)
         self._image.set_image(stream_image)
         self._image.update()
@@ -114,12 +111,19 @@ class FeatureWindowLayer(LayerBase):
         num_samples = stream_image.shape[1]  # time (width)
         num_streams = stream_image.shape[0]  # feature_len (height)
         output_aspect = self._fbo.width / self._fbo.height
+
+        # Constrain stream height to 20% of layer width
+        max_stream_step = 0.2 * output_aspect
+        stream_step = min(1.0 / num_streams, max_stream_step)
+
         self._shader.use(
             self._image.texture,
             num_samples,
             num_streams,
+            stream_step,
             line_width=self.line_width / self._fbo.height,
             output_aspect_ratio=output_aspect,
+
             display_range=display_range,
             color_even=self._config.color_even,
             color_odd=self._config.color_odd,
@@ -160,7 +164,7 @@ class AngleMtnWindowLayer(FeatureWindowLayer):
     """Angle motion window layer."""
 
     def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = (4.0, 0.0)) -> None:
+                 display_range: Tuple[float, float] | None = None) -> None:
         config = WindowLayerConfig(
             data_type=DataHubType.angle_motion_window,
             display_range=display_range,
@@ -176,7 +180,7 @@ class AngleVelWindowLayer(FeatureWindowLayer):
     """Angle velocity window layer."""
 
     def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = (-np.pi, np.pi)) -> None:
+                 display_range: Tuple[float, float] | None = None) -> None:
         config = WindowLayerConfig(
             data_type=DataHubType.angle_vel_window,
             display_range=display_range,
@@ -208,7 +212,7 @@ class SimilarityWindowLayer(FeatureWindowLayer):
     """Similarity window layer."""
 
     def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = (1.0, 0.0)) -> None:
+                 display_range: Tuple[float, float] | None = (0.0, 1.0)) -> None:
         config = WindowLayerConfig(
             data_type=DataHubType.similarity_window,
             display_range=display_range,
@@ -216,5 +220,21 @@ class SimilarityWindowLayer(FeatureWindowLayer):
             color_odd=(0.0, 1.0, 1.0),   # cyan
             alpha=0.75,
             render_labels=False  # Labels were commented out in original
+        )
+        super().__init__(track_id, data_hub, line_width, config)
+
+
+class BBoxWindowLayer(FeatureWindowLayer):
+    """Bounding box window layer."""
+
+    def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
+                 display_range: Tuple[float, float] | None = None) -> None:
+        config = WindowLayerConfig(
+            data_type=DataHubType.bbox_window,
+            display_range=display_range,  # Dynamic from window.range
+            color_even=(0.0, 1.0, 0.5),  # green-cyan
+            color_odd=(1.0, 0.0, 1.0),   # magenta
+            alpha=0.75,
+            render_labels=True
         )
         super().__init__(track_id, data_hub, line_width, config)
