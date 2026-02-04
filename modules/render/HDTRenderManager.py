@@ -116,9 +116,9 @@ PREVIEW_CENTRE: list[Layers] = [
     Layers.centre_frg,
     Layers.centre_pose,
 
-    # Layers.angle_W,
-    # Layers.angle_vel_W,
-    # Layers.angle_mtn_W,
+    Layers.angle_W,
+    Layers.angle_vel_W,
+    Layers.angle_mtn_W,
     Layers.similarity_W,
 
     # Layers.flow,

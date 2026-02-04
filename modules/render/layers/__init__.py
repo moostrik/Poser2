@@ -18,6 +18,7 @@ from .data.PoseBarSLayer import             PoseBarSLayer
 from .pose.PoseDotLayer import              PoseDotLayer
 from .pose.PoseLineLayer import             PoseLineLayer
 from .data.PoseMTimeRenderer import         PoseMTimeRenderer
+from .data.FeatureWindowLayer import        AngleMtnWindowLayer, AngleVelWindowLayer, AngleWindowLayer, SimilarityWindowLayer
 
 from .flow.FlowSourceLayer import           FlowSourceLayer
 from .flow.OpticalFlowLayer import          OpticalFlowLayer
@@ -32,8 +33,3 @@ from .source.ImageSourceLayer import        ImageSourceLayer
 from .source.CropSourceLayer import         CropSourceLayer
 from .source.MaskSourceLayer import         MaskSourceLayer
 from .source.FrgSourceLayer import          FrgSourceLayer
-
-from .window.AngleMtnWindowLayer import     AngleMtnWindowLayer
-from .window.AngleVelWindowLayer import     AngleVelWindowLayer
-from .window.AngleWindowLayer import        AngleWindowLayer
-from .window.SimilarityWindowLayer import   SimilarityWindowLayer

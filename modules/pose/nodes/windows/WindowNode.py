@@ -24,14 +24,17 @@ class FeatureWindow(Generic[TEnum]):
         values: Feature values array of shape (time, feature_len)
         mask: Boolean validity mask of shape (time, feature_len)
         feature_enum: Enum class for feature elements (e.g., AngleLandmark)
-        feature_names: List of feature element names
         range: (min, max) tuple for display range
     """
     values: np.ndarray       # (time, feature_len)
     mask: np.ndarray         # (time, feature_len) bool
     feature_enum: type[TEnum]  # e.g., AngleLandmark
-    feature_names: list[str]  # Feature element names
     range: tuple[float, float]  # (min, max) display range
+
+    @property
+    def feature_names(self) -> list[str]:
+        """Derive feature names from enum."""
+        return [e.name for e in self.feature_enum]
 
     def __getitem__(self, landmark: TEnum | int) -> np.ndarray:
         """Get time series for one feature element.
@@ -161,7 +164,6 @@ class WindowNode(NodeBase, Generic[TFeature]):
             values=values,
             mask=mask,
             feature_enum=self.feature_enum,
-            feature_names=[e.name for e in self.feature_enum],
             range=self.frame_field.get_range()
         )
 
