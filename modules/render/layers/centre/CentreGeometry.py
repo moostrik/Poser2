@@ -290,16 +290,16 @@ class CentreGeometry(LayerBase):
         """Transform pose points to crop-space coordinates [0,1]."""
         x_bbox, y_bbox = points.get_xy_arrays()
 
-        # Convert from bbox-relative to texture coordinates
+        # Convert from bbox-relative to image coordinates
         x = x_bbox * bbox.width + bbox.x
         y = y_bbox * bbox.height + bbox.y
 
-        # Rotate around point with aspect correction (matches shader behavior)
-        dx = (x - top.x) * aspect
+        # Rotate around shoulder position (no aspect correction in image space)
+        dx = x - top.x
         dy = y - top.y
 
         cos_a, sin_a = np.cos(rotation), np.sin(rotation)
-        x_rot = (cos_a * dx - sin_a * dy) / aspect + top.x
+        x_rot = cos_a * dx - sin_a * dy + top.x
         y_rot = sin_a * dx + cos_a * dy + top.y
 
         # Convert to crop ROI space
