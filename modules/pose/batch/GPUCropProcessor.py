@@ -175,6 +175,17 @@ class GPUCropProcessor:
                 except Exception as e:
                     print(f"GPUCropProcessor: Error processing pose {pose_id}: {e}")
 
+            # Emit camera-only frames for cameras without poses
+            # This ensures camera feeds remain visible even when no tracklets exist for that camera
+            pose_cam_ids = {pose.cam_id if hasattr(pose, 'cam_id') else pose_id for pose_id, pose in poses.items()}
+            for cam_id, gpu_image in self._gpu_images.items():
+                if cam_id not in pose_cam_ids and cam_id not in gpu_frames:
+                    gpu_frames[cam_id] = GPUFrame(
+                        track_id=cam_id,
+                        full_image=gpu_image,
+                        crop=None  # No crop without bbox
+                    )
+
         # Sync before callbacks access the data
         self._stream.synchronize()
 
@@ -183,7 +194,7 @@ class GPUCropProcessor:
         self._process_timer.add_time(elapsed_ms, report=self._config.verbose)
         self._accumulated_upload_ms = 0.0
 
-        # Notify callbacks
+        # Always notify callbacks to maintain data flow (even with empty dicts)
         for callback in self._callbacks:
             try:
                 callback(cropped_poses, gpu_frames)

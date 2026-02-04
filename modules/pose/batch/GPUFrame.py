@@ -22,7 +22,7 @@ class GPUFrame:
     Attributes:
         track_id: Tracklet identifier
         full_image: Full source frame on GPU (3, H, W) float16 RGB CHW [0,1]
-        crop: Cropped and resized region on GPU (3, crop_height, crop_width) float16 RGB CHW [0,1]
+        crop: Cropped and resized region on GPU (3, crop_height, crop_width) float16 RGB CHW [0,1], None if no bbox
         prev_crop: Previous frame cropped at CURRENT bbox location for optical flow.
                    (3, H, W) float16 RGB CHW [0,1], None if no previous frame available.
         mask: Optional segmentation mask on GPU (H, W) float16 or float32 [0,1] - no channel dim
@@ -30,7 +30,7 @@ class GPUFrame:
     """
     track_id: int
     full_image: torch.Tensor
-    crop: torch.Tensor
+    crop: torch.Tensor | None = None
     prev_crop: torch.Tensor | None = None
     mask: torch.Tensor | None = None
     foreground: torch.Tensor | None = None

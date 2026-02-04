@@ -73,12 +73,14 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         for tracklet_id in poses.keys():
             if tracklet_id in gpu_frames:
                 gpu_frame = gpu_frames[tracklet_id]
-                # Only add if prev_crop exists (need both frames for optical flow)
-                if gpu_frame.prev_crop is not None:
+                # Only add if prev_crop and crop exist (need both frames for optical flow)
+                if gpu_frame.prev_crop is not None and gpu_frame.crop is not None:
                     tracklet_id_list.append(tracklet_id)
                     pair_list.append((gpu_frame.prev_crop, gpu_frame.crop))
 
+        # If no pairs available, emit empty flow dict to maintain data flow
         if not pair_list:
+            self._notify_callbacks({})
             return
 
         with self._lock:

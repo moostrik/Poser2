@@ -33,9 +33,6 @@ class ImageSourceLayer(LayerBase):
         gpu_frame: GPUFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._cam_id)
         self._data_cache.update(gpu_frame)
 
-        # if self._data_cache.lost:
-        #     self._image.clear()
-
         if self._data_cache.idle or gpu_frame is None:
             return
 

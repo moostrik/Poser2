@@ -113,7 +113,7 @@ LARGE_LAYERS: list[Layers] = [
 ]
 
 PREVIEW_CENTRE: list[Layers] = [
-    Layers.centre_cam,
+    Layers.centre_frg,
     Layers.centre_pose,
 
     # Layers.angle_W,
@@ -163,7 +163,7 @@ SHOW_COMP: list[Layers] = [
 
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_CENTRE
+FINAL_LAYERS: list[Layers] = SHOW_CAM
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:

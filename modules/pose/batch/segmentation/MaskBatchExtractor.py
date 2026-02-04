@@ -81,11 +81,13 @@ class MaskBatchExtractor:
         gpu_image_list: list = []  # list[cp.ndarray]
 
         for tracklet_id in poses.keys():
-            if tracklet_id in gpu_frames:
+            if tracklet_id in gpu_frames and gpu_frames[tracklet_id].crop is not None:
                 tracklet_ids.append(tracklet_id)
                 gpu_image_list.append(gpu_frames[tracklet_id].crop)
 
+        # If no crops available, forward frames without segmentation to maintain data flow
         if not gpu_image_list:
+            self._notify_callbacks(poses, gpu_frames)
             return
 
         with self._lock:
