@@ -186,7 +186,7 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
 
 
     def _stack_windows(self, windows: WindowDict) -> tuple[list[int], np.ndarray]:
-        """Stack all windows into (N, T, F) tensor with padding.
+        """Stack all windows into (N, T, F) tensor.
 
         Returns:
             track_ids: List of track IDs
@@ -200,15 +200,8 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         for track_id, window in windows.items():
             track_ids.append(track_id)
 
-            # Get last window_length samples
+            # Get last window_length samples (windows are always full-sized now)
             window_data = window.values[-window_length:]
-
-            # Pad with NaN if shorter than window_length
-            if len(window_data) < window_length:
-                pad_len = window_length - len(window_data)
-                padding = np.full((pad_len, window.feature_len), np.nan, dtype=np.float32)
-                window_data = np.vstack([padding, window_data])
-
             slices.append(window_data)
 
         # Stack: (N, T, F)

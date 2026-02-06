@@ -77,12 +77,13 @@ class WindowNode(NodeBase, Generic[TFeature]):
     """Base class for nodes that buffer poses and output feature windows.
 
     Uses a preallocated numpy ring buffer for performance.
-    Window grows from 1 frame up to window_size, returning current buffer state.
-    Output is reordered so index 0 is always the oldest sample.
+    Always returns full window_size buffer with oldest samples first.
+    Unfilled slots have mask=False to indicate no data is present.
     Thread-safe: config changes and buffer operations are protected by lock.
 
     Output:
-        FeatureWindow with values and mask arrays, both shape (current_len, feature_len), oldest first
+        FeatureWindow with values and mask arrays, both shape (window_size, feature_len), oldest first.
+        Unfilled slots have mask=False.
     """
 
     def __init__(self, frame_field: FrameField, config: WindowNodeConfig | None = None) -> None:
@@ -151,16 +152,14 @@ class WindowNode(NodeBase, Generic[TFeature]):
             return self._get_ordered_window()
 
     def _get_ordered_window(self) -> FeatureWindow:
-        """Return window with oldest sample at index 0."""
-        if self._count < self._config.window_size:
-            # Not full yet - data is already in order from index 0
-            values = self._values[:self._count].copy()
-            mask = self._mask[:self._count].copy()
-        else:
-            # Full - use np.roll to reorder so oldest is first
-            # _head points to next insert = oldest slot
-            values = np.roll(self._values, -self._head, axis=0)
-            mask = np.roll(self._mask, -self._head, axis=0)
+        """Return full-sized window with oldest sample at index 0.
+        
+        Always returns window_size buffer. Unfilled slots have mask=False.
+        """
+        # Always use np.roll to reorder so oldest is first
+        # _head points to next insert = oldest slot
+        values = np.roll(self._values, -self._head, axis=0).copy()
+        mask = np.roll(self._mask, -self._head, axis=0).copy()
 
         return FeatureWindow(
             values=values,
