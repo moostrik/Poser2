@@ -11,8 +11,8 @@ from .centre.CentreFrgLayer import          CentreFrgLayer
 from .centre.CentrePoseLayer import         CentrePoseLayer
 from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer
 
-from .data.FeatureFrameLayer import         FeatureFrameLayer, AngleFrameLayer, AngleVelFrameLayer, AngleMotionFrameLayer, AngleSymFrameLayer, SimilarityFrameLayer, BBoxFrameLayer, LeaderFrameLayer
-from .data.AgleVelFrameLayer import         AgleVelFrameLayer
+from .data.FeatureFrameLayer import         FeatureFrameLayer, AngleFrameLayer, AngleVelFrameLayer, AngleMtnFrameLayer, AngleSymFrameLayer, SimilarityFrameLayer, BBoxFrameLayer, LeaderFrameLayer
+from .data.AngleVelLayer import             AngleVelLayer
 from .data.FeatureWindowLayer import        AngleMtnWindowLayer, AngleVelWindowLayer, AngleWindowLayer, SimilarityWindowLayer, BBoxWindowLayer
 from .data.MTimeRenderer import             MTimeRenderer
 from .pose.PoseDotLayer import              PoseDotLayer

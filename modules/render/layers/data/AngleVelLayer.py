@@ -15,7 +15,7 @@ from .Colors import ANGLES_COLORS
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class AgleVelFrameLayer(LayerBase):
+class AngleVelLayer(LayerBase):
     """Visualizes angles with line thickness modulated by angular velocity.
 
     Unique visualization: horizontal lines show angle positions, but line thickness
@@ -77,8 +77,8 @@ class AgleVelFrameLayer(LayerBase):
             return
 
         # Extract features from frame
-        angles = pose.get_feature(FrameField.angles)
-        velocity = pose.get_feature(FrameField.angle_vel)
+        angles = pose.angles
+        velocity = pose.angle_vel
 
         # Override display range if configured
         if self._display_range is not None:

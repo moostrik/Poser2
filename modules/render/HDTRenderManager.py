@@ -238,12 +238,12 @@ class HDTRenderManager(RenderBase):
             angle_W =       self.L[Layers.angle_W][i] =     ls.AngleWindowLayer(    i, self.data_hub, self.line_width)
             angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer( i, self.data_hub, self.line_width)
             angle_mtn_W =   self.L[Layers.angle_mtn_W][i] = ls.AngleMtnWindowLayer( i, self.data_hub, self.line_width)
-            similarity_W =  self.L[Layers.similarity_W][i] = ls.SimilarityWindowLayer(  i, self.data_hub, self.line_width)
+            similarity_W =  self.L[Layers.similarity_W][i] =ls.SimilarityWindowLayer(  i, self.data_hub, self.line_width)
             bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub, self.line_width)
 
-            angle_vel_F =   self.L[Layers.angle_vel_F][i] = ls.AgleVelFrameLayer(   i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=2.0, line_smooth=2.0)
-            angle_mtn_F =   self.L[Layers.angle_mtn_F][i] = ls.AngleMotionFrameLayer(i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=2.0, line_smooth=2.0)
-            similarity_F =  self.L[Layers.similarity_F][i] = ls.SimilarityFrameLayer(i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=4.0, line_smooth=2.0)
+            angle_vel_F =   self.L[Layers.angle_vel_F][i] = ls.AngleVelLayer(       i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=1.0, line_smooth=1.0)
+            angle_mtn_F =   self.L[Layers.angle_mtn_F][i] = ls.AngleMtnFrameLayer(  i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=2.0, line_smooth=2.0)
+            similarity_F =  self.L[Layers.similarity_F][i] =ls.SimilarityFrameLayer(i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=4.0, line_smooth=2.0)
             bbox_F =        self.L[Layers.bbox_F][i] =      ls.BBoxFrameLayer(      i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=2.0, line_smooth=2.0)
 
         # composition

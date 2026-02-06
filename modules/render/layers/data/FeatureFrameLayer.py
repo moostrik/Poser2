@@ -193,7 +193,7 @@ class AngleVelFrameLayer(FeatureFrameLayer):
         super().__init__(track_id, data_hub, config, line_thickness, line_smooth)
 
 
-class AngleMotionFrameLayer(FeatureFrameLayer):
+class AngleMtnFrameLayer(FeatureFrameLayer):
     """Angle motion frame layer."""
 
     def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
