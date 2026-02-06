@@ -6,7 +6,7 @@ from datetime import datetime
 import os
 
 # Local application imports
-from modules.render.HDTRenderManager import HDTRenderManager
+from modules.render.RenderManager import RenderManager
 from modules.Settings import Settings
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import FrameField
@@ -69,7 +69,7 @@ class Main():
         self.timer_gui = ConfigGuiGenerator(self.timer_config, self.gui, "Timer")
 
         # RENDER
-        self.render = HDTRenderManager(self.gui, self.data_hub, settings.render)
+        self.render = RenderManager(self.gui, self.data_hub, settings.render)
 
         # POSE CONFIGURATION
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
@@ -226,28 +226,24 @@ class Main():
 
         # POSE RAW
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
-        self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, Stage.RAW)) # raw poses
+        self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, Stage.RAW))
+        self.pose_raw_filters.add_poses_callback(self.window_tracker_R.process)
+        self.window_tracker_R.add_callback(partial(self.data_hub.set_feature_windows, Stage.RAW))
 
         # POSE SMOOTH
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
 
         # POSE PREDICTION
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, Stage.SMOOTH)) # smooth poses
+        self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, Stage.SMOOTH))
+        self.pose_smooth_filters.add_poses_callback(self.window_tracker_S.process)
+        self.window_tracker_S.add_callback(partial(self.data_hub.set_feature_windows, Stage.SMOOTH))
 
         # INTERPOLATION
         self.data_hub.add_update_callback(self.interpolator.update)
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
-        self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, Stage.LERP)) # interpolated poses
-
-        # WINDOW TRACKERS
-        self.pose_raw_filters.add_poses_callback(self.window_tracker_R.process)
-        self.window_tracker_R.add_callback(partial(self.data_hub.set_feature_windows, Stage.RAW))
-
-        self.pose_smooth_filters.add_poses_callback(self.window_tracker_S.process)
-        self.window_tracker_S.add_callback(partial(self.data_hub.set_feature_windows, Stage.SMOOTH))
-
+        self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, Stage.LERP))
         self.pose_interpolation_pipeline.add_poses_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_callback(partial(self.data_hub.set_feature_windows, Stage.LERP))
 

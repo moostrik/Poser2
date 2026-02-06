@@ -183,7 +183,7 @@ SHOW_DATA: list[Layers] = [
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
 FINAL_LAYERS: list[Layers] = SHOW_DATA
 
-class HDTRenderManager(RenderBase):
+class RenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
         self.num_players: int = settings.num_players
         self.num_cams: int =    settings.num_cams
