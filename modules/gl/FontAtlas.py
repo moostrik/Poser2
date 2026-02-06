@@ -112,7 +112,7 @@ class FontAtlas:
         # Second pass: pack glyphs into atlas
         x, y = 0, 0
         row_height = 0
-        
+
         # Store ascent for text positioning
         self.ascent = max_bearing_y
 

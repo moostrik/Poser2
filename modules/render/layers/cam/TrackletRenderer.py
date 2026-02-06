@@ -13,19 +13,23 @@ from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 from modules.DataHub import DataHub, DataHubType
 from modules.render.layers.LayerBase import LayerBase, Rect
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 
 class TrackletRenderer(LayerBase):
     def __init__(self, cam_id: int, data: DataHub) -> None:
         self._data: DataHub = data
         self._cam_id: int = cam_id
-        self._tracklets: list[DepthTracklet] | None = None
+        self._tracklets: list[DepthTracklet] = []
         self._shader: DrawColoredRectangle = DrawColoredRectangle()
         self._text_renderer: Text = Text()
 
+        self._hot_reloader = HotReloadMethods(self.__class__, True, True)
+
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._shader.allocate()
-        self._text_renderer.allocate("files/RobotoMono-Regular.ttf", font_size=14)
+        self._text_renderer.allocate(font_size=14)
         self._width = width
         self._height = height
 
@@ -34,13 +38,15 @@ class TrackletRenderer(LayerBase):
         self._text_renderer.deallocate()
 
     def draw(self) -> None:
-        if self._tracklets is None:
-            return
-        for depth_tracklet in self._tracklets or []:
+        for depth_tracklet in self._tracklets:
             self.draw_depth_tracklet(depth_tracklet, self._shader, self._text_renderer, self._width, self._height)
 
     def update(self) -> None:
-        self._tracklets: list[DepthTracklet] | None = self._data.get_item(DataHubType.depth_tracklet, self._cam_id)
+        tracklets: list[DepthTracklet] | None = self._data.get_item(DataHubType.depth_tracklet, self._cam_id)
+        if tracklets is None:
+            self._tracklets = []
+        else:
+            self._tracklets = tracklets
 
     def draw_depth_tracklet(self, tracklet: DepthTracklet, shader: DrawColoredRectangle,
                            text_renderer: Text, width: int, height: int) -> None:
@@ -67,15 +73,25 @@ class TrackletRenderer(LayerBase):
 
         shader.use(t_x, t_y, t_w, t_h, r, g, b, a)
 
-        string: str
-        t_x += t_w - 6
-        t_y += 22
-        string = f'ID: {tracklet.id}'
-        text_renderer.draw_box_text(t_x, t_y, string, (1.0, 1.0, 1.0, 1.0),
-                                   (0.0, 0.0, 0.0, 0.6), width, height)
-        t_y += 22
-        string = f'Age: {tracklet.age}'
-        text_renderer.draw_box_text(t_x, t_y, string, (1.0, 1.0, 1.0, 1.0),
+        # Convert tracklet coordinates to pixel space if needed
+        # Tracklet ROI is typically in normalized coordinates (0-1)
+        pixel_x: float = t_x * width
+        pixel_y: float = t_y * height
+
+        # Draw text at top-left corner of tracklet with padding
+        padding: float = 4.0
+        text_x: float = pixel_x + padding
+        text_y: float = pixel_y + padding
+
+        # Combine ID and Age on one line with labels
+        text_string: str = f'ID: {tracklet.id} Age: {tracklet.age}'
+        text_width, text_height = text_renderer.measure_text(text_string)
+
+        # Clamp to viewport bounds if text would go outside
+        final_x: float = max(0, min(text_x, width - text_width - padding))
+        final_y: float = max(0, min(text_y, height - text_height - padding))
+
+        text_renderer.draw_box_text(final_x, final_y, text_string, (1.0, 1.0, 1.0, 1.0),
                                    (0.0, 0.0, 0.0, 0.6), width, height)
 
 
