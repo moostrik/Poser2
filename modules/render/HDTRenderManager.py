@@ -51,10 +51,6 @@ class Layers(IntEnum):
     cam_bbox =      auto()
     cam_track =     auto()
 
-    # pose data layers
-    mtime_data =    auto()
-    # angle_bar =     auto()
-
     # centre layers
     centre_math=    auto()
     centre_cam =    auto()
@@ -71,7 +67,7 @@ class Layers(IntEnum):
     bbox_W =        auto()
 
     # Frame layers
-    # angle_F =       auto()
+    mtime_data =    auto()
     angle_vel_F =   auto()
     angle_mtn_F =   auto()
     similarity_F =  auto()
@@ -125,6 +121,7 @@ PREVIEW_CENTRE: list[Layers] = [
     # Layers.similarity_W,
     Layers.bbox_W,
     Layers.angle_vel_F,
+    Layers.mtime_data
 ]
 
 SHOW_CAM: list[Layers] = [
@@ -173,7 +170,7 @@ SHOW_DATA: list[Layers] = [
     # Layers.angle_vel_F,
     # Layers.angle_mtn_F,
     Layers.similarity_F,
-    Layers.angle_vel_F,
+    # Layers.angle_vel_F,
     # Layers.motion_bar,
 
     # Layers.motion_sim,
