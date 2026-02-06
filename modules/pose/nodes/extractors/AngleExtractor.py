@@ -21,5 +21,5 @@ class AngleExtractor(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         """Compute angles for all poses and emit enriched results."""
-        angles: Angles = AngleUtils.from_points(pose.points)
+        angles: Angles = AngleUtils.from_points(pose.points, aspect_ratio=pose.model_ar)
         return replace(pose, angles=angles)

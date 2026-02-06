@@ -42,14 +42,19 @@ _ANGLE_MIRRORED: set[AngleLandmark] = {
 class AngleUtils:
 
     @staticmethod
-    def from_points(points: Points2D, min_dist: float = 0.02) -> Angles:
+    def from_points(points: Points2D, aspect_ratio: float = 0.75, min_dist: float = 0.02) -> Angles:
         """Create angle measurements from keypoint data.
 
         Computes joint angles from 2D keypoint positions, applies rotation offsets,
         and mirrors right-side angles for symmetric representation.
 
+        Points are scaled to isotropic space before angle computation to correct
+        for non-square crop aspect ratios (e.g. 192x256 → 3:4).
+
         Args:
             points: Keypoint data
+            aspect_ratio: Width/height ratio of the crop (e.g. 0.75 for 192x256).
+                          Used to correct y-axis scaling so angles are geometrically accurate.
             min_dist: Minimum distance between points to consider them valid
                         0.02 is ~2% of image size or about 4 pixels in 192 x 256 image crops
 
@@ -59,6 +64,11 @@ class AngleUtils:
         if points.valid_count == 0:
             return Angles.create_dummy()
 
+        # Scale factor to correct normalized coords to isotropic (square-pixel) space.
+        # For a 192x256 crop (ar=0.75), y is stretched by 1/0.75 = 1.333 so that
+        # equal normalized distances correspond to equal physical distances.
+        ar_scale = np.array([1.0, 1.0 / aspect_ratio], dtype=np.float32)
+
         angle_values = np.full(len(AngleLandmark), np.nan, dtype=np.float32)
         angle_scores = np.zeros(len(AngleLandmark), dtype=np.float32)
 
@@ -67,8 +77,8 @@ class AngleUtils:
             if not points.are_valid(list(keypoints)):
                 continue  # Skip if any required keypoint is invalid
 
-            # Extract points (guaranteed valid - no NaN)
-            P = [points[kp] for kp in keypoints]
+            # Extract points and scale to isotropic space (guaranteed valid - no NaN)
+            P = [points[kp] * ar_scale for kp in keypoints]
             if AngleUtils._points_too_close(P, min_dist):
                 continue  # Skip if any points are too close
 
