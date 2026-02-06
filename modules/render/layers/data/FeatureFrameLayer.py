@@ -49,7 +49,7 @@ class FeatureFrameLayer(LayerBase):
 
         self.line_thickness: float = line_thickness
         self.line_smooth: float = line_smooth
-        self.draw_labels: bool = True
+        self.draw_labels: bool = False
 
         self._shader: FeatureShader = FeatureShader()
         self._text_renderer: Text = Text()
@@ -141,17 +141,17 @@ class FeatureFrameLayer(LayerBase):
 
         step: float = rect.width / num_labels
 
-        # Alternate colors for readability
-        colors: list[tuple[float, float, float, float]] = ANGLES_COLORS
+        # Use colors from config
+        colors: list[tuple[float, float, float, float]] = self._config.colors
 
         for i in range(num_labels):
             string: str = labels[i]
             x: int = int(rect.x + (i + 0.1) * step)
             y: int = int(rect.y + rect.height * 0.5 - 7)
-            clr: int = i % 2
+            clr: int = i % len(colors)
 
             self._text_renderer.draw_box_text(
-                x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3),
+                x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.66),
                 screen_width=fbo.width, screen_height=fbo.height
             )
 

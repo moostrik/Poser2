@@ -14,6 +14,10 @@ from modules.gl.shaders.TextShader import TextShader
 from modules.gl.shaders.BoxShader import BoxShader
 
 
+# Default font path
+DEFAULT_FONT = "files/RobotoMono-Regular.ttf"
+
+
 class Text:
     """GPU-based text renderer using texture atlas.
 
@@ -42,11 +46,11 @@ class Text:
     def allocated(self) -> bool:
         return self._allocated
 
-    def allocate(self, font_path: str | Path, font_size: int = 16) -> bool:
+    def allocate(self, font_path: str | Path | None = None, font_size: int = 16) -> bool:
         """Initialize text rendering resources.
 
         Args:
-            font_path: Path to TTF font file
+            font_path: Path to TTF font file (defaults to RobotoMono-Regular.ttf)
             font_size: Font size in pixels
 
         Returns:
@@ -54,6 +58,10 @@ class Text:
         """
         if self._allocated:
             return True
+
+        # Default to RobotoMono-Regular if no font specified
+        if font_path is None:
+            font_path = DEFAULT_FONT
 
         # Build font atlas
         if not self._atlas.allocate(font_path, font_size):
@@ -95,7 +103,7 @@ class Text:
 
         Args:
             x: X position in pixels (left edge)
-            y: Y position in pixels (top edge / baseline area)
+            y: Y position in pixels (top edge of text box)
             text: Text string to render
             color: (r, g, b, a) text color
             screen_width: Width of render target in pixels
@@ -116,10 +124,10 @@ class Text:
             if glyph is None:
                 continue
 
-            # Calculate glyph position
-            # bearing_y is distance from baseline to top of glyph
+            # Position glyph from top edge (y) down by (ascent - bearing_y)
+            # This places text consistently regardless of which characters are used
             glyph_x = cursor_x + glyph.bearing_x
-            glyph_y = y + (self._atlas.line_height - glyph.bearing_y)
+            glyph_y = y + (self._atlas.ascent - glyph.bearing_y)
 
             glyph_rect = (glyph_x, glyph_y, float(glyph.width), float(glyph.height))
             uv_rect = (glyph.u0, glyph.v0, glyph.u1, glyph.v1)
@@ -171,23 +179,6 @@ class Text:
             bg_color, screen_size
         )
 
-        # Draw text on top
-        self.draw_text(x, y, text, color, screen_width, screen_height)
-
-
-# Legacy compatibility stubs - use TextRenderer class directly instead
-
-def draw_box_string(x: float, y: float, string: str,
-                    color: Tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0),
-                    box_color: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6),
-                    big: bool = False) -> None:
-    """Legacy compatibility stub - does nothing."""
-    pass
-
-
-def draw_string(x: float, y: float, string: str,
-                color: Tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0),
-                big: bool = False) -> None:
-    """Legacy compatibility stub - does nothing."""
-    pass
-
+        # Draw text with slight vertical offset for better centering
+        text_y = y + pad * 0.5
+        self.draw_text(x, text_y, text, color, screen_width, screen_height)

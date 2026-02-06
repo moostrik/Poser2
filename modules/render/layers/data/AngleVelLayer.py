@@ -37,7 +37,7 @@ class AngleVelLayer(LayerBase):
 
         self.line_thickness: float = line_thickness
         self.line_smooth: float = line_smooth
-        self.draw_labels: bool = True
+        self.draw_labels: bool = False
 
         self._shader: AngleVelShader = AngleVelShader()
         self._text_renderer: Text = Text()

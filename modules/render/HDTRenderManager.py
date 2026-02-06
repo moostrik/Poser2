@@ -162,6 +162,8 @@ SHOW_COMP: list[Layers] = [
 ]
 
 SHOW_DATA: list[Layers] = [
+
+    Layers.cam_image,
     # Layers.angle_W,
     # Layers.angle_vel_W,
     # Layers.angle_mtn_W,
@@ -169,7 +171,7 @@ SHOW_DATA: list[Layers] = [
     # Layers.angle_F,
     # Layers.angle_vel_F,
     Layers.angle_mtn_F,
-    Layers.similarity_F,
+    # Layers.similarity_F,
     # Layers.angle_vel_F,
     # Layers.motion_bar,
 

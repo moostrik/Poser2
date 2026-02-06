@@ -41,6 +41,7 @@ class FontAtlas:
         self.atlas_height: int = 0
         self.glyphs: Dict[str, GlyphMetrics] = {}
         self.line_height: int = 0
+        self.ascent: int = 0  # Maximum bearing_y (distance from baseline to top)
         self.allocated: bool = False
 
     def allocate(self, font_path: str | Path, font_size: int = 16) -> bool:
@@ -70,6 +71,7 @@ class FontAtlas:
 
         # First pass: measure all glyphs to determine atlas size
         max_height = 0
+        max_bearing_y = 0
         total_width = 0
         glyph_data: list = []
 
@@ -93,6 +95,7 @@ class FontAtlas:
             glyph_data.append((char, buffer, width, height, bearing_x, bearing_y, advance))
             total_width += width + 2  # 2px padding
             max_height = max(max_height, height)
+            max_bearing_y = max(max_bearing_y, bearing_y)
 
         # Calculate atlas dimensions (simple row packing)
         self.atlas_width = min(1024, total_width)
@@ -109,6 +112,9 @@ class FontAtlas:
         # Second pass: pack glyphs into atlas
         x, y = 0, 0
         row_height = 0
+        
+        # Store ascent for text positioning
+        self.ascent = max_bearing_y
 
         for char, buffer, width, height, bearing_x, bearing_y, advance in glyph_data:
             # Move to next row if needed

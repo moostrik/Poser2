@@ -44,6 +44,11 @@ class FeatureWindowLayer(LayerBase):
         self._label_fbo: Fbo = Fbo()
         self._image: Image = Image()
         self._data_cache: DataCache[FeatureWindow] = DataCache()
+        self._labels: list[str] = []
+
+        self._width: int = 0
+        self._height: int = 0
+        self._stream_step_pixels: float = 0.0
 
         self.draw_labels: bool = True
         self.line_width: float = line_width
@@ -60,14 +65,11 @@ class FeatureWindowLayer(LayerBase):
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         if width is None or height is None or internal_format is None:
             return
+        self._width = width
+        self._height = height
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
-        self._text_renderer.allocate("files/RobotoMono-Regular.ttf", font_size=14)
-        # Get feature names from first available window for label rendering
-        if self._config.render_labels:
-            window: FeatureWindow | None = self._data_hub.get_item(self._config.data_type, self._track_id)
-            if window is not None:
-                self._render_labels_static(self._label_fbo, window.feature_names)
+        self._text_renderer.allocate("files/RobotoMono-Regular.ttf", font_size=30)
         self._shader.allocate()
 
     def deallocate(self) -> None:
@@ -117,6 +119,7 @@ class FeatureWindowLayer(LayerBase):
         # Constrain stream height to 20% of layer width
         max_stream_step = 0.2 * output_aspect
         stream_step = min(1.0 / num_streams, max_stream_step)
+        self._stream_step_pixels = stream_step * self._height
 
         self._shader.use(
             self._image.texture,
@@ -131,7 +134,14 @@ class FeatureWindowLayer(LayerBase):
         )
         self._fbo.end()
 
-    def _render_labels_static(self, fbo: Fbo, feature_names: list[str]) -> None:
+        # Render labels if changed
+        if self._config.render_labels:
+            labels: list[str] = window.feature_names
+            if labels != self._labels:
+                self._render_labels_static(self._label_fbo, labels, self._stream_step_pixels)
+                self._labels = labels
+
+    def _render_labels_static(self, fbo: Fbo, feature_names: list[str], step: float) -> None:
         """Render feature labels overlay."""
         rect = Rect(0, 0, fbo.width, fbo.height)
 
@@ -139,17 +149,16 @@ class FeatureWindowLayer(LayerBase):
         clear_color()
 
         feature_num: int = len(feature_names)
-        step: float = rect.height / feature_num
-        colors: list[tuple[float, float, float, float]] = ANGLES_COLORS
+        colors: list[tuple[float, float, float, float]] = self._config.colors
 
         for i in range(feature_num):
-            string: str = feature_names[i]
+            string: str = feature_names[i] + "abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             x: int = int(rect.x + 10)
             y: int = int(rect.y + rect.height - (rect.height - (i + 0.5) * step) - 7)
-            clr: int = i % 2
+            clr: int = i % len(colors)
 
             self._text_renderer.draw_box_text(
-                x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3),
+                x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.66),
                 screen_width=fbo.width, screen_height=fbo.height
             )
 
@@ -213,7 +222,7 @@ class SimilarityWindowLayer(FeatureWindowLayer):
             display_range=display_range,
             colors=SIMILARITY_COLORS,
             alpha=1.0,
-            render_labels=False  # Labels were commented out in original
+            render_labels=True
         )
         super().__init__(track_id, data_hub, line_width, config)
 
