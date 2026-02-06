@@ -152,7 +152,7 @@ class FeatureWindowLayer(LayerBase):
         colors: list[tuple[float, float, float, float]] = self._config.colors
 
         for i in range(feature_num):
-            string: str = feature_names[i] + "abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            string: str = feature_names[i]
             x: int = int(rect.x + 10)
             y: int = int(rect.y + rect.height - (rect.height - (i + 0.5) * step) - 7)
             clr: int = i % len(colors)

@@ -185,6 +185,15 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
         pass
 
     @classmethod
+    def display_range(cls) -> tuple[float, float]:
+        """Display range for visualization. Defaults to range().
+
+        Override in subclasses where the validation range is too wide
+        or unbounded for meaningful display.
+        """
+        return cls.range()
+
+    @classmethod
     @abstractmethod
     def dimensions(cls) -> int:
         """Number of dimensions per vector (2 for 2D, 3 for 3D, etc.)."""

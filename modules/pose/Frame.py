@@ -28,6 +28,7 @@ class Frame:
     leader: LeaderScore =       field(default_factory=LeaderScore.create_dummy)
     motion_time: float =        field(default=0.0)
     age: float =                field(default=0.0)
+    model_ar: float =           field(default=0.75)
 
     def get_feature(self, feature: 'FrameField') -> Any:
         """Get a feature by its Enum value"""
@@ -56,6 +57,7 @@ class FrameField(IntEnum):
     leader =        auto()
     motion_time =   auto()
     age =           auto()
+    model_ar =      auto()
 
     def get_type(self) -> type:
         """Get the feature class for this pose field using Pose type hints."""
@@ -71,6 +73,15 @@ class FrameField(IntEnum):
             return feature_type.range()
         raise ValueError(
             f"PoseField '{self.name}' of type '{feature_type.__name__}' does not have a defined range"
+        )
+
+    def get_display_range(self) -> tuple[float, float]:
+        """Get the display range for this feature, if applicable."""
+        feature_type: type = self.get_type()
+        if issubclass(feature_type, BaseFeature):
+            return feature_type.display_range()
+        raise ValueError(
+            f"PoseField '{self.name}' of type '{feature_type.__name__}' does not have a defined display range"
         )
 
     def get_length(self) -> int:

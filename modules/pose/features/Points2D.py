@@ -217,7 +217,12 @@ class Points2D(BaseVectorFeature[PointLandmark]):
     @classmethod
     def range(cls) -> tuple[float, float]:
         """Returns normalized coordinate range"""
-        return (-2.0, 2.0)
+        return (-1.0, 2.0)
+
+    @classmethod
+    def display_range(cls) -> tuple[float, float]:
+        """Tighter display range than validation range."""
+        return (0.0, 1.0)
 
     @classmethod
     def dimensions(cls) -> int:

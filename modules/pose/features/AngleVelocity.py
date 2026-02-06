@@ -14,3 +14,8 @@ class AngleVelocity(BaseScalarFeature[AngleLandmark]):
     def range(cls) -> tuple[float, float]:
         # Unbounded range for velocities
         return (-np.inf, np.inf)
+
+    @classmethod
+    def display_range(cls) -> tuple[float, float]:
+        """Clamp display to ±π for meaningful visualization."""
+        return (-np.pi, np.pi)

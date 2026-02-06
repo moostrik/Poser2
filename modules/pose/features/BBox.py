@@ -204,7 +204,12 @@ class BBox(BaseScalarFeature[BBoxElement]):
     @classmethod
     def range(cls) -> tuple[float, float]:
         # return (-np.inf, np.inf)
-        return (-2.0, 2.0)
+        return (-1.0, 2.0)
+
+    @classmethod
+    def display_range(cls) -> tuple[float, float]:
+        """Tighter display range than validation range."""
+        return (0.0, 1.0)
 
     # ========== RECT CONVERSION ==========
 

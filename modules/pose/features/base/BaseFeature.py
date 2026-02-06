@@ -181,7 +181,7 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
         Note: For runtime-configured features, generate the enum at
               configuration time (see Similarity for example).
         """
-        pass
+        ...
 
     @classmethod
     @abstractmethod
@@ -193,7 +193,7 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
 
         Standard implementation: return len(cls.enum())
         """
-        pass
+        ...
 
     @classmethod
     @abstractmethod
@@ -203,7 +203,16 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
         Returns:
             (min_value, max_value) tuple. Use module constants.
         """
-        pass
+        ...
+
+    @classmethod
+    def display_range(cls) -> tuple[float, float]:
+        """Display range for visualization. Defaults to range().
+
+        Override in subclasses where the validation range is too wide
+        or unbounded for meaningful display (e.g. AngleVelocity, BBox, Points2D).
+        """
+        ...
 
     @classmethod
     @abstractmethod
@@ -213,12 +222,12 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
         Returns:
             Instance with NaN values and zero scores for initialization.
         """
-        pass
+        ...
 
     @abstractmethod
     def __len__(self) -> int:
         """Number of elements in this feature."""
-        pass
+        ...
 
     # ========== RAW DATA ACCESS ==========
 
@@ -226,13 +235,13 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
     @abstractmethod
     def values(self) -> np.ndarray:
         """Feature values array (read-only, shape varies by type)."""
-        pass
+        ...
 
     @property
     @abstractmethod
     def scores(self) -> np.ndarray:
         """Confidence scores array (read-only, n_elements)."""
-        pass
+        ...
 
     # ========== VALIDITY ==========
 
@@ -240,25 +249,25 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
     @abstractmethod
     def valid_mask(self) -> np.ndarray:
         """Boolean mask of valid elements (n_elements)."""
-        pass
+        ...
 
     @property
     @abstractmethod
     def valid_count(self) -> int:
         """Number of elements with valid data."""
-        pass
+        ...
 
     # ========== SCORE ACCESS ==========
 
     @abstractmethod
     def get_score(self, element: FeatureEnum | int) -> float:
         """Get confidence score for a single element (Python float)."""
-        pass
+        ...
 
     @abstractmethod
     def get_scores(self, elements: list[FeatureEnum | int]) -> list[float]:
         """Get confidence scores for multiple elements (Python list)."""
-        pass
+        ...
 
     # ========== VALIDATION ==========
 
@@ -272,11 +281,11 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
         Returns:
             Tuple of (is_valid, error_message if invalid).
         """
-        pass
+        ...
 
     # ========== REPRESENTATION ==========
 
     @abstractmethod
     def __repr__(self) -> str:
         """String representation for debugging."""
-        pass
+        ...

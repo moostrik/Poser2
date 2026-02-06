@@ -172,6 +172,15 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         """Define valid range for scalar values. Must be implemented by subclasses."""
         pass
 
+    @classmethod
+    def display_range(cls) -> tuple[float, float]:
+        """Display range for visualization. Defaults to range().
+
+        Override in subclasses where the validation range is too wide
+        or unbounded for meaningful display.
+        """
+        return cls.range()
+
     # ========== BASEFEATURE ==========
 
     def __len__(self) -> int:
