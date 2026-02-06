@@ -168,7 +168,7 @@ SHOW_DATA: list[Layers] = [
     Layers.similarity_W,
     # Layers.angle_F,
     # Layers.angle_vel_F,
-    # Layers.angle_mtn_F,
+    Layers.angle_mtn_F,
     Layers.similarity_F,
     # Layers.angle_vel_F,
     # Layers.motion_bar,

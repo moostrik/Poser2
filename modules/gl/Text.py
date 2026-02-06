@@ -191,8 +191,3 @@ def draw_string(x: float, y: float, string: str,
     """Legacy compatibility stub - does nothing."""
     pass
 
-
-def text_init() -> None:
-    """Legacy compatibility stub - does nothing."""
-    pass
-

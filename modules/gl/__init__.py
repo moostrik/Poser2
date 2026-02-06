@@ -15,4 +15,3 @@ from .Tensor import Tensor
 
 # TEXT RENDERING
 from .Text import Text
-from .Text import text_init, draw_string, draw_box_string  # Legacy stubs

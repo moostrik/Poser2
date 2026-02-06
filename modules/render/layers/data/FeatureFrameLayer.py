@@ -7,7 +7,7 @@ from OpenGL.GL import *  # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, Blit, clear_color, draw_box_string, text_init
+from modules.gl import Fbo, Texture, Blit, clear_color, Text
 from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
@@ -52,8 +52,7 @@ class FeatureFrameLayer(LayerBase):
         self.draw_labels: bool = True
 
         self._shader: FeatureShader = FeatureShader()
-
-        text_init()
+        self._text_renderer: Text = Text()
 
         self._hot_reloader = HotReloadMethods(self.__class__, True, True)
 
@@ -65,11 +64,13 @@ class FeatureFrameLayer(LayerBase):
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
         self._shader.allocate()
+        self._text_renderer.allocate("files/RobotoMono-Regular.ttf", font_size=14)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._label_fbo.deallocate()
         self._shader.deallocate()
+        self._text_renderer.deallocate()
 
     def draw(self) -> None:
         if self._fbo.allocated:
@@ -128,8 +129,6 @@ class FeatureFrameLayer(LayerBase):
 
     def _render_labels_static(self, fbo: Fbo, labels: list[str]) -> None:
         """Render feature labels overlay."""
-        text_init()
-
         rect = Rect(0, 0, fbo.width, fbo.height)
 
         fbo.begin()
@@ -148,10 +147,13 @@ class FeatureFrameLayer(LayerBase):
         for i in range(num_labels):
             string: str = labels[i]
             x: int = int(rect.x + (i + 0.1) * step)
-            y: int = int(rect.y + rect.height * 0.5 - 9)
+            y: int = int(rect.y + rect.height * 0.5 - 7)
             clr: int = i % 2
 
-            draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3))  # type: ignore
+            self._text_renderer.draw_box_text(
+                x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3),
+                screen_width=fbo.width, screen_height=fbo.height
+            )
 
         fbo.end()
 

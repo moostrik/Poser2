@@ -5,7 +5,7 @@ import numpy as np
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl.Text import draw_box_string, text_init
+from modules.gl import Text
 from modules.render.shaders import DrawColoredRectangle
 
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
@@ -21,25 +21,29 @@ class TrackletRenderer(LayerBase):
         self._cam_id: int = cam_id
         self._tracklets: list[DepthTracklet] | None = None
         self._shader: DrawColoredRectangle = DrawColoredRectangle()
-        text_init()
+        self._text_renderer: Text = Text()
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._shader.allocate()
+        self._text_renderer.allocate("files/RobotoMono-Regular.ttf", font_size=14)
+        self._width = width
+        self._height = height
 
     def deallocate(self) -> None:
         self._shader.deallocate()
+        self._text_renderer.deallocate()
 
     def draw(self) -> None:
         if self._tracklets is None:
             return
         for depth_tracklet in self._tracklets or []:
-            TrackletRenderer.draw_depth_tracklet(depth_tracklet, self._shader)
+            self.draw_depth_tracklet(depth_tracklet, self._shader, self._text_renderer, self._width, self._height)
 
     def update(self) -> None:
         self._tracklets: list[DepthTracklet] | None = self._data.get_item(DataHubType.depth_tracklet, self._cam_id)
 
-    @staticmethod
-    def draw_depth_tracklet(tracklet: DepthTracklet, shader: DrawColoredRectangle) -> None:
+    def draw_depth_tracklet(self, tracklet: DepthTracklet, shader: DrawColoredRectangle,
+                           text_renderer: Text, width: int, height: int) -> None:
         if tracklet.status == DepthTracklet.TrackingStatus.REMOVED:
             return
 
@@ -64,13 +68,15 @@ class TrackletRenderer(LayerBase):
         shader.use(t_x, t_y, t_w, t_h, r, g, b, a)
 
         string: str
-        t_x += t_w -6
+        t_x += t_w - 6
         t_y += 22
         string = f'ID: {tracklet.id}'
-        draw_box_string(t_x, t_y, string)
+        text_renderer.draw_box_text(t_x, t_y, string, (1.0, 1.0, 1.0, 1.0),
+                                   (0.0, 0.0, 0.0, 0.6), width, height)
         t_y += 22
         string = f'Age: {tracklet.age}'
-        draw_box_string(t_x, t_y, string)
+        text_renderer.draw_box_text(t_x, t_y, string, (1.0, 1.0, 1.0, 1.0),
+                                   (0.0, 0.0, 0.0, 0.6), width, height)
 
 
 

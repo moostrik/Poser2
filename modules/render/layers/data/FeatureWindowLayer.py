@@ -8,7 +8,7 @@ from OpenGL.GL import *  # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gl import Fbo, Texture, Blit, Image, clear_color, draw_box_string, text_init
+from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.nodes import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import WindowShader
@@ -49,6 +49,7 @@ class FeatureWindowLayer(LayerBase):
         self.line_width: float = line_width
 
         self._shader: WindowShader = WindowShader()
+        self._text_renderer: Text = Text()
 
         self._hot_reloader = HotReloadMethods(self.__class__, True, True)
 
@@ -61,6 +62,7 @@ class FeatureWindowLayer(LayerBase):
             return
         self._fbo.allocate(width, height, internal_format)
         self._label_fbo.allocate(width, height, internal_format)
+        self._text_renderer.allocate("files/RobotoMono-Regular.ttf", font_size=14)
         # Get feature names from first available window for label rendering
         if self._config.render_labels:
             window: FeatureWindow | None = self._data_hub.get_item(self._config.data_type, self._track_id)
@@ -73,6 +75,7 @@ class FeatureWindowLayer(LayerBase):
         self._label_fbo.deallocate()
         self._image.deallocate()
         self._shader.deallocate()
+        self._text_renderer.deallocate()
 
     def draw(self) -> None:
         if self._fbo.allocated:
@@ -130,8 +133,6 @@ class FeatureWindowLayer(LayerBase):
 
     def _render_labels_static(self, fbo: Fbo, feature_names: list[str]) -> None:
         """Render feature labels overlay."""
-        text_init()
-
         rect = Rect(0, 0, fbo.width, fbo.height)
 
         fbo.begin()
@@ -144,10 +145,13 @@ class FeatureWindowLayer(LayerBase):
         for i in range(feature_num):
             string: str = feature_names[i]
             x: int = int(rect.x + 10)
-            y: int = int(rect.y + rect.height - (rect.height - (i + 0.5) * step) - 9)
+            y: int = int(rect.y + rect.height - (rect.height - (i + 0.5) * step) - 7)
             clr: int = i % 2
 
-            draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3))  # type: ignore
+            self._text_renderer.draw_box_text(
+                x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3),
+                screen_width=fbo.width, screen_height=fbo.height
+            )
 
         fbo.end()
 
