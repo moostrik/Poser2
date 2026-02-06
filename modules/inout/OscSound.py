@@ -1,8 +1,7 @@
 from dataclasses import dataclass, field
 from threading import Thread, Event
 from time import perf_counter
-import ipaddress
-import subprocess
+import socket
 
 import numpy as np
 from pythonosc.udp_client import SimpleUDPClient
@@ -17,8 +16,8 @@ from modules.pose.features.AngleSymmetry import SymmetryElement, AggregationMeth
 from modules.DataHub import DataHub, DataHubType
 from modules.ConfigBase import ConfigBase
 from modules.utils.Timer import TimerState
-
 from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.inout.NetworkValidation import validate_connection
 
 @dataclass
 class OscSoundConfig(ConfigBase):
@@ -45,10 +44,6 @@ class OscSound:
         self._thread: Thread | None = None
         # Initialize inactive message counts for all players
         self._inactive_message_counts: dict[int, int] = {id: 0 for id in range(self._config.num_players)}
-
-        # Validate IP in background thread (non-blocking)
-        validation_thread = Thread(target=self._validate_ip_background, daemon=True)
-        validation_thread.start()
 
         # Pre-build inactive messages for all players
         self._inactive_messages: dict[int, list[OscBundle]] = {}
@@ -86,6 +81,11 @@ class OscSound:
 
     def _run(self) -> None:
         """Main loop for sending OSC data at regular intervals"""
+        # Validate network and IP before starting
+        if not validate_connection(self._config.ip_addresses, self._config.port, "OscSound"):
+            self._running = False
+            return
+
         while self._running:
             self._update_event.wait()
             self._update_event.clear()
@@ -93,6 +93,10 @@ class OscSound:
 
                 try:
                     self._send_data()
+                except socket.error as e:
+                    print(f"ERROR: Socket error with exception: {e}")
+                    self._running = False
+                    break
                 except Exception as e:
                     print(f"Error sending OSC data: {e}")
 
@@ -107,11 +111,11 @@ class OscSound:
 
         timer_state_msg = OscMessageBuilder(address="/global/state")
         timer_state_msg.add_arg(timer_state if timer_state is not None else 0, arg_type=OscMessageBuilder.ARG_TYPE_INT)
-        bundle_builder.add_content(timer_state_msg.build())
+        bundle_builder.add_content(timer_state_msg.build()) # type: ignore
 
         timer_time_msg = OscMessageBuilder(address="/global/time")
         timer_time_msg.add_arg(timer_time if timer_time is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(timer_time_msg.build())
+        bundle_builder.add_content(timer_time_msg.build()) # type: ignore
 
         poses: dict[int, Frame] = self._data_hub.get_dict(self._config.data_type)
         num_players = self._config.num_players
@@ -244,32 +248,4 @@ class OscSound:
             similarity_msg.add_arg(similarity, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(similarity_msg.build()) # type: ignore
 
-    # IP VALIDATION
-    def _validate_ip_background(self) -> None:
-        """Validate IP reachability in background thread (non-blocking)."""
-        if not OscSound._validate_ip(self._config.ip_addresses):
-            print(f"OscSound WARNING: Invalid IP address format: {self._config.ip_addresses}")
-        elif not OscSound._ping_ip(self._config.ip_addresses):
-            print(f"OscSound WARNING: IP {self._config.ip_addresses} is not reachable (ping failed). Device may appear later.")
 
-    @staticmethod
-    def _ping_ip(ip_address: str) -> bool:
-        """Ping IP address to check if host is reachable."""
-        try:
-            result = subprocess.run(
-                ['ping', '-n', '1', '-w', '500', ip_address],
-                capture_output=True,
-                timeout=2.0
-            )
-            return result.returncode == 0
-        except (subprocess.TimeoutExpired, Exception):
-            return False
-
-    @staticmethod
-    def _validate_ip(ip_address: str) -> bool:
-        """Validate IP address format."""
-        try:
-            ipaddress.ip_address(ip_address)
-            return True
-        except ValueError:
-            return False

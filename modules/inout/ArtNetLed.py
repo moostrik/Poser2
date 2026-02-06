@@ -7,12 +7,12 @@ Each instance controls one controller (one IP) with two bars.
 from dataclasses import dataclass, field
 from enum import IntEnum
 from threading import Thread, Event, Lock
-import ipaddress
-import subprocess
+import socket
 
 from stupidArtnet import StupidArtnet
 
 from modules.ConfigBase import ConfigBase, config_field
+from modules.inout.NetworkValidation import validate_connection
 
 CONFIG_MODE: bool = False
 
@@ -149,10 +149,6 @@ class ArtNetLed:
         self._thread: Thread | None = None
         self._dirty: bool = True  # Frame needs recalculation
 
-        # IP validation
-        self._valid_ip: bool = False
-        self._validate_ip()
-
         # Watch config changes to trigger immediate update
         self._unwatchers: list = []
         self._setup_watchers()
@@ -163,22 +159,16 @@ class ArtNetLed:
     def start(self) -> None:
         """Start the ArtNet output thread.
 
-        Note: IP reachability check happens in background thread.
+        Note: Network validation happens at thread start.
         """
         if self._running:
             return
-
-        # Basic IP format validation only (non-blocking)
-        if not self._validate_ip():
-            raise RuntimeError(
-                f"Cannot start ArtNetLed: Invalid IP address format: {self._config.ip_address}"
-            )
 
         self._running = True
         self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self._config.ip_address}")
         self._thread.start()
         if self._config.verbose:
-            print(f"ArtNetLed: Starting output to {self._config.ip_address} (validating in background)...")
+            print(f"ArtNetLed: Starting output to {self._config.ip_address}...")
 
     def stop(self) -> None:
         """Stop the ArtNet output thread and blackout."""
@@ -238,42 +228,13 @@ class ArtNetLed:
         self._dirty = True
         self._update_event.set()
 
-    def _ping_ip(self) -> bool:
-        """Ping IP address to check if host is reachable.
-
-        Returns:
-            True if ping successful, False otherwise.
-        """
-        try:
-            # Windows: ping -n 1 -w 500 (1 packet, 500ms timeout)
-            result = subprocess.run(
-                ['ping', '-n', '1', '-w', '500', self._config.ip_address],
-                capture_output=True,
-                timeout=2.0
-            )
-            return result.returncode == 0
-        except (subprocess.TimeoutExpired, Exception) as e:
-            return False
-
-    def _validate_ip(self) -> bool:
-        """Validate IP address format.
-
-        Returns:
-            True if IP format is valid, False otherwise.
-        """
-        try:
-            # Validate IP format
-            ipaddress.ip_address(self._config.ip_address)
-            return True
-        except ValueError:
-            print(f"ArtNetLed ERROR: Invalid IP address format: {self._config.ip_address}")
-            return False
-
     def _validate_and_reinit_artnet(self) -> None:
-        """Reinitialize ArtNet connection after IP change."""
-        if not self._validate_ip():
-            self._valid_ip = False
-            return
+        """Reinitialize ArtNet connection after IP change with validation."""
+        # Validate the new IP before reinitializing
+        if not validate_connection(self._config.ip_address, 5568, "ArtNetLed"):
+            print(f"ArtNetLed WARNING: New IP {self._config.ip_address} is not reachable. Changes saved but output may fail.")
+            # Don't return - still reinit so user can fix it later
+
         self._reinit_artnet()
 
     def _update_packet_size(self) -> None:
@@ -431,30 +392,33 @@ class ArtNetLed:
 
     def _update_loop(self) -> None:
         """Background thread loop for continuous updates."""
-        # Validate IP reachability in background thread
-        if not self._ping_ip():
-            print(f"ArtNetLed WARNING: IP {self._config.ip_address} is not reachable (ping failed). Device may appear later.")
-            self._valid_ip = False
-        else:
-            self._valid_ip = True
-            if self._config.verbose:
-                print(f"ArtNetLed: IP {self._config.ip_address} is reachable, starting output.")
+        # Validate network and IP before starting
+        if not validate_connection(self._config.ip_address, 5568, "ArtNetLed"):
+            self._running = False
+            return
 
         # Blackout before starting the loop
         self._blackout()
 
         while self._running:
-            if self._dirty:
-                with self._lock:
-                    self._compute_frame()
-                self._dirty = False
-            # Send outside lock to avoid blocking config updates during I/O
-            self._send_frame()
+            try:
+                if self._dirty:
+                    with self._lock:
+                        self._compute_frame()
+                    self._dirty = False
+                # Send outside lock to avoid blocking config updates during I/O
+                self._send_frame()
 
-            # Wait for next frame or config change
-            frame_time: float = 1.0 / self._config.fps
-            self._update_event.wait(timeout=frame_time)
-            self._update_event.clear()
+                # Wait for next frame or config change
+                frame_time: float = 1.0 / self._config.fps
+                self._update_event.wait(timeout=frame_time)
+                self._update_event.clear()
+            except socket.error as e:
+                print(f"ArtNetLed ERROR: Socket error with exception: {e}")
+                self._running = False
+                break
+            except Exception as e:
+                print(f"ArtNetLed: Error in update loop: {e}")
 
         # Blackout after exiting the loop
         self._blackout()
