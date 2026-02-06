@@ -18,8 +18,8 @@ from .mask.MaskMultiply import          MaskMultiply
 from .data.FeatureShader import         FeatureShader
 from .data.AngleVelShader import        AngleVelShader
 from .data.WindowShader import          WindowShader
-from .pose.PosePointDots import         PosePointDots
-from .pose.PosePointLines import        PosePointLines
+from .data.PosePointDots import         PosePointDots
+from .data.PosePointLines import        PosePointLines
 
 
 from .hdt.HDTTripleBlend import         HDTTripleBlend

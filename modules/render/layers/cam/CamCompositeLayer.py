@@ -7,7 +7,7 @@ from modules.render.layers.LayerBase import LayerBase, Rect
 
 from modules.render.layers.cam.BBoxRenderer import BBoxRenderer
 from modules.render.layers.cam.TrackletRenderer import TrackletRenderer
-from modules.render.layers.pose.PoseLineLayer import PoseLineLayer
+from modules.render.layers.data.PoseLineLayer import PoseLineLayer
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 

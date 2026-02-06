@@ -15,8 +15,8 @@ from .data.FeatureFrameLayer import         FeatureFrameLayer, AngleFrameLayer, 
 from .data.AngleVelLayer import             AngleVelLayer
 from .data.FeatureWindowLayer import        AngleMtnWindowLayer, AngleVelWindowLayer, AngleWindowLayer, SimilarityWindowLayer, BBoxWindowLayer
 from .data.MTimeRenderer import             MTimeRenderer
-from .pose.PoseDotLayer import              PoseDotLayer
-from .pose.PoseLineLayer import             PoseLineLayer
+from .data.PoseDotLayer import              PoseDotLayer
+from .data.PoseLineLayer import             PoseLineLayer
 
 from .flow.FlowSourceLayer import           FlowSourceLayer
 from .flow.OpticalFlowLayer import          OpticalFlowLayer
