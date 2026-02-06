@@ -10,37 +10,54 @@ from torch import Tensor
 
 # Local application imports for setter types
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
-from modules.pose.Frame import FrameDict
+from modules.pose.Frame import FrameDict, FrameField
 from modules.tracker.Tracklet import TrackletDict
 from modules.utils.Timer import TimerState
 
 
+class Stage(IntEnum):
+    RAW =       0
+    SMOOTH =    auto()
+    LERP =      auto()
+
+
 class DataHubType(IntEnum):
-    cam_image =             auto()   # sorted by cam_id, raw camera images
-    depth_tracklet =        auto()   # sorted by cam_id
-    tracklet =              auto()   # sorted by track_id, has cam_id
-    pose_R =                auto()   # sorted by track_id, has cam_id
-    pose_S =                auto()   # sorted by track_id, has cam_id
-    pose_I =                auto()   # sorted by track_id, has cam_id
+    cam_image =         auto()   # sorted by cam_id, raw camera images
+    depth_tracklet =    auto()   # sorted by cam_id
+    tracklet =          auto()   # sorted by track_id, has cam_id
 
-    gpu_frames =            auto()   # sorted by track_id, GPU frames with crops
-    mask_tensor =           auto()   # sorted by track_id, GPU tensors (H, W) FP16
-    flow_tensor =           auto()   # sorted by track_id, GPU tensors (H, W, 2) FP16
-    flow_images =           auto()   # sorted by track_id, flow visualization images
+    gpu_frames =        auto()   # sorted by track_id, GPU frames with crops
+    flow_tensor =       auto()   # sorted by track_id, GPU tensors (H, W, 2) FP16
 
-    angle_window =          auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
-    angle_vel_window =      auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
-    angle_motion_window =   auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
-    bbox_window =           auto()   # sorted by track_id, FeatureWindow[BBoxElement]
-    similarity_window =     auto()   # sorted by track_id, FeatureWindow[AngleLandmark]
+    pose_frame_R =      auto()   # sorted by track_id, has cam_id
+    pose_frame_S =      auto()   # sorted by track_id, has cam_id
+    pose_frame_I =      auto()   # sorted by track_id, has cam_id
 
-    timer_state =           auto()   # TimerState int value (IDLE=0, RUNNING=1, INTERMEZZO=2)
-    timer_time =            auto()   # float, elapsed time in seconds
+    pose_window_R =     auto()   # sorted by track_id, {FrameField: FeatureWindow}
+    pose_window_S =     auto()   # sorted by track_id, {FrameField: FeatureWindow}
+    pose_window_I =     auto()   # sorted by track_id, {FrameField: FeatureWindow}
 
+    timer_state =       auto()   # TimerState int value (IDLE=0, RUNNING=1, INTERMEZZO=2)
+    timer_time =        auto()   # float, elapsed time in seconds
+
+
+# Stage → DataHubType lookup
+_FRAME_TYPES: dict[Stage, DataHubType] = {
+    Stage.RAW:          DataHubType.pose_frame_R,
+    Stage.SMOOTH:       DataHubType.pose_frame_S,
+    Stage.LERP: DataHubType.pose_frame_I,
+}
+_WINDOW_TYPES: dict[Stage, DataHubType] = {
+    Stage.RAW:          DataHubType.pose_window_R,
+    Stage.SMOOTH:       DataHubType.pose_window_S,
+    Stage.LERP: DataHubType.pose_window_I,
+}
+
+# DEPRECATED: Use PipelineStage instead
 class PoseDataHubTypes(IntEnum):
-    pose_R =      DataHubType.pose_R.value
-    pose_S =      DataHubType.pose_S.value
-    pose_I =      DataHubType.pose_I.value
+    pose_R =      DataHubType.pose_frame_R.value
+    pose_S =      DataHubType.pose_frame_S.value
+    pose_I =      DataHubType.pose_frame_I.value
 
 # POSE_ENUMS: set[DataType] = {DataType.pose_R, DataType.pose_S, DataType.pose_I}
 # SIMILARITY_ENUMS: set[DataType] = {DataType.sim_P, DataType.sim_M}
@@ -79,22 +96,28 @@ class DataHub:
         """ this works on tracklets and poses """
         return any(self.get_filtered(data_type, lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id))
 
-    # WINDOW CONVENIENCE GETTERS
-    def get_angle_windows(self) -> dict[int, Any]:
-        """Get all angle feature windows."""
-        return self.get_dict(DataHubType.angle_window)
+    # POSE GETTERS
+    def get_poses(self, stage: Stage) -> dict[int, Any]:
+        """Get all pose frames for a specific stage."""
+        return self.get_dict(_FRAME_TYPES[stage])
 
-    def get_angle_vel_windows(self) -> dict[int, Any]:
-        """Get all angle velocity feature windows."""
-        return self.get_dict(DataHubType.angle_vel_window)
+    def get_pose(self, stage: Stage, track_id: int) -> Any | None:
+        """Get a single pose frame for a specific stage and track."""
+        return self.get_item(_FRAME_TYPES[stage], track_id)
 
-    def get_angle_window(self, track_id: int) -> Any | None:
-        """Get angle window for specific track."""
-        return self.get_item(DataHubType.angle_window, track_id)
+    # FEATURE WINDOW GETTERS (stored as _data[pose_window_X] = {track_id: {FrameField: FeatureWindow}})
+    def get_feature_window(self, stage: Stage, field: FrameField, track_id: int) -> Any | None:
+        """Get a single feature window for a specific stage, field, and track."""
+        with self.mutex:
+            track_windows = self._data.get(_WINDOW_TYPES[stage], {}).get(track_id)
+            if track_windows is None:
+                return None
+            return track_windows.get(field)
 
-    def get_angle_vel_window(self, track_id: int) -> Any | None:
-        """Get angle velocity window for specific track."""
-        return self.get_item(DataHubType.angle_vel_window, track_id)
+    def get_feature_windows_for_track(self, stage: Stage, track_id: int) -> dict[FrameField, Any]:
+        """Get all feature windows for a specific stage and track."""
+        with self.mutex:
+            return dict(self._data.get(_WINDOW_TYPES[stage], {}).get(track_id, {}))
 
     # GENERIC SETTERS
     def set_item(self, data_type: DataHubType, key: int, value: object) -> None:
@@ -120,42 +143,20 @@ class DataHub:
     def set_tracklets(self, tracklets: TrackletDict) -> None:
         self.set_dict(DataHubType.tracklet, tracklets)
 
-    def set_poses(self, data_type: DataHubType, poses: FrameDict) -> None:
-        self.set_dict(data_type, poses)
-
-    def set_mask_tensors(self, masks: dict[int, Tensor]) -> None:
-        self.set_dict(DataHubType.mask_tensor, masks)
-
     def set_flow_tensors(self, flows: dict[int, Tensor]) -> None:
         self.set_dict(DataHubType.flow_tensor, flows)
-
-    def set_flow_images(self, _: FrameDict, images: dict[int, tuple[np.ndarray, np.ndarray]]) -> None:
-        self.set_dict(DataHubType.flow_images, images)
 
     def set_gpu_frames(self, _: FrameDict, gpu_frames) -> None:
         """Store GPU frame data. Expects GPUFrameDict from GPUCropProcessor."""
         self.set_dict(DataHubType.gpu_frames, gpu_frames)
 
-    # WINDOWS
-    def set_angle_windows(self, windows) -> None:
-        """Store angle feature windows. Expects dict[int, FeatureWindow]."""
-        self.set_dict(DataHubType.angle_window, windows)
+    # POSE SETTERS
+    def set_poses(self, stage: Stage, poses: FrameDict) -> None:
+        self.set_dict(_FRAME_TYPES[stage], poses)
 
-    def set_angle_vel_windows(self, windows) -> None:
-        """Store angle velocity feature windows. Expects dict[int, FeatureWindow]."""
-        self.set_dict(DataHubType.angle_vel_window, windows)
-
-    def set_angle_motion_windows(self, windows) -> None:
-        """Store angle motion feature windows. Expects dict[int, FeatureWindow]."""
-        self.set_dict(DataHubType.angle_motion_window, windows)
-
-    def set_bbox_windows(self, windows) -> None:
-        """Store bounding box feature windows. Expects dict[int, FeatureWindow]."""
-        self.set_dict(DataHubType.bbox_window, windows)
-
-    def set_similarity_windows(self, windows) -> None:
-        """Store angle symmetry feature windows. Expects dict[int, FeatureWindow]."""
-        self.set_dict(DataHubType.similarity_window, windows)
+    def set_feature_windows(self, stage: Stage, windows: dict[int, dict[FrameField, Any]]) -> None:
+        """Store feature windows. Expects {track_id: {FrameField: FeatureWindow}}."""
+        self.set_dict(_WINDOW_TYPES[stage], windows)
 
     # TIMER
     def set_timer_state(self, state: TimerState) -> None:

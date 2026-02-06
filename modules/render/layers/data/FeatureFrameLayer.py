@@ -6,7 +6,7 @@ from typing import Tuple
 from OpenGL.GL import *  # type: ignore
 
 # Local application imports
-from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
+from modules.DataHub import DataHub, Stage
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
 from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
@@ -20,7 +20,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 @dataclass
 class FrameLayerConfig:
     """Configuration for FeatureFrameLayer variants."""
-    data_type: PoseDataHubTypes
+    stage: Stage
     feature_field: FrameField
     display_range: Tuple[float, float] | None  # None means dynamic from feature.range()
     colors: list[tuple[float, float, float, float]]
@@ -80,7 +80,7 @@ class FeatureFrameLayer(LayerBase):
 
     def update(self) -> None:
         """Update visualization from DataHub Frame."""
-        pose: Frame | None = self._data_hub.get_item(DataHubType(self._config.data_type), self._track_id)
+        pose: Frame | None = self._data_hub.get_pose(self._config.stage, self._track_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:
@@ -163,11 +163,11 @@ class FeatureFrameLayer(LayerBase):
 class AngleFrameLayer(FeatureFrameLayer):
     """Angle frame layer."""
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
                  line_thickness: float = 1.0, line_smooth: float = 1.0,
                  display_range: Tuple[float, float] | None = None) -> None:
         config = FrameLayerConfig(
-            data_type=data_type,
+            stage=stage,
             feature_field=FrameField.angles,
             display_range=display_range,
             colors=ANGLES_COLORS,
@@ -180,12 +180,12 @@ class AngleFrameLayer(FeatureFrameLayer):
 class AngleVelFrameLayer(FeatureFrameLayer):
     """Angle velocity frame layer."""
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
                  line_thickness: float = 1.0, line_smooth: float = 1.0,
                  display_range: Tuple[float, float] | None = None) -> None:
         import numpy as np
         config = FrameLayerConfig(
-            data_type=data_type,
+            stage=stage,
             feature_field=FrameField.angle_vel,
             display_range=display_range if display_range is not None else (-np.pi, np.pi),
             colors=ANGLES_COLORS,
@@ -198,11 +198,11 @@ class AngleVelFrameLayer(FeatureFrameLayer):
 class AngleMtnFrameLayer(FeatureFrameLayer):
     """Angle motion frame layer."""
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
                  line_thickness: float = 1.0, line_smooth: float = 1.0,
                  display_range: Tuple[float, float] | None = (0.0, 5.0)) -> None:
         config = FrameLayerConfig(
-            data_type=data_type,
+            stage=stage,
             feature_field=FrameField.angle_motion,
             display_range=display_range,
             colors=MOVEMENT_COLORS,
@@ -215,11 +215,11 @@ class AngleMtnFrameLayer(FeatureFrameLayer):
 class AngleSymFrameLayer(FeatureFrameLayer):
     """Angle symmetry frame layer."""
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
                  line_thickness: float = 1.0, line_smooth: float = 1.0,
                  display_range: Tuple[float, float] | None = None) -> None:
         config = FrameLayerConfig(
-            data_type=data_type,
+            stage=stage,
             feature_field=FrameField.angle_sym,
             display_range=display_range,
             colors=ANGLES_COLORS,
@@ -232,11 +232,11 @@ class AngleSymFrameLayer(FeatureFrameLayer):
 class SimilarityFrameLayer(FeatureFrameLayer):
     """Similarity frame layer."""
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
                  line_thickness: float = 1.0, line_smooth: float = 1.0,
                  display_range: Tuple[float, float] | None = (0.0, 1.0)) -> None:
         config = FrameLayerConfig(
-            data_type=data_type,
+            stage=stage,
             feature_field=FrameField.similarity,
             display_range=display_range,
             colors=SIMILARITY_COLORS,
@@ -249,11 +249,11 @@ class SimilarityFrameLayer(FeatureFrameLayer):
 class BBoxFrameLayer(FeatureFrameLayer):
     """Bounding box frame layer."""
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
                  line_thickness: float = 1.0, line_smooth: float = 1.0,
                  display_range: Tuple[float, float] | None = None) -> None:
         config = FrameLayerConfig(
-            data_type=data_type,
+            stage=stage,
             feature_field=FrameField.bbox,
             display_range=display_range,
             colors=BBOX_COLORS,
@@ -266,11 +266,11 @@ class BBoxFrameLayer(FeatureFrameLayer):
 class LeaderFrameLayer(FeatureFrameLayer):
     """Leader score frame layer."""
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
                  line_thickness: float = 1.0, line_smooth: float = 1.0,
                  display_range: Tuple[float, float] | None = (0.0, 1.0)) -> None:
         config = FrameLayerConfig(
-            data_type=data_type,
+            stage=stage,
             feature_field=FrameField.leader,
             display_range=display_range,
             colors=SIMILARITY_COLORS,

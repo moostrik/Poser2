@@ -9,7 +9,7 @@ from OpenGL.GL import * # type: ignore
 from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color
 from modules.render.layers import LayerBase
 
-from modules.DataHub import DataHub, PoseDataHubTypes, DataHubType
+from modules.DataHub import DataHub, PoseDataHubTypes, DataHubType, Stage
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.Frame import FrameField
 from modules.render.Settings import Settings
@@ -163,7 +163,7 @@ SHOW_COMP: list[Layers] = [
 
 SHOW_DATA: list[Layers] = [
 
-    Layers.cam_image,
+    Layers.centre_frg,
     Layers.angle_W,
     # Layers.angle_vel_W,
     # Layers.angle_mtn_W,
@@ -239,10 +239,10 @@ class HDTRenderManager(RenderBase):
             similarity_W =  self.L[Layers.similarity_W][i] =ls.SimilarityWindowLayer(  i, self.data_hub, self.line_width)
             bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub, self.line_width)
 
-            angle_vel_F =   self.L[Layers.angle_vel_F][i] = ls.AngleVelLayer(       i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=1.0, line_smooth=1.0)
-            angle_mtn_F =   self.L[Layers.angle_mtn_F][i] = ls.AngleMtnFrameLayer(  i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=2.0, line_smooth=2.0)
-            similarity_F =  self.L[Layers.similarity_F][i] =ls.SimilarityFrameLayer(i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=4.0, line_smooth=2.0)
-            bbox_F =        self.L[Layers.bbox_F][i] =      ls.BBoxFrameLayer(      i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=2.0, line_smooth=2.0)
+            angle_vel_F =   self.L[Layers.angle_vel_F][i] = ls.AngleVelLayer(       i, self.data_hub, Stage.LERP, line_thickness=1.0, line_smooth=1.0)
+            angle_mtn_F =   self.L[Layers.angle_mtn_F][i] = ls.AngleMtnFrameLayer(  i, self.data_hub, Stage.LERP, line_thickness=2.0, line_smooth=2.0)
+            similarity_F =  self.L[Layers.similarity_F][i] =ls.SimilarityFrameLayer(i, self.data_hub, Stage.LERP, line_thickness=4.0, line_smooth=2.0)
+            bbox_F =        self.L[Layers.bbox_F][i] =      ls.BBoxFrameLayer(      i, self.data_hub, Stage.LERP, line_thickness=2.0, line_smooth=2.0)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [

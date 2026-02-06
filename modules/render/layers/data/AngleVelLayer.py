@@ -5,7 +5,7 @@ from typing import Tuple
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
+from modules.DataHub import DataHub, Stage
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
 from modules.pose.Frame import Frame, FrameField
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
@@ -22,12 +22,12 @@ class AngleVelLayer(LayerBase):
     dynamically changes based on angular velocity magnitude - high velocity = thick lines.
     """
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
                  line_thickness: float = 1.0, line_smooth: float = 1.0,
                  display_range: Tuple[float, float] | None = None) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
-        self._data_type: PoseDataHubTypes = data_type
+        self._stage: Stage = stage
         self._display_range: Tuple[float, float] | None = display_range
 
         self._fbo: Fbo = Fbo()
@@ -68,7 +68,7 @@ class AngleVelLayer(LayerBase):
 
     def update(self) -> None:
         """Update visualization from DataHub Frame."""
-        pose: Frame | None = self._data_hub.get_item(DataHubType(self._data_type), self._track_id)
+        pose: Frame | None = self._data_hub.get_pose(self._stage, self._track_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:

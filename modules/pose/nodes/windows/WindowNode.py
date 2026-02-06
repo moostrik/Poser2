@@ -153,7 +153,7 @@ class WindowNode(NodeBase, Generic[TFeature]):
 
     def _get_ordered_window(self) -> FeatureWindow:
         """Return full-sized window with oldest sample at index 0.
-        
+
         Always returns window_size buffer. Unfilled slots have mask=False.
         """
         # Always use np.roll to reorder so oldest is first

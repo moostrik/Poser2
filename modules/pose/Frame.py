@@ -6,7 +6,7 @@ from typing import Callable, Any, get_type_hints
 
 # Pose imports
 from modules.pose.features import Points2D, Angles, AngleVelocity, AngleMotion, AngleSymmetry, BBox, Similarity, LeaderScore
-from modules.pose.features.base import BaseFeature
+from modules.pose.features.base import BaseFeature, BaseScalarFeature
 
 
 @dataclass(frozen=True)
@@ -98,6 +98,22 @@ class FrameField(IntEnum):
             f"PoseField '{self.name}' of type '{feature_type.__name__}' does not have a defined length"
         )
 
+    @staticmethod
+    def get_scalar_fields() -> list['FrameField']:
+        """Return all FrameField members whose type is a BaseScalarFeature subclass.
+
+        Excludes Points2D (BaseVectorFeature) and plain scalars (float, int, bool).
+        This is the single source of truth for which fields can be windowed.
+        """
+        result: list[FrameField] = []
+        for ff in FrameField:
+            try:
+                ft = ff.get_type()
+                if isinstance(ft, type) and issubclass(ft, BaseScalarFeature):
+                    result.append(ff)
+            except (ValueError, TypeError):
+                pass
+        return result
 
 
 # FRAME FIELD VALIDATION

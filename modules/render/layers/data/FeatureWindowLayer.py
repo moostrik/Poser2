@@ -7,7 +7,8 @@ import numpy as np
 from OpenGL.GL import *  # type: ignore
 
 # Local application imports
-from modules.DataHub import DataHub, DataHubType
+from modules.DataHub import DataHub, Stage
+from modules.pose.Frame import FrameField
 from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.nodes import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
@@ -20,11 +21,12 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 @dataclass
 class WindowLayerConfig:
     """Configuration for FeatureWindowLayer variants."""
-    data_type: DataHubType
+    frame_field: FrameField
     display_range: Tuple[float, float] | None  # None means dynamic from window.range
     colors: list[tuple[float, float, float, float]]  # Cycle through these RGBA colors
     alpha: float
     render_labels: bool = True
+    stage: Stage = Stage.SMOOTH  # default to smooth
 
 
 class FeatureWindowLayer(LayerBase):
@@ -87,7 +89,9 @@ class FeatureWindowLayer(LayerBase):
 
     def update(self) -> None:
         """Update visualization from DataHub FeatureWindow."""
-        window: FeatureWindow | None = self._data_hub.get_item(self._config.data_type, self._track_id)
+        window: FeatureWindow | None = self._data_hub.get_feature_window(
+            self._config.stage, self._config.frame_field, self._track_id
+        )
         self._data_cache.update(window)
 
         if self._data_cache.idle or window is None:
@@ -171,13 +175,15 @@ class AngleMtnWindowLayer(FeatureWindowLayer):
     """Angle motion window layer."""
 
     def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = None) -> None:
+                 display_range: Tuple[float, float] | None = None,
+                 stage: Stage = Stage.SMOOTH) -> None:
         config = WindowLayerConfig(
-            data_type=DataHubType.angle_motion_window,
+            frame_field=FrameField.angle_motion,
             display_range=display_range,
             colors=MOVEMENT_COLORS,
             alpha=1.0,
-            render_labels=True
+            render_labels=True,
+            stage=stage
         )
         super().__init__(track_id, data_hub, line_width, config)
 
@@ -186,13 +192,15 @@ class AngleVelWindowLayer(FeatureWindowLayer):
     """Angle velocity window layer."""
 
     def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = None) -> None:
+                 display_range: Tuple[float, float] | None = None,
+                 stage: Stage = Stage.SMOOTH) -> None:
         config = WindowLayerConfig(
-            data_type=DataHubType.angle_vel_window,
+            frame_field=FrameField.angle_vel,
             display_range=display_range if display_range is not None else (-np.pi, np.pi),
             colors=ANGLES_COLORS,
             alpha=1.0,
-            render_labels=True
+            render_labels=True,
+            stage=stage
         )
         super().__init__(track_id, data_hub, line_width, config)
 
@@ -201,13 +209,15 @@ class AngleWindowLayer(FeatureWindowLayer):
     """Angle window layer."""
 
     def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = None) -> None:
+                 display_range: Tuple[float, float] | None = None,
+                 stage: Stage = Stage.SMOOTH) -> None:
         config = WindowLayerConfig(
-            data_type=DataHubType.angle_window,
-            display_range=display_range,  # Default to dynamic from window.range
+            frame_field=FrameField.angles,
+            display_range=display_range,
             colors=ANGLES_COLORS,
             alpha=1.0,
-            render_labels=True
+            render_labels=True,
+            stage=stage
         )
         super().__init__(track_id, data_hub, line_width, config)
 
@@ -216,13 +226,15 @@ class SimilarityWindowLayer(FeatureWindowLayer):
     """Similarity window layer."""
 
     def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = (0.0, 1.0)) -> None:
+                 display_range: Tuple[float, float] | None = (0.0, 1.0),
+                 stage: Stage = Stage.SMOOTH) -> None:
         config = WindowLayerConfig(
-            data_type=DataHubType.similarity_window,
+            frame_field=FrameField.similarity,
             display_range=display_range,
             colors=SIMILARITY_COLORS,
             alpha=1.0,
-            render_labels=True
+            render_labels=True,
+            stage=stage
         )
         super().__init__(track_id, data_hub, line_width, config)
 
@@ -231,12 +243,14 @@ class BBoxWindowLayer(FeatureWindowLayer):
     """Bounding box window layer."""
 
     def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = None) -> None:
+                 display_range: Tuple[float, float] | None = None,
+                 stage: Stage = Stage.SMOOTH) -> None:
         config = WindowLayerConfig(
-            data_type=DataHubType.bbox_window,
-            display_range=display_range,  # Dynamic from window.range
+            frame_field=FrameField.bbox,
+            display_range=display_range,
             colors=BBOX_COLORS,
             alpha=1.0,
-            render_labels=True
+            render_labels=True,
+            stage=stage
         )
         super().__init__(track_id, data_hub, line_width, config)

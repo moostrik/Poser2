@@ -13,7 +13,7 @@ from modules.pose.Frame import Frame
 from modules.pose.features.Angles import AngleLandmark
 from modules.pose.features.AngleSymmetry import SymmetryElement, AggregationMethod
 
-from modules.DataHub import DataHub, DataHubType
+from modules.DataHub import DataHub, DataHubType, Stage
 from modules.ConfigBase import ConfigBase
 from modules.utils.Timer import TimerState
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -24,7 +24,7 @@ class OscSoundConfig(ConfigBase):
     ip_addresses: str = field(default_factory=lambda: "127.0.0.1", metadata={"description": "Target OSC IP address"})
     port: int = field(default=9000, metadata={"min": 1024, "max": 65535, "description": "Target OSC port"})
     num_players: int = field(default=8, metadata={"min": 1, "max": 16, "description": "Number of pose tracking slots"})
-    data_type: DataHubType = field(default=DataHubType.pose_I, metadata={"description": "Data source type from DataHub"})
+    stage: Stage = field(default=Stage.LERP, metadata={"description": "Pipeline stage to read poses from"})
 
 
 class OscSound:
@@ -117,9 +117,11 @@ class OscSound:
         timer_time_msg.add_arg(timer_time if timer_time is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(timer_time_msg.build()) # type: ignore
 
-        poses: dict[int, Frame] = self._data_hub.get_dict(self._config.data_type)
+        poses: dict[int, Frame] = self._data_hub.get_poses(self._config.stage)
         num_players = self._config.num_players
 
+
+        # THIS MOTION CALCULATION IS A BIT OF A HACK
         motions: dict[int, float] = {}
         for id in range(num_players):
             if id not in poses:

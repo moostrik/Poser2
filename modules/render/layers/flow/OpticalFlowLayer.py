@@ -32,8 +32,6 @@ class OpticalFlowLayer(LayerBase):
         self.vis_config.element_length = 40.0
         self.draw_mode: DrawModes = DrawModes.FIELD
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
-
     @property
     def config(self) -> OpticalFlowConfig:
         """Access to optical flow configuration."""

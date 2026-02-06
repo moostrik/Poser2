@@ -8,7 +8,8 @@ import os
 # Local application imports
 from modules.render.HDTRenderManager import HDTRenderManager
 from modules.Settings import Settings
-from modules.DataHub import DataHub, DataHubType
+from modules.DataHub import DataHub, Stage
+from modules.pose.Frame import FrameField
 from modules.gui import Gui
 from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
 from modules.inout import OscSound, ArtNetLed
@@ -124,11 +125,9 @@ class Main():
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
         # WINDOW TRACKERS
-        self.angle_window_tracker =     trackers.AngleWindowTracker(num_players, self.window_config)
-        self.angle_vel_window_tracker = trackers.AngleVelocityWindowTracker(num_players, self.window_config)
-        self.angle_mot_window_tracker = trackers.AngleMotionWindowTracker(num_players, self.window_config)
-        self.similarity_window_tracker = trackers.SimilarityWindowTracker(num_players, self.window_config)
-        self.bbox_window_tracker =      trackers.BBoxWindowTracker(num_players, self.window_config)
+        self.window_tracker_R =     trackers.AllWindowTracker(num_players, self.window_config)
+        self.window_tracker_S =     trackers.AllWindowTracker(num_players, self.window_config)
+        self.window_tracker_I =     trackers.AllWindowTracker(num_players, self.window_config)
 
         self.bbox_filters =      trackers.FilterTracker(
             settings.num_players,
@@ -227,35 +226,33 @@ class Main():
 
         # POSE RAW
         self.point_extractor.add_poses_callback(self.pose_raw_filters.process)
-        self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_R)) # raw poses
+        self.pose_raw_filters.add_poses_callback(partial(self.data_hub.set_poses, Stage.RAW)) # raw poses
 
         # POSE SMOOTH
         self.pose_raw_filters.add_poses_callback(self.pose_smooth_filters.process)
 
         # POSE PREDICTION
         self.pose_smooth_filters.add_poses_callback(self.pose_prediction_filters.process)
-        self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_S)) # smooth poses
+        self.pose_prediction_filters.add_poses_callback(partial(self.data_hub.set_poses, Stage.SMOOTH)) # smooth poses
 
         # INTERPOLATION
         self.data_hub.add_update_callback(self.interpolator.update)
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
-        self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, DataHubType.pose_I)) # interpolated poses
+        self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, Stage.LERP)) # interpolated poses
 
         # WINDOW TRACKERS
-        self.pose_smooth_filters.add_poses_callback(self.angle_window_tracker.process)
-        self.angle_window_tracker.add_window_callback(self.data_hub.set_angle_windows)
-        self.pose_smooth_filters.add_poses_callback(self.angle_vel_window_tracker.process)
-        self.angle_vel_window_tracker.add_window_callback(self.data_hub.set_angle_vel_windows)
-        self.pose_smooth_filters.add_poses_callback(self.angle_mot_window_tracker.process)
-        self.angle_mot_window_tracker.add_window_callback(self.data_hub.set_angle_motion_windows)
-        self.pose_smooth_filters.add_poses_callback(self.similarity_window_tracker.process)
-        self.similarity_window_tracker.add_window_callback(self.data_hub.set_similarity_windows)
-        self.pose_smooth_filters.add_poses_callback(self.bbox_window_tracker.process)
-        self.bbox_window_tracker.add_window_callback(self.data_hub.set_bbox_windows)
+        self.pose_raw_filters.add_poses_callback(self.window_tracker_R.process)
+        self.window_tracker_R.add_callback(partial(self.data_hub.set_feature_windows, Stage.RAW))
+
+        self.pose_smooth_filters.add_poses_callback(self.window_tracker_S.process)
+        self.window_tracker_S.add_callback(partial(self.data_hub.set_feature_windows, Stage.SMOOTH))
+
+        self.pose_interpolation_pipeline.add_poses_callback(self.window_tracker_I.process)
+        self.window_tracker_I.add_callback(partial(self.data_hub.set_feature_windows, Stage.LERP))
 
         # SIMILARITY COMPUTATION
-        self.angle_window_tracker.add_window_callback(self.window_similator.submit)
+        self.window_tracker_S.add_window_callback(FrameField.angles, self.window_similator.submit)
         self.window_similator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
         self.window_similator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
         self.window_similator.start()
