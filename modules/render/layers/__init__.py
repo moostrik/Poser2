@@ -11,14 +11,14 @@ from .centre.CentreFrgLayer import          CentreFrgLayer
 from .centre.CentrePoseLayer import         CentrePoseLayer
 from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer
 
-from .data.PoseBarADLayer import            PoseBarADLayer
-from .data.PoseBarMLayer import             PoseBarMLayer
-from .data.PoseBarScalarLayer import        PoseBarScalarLayer
-from .data.PoseBarSLayer import             PoseBarSLayer
+from .data.FeatureWindowLayer import        AngleMtnWindowLayer, AngleVelWindowLayer, AngleWindowLayer, SimilarityWindowLayer, BBoxWindowLayer
+from .data.FeatureFrameLayer import         FeatureFrameLayer, AngleFrameLayer, AngleVelFrameLayer, AngleMotionFrameLayer, SimilarityFrameLayer, BBoxFrameLayer
+from .data.AngDltFrameLayer import          AngDltFrameLayer
+from .data.MotionFrameLayer import          MotionFrameLayer
+from .data.SimMtnFrameLayer import          SimMtnFrameLayer
+from .data.MTimeRenderer import             MTimeRenderer
 from .pose.PoseDotLayer import              PoseDotLayer
 from .pose.PoseLineLayer import             PoseLineLayer
-from .data.MTimeRenderer import         MTimeRenderer
-from .data.FeatureWindowLayer import        AngleMtnWindowLayer, AngleVelWindowLayer, AngleWindowLayer, SimilarityWindowLayer, BBoxWindowLayer
 
 from .flow.FlowSourceLayer import           FlowSourceLayer
 from .flow.OpticalFlowLayer import          OpticalFlowLayer
@@ -33,3 +33,5 @@ from .source.ImageSourceLayer import        ImageSourceLayer
 from .source.CropSourceLayer import         CropSourceLayer
 from .source.MaskSourceLayer import         MaskSourceLayer
 from .source.FrgSourceLayer import          FrgSourceLayer
+
+from ._deprecated.PoseBarScalarLayer import PoseBarScalarLayer

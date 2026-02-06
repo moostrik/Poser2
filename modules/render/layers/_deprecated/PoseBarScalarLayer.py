@@ -1,22 +1,20 @@
-""" Draws a scalar bar for pose motion features """
+""" Draws a scalar bar for pose features """
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
-from modules.gl import Fbo, Texture, Blit, draw_box_string, text_init
-from modules.gl.Utils import clear_color
+from modules.gl import Fbo, Texture, Blit, clear_color, draw_box_string, text_init
+from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
+from modules.render.shaders import PoseScalarBar as shader
 from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import PoseMotionBar as shader
-from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT, POSE_COLOR_CENTER
+from ..data.Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT, POSE_COLOR_CENTER
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-
-class PoseBarMLayer(LayerBase):
+class PoseBarScalarLayer(LayerBase):
 
     def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, feature_type: FrameField,
                 line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0)) -> None:
@@ -74,6 +72,8 @@ class PoseBarMLayer(LayerBase):
         if not isinstance(feature, PoseFeatureType):
             raise ValueError(f"PoseFeatureLayer expected feature of type PoseFeature, got {type(feature)}")
 
+        # print(feature.values)
+
         line_thickness = 1.0 / self._fbo.height * self.line_thickness
         line_smooth = 1.0 / self._fbo.height * self.line_smooth
 
@@ -87,18 +87,21 @@ class PoseBarMLayer(LayerBase):
         num_joints: int = len(feature)
         labels: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
         if labels != self._labels:
-            PoseBarMLayer.render_labels(self._label_fbo, labels)
+            PoseBarScalarLayer.render_labels(self._label_fbo, labels)
         self._labels = [joint_enum_type(i).name for i in range(num_joints)]
 
 
     @staticmethod
-    def render_labels(fbo: Fbo,labels: list[str]) -> None:
+    def render_labels(fbo: Fbo, labels: list[str]) -> None:
         text_init()
 
         rect = Rect(0, 0, fbo.width, fbo.height)
 
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        fbo.clear(0.0, 0.0, 0.0, 0.0)
+
         fbo.begin()
-        clear_color()
 
         """Draw joint names at the bottom of each bar."""
         num_labels: int = len(labels)
@@ -121,4 +124,3 @@ class PoseBarMLayer(LayerBase):
             draw_box_string(x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.3)) # type: ignore
 
         fbo.end()
-

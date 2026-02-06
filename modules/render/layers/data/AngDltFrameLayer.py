@@ -1,4 +1,3 @@
-""" Draws a scalar bar for pose features """
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -6,34 +5,32 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, Texture, Blit, clear_color, draw_box_string, text_init
+from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import PoseScalarBar as shader
-from modules.pose.features import PoseFeatureType
-from modules.pose.Frame import Frame, FrameField
+from modules.render.shaders import PoseAngleDeltaBar
 from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT, POSE_COLOR_CENTER
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PoseBarScalarLayer(LayerBase):
 
-    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, feature_type: FrameField,
-                line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0)) -> None:
+class AngDltFrameLayer(LayerBase):
+    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+                 line_thickness: float = 1.0, line_smooth: float = 1.0, color=(1.0, 1.0, 1.0, 1.0)) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
         self._data_cache: DataCache[Frame]= DataCache[Frame]()
         self._labels: list[str] = []
+        self._shader: PoseAngleDeltaBar = PoseAngleDeltaBar()
 
         self.data_type: PoseDataHubTypes = data_type
-        self.feature_type: FrameField = feature_type
         self.color: tuple[float, float, float, float] = color
-        self.bg_alpha: float = 0.4
         self.line_thickness: float = line_thickness
         self.line_smooth: float = line_smooth
-        self.draw_labels: bool = True
+        self.draw_labels: bool = False
+        self.bg_alpha: float = 1.0
 
-        self._shader: shader = shader()
         text_init()
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -41,6 +38,7 @@ class PoseBarScalarLayer(LayerBase):
     @property
     def texture(self) -> Texture:
         return self._fbo.texture
+
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
@@ -68,40 +66,30 @@ class PoseBarScalarLayer(LayerBase):
         if self._data_cache.idle or pose is None:
             return
 
-        feature = pose.get_feature(FrameField[self.feature_type.name])
-        if not isinstance(feature, PoseFeatureType):
-            raise ValueError(f"PoseFeatureLayer expected feature of type PoseFeature, got {type(feature)}")
-
-        # print(feature.values)
-
         line_thickness = 1.0 / self._fbo.height * self.line_thickness
         line_smooth = 1.0 / self._fbo.height * self.line_smooth
 
         self._fbo.begin()
         clear_color()
-        self._shader.use(feature, line_thickness, line_smooth,
-                         self.color, (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
+        self._shader.use(pose.angles, pose.angle_vel, line_thickness, line_smooth, (*POSE_COLOR_RIGHT, self.bg_alpha), (*POSE_COLOR_LEFT, self.bg_alpha))
         self._fbo.end()
 
-        joint_enum_type = feature.__class__.enum()
-        num_joints: int = len(feature)
+        joint_enum_type = pose.angles.__class__.enum()
+        num_joints: int = len(pose.angles)
         labels: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
         if labels != self._labels:
-            PoseBarScalarLayer.render_labels(self._label_fbo, labels)
+            AngDltFrameLayer.render_labels(self._label_fbo, labels)
         self._labels = [joint_enum_type(i).name for i in range(num_joints)]
 
 
     @staticmethod
-    def render_labels(fbo: Fbo, labels: list[str]) -> None:
+    def render_labels(fbo: Fbo,labels: list[str]) -> None:
         text_init()
 
         rect = Rect(0, 0, fbo.width, fbo.height)
 
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        fbo.clear(0.0, 0.0, 0.0, 0.0)
-
         fbo.begin()
+        clear_color()
 
         """Draw joint names at the bottom of each bar."""
         num_labels: int = len(labels)

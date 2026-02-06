@@ -74,6 +74,13 @@ class Layers(IntEnum):
     similarity_W =  auto()
     bbox_W =        auto()
 
+    # Frame layers
+    angle_F =       auto()
+    angle_vel_F =   auto()
+    angle_mtn_F =   auto()
+    similarity_F =  auto()
+    bbox_F =        auto()
+
     # composition layers
     sim_blend =     auto()
     flow =          auto()
@@ -121,6 +128,7 @@ PREVIEW_CENTRE: list[Layers] = [
     # Layers.angle_mtn_W,
     # Layers.similarity_W,
     Layers.bbox_W,
+    Layers.angle_F,
 ]
 
 SHOW_CAM: list[Layers] = [
@@ -153,8 +161,6 @@ SHOW_MASK: list[Layers] = [
     # Layers.cam_crop
 ]
 
-
-
 SHOW_COMP: list[Layers] = [
     Layers.flow,
     # Layers.centre_pose,
@@ -162,9 +168,26 @@ SHOW_COMP: list[Layers] = [
     Layers.cam_frg,
 ]
 
+SHOW_DATA: list[Layers] = [
+    Layers.angle_W,
+    # Layers.angle_vel_W,
+    # Layers.angle_mtn_W,
+    # Layers.similarity_W,
+    # Layers.angle_F,
+    Layers.angle_vel_F,
+    # Layers.angle_mtn_F,
+    # Layers.similarity_F,
+    # Layers.angle_bar,
+
+    # Layers.motion_bar,
+    # Layers.motion_sim,
+    # Layers.field_bar_R,
+    # Layers.field_bar_I,
+]
+
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = PREVIEW_CENTRE
+FINAL_LAYERS: list[Layers] = SHOW_DATA
 
 class HDTRenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
@@ -196,12 +219,12 @@ class HDTRenderManager(RenderBase):
 
             cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxRenderer(        i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=2.0)
-            mtime_data =    self.L[Layers.mtime_data][i] =  ls.MTimeRenderer(   i, self.data_hub,   PoseDataHubTypes.pose_I)
+            mtime_data =    self.L[Layers.mtime_data][i] =  ls.MTimeRenderer(       i, self.data_hub,   PoseDataHubTypes.pose_I)
             field_bar_R =   self.L[Layers.field_bar_R][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_R,    FrameField.angles, line_thickness=4.0, line_smooth=16.0, color = (0.0, 0.0, 0.0, 0.33))
             field_bar_I =   self.L[Layers.field_bar_I][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_I,    FrameField.angles, line_thickness=2.0, line_smooth=2.0)
-            angle_bar =     self.L[Layers.angle_bar][i] =   ls.PoseBarADLayer(      i, self.data_hub,   PoseDataHubTypes.pose_I)
-            motion_bar =    self.L[Layers.motion_bar][i] =  ls.PoseBarMLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I,    FrameField.angle_motion, line_thickness=2.0, line_smooth=2.0)
-            motion_sim =    self.L[Layers.motion_sim][i] =  ls.PoseBarSLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I)
+            angle_bar =     self.L[Layers.angle_bar][i] =   ls.AngDltFrameLayer(    i, self.data_hub,   PoseDataHubTypes.pose_I)
+            motion_bar =    self.L[Layers.motion_bar][i] =  ls.MotionFrameLayer(    i, self.data_hub,   PoseDataHubTypes.pose_I,    FrameField.angle_motion, line_thickness=2.0, line_smooth=2.0)
+            motion_sim =    self.L[Layers.motion_sim][i] =  ls.SimMtnFrameLayer(    i, self.data_hub,   PoseDataHubTypes.pose_I)
 
             box_cam =       self.L[Layers.box_cam][i] =     ls.CamBBoxLayer(        i, self.data_hub,   PoseDataHubTypes.pose_I,    cam_image.texture)
             box_pose_R =    self.L[Layers.box_pose_R][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_R,    3.0, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
@@ -226,6 +249,12 @@ class HDTRenderManager(RenderBase):
             angle_mtn_W =   self.L[Layers.angle_mtn_W][i] = ls.AngleMtnWindowLayer( i, self.data_hub, self.line_width)
             similarity_W =  self.L[Layers.similarity_W][i] = ls.SimilarityWindowLayer(  i, self.data_hub, self.line_width)
             bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub, self.line_width)
+
+            angle_F =       self.L[Layers.angle_F][i] =     ls.AngleFrameLayer(     i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=2.0, line_smooth=2.0)
+            angle_vel_F =   self.L[Layers.angle_vel_F][i] = ls.AngleVelFrameLayer(  i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=2.0, line_smooth=2.0)
+            angle_mtn_F =   self.L[Layers.angle_mtn_F][i] = ls.AngleMotionFrameLayer(i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=2.0, line_smooth=2.0)
+            similarity_F =  self.L[Layers.similarity_F][i] = ls.SimilarityFrameLayer(i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=4.0, line_smooth=2.0)
+            bbox_F =        self.L[Layers.bbox_F][i] =      ls.BBoxFrameLayer(      i, self.data_hub, PoseDataHubTypes.pose_I, line_thickness=2.0, line_smooth=2.0)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [

@@ -16,7 +16,7 @@ from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT, POSE_COLOR_CENTER
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-class PoseBarSLayer(LayerBase):
+class SimMtnFrameLayer(LayerBase):
 
     def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes) -> None:
         self._track_id: int = track_id
@@ -95,7 +95,7 @@ class PoseBarSLayer(LayerBase):
         num_joints: int = len(feature)
         labels: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
         if labels != self._labels:
-            PoseBarSLayer.render_labels(self._label_fbo, labels)
+            SimMtnFrameLayer.render_labels(self._label_fbo, labels)
         self._labels = [joint_enum_type(i).name for i in range(num_joints)]
 
 

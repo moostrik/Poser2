@@ -19,6 +19,7 @@ from .data.PoseAngleDeltaBar import     PoseAngleDeltaBar
 from .data.PoseMotionBar import         PoseMotionBar
 from .data.PoseScalarBar import         PoseScalarBar
 from .data.PoseValuesBar import         PoseValuesBar
+from .data.FeatureBand import           FeatureBand
 from .pose.PosePointDots import         PosePointDots
 from .pose.PosePointLines import        PosePointLines
 
