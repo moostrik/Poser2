@@ -5,7 +5,7 @@ import numpy as np
 
 from modules.pose.features import Angles, AngleVelocity
 
-class PoseAngleDeltaBar(Shader):
+class AngleVelShader(Shader):
     def use(self, angles: Angles, deltas: AngleVelocity, line_thickness: float = 0.1, line_smooth: float = 0.01,
             color_odd=(1.0, 0.2, 0.0, 1.0), color_even=(1.0, 0.2, 0.0, 1.0)) -> None:
         if not self.allocated or not self.shader_program:

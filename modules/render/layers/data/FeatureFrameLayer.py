@@ -11,7 +11,7 @@ from modules.gl import Fbo, Texture, Blit, clear_color, draw_box_string, text_in
 from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import FeatureBand
+from modules.render.shaders import FeatureShader
 from .Colors import ANGLES_COLORS, MOVEMENT_COLORS, SIMILARITY_COLORS, BBOX_COLORS
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -51,7 +51,7 @@ class FeatureFrameLayer(LayerBase):
         self.line_smooth: float = line_smooth
         self.draw_labels: bool = True
 
-        self._shader: FeatureBand = FeatureBand()
+        self._shader: FeatureShader = FeatureShader()
 
         text_init()
 
@@ -210,6 +210,23 @@ class AngleMotionFrameLayer(FeatureFrameLayer):
         super().__init__(track_id, data_hub, config, line_thickness, line_smooth)
 
 
+class AngleSymFrameLayer(FeatureFrameLayer):
+    """Angle symmetry frame layer."""
+
+    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+                 line_thickness: float = 1.0, line_smooth: float = 1.0,
+                 display_range: Tuple[float, float] | None = None) -> None:
+        config = FrameLayerConfig(
+            data_type=data_type,
+            feature_field=FrameField.angle_sym,
+            display_range=display_range,
+            colors=ANGLES_COLORS,
+            alpha=1.0,
+            render_labels=True
+        )
+        super().__init__(track_id, data_hub, config, line_thickness, line_smooth)
+
+
 class SimilarityFrameLayer(FeatureFrameLayer):
     """Similarity frame layer."""
 
@@ -240,5 +257,22 @@ class BBoxFrameLayer(FeatureFrameLayer):
             colors=BBOX_COLORS,
             alpha=1.0,
             render_labels=True
+        )
+        super().__init__(track_id, data_hub, config, line_thickness, line_smooth)
+
+
+class LeaderFrameLayer(FeatureFrameLayer):
+    """Leader score frame layer."""
+
+    def __init__(self, track_id: int, data_hub: DataHub, data_type: PoseDataHubTypes,
+                 line_thickness: float = 1.0, line_smooth: float = 1.0,
+                 display_range: Tuple[float, float] | None = (0.0, 1.0)) -> None:
+        config = FrameLayerConfig(
+            data_type=data_type,
+            feature_field=FrameField.leader,
+            display_range=display_range,
+            colors=SIMILARITY_COLORS,
+            alpha=1.0,
+            render_labels=False
         )
         super().__init__(track_id, data_hub, config, line_thickness, line_smooth)

@@ -5,7 +5,7 @@ import numpy as np
 
 from modules.pose.features import PoseFeatureType as PoseFeatureUnion
 
-class FeatureBand(Shader):
+class FeatureShader(Shader):
     def use(self, feature: PoseFeatureUnion, colors: list[tuple[float, float, float, float]],
             line_thickness: float = 0.1, line_smooth: float = 0.01, use_scores: bool = False) -> None:
         if not self.allocated or not self.shader_program:
