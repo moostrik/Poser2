@@ -7,8 +7,8 @@ uniform float       line_width;
 uniform float       output_aspect_ratio;  // output buffer aspect ratio (width/height)
 uniform float       display_range_min;   // minimum value for display range
 uniform float       display_range_max;   // maximum value for display range
-uniform vec3        color_even;          // color for even-numbered streams
-uniform vec3        color_odd;           // color for odd-numbered streams
+uniform vec4        colors[8];           // RGBA color array to cycle through
+uniform int         num_colors;          // number of colors in array
 uniform float       alpha;               // alpha transparency
 
 in vec2     texCoord;
@@ -57,8 +57,8 @@ void main() {
     float stream_center = (float(stream_id) + 0.5) * stream_step;
     float stream_top = stream_center - 0.5 * stream_step;
 
-    // Sample from texture using texture coordinates (not display coordinates)
-    float texture_v = (float(stream_id) + 0.5) / float(num_streams);
+    // Sample from texture - flip v coordinate so first stream (index 0) is at top
+    float texture_v = (float(num_streams - stream_id) - 0.5) / float(num_streams);
     vec2 value_uv = vec2(stream_uv.x, texture_v);
     float value = texture(tex0, value_uv).r;
     float mask = texture(tex0, value_uv).g;
@@ -69,7 +69,8 @@ void main() {
     }
 
     float norm = clamp((value - display_range_min) / (display_range_max - display_range_min), 0.0, 1.0);
-    vec2 point = vec2(value_uv.x, stream_top + norm * stream_step);
+    // Invert norm so high values are at top, low values at bottom
+    vec2 point = vec2(value_uv.x, stream_top + (1.0 - norm) * stream_step);
 
     // Draw continuous dots (no spacing)
     float dot_radius = line_width * 2.0;
@@ -78,8 +79,9 @@ void main() {
     diff.y /= output_aspect_ratio;
     float dist = length(diff);
     if (dist < dot_radius) {
-        vec3 dot_color = (stream_id % 2 == 0) ? color_even : color_odd;
-        fragColor = vec4(dot_color, alpha);
+        int color_index = stream_id % num_colors;
+        vec4 dot_color = colors[color_index];
+        fragColor = vec4(dot_color.rgb, dot_color.a * alpha);
         return;
     }
 

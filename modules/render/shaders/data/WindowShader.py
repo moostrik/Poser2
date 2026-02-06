@@ -30,8 +30,7 @@ class WindowShader(Shader):
         line_width: float,
         output_aspect_ratio: float = 1.0,
         display_range: tuple[float, float] = (-3.14159, 3.14159),
-        color_even: tuple[float, float, float] = (1.0, 0.5, 0.0),
-        color_odd: tuple[float, float, float] = (0.0, 1.0, 1.0),
+        colors: list[tuple[float, float, float, float]] = [(1.0, 0.5, 0.0, 1.0), (0.0, 1.0, 1.0, 1.0)],
         alpha: float = 0.5,
     ) -> None:
         """Render feature window visualization.
@@ -44,8 +43,7 @@ class WindowShader(Shader):
             line_width: Line thickness in normalized coordinates
             output_aspect_ratio: Output buffer aspect ratio (width/height)
             display_range: (min, max) value range for normalization
-            color_even: RGB color for even-numbered streams (default orange)
-            color_odd: RGB color for odd-numbered streams (default cyan)
+            colors: List of RGBA colors to cycle through (default orange/cyan)
             alpha: Alpha transparency (default 0.5)
         """
         if not self.allocated or not self.shader_program:
@@ -67,8 +65,12 @@ class WindowShader(Shader):
         glUniform1f(self.get_uniform_loc("output_aspect_ratio"), output_aspect_ratio)
         glUniform1f(self.get_uniform_loc("display_range_min"), display_range[0])
         glUniform1f(self.get_uniform_loc("display_range_max"), display_range[1])
-        glUniform3f(self.get_uniform_loc("color_even"), *color_even)
-        glUniform3f(self.get_uniform_loc("color_odd"), *color_odd)
+
+        # Upload colors array
+        import numpy as np
+        colors_array = np.array(colors, dtype=np.float32).flatten()
+        glUniform4fv(self.get_uniform_loc("colors"), len(colors), colors_array)
+        glUniform1i(self.get_uniform_loc("num_colors"), len(colors))
         glUniform1f(self.get_uniform_loc("alpha"), alpha)
 
         draw_quad()

@@ -53,8 +53,6 @@ class Layers(IntEnum):
 
     # pose data layers
     mtime_data =    auto()
-    field_bar_R =   auto()
-    field_bar_I =   auto()
     angle_bar =     auto()
     motion_bar =    auto()
     motion_sim =    auto()
@@ -169,14 +167,14 @@ SHOW_COMP: list[Layers] = [
 ]
 
 SHOW_DATA: list[Layers] = [
-    Layers.angle_W,
+    # Layers.angle_W,
     # Layers.angle_vel_W,
     # Layers.angle_mtn_W,
-    # Layers.similarity_W,
+    Layers.similarity_W,
     # Layers.angle_F,
-    Layers.angle_vel_F,
+    # Layers.angle_vel_F,
     # Layers.angle_mtn_F,
-    # Layers.similarity_F,
+    Layers.similarity_F,
     # Layers.angle_bar,
 
     # Layers.motion_bar,
@@ -220,8 +218,6 @@ class HDTRenderManager(RenderBase):
             cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxRenderer(        i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=2.0)
             mtime_data =    self.L[Layers.mtime_data][i] =  ls.MTimeRenderer(       i, self.data_hub,   PoseDataHubTypes.pose_I)
-            field_bar_R =   self.L[Layers.field_bar_R][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_R,    FrameField.angles, line_thickness=4.0, line_smooth=16.0, color = (0.0, 0.0, 0.0, 0.33))
-            field_bar_I =   self.L[Layers.field_bar_I][i] = ls.PoseBarScalarLayer(  i, self.data_hub,   PoseDataHubTypes.pose_I,    FrameField.angles, line_thickness=2.0, line_smooth=2.0)
             angle_bar =     self.L[Layers.angle_bar][i] =   ls.AngDltFrameLayer(    i, self.data_hub,   PoseDataHubTypes.pose_I)
             motion_bar =    self.L[Layers.motion_bar][i] =  ls.MotionFrameLayer(    i, self.data_hub,   PoseDataHubTypes.pose_I,    FrameField.angle_motion, line_thickness=2.0, line_smooth=2.0)
             motion_sim =    self.L[Layers.motion_sim][i] =  ls.SimMtnFrameLayer(    i, self.data_hub,   PoseDataHubTypes.pose_I)

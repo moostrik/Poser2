@@ -108,8 +108,8 @@ class MotionFrameLayer(LayerBase):
 
         # Alternate colors for readability
         colors: list[tuple[float, float, float, float]] = [
-            (*POSE_COLOR_LEFT, 1.0),
-            (*POSE_COLOR_RIGHT, 1.0)
+            (POSE_COLOR_LEFT),
+            (POSE_COLOR_RIGHT)
         ]
 
         for i in range(num_labels):

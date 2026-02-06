@@ -12,7 +12,7 @@ from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import FeatureBand
-from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
+from .Colors import ANGLES_COLORS, MOVEMENT_COLORS, SIMILARITY_COLORS, BBOX_COLORS
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -143,10 +143,7 @@ class FeatureFrameLayer(LayerBase):
         step: float = rect.width / num_labels
 
         # Alternate colors for readability
-        colors: list[tuple[float, float, float, float]] = [
-            (*POSE_COLOR_LEFT, 1.0),
-            (*POSE_COLOR_RIGHT, 1.0)
-        ]
+        colors: list[tuple[float, float, float, float]] = ANGLES_COLORS
 
         for i in range(num_labels):
             string: str = labels[i]
@@ -171,10 +168,7 @@ class AngleFrameLayer(FeatureFrameLayer):
             data_type=data_type,
             feature_field=FrameField.angles,
             display_range=display_range,
-            colors=[
-                (1.0, 0.5, 0.0, 1.0),  # orange
-                (0.0, 1.0, 1.0, 1.0),  # cyan
-            ],
+            colors=ANGLES_COLORS,
             alpha=1.0,
             render_labels=True
         )
@@ -192,10 +186,7 @@ class AngleVelFrameLayer(FeatureFrameLayer):
             data_type=data_type,
             feature_field=FrameField.angle_vel,
             display_range=display_range if display_range is not None else (-np.pi, np.pi),
-            colors=[
-                (1.0, 0.5, 0.0, 1.0),  # orange
-                (0.0, 1.0, 1.0, 1.0),  # cyan
-            ],
+            colors=ANGLES_COLORS,
             alpha=1.0,
             render_labels=True
         )
@@ -212,9 +203,7 @@ class AngleMotionFrameLayer(FeatureFrameLayer):
             data_type=data_type,
             feature_field=FrameField.angle_motion,
             display_range=display_range,
-            colors=[
-                (1.0, 1.0, 1.0, 1.0),  # white
-            ],
+            colors=MOVEMENT_COLORS,
             alpha=1.0,
             render_labels=True
         )
@@ -231,11 +220,7 @@ class SimilarityFrameLayer(FeatureFrameLayer):
             data_type=data_type,
             feature_field=FrameField.similarity,
             display_range=display_range,
-            colors=[
-                (1.0, 0.0, 0.0, 1.0),  # red
-                (0.0, 0.0, 1.0, 1.0),  # blue
-                (1.0, 1.0, 0.0, 1.0),  # yellow
-            ],
+            colors=SIMILARITY_COLORS,
             alpha=1.0,
             render_labels=False
         )
@@ -252,9 +237,7 @@ class BBoxFrameLayer(FeatureFrameLayer):
             data_type=data_type,
             feature_field=FrameField.bbox,
             display_range=display_range,
-            colors=[
-                (0.5, 0.5, 1.0, 1.0),  # light blue
-            ],
+            colors=BBOX_COLORS,
             alpha=1.0,
             render_labels=True
         )

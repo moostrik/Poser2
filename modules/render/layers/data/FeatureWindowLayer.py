@@ -12,7 +12,7 @@ from modules.gl import Fbo, Texture, Blit, Image, clear_color, draw_box_string, 
 from modules.pose.nodes import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import WindowShader
-from .Colors import POSE_COLOR_LEFT, POSE_COLOR_RIGHT
+from .Colors import ANGLES_COLORS, MOVEMENT_COLORS, SIMILARITY_COLORS, BBOX_COLORS
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -22,8 +22,7 @@ class WindowLayerConfig:
     """Configuration for FeatureWindowLayer variants."""
     data_type: DataHubType
     display_range: Tuple[float, float] | None  # None means dynamic from window.range
-    color_even: Tuple[float, float, float]
-    color_odd: Tuple[float, float, float]
+    colors: list[tuple[float, float, float, float]]  # Cycle through these RGBA colors
     alpha: float
     render_labels: bool = True
 
@@ -123,10 +122,8 @@ class FeatureWindowLayer(LayerBase):
             stream_step,
             line_width=self.line_width / self._fbo.height,
             output_aspect_ratio=output_aspect,
-
             display_range=display_range,
-            color_even=self._config.color_even,
-            color_odd=self._config.color_odd,
+            colors=self._config.colors,
             alpha=self._config.alpha
         )
         self._fbo.end()
@@ -142,10 +139,7 @@ class FeatureWindowLayer(LayerBase):
 
         feature_num: int = len(feature_names)
         step: float = rect.height / feature_num
-        colors: list[tuple[float, float, float, float]] = [
-            (*POSE_COLOR_LEFT, 1.0),
-            (*POSE_COLOR_RIGHT, 1.0)
-        ]
+        colors: list[tuple[float, float, float, float]] = ANGLES_COLORS
 
         for i in range(feature_num):
             string: str = feature_names[i]
@@ -168,8 +162,7 @@ class AngleMtnWindowLayer(FeatureWindowLayer):
         config = WindowLayerConfig(
             data_type=DataHubType.angle_motion_window,
             display_range=display_range,
-            color_even=(1.0, 1.0, 1.0),  # white
-            color_odd=(1.0, 1.0, 1.0),   # white
+            colors=MOVEMENT_COLORS,
             alpha=1.0,
             render_labels=True
         )
@@ -183,9 +176,8 @@ class AngleVelWindowLayer(FeatureWindowLayer):
                  display_range: Tuple[float, float] | None = None) -> None:
         config = WindowLayerConfig(
             data_type=DataHubType.angle_vel_window,
-            display_range=display_range,
-            color_even=(1.0, 0.5, 0.0),  # orange
-            color_odd=(0.0, 1.0, 1.0),   # cyan
+            display_range=display_range if display_range is not None else (-np.pi, np.pi),
+            colors=ANGLES_COLORS,
             alpha=1.0,
             render_labels=True
         )
@@ -200,9 +192,8 @@ class AngleWindowLayer(FeatureWindowLayer):
         config = WindowLayerConfig(
             data_type=DataHubType.angle_window,
             display_range=display_range,  # Default to dynamic from window.range
-            color_even=(1.0, 0.5, 0.0),  # orange
-            color_odd=(0.0, 1.0, 1.0),   # cyan
-            alpha=0.75,
+            colors=ANGLES_COLORS,
+            alpha=1.0,
             render_labels=True
         )
         super().__init__(track_id, data_hub, line_width, config)
@@ -216,9 +207,8 @@ class SimilarityWindowLayer(FeatureWindowLayer):
         config = WindowLayerConfig(
             data_type=DataHubType.similarity_window,
             display_range=display_range,
-            color_even=(1.0, 0.5, 0.0),  # orange
-            color_odd=(0.0, 1.0, 1.0),   # cyan
-            alpha=0.75,
+            colors=SIMILARITY_COLORS,
+            alpha=1.0,
             render_labels=False  # Labels were commented out in original
         )
         super().__init__(track_id, data_hub, line_width, config)
@@ -232,9 +222,8 @@ class BBoxWindowLayer(FeatureWindowLayer):
         config = WindowLayerConfig(
             data_type=DataHubType.bbox_window,
             display_range=display_range,  # Dynamic from window.range
-            color_even=(0.0, 1.0, 0.5),  # green-cyan
-            color_odd=(1.0, 0.0, 1.0),   # magenta
-            alpha=0.75,
+            colors=BBOX_COLORS,
+            alpha=1.0,
             render_labels=True
         )
         super().__init__(track_id, data_hub, line_width, config)
