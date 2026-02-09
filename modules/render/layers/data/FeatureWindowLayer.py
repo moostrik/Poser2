@@ -93,8 +93,9 @@ class FeatureWindowLayer(LayerBase):
         """Update visualization from DataHub FeatureWindow."""
         if not self._config.active:
             return
+        # ScalarFrameField.value matches FrameField.value for dict key lookup
         window: FeatureWindow | None = self._data_hub.get_feature_window(
-            self._config.stage, self._config.feature_field, self._track_id
+            self._config.stage, FrameField(self._config.feature_field), self._track_id
         )
         self._data_cache.update(window)
 

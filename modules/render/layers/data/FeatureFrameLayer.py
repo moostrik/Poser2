@@ -91,7 +91,7 @@ class FeatureFrameLayer(LayerBase):
             return
 
         # Extract feature from frame
-        feature = pose.get_feature(self._config.feature_field)
+        feature = pose.get_feature(FrameField(self._config.feature_field))
         if not isinstance(feature, PoseFeatureType):
             raise ValueError(f"FeatureFrameLayer expected PoseFeatureType, got {type(feature)}")
 

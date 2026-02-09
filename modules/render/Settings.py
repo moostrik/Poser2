@@ -4,7 +4,7 @@ from typing import Protocol
 
 from modules.ConfigBase import ConfigBase, config_field
 from modules.DataHub import Stage
-from modules.pose.Frame import FrameField
+from modules.pose.Frame import FrameField, ScalarFrameField
 
 
 # Auto-generated list of scalar features from Frame definition
@@ -27,7 +27,7 @@ class LayerMode(IntEnum):
 
 class DataLayerConfig(Protocol):
     """Protocol for data layer configs. Both WindowLayerConfig and FrameLayerConfig satisfy this."""
-    feature_field: FrameField
+    feature_field: ScalarFrameField
     stage: Stage
     active: bool
 
@@ -55,10 +55,10 @@ class Config(ConfigBase):
     stream_capacity: int = config_field(600,     fixed=True, description="10 seconds at 60 FPS")
 
     # Data layer config (mutable — runtime switching via GUI / watch)
-    feature: FrameField =   config_field(FrameField.angle_motion)
-    mode: LayerMode =       config_field(LayerMode.WINDOW)
-    stage_a: SlotStage =    config_field(SlotStage.SMOOTH)
-    stage_b: SlotStage =    config_field(SlotStage.LERP)
+    feature: ScalarFrameField = config_field(ScalarFrameField.angle_motion)
+    mode: LayerMode =           config_field(LayerMode.WINDOW)
+    stage_a: SlotStage =        config_field(SlotStage.SMOOTH)
+    stage_b: SlotStage =        config_field(SlotStage.LERP)
 
     def bind(self,
              windows_a: dict[int, DataLayerConfig], frames_a: dict[int, DataLayerConfig], angvel_a: dict[int, DataLayerConfig],
@@ -74,7 +74,7 @@ class Config(ConfigBase):
     def _propagate(self) -> None:
         """Push current config to all bound layer configs."""
         ff = self.feature
-        is_angles = (ff == FrameField.angles)
+        is_angles = (ff == ScalarFrameField.angles)
 
         for windows, frames, angvel, stage_attr in self._slots:
             slot_stage: SlotStage = getattr(self, stage_attr)

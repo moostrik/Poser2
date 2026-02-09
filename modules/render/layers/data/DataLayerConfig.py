@@ -4,7 +4,7 @@ from dataclasses import dataclass
 # Local application imports
 from modules.ConfigBase import ConfigBase, config_field
 from modules.DataHub import Stage
-from modules.pose.Frame import FrameField
+from modules.pose.Frame import FrameField, ScalarFrameField
 
 
 # Individual color constants
@@ -36,29 +36,25 @@ BBOX_COLORS: list[tuple[float, float, float, float]] = [
 ]
 
 
-# FrameField → color list lookup
-FEATURE_COLORS: dict[FrameField, list[tuple[float, float, float, float]]] = {
-    FrameField.bbox:            BBOX_COLORS,
-    FrameField.angles:          DEFAULT_COLORS,
-    FrameField.angle_vel:       DEFAULT_COLORS,
-    FrameField.angle_motion:    DEFAULT_COLORS,
-    FrameField.angle_sym:       DEFAULT_COLORS,
-    FrameField.similarity:      SIMILARITY_COLORS,
-    FrameField.leader:          SIMILARITY_COLORS,
-    FrameField.motion_gate:     SIMILARITY_COLORS,
+# ScalarFrameField → color list lookup
+FEATURE_COLORS: dict[ScalarFrameField, list[tuple[float, float, float, float]]] = {
+    ScalarFrameField.bbox:            BBOX_COLORS,
+    ScalarFrameField.angles:          DEFAULT_COLORS,
+    ScalarFrameField.angle_vel:       DEFAULT_COLORS,
+    ScalarFrameField.angle_motion:    DEFAULT_COLORS,
+    ScalarFrameField.angle_sym:       DEFAULT_COLORS,
+    ScalarFrameField.similarity:      SIMILARITY_COLORS,
+    ScalarFrameField.leader:          SIMILARITY_COLORS,
+    ScalarFrameField.motion_gate:     SIMILARITY_COLORS,
 }
-
-
-# Scalar fields only - for data visualization dropdown
-SCALAR_FIELDS: list[FrameField] = FrameField.get_scalar_fields()
 
 
 @dataclass
 class DataLayerConfig(ConfigBase):
     """Unified configuration for data visualization layers."""
-    active: bool =              config_field(False)
-    feature_field: FrameField = config_field(FrameField.angle_motion, choices=SCALAR_FIELDS)
-    stage: Stage =              config_field(Stage.SMOOTH)
+    active: bool =                      config_field(False)
+    feature_field: ScalarFrameField =   config_field(ScalarFrameField.angle_motion)
+    stage: Stage =                      config_field(Stage.SMOOTH)
 
     line_width: float =         config_field(3.0)
     line_smooth: float =        config_field(1.0)

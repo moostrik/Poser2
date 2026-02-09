@@ -13,7 +13,7 @@ from modules.DataHub import DataHub, PoseDataHubTypes, DataHubType, Stage
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.Frame import FrameField
 from modules.render.Settings import Config, LayerMode
-from modules.render.layers.data.DataLayerConfig import DataLayerConfig
+from modules.render.layers.data.DataLayerConfig import DataLayerConfig, ScalarFrameField
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -153,6 +153,7 @@ SHOW_COMP: list[Layers] = [
 ]
 
 SHOW_DATA: list[Layers] = [
+    Layers.centre_motion,
     Layers.data_B_W,
     Layers.data_B_F,
     Layers.data_B_AV,
@@ -218,7 +219,7 @@ class RenderManager(RenderBase):
             # Slot A: default colors (from FEATURE_COLORS), default line params
             # Slot B: white colors, doubled line params
             WHITE: list[tuple[float, float, float, float]] = [(0.5, 0.5, 0.5, 1.0)]
-            ff = FrameField.angle_motion
+            ff = ScalarFrameField.angle_motion
             self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.SMOOTH, line_width=3.0, line_smooth=1.0))
             self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.SMOOTH, line_width=3.0, line_smooth=1.0))
             self.L[Layers.data_A_AV][i] = ls.AngleVelLayer(     i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.SMOOTH, line_width=3.0, line_smooth=1.0))

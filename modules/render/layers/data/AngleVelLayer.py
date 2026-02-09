@@ -4,7 +4,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
-from modules.pose.Frame import Frame, FrameField
+from modules.pose.Frame import Frame, ScalarFrameField
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import AngleVelShader
 from modules.render.layers.data.DataLayerConfig import FEATURE_COLORS, DEFAULT_COLORS, DataLayerConfig
@@ -90,7 +90,7 @@ class AngleVelLayer(LayerBase):
         velocity = pose.angle_vel
 
         # Use config colors or fallback to FEATURE_COLORS (angles)
-        colors = self._config.colors or FEATURE_COLORS.get(FrameField.angles, DEFAULT_COLORS)
+        colors = self._config.colors or FEATURE_COLORS.get(ScalarFrameField.angles, DEFAULT_COLORS)
 
         line_width = 1.0 / self._fbo.height * self._config.line_width
         line_smooth = 1.0 / self._fbo.height * self._config.line_smooth
@@ -124,7 +124,7 @@ class AngleVelLayer(LayerBase):
 
         step: float = rect.width / num_labels
 
-        colors = self._config.colors or FEATURE_COLORS.get(FrameField.angles, DEFAULT_COLORS)
+        colors = self._config.colors or FEATURE_COLORS.get(ScalarFrameField.angles, DEFAULT_COLORS)
         # Ensure we have at least one color
         if not colors:
             colors = DEFAULT_COLORS

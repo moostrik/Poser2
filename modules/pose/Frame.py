@@ -130,3 +130,32 @@ if _missing_in_enum:
     raise ValueError(f"Pose fields missing in PoseField enum: {_missing_in_enum}")
 if _missing_in_dataclass:
     raise ValueError(f"PoseField enum values missing in Pose dataclass: {_missing_in_dataclass}")
+
+
+class ScalarFrameField(IntEnum):
+    """Subset of FrameField containing only BaseScalarFeature fields.
+
+    Used for data visualization where only scalar features are valid.
+    Values match FrameField so they work interchangeably as dict keys
+    and with Frame.get_feature() which uses .name attribute.
+    """
+    bbox =          FrameField.bbox
+    angles =        FrameField.angles
+    angle_vel =     FrameField.angle_vel
+    angle_motion =  FrameField.angle_motion
+    angle_sym =     FrameField.angle_sym
+    similarity =    FrameField.similarity
+    leader =        FrameField.leader
+    motion_gate =   FrameField.motion_gate
+
+
+# SCALAR FRAME FIELD VALIDATION
+_scalar_names = {ff.name for ff in FrameField.get_scalar_fields()}
+_enum_scalar_names = {sf.name for sf in ScalarFrameField}
+_missing_in_scalar_enum = _scalar_names - _enum_scalar_names
+_extra_in_scalar_enum = _enum_scalar_names - _scalar_names
+
+if _missing_in_scalar_enum:
+    raise ValueError(f"ScalarFrameField missing scalar fields: {_missing_in_scalar_enum}")
+if _extra_in_scalar_enum:
+    raise ValueError(f"ScalarFrameField has non-scalar fields: {_extra_in_scalar_enum}")
