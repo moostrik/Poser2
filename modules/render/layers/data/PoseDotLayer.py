@@ -19,15 +19,15 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class PoseDotLayerConfig(ConfigBase):
+class PoseDotConfig(ConfigBase):
     stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
     dot_size: float = config_field(4.0, min=1.0, max=20.0, description="Dot size in pixels")
     dot_smooth: float = config_field(2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")
 
 
 class PoseDotLayer(LayerBase):
-    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseDotLayerConfig | None = None) -> None:
-        self._config: PoseDotLayerConfig = config or PoseDotLayerConfig()
+    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseDotConfig | None = None) -> None:
+        self._config: PoseDotConfig = config or PoseDotConfig()
         self._track_id: int = track_id
         self._data_hub: DataHub = data
         self._fbo: Fbo = Fbo()

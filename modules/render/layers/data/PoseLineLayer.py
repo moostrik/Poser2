@@ -19,7 +19,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class PoseLineLayerConfig(ConfigBase):
+class PoseLineConfig(ConfigBase):
     stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
     line_width: float = config_field(4.0, min=0.5, max=20.0, description="Line width in pixels")
     line_smooth: float = config_field(2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
@@ -30,8 +30,8 @@ class PoseLineLayerConfig(ConfigBase):
 
 class PoseLineLayer(LayerBase):
 
-    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseLineLayerConfig | None = None) -> None:
-        self._config: PoseLineLayerConfig = config or PoseLineLayerConfig()
+    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseLineConfig | None = None) -> None:
+        self._config: PoseLineConfig = config or PoseLineConfig()
         self._track_id: int = track_id
         self._data_hub: DataHub = data
         self._fbo: Fbo = Fbo()

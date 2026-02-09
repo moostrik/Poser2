@@ -19,13 +19,13 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class CamCropLayerConfig(ConfigBase):
+class CropConfig(ConfigBase):
     stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
 
 
-class CamCropLayer(LayerBase):
-    def __init__(self, track_id: int, data_hub: DataHub, cam_texture: Texture, config: CamCropLayerConfig | None = None) -> None:
-        self._config: CamCropLayerConfig = config or CamCropLayerConfig()
+class CropLayer(LayerBase):
+    def __init__(self, track_id: int, data_hub: DataHub, cam_texture: Texture, config: CropConfig | None = None) -> None:
+        self._config: CropConfig = config or CropConfig()
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
