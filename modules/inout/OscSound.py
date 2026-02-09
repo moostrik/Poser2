@@ -120,31 +120,6 @@ class OscSound:
         poses: dict[int, Frame] = self._data_hub.get_poses(self._config.stage)
         num_players = self._config.num_players
 
-
-        # THIS MOTION CALCULATION IS A BIT OF A HACK
-        motions: dict[int, float] = {}
-        for id in range(num_players):
-            if id not in poses:
-                motions[id] = 0
-            else:
-                motion = poses[id].angle_motion.aggregate(AggregationMethod.MAX)
-                motion = min(1.0, motion * 1.5)
-                motions[id] = motion
-
-        motion_similarities: dict[int, list[float]] = {}
-
-        for id in range(num_players):
-            if id in poses:
-                values = poses[id].similarity.values
-
-                similarity_values: list[float] = np.nan_to_num(values, nan=0.0).tolist()
-                other_ids = [i for i in range(3) if i != id]
-
-                for o_id in other_ids:
-                    similarity_values[o_id] *= min(motions[id], motions[o_id])
-
-                motion_similarities[id] = similarity_values
-
         for id in range(num_players):
             if id not in poses:
                 # Only send inactive messages twice
@@ -156,7 +131,7 @@ class OscSound:
             else:
                 # Reset inactive count when pose becomes active
                 self._inactive_message_counts[id] = 0
-                OscSound._build_active_message(poses[id], bundle_builder, motion_similarities[id])
+                OscSound._build_active_message(poses[id], bundle_builder, poses, num_players)
 
         bundle: OscBundle = bundle_builder.build()
 
@@ -204,8 +179,32 @@ class OscSound:
             similarity_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(similarity_reset_msg.build()) # type: ignore
 
-    @ staticmethod
-    def _build_active_message(pose: Frame, bundle_builder: OscBundleBuilder, m_s: list[float] ) -> None:
+        # Reset similarity/pose to 0
+        pose_sim_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/pose")
+        for _ in range(num_players):
+            pose_sim_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(pose_sim_reset_msg.build()) # type: ignore
+
+        # Reset similarity/gate to 0
+        gate_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/gate")
+        for _ in range(num_players):
+            gate_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(gate_reset_msg.build()) # type: ignore
+
+        # Reset similarity/motion to 0
+        motion_sim_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
+        for _ in range(num_players):
+            motion_sim_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(motion_sim_reset_msg.build()) # type: ignore
+
+        # Reset similarity/leader to 0
+        leader_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/leader")
+        for _ in range(num_players):
+            leader_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(leader_reset_msg.build()) # type: ignore
+
+    @staticmethod
+    def _build_active_message(pose: Frame, bundle_builder: OscBundleBuilder, poses: dict[int, Frame], num_players: int) -> None:
         id: int = pose.track_id
         active_msg = OscMessageBuilder(address=f"/pose/{id}/active")
         active_msg.add_arg(1, OscMessageBuilder.ARG_TYPE_INT)
@@ -243,8 +242,51 @@ class OscSound:
         mean_sym_msg.add_arg(float(mean_sym), OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(mean_sym_msg.build()) # type: ignore
 
-        # range [0, 1]
-        similarity_values: list[float] = m_s
+        # range [0, 1] - raw angle similarity
+        pose_sim_values: list[float] = pose.similarity.values.tolist()
+        pose_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/pose")
+        for val in pose_sim_values:
+            pose_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(pose_sim_msg.build()) # type: ignore
+
+        # range [0, 1] - motion gate (both poses moving)
+        gate_values: list[float] = pose.motion_gate.values.tolist()
+        gate_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/gate")
+        for val in gate_values:
+            gate_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(gate_msg.build()) # type: ignore
+
+        # range [0, 1] - motion-gated similarity (similarity * motion_gate)
+        motion_sim_values: list[float] = (pose.similarity.values * pose.motion_gate.values).tolist()
+        motion_sim_values = [0.0 if np.isnan(v) else v for v in motion_sim_values]
+        motion_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
+        for val in motion_sim_values:
+            motion_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(motion_sim_msg.build()) # type: ignore
+
+        # range [-1, 1] - leader scores (negative=this leads, positive=other leads)
+        leader_values: list[float] = pose.leader.values.tolist()
+        leader_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/leader")
+        for val in leader_values:
+            leader_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(leader_msg.build()) # type: ignore
+
+        # DEPRECATED: Compute motion-gated similarity using old method (backward compatibility)
+        # TODO: Remove this once all OSC receivers migrate to /similarity/motion
+        motions: dict[int, float] = {}
+        for pid in range(num_players):
+            if pid not in poses:
+                motions[pid] = 0.0
+            else:
+                motion = poses[pid].angle_motion.aggregate(AggregationMethod.MAX)
+                motions[pid] = min(1.0, motion * 1.5)
+
+        similarity_values: list[float] = np.nan_to_num(pose.similarity.values, nan=0.0).tolist()
+        other_ids = [i for i in range(3) if i != id]  # Hardcoded to first 3 poses
+        for o_id in other_ids:
+            similarity_values[o_id] *= min(motions[id], motions[o_id])
+
+        # range [0, 1] - DEPRECATED backward-compatible motion-gated similarity
         similarity_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
         for similarity in similarity_values:
             similarity_msg.add_arg(similarity, OscMessageBuilder.ARG_TYPE_FLOAT)
