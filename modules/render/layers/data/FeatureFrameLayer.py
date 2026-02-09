@@ -12,21 +12,9 @@ from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import FeatureShader
-from .Colors import ANGLES_COLORS, MOVEMENT_COLORS, SIMILARITY_COLORS, BBOX_COLORS
+from modules.render.layers.data.DataLayerConfig import FEATURE_COLORS, DEFAULT_COLORS, DataLayerConfig
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
-@dataclass
-class FrameLayerConfig:
-    """Configuration for FeatureFrameLayer variants."""
-    stage: Stage
-    feature_field: FrameField
-    display_range: Tuple[float, float] | None  # None means dynamic from feature.range()
-    colors: list[tuple[float, float, float, float]]
-    alpha: float
-    render_labels: bool = True
-    use_scores: bool = False
 
 
 class FeatureFrameLayer(LayerBase):
@@ -36,25 +24,29 @@ class FeatureFrameLayer(LayerBase):
     a configurable color list. Transparent background.
     """
 
-    def __init__(self, track_id: int, data_hub: DataHub, config: FrameLayerConfig,
-                 line_thickness: float = 1.0, line_smooth: float = 1.0) -> None:
+    def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerConfig) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
-        self._config: FrameLayerConfig = config
+        self._config: DataLayerConfig = config
 
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
         self._labels: list[str] = []
 
-        self.line_thickness: float = line_thickness
-        self.line_smooth: float = line_smooth
         self.draw_labels: bool = False
 
         self._shader: FeatureShader = FeatureShader()
         self._text_renderer: Text = Text()
 
+        # Watch active to clear cache on deactivate
+        self._config.watch(self._on_active_change, 'active')
+
         self._hot_reloader = HotReloadMethods(self.__class__, True, True)
+
+    def _on_active_change(self, active: bool) -> None:
+        if not active:
+            self.clear()
 
     @property
     def texture(self) -> Texture:
@@ -72,7 +64,14 @@ class FeatureFrameLayer(LayerBase):
         self._shader.deallocate()
         self._text_renderer.deallocate()
 
+    def clear(self) -> None:
+        """Clear cached data."""
+        self._data_cache = DataCache()
+        self._labels = []
+
     def draw(self) -> None:
+        if not self._config.active:
+            return
         if self._fbo.allocated:
             Blit.use(self._fbo.texture)
             if self.draw_labels and self._config.render_labels:
@@ -80,6 +79,8 @@ class FeatureFrameLayer(LayerBase):
 
     def update(self) -> None:
         """Update visualization from DataHub Frame."""
+        if not self._config.active:
+            return
         pose: Frame | None = self._data_hub.get_pose(self._config.stage, self._track_id)
         self._data_cache.update(pose)
 
@@ -94,29 +95,17 @@ class FeatureFrameLayer(LayerBase):
         if not isinstance(feature, PoseFeatureType):
             raise ValueError(f"FeatureFrameLayer expected PoseFeatureType, got {type(feature)}")
 
-        # Apply alpha to colors
-        colors_with_alpha = [
-            (r, g, b, a * self._config.alpha)
-            for r, g, b, a in self._config.colors
-        ]
+        # Use config colors or fallback to FEATURE_COLORS
+        colors = self._config.colors or FEATURE_COLORS.get(self._config.feature_field, DEFAULT_COLORS)
 
-        # Override display range if configured
-        if self._config.display_range is not None:
-            # Temporarily override feature range for rendering
-            original_range = feature.range()
-            feature._range = self._config.display_range  # type: ignore
-
-        line_thickness = 1.0 / self._fbo.height * self.line_thickness
-        line_smooth = 1.0 / self._fbo.height * self.line_smooth
+        line_width = 1.0 / self._fbo.height * self._config.line_width
+        line_smooth = 1.0 / self._fbo.height * self._config.line_smooth
+        display_range = feature.display_range()
 
         self._fbo.begin()
         clear_color()
-        self._shader.use(feature, colors_with_alpha, line_thickness, line_smooth, self._config.use_scores)
+        self._shader.use(feature, colors, line_width, line_smooth, self._config.use_scores, display_range)
         self._fbo.end()
-
-        # Restore original range
-        if self._config.display_range is not None:
-            feature._range = original_range  # type: ignore
 
         # Render labels if changed
         if self._config.render_labels:
@@ -141,8 +130,8 @@ class FeatureFrameLayer(LayerBase):
 
         step: float = rect.width / num_labels
 
-        # Use colors from config
-        colors: list[tuple[float, float, float, float]] = self._config.colors
+        # Use config colors or fallback to FEATURE_COLORS
+        colors = self._config.colors or FEATURE_COLORS.get(self._config.feature_field, DEFAULT_COLORS)
 
         for i in range(num_labels):
             string: str = labels[i]
@@ -157,124 +146,3 @@ class FeatureFrameLayer(LayerBase):
 
         fbo.end()
 
-
-# Convenience classes for common configurations
-
-class AngleFrameLayer(FeatureFrameLayer):
-    """Angle frame layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
-                 line_thickness: float = 1.0, line_smooth: float = 1.0,
-                 display_range: Tuple[float, float] | None = None) -> None:
-        config = FrameLayerConfig(
-            stage=stage,
-            feature_field=FrameField.angles,
-            display_range=display_range,
-            colors=ANGLES_COLORS,
-            alpha=1.0,
-            render_labels=True
-        )
-        super().__init__(track_id, data_hub, config, line_thickness, line_smooth)
-
-
-class AngleVelFrameLayer(FeatureFrameLayer):
-    """Angle velocity frame layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
-                 line_thickness: float = 1.0, line_smooth: float = 1.0,
-                 display_range: Tuple[float, float] | None = None) -> None:
-        import numpy as np
-        config = FrameLayerConfig(
-            stage=stage,
-            feature_field=FrameField.angle_vel,
-            display_range=display_range if display_range is not None else (-np.pi, np.pi),
-            colors=ANGLES_COLORS,
-            alpha=1.0,
-            render_labels=True
-        )
-        super().__init__(track_id, data_hub, config, line_thickness, line_smooth)
-
-
-class AngleMtnFrameLayer(FeatureFrameLayer):
-    """Angle motion frame layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
-                 line_thickness: float = 1.0, line_smooth: float = 1.0,
-                 display_range: Tuple[float, float] | None = (0.0, 5.0)) -> None:
-        config = FrameLayerConfig(
-            stage=stage,
-            feature_field=FrameField.angle_motion,
-            display_range=display_range,
-            colors=MOVEMENT_COLORS,
-            alpha=1.0,
-            render_labels=True
-        )
-        super().__init__(track_id, data_hub, config, line_thickness, line_smooth)
-
-
-class AngleSymFrameLayer(FeatureFrameLayer):
-    """Angle symmetry frame layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
-                 line_thickness: float = 1.0, line_smooth: float = 1.0,
-                 display_range: Tuple[float, float] | None = None) -> None:
-        config = FrameLayerConfig(
-            stage=stage,
-            feature_field=FrameField.angle_sym,
-            display_range=display_range,
-            colors=ANGLES_COLORS,
-            alpha=1.0,
-            render_labels=True
-        )
-        super().__init__(track_id, data_hub, config, line_thickness, line_smooth)
-
-
-class SimilarityFrameLayer(FeatureFrameLayer):
-    """Similarity frame layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
-                 line_thickness: float = 1.0, line_smooth: float = 1.0,
-                 display_range: Tuple[float, float] | None = (0.0, 1.0)) -> None:
-        config = FrameLayerConfig(
-            stage=stage,
-            feature_field=FrameField.similarity,
-            display_range=display_range,
-            colors=SIMILARITY_COLORS,
-            alpha=1.0,
-            render_labels=False
-        )
-        super().__init__(track_id, data_hub, config, line_thickness, line_smooth)
-
-
-class BBoxFrameLayer(FeatureFrameLayer):
-    """Bounding box frame layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
-                 line_thickness: float = 1.0, line_smooth: float = 1.0,
-                 display_range: Tuple[float, float] | None = None) -> None:
-        config = FrameLayerConfig(
-            stage=stage,
-            feature_field=FrameField.bbox,
-            display_range=display_range,
-            colors=BBOX_COLORS,
-            alpha=1.0,
-            render_labels=True
-        )
-        super().__init__(track_id, data_hub, config, line_thickness, line_smooth)
-
-
-class LeaderFrameLayer(FeatureFrameLayer):
-    """Leader score frame layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, stage: Stage,
-                 line_thickness: float = 1.0, line_smooth: float = 1.0,
-                 display_range: Tuple[float, float] | None = (0.0, 1.0)) -> None:
-        config = FrameLayerConfig(
-            stage=stage,
-            feature_field=FrameField.leader,
-            display_range=display_range,
-            colors=SIMILARITY_COLORS,
-            alpha=1.0,
-            render_labels=False
-        )
-        super().__init__(track_id, data_hub, config, line_thickness, line_smooth)

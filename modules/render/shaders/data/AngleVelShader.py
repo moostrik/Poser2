@@ -6,8 +6,9 @@ import numpy as np
 from modules.pose.features import Angles, AngleVelocity
 
 class AngleVelShader(Shader):
-    def use(self, angles: Angles, deltas: AngleVelocity, line_thickness: float = 0.1, line_smooth: float = 0.01,
-            color_odd=(1.0, 0.2, 0.0, 1.0), color_even=(1.0, 0.2, 0.0, 1.0)) -> None:
+    def use(self, angles: Angles, deltas: AngleVelocity, line_width: float = 0.1, line_smooth: float = 0.01,
+            colors: list[tuple[float, float, float, float]] = [(1.0, 0.5, 0.0, 1.0), (0.0, 1.0, 1.0, 1.0)],
+            display_range: tuple[float, float] | None = None) -> None:
         if not self.allocated or not self.shader_program:
             print("PoseAngleDeltaBar shader not allocated or shader program missing.")
             return
@@ -17,6 +18,14 @@ class AngleVelShader(Shader):
         delta_values: np.ndarray = np.nan_to_num(deltas.values.astype(np.float32), nan=0.0)
         score_values: np.ndarray = np.minimum(angles.scores, deltas.scores).astype(np.float32)
 
+        # Use provided display_range or get from angles
+        if display_range is None:
+            display_range = angles.display_range()
+
+        # Extract odd/even colors from list
+        color_odd = colors[0] if len(colors) > 0 else (1.0, 0.5, 0.0, 1.0)
+        color_even = colors[1] if len(colors) > 1 else color_odd
+
         # Activate shader program
         glUseProgram(self.shader_program)
 
@@ -25,9 +34,8 @@ class AngleVelShader(Shader):
         glUniform1fv(self.get_uniform_loc("deltas"), len(delta_values), delta_values)
         glUniform1fv(self.get_uniform_loc("scores"), len(score_values), score_values)
         glUniform1i(self.get_uniform_loc("num_joints"), len(angles))
-        glUniform1f(self.get_uniform_loc("value_min"), angles.range()[0])
-        glUniform1f(self.get_uniform_loc("value_max"), angles.range()[1])
-        glUniform1f(self.get_uniform_loc("line_thickness"), line_thickness)
+        glUniform2f(self.get_uniform_loc("display_range"), display_range[0], display_range[1])
+        glUniform1f(self.get_uniform_loc("line_width"), line_width)
         glUniform1f(self.get_uniform_loc("line_smooth"), line_smooth)
         glUniform4f(self.get_uniform_loc("color_odd"), *color_odd)
         glUniform4f(self.get_uniform_loc("color_even"), *color_even)

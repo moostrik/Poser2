@@ -2,9 +2,8 @@
 
 uniform int num_joints;
 uniform int num_colors;
-uniform float value_min;
-uniform float value_max;
-uniform float line_thickness = 0.01;
+uniform vec2 display_range;
+uniform float line_width = 0.01;
 uniform float line_smooth = 0.01;
 uniform int use_scores = 0;
 
@@ -37,14 +36,14 @@ void main() {
     vec4 line_color = colors[color_index];
 
     // Normalize value to [0, 1]
-    float normalized_value = (value - value_min) / (value_max - value_min);
+    float normalized_value = (value - display_range.x) / (display_range.y - display_range.x);
     normalized_value = clamp(normalized_value, 0.0, 1.0);
 
     // Calculate distance from horizontal line
     float dist = abs(texCoord.y - normalized_value);
 
     // Smooth antialiased line
-    float alpha = 1.0 - smoothstep(line_thickness, line_thickness + line_smooth, dist);
+    float alpha = 1.0 - smoothstep(line_width, line_width + line_smooth, dist);
 
     if (alpha > 0.01) {
         fragColor = vec4(line_color.rgb, line_color.a * alpha * score);

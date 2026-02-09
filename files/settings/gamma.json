@@ -86,6 +86,10 @@
     "num_players": 3,
     "cams_a_row": 3,
     "num_R": 3,
-    "stream_capacity": 600
+    "stream_capacity": 600,
+    "feature": "angle_motion",
+    "mode": "WINDOW",
+    "stage_a": "SMOOTH",
+    "stage_b": "LERP"
   }
 }

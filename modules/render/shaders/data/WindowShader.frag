@@ -4,12 +4,11 @@ uniform sampler2D   tex0;
 uniform int         num_streams;
 uniform float       stream_step;
 uniform float       line_width;
+uniform float       line_smooth;
 uniform float       output_aspect_ratio;  // output buffer aspect ratio (width/height)
-uniform float       display_range_min;   // minimum value for display range
-uniform float       display_range_max;   // maximum value for display range
+uniform vec2        display_range;       // (min, max) value range for display
 uniform vec4        colors[8];           // RGBA color array to cycle through
 uniform int         num_colors;          // number of colors in array
-uniform float       alpha;               // alpha transparency
 
 in vec2     texCoord;
 out vec4    fragColor;
@@ -68,7 +67,7 @@ void main() {
         return;
     }
 
-    float norm = clamp((value - display_range_min) / (display_range_max - display_range_min), 0.0, 1.0);
+    float norm = clamp((value - display_range.x) / (display_range.y - display_range.x), 0.0, 1.0);
     // Invert norm so high values are at top, low values at bottom
     vec2 point = vec2(value_uv.x, stream_top + (1.0 - norm) * stream_step);
 
@@ -81,7 +80,7 @@ void main() {
     if (dist < dot_radius) {
         int color_index = stream_id % num_colors;
         vec4 dot_color = colors[color_index];
-        fragColor = vec4(dot_color.rgb, dot_color.a * alpha);
+        fragColor = dot_color;
         return;
     }
 

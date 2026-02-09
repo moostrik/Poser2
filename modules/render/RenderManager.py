@@ -12,7 +12,8 @@ from modules.render.layers import LayerBase
 from modules.DataHub import DataHub, PoseDataHubTypes, DataHubType, Stage
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.Frame import FrameField
-from modules.render.Settings import Settings
+from modules.render.Settings import Config, LayerMode
+from modules.render.layers.data.DataLayerConfig import DataLayerConfig
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -59,19 +60,16 @@ class Layers(IntEnum):
     centre_pose =   auto()
     centre_motion = auto()
 
-    # Window layers
-    angle_W =       auto()
-    angle_vel_W =   auto()
-    angle_mtn_W =   auto()
-    similarity_W =  auto()
-    bbox_W =        auto()
+    # Data layers (configurable slots A and B, all pre-allocated)
+    data_B_W =      auto()
+    data_B_F =      auto()
+    data_B_AV =     auto()
+    data_A_W =      auto()
+    data_A_F =      auto()
+    data_A_AV =     auto()
 
-    # Frame layers
+    # Other data layers
     mtime_data =    auto()
-    angle_vel_F =   auto()
-    angle_mtn_F =   auto()
-    similarity_F =  auto()
-    bbox_F =        auto()
 
     # composition layers
     sim_blend =     auto()
@@ -114,14 +112,7 @@ LARGE_LAYERS: list[Layers] = [
 PREVIEW_CENTRE: list[Layers] = [
     Layers.centre_frg,
     Layers.centre_pose,
-
-    # Layers.angle_W,
-    # Layers.angle_vel_W,
-    # Layers.angle_mtn_W,
-    # Layers.similarity_W,
-    Layers.bbox_W,
-    Layers.angle_vel_F,
-    Layers.mtime_data
+    Layers.mtime_data,
 ]
 
 SHOW_CAM: list[Layers] = [
@@ -162,21 +153,12 @@ SHOW_COMP: list[Layers] = [
 ]
 
 SHOW_DATA: list[Layers] = [
-
-    Layers.centre_frg,
-    Layers.angle_W,
-    # Layers.angle_vel_W,
-    # Layers.angle_mtn_W,
-    # Layers.similarity_W,
-    Layers.angle_vel_F,
-    # Layers.angle_mtn_F,
-    # Layers.similarity_F,
-    # Layers.angle_vel_F,
-    # Layers.motion_bar,
-
-    # Layers.motion_sim,
-    # Layers.field_bar_R,
-    # Layers.field_bar_I,
+    Layers.data_B_W,
+    Layers.data_B_F,
+    Layers.data_B_AV,
+    Layers.data_A_W,
+    Layers.data_A_F,
+    Layers.data_A_AV,
 ]
 
 
@@ -184,12 +166,13 @@ PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
 FINAL_LAYERS: list[Layers] = SHOW_DATA
 
 class RenderManager(RenderBase):
-    def __init__(self, gui: Gui, data_hub: DataHub, settings: Settings) -> None:
+    def __init__(self, gui: Gui, data_hub: DataHub, settings: Config) -> None:
         self.num_players: int = settings.num_players
         self.num_cams: int =    settings.num_cams
 
         # data
         self.data_hub: DataHub = data_hub
+        self._settings: Config = settings
 
         # layers
         self._update_layers: list[Layers] =     UPDATE_LAYERS
@@ -199,8 +182,6 @@ class RenderManager(RenderBase):
 
         # camera layers
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
-
-        self.line_width: float = 3.0
 
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
@@ -233,16 +214,27 @@ class RenderManager(RenderBase):
 
             gpu_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
 
-            angle_W =       self.L[Layers.angle_W][i] =     ls.AngleWindowLayer(    i, self.data_hub, self.line_width)
-            angle_vel_W =   self.L[Layers.angle_vel_W][i] = ls.AngleVelWindowLayer( i, self.data_hub, self.line_width)
-            angle_mtn_W =   self.L[Layers.angle_mtn_W][i] = ls.AngleMtnWindowLayer( i, self.data_hub, self.line_width)
-            similarity_W =  self.L[Layers.similarity_W][i] =ls.SimilarityWindowLayer(  i, self.data_hub, self.line_width)
-            bbox_W =        self.L[Layers.bbox_W][i] =      ls.BBoxWindowLayer(     i, self.data_hub, self.line_width)
+            # Data layers — all 6 pre-allocated per camera
+            # Slot A: default colors (from FEATURE_COLORS), default line params
+            # Slot B: white colors, doubled line params
+            WHITE: list[tuple[float, float, float, float]] = [(0.5, 0.5, 0.5, 1.0)]
+            ff = FrameField.angle_motion
+            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.SMOOTH, line_width=3.0, line_smooth=1.0))
+            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.SMOOTH, line_width=3.0, line_smooth=1.0))
+            self.L[Layers.data_A_AV][i] = ls.AngleVelLayer(     i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.SMOOTH, line_width=3.0, line_smooth=1.0))
+            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.LERP,   line_width=6.0, line_smooth=6.0,  colors=WHITE))
+            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.LERP,   line_width=6.0, line_smooth=6.0,  colors=WHITE))
+            self.L[Layers.data_B_AV][i] = ls.AngleVelLayer(     i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.LERP,   line_width=6.0, line_smooth=6.0,  colors=WHITE))
 
-            angle_vel_F =   self.L[Layers.angle_vel_F][i] = ls.AngleVelLayer(       i, self.data_hub, Stage.LERP, line_thickness=1.0, line_smooth=1.0)
-            angle_mtn_F =   self.L[Layers.angle_mtn_F][i] = ls.AngleMtnFrameLayer(  i, self.data_hub, Stage.LERP, line_thickness=2.0, line_smooth=2.0)
-            similarity_F =  self.L[Layers.similarity_F][i] =ls.SimilarityFrameLayer(i, self.data_hub, Stage.LERP, line_thickness=4.0, line_smooth=2.0)
-            bbox_F =        self.L[Layers.bbox_F][i] =      ls.BBoxFrameLayer(      i, self.data_hub, Stage.LERP, line_thickness=2.0, line_smooth=2.0)
+        # Bind data config to layer configs - propagates config changes automatically
+        settings.bind(
+            {i: cast(ls.FeatureWindowLayer, self.L[Layers.data_A_W][i])._config for i in range(self.num_cams)},
+            {i: cast(ls.FeatureFrameLayer,  self.L[Layers.data_A_F][i])._config for i in range(self.num_cams)},
+            {i: cast(ls.AngleVelLayer,      self.L[Layers.data_A_AV][i])._config for i in range(self.num_cams)},
+            {i: cast(ls.FeatureWindowLayer, self.L[Layers.data_B_W][i])._config for i in range(self.num_cams)},
+            {i: cast(ls.FeatureFrameLayer,  self.L[Layers.data_B_F][i])._config for i in range(self.num_cams)},
+            {i: cast(ls.AngleVelLayer,      self.L[Layers.data_B_AV][i])._config for i in range(self.num_cams)},
+        )
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
@@ -329,7 +321,6 @@ class RenderManager(RenderBase):
             self.L[Layers.centre_cam][i].use_mask = True    #type: ignore
             self.L[Layers.centre_frg][i].use_mask = True    #type: ignore
             self.L[Layers.centre_mask][i].blur_steps = 0    #type: ignore
-            self.L[Layers.angle_W][i].line_width = 3.0      #type: ignore
 
         self._update_layers = UPDATE_LAYERS
         self._draw_layers = FINAL_LAYERS

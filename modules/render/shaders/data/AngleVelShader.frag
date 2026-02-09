@@ -1,9 +1,8 @@
 #version 460 core
 
 uniform int num_joints;
-uniform float value_min;
-uniform float value_max;
-uniform float line_thickness = 0.001;
+uniform vec2 display_range;
+uniform float line_width = 0.001;
 uniform float line_smooth = 0.001;
 uniform vec4 color_odd;
 uniform vec4 color_even;
@@ -24,10 +23,10 @@ void main() {
 
     float angle = angles[joint_index];
     float delta = deltas[joint_index];
-    float thickness = max(abs(delta) * line_thickness * 10, line_thickness);
+    float thickness = max(abs(delta) * line_width * 10, line_width);
     float score = 1.0; //scores[joint_index];
 
-    float normalized_value = (angle - value_min) / (value_max - value_min);
+    float normalized_value = (angle - display_range.x) / (display_range.y - display_range.x);
 
     // Handle wrapping - if value exceeds range, wrap it around
     normalized_value = fract(normalized_value);

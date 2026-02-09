@@ -28,10 +28,10 @@ class WindowShader(Shader):
         num_streams: int,
         stream_step: float,
         line_width: float,
+        line_smooth: float = 0.01,
         output_aspect_ratio: float = 1.0,
         display_range: tuple[float, float] = (-3.14159, 3.14159),
         colors: list[tuple[float, float, float, float]] = [(1.0, 0.5, 0.0, 1.0), (0.0, 1.0, 1.0, 1.0)],
-        alpha: float = 0.5,
     ) -> None:
         """Render feature window visualization.
 
@@ -41,10 +41,10 @@ class WindowShader(Shader):
             num_streams: Number of feature elements (height)
             stream_step: Normalized height per stream (constrained)
             line_width: Line thickness in normalized coordinates
+            line_smooth: Line smoothing amount
             output_aspect_ratio: Output buffer aspect ratio (width/height)
             display_range: (min, max) value range for normalization
             colors: List of RGBA colors to cycle through (default orange/cyan)
-            alpha: Alpha transparency (default 0.5)
         """
         if not self.allocated or not self.shader_program:
             print(f"{self.__class__.__name__} shader not allocated or shader program missing.")
@@ -62,15 +62,14 @@ class WindowShader(Shader):
         glUniform1i(self.get_uniform_loc("num_streams"), num_streams)
         glUniform1f(self.get_uniform_loc("stream_step"), stream_step)
         glUniform1f(self.get_uniform_loc("line_width"), line_width)
+        glUniform1f(self.get_uniform_loc("line_smooth"), line_smooth)
         glUniform1f(self.get_uniform_loc("output_aspect_ratio"), output_aspect_ratio)
-        glUniform1f(self.get_uniform_loc("display_range_min"), display_range[0])
-        glUniform1f(self.get_uniform_loc("display_range_max"), display_range[1])
+        glUniform2f(self.get_uniform_loc("display_range"), display_range[0], display_range[1])
 
         # Upload colors array
         import numpy as np
         colors_array = np.array(colors, dtype=np.float32).flatten()
         glUniform4fv(self.get_uniform_loc("colors"), len(colors), colors_array)
         glUniform1i(self.get_uniform_loc("num_colors"), len(colors))
-        glUniform1f(self.get_uniform_loc("alpha"), alpha)
 
         draw_quad()

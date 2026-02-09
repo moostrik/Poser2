@@ -1,6 +1,6 @@
 # Standard library imports
 from dataclasses import dataclass
-from typing import Tuple, Optional
+from typing import Tuple
 
 # Third-party imports
 import numpy as np
@@ -13,20 +13,9 @@ from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.nodes import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import WindowShader
-from .Colors import ANGLES_COLORS, MOVEMENT_COLORS, SIMILARITY_COLORS, BBOX_COLORS
+from modules.render.layers.data.DataLayerConfig import FEATURE_COLORS, DEFAULT_COLORS, DataLayerConfig
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
-@dataclass
-class WindowLayerConfig:
-    """Configuration for FeatureWindowLayer variants."""
-    frame_field: FrameField
-    display_range: Tuple[float, float] | None  # None means dynamic from window.range
-    colors: list[tuple[float, float, float, float]]  # Cycle through these RGBA colors
-    alpha: float
-    render_labels: bool = True
-    stage: Stage = Stage.SMOOTH  # default to smooth
 
 
 class FeatureWindowLayer(LayerBase):
@@ -37,10 +26,10 @@ class FeatureWindowLayer(LayerBase):
     via DataHub per-track windows.
     """
 
-    def __init__(self, track_id: int, data_hub: DataHub, line_width: float, config: WindowLayerConfig) -> None:
+    def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerConfig) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
-        self._config: WindowLayerConfig = config
+        self._config: DataLayerConfig = config
 
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
@@ -53,12 +42,18 @@ class FeatureWindowLayer(LayerBase):
         self._stream_step_pixels: float = 0.0
 
         self.draw_labels: bool = True
-        self.line_width: float = line_width
 
         self._shader: WindowShader = WindowShader()
         self._text_renderer: Text = Text()
 
+        # Watch active to clear cache on deactivate
+        self._config.watch(self._on_active_change, 'active')
+
         self._hot_reloader = HotReloadMethods(self.__class__, True, True)
+
+    def _on_active_change(self, active: bool) -> None:
+        if not active:
+            self.clear()
 
     @property
     def texture(self) -> Texture:
@@ -81,7 +76,14 @@ class FeatureWindowLayer(LayerBase):
         self._shader.deallocate()
         self._text_renderer.deallocate()
 
+    def clear(self) -> None:
+        """Clear cached data."""
+        self._data_cache = DataCache()
+        self._labels = []
+
     def draw(self) -> None:
+        if not self._config.active:
+            return
         if self._fbo.allocated:
             Blit.use(self._fbo.texture)
             if self.draw_labels and self._config.render_labels:
@@ -89,8 +91,10 @@ class FeatureWindowLayer(LayerBase):
 
     def update(self) -> None:
         """Update visualization from DataHub FeatureWindow."""
+        if not self._config.active:
+            return
         window: FeatureWindow | None = self._data_hub.get_feature_window(
-            self._config.stage, self._config.frame_field, self._track_id
+            self._config.stage, self._config.feature_field, self._track_id
         )
         self._data_cache.update(window)
 
@@ -110,8 +114,11 @@ class FeatureWindowLayer(LayerBase):
 
         self._shader.reload()
 
-        # Determine display range (static from config or dynamic from window)
-        display_range = self._config.display_range if self._config.display_range is not None else window.range
+        # Use window's display_range
+        display_range = window.display_range
+
+        # Use config colors or fallback to FEATURE_COLORS
+        colors = self._config.colors or FEATURE_COLORS.get(self._config.feature_field, DEFAULT_COLORS)
 
         # Render using shader
         self._fbo.begin()
@@ -130,11 +137,11 @@ class FeatureWindowLayer(LayerBase):
             num_samples,
             num_streams,
             stream_step,
-            line_width=self.line_width / self._fbo.height,
+            line_width=self._config.line_width / self._fbo.height,
+            line_smooth=self._config.line_smooth / self._fbo.height,
             output_aspect_ratio=output_aspect,
             display_range=display_range,
-            colors=self._config.colors,
-            alpha=self._config.alpha
+            colors=colors,
         )
         self._fbo.end()
 
@@ -153,7 +160,7 @@ class FeatureWindowLayer(LayerBase):
         clear_color()
 
         feature_num: int = len(feature_names)
-        colors: list[tuple[float, float, float, float]] = self._config.colors
+        colors = self._config.colors or FEATURE_COLORS.get(self._config.feature_field, DEFAULT_COLORS)
 
         for i in range(feature_num):
             string: str = feature_names[i]
@@ -168,89 +175,3 @@ class FeatureWindowLayer(LayerBase):
 
         fbo.end()
 
-
-# Convenience classes for common configurations
-
-class AngleMtnWindowLayer(FeatureWindowLayer):
-    """Angle motion window layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = None,
-                 stage: Stage = Stage.SMOOTH) -> None:
-        config = WindowLayerConfig(
-            frame_field=FrameField.angle_motion,
-            display_range=display_range,
-            colors=MOVEMENT_COLORS,
-            alpha=1.0,
-            render_labels=True,
-            stage=stage
-        )
-        super().__init__(track_id, data_hub, line_width, config)
-
-
-class AngleVelWindowLayer(FeatureWindowLayer):
-    """Angle velocity window layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = None,
-                 stage: Stage = Stage.SMOOTH) -> None:
-        config = WindowLayerConfig(
-            frame_field=FrameField.angle_vel,
-            display_range=display_range if display_range is not None else (-np.pi, np.pi),
-            colors=ANGLES_COLORS,
-            alpha=1.0,
-            render_labels=True,
-            stage=stage
-        )
-        super().__init__(track_id, data_hub, line_width, config)
-
-
-class AngleWindowLayer(FeatureWindowLayer):
-    """Angle window layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = None,
-                 stage: Stage = Stage.SMOOTH) -> None:
-        config = WindowLayerConfig(
-            frame_field=FrameField.angles,
-            display_range=display_range,
-            colors=ANGLES_COLORS,
-            alpha=1.0,
-            render_labels=True,
-            stage=stage
-        )
-        super().__init__(track_id, data_hub, line_width, config)
-
-
-class SimilarityWindowLayer(FeatureWindowLayer):
-    """Similarity window layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = (0.0, 1.0),
-                 stage: Stage = Stage.SMOOTH) -> None:
-        config = WindowLayerConfig(
-            frame_field=FrameField.similarity,
-            display_range=display_range,
-            colors=SIMILARITY_COLORS,
-            alpha=1.0,
-            render_labels=True,
-            stage=stage
-        )
-        super().__init__(track_id, data_hub, line_width, config)
-
-
-class BBoxWindowLayer(FeatureWindowLayer):
-    """Bounding box window layer."""
-
-    def __init__(self, track_id: int, data_hub: DataHub, line_width: float,
-                 display_range: Tuple[float, float] | None = None,
-                 stage: Stage = Stage.SMOOTH) -> None:
-        config = WindowLayerConfig(
-            frame_field=FrameField.bbox,
-            display_range=display_range,
-            colors=BBOX_COLORS,
-            alpha=1.0,
-            render_labels=True,
-            stage=stage
-        )
-        super().__init__(track_id, data_hub, line_width, config)

@@ -70,6 +70,7 @@ class Main():
 
         # RENDER
         self.render = RenderManager(self.gui, self.data_hub, settings.render)
+        self.data_gui = ConfigGuiGenerator(settings.render, self.gui, "Render")
 
         # POSE CONFIGURATION
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
@@ -103,9 +104,6 @@ class Main():
         self.motion_smooth_config = nodes.EmaSmootherConfig(attack=0.95, release=0.8)
         self.motion_smooth_gui =    guis.EmaSmootherGui(self.motion_smooth_config, self.gui, 'MOTION')
 
-        # WINDOW TRACKER CONFIGURATION
-        self.window_config =      trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps), emit_partial=True)
-
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
@@ -125,9 +123,9 @@ class Main():
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
         # WINDOW TRACKERS
-        self.window_tracker_R =     trackers.AllWindowTracker(num_players, self.window_config)
-        self.window_tracker_S =     trackers.AllWindowTracker(num_players, self.window_config)
-        self.window_tracker_I =     trackers.AllWindowTracker(num_players, self.window_config)
+        self.window_tracker_R =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps)))
+        self.window_tracker_S =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps)))
+        self.window_tracker_I =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(5.0 * settings.render.fps)))
 
         self.bbox_filters =      trackers.FilterTracker(
             settings.num_players,
@@ -305,6 +303,7 @@ class Main():
         self.gui.addFrame([self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame])
         self.gui.addFrame([self.artnet_guis[2].frame, self.timer_gui.frame])
+        self.gui.addFrame([self.data_gui.frame])
 
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])
