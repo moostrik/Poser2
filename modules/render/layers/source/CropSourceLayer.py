@@ -42,7 +42,7 @@ class CropSourceLayer(LayerBase):
         gpu_frame: GPUFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
         self._data_cache.update(gpu_frame)
 
-        if self._data_cache.idle or gpu_frame is None:
+        if self._data_cache.idle or gpu_frame is None or gpu_frame.crop is None:
             return
 
         self._cuda_image.set_tensor(gpu_frame.crop)

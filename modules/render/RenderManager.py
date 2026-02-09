@@ -125,7 +125,7 @@ SHOW_CAM: list[Layers] = [
 SHOW_CENTRE: list[Layers] = [
     Layers.centre_cam,
     Layers.centre_mask,
-    Layers.centre_frg,
+    # Layers.centre_frg,
     # Layers.centre_motion,
     Layers.centre_pose,
 ]
@@ -164,7 +164,7 @@ SHOW_DATA: list[Layers] = [
 
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_DATA
+FINAL_LAYERS: list[Layers] = SHOW_CENTRE
 
 class RenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Config) -> None:
@@ -204,8 +204,8 @@ class RenderManager(RenderBase):
 
             centre_math =   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,   PoseDataHubTypes.pose_I,    16/9)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_math,                                 cam_mask.texture)
-            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_math,                                 cam_frg.texture, centre_mask.texture)
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_math,                                 cam_image.texture,  centre_mask.texture)
+            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_math,                                 cam_frg.texture, centre_mask.texture)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_math,                                 line_width=3.0, line_smooth=0.0, use_scores=False, color=COLORS[i % len(COLORS)])
             centre_motion = self.L[Layers.centre_motion][i]=ls.MotionMultiply(      i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
             centre_D_flow = self.L[Layers.centre_D_flow][i]=ls.CentreDenseFlowLayer(   centre_math,                                 dense_flow.texture, centre_mask.texture)

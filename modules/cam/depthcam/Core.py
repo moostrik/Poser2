@@ -241,9 +241,6 @@ class Core(Thread):
         if not self.do_stereo and frame_type == FrameType.VIDEO:
             frames: dict[FrameType, ndarray] = {}
             frames[frame_type] = frame
-            # print width and height of frames for debugging
-            for frame_type, frame in frames.items():
-                print(f"[DEBUG] cam {self.id} frame type: {frame_type}, shape: {frame.shape}")
             self._update_sync_callbacks(frames, self.fps)
 
     def _update_sync_callbacks(self, frames: dict[FrameType, ndarray], fps: float) -> None:
