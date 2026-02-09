@@ -58,14 +58,14 @@ class InterpolatorTracker(TrackerBase):
                 pose: Frame | None = None
                 for node in pipeline:
                     interpolated_pose: Frame | None = node.update()
-                    attractor: str = node.attr_name
                     if interpolated_pose is not None:
                         if pose is None:
                             # Use first interpolator's pose as base
                             pose = interpolated_pose
                         else:
                             # Merge subsequent interpolator's feature into combined pose
-                            pose = replace(pose, **{attractor: getattr(interpolated_pose, attractor)})
+                            field_name = node.pose_field.name
+                            pose = replace(pose, **{field_name: getattr(interpolated_pose, field_name)})
 
                 if pose is not None:
                     interpolated_poses[id] = pose

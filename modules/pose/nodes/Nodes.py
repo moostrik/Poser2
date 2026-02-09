@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Generic, TypeVar
-from modules.pose.Frame import Frame
+from modules.pose.Frame import Frame, FrameField
 
 
 class NodeConfigBase:
@@ -81,6 +81,12 @@ class InterpolatorNode(NodeBase):
     @abstractmethod
     def update(self) -> Frame | None:
         """Get interpolated pose. Called at render frequency (~60+ FPS). Returns None if not ready."""
+        pass
+
+    @property
+    @abstractmethod
+    def pose_field(self) -> FrameField:
+        """Return the FrameField this interpolator processes."""
         pass
 
 

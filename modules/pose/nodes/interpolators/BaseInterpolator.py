@@ -112,9 +112,9 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
         return self._config
 
     @property
-    def attr_name(self) -> str:
-        """Return the attribute name this interpolator processes."""
-        return self._pose_field.name
+    def pose_field(self) -> FrameField:
+        """Return the FrameField this interpolator processes."""
+        return self._pose_field
 
     def submit(self, pose: Frame) -> None:
         """Set target from pose. Call at input frequency (e.g., 30 FPS)."""
