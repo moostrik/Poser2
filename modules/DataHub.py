@@ -105,6 +105,11 @@ class DataHub:
         """Get a single pose frame for a specific stage and track."""
         return self.get_item(_FRAME_TYPES[stage], track_id)
 
+    def get_pose_count(self, stage: Stage) -> int:
+        """Get the number of active poses for a specific stage."""
+        with self.mutex:
+            return len(self._data.get(_FRAME_TYPES[stage], {}))
+
     # FEATURE WINDOW GETTERS (stored as _data[pose_window_X] = {track_id: {FrameField: FeatureWindow}})
     def get_feature_window(self, stage: Stage, field: FrameField, track_id: int) -> Any | None:
         """Get a single feature window for a specific stage, field, and track."""
