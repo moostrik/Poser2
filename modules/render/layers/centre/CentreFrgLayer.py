@@ -1,6 +1,10 @@
 """Renders centered and rotated foreground with temporal blending and optional mask."""
 
+# Standard library imports
+from dataclasses import dataclass
+
 # Local application imports
+from modules.ConfigBase import ConfigBase, config_field
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, Blend, MaskApply
@@ -9,16 +13,27 @@ from modules.gl import Fbo, SwapFbo, Texture
 from modules.utils import HotReloadMethods
 
 
+@dataclass
+class CentreFrgConfig(ConfigBase):
+    """Configuration for CentreFrgLayer foreground rendering."""
+    blend_factor: float = config_field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
+    mask_opacity: float = config_field(1.0, min=0.0, max=1.0, description="Foreground mask strength")
+    use_mask: bool = config_field(True, description="Apply mask to foreground")
+
+
 class CentreFrgLayer(LayerBase):
     """Renders foreground image cropped and rotated with temporal blending.
 
     Uses bbox_geometry for rendering. Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, geometry: CentreGeometry, frg_texture: Texture, mask_texture: Texture | None = None, mask_opacity: float = 1.0) -> None:
+    def __init__(self, geometry: CentreGeometry, frg_texture: Texture, mask_texture: Texture | None = None, config: CentreFrgConfig | None = None) -> None:
         self._geometry: CentreGeometry = geometry
         self._frg_texture: Texture = frg_texture
         self._mask_texture: Texture | None = mask_texture
+
+        # Configuration
+        self.config: CentreFrgConfig = config or CentreFrgConfig()
 
         # FBOs
         self._frg_fbo: Fbo = Fbo()
@@ -30,11 +45,6 @@ class CentreFrgLayer(LayerBase):
         self._roi_shader = DrawRoi()
         self._blend_shader = Blend()
         self._mask_shader = MaskApply()
-
-        # Configuration
-        self.blend_factor: float = 0.2
-        self.mask_opacity: float = mask_opacity
-        self.use_mask: bool = True
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
@@ -66,8 +76,9 @@ class CentreFrgLayer(LayerBase):
             self._frg_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._frg_blend_fbo.swap()
             self._frg_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            if self._mask_texture and self.use_mask:
+            if self._mask_texture and self.config.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
+            return
 
         if self._geometry.crop_pose_points is None:
             return
@@ -89,18 +100,18 @@ class CentreFrgLayer(LayerBase):
         self._blend_shader.use(
             self._frg_blend_fbo.back_texture,
             self._frg_fbo.texture,
-            self.blend_factor
+            self.config.blend_factor
         )
         self._frg_blend_fbo.end()
 
         # Apply mask if provided and enabled
-        if self._mask_texture and self.use_mask:
+        if self._mask_texture and self.config.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._masked_fbo.begin()
             self._mask_shader.use(
                 self._frg_blend_fbo.texture,
                 self._mask_texture,
-                self.mask_opacity
+                self.config.mask_opacity
             )
             self._masked_fbo.end()
             self._output_fbo = self._masked_fbo

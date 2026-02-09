@@ -1,6 +1,10 @@
 """Renders centered and rotated camera view based on pose anchor points with optional mask."""
 
+# Standard library imports
+from dataclasses import dataclass
+
 # Local application imports
+from modules.ConfigBase import ConfigBase, config_field
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import Blend, DrawRoi, MaskApply
@@ -10,6 +14,14 @@ from modules.gl import Fbo, SwapFbo, Texture, Style, clear_color
 
 from modules.utils import HotReloadMethods
 
+
+@dataclass
+class CentreCamConfig(ConfigBase):
+    """Configuration for CentreCamLayer camera rendering."""
+    blend_factor: float = config_field(0.5, min=0.0, max=1.0, description="Camera frame temporal blending")
+    mask_opacity: float = config_field(1.0, min=0.0, max=1.0, description="Mask alpha strength")
+    use_mask: bool = config_field(True, description="Apply mask to camera output")
+
 class CentreCamLayer(LayerBase):
     """Renders camera image cropped and rotated around pose anchor points.
 
@@ -17,10 +29,13 @@ class CentreCamLayer(LayerBase):
     followed by temporal blending. Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, geometry: CentreGeometry, cam_texture: Texture, mask_texture: Texture | None = None, mask_opacity: float = 1.0) -> None:
+    def __init__(self, geometry: CentreGeometry, cam_texture: Texture, mask_texture: Texture | None = None, config: CentreCamConfig | None = None) -> None:
         self._geometry: CentreGeometry = geometry
         self._cam_texture: Texture = cam_texture
         self._mask_texture: Texture | None = mask_texture
+
+        # Configuration
+        self.config: CentreCamConfig = config or CentreCamConfig()
 
         # FBOs
         self._cam_fbo: Fbo = Fbo()
@@ -32,11 +47,6 @@ class CentreCamLayer(LayerBase):
         self._roi_shader = DrawRoi()
         self._blend_shader = Blend()
         self._mask_shader = MaskApply()
-
-        # Configuration
-        self.blend_factor: float = 0.5
-        self.mask_opacity: float = mask_opacity
-        self.use_mask: bool = True  # Toggle for mask application
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
@@ -64,16 +74,13 @@ class CentreCamLayer(LayerBase):
 
     def update(self) -> None:
         """Render camera crop using anchor geometry, optionally with mask."""
-        # Disable blending during FBO rendering
-
-        self.blend_factor: float = 0.2
-
         if self._geometry.lost:
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._cam_blend_fbo.swap()
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            if self._mask_texture and self.use_mask:
+            if self._mask_texture and self.config.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
+            return
 
         if self._geometry.crop_pose_points is None:
             return
@@ -96,18 +103,18 @@ class CentreCamLayer(LayerBase):
         self._blend_shader.use(
             self._cam_blend_fbo.back_texture,
             self._cam_fbo.texture,
-            self.blend_factor
+            self.config.blend_factor
         )
         self._cam_blend_fbo.end()
 
         # Apply mask if provided and enabled
-        if self._mask_texture and self.use_mask:
+        if self._mask_texture and self.config.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._masked_fbo.begin()
             self._mask_shader.use(
                 self._cam_blend_fbo.texture,
                 self._mask_texture,
-                self.mask_opacity
+                self.config.mask_opacity
             )
             self._masked_fbo.end()
             self._output_fbo = self._masked_fbo

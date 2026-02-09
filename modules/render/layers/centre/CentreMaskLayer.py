@@ -1,9 +1,13 @@
 """Renders centered and rotated mask with temporal blending and blur."""
 
+# Standard library imports
+from dataclasses import dataclass
+
 # Third-party imports
 from OpenGL.GL import GL_R16F
 
 # Local application imports
+from modules.ConfigBase import ConfigBase, config_field
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur
@@ -11,12 +15,23 @@ from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.utils import HotReloadMethods
 
 
+@dataclass
+class CentreMaskConfig(ConfigBase):
+    """Configuration for CentreMaskLayer temporal blending and blur."""
+    blend_factor: float = config_field(0.2, min=0.0, max=1.0, description="Temporal blending strength (0=static, 1=instant)")
+    blur_steps: int = config_field(0, min=0, max=10, description="Number of blur iterations")
+    blur_radius: float = config_field(8.0, min=0.0, max=20.0, description="Blur kernel radius in pixels")
+
+
 class CentreMaskLayer(LayerBase):
     """Renders mask image cropped and rotated with temporal blending and blur."""
 
-    def __init__(self, geometry: CentreGeometry, cam_texture: Texture) -> None:
+    def __init__(self, geometry: CentreGeometry, cam_texture: Texture, config: CentreMaskConfig | None = None) -> None:
         self._geometry: CentreGeometry = geometry
         self._cam_texture: Texture = cam_texture
+
+        # Configuration
+        self.config: CentreMaskConfig = config or CentreMaskConfig()
 
         # FBOs
         self._mask_blend_fbo: SwapFbo = SwapFbo()
@@ -28,11 +43,6 @@ class CentreMaskLayer(LayerBase):
         self._mask_blend_shader = MaskBlend()
         self._mask_AA_shader = MaskAA()
         self._mask_blur_shader = MaskBlur()
-
-        # Configuration
-        self.blend_factor: float = 0.2
-        self.blur_steps: int = 0
-        self.blur_radius: float = 8.0
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
@@ -96,7 +106,7 @@ class CentreMaskLayer(LayerBase):
         self._mask_blend_shader.use(
             self._mask_blend_fbo.back_texture,
             self._temp_fbo.texture,
-            self.blend_factor
+            self.config.blend_factor
         )
         self._mask_blend_fbo.end()
 
@@ -106,13 +116,13 @@ class CentreMaskLayer(LayerBase):
         self._mask_blur_fbo.end()
 
         # Multi-pass blur
-        for i in range(self.blur_steps):
+        for i in range(self.config.blur_steps):
             self._mask_blur_fbo.swap()
             self._mask_blur_fbo.begin()
             self._mask_blur_shader.use(
                 self._mask_blur_fbo.back_texture,
                 True,
-                self.blur_radius
+                self.config.blur_radius
             )
             self._mask_blur_fbo.end()
 
@@ -121,7 +131,7 @@ class CentreMaskLayer(LayerBase):
             self._mask_blur_shader.use(
                 self._mask_blur_fbo.back_texture,
                 False,
-                self.blur_radius
+                self.config.blur_radius
             )
             self._mask_blur_fbo.end()
 

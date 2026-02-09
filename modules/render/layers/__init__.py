@@ -4,14 +4,14 @@ from .cam.BBoxRenderer import               BBoxRenderer
 from .cam.CamCompositeLayer import          CamCompositeLayer
 from .cam.TrackletRenderer import           TrackletRenderer
 
-from .centre.CentreGeometry import          CentreGeometry
-from .centre.CentreCamLayer import          CentreCamLayer
-from .centre.CentreMaskLayer import         CentreMaskLayer
-from .centre.CentreFrgLayer import          CentreFrgLayer
-from .centre.CentrePoseLayer import         CentrePoseLayer
-from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer
+from .centre.CentreGeometry import          CentreGeometry, CentreGeometryConfig
+from .centre.CentreCamLayer import          CentreCamLayer, CentreCamConfig
+from .centre.CentreMaskLayer import         CentreMaskLayer, CentreMaskConfig
+from .centre.CentreFrgLayer import          CentreFrgLayer, CentreFrgConfig
+from .centre.CentrePoseLayer import         CentrePoseLayer, CentrePoseConfig
+from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer, CentreDlowConfig
 
-from .data.DataLayerConfig import           DataLayerConfig
+from .data.DataLayerConfig import           DataLayerConfig, ScalarFrameField
 from .data.FeatureFrameLayer import         FeatureFrameLayer
 from .data.FeatureWindowLayer import        FeatureWindowLayer
 from .data.AngleVelLayer import             AngleVelLayer

@@ -1,10 +1,21 @@
 """Renders centered and rotated optical flow visualization with optional mask."""
 
+# Standard library imports
+from dataclasses import dataclass
+
 # Local application imports
+from modules.ConfigBase import ConfigBase, config_field
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskApply
 from modules.gl import Fbo, Texture, Style
+
+
+@dataclass
+class CentreDlowConfig(ConfigBase):
+    """Configuration for CentreDenseFlowLayer optical flow visualization."""
+    mask_opacity: float = config_field(1.0, min=0.0, max=1.0, description="Flow mask opacity")
+    use_mask: bool = config_field(True, description="Enable flow masking")
 
 
 class CentreDenseFlowLayer(LayerBase):
@@ -14,10 +25,13 @@ class CentreDenseFlowLayer(LayerBase):
     Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, geometry: CentreGeometry, flow_texture: Texture, mask_texture: Texture | None = None, mask_opacity: float = 1.0) -> None:
+    def __init__(self, geometry: CentreGeometry, flow_texture: Texture, mask_texture: Texture | None = None, config: CentreDlowConfig | None = None) -> None:
         self._geometry: CentreGeometry = geometry
         self._flow_texture: Texture = flow_texture
         self._mask_texture: Texture | None = mask_texture
+
+        # Configuration
+        self.config: CentreDlowConfig = config or CentreDlowConfig()
 
         # FBOs
         self._flow_fbo: Fbo = Fbo()
@@ -28,13 +42,10 @@ class CentreDenseFlowLayer(LayerBase):
         self._roi_shader = DrawRoi()
         self._mask_shader = MaskApply()
 
-        self.mask_opacity: float = mask_opacity
-        self.use_mask: bool = True  # Toggle for mask application
-
     @property
     def texture(self) -> Texture:
         """Output texture for external use."""
-        return self._output_fbo
+        return self._output_fbo.texture
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._flow_fbo.allocate(width, height, internal_format)
@@ -51,11 +62,11 @@ class CentreDenseFlowLayer(LayerBase):
 
     def update(self) -> None:
         """Render flow crop using anchor geometry, optionally with mask."""
-
         if self._geometry.lost:
             self._flow_fbo.clear()
-            if self._mask_texture and self.use_mask:
+            if self._mask_texture and self.config.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
+            return
 
         # Check if valid geometry exists
         if self._geometry.crop_pose_points is None:
@@ -73,13 +84,13 @@ class CentreDenseFlowLayer(LayerBase):
         self._flow_fbo.end()
 
         # Apply mask if provided and enabled
-        if self._mask_texture and self.use_mask:
+        if self._mask_texture and self.config.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._masked_fbo.begin()
             self._mask_shader.use(
-                self._flow_fbo,
+                self._flow_fbo.texture,
                 self._mask_texture,
-                self.mask_opacity
+                self.config.mask_opacity
             )
             self._masked_fbo.end()
             self._output_fbo = self._masked_fbo

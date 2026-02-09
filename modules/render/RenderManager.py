@@ -9,11 +9,10 @@ from OpenGL.GL import * # type: ignore
 from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color
 from modules.render.layers import LayerBase
 
-from modules.DataHub import DataHub, PoseDataHubTypes, DataHubType, Stage
+from modules.DataHub import DataHub, Stage, DataHubType, PoseDataHubTypes
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.Frame import FrameField
 from modules.render.Settings import Config, LayerMode
-from modules.render.layers.data.DataLayerConfig import DataLayerConfig, ScalarFrameField
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -138,7 +137,7 @@ SHOW_POSE: list[Layers] = [
 ]
 
 SHOW_MASK: list[Layers] = [
-    # Layers.cam_mask,
+    Layers.cam_mask,
     Layers.centre_mask,
     # Layers.centre_motion,
     Layers.centre_pose,
@@ -184,6 +183,20 @@ class RenderManager(RenderBase):
         # camera layers
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
+        # Shared configs for Centre layers
+        centre_geometry_config =    ls.CentreGeometryConfig(stage=Stage.LERP, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
+        centre_mask_config =        ls.CentreMaskConfig(    blend_factor=0.2, blur_steps=0, blur_radius=8.0)
+        centre_cam_config =         ls.CentreCamConfig(     blend_factor=0.5, mask_opacity=1.0, use_mask=True)
+        centre_frg_config =         ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
+        centre_pose_config =        ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
+        centre_denseflow_config =   ls.CentreDlowConfig(    mask_opacity=1.0, use_mask=True)
+
+        # Shared configs for Data layers
+        grey: list[tuple[float, float, float, float]] = [(0.5, 0.5, 0.5, 1.0)]
+        ff = ls.ScalarFrameField.angle_motion
+        data_A_config = ls.DataLayerConfig(active=False, feature_field=ff, stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
+        data_B_config = ls.DataLayerConfig(active=False, feature_field=ff, stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=grey)
+
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
@@ -202,30 +215,27 @@ class RenderManager(RenderBase):
             box_pose_S =    self.L[Layers.box_pose_S][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_S,    3.0, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
             box_pose_I =    self.L[Layers.box_pose_I][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I,    6.0, 0.0, True, False)
 
-            centre_math =   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,   PoseDataHubTypes.pose_I,    16/9)
-            centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_math,                                 cam_mask.texture)
-            centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_math,                                 cam_image.texture,  centre_mask.texture)
-            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_math,                                 cam_frg.texture, centre_mask.texture)
-            centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_math,                                 line_width=3.0, line_smooth=0.0, use_scores=False, color=COLORS[i % len(COLORS)])
-            centre_motion = self.L[Layers.centre_motion][i]=ls.MotionMultiply(      i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
-            centre_D_flow = self.L[Layers.centre_D_flow][i]=ls.CentreDenseFlowLayer(   centre_math,                                 dense_flow.texture, centre_mask.texture)
 
+            color: tuple[float, float, float, float] = COLORS[i % len(COLORS)]
+            centre_geometry=self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,       centre_geometry_config)
+            centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_geometry,     cam_mask.texture,   centre_mask_config)
+            centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_geometry,     cam_image.texture,  centre_mask.texture, centre_cam_config)
+            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_geometry,     cam_frg.texture,    centre_mask.texture, centre_frg_config)
+            centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_geometry,     color,              centre_pose_config)
+            centre_D_flow = self.L[Layers.centre_D_flow][i]=ls.CentreDenseFlowLayer(   centre_geometry,     dense_flow.texture, centre_mask.texture, centre_denseflow_config)
+
+            centre_motion = self.L[Layers.centre_motion][i]=ls.MotionMultiply(      i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
             flow =          self.L[Layers.flow][i] =        ls.FlowLayer(              sim_blend)
 
             gpu_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
 
-            # Data layers — all 6 pre-allocated per camera
-            # Slot A: default colors (from FEATURE_COLORS), default line params
-            # Slot B: white colors, doubled line params
-            WHITE: list[tuple[float, float, float, float]] = [(0.5, 0.5, 0.5, 1.0)]
-            ff = ScalarFrameField.angle_motion
-            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.SMOOTH, line_width=3.0, line_smooth=1.0))
-            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.SMOOTH, line_width=3.0, line_smooth=1.0))
-            self.L[Layers.data_A_AV][i] = ls.AngleVelLayer(     i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.SMOOTH, line_width=3.0, line_smooth=1.0))
-            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.LERP,   line_width=6.0, line_smooth=6.0,  colors=WHITE))
-            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.LERP,   line_width=6.0, line_smooth=6.0,  colors=WHITE))
-            self.L[Layers.data_B_AV][i] = ls.AngleVelLayer(     i, self.data_hub, DataLayerConfig(feature_field=ff, stage=Stage.LERP,   line_width=6.0, line_smooth=6.0,  colors=WHITE))
+            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, data_A_config)
+            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, data_A_config)
+            self.L[Layers.data_A_AV][i] = ls.AngleVelLayer(     i, self.data_hub, data_A_config)
+            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, data_B_config)
+            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, data_B_config)
+            self.L[Layers.data_B_AV][i] = ls.AngleVelLayer(     i, self.data_hub, data_B_config)
 
         # Bind data config to layer configs - propagates config changes automatically
         settings.bind(

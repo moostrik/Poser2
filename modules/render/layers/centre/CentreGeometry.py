@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
+from modules.ConfigBase import ConfigBase, config_field
+from modules.DataHub import DataHub, DataHubType, Stage
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.render.layers.LayerBase import LayerBase, DataCache
@@ -17,6 +18,18 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.gl import Texture
 
 from modules.utils.HotReloadMethods import HotReloadMethods
+
+
+@dataclass
+class CentreGeometryConfig(ConfigBase):
+    """Configuration for CentreGeometry anchor point positioning."""
+    stage: Stage = config_field(Stage.LERP, fixed=True, description="Pose data pipeline stage")
+    cam_aspect: float = config_field(1.7778, fixed=True, description="Camera aspect ratio (16/9 = 1.7778)")
+    target_top_x: float = config_field(0.5, min=0.0, max=1.0, description="Top anchor X position (normalized)")
+    target_top_y: float = config_field(0.33, min=0.0, max=1.0, description="Top anchor Y position (normalized)")
+    target_bottom_x: float = config_field(0.5, min=0.0, max=1.0, description="Bottom anchor X position (normalized)")
+    target_bottom_y: float = config_field(0.6, min=0.0, max=1.0, description="Bottom anchor Y position (normalized)")
+    dst_aspectratio: float = config_field(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
 
 
 @dataclass
@@ -44,12 +57,15 @@ class CentreGeometry(LayerBase):
     pose points to crop space.
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, cam_aspect: float) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, config: CentreGeometryConfig | None = None) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
-        self._data_type: PoseDataHubTypes = data_type
-        self._cam_aspect: float = cam_aspect
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
+
+        # Configuration
+        self.config: CentreGeometryConfig = config or CentreGeometryConfig()
+        self._stage: Stage = self.config.stage
+        self._cam_aspect: float = self.config.cam_aspect
 
         # Geometry results
         self._cam_geometry: CamGeometry = CamGeometry(
@@ -59,11 +75,6 @@ class CentreGeometry(LayerBase):
             Rect(0.0, 0.0, 1.0, 1.0), 0.0, Point2f(0.5, 0.5), 1.0
         )
         self._transformed_points: Points2D | None = None
-
-        # Configuration
-        self.target_top: Point2f = Point2f(0.5, 0.33)
-        self.target_bottom: Point2f = Point2f(0.5, 0.6)
-        self.dst_aspectratio: float = 9/16
 
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
@@ -104,7 +115,7 @@ class CentreGeometry(LayerBase):
     def update(self) -> None:
         """Calculate anchor points and derived geometry from current pose."""
         # Get pose data
-        pose: Frame | None = self._data_hub.get_item(DataHubType(self._data_type), self._cam_id)
+        pose: Frame | None = self._data_hub.get_pose(self._stage, self._cam_id)
         self._data_cache.update(pose)
         if self._data_cache.idle:
             return
@@ -112,6 +123,10 @@ class CentreGeometry(LayerBase):
         if pose is None:
             self._transformed_points = None
             return
+
+        # Reconstruct Point2f from config
+        target_top = Point2f(self.config.target_top_x, self.config.target_top_y)
+        target_bottom = Point2f(self.config.target_bottom_x, self.config.target_bottom_y)
 
         # Get current body landmarks (bbox-relative coordinates)
         shoulder_mid = CentreGeometry._get_midpoint(
@@ -134,9 +149,9 @@ class CentreGeometry(LayerBase):
         anchor_top_tex = CentreGeometry._image_to_texture_point(anchor_top_img)
 
         # Calculate camera-space geometry
-        target_distance: float = self.target_bottom.y - self.target_top.y
+        target_distance: float = target_bottom.y - target_top.y
         cam_rotation_img, distance, cam_crop_roi_img = CentreGeometry._calculate_roi(
-            anchor_top_img, anchor_bot_img, self.target_top, target_distance, self.dst_aspectratio
+            anchor_top_img, anchor_bot_img, target_top, target_distance, self.config.dst_aspectratio
         )
 
         # Store camera geometry (texture space)
@@ -163,8 +178,8 @@ class CentreGeometry(LayerBase):
         # Store bbox geometry
         self._bbox_geometry = BboxGeometry(
             crop_roi=Rect(
-                x=shoulder_mid.x - mask_width * self.target_top.x,
-                y=1.0 - shoulder_mid.y - mask_height * (1.0 - self.target_top.y),
+                x=shoulder_mid.x - mask_width * target_top.x,
+                y=1.0 - shoulder_mid.y - mask_height * (1.0 - target_top.y),
                 width=mask_width,
                 height=mask_height
             ),
