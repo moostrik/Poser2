@@ -1,14 +1,15 @@
 """ Draws camera image roi for a given pose frame """
 
 # Standard library imports
+from dataclasses import dataclass
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.DataHub import DataHub
+from modules.ConfigBase import ConfigBase, config_field
+from modules.DataHub import DataHub, Stage
 from modules.gl import Fbo, Texture, clear_color
-from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.layers.source import ImageSourceLayer
@@ -17,15 +18,19 @@ from modules.render.shaders import DrawRoi
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CamBBoxLayer(LayerBase):
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, cam_texture: Texture) -> None:
-        self._cam_id: int = cam_id
+@dataclass
+class CamCropLayerConfig(ConfigBase):
+    stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
+
+
+class CamCropLayer(LayerBase):
+    def __init__(self, track_id: int, data_hub: DataHub, cam_texture: Texture, config: CamCropLayerConfig | None = None) -> None:
+        self._config: CamCropLayerConfig = config or CamCropLayerConfig()
+        self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()
         self._cam_texture: Texture = cam_texture
         self._data_cache: DataCache[Frame]= DataCache[Frame]()
-
-        self.data_type: PoseDataHubTypes = data_type
 
         # Add DrawRoi shader
         self._roi_shader = DrawRoi()
@@ -45,7 +50,7 @@ class CamBBoxLayer(LayerBase):
         self._roi_shader.deallocate()
 
     def update(self) -> None:
-        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._cam_id)
+        pose: Frame | None = self._data_hub.get_pose(self._config.stage, self._track_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:

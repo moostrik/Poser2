@@ -36,13 +36,12 @@ class Layers(IntEnum):
     cam_crop =      auto()
 
     # bbox layers
-    box_cam =       auto()
-    box_pose_R =    auto()
-    box_pose_S =    auto()
-    box_pose_I =    auto()
+    bbox_cam =      auto()
+    bbox_bbox =     auto()
+    bbox_pose_A =   auto()
+    bbox_pose_B =   auto()
 
     # cam composite layers
-    cam_bbox =      auto()
     cam_track =     auto()
 
     # centre layers
@@ -87,7 +86,7 @@ UPDATE_LAYERS: list[Layers] = [
 
 INTERFACE_LAYERS: list[Layers] = [
     Layers.cam_track,
-    Layers.cam_bbox,
+    Layers.bbox_bbox,
 ]
 
 LARGE_LAYERS: list[Layers] = [
@@ -104,8 +103,10 @@ PREVIEW_CENTRE: list[Layers] = [
 ]
 
 SHOW_CAM: list[Layers] = [
-    Layers.cam_image,
-    Layers.cam_bbox,
+    Layers.cam_track
+    # Layers.cam_image,
+    # Layers.bbox_bbox,
+    # Layers.bbox_pose_A
     # Layers.cam_mask,
     # Layers.cam_frg,
 ]
@@ -119,10 +120,11 @@ SHOW_CENTRE: list[Layers] = [
 ]
 
 SHOW_POSE: list[Layers] = [
-    Layers.box_cam,
-    Layers.box_pose_R,
-    Layers.box_pose_S,
-    Layers.box_pose_I,
+    Layers.bbox_cam,
+    # Layers.cam_image,
+    # Layers.bbox_bbox,
+    Layers.bbox_pose_B,
+    Layers.bbox_pose_A,
 ]
 
 SHOW_MASK: list[Layers] = [
@@ -152,7 +154,7 @@ SHOW_DATA: list[Layers] = [
 
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_CENTRE
+FINAL_LAYERS: list[Layers] = SHOW_POSE
 
 class RenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Config) -> None:
@@ -180,27 +182,34 @@ class RenderManager(RenderBase):
         centre_pose_config =        ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
 
         # Shared configs for Data layers
-        grey: list[tuple[float, float, float, float]] = [(0.5, 0.5, 0.5, 1.0)]
+        grey: tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0)
         ff = ls.ScalarFrameField.angle_motion
         data_A_config = ls.DataLayerConfig(active=False, feature_field=ff, stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
-        data_B_config = ls.DataLayerConfig(active=False, feature_field=ff, stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=grey)
+        data_B_config = ls.DataLayerConfig(active=False, feature_field=ff, stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[grey])
 
+        # Shared configs for Cam layers
+        bbox_config =           ls.BBoxRendererConfig(      stage=Stage.LERP, line_width=2)
+        cam_composite_config =  ls.CamCompositeLayerConfig( stage=Stage.LERP, track_line_width=2.0, bbox_line_width=2)
+
+        # Shared configs for Pose renderers
+        pose_line_A_config =    ls.PoseLineLayerConfig(     stage=Stage.LERP, line_width=3.0, line_smooth=0.0, use_scores=True, use_bbox=False)
+        pose_line_B_config =    ls.PoseLineLayerConfig(     stage=Stage.RAW,  line_width=6.0, line_smooth=0.0, use_scores=True, use_bbox=False)
+        mtime_config =          ls.MTimeRendererConfig(     stage=Stage.LERP)
+        cam_crop_config =       ls.CamCropLayerConfig(      stage=Stage.LERP)
         for i in range(self.num_cams):
+            color: tuple[float, float, float, float] = COLORS[i % len(COLORS)]
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
             cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.data_hub)
 
-            cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxRenderer(        i, self.data_hub,   PoseDataHubTypes.pose_I)
-            cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=2.0)
-            mtime_data =    self.L[Layers.mtime_data][i] =  ls.MTimeRenderer(       i, self.data_hub,   PoseDataHubTypes.pose_I)
+            cam_comp =      self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub, cam_image.texture, cam_composite_config)
 
-            box_cam =       self.L[Layers.box_cam][i] =     ls.CamBBoxLayer(        i, self.data_hub,   PoseDataHubTypes.pose_I,    cam_image.texture)
-            box_pose_R =    self.L[Layers.box_pose_R][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_R,    3.0, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
-            box_pose_S =    self.L[Layers.box_pose_S][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_S,    3.0, 0.0, True, False, (1.0, 1.0, 1.0, 1.0))
-            box_pose_I =    self.L[Layers.box_pose_I][i] =  ls.PoseLineLayer(       i, self.data_hub,   PoseDataHubTypes.pose_I,    6.0, 0.0, True, False)
+            box_cam =       self.L[Layers.bbox_cam][i] =     ls.CamCropLayer(        i, self.data_hub, cam_image.texture, cam_crop_config)
+            bbox_bbox =     self.L[Layers.bbox_bbox][i] =    ls.BBoxRenderer(        i, self.data_hub, color,    bbox_config)
+            box_pose_A =    self.L[Layers.bbox_pose_A][i] =  ls.PoseLineLayer(       i, self.data_hub, color,    pose_line_A_config)
+            box_pose_B =    self.L[Layers.bbox_pose_B][i] =  ls.PoseLineLayer(       i, self.data_hub, grey,     pose_line_B_config)
 
 
-            color: tuple[float, float, float, float] = COLORS[i % len(COLORS)]
             centre_geometry=self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,       centre_geometry_config)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_geometry,     cam_mask.texture,   centre_mask_config)
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_geometry,     cam_image.texture,  centre_mask.texture, centre_cam_config)
@@ -219,6 +228,8 @@ class RenderManager(RenderBase):
             self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, data_B_config)
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, data_B_config)
             self.L[Layers.data_B_AV][i] = ls.AngleVelLayer(     i, self.data_hub, data_B_config)
+
+            mtime_data =    self.L[Layers.mtime_data][i] =  ls.MTimeRenderer(       i, self.data_hub, mtime_config)
 
         # Bind data config to layer configs - propagates config changes automatically
         settings.bind(
@@ -310,8 +321,7 @@ class RenderManager(RenderBase):
                 self.L[layer_type][i].draw()
 
             # DO TEST SETTINGS HERE
-            self.L[Layers.box_pose_R][i].color = (1.0, 0.0, 0.0, 1.0)    #type: ignore
-            self.L[Layers.box_pose_S][i].color = (0.0, 1.0, 0.0, 1.0)    #type: ignore
+            self.L[Layers.bbox_pose_A][i].color = (1.0, 0.0, 0.0, 1.0)    #type: ignore
             self.L[Layers.centre_cam][i].use_mask = True    #type: ignore
             self.L[Layers.centre_frg][i].use_mask = True    #type: ignore
             self.L[Layers.centre_mask][i].blur_steps = 0    #type: ignore

@@ -43,14 +43,14 @@ class DataHubType(IntEnum):
 
 # Stage → DataHubType lookup
 _FRAME_TYPES: dict[Stage, DataHubType] = {
-    Stage.RAW:          DataHubType.pose_frame_R,
-    Stage.SMOOTH:       DataHubType.pose_frame_S,
-    Stage.LERP: DataHubType.pose_frame_I,
+    Stage.RAW:      DataHubType.pose_frame_R,
+    Stage.SMOOTH:   DataHubType.pose_frame_S,
+    Stage.LERP:     DataHubType.pose_frame_I,
 }
 _WINDOW_TYPES: dict[Stage, DataHubType] = {
-    Stage.RAW:          DataHubType.pose_window_R,
-    Stage.SMOOTH:       DataHubType.pose_window_S,
-    Stage.LERP: DataHubType.pose_window_I,
+    Stage.RAW:      DataHubType.pose_window_R,
+    Stage.SMOOTH:   DataHubType.pose_window_S,
+    Stage.LERP:     DataHubType.pose_window_I,
 }
 
 # DEPRECATED: Use PipelineStage instead
@@ -95,6 +95,10 @@ class DataHub:
     def has_items_for_cam(self, data_type: DataHubType, cam_id: int) -> bool:
         """ this works on tracklets and poses """
         return any(self.get_filtered(data_type, lambda v: hasattr(v, "cam_id") and v.cam_id == cam_id))
+
+    def get_poses_for_cam(self, stage: Stage, cam_id: int) -> set[Any]:
+        """Get all pose frames for a specific stage that belong to a camera."""
+        return self.get_items_for_cam(_FRAME_TYPES[stage], cam_id)
 
     # POSE GETTERS
     def get_poses(self, stage: Stage) -> dict[int, Any]:

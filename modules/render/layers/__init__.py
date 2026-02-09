@@ -1,7 +1,7 @@
 from .LayerBase import                      LayerBase, Rect
 
-from .cam.BBoxRenderer import               BBoxRenderer
-from .cam.CamCompositeLayer import          CamCompositeLayer
+from .cam.BBoxRenderer import               BBoxRenderer, BBoxRendererConfig
+from .cam.CamCompositeLayer import          CamCompositeLayer, CamCompositeLayerConfig
 from .cam.TrackletRenderer import           TrackletRenderer
 
 from .centre.CentreGeometry import          CentreGeometry, CentreGeometryConfig
@@ -15,16 +15,16 @@ from .data.DataLayerConfig import           DataLayerConfig, ScalarFrameField
 from .data.FeatureFrameLayer import         FeatureFrameLayer
 from .data.FeatureWindowLayer import        FeatureWindowLayer
 from .data.AngleVelLayer import             AngleVelLayer
-from .data.MTimeRenderer import             MTimeRenderer
-from .data.PoseDotLayer import              PoseDotLayer
-from .data.PoseLineLayer import             PoseLineLayer
+from .data.MTimeRenderer import             MTimeRenderer, MTimeRendererConfig
+from .data.PoseDotLayer import              PoseDotLayer, PoseDotLayerConfig
+from .data.PoseLineLayer import             PoseLineLayer, PoseLineLayerConfig
 
 from .flow.FlowSourceLayer import           FlowSourceLayer
 from .flow.OpticalFlowLayer import          OpticalFlowLayer
 from .flow.FlowLayer import                 FlowLayer
 
 from .generic.MotionMultiply import         MotionMultiply
-from .generic.CamBBoxLayer import           CamBBoxLayer
+from .cam.CamCropLayer import               CamCropLayer, CamCropLayerConfig
 from .generic.HDTBlend import               SimilarityBlend
 
 from .source.DFlowSourceLayer import        DFlowSourceLayer

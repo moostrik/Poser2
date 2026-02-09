@@ -1,12 +1,14 @@
 """ Renders pose keypoints as dots into an offscreen buffer """
 
 # Standard library imports
+from dataclasses import dataclass
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
+from modules.ConfigBase import ConfigBase, config_field
+from modules.DataHub import DataHub, Stage
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
@@ -16,18 +18,21 @@ from modules.utils.PointsAndRects import Rect
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
+@dataclass
+class PoseDotLayerConfig(ConfigBase):
+    stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
+    dot_size: float = config_field(4.0, min=1.0, max=20.0, description="Dot size in pixels")
+    dot_smooth: float = config_field(2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")
+
+
 class PoseDotLayer(LayerBase):
-    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes,
-                 dot_size: float = 4.0, dot_smooth: float = 2.0,
-                 color: tuple[float, float, float, float] | None = None) -> None:
+    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseDotLayerConfig | None = None) -> None:
+        self._config: PoseDotLayerConfig = config or PoseDotLayerConfig()
         self._track_id: int = track_id
         self._data_hub: DataHub = data
         self._fbo: Fbo = Fbo()
         self._data_cache: DataCache[Frame]= DataCache[Frame]()
 
-        self.data_type: PoseDataHubTypes = data_type
-        self.dot_size: float = dot_size
-        self.dot_smooth: float = dot_smooth
         self.color: tuple[float, float, float, float] | None = color
 
         self._shader: shader = shader()
@@ -47,7 +52,7 @@ class PoseDotLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        pose: Frame | None = self._data_hub.get_item(DataHubType(self.data_type), self._track_id)
+        pose: Frame | None = self._data_hub.get_pose(self._config.stage, self._track_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:
@@ -56,8 +61,8 @@ class PoseDotLayer(LayerBase):
         if self._data_cache.idle or pose is None:
             return
 
-        dot_size: float = 1.0 / self._fbo.height * self.dot_size * 2
-        dot_smooth: float = 1.0 / self._fbo.height * self.dot_smooth * 2
+        dot_size: float = 1.0 / self._fbo.height * self._config.dot_size * 2
+        dot_smooth: float = 1.0 / self._fbo.height * self._config.dot_smooth * 2
 
         self._fbo.begin()
         clear_color()

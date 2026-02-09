@@ -1,9 +1,13 @@
 
+# Standard library imports
+from dataclasses import dataclass
+
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
+from modules.ConfigBase import ConfigBase, config_field
+from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.gl import Text
@@ -11,12 +15,17 @@ from modules.gl import Text
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
+@dataclass
+class MTimeRendererConfig(ConfigBase):
+    stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
+
+
 class MTimeRenderer(LayerBase):
-    def __init__(self, track_id: int, data: DataHub, data_type: PoseDataHubTypes) -> None:
+    def __init__(self, track_id: int, data: DataHub, config: MTimeRendererConfig | None = None) -> None:
+        self._config: MTimeRendererConfig = config or MTimeRendererConfig()
         self._data: DataHub = data
         self._track_id: int = track_id
         self._motion_time: str | None = None
-        self.data_type: PoseDataHubTypes = data_type
 
         # Text renderer for GPU-based text drawing (allocate later)
         self._text_renderer: Text = Text()
@@ -52,7 +61,7 @@ class MTimeRenderer(LayerBase):
         )
 
     def update(self) -> None:
-        pose: Frame | None = self._data.get_item(DataHubType(self.data_type), self._track_id)
+        pose: Frame | None = self._data.get_pose(self._config.stage, self._track_id)
 
         if pose is None:
             self._motion_time = None
