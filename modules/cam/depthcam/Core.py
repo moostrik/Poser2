@@ -203,8 +203,7 @@ class Core(Thread):
                     self._stereo_callback(msg)
                 else:
                     print('unknown message', name)
-        fps: float = self.fps_counters[FrameType.VIDEO].get_rate_average()
-        self._update_sync_callbacks(frames, fps)
+        self._update_sync_callbacks(frames, self.fps)
 
         self.cntr = self.cntr + 1
 
@@ -242,7 +241,10 @@ class Core(Thread):
         if not self.do_stereo and frame_type == FrameType.VIDEO:
             frames: dict[FrameType, ndarray] = {}
             frames[frame_type] = frame
-            self._update_sync_callbacks(frames, 30.0)
+            # print width and height of frames for debugging
+            for frame_type, frame in frames.items():
+                print(f"[DEBUG] cam {self.id} frame type: {frame_type}, shape: {frame.shape}")
+            self._update_sync_callbacks(frames, self.fps)
 
     def _update_sync_callbacks(self, frames: dict[FrameType, ndarray], fps: float) -> None:
         # if not self.running:
