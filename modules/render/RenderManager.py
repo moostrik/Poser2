@@ -41,12 +41,6 @@ class Layers(IntEnum):
     box_pose_S =    auto()
     box_pose_I =    auto()
 
-    # ALTERNATIVE FLOW LAYERS
-    dense_flow =    auto()
-    centre_D_flow = auto()
-    sparse_flow =   auto()
-    sparse_images = auto()
-
     # cam composite layers
     cam_bbox =      auto()
     cam_track =     auto()
@@ -82,18 +76,13 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.cam_crop,
 
     Layers.centre_math,
-    Layers.centre_cam,
+    # Layers.centre_cam,
     Layers.centre_mask,
     Layers.centre_frg,
     Layers.centre_pose,
+
     Layers.centre_motion,
-
     Layers.sim_blend,
-    # Layers.centre_D_flow,
-
-    # Layers.dense_flow,
-    # Layers.flow_images,
-    # Layers.sparse_flow,
 ]
 
 INTERFACE_LAYERS: list[Layers] = [
@@ -189,7 +178,6 @@ class RenderManager(RenderBase):
         centre_cam_config =         ls.CentreCamConfig(     blend_factor=0.5, mask_opacity=1.0, use_mask=True)
         centre_frg_config =         ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
         centre_pose_config =        ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
-        centre_denseflow_config =   ls.CentreDlowConfig(    mask_opacity=1.0, use_mask=True)
 
         # Shared configs for Data layers
         grey: list[tuple[float, float, float, float]] = [(0.5, 0.5, 0.5, 1.0)]
@@ -201,10 +189,6 @@ class RenderManager(RenderBase):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
             cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.data_hub)
-
-            sparse_images = self.L[Layers.sparse_images][i] =  ls.FlowSourceLayer(  i, self.data_hub)
-            sparse_flow =   self.L[Layers.sparse_flow][i] = ls.OpticalFlowLayer(       sparse_images)
-            dense_flow =    self.L[Layers.dense_flow][i] =  ls.DFlowSourceLayer(    i, self.data_hub)
 
             cam_bbox =      self.L[Layers.cam_bbox][i] =    ls.BBoxRenderer(        i, self.data_hub,   PoseDataHubTypes.pose_I)
             cam_track =     self.L[Layers.cam_track][i] =   ls.CamCompositeLayer(   i, self.data_hub,   PoseDataHubTypes.pose_R,    cam_image.texture, line_width=2.0)
@@ -222,7 +206,6 @@ class RenderManager(RenderBase):
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_geometry,     cam_image.texture,  centre_mask.texture, centre_cam_config)
             centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_geometry,     cam_frg.texture,    centre_mask.texture, centre_frg_config)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_geometry,     color,              centre_pose_config)
-            centre_D_flow = self.L[Layers.centre_D_flow][i]=ls.CentreDenseFlowLayer(   centre_geometry,     dense_flow.texture, centre_mask.texture, centre_denseflow_config)
 
             centre_motion = self.L[Layers.centre_motion][i]=ls.MotionMultiply(      i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
