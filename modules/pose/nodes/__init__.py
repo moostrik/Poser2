@@ -9,6 +9,7 @@ from .extractors.MotionTimeExtractor import     MotionTimeExtractor
 
 from .applicators.SimilarityApplicator import   SimilarityApplicator
 from .applicators.LeaderScoreApplicator import  LeaderScoreApplicator
+from .applicators.MotionGateApplicator import   MotionGateApplicator, MotionGateApplicatorConfig
 
 from .filters.ConfidenceFilters import          ConfidenceFilterConfig,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelConfidenceFilter,   AngleSymConfFilter
 from .filters.DualConfidenceFilters import      DualConfFilterConfig,       BBoxDualConfFilter,     PointDualConfFilter,    AngleDualConfFilter,    AngleVelDualConfFilter,     AngleSymDualConfidenceFilter

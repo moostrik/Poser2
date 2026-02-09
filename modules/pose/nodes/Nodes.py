@@ -99,6 +99,6 @@ class ProcessorNode(NodeBase, Generic[TInput, TOutput]):
         pass
 
     @abstractmethod
-    def process(self, pose: Frame) -> tuple[Frame, TOutput]: # see if we can remove Pose from output
+    def process(self, pose: Frame) -> tuple[Frame, TOutput]:
         """Process pose using stored context to produce derived output."""
         pass

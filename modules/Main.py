@@ -119,6 +119,7 @@ class Main():
         # Feature applicators (replace SimilarityExtractor)
         self.similarity_applicator = nodes.SimilarityApplicator(max_poses=settings.pose.max_poses)
         self.leader_applicator =     nodes.LeaderScoreApplicator(max_poses=settings.pose.max_poses)
+        self.motion_gate_applicator = nodes.MotionGateApplicator(nodes.MotionGateApplicatorConfig(max_poses=settings.pose.max_poses))
 
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
@@ -241,8 +242,15 @@ class Main():
         self.data_hub.add_update_callback(self.interpolator.update)
         self.pose_prediction_filters.add_poses_callback(self.interpolator.submit)
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
-        self.pose_interpolation_pipeline.add_poses_callback(partial(self.data_hub.set_poses, Stage.LERP))
-        self.pose_interpolation_pipeline.add_poses_callback(self.window_tracker_I.process)
+
+        # MOTION GATE (after interpolation pipeline, before DataHub)
+        def apply_motion_gate(frames: dict) -> None:
+            self.motion_gate_applicator.submit(frames)
+            enriched_frames = {tid: self.motion_gate_applicator.process(f) for tid, f in frames.items()}
+            self.data_hub.set_poses(Stage.LERP, enriched_frames)
+            self.window_tracker_I.process(enriched_frames)
+
+        self.pose_interpolation_pipeline.add_poses_callback(apply_motion_gate)
         self.window_tracker_I.add_callback(partial(self.data_hub.set_feature_windows, Stage.LERP))
 
         # SIMILARITY COMPUTATION

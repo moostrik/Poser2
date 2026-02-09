@@ -45,14 +45,19 @@ FEATURE_COLORS: dict[FrameField, list[tuple[float, float, float, float]]] = {
     FrameField.angle_sym:       DEFAULT_COLORS,
     FrameField.similarity:      SIMILARITY_COLORS,
     FrameField.leader:          SIMILARITY_COLORS,
+    FrameField.motion_gate:     SIMILARITY_COLORS,
 }
+
+
+# Scalar fields only - for data visualization dropdown
+SCALAR_FIELDS: list[FrameField] = FrameField.get_scalar_fields()
 
 
 @dataclass
 class DataLayerConfig(ConfigBase):
     """Unified configuration for data visualization layers."""
     active: bool =              config_field(False)
-    feature_field: FrameField = config_field(FrameField.angle_motion)
+    feature_field: FrameField = config_field(FrameField.angle_motion, choices=SCALAR_FIELDS)
     stage: Stage =              config_field(Stage.SMOOTH)
 
     line_width: float =         config_field(3.0)
