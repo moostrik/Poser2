@@ -79,17 +79,9 @@ class InterpolatorNode(NodeBase):
         pass
 
     @abstractmethod
-    def update(self, time_stamp: float | None = None) -> Frame | None:
+    def update(self) -> Frame | None:
         """Get interpolated pose. Called at render frequency (~60+ FPS). Returns None if not ready."""
         pass
-
-    @property
-    @abstractmethod
-    def attr_name(self) -> str:
-        """Return the attribute name this interpolator processes, or None if not applicable."""
-        pass
-
-
 
 
 class ProcessorNode(NodeBase, Generic[TInput, TOutput]):

@@ -16,9 +16,6 @@ and makes sure the last_pose always corresponds to interpolator's last set targe
 """
 
 # Standard library imports
-from dataclasses import replace
-from threading import Lock
-from time import monotonic
 from collections import defaultdict
 from typing import cast
 
@@ -28,17 +25,16 @@ import numpy as np
 # Pose imports
 from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, AngleSymmetry
 from modules.pose.nodes._utils.ArrayChase import AngleChase, PointChase, Chase
-from modules.pose.nodes.Nodes import InterpolatorNode, NodeConfigBase
-from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase
+from modules.pose.nodes.interpolators.BaseInterpolator import FeatureInterpolatorBase, InterpolatorConfigBase
 from modules.pose.Frame import Frame, FrameField
 
 
-class ChaseInterpolatorConfig(NodeConfigBase):
+class ChaseInterpolatorConfig(InterpolatorConfigBase):
     """Configuration for pose chase interpolation with automatic change notification."""
 
-    def __init__(self, input_frequency: float = 30.0, responsiveness: float = 0.2, friction: float = 0.03) -> None:
-        super().__init__()
-        self.input_frequency: float = input_frequency
+    def __init__(self, input_frequency: float = 30.0, output_frequency: float = 60.0,
+                 responsiveness: float = 0.2, friction: float = 0.03) -> None:
+        super().__init__(input_frequency, output_frequency)
         self.responsiveness: float = responsiveness
         self.friction: float = friction
 
@@ -75,6 +71,7 @@ class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorConfig])
             cast(Chase, self._interpolator).input_frequency = self._config.input_frequency
             cast(Chase, self._interpolator).responsiveness = self._config.responsiveness
             cast(Chase, self._interpolator).friction = self._config.friction
+            self._output_interval = 1.0 / self._config.output_frequency
 
 
 # Convenience classes

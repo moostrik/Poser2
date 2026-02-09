@@ -26,8 +26,25 @@ from modules.pose.features import PoseFeatureType, Angles, BBox, Points2D, Angle
 from modules.pose.nodes.Nodes import InterpolatorNode, NodeConfigBase
 from modules.pose.Frame import Frame, FrameField
 
+
+class InterpolatorConfigBase(NodeConfigBase):
+    """Base config for interpolators with input/output frequency settings."""
+
+    def __init__(self, input_frequency: float = 30.0, output_frequency: float = 60.0) -> None:
+        super().__init__()
+        if output_frequency < input_frequency:
+            import warnings
+            warnings.warn(
+                f"output_frequency ({output_frequency}) < input_frequency ({input_frequency}). "
+                "Interpolators are designed to upsample, not downsample.",
+                RuntimeWarning
+            )
+        self.input_frequency: float = input_frequency
+        self.output_frequency: float = output_frequency
+
+
 # Generic type variable for config
-ConfigType = TypeVar('ConfigType', bound=NodeConfigBase)
+ConfigType = TypeVar('ConfigType', bound=InterpolatorConfigBase)
 
 
 class InterpolatorProtocol(Protocol):
@@ -37,8 +54,8 @@ class InterpolatorProtocol(Protocol):
         """Set new target values."""
         ...
 
-    def update(self, current_time: float | None = None) -> None:
-        """Update interpolated values."""
+    def update(self, dt: float) -> None:
+        """Update interpolated values by time delta."""
         ...
 
     @property
@@ -64,6 +81,7 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
         self._pose_field: FrameField = pose_field
         self._lock: Lock = Lock()
         self._last_pose: Frame | None = None
+        self._output_interval: float = 1.0 / config.output_frequency
         self._interpolator: InterpolatorProtocol = self._create_interpolator()
         self._config.add_listener(self._on_config_changed)
 
@@ -106,8 +124,10 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
             self._interpolator.set_target(feature_data.values)
             self._last_pose = pose
 
-    def update(self, time_stamp: float | None = None) -> Frame | None:
+    def update(self) -> Frame | None:
         """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS).
+
+        Uses the configured output_frequency to determine the time delta.
 
         Returns:
             Interpolated pose, or None if submit() has not been called yet.
@@ -117,12 +137,12 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
                 return None
             last_pose = self._last_pose
 
-            self._interpolator.update(time_stamp)
+            self._interpolator.update(self._output_interval)
             interpolated_values: np.ndarray = self._interpolator.value
 
         feature_data = last_pose.get_feature(self._pose_field)
         interpolated_data = self._create_interpolated_data(feature_data, interpolated_values)
-        return replace(last_pose, **{self._pose_field.name: interpolated_data}, time_stamp=time_stamp)
+        return replace(last_pose, **{self._pose_field.name: interpolated_data})
 
     def _create_interpolated_data(self, original_data: PoseFeatureType,
                                  interpolated_values: np.ndarray) -> PoseFeatureType:

@@ -24,12 +24,10 @@ Note: These classes are NOT thread-safe by design.
 
 
 # Standard library imports
-from time import monotonic
 from typing import Union
 
 # Third-party imports
 import numpy as np
-import warnings
 
 class Chase:
     """Chase interpolator for arbitrary vector data (positions, coordinates, etc.)."""
@@ -85,8 +83,6 @@ class Chase:
         self._inv_friction: float = 1.0 - friction
         self._clamp_range: tuple[float, float] | None = clamp_range
 
-        self._last_update_time: float | None = None
-
         self._target: np.ndarray = np.full(vector_size, np.nan)
         self._interpolated: np.ndarray = np.full(vector_size, np.nan)
 
@@ -95,8 +91,6 @@ class Chase:
 
     def reset(self) -> None:
         """Reset the interpolator's internal state."""
-        self._last_update_time = None
-
         self._target = np.full(self._vector_size, np.nan)
         self._interpolated = np.full(self._vector_size, np.nan)
 
@@ -189,11 +183,11 @@ class Chase:
             self._interpolated[state_changed] = values[state_changed]
             self._v_curr[state_changed] = 0.0
 
-    def update(self, current_time: float | None = None) -> None:
-        """Update the interpolated value for the current time.
+    def update(self, dt: float) -> None:
+        """Update the interpolated value by a time delta.
 
         This method should be called at the render frequency (e.g., every display frame).
-        It advances the interpolation based on elapsed time using the perpetual chase algorithm:
+        It advances the interpolation using the perpetual chase algorithm:
 
         1. Calculate target velocity: v_target = (target - current) / input_interval
            This represents "how fast to move to reach target in one input period"
@@ -212,26 +206,15 @@ class Chase:
         The magic: By recalculating v_target every frame based on current distance,
         the system naturally decelerates as it approaches the target. This creates
         smooth adaptive easing without explicit easing curves.
-        """
 
+        Args:
+            dt: Time delta in seconds since last update (e.g., 1/60 for 60 FPS output).
+        """
         if np.all(np.isnan(self._target)):
             return
 
-        if current_time is None:
-            current_time = monotonic()
-
-        # Initialize on first update
-        if self._last_update_time is None:
-            self._last_update_time = current_time
+        if dt <= 0:
             return
-
-        if current_time <= self._last_update_time:
-            if current_time < self._last_update_time:
-                warnings.warn("Interpolator received out-of-order time update.", RuntimeWarning)
-            return  # Skip update for non-positive dt
-
-        dt: float = current_time - self._last_update_time
-        self._last_update_time = current_time
 
         # Calculate target velocity (PID Proportional term)
         self._v_target = self._calculate_velocity(self._interpolated, self._target, self._input_interval)

@@ -12,9 +12,7 @@ Note: These classes are NOT thread-safe by design.
 """
 
 # Standard library imports
-from time import monotonic
 from typing import Union
-import warnings
 
 # Third-party imports
 import numpy as np
@@ -59,8 +57,7 @@ class Lerp:
         self._input_interval: float = 1.0 / input_frequency
         self._clamp_range: tuple[float, float] | None = clamp_range
 
-        self._last_update_time: float | None = None
-        self._lerp_start_time: float | None = None
+        self._elapsed: float = 0.0
 
         self._start_values: np.ndarray = np.full(vector_size, np.nan)
         self._target: np.ndarray = np.full(vector_size, np.nan)
@@ -68,8 +65,7 @@ class Lerp:
 
     def reset(self) -> None:
         """Reset the interpolator's internal state."""
-        self._last_update_time = None
-        self._lerp_start_time = None
+        self._elapsed = 0.0
         self._start_values = np.full(self._vector_size, np.nan)
         self._target = np.full(self._vector_size, np.nan)
         self._interpolated = np.full(self._vector_size, np.nan)
@@ -126,42 +122,27 @@ class Lerp:
             self._interpolated[newly_valid] = values[newly_valid]
             self._start_values[newly_valid] = values[newly_valid]
 
-        # Reset lerp timing
-        self._lerp_start_time = self._last_update_time
+        # Reset elapsed time for new lerp
+        self._elapsed = 0.0
 
-    def update(self, current_time: float | None = None) -> None:
-        """Update the interpolated value for the current time.
+    def update(self, dt: float) -> None:
+        """Update the interpolated value by a time delta.
 
         Performs linear interpolation: interpolated = start + (target - start) * t
         where t is the progress through the input interval [0.0, 1.0].
 
         Args:
-            current_time: Optional timestamp. Uses monotonic() if not provided.
+            dt: Time delta in seconds since last update (e.g., 1/60 for 60 FPS output).
         """
         if np.all(np.isnan(self._target)):
             return
 
-        if current_time is None:
-            current_time = monotonic()
-
-        # Initialize on first update
-        if self._last_update_time is None:
-            self._last_update_time = current_time
-            self._lerp_start_time = current_time
+        if dt <= 0:
             return
 
-        if current_time < self._last_update_time:
-            warnings.warn("Interpolator received out-of-order time update.", RuntimeWarning)
-            return
-
-        self._last_update_time = current_time
-
-        # Calculate interpolation progress
-        if self._lerp_start_time is None:
-            self._lerp_start_time = current_time
-
-        elapsed = current_time - self._lerp_start_time
-        t = min(elapsed / self._input_interval, 1.0)  # Clamp to [0, 1]
+        # Accumulate elapsed time and calculate progress
+        self._elapsed += dt
+        t = min(self._elapsed / self._input_interval, 1.0)  # Clamp to [0, 1]
 
         # Linear interpolation: lerp(a, b, t) = a + (b - a) * t
         self._interpolated = self._start_values + (self._target - self._start_values) * t
@@ -217,8 +198,8 @@ class AngleLerp(Lerp):
             self._start_values[newly_valid] = values[newly_valid]
             self._target[newly_valid] = values[newly_valid]
 
-        # Reset lerp timing
-        self._lerp_start_time = self._last_update_time
+        # Reset elapsed time for new lerp
+        self._elapsed = 0.0
 
     def _apply_constraints(self) -> None:
         """Apply angular wrapping to [-π, π]."""
