@@ -184,7 +184,6 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
 
         return similarity_dict, leader_dict
 
-
     def _stack_windows(self, windows: WindowDict) -> tuple[list[int], np.ndarray]:
         """Stack all windows into (N, T, F) tensor.
 

@@ -15,7 +15,7 @@ if "%ERRORLEVEL%"=="0" (
 set "CURRENT_DIR=%~dp0"
 
 echo Opening Main App
-start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" launcher.py
+start "" "%CURRENT_DIR%.venv\Scripts\python.exe" launcher.py
 timeout /t 2 /nobreak >nul
 
 @REM echo Press any key to continue . . .

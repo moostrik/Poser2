@@ -5,6 +5,43 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import os
 os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
 
+import sys
+from datetime import datetime
+from pathlib import Path
+
+# Tee class to write output to both console and log file
+class Tee:
+    def __init__(self, console, log_file):
+        self.console = console
+        self.log_file = log_file  # Binary unbuffered file
+
+    def write(self, data):
+        self.console.write(data)
+        self.log_file.write(data.encode('utf-8'))
+        return len(data)
+
+    def flush(self):
+        self.console.flush()
+        self.log_file.flush()
+
+# Setup logging to file with timestamp
+log_dir = Path(__file__).parent / "logs"
+log_dir.mkdir(exist_ok=True)
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+log_file = log_dir / f"poser_{timestamp}.log"
+
+# Binary unbuffered - writes immediately to disk, survives crashes
+log_handle = open(log_file, 'wb', buffering=0)
+
+# Save original stdout/stderr
+original_stdout = sys.stdout
+original_stderr = sys.stderr
+
+sys.stdout = Tee(original_stdout, log_handle)
+sys.stderr = Tee(original_stderr, log_handle)
+
+print(f"Logging to: {log_file}")
+
 
 
 from threading import Event
@@ -83,7 +120,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     while not app.is_finished and not shutdown_event.is_set():
         shutdown_event.wait(0.01)
-
 
     # Hard Exit for a problem that arises from GLFW not closing properly
     from os import _exit

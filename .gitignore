@@ -3,6 +3,7 @@ cache/
 BACKUP/
 .venv/
 recordings/*
+logs/*
 files/audio/UMU*
 RobustVideoMatting/*
 ofxFlowTools_new/*
