@@ -99,9 +99,9 @@ SHOW_POSE: list[Layers] = [
 
 SHOW_CENTRE: list[Layers] = [
     # Layers.centre_cam,
-    # Layers.centre_frg,
-    # Layers.centre_mask,
-    Layers.centre_motion,
+    Layers.centre_frg,
+    Layers.centre_mask,
+    # Layers.centre_motion,
     Layers.centre_pose,
 ]
 
@@ -114,8 +114,9 @@ SHOW_MASK: list[Layers] = [
 ]
 
 SHOW_COMP: list[Layers] = [
+    Layers.centre_motion,
     Layers.flow,
-    Layers.sim_blend,
+    # Layers.sim_blend,
     Layers.centre_pose,
     # Layers.cam_frg,
 ]
@@ -133,7 +134,7 @@ SHOW_DATA: list[Layers] = [
 
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_CENTRE + SHOW_DATA
+FINAL_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
 
 class RenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Config) -> None:
@@ -153,8 +154,8 @@ class RenderManager(RenderBase):
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
         # configs
-        self.tracker_comp_config =  ls.TrackerCompositorConfig( stage=Stage.LERP, pose_line_width=2.0, bbox_line_width=2)
-        self.pose_comp_config =     ls.PoseCompositorConfig(stage=Stage.LERP, line_width=2.0, line_smooth=0.0, use_gpu_crop=True)
+        self.tracker_comp_config =  ls.TrackerCompConfig(   stage=Stage.LERP, pose_line_width=2.0, bbox_line_width=2)
+        self.pose_comp_config =     ls.PoseCompConfig(      stage=Stage.LERP, line_width=2.0, line_smooth=0.0, use_gpu_crop=True)
 
         self.centre_gmtr_config=    ls.CentreGeometryConfig(stage=Stage.LERP, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
         self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.3, blur_steps=0, blur_radius=1.0, dilation_steps=0)
@@ -162,9 +163,9 @@ class RenderManager(RenderBase):
         self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
         self.centre_pose_config =   ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
 
-        self.data_A_config =        ls.DataLayerConfig(stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
-        self.data_B_config =        ls.DataLayerConfig(stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[HISTORY_COLOR])
-        self.data_time_config =     ls.MTimeRendererConfig(     stage=Stage.LERP)
+        self.data_A_config =        ls.DataLayerConfig(     stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
+        self.data_B_config =        ls.DataLayerConfig(     stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[HISTORY_COLOR])
+        self.data_time_config =     ls.MTimeRendererConfig( stage=Stage.LERP)
 
         for i in range(self.num_cams):
             color: tuple[float, float, float, float] = TRACK_COLORS[i % len(TRACK_COLORS)]
@@ -184,7 +185,7 @@ class RenderManager(RenderBase):
 
             centre_motion = self.L[Layers.centre_motion][i]=ls.MotionMultiply(      i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
             sim_blend =     self.L[Layers.sim_blend][i] =   ls.SimilarityBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.MotionMultiply], self.L[Layers.centre_motion]))
-            flow =          self.L[Layers.flow][i] =        ls.FlowLayer(              sim_blend)
+            flow =          self.L[Layers.flow][i] =        ls.FlowLayer(              centre_mask)
 
 
             self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, self.data_A_config)

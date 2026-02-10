@@ -17,15 +17,15 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class TrackerCompositorConfig(ConfigBase):
+class TrackerCompConfig(ConfigBase):
     stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
     pose_line_width: float = config_field(1.0, min=0.5, max=10.0, description="Pose line width")
     bbox_line_width: int = config_field(2, min=1, max=10, description="Bounding box line width in pixels")
 
 
 class TrackerCompositor(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, cam_texture: Texture, bbox_a_color: tuple[float, float, float, float], bbox_b_color: tuple[float, float, float, float], config: TrackerCompositorConfig | None = None) -> None:
-        self._config: TrackerCompositorConfig = config or TrackerCompositorConfig()
+    def __init__(self, cam_id: int, data: DataHub, cam_texture: Texture, bbox_a_color: tuple[float, float, float, float], bbox_b_color: tuple[float, float, float, float], config: TrackerCompConfig | None = None) -> None:
+        self._config: TrackerCompConfig = config or TrackerCompConfig()
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data
         self._fbo: Fbo = Fbo()

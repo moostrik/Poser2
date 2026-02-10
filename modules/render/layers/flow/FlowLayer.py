@@ -3,6 +3,7 @@
 # Standard library imports
 from enum import IntEnum, auto
 from dataclasses import dataclass, field
+from turtle import width
 
 
 # Third-party imports
@@ -10,7 +11,7 @@ from OpenGL.GL import *  # type: ignore
 
 # Local application imports
 from modules.gl import Texture, Style
-from modules.render.layers.LayerBase import LayerBase, Rect
+from modules.render.layers.LayerBase import LayerBase, Rect, Blit
 
 from modules.flow import (
     FlowBase,
@@ -61,36 +62,13 @@ class FlowDrawMode(IntEnum):
     FLUID_BUOYANCY = auto()
     FLUID_OBSTACLE = auto()
 
-DRAW_MODE_BLEND_MODES: dict[FlowDrawMode, Style.BlendMode] = {
-    FlowDrawMode.OPTICAL_INPUT:                 Style.BlendMode.DISABLED,
-    FlowDrawMode.OPTICAL_OUTPUT:                Style.BlendMode.ADDITIVE,
-    FlowDrawMode.SMOOTH_VELOCITY_INPUT:         Style.BlendMode.DISABLED,
-    FlowDrawMode.SMOOTH_VELOCITY_OUTPUT:        Style.BlendMode.ADDITIVE,
-    FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE:     Style.BlendMode.ADDITIVE,
-    FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR:    Style.BlendMode.DISABLED,
-    FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: Style.BlendMode.ADDITIVE,
-    FlowDrawMode.DENSITY_BRIDGE_OUTPUT:         Style.BlendMode.DISABLED,
-    FlowDrawMode.TEMP_BRIDGE_INPUT_COLOR:       Style.BlendMode.DISABLED,
-    FlowDrawMode.TEMP_BRIDGE_INPUT_MASK:        Style.BlendMode.ADDITIVE,
-    FlowDrawMode.TEMP_BRIDGE_OUTPUT:            Style.BlendMode.DISABLED,
-
-    # Fluid simulation blend modes
-    FlowDrawMode.FLUID_VELOCITY:                Style.BlendMode.ADDITIVE,
-    FlowDrawMode.FLUID_DENSITY:                 Style.BlendMode.DISABLED,
-    FlowDrawMode.FLUID_PRESSURE:                Style.BlendMode.ADDITIVE,
-    FlowDrawMode.FLUID_TEMPERATURE:             Style.BlendMode.ADDITIVE,
-    FlowDrawMode.FLUID_DIVERGENCE:              Style.BlendMode.ADDITIVE,
-    FlowDrawMode.FLUID_VORTICITY:               Style.BlendMode.ADDITIVE,
-    FlowDrawMode.FLUID_BUOYANCY:                Style.BlendMode.ADDITIVE,
-    FlowDrawMode.FLUID_OBSTACLE:                Style.BlendMode.DISABLED,
-}
-
 
 @dataclass
 class FlowConfig:
     """Configuration for unified FlowLayer."""
     fps: float = 60.0
     draw_mode: FlowDrawMode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
+    blend_mode: Style.BlendMode = Style.BlendMode.ADDITIVE
     field_mode: bool = False  # False=scalar/direction, True=arrow field
     simulation_scale: float = 0.25
 
@@ -157,8 +135,8 @@ class FlowLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        """Smoothed velocity output (RG32F)."""
-        return self._velocity_trail.velocity
+        """Visualization output texture."""
+        return self._visualizer.texture
 
     # ========== Lifecycle Methods ==========
 
@@ -209,7 +187,7 @@ class FlowLayer(LayerBase):
         self.config.visualisation.spacing = 20 # in pixels
         self.config.visualisation.element_length = 40.0 # in pixels
         self.config.visualisation.scale = 1.0
-        self.config.visualisation.toggle_scalar = True
+        self.config.visualisation.toggle_scalar = False
 
         self.config.optical_flow.offset = 3
         self.config.optical_flow.threshold = 0.01
@@ -248,9 +226,9 @@ class FlowLayer(LayerBase):
 
 
         # self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
-        # self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
+        self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_INPUT
-        # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
+        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY
@@ -258,8 +236,8 @@ class FlowLayer(LayerBase):
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_MASK
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
-        self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
-        self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
+        # self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
+        # self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
         # self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
         # self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
         # self.config.draw_mode = FlowDrawMode.FLUID_DIVERGENCE
@@ -322,21 +300,24 @@ class FlowLayer(LayerBase):
         # Update fluid simulation
         self._fluid_flow.update(self._delta_time)
 
+        # Update visualization (FBO operations)
+        self._visualizer.update(self._get_draw_texture())
+
+        self.config.blend_mode = Style.BlendMode.DISABLED
 
         Style.pop_style()
 
     # ========== Rendering ==========
 
     def draw(self) -> None:
-
-        """Draw flow visualization based on draw_mode."""
+        """Draw with configured blend mode."""
         Style.push_style()
-        Style.set_blend_mode(DRAW_MODE_BLEND_MODES.get(self.config.draw_mode, Style.BlendMode.DISABLED))
-        self._visualizer.draw(self._get_draw_texture())
-
-
-
+        Style.set_blend_mode(self.config.blend_mode)
+        if self.texture.allocated:
+            Blit.use(self.texture)
         Style.pop_style()
+
+    # ========== Texture Selection ==========
 
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""

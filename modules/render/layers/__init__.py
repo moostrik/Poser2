@@ -2,8 +2,8 @@ from .LayerBase import                      LayerBase, Rect
 
 from .cam.BBoxRenderer import               BBoxRenderer, BBoxRendererConfig
 from .cam.PoseRenderer import               PoseRenderer, PoseRendererConfig
-from .cam.PoseCompositor import             PoseCompositor, PoseCompositorConfig
-from .cam.TrackerCompositor import          TrackerCompositor, TrackerCompositorConfig
+from .cam.PoseCompositor import             PoseCompositor, PoseCompConfig
+from .cam.TrackerCompositor import          TrackerCompositor, TrackerCompConfig
 from .cam.TrackletRenderer import           TrackletRenderer
 
 from .centre.CentreGeometry import          CentreGeometry, CentreGeometryConfig
@@ -23,7 +23,7 @@ from .data.PoseLineLayer import             PoseLineLayer, PoseLineConfig
 
 from .flow.FlowSourceLayer import           FlowSourceLayer
 from .flow.OpticalFlowLayer import          OpticalFlowLayer
-from .flow.FlowLayer import                 FlowLayer
+from .flow.FlowLayer import                 FlowLayer, FlowConfig
 
 from .generic.MotionMultiply import         MotionMultiply
 from .cam.CropLayer import                  CropLayer, CropConfig

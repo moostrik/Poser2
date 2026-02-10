@@ -20,7 +20,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
-class PoseCompositorConfig(ConfigBase):
+class PoseCompConfig(ConfigBase):
     stage: Stage = config_field(Stage.LERP, description="Pipeline stage for camera crop", fixed=True)
     line_width: float = config_field(3.0, min=0.5, max=20.0, description="Base line width (multiplied per stage)")
     line_smooth: float = config_field(0.0, min=0.0, max=10.0, description="Base line smoothing (multiplied per stage)")
@@ -28,8 +28,8 @@ class PoseCompositorConfig(ConfigBase):
 
 
 class PoseCompositor(LayerBase):
-    def __init__(self, track_id: int, data: DataHub, cam_texture: Texture, track_color: tuple[float, float, float, float], config: PoseCompositorConfig | None = None) -> None:
-        self._config: PoseCompositorConfig = config or PoseCompositorConfig()
+    def __init__(self, track_id: int, data: DataHub, cam_texture: Texture, track_color: tuple[float, float, float, float], config: PoseCompConfig | None = None) -> None:
+        self._config: PoseCompConfig = config or PoseCompConfig()
         self._track_id: int = track_id
         self._fbo: Fbo = Fbo()
 
