@@ -10,7 +10,7 @@ from modules.gl import Tensor, Texture
 
 from modules.DataHub import DataHub, DataHubType
 from modules.render.layers.LayerBase import LayerBase, DataCache
-from modules.pose.batch.GPUFrame import GPUFrame
+from modules.pose.batch.ImageFrame import ImageFrame
 
 
 class ImageSourceLayer(LayerBase):
@@ -18,7 +18,7 @@ class ImageSourceLayer(LayerBase):
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data
         self._cuda_image: Tensor = Tensor()
-        self._data_cache: DataCache[GPUFrame]= DataCache[GPUFrame]()
+        self._data_cache: DataCache[ImageFrame]= DataCache[ImageFrame]()
 
 
     @property
@@ -30,7 +30,7 @@ class ImageSourceLayer(LayerBase):
             self._cuda_image.deallocate()
 
     def update(self) -> None:
-        gpu_frame: GPUFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._cam_id)
+        gpu_frame: ImageFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._cam_id)
         self._data_cache.update(gpu_frame)
 
         if self._data_cache.lost:

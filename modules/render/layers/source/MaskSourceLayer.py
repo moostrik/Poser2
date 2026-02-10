@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
 from modules.gl import Tensor, Texture
-from modules.pose.batch.GPUFrame import GPUFrame
+from modules.pose.batch.ImageFrame import ImageFrame
 from modules.render.layers.LayerBase import LayerBase, DataCache
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -40,7 +40,7 @@ class MaskSourceLayer(LayerBase):
         self._cuda_image.deallocate()
 
     def update(self) -> None:
-        gpu_frame: GPUFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
+        gpu_frame: ImageFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
         mask_tensor: torch.Tensor | None = gpu_frame.mask if gpu_frame else None
         self._data_cache.update(mask_tensor)
 

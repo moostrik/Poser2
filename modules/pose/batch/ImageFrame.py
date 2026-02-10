@@ -10,7 +10,7 @@ from modules.pose.Frame import FrameDict
 
 
 @dataclass(frozen=True)
-class GPUFrame:
+class ImageFrame:
     """GPU-resident frame data for a single tracklet.
 
     Contains the full source image and a cropped region on GPU memory.
@@ -37,5 +37,5 @@ class GPUFrame:
 
 
 # Type aliases
-GPUFrameDict = dict[int, GPUFrame]
-GPUFrameCallback = Callable[[FrameDict, GPUFrameDict], None]
+ImageFrameDict = dict[int, ImageFrame]
+ImageFrameCallback = Callable[[FrameDict, ImageFrameDict], None]

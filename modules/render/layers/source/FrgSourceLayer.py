@@ -7,7 +7,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
 from modules.gl import Tensor, SwapFbo, Texture, Blit
-from modules.pose.batch.GPUFrame import GPUFrame
+from modules.pose.batch.ImageFrame import ImageFrame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import MaskDilate
 
@@ -33,7 +33,7 @@ class FrgSourceLayer(LayerBase):
         self._cuda_image.deallocate()
 
     def update(self) -> None:
-        gpu_frame: GPUFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
+        gpu_frame: ImageFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
         foreground: torch.Tensor | None = gpu_frame.foreground if gpu_frame else None
         self._data_cache.update(foreground)
 

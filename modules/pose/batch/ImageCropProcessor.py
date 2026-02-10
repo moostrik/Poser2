@@ -12,7 +12,7 @@ import torch.nn.functional as F
 # Local application imports
 from modules.pose.features import BBox
 from modules.pose.Frame import FrameDict
-from modules.pose.batch.GPUFrame import GPUFrame, GPUFrameDict, GPUFrameCallback
+from modules.pose.batch.ImageFrame import ImageFrame, ImageFrameDict, ImageFrameCallback
 from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 
@@ -20,7 +20,7 @@ from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class GPUCropProcessorConfig:
+class ImageCropConfig:
     """Configuration for GPU-based image cropping."""
 
     def __init__(self, expansion_width: float = 0.0, expansion_height: float = 0.0, output_width: int = 384, output_height: int = 512, max_poses: int = 4, enable_prev_crop: bool = True, verbose: bool = False) -> None:
@@ -33,7 +33,7 @@ class GPUCropProcessorConfig:
         self.verbose: bool = verbose
 
 
-class GPUCropProcessor:
+class ImageCropProcessor:
     """GPU-based batch processor for cropping images based on pose bounding boxes.
 
     Uploads full frames to GPU once, then performs all cropping and resizing on GPU.
@@ -45,20 +45,20 @@ class GPUCropProcessor:
     Full frames are stored as float16 RGB CHW [0,1].
     """
 
-    def __init__(self, config: GPUCropProcessorConfig) -> None:
+    def __init__(self, config: ImageCropConfig) -> None:
         """Initialize GPU crop processor.
 
         Args:
             config: Configuration for GPU crop processor
         """
-        self._config: GPUCropProcessorConfig = config
+        self._config: ImageCropConfig = config
 
         # Per-camera GPU frame storage (float32 BGR [0,1])
         self._gpu_images: dict[int, torch.Tensor] = {}  # cam_id -> full frame on GPU
         self._prev_gpu_images: dict[int, torch.Tensor] = {}  # cam_id -> previous frame on GPU
 
         # Callbacks
-        self._callbacks: set[GPUFrameCallback] = set()
+        self._callbacks: set[ImageFrameCallback] = set()
 
         # Create dedicated CUDA stream for crop operations
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
@@ -114,7 +114,7 @@ class GPUCropProcessor:
         start = time.perf_counter()
 
         cropped_poses: FrameDict = {}
-        gpu_frames: GPUFrameDict = {}
+        gpu_frames: ImageFrameDict = {}
 
         # Clean up previous images for lost tracks
         lost_ids = set(self._prev_gpu_images.keys()) - set(poses.keys())
@@ -158,7 +158,7 @@ class GPUCropProcessor:
                     cropped_poses[pose_id] = replace(pose, bbox=BBox.from_rect(normalized_roi))
 
                     # Build GPUFrame with PyTorch tensors
-                    gpu_frames[pose_id] = GPUFrame(
+                    gpu_frames[pose_id] = ImageFrame(
                         track_id=pose_id,
                         full_image=gpu_image,  # float16 RGB CHW [0,1]
                         crop=crop_tensor,       # float16 RGB CHW [0,1]
@@ -175,7 +175,7 @@ class GPUCropProcessor:
             pose_cam_ids = {pose.cam_id if hasattr(pose, 'cam_id') else pose_id for pose_id, pose in poses.items()}
             for cam_id, gpu_image in self._gpu_images.items():
                 if cam_id not in pose_cam_ids and cam_id not in gpu_frames:
-                    gpu_frames[cam_id] = GPUFrame(
+                    gpu_frames[cam_id] = ImageFrame(
                         track_id=cam_id,
                         full_image=gpu_image,
                         crop=None  # No crop without bbox
@@ -269,11 +269,11 @@ class GPUCropProcessor:
         # Keep CHW format (deep learning standard)
         return crop_chw
 
-    def add_callback(self, callback: GPUFrameCallback) -> None:
+    def add_callback(self, callback: ImageFrameCallback) -> None:
         """Register callback to receive cropped poses and GPU frames."""
         self._callbacks.add(callback)
 
-    def remove_callback(self, callback: GPUFrameCallback) -> None:
+    def remove_callback(self, callback: ImageFrameCallback) -> None:
         """Unregister callback."""
         self._callbacks.discard(callback)
 

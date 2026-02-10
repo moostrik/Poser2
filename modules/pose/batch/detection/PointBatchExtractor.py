@@ -1,7 +1,7 @@
 from dataclasses import replace
 from threading import Lock
 from typing import Union
-from modules.pose.batch.GPUFrame import GPUFrameDict
+from modules.pose.batch.ImageFrame import ImageFrameDict
 from modules.pose.features import Points2D
 from modules.pose.callback.mixins import PoseDictCallbackMixin
 from modules.pose.Frame import FrameDict
@@ -52,7 +52,7 @@ class PointBatchExtractor(PoseDictCallbackMixin):
         """Stop the detection processing thread."""
         self._detection.stop()
 
-    def process(self, poses: FrameDict, gpu_frames: GPUFrameDict) -> None:
+    def process(self, poses: FrameDict, gpu_frames: ImageFrameDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:

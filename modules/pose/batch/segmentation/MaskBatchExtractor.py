@@ -5,7 +5,7 @@ from typing import Union
 
 import torch
 
-from modules.pose.batch.GPUFrame import GPUFrame, GPUFrameDict, GPUFrameCallback
+from modules.pose.batch.ImageFrame import ImageFrame, ImageFrameDict, ImageFrameCallback
 from modules.pose.Frame import FrameDict
 from modules.pose.Settings import Settings, ModelType
 from modules.utils.PerformanceTimer import PerformanceTimer
@@ -44,11 +44,11 @@ class MaskBatchExtractor:
         self._verbose: bool = settings.verbose
 
         # Callbacks
-        self._callbacks: set[GPUFrameCallback] = set()
+        self._callbacks: set[ImageFrameCallback] = set()
         self._callback_lock: Lock = Lock()
 
         # Pending frames awaiting segmentation results, keyed by batch_id
-        self._pending_frames: dict[int, tuple[FrameDict, GPUFrameDict]] = {}
+        self._pending_frames: dict[int, tuple[FrameDict, ImageFrameDict]] = {}
 
         # Track active tracklet IDs for detecting removed tracklets
         self._previous_tracklet_ids: set[int] = set()
@@ -67,7 +67,7 @@ class MaskBatchExtractor:
         """Stop the segmentation processing thread."""
         self._segmentation.stop()
 
-    def process(self, poses: FrameDict, gpu_frames: GPUFrameDict) -> None:
+    def process(self, poses: FrameDict, gpu_frames: ImageFrameDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:
@@ -125,7 +125,7 @@ class MaskBatchExtractor:
         self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
 
         # Create updated GPUFrameDict with masks attached
-        result_frames: GPUFrameDict = {}
+        result_frames: ImageFrameDict = {}
         for idx, tracklet_id in enumerate(output.tracklet_ids):
             if tracklet_id in gpu_frames and idx < output.mask_tensor.shape[0]:
                 mask = output.mask_tensor[idx]  # (H, W) tensor on GPU
@@ -144,7 +144,7 @@ class MaskBatchExtractor:
         # Broadcast to callbacks
         self._notify_callbacks(poses, result_frames)
 
-    def _notify_callbacks(self, poses: FrameDict, gpu_frames: GPUFrameDict) -> None:
+    def _notify_callbacks(self, poses: FrameDict, gpu_frames: ImageFrameDict) -> None:
         """Emit callbacks with poses and GPU frames."""
         with self._callback_lock:
             for callback in self._callbacks:
@@ -154,12 +154,12 @@ class MaskBatchExtractor:
                     print(f"{self.__class__.__name__}: Error in callback: {e}")
                     print_exc()
 
-    def add_callback(self, callback: GPUFrameCallback) -> None:
+    def add_callback(self, callback: ImageFrameCallback) -> None:
         """Register callback to receive poses and GPU frames with masks."""
         with self._callback_lock:
             self._callbacks.add(callback)
 
-    def remove_callback(self, callback: GPUFrameCallback) -> None:
+    def remove_callback(self, callback: ImageFrameCallback) -> None:
         """Unregister callback."""
         with self._callback_lock:
             self._callbacks.discard(callback)

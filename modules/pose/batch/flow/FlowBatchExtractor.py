@@ -5,7 +5,7 @@ from typing import Union
 import torch
 
 from modules.pose.callback.mixins import TypedCallbackMixin
-from modules.pose.batch.GPUFrame import GPUFrameDict
+from modules.pose.batch.ImageFrame import ImageFrameDict
 from modules.pose.Frame import FrameDict
 from modules.pose.Settings import Settings, ModelType
 from modules.utils.PerformanceTimer import PerformanceTimer
@@ -57,7 +57,7 @@ class FlowBatchExtractor(TypedCallbackMixin[dict[int, torch.Tensor]]):
         """Stop the optical flow processing thread."""
         self._optical_flow.stop()
 
-    def process(self, poses: FrameDict, gpu_frames: GPUFrameDict) -> None:
+    def process(self, poses: FrameDict, gpu_frames: ImageFrameDict) -> None:
         """Submit batch for async processing. Results broadcast via callbacks.
 
         Args:

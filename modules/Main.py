@@ -74,7 +74,7 @@ class Main():
 
         # POSE CONFIGURATION
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
-        self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=768, output_height=1024, max_poses=settings.pose.max_poses, verbose=False, enable_prev_crop=False)
+        self.gpu_crop_config =      batch.ImageCropConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=768, output_height=1024, max_poses=settings.pose.max_poses, verbose=False, enable_prev_crop=False)
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
@@ -107,7 +107,7 @@ class Main():
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
 
-        self.gpu_crop_processor =   batch.GPUCropProcessor(self.gpu_crop_config)
+        self.gpu_crop_processor =   batch.ImageCropProcessor(self.gpu_crop_config)
         self.point_extractor =      batch.PointBatchExtractor(settings.pose)  # GPU-based 2D point extractor
         self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
