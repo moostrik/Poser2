@@ -7,8 +7,7 @@ from dataclasses import dataclass, field
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Texture, Blit
-from modules.utils.PointsAndRects import Rect
+from modules.gl import Texture
 
 from .. import FlowUtil
 from .BaseField import VisualisationFieldConfig
@@ -37,6 +36,8 @@ class Visualizer:
         self.velocity_field: VelocityField = VelocityField(self._config)
 
         self._allocated: bool = False
+        self._current_texture: Texture | None = None
+        self._use_velocity_field: bool = False
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -59,31 +60,44 @@ class Visualizer:
         """Deallocate all resources."""
         self.velocity_field.deallocate()
         self._allocated = False
+        self._current_texture = None
 
-    def draw(self, texture: Texture) -> None:
-        """Auto-detect format and draw appropriately."""
+    @property
+    def texture(self) -> Texture:
+        """Output texture (velocity field FBO or passthrough)."""
+        if self._use_velocity_field:
+            return self.velocity_field.texture
+        elif self._current_texture is not None:
+            return self._current_texture
+        else:
+            raise RuntimeError("Visualizer: no texture available, call update() first")
+
+    def update(self, texture: Texture) -> None:
+        """Process texture for visualization (FBO operations happen here)."""
         if not self._allocated or not texture.allocated:
+            self._current_texture = None
+            self._use_velocity_field = False
             return
+
+        self._current_texture = texture
 
         # Get texture format
         num_channels = FlowUtil.get_num_channels(texture.internal_format)  # type: ignore
 
         # Visualize 2-channel velocity data (RG32F)
         # Always visualized since raw output can contain negatives
-        # Use velocity_field.config.toggle_scalar to switch modes
         if num_channels <= 2:
+            self._use_velocity_field = True
             # Sync scale with velocity visualization
             self.velocity_field.config.scale = self._config.scale
 
-            # Render visualization
+            # Render visualization to FBO
             self.velocity_field.set(texture)
             self.velocity_field.update()
-            self.velocity_field.draw()
-
-        # Direct draw for RGB/RGBA (3-4 channels) or R (1 channel)
         else:
-            Blit.use(texture)
+            # RGB/RGBA (3-4 channels): passthrough, no FBO needed
+            self._use_velocity_field = False
 
     def _on_config_changed(self) -> None:
         """Handle config changes."""
-        pass  # Config changes are applied during draw()
+        pass  # Config changes are applied during update()
