@@ -116,11 +116,11 @@ class DensityBridge(FlowBase):
         super().reset()
         FlowUtil.zero(self._velocity_fbo)
 
-    def update(self, delta_time: float = 1.0) -> None:
+    def update(self, speed: float = 1.0) -> None:
         """Update density bridge processing.
 
         Args:
-            delta_time: Unused (kept for FlowBase compatibility)
+            speed: Speed multiplier for alpha
         """
         if not self._allocated:
             return
@@ -130,7 +130,7 @@ class DensityBridge(FlowBase):
         self._density_bridge_shader.use(
             self._input,                    # Density RGB from input_fbo
             self._velocity_fbo.texture,    # Pre-smoothed velocity
-            1.0                             # Speed multiplier for alpha
+            speed                             # Speed multiplier for alpha
         )
         self._output_fbo.end()
 

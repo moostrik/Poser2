@@ -14,7 +14,7 @@ FrameWidget = sg.Frame
 BASEHEIGHT = 40
 ELEMHEIGHT = 20  # Standard element height
 SLIDERHEIGHT = 30  # Slider elements are taller
-FRAMEWIDTH = 700
+FRAMEWIDTH = 600
 
 class eType(Enum):
     NONE = 0
@@ -78,10 +78,10 @@ def Element(type: eType, key: str, callback=None, value: bool| int | float | str
         element = sg.Checkbox(text = display_text, key = key, default = bool(value), metadata = callback, enable_events=enable_events, disabled=disabled)
 
     elif type == eType.SLDR:
-        if size == (None, None): size = (20, 8)
+        if size == (None, None): size = (16, 8)
         element = sg.Slider(key = key, default_value = value,  range = range,  resolution = resolution,
                              expand_x=expand, orientation='h', metadata = callback,
-                             enable_events=enable_events, disabled=disabled, size = (20,8))
+                             enable_events=enable_events, disabled=disabled, size = (16,8))
     elif type == eType.ITXT :
         if size == (None, None): size = (10,1)
         # Disable live events - only trigger callback on Return key or focus loss
@@ -200,15 +200,15 @@ class Gui(Thread):
 
     def start(self) -> None:
         elem = []
-        elem.append([Element(eType.TEXT, '© Matthias Oostrik 2025')])
-        autograph = Frame('TITLE', elem, 90)
+        elem.append([Element(eType.TEXT, '© Matthias Oostrik 2026')])
+        autograph = Frame('TITLE', elem, 60)
         elem = []
         elem.append([Element(eType.BTTN, 'Exit', self.call_exit_callback),
                      Element(eType.TEXT, ' '),
                      Element(eType.CMBO, 'SettingsFile', self.set_settings_name, self.defaultSettingsName, self.get_setting_names()),
                      Element(eType.BTTN, 'Save', self.saveSettings),
                      Element(eType.BTTN, 'Load', self.loadSettings)])
-        frame = Frame('APP', elem, 90)
+        frame = Frame('APP', elem, 60)
         self.addFrame([autograph, frame])
 
         self.window: sg.Window | None = None

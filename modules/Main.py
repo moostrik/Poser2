@@ -103,6 +103,10 @@ class Main():
 
         self.motion_smooth_config = nodes.EmaSmootherConfig(attack=0.95, release=0.8)
         self.motion_smooth_gui =    guis.EmaSmootherGui(self.motion_smooth_config, self.gui, 'MOTION')
+        self.motion_easing_config = nodes.EasingConfig(easing_name='easeInOutSine')
+        self.motion_easing_gui =    guis.EasingGui(self.motion_easing_config, self.gui, 'MOTION_EASE')
+        self.motion_extractor_config = nodes.AngleMotionExtractorConfig(noise_threshold=0.05, max_threshold=0.5)
+        self.motion_extractor_gui = guis.AngleMotionExtractorGui(self.motion_extractor_config, self.gui, 'MOTION_EXT')
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
@@ -157,7 +161,9 @@ class Main():
                 lambda: nodes.AngleVelEuroSmoother(self.angle_smooth_config),
                 lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
                 # lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=False)),
-                nodes.AngleMotionExtractor,
+                lambda: nodes.AngleMotionExtractor(self.motion_extractor_config),
+                lambda: nodes.AngleMotionEmaSmoother(self.motion_smooth_config),
+                lambda: nodes.AngleMotionEasingNode(self.motion_easing_config),
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
@@ -200,8 +206,9 @@ class Main():
                 nodes.AgeExtractor,
                 lambda: nodes.AngleVelStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
                 lambda: nodes.AngleVelEuroSmoother(self.a_vel_smooth_config),
-                nodes.AngleMotionExtractor,
+                lambda: nodes.AngleMotionExtractor(self.motion_extractor_config),
                 lambda: nodes.AngleMotionEmaSmoother(self.motion_smooth_config),
+                lambda: nodes.AngleMotionEasingNode(self.motion_easing_config),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
             ]
         )
@@ -296,27 +303,26 @@ class Main():
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
         self.gui.exit_callback = self.stop
 
-        for i in range(ceil(len(self.cameras) / 2.0)):
-            c: int = i * 2
-            if c + 1 < len(self.cameras):
+        for i in range(ceil(len(self.cameras) / 3.0)):
+            c: int = i * 3
+            if c + 2 < len(self.cameras):
+                self.gui.addFrame([self.cameras[c].gui.get_gui_frame(), self.cameras[c+1].gui.get_gui_frame(), self.cameras[c+2].gui.get_gui_frame()])
+            elif c + 1 < len(self.cameras):
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame(), self.cameras[c+1].gui.get_gui_frame()])
             else:
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
-        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame(), self.data_gui.frame])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.a_vel_smooth_gui.get_gui_frame()])
-        self.gui.addFrame([self.motion_smooth_gui.get_gui_frame(), self.window_similarity_gui.get_gui_frame()])
-        self.gui.addFrame([self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
-        self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame])
-        self.gui.addFrame([self.artnet_guis[2].frame, self.timer_gui.frame])
-        self.gui.addFrame([self.data_gui.frame])
-
+        self.gui.addFrame([self.motion_extractor_gui.get_gui_frame(), self.motion_smooth_gui.get_gui_frame(), self.motion_easing_gui.get_gui_frame()])
+        self.gui.addFrame([self.window_similarity_gui.get_gui_frame(), self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame, self.artnet_guis[2].frame])
         if self.player:
-            self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])
+            self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.timer_gui.frame])
         if self.recorder:
-            self.gui.addFrame([self.recorder.get_gui_frame(), self.tracker.gui.get_gui_frame()])
+            self.gui.addFrame([self.recorder.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.timer_gui.frame])
         self.gui.start()
         self.gui.bringToFront()
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI

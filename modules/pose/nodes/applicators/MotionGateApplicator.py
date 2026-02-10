@@ -5,7 +5,6 @@ from threading import Lock
 import numpy as np
 
 from modules.pose.features.MotionGate import MotionGate, configure_motion_gate
-from modules.pose.features.base.NormalizedScalarFeature import AggregationMethod
 from modules.pose.nodes.Nodes import FilterNode, NodeConfigBase
 from modules.pose.Frame import Frame, FrameDict
 
@@ -49,7 +48,7 @@ class MotionGateApplicator(FilterNode):
         motion_values: dict[int, float] = {}
         for track_id, frame in frames.items():
             if frame.angle_motion is not None:
-                motion = frame.angle_motion.aggregate(AggregationMethod.MAX)
+                motion = frame.angle_motion.value
                 motion_values[track_id] = motion if not np.isnan(motion) else 0.0
             else:
                 motion_values[track_id] = 0.0

@@ -2,7 +2,7 @@
 
 from .extractors.AngleExtractor import          AngleExtractor
 from .extractors.AngleVelExtractor import       AngleVelExtractor
-from .extractors.AngleMotionExtractor import    AngleMotionExtractor
+from .extractors.AngleMotionExtractor import    AngleMotionExtractor, AngleMotionExtractorConfig
 from .extractors.AngleSymExtractor import       AngleSymExtractor
 from .extractors.AgeExtractor import            AgeExtractor
 from .extractors.MotionTimeExtractor import     MotionTimeExtractor
@@ -18,6 +18,7 @@ from .filters.EmaSmoothers import               EmaSmootherConfig,  BBoxEmaSmoot
 from .filters.EuroSmoothers import              EuroSmootherConfig, BBoxEuroSmoother,   PointEuroSmoother,  AngleEuroSmoother,  AngleVelEuroSmoother,   AngleSymEuroSmoother,   SimilarityEuroSmoother
 from .filters.StickyFillers import              StickyFillerConfig, BBoxStickyFiller,   PointStickyFiller,  AngleStickyFiller,  AngleVelStickyFiller,   AngleSymStickyFiller,   SimilarityStickyFiller
 from .filters.RateLimiters import               RateLimiterConfig,  BBoxRateLimiter,    PointRateLimiter,   AngleRateLimiter,   AngleVelRateLimiter,    AngleSymRateLimiter,    SimilarityRateLimiter,  AngleMotionRateLimiter
+from .filters.EasingNode import                 EasingConfig,       EasingNode,         AngleMotionEasingNode
 from .filters.TemporalFilters import            TemporalStabilizerConfig,   BBoxTemporalStabilizer, PointTemporalStabilizer,    AngleTemporalStabilizer,    AngleVelTemporalStabilizer, AngleSymTemporalStabilizer
 from .filters.Validators import                 ValidatorConfig,    BBoxValidator,      PointValidator,     AngleValidator,     AngleVelValidator,      AngleSymValidator,      PoseValidator
 

@@ -1,9 +1,8 @@
-from enum import IntEnum
-import numpy as np
 from modules.pose.features.Angles import AngleLandmark
-from modules.pose.features import NormalizedScalarFeature
+from modules.pose.features.base.NormalizedSingleValue import NormalizedSingleValue
 
 
+# Joint-specific normalization weights (higher = more sensitive)
 ANGLE_MOTION_NORMALISATION: dict[AngleLandmark, float] = {
     AngleLandmark.left_shoulder:   1.0,
     AngleLandmark.right_shoulder:  1.0,
@@ -17,10 +16,10 @@ ANGLE_MOTION_NORMALISATION: dict[AngleLandmark, float] = {
 }
 
 
+class AngleMotion(NormalizedSingleValue):
+    """Single normalized motion value representing overall body movement intensity.
 
-class AngleMotion(NormalizedScalarFeature[AngleLandmark]):
-    """Angular velocities for body landmarks (radians/sec, unbounded)."""
-
-    @classmethod
-    def enum(cls) -> type[IntEnum]:
-        return AngleLandmark
+    Value range: [0.0, 1.0] where 0 = no motion, 1 = maximum motion.
+    Computed as the max of weighted per-joint angular velocities.
+    """
+    pass

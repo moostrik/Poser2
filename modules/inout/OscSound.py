@@ -11,7 +11,6 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.Frame import Frame
 from modules.pose.features.Angles import AngleLandmark
-from modules.pose.features.AngleSymmetry import SymmetryElement, AggregationMethod
 
 from modules.DataHub import DataHub, DataHubType, Stage
 from modules.ConfigBase import ConfigBase
@@ -278,8 +277,8 @@ class OscSound:
             if pid not in poses:
                 motions[pid] = 0.0
             else:
-                motion = poses[pid].angle_motion.aggregate(AggregationMethod.MAX)
-                motions[pid] = min(1.0, motion * 1.5)
+                # Motion value is already normalized [0,1] and eased by pipeline
+                motions[pid] = poses[pid].angle_motion.value
 
         similarity_values: list[float] = np.nan_to_num(pose.similarity.values, nan=0.0).tolist()
         other_ids = [i for i in range(3) if i != id]  # Hardcoded to first 3 poses

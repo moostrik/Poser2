@@ -4,7 +4,6 @@
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
-from pytweening import *    # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
@@ -13,7 +12,6 @@ from modules.gl import Fbo, Texture, Blit, Style, clear_color
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import MaskApply as shader, Tint
 
-from modules.pose.features import AggregationMethod
 from modules.pose.Frame import Frame
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -94,24 +92,8 @@ class MotionMultiply(LayerBase):
         cam = self._centre_mask
         mask = self._centre_mask  # MotionMultiply currently doesn't use mask separately
 
-
-
-        motion: float = pose.angle_motion.aggregate(AggregationMethod.MAX)
-        # motion = float(np.nansum(pose.angle_motion.values))
-        m_values = pose.angle_motion.values
-        # for i in AngleLandmark:
-        #     if m_values[i] >= 1.0:
-        #         print(AngleLandmark(i).name, m_values[i])
-                # motion -= m_values.values[i]
-
-        # print(f"Motion value: {motion:.4f}")
-
-
-        # print(pose.angle_motion.values)
-
-        # motion = max(0.0, motion - 0.25)
-        motion = min(1.0, motion * 1.5)
-        motion = easeInOutSine(motion)
+        # Motion value is already normalized [0,1] and eased by pipeline
+        motion: float = pose.angle_motion.value
         self._motion = motion
 
         self._cam_fbo.begin()

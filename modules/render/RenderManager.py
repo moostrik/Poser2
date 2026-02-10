@@ -118,6 +118,7 @@ SHOW_COMP: list[Layers] = [
     Layers.flow,
     # Layers.sim_blend,
     Layers.centre_pose,
+    Layers.centre_motion,
     # Layers.cam_frg,
 ]
 
