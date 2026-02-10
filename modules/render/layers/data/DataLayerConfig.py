@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from modules.ConfigBase import ConfigBase, config_field
 from modules.DataHub import Stage
 from modules.pose.Frame import FrameField, ScalarFrameField
-from modules.render.layers.colors import (
+from modules.render.layers.data.colors import (
     POSE_COLOR_LEFT,
     POSE_COLOR_RIGHT,
     POSE_COLOR_CENTER,

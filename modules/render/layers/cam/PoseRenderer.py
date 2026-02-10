@@ -12,7 +12,7 @@ from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D
 from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.render.layers.colors import TRACK_COLORS
+from modules.render.layers.data.colors import TRACK_COLORS
 from modules.render.shaders import PosePointLines
 
 

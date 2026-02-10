@@ -1,10 +1,10 @@
 """Centralized color definitions for visualization layers"""
 
-# Track colors for person identification (red, blue, green)
+# Track colors for person identification (red, blue, yellow - matched perceived brightness Y=0.33)
 TRACK_COLORS: list[tuple[float, float, float, float]] = [
-    (1.0, 0.0, 0.0, 1.0),  # Red
-    (0.0, 0.0, 1.0, 1.0),  # Blue
-    (0.0, 1.0, 0.0, 1.0),  # Green
+    (1.0, 0.15, 0.15, 1.0),    # Red    Y = 0.33
+    (0.28, 0.28, 1.0, 1.0),    # Blue   Y = 0.33
+    (0.36, 0.36, 0.0, 1.0),    # Yellow Y = 0.33
 ]
 
 # Pose anatomical colors (left/right/center joints)

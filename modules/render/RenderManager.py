@@ -18,7 +18,7 @@ from modules.utils.PointsAndRects import Rect, Point2f
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render import layers as ls
-from modules.render.layers.colors import TRACK_COLORS
+from modules.render.layers.data.colors import TRACK_COLORS
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -115,9 +115,9 @@ SHOW_MASK: list[Layers] = [
 
 SHOW_COMP: list[Layers] = [
     Layers.flow,
-    # Layers.centre_pose,
     Layers.sim_blend,
-    Layers.cam_frg,
+    Layers.centre_pose,
+    # Layers.cam_frg,
 ]
 
 SHOW_DATA: list[Layers] = [
@@ -132,7 +132,7 @@ SHOW_DATA: list[Layers] = [
 
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_POSE
+FINAL_LAYERS: list[Layers] = SHOW_COMP
 
 class RenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Config) -> None:
