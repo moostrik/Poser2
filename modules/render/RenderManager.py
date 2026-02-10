@@ -99,9 +99,9 @@ SHOW_POSE: list[Layers] = [
 
 SHOW_CENTRE: list[Layers] = [
     # Layers.centre_cam,
-    Layers.centre_frg,
-    Layers.centre_mask,
-    # Layers.centre_motion,
+    # Layers.centre_frg,
+    # Layers.centre_mask,
+    Layers.centre_motion,
     Layers.centre_pose,
 ]
 

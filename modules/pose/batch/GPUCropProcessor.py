@@ -52,13 +52,6 @@ class GPUCropProcessor:
             config: Configuration for GPU crop processor
         """
         self._config: GPUCropProcessorConfig = config
-        self._crop_width: int = config.output_width
-        self._crop_height: int = config.output_height
-        self._expansion_width: float = config.expansion_width
-        self._expansion_height: float = config.expansion_height
-        self._max_poses: int = config.max_poses
-        self._aspect_ratio: float = config.output_width / config.output_height
-        self._enable_prev_crop: bool = config.enable_prev_crop
 
         # Per-camera GPU frame storage (float32 BGR [0,1])
         self._gpu_images: dict[int, torch.Tensor] = {}  # cam_id -> full frame on GPU
@@ -136,15 +129,15 @@ class GPUCropProcessor:
                 if pose_id not in self._gpu_images:
                     continue
 
-                if pose_count >= self._max_poses:
-                    print(f"GPUCropProcessor: Exceeded max poses ({self._max_poses}), skipping {pose_id}")
+                if pose_count >= self._config.max_poses:
+                    print(f"GPUCropProcessor: Exceeded max poses ({self._config.max_poses}), skipping {pose_id}")
                     continue
 
                 try:
                     gpu_image = self._gpu_images[pose_id]
                     # CHW format: (3, H, W)
                     img_height, img_width = gpu_image.shape[1:3]
-                    bbox_rect = pose.bbox.to_rect().zoom(Point2f(1.0 + self._expansion_width, 1.0 + self._expansion_height))
+                    bbox_rect = pose.bbox.to_rect().zoom(Point2f(1.0 + self._config.expansion_width, 1.0 + self._config.expansion_height))
 
                     # Calculate crop region (same logic as ImageProcessor)
                     crop_roi = self._calculate_crop_roi(bbox_rect, img_width, img_height)
@@ -154,7 +147,7 @@ class GPUCropProcessor:
 
                     # Crop previous frame at CURRENT bbox location (for optical flow)
                     prev_crop: torch.Tensor | None = None
-                    if self._enable_prev_crop and pose_id in self._prev_gpu_images:
+                    if self._config.enable_prev_crop and pose_id in self._prev_gpu_images:
                         prev_img = self._prev_gpu_images[pose_id]
                         # CHW format: (3, H, W)
                         prev_h, prev_w = prev_img.shape[1:3]
@@ -221,7 +214,7 @@ class GPUCropProcessor:
         roi = bbox_rect.affine_transform(image_rect)
 
         # Scale to cover ROI while maintaining output aspect ratio
-        crop_roi = Rect(0, 0, self._crop_width, self._crop_height)
+        crop_roi = Rect(0, 0, self._config.output_width, self._config.output_height)
         crop_roi = crop_roi.aspect_fill(roi)
 
         return crop_roi
@@ -248,7 +241,7 @@ class GPUCropProcessor:
 
         # Check if ROI is completely outside image
         if x1 >= x2 or y1 >= y2:
-            return torch.zeros((3, self._crop_height, self._crop_width), device='cuda', dtype=torch.float16)
+            return torch.zeros((3, self._config.output_height, self._config.output_width), device='cuda', dtype=torch.float16)
 
         # Extract valid region from CHW tensor: (3, H, W)
         crop_chw = src[:, y1:y2, x1:x2]
@@ -265,10 +258,10 @@ class GPUCropProcessor:
 
         # Resize using nearest neighbor (fast, since TRT will resize again with bilinear)
         crop_h, crop_w = crop_chw.shape[1], crop_chw.shape[2]
-        if crop_h != self._crop_height or crop_w != self._crop_width:
+        if crop_h != self._config.output_height or crop_w != self._config.output_width:
             crop_chw = F.interpolate(
                 crop_chw.unsqueeze(0),
-                size=(self._crop_height, self._crop_width),
+                size=(self._config.output_height, self._config.output_width),
                 mode='bilinear',
                 align_corners=False
             ).squeeze(0)
