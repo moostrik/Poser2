@@ -90,15 +90,15 @@ class InterpolatorNode(NodeBase):
         pass
 
 
-class ProcessorNode(NodeBase, Generic[TInput, TOutput]):
-    """Base class for processor nodes that extract derived data from poses using stored context."""
+# class ProcessorNode(NodeBase, Generic[TInput, TOutput]):
+#     """Base class for processor nodes that extract derived data from poses using stored context."""
 
-    @abstractmethod
-    def submit(self, input_data: TInput | None) -> None:
-        """Set the context data for processing."""
-        pass
+#     @abstractmethod
+#     def submit(self, input_data: TInput | None) -> None:
+#         """Set the context data for processing."""
+#         pass
 
-    @abstractmethod
-    def process(self, pose: Frame) -> tuple[Frame, TOutput]:
-        """Process pose using stored context to produce derived output."""
-        pass
+#     @abstractmethod
+#     def process(self, pose: Frame) -> tuple[Frame, TOutput]:
+#         """Process pose using stored context to produce derived output."""
+#         pass

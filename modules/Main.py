@@ -124,13 +124,14 @@ class Main():
         self.similarity_applicator = nodes.SimilarityApplicator(max_poses=settings.pose.max_poses)
         self.leader_applicator =     nodes.LeaderScoreApplicator(max_poses=settings.pose.max_poses)
         self.motion_gate_applicator = nodes.MotionGateApplicator(nodes.MotionGateApplicatorConfig(max_poses=settings.pose.max_poses))
+        self.motion_gate_tracker =   trackers.FilterTracker(num_players, [lambda: self.motion_gate_applicator])
 
         self.debug_tracker =        trackers.DebugTracker(num_players)
 
         # WINDOW TRACKERS
-        self.window_tracker_R =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps)))
-        self.window_tracker_S =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(5.0 * settings.camera.fps)))
-        self.window_tracker_I =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(5.0 * settings.render.fps)))
+        self.window_tracker_R =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * settings.camera.fps)))
+        self.window_tracker_S =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * settings.camera.fps)))
+        self.window_tracker_I =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * settings.render.fps)))
 
         self.bbox_filters =      trackers.FilterTracker(
             settings.num_players,
@@ -251,13 +252,10 @@ class Main():
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
 
         # MOTION GATE (after interpolation pipeline, before DataHub)
-        def apply_motion_gate(frames: dict) -> None:
-            self.motion_gate_applicator.submit(frames)
-            enriched_frames = {tid: self.motion_gate_applicator.process(f) for tid, f in frames.items()}
-            self.data_hub.set_poses(Stage.LERP, enriched_frames)
-            self.window_tracker_I.process(enriched_frames)
-
-        self.pose_interpolation_pipeline.add_poses_callback(apply_motion_gate)
+        self.pose_interpolation_pipeline.add_poses_callback(self.motion_gate_applicator.submit)
+        self.pose_interpolation_pipeline.add_poses_callback(self.motion_gate_tracker.process)
+        self.motion_gate_tracker.add_poses_callback(partial(self.data_hub.set_poses, Stage.LERP))
+        self.motion_gate_tracker.add_poses_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_callback(partial(self.data_hub.set_feature_windows, Stage.LERP))
 
         # SIMILARITY COMPUTATION
