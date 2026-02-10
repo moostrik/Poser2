@@ -12,6 +12,8 @@ POSE_COLOR_LEFT:   tuple[float, float, float, float] = (1.0, 0.5, 0.0, 1.0)  # O
 POSE_COLOR_RIGHT:  tuple[float, float, float, float] = (0.0, 1.0, 1.0, 1.0)  # Cyan
 POSE_COLOR_CENTER: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)  # White
 
+HISTORY_COLOR: tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0)  # Grey
+
 # Default feature colors
 DEFAULT_COLORS: list[tuple[float, float, float, float]] = [
     POSE_COLOR_LEFT,   # Orange

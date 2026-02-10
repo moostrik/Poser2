@@ -30,8 +30,7 @@ FEATURE_COLORS: dict[ScalarFrameField, list[tuple[float, float, float, float]]] 
 
 @dataclass
 class DataLayerConfig(ConfigBase):
-    """Unified configuration for data visualization layers."""
-    active: bool =                      config_field(False)
+    """Unified configuration for data visualization layers. Active state is per-layer instance."""
     feature_field: ScalarFrameField =   config_field(ScalarFrameField.angle_motion)
     stage: Stage =                      config_field(Stage.SMOOTH)
 

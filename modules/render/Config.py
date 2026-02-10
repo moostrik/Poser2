@@ -25,11 +25,16 @@ class LayerMode(IntEnum):
     WINDOW =    auto()
 
 
+class DataLayer(Protocol):
+    """Protocol for data layer instances with active state and shared config."""
+    _config: 'DataLayerConfig'
+
+    def set_active(self, active: bool) -> None: ...
+
 class DataLayerConfig(Protocol):
-    """Protocol for data layer configs. Both WindowLayerConfig and FrameLayerConfig satisfy this."""
+    """Protocol for data layer shared configs."""
     feature_field: ScalarFrameField
     stage: Stage
-    active: bool
 
 
 @dataclass
@@ -61,9 +66,9 @@ class Config(ConfigBase):
     stage_b: SlotStage =        config_field(SlotStage.LERP)
 
     def bind(self,
-             windows_a: dict[int, DataLayerConfig], frames_a: dict[int, DataLayerConfig], angvel_a: dict[int, DataLayerConfig],
-             windows_b: dict[int, DataLayerConfig], frames_b: dict[int, DataLayerConfig], angvel_b: dict[int, DataLayerConfig]) -> None:
-        """Bind layer config dicts to this config. Config changes propagate automatically."""
+             windows_a: dict[int, DataLayer], frames_a: dict[int, DataLayer], angvel_a: dict[int, DataLayer],
+             windows_b: dict[int, DataLayer], frames_b: dict[int, DataLayer], angvel_b: dict[int, DataLayer]) -> None:
+        """Bind layer instances to this config. Config changes propagate active state to layers."""
         self._slots = [
             (windows_a, frames_a, angvel_a, 'stage_a'),
             (windows_b, frames_b, angvel_b, 'stage_b'),
@@ -72,16 +77,24 @@ class Config(ConfigBase):
         self._propagate()
 
     def _propagate(self) -> None:
-        """Push current config to all bound layer configs."""
+        """Push current config to bound layers, setting active state and shared properties."""
         ff = self.feature
         is_angles = (ff == ScalarFrameField.angles)
 
         for windows, frames, angvel, stage_attr in self._slots:
             slot_stage: SlotStage = getattr(self, stage_attr)
             for i in windows:
-                windows[i].active = frames[i].active = angvel[i].active = False
+                # Deactivate all three layer types
+                windows[i].set_active(False)
+                frames[i].set_active(False)
+                angvel[i].set_active(False)
+
+                # Activate and configure the selected layer
                 if slot_stage != SlotStage.NONE:
-                    cfg = windows[i] if self.mode == LayerMode.WINDOW else (angvel[i] if is_angles else frames[i])
-                    cfg.active = True
+                    layer = windows[i] if self.mode == LayerMode.WINDOW else (angvel[i] if is_angles else frames[i])
+                    layer.set_active(True)
+
+                    # Update shared config properties (all layers see these changes)
+                    cfg = layer._config
                     cfg.feature_field = ff
                     cfg.stage = Stage(slot_stage)

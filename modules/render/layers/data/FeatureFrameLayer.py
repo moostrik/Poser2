@@ -28,6 +28,7 @@ class FeatureFrameLayer(LayerBase):
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._config: DataLayerConfig = config
+        self.active: bool = False  # Instance-level active state
 
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
@@ -39,10 +40,14 @@ class FeatureFrameLayer(LayerBase):
         self._shader: FeatureShader = FeatureShader()
         self._text_renderer: Text = Text()
 
-        # Watch active to clear cache on deactivate
-        self._config.watch(self._on_active_change, 'active')
-
         self._hot_reloader = HotReloadMethods(self.__class__, True, True)
+
+    def set_active(self, active: bool) -> None:
+        """Set active state and trigger cleanup on deactivation."""
+        if self.active != active:
+            self.active = active
+            if not active:
+                self.clear()
 
     def _on_active_change(self, active: bool) -> None:
         if not active:
@@ -70,7 +75,7 @@ class FeatureFrameLayer(LayerBase):
         self._labels = []
 
     def draw(self) -> None:
-        if not self._config.active:
+        if not self.active:
             return
         if self._fbo.allocated:
             Blit.use(self._fbo.texture)
@@ -79,7 +84,7 @@ class FeatureFrameLayer(LayerBase):
 
     def update(self) -> None:
         """Update visualization from DataHub Frame."""
-        if not self._config.active:
+        if not self.active:
             return
         pose: Frame | None = self._data_hub.get_pose(self._config.stage, self._track_id)
         self._data_cache.update(pose)

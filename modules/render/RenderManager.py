@@ -12,7 +12,7 @@ from modules.render.layers import LayerBase
 from modules.DataHub import DataHub, Stage, DataHubType, PoseDataHubTypes
 from modules.gui.PyReallySimpleGui import Gui
 from modules.pose.Frame import FrameField
-from modules.render.Settings import Config, LayerMode
+from modules.render.Config import Config, LayerMode, DataLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -98,8 +98,8 @@ SHOW_POSE: list[Layers] = [
 ]
 
 SHOW_CENTRE: list[Layers] = [
-    Layers.centre_cam,
-    # Layers.centre_frg,
+    # Layers.centre_cam,
+    Layers.centre_frg,
     Layers.centre_mask,
     # Layers.centre_motion,
     Layers.centre_pose,
@@ -121,18 +121,19 @@ SHOW_COMP: list[Layers] = [
 ]
 
 SHOW_DATA: list[Layers] = [
-    Layers.centre_motion,
+    # Layers.centre_motion,
     Layers.data_B_W,
     Layers.data_B_F,
     Layers.data_B_AV,
     Layers.data_A_W,
     Layers.data_A_F,
     Layers.data_A_AV,
+    Layers.data_time,
 ]
 
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_COMP
+FINAL_LAYERS: list[Layers] = SHOW_CENTRE + SHOW_DATA
 
 class RenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Config) -> None:
@@ -149,40 +150,29 @@ class RenderManager(RenderBase):
         self._preview_layers: list[Layers] =    PREVIEW_LAYERS
         self._draw_layers: list[Layers] =       FINAL_LAYERS
 
-        # camera layers
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
-        # Shared configs for Centre layers
-        centre_geometry_config =    ls.CentreGeometryConfig(stage=Stage.LERP, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
-        centre_mask_config =        ls.CentreMaskConfig(    blend_factor=0.2, blur_steps=0, blur_radius=8.0)
-        centre_cam_config =         ls.CentreCamConfig(     blend_factor=0.5, mask_opacity=1.0, use_mask=True)
-        centre_frg_config =         ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
-        centre_pose_config =        ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
-
-        # Shared configs for Data layers
+        # configs
+        tracker_comp_config =   ls.TrackerCompositorConfig( stage=Stage.LERP, pose_line_width=2.0, bbox_line_width=2)
+        pose_comp_config =      ls.PoseCompositorConfig(stage=Stage.LERP, line_width=2.0, line_smooth=0.0)
+        centre_geometry_config= ls.CentreGeometryConfig(stage=Stage.LERP, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
+        centre_mask_config =    ls.CentreMaskConfig(    blend_factor=0.2, blur_steps=0, blur_radius=8.0)
+        centre_cam_config =     ls.CentreCamConfig(     blend_factor=0.5, mask_opacity=1.0, use_mask=True)
+        centre_frg_config =     ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
+        centre_pose_config =    ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
         grey: tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0)
-        ff = ls.ScalarFrameField.angle_motion
-        data_A_config = ls.DataLayerConfig(active=False, feature_field=ff, stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
-        data_B_config = ls.DataLayerConfig(active=False, feature_field=ff, stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[grey])
+        data_A_config =         ls.DataLayerConfig(stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
+        data_B_config =         ls.DataLayerConfig(stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[grey])
+        data_time_config =      ls.MTimeRendererConfig(     stage=Stage.LERP)
 
-        # Shared configs for Cam layers
-        bbox_config =           ls.BBoxRendererConfig(      stage=Stage.LERP, line_width=2)
-        cam_composite_config =  ls.TrackerCompositorConfig( stage=Stage.LERP, pose_line_width=2.0, bbox_line_width=2)
-
-        # Shared configs for Pose renderers
-        pose_line_A_config =    ls.PoseLineConfig(     stage=Stage.LERP, line_width=3.0, line_smooth=0.0, use_scores=True, use_bbox=False)
-        pose_line_B_config =    ls.PoseLineConfig(     stage=Stage.RAW,  line_width=6.0, line_smooth=0.0, use_scores=True, use_bbox=False)
-        mtime_config =          ls.MTimeRendererConfig(     stage=Stage.LERP)
-        cam_crop_config =       ls.CropConfig(      stage=Stage.LERP)
-        track_pose_composite_config = ls.PoseCompositorConfig(stage=Stage.LERP, line_width=2.0, line_smooth=0.0)
         for i in range(self.num_cams):
             color: tuple[float, float, float, float] = TRACK_COLORS[i % len(TRACK_COLORS)]
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
             cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.data_hub)
 
-            cam_comp =      self.L[Layers.poser][i] =   ls.TrackerCompositor(   i, self.data_hub, cam_image.texture, cam_composite_config)
-            track_comp =    self.L[Layers.tracker][i] = ls.PoseCompositor(i, self.data_hub, cam_image.texture, color, track_pose_composite_config)
+            cam_comp =      self.L[Layers.poser][i] =   ls.TrackerCompositor(       i, self.data_hub, cam_image.texture, tracker_comp_config)
+            track_comp =    self.L[Layers.tracker][i] = ls.PoseCompositor(          i, self.data_hub, cam_image.texture, color, pose_comp_config)
 
             centre_geometry=self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,       centre_geometry_config)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_geometry,     cam_mask.texture,   centre_mask_config)
@@ -203,16 +193,16 @@ class RenderManager(RenderBase):
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, data_B_config)
             self.L[Layers.data_B_AV][i] = ls.AngleVelLayer(     i, self.data_hub, data_B_config)
 
-            mtime_data =    self.L[Layers.data_time][i] =  ls.MTimeRenderer(       i, self.data_hub, mtime_config)
+            mtime_data =    self.L[Layers.data_time][i] =  ls.MTimeRenderer(       i, self.data_hub, data_time_config)
 
-        # Bind data config to layer configs - propagates config changes automatically
+        # Bind data layers (not configs) to settings - propagates active state and shared properties
         settings.bind(
-            {i: cast(ls.FeatureWindowLayer, self.L[Layers.data_A_W][i])._config for i in range(self.num_cams)},
-            {i: cast(ls.FeatureFrameLayer,  self.L[Layers.data_A_F][i])._config for i in range(self.num_cams)},
-            {i: cast(ls.AngleVelLayer,      self.L[Layers.data_A_AV][i])._config for i in range(self.num_cams)},
-            {i: cast(ls.FeatureWindowLayer, self.L[Layers.data_B_W][i])._config for i in range(self.num_cams)},
-            {i: cast(ls.FeatureFrameLayer,  self.L[Layers.data_B_F][i])._config for i in range(self.num_cams)},
-            {i: cast(ls.AngleVelLayer,      self.L[Layers.data_B_AV][i])._config for i in range(self.num_cams)},
+            {i: cast(DataLayer, self.L[Layers.data_A_W][i]) for i in range(self.num_cams)},
+            {i: cast(DataLayer, self.L[Layers.data_A_F][i]) for i in range(self.num_cams)},
+            {i: cast(DataLayer, self.L[Layers.data_A_AV][i]) for i in range(self.num_cams)},
+            {i: cast(DataLayer, self.L[Layers.data_B_W][i]) for i in range(self.num_cams)},
+            {i: cast(DataLayer, self.L[Layers.data_B_F][i]) for i in range(self.num_cams)},
+            {i: cast(DataLayer, self.L[Layers.data_B_AV][i]) for i in range(self.num_cams)},
         )
 
         # composition

@@ -13,7 +13,7 @@ from modules.gui.PyReallySimpleGui import GuiConfig
 from modules.inout import OscSoundConfig
 from modules.inout.ArtNetLed import ArtNetLedConfig
 
-from modules.render.Settings import Config as RenderSettings
+from modules.render.Config import Config as RenderSettings
 from modules.pose.Settings import Settings as PoseSettings, ModelType
 from modules.tracker.TrackerBase import TrackerType
 
