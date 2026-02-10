@@ -24,7 +24,7 @@ class TrackerCompositorConfig(ConfigBase):
 
 
 class TrackerCompositor(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, cam_texture: Texture, config: TrackerCompositorConfig | None = None) -> None:
+    def __init__(self, cam_id: int, data: DataHub, cam_texture: Texture, bbox_a_color: tuple[float, float, float, float], bbox_b_color: tuple[float, float, float, float], config: TrackerCompositorConfig | None = None) -> None:
         self._config: TrackerCompositorConfig = config or TrackerCompositorConfig()
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data
@@ -34,10 +34,10 @@ class TrackerCompositor(LayerBase):
         self._depth_track_renderer: TrackletRenderer = TrackletRenderer(cam_id, data)
 
         bbox_config_A: BBoxRendererConfig = BBoxRendererConfig(stage=Stage.RAW, line_width=self._config.bbox_line_width * 2.0)
-        self._bbox_renderer_A: BBoxRenderer = BBoxRenderer(cam_id, data, (0.5, 0.5, 0.5, 0.5), bbox_config_A)
+        self._bbox_renderer_A: BBoxRenderer = BBoxRenderer(cam_id, data, bbox_a_color, bbox_config_A)
 
         bbox_config_B: BBoxRendererConfig = BBoxRendererConfig(stage=Stage.LERP, line_width=self._config.bbox_line_width)
-        self._bbox_renderer_B: BBoxRenderer = BBoxRenderer(cam_id, data, (1.0, 1.0, 1.0, 1.0), bbox_config_B)
+        self._bbox_renderer_B: BBoxRenderer = BBoxRenderer(cam_id, data, bbox_b_color, bbox_config_B)
 
         pose_config: PoseRendererConfig = PoseRendererConfig(stage=self._config.stage, line_width=self._config.pose_line_width, line_smooth=0.0, use_scores=False, use_bbox=True)
         self._pose_renderer: PoseRenderer = PoseRenderer(cam_id, data, colors=None, config=pose_config)

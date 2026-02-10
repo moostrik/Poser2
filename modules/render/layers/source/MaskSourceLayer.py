@@ -6,66 +6,46 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gl import Tensor, SwapFbo, Texture, Blit
+from modules.gl import Tensor, Texture
 from modules.pose.batch.GPUFrame import GPUFrame
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import MaskDilate
+from modules.render.layers.LayerBase import LayerBase, DataCache
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class MaskSourceLayer(LayerBase):
+    """Pure source layer for mask retrieval from DataHub.
 
-    def __init__(self, track_id: int, data_hub: DataHub, process_scale: float = 1.0, dilations: int = 0) -> None:
+    Retrieves mask tensor from GPUFrame and uploads to GPU texture.
+    No processing - dilation now handled by CentreMaskLayer.
+    """
+
+    def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._cuda_image: Tensor = Tensor()
-        self._data_cache: DataCache[torch.Tensor]= DataCache[torch.Tensor]()
-        self._fbo: SwapFbo = SwapFbo()
-        self._dilate_shader: MaskDilate = MaskDilate()
-
-        self.process_scale: float = process_scale
-        self.dilatations: int = dilations
+        self._data_cache: DataCache[torch.Tensor] = DataCache[torch.Tensor]()
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:
-        return self._fbo.texture
+        return self._cuda_image
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
-        self._dilate_shader.allocate()
+        pass  # Lazy allocation on first update
 
     def deallocate(self) -> None:
         self._cuda_image.deallocate()
-        self._fbo.deallocate()
-        self._dilate_shader.deallocate()
 
     def update(self) -> None:
         gpu_frame: GPUFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
         mask_tensor: torch.Tensor | None = gpu_frame.mask if gpu_frame else None
         self._data_cache.update(mask_tensor)
-        if self._data_cache.lost:
-            self._fbo.clear()
+
         if self._data_cache.idle or mask_tensor is None:
             return
 
         self._cuda_image.set_tensor(mask_tensor)
         self._cuda_image.update()
-
-        if self._cuda_image.allocated:
-            w = int(self._cuda_image.width * self.process_scale)
-            h = int(self._cuda_image.height * self.process_scale)
-            if not self._fbo.allocated or self._fbo.width != w or self._fbo.height != h:
-                self._fbo.allocate(w, h, self._cuda_image.internal_format)
-
-            self._fbo.begin()
-            Blit.use(self._cuda_image)
-            self._fbo.end()
-
-            for i in range(self.dilatations):
-                self._fbo.swap()
-                self._fbo.begin()
-                self._dilate_shader.use(self._fbo.back_texture, 1.0)
-                self._fbo.end()

@@ -98,9 +98,9 @@ SHOW_POSE: list[Layers] = [
 ]
 
 SHOW_CENTRE: list[Layers] = [
-    Layers.centre_cam,
-    # Layers.centre_frg,
-    # Layers.centre_mask,
+    # Layers.centre_cam,
+    Layers.centre_frg,
+    Layers.centre_mask,
     # Layers.centre_motion,
     Layers.centre_pose,
 ]
@@ -133,7 +133,7 @@ SHOW_DATA: list[Layers] = [
 
 
 PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_POSE + SHOW_DATA
+FINAL_LAYERS: list[Layers] = SHOW_CENTRE + SHOW_DATA
 
 class RenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Config) -> None:
@@ -157,7 +157,7 @@ class RenderManager(RenderBase):
         self.pose_comp_config =     ls.PoseCompositorConfig(stage=Stage.LERP, line_width=2.0, line_smooth=0.0, use_gpu_crop=True)
 
         self.centre_gmtr_config=    ls.CentreGeometryConfig(stage=Stage.LERP, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
-        self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.2, blur_steps=0, blur_radius=8.0)
+        self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.2, blur_steps=0, blur_radius=8.0, dilation_steps=0)
         self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.5, mask_opacity=1.0, use_mask=True)
         self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
         self.centre_pose_config =   ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
@@ -173,7 +173,7 @@ class RenderManager(RenderBase):
             cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.data_hub)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
 
-            cam_comp =      self.L[Layers.poser][i] =   ls.TrackerCompositor(       i, self.data_hub,   cam_image.texture,                          self.tracker_comp_config)
+            cam_comp =      self.L[Layers.poser][i] =   ls.TrackerCompositor(       i, self.data_hub,   cam_image.texture,  HISTORY_COLOR, color,  self.tracker_comp_config)
             track_comp =    self.L[Layers.tracker][i] = ls.PoseCompositor(          i, self.data_hub,   cam_image.texture,  color,                  self.pose_comp_config)
 
             centre_gmtry=   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,                                               self.centre_gmtr_config)
@@ -288,6 +288,11 @@ class RenderManager(RenderBase):
         self._update_layers = UPDATE_LAYERS
         self._draw_layers = FINAL_LAYERS
         self._preview_layers = PREVIEW_LAYERS
+
+        self.centre_mask_config.blend_factor = 0.2
+        self.centre_mask_config.blur_steps = 0
+        self.centre_mask_config.blur_radius = 8.0
+        self.centre_mask_config.dilation_steps = 0
 
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:

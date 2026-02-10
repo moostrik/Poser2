@@ -5,19 +5,12 @@ from dataclasses import dataclass
 from modules.ConfigBase import ConfigBase, config_field
 from modules.DataHub import Stage
 from modules.pose.Frame import FrameField, ScalarFrameField
-from modules.render.layers.data.colors import (
-    POSE_COLOR_LEFT,
-    POSE_COLOR_RIGHT,
-    POSE_COLOR_CENTER,
-    DEFAULT_COLORS,
-    BBOX_COLORS,
-    TRACK_COLORS,
-)
+from modules.render.layers.data.colors import DEFAULT_COLORS, TRACK_COLORS
 
 
 # ScalarFrameField → color list lookup
 FEATURE_COLORS: dict[ScalarFrameField, list[tuple[float, float, float, float]]] = {
-    ScalarFrameField.bbox:            BBOX_COLORS,
+    ScalarFrameField.bbox:            DEFAULT_COLORS,
     ScalarFrameField.angles:          DEFAULT_COLORS,
     ScalarFrameField.angle_vel:       DEFAULT_COLORS,
     ScalarFrameField.angle_motion:    DEFAULT_COLORS,
