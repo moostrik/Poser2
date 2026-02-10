@@ -2,15 +2,16 @@ from OpenGL.GL import * # type: ignore
 from modules.gl.Texture import Texture
 
 class Fbo(Texture):
-    def __init__(self) -> None :
-        super(Fbo, self).__init__()
+    def __init__(self,
+                 interpolation: int = GL_LINEAR,
+                 wrap: int = GL_CLAMP_TO_EDGE,
+                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
+        super().__init__(interpolation, wrap, border_color)
         self.fbo_id = 0
 
 
-    def allocate(self, width: int, height: int, internal_format,
-                 wrap_s: int = GL_CLAMP_TO_EDGE, wrap_t: int = GL_CLAMP_TO_EDGE,
-                 min_filter: int = GL_LINEAR, mag_filter: int = GL_LINEAR) -> None :
-        super(Fbo, self).allocate(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
+    def allocate(self, width: int, height: int, internal_format) -> None:
+        super().allocate(width, height, internal_format)
         if not self.allocated: return
 
         self.fbo_id = glGenFramebuffers(1)
@@ -47,9 +48,12 @@ class SwapFbo(Fbo):
     Use .texture for current buffer and .back_texture for previous buffer.
     """
 
-    def __init__(self) -> None:
+    def __init__(self,
+                 interpolation: int = GL_LINEAR,
+                 wrap: int = GL_CLAMP_TO_EDGE,
+                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
         # Don't call super().__init__() - we manage internal FBOs
-        self._fbos: list[Fbo] = [Fbo(), Fbo()]
+        self._fbos: list[Fbo] = [Fbo(interpolation, wrap, border_color), Fbo(interpolation, wrap, border_color)]
         self._swap_state: int = 0
 
     # Override all Fbo/Texture properties to delegate to current buffer
@@ -95,12 +99,10 @@ class SwapFbo(Fbo):
         """Previous buffer for reading in ping-pong rendering."""
         return self._fbos[1 - self._swap_state]
 
-    def allocate(self, width: int, height: int, internal_format,
-                 wrap_s: int = GL_CLAMP_TO_EDGE, wrap_t: int = GL_CLAMP_TO_EDGE,
-                 min_filter: int = GL_LINEAR, mag_filter: int = GL_LINEAR) -> None:
+    def allocate(self, width: int, height: int, internal_format) -> None:
         """Allocate both buffers with same parameters."""
-        self._fbos[0].allocate(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
-        self._fbos[1].allocate(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
+        self._fbos[0].allocate(width, height, internal_format)
+        self._fbos[1].allocate(width, height, internal_format)
 
     def deallocate(self) -> None:
         """Deallocate both buffers."""

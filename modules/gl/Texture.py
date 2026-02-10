@@ -92,7 +92,17 @@ def get_data_type(internal_format) -> Constant:
 
 
 class Texture():
-    def __init__(self) -> None :
+    def __init__(self,
+                 interpolation: int = GL_LINEAR,
+                 wrap: int = GL_CLAMP_TO_EDGE,
+                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
+        """Initialize texture with configuration.
+
+        Args:
+            interpolation: Filter mode for min/mag (GL_LINEAR or GL_NEAREST)
+            wrap: Wrap mode for both axes (GL_CLAMP_TO_EDGE, GL_REPEAT, GL_MIRRORED_REPEAT, GL_CLAMP_TO_BORDER)
+            border_color: RGBA color when wrap is GL_CLAMP_TO_BORDER
+        """
         self.allocated = False
         self.width: int = 0
         self.height: int = 0
@@ -100,39 +110,24 @@ class Texture():
         self.format: Constant = GL_NONE
         self.data_type: Constant = GL_NONE
         self.tex_id = 0
-        # Store filter settings for reallocation
-        self._wrap_s: int = GL_CLAMP_TO_EDGE
-        self._wrap_t: int = GL_CLAMP_TO_EDGE
-        self._min_filter: int = GL_LINEAR
-        self._mag_filter: int = GL_LINEAR
+        # Texture configuration
+        self._interpolation: int = interpolation
+        self._wrap: int = wrap
+        self._border_color: tuple[float, float, float, float] = border_color
 
     @property
     def texture(self) -> 'Texture':
         """Convenience property for interface compatibility."""
         return self
 
-    def allocate(self, width: int, height: int, internal_format,
-                 wrap_s: int = GL_CLAMP_TO_EDGE,
-                 wrap_t: int = GL_CLAMP_TO_EDGE,
-                 min_filter: int = GL_LINEAR,
-                 mag_filter: int = GL_LINEAR) -> None :
+    def allocate(self, width: int, height: int, internal_format) -> None:
         """Allocate OpenGL texture with specified dimensions and format.
 
         Args:
             width: Texture width in pixels
             height: Texture height in pixels
             internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
-            wrap_s: Horizontal wrap mode (default: GL_CLAMP_TO_EDGE)
-            wrap_t: Vertical wrap mode (default: GL_CLAMP_TO_EDGE)
-            min_filter: Minification filter (default: GL_LINEAR)
-            mag_filter: Magnification filter (default: GL_LINEAR)
         """
-        # Store filter settings for future reallocations
-        self._wrap_s = wrap_s
-        self._wrap_t = wrap_t
-        self._min_filter = min_filter
-        self._mag_filter = mag_filter
-        
         data_type: Constant = get_data_type(internal_format)
         if data_type == GL_NONE: return
 
@@ -144,10 +139,11 @@ class Texture():
         self.tex_id: int = glGenTextures(1)
 
         glBindTexture(GL_TEXTURE_2D, self.tex_id)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, self._wrap)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, self._wrap)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, self._interpolation)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, self._interpolation)
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, self._border_color)
 
         # Set the swizzle mask for the texture to draw it as grayscale
         if self.format == GL_RED:

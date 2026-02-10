@@ -84,19 +84,25 @@ def _get_internal_format(image: np.ndarray) -> Constant:
 
 
 class Image(Fbo):
-    def __init__(self, channel_order: Literal['BGR', 'RGB'] = 'RGB') -> None:
-        """Initialize Image texture with specified channel order.
+    def __init__(self,
+                 channel_order: Literal['BGR', 'RGB'] = 'RGB',
+                 interpolation: int = GL_LINEAR,
+                 wrap: int = GL_CLAMP_TO_EDGE,
+                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
+        """Initialize Image texture with specified channel order and texture settings.
 
         Args:
             channel_order: Channel order for input images - 'BGR' (OpenCV default) or 'RGB' (standard)
-            The output FBO texture is always in RGB format.
+            interpolation: Filter mode for min/mag (GL_LINEAR or GL_NEAREST)
+            wrap: Wrap mode for both axes (GL_CLAMP_TO_EDGE, GL_REPEAT, GL_MIRRORED_REPEAT, GL_CLAMP_TO_BORDER)
+            border_color: RGBA color when wrap is GL_CLAMP_TO_BORDER
         """
-        super().__init__()
+        super().__init__(interpolation, wrap, border_color)
         self._image: np.ndarray | None = None
         self._needs_update: bool = False
         self._mutex: Lock = Lock()
         self._channel_order: Literal['BGR', 'RGB'] = channel_order
-        self._source: Texture = Texture()  # Private texture for numpy upload
+        self._source: Texture = Texture(interpolation, wrap, border_color)  # Private texture for numpy upload
         # Cache last uploaded dimensions/format to avoid redundant checks
         self._cached_width: int = 0
         self._cached_height: int = 0
@@ -123,32 +129,23 @@ class Image(Fbo):
         if needs_update and image is not None:
             self.set_from_image(image)
 
-    def allocate(self, width: int, height: int, internal_format,
-                 wrap_s: int = GL_CLAMP_TO_EDGE,
-                 wrap_t: int = GL_CLAMP_TO_EDGE,
-                 min_filter: int = GL_LINEAR,
-                 mag_filter: int = GL_LINEAR) -> None:
+    def allocate(self, width: int, height: int, internal_format) -> None:
         """Allocate source texture and FBO for flipped output.
 
         Args:
             width: Texture width in pixels
             height: Texture height in pixels
             internal_format: OpenGL internal format (e.g., GL_RGB8, GL_RGBA8)
-            wrap_s: Horizontal wrap mode (default: GL_CLAMP_TO_EDGE)
-            wrap_t: Vertical wrap mode (default: GL_CLAMP_TO_EDGE)
-            min_filter: Minification filter (default: GL_LINEAR)
-            mag_filter: Magnification filter (default: GL_LINEAR)
         """
         # Allocate FBO (output texture in RGB format)
-        super().allocate(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
+        super().allocate(width, height, internal_format)
         if not self.allocated:
             return
 
         # Allocate source texture for numpy upload (with BGR support)
-        self._allocate_source(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
+        self._allocate_source(width, height, internal_format)
 
-    def _allocate_source(self, width: int, height: int, internal_format,
-                         wrap_s: int, wrap_t: int, min_filter: int, mag_filter: int) -> None:
+    def _allocate_source(self, width: int, height: int, internal_format) -> None:
         """Allocate the internal source texture with BGR channel order support."""
         data_type: Constant = get_data_type(internal_format)
         if data_type == GL_NONE:
@@ -162,10 +159,11 @@ class Image(Fbo):
         self._source.tex_id = glGenTextures(1)
 
         glBindTexture(GL_TEXTURE_2D, self._source.tex_id)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter)
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, self._wrap)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, self._wrap)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, self._interpolation)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, self._interpolation)
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, self._border_color)
 
         # Set the swizzle mask for grayscale textures
         if self._source.format == GL_RED:
@@ -208,8 +206,7 @@ class Image(Fbo):
             if internal_format != self.internal_format or width != self.width or height != self.height:
                 if self.allocated:
                     self.deallocate()
-                self.allocate(width, height, internal_format,
-                             self._wrap_s, self._wrap_t, self._min_filter, self._mag_filter)
+                self.allocate(width, height, internal_format)
 
             # Update cache to prevent unnecessary reallocations
             self._cached_width = width

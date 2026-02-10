@@ -101,8 +101,18 @@ class Tensor(Texture):
     Falls back to CPU transfer if CUDA-OpenGL interop is unavailable.
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self,
+                 interpolation: int = GL_LINEAR,
+                 wrap: int = GL_CLAMP_TO_EDGE,
+                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
+        """Initialize Tensor texture with configuration.
+
+        Args:
+            interpolation: Filter mode for min/mag (GL_LINEAR or GL_NEAREST)
+            wrap: Wrap mode for both axes (GL_CLAMP_TO_EDGE, GL_REPEAT, GL_MIRRORED_REPEAT, GL_CLAMP_TO_BORDER)
+            border_color: RGBA color when wrap is GL_CLAMP_TO_BORDER
+        """
+        super().__init__(interpolation, wrap, border_color)
         self._tensor: torch.Tensor | None = None
         self._needs_update: bool = False
         self._mutex: Lock = Lock()
@@ -126,24 +136,16 @@ class Tensor(Texture):
             self._tensor = tensor
             self._needs_update = True
 
-    def allocate(self, width: int, height: int, internal_format,
-                 wrap_s: int = GL_CLAMP_TO_EDGE,
-                 wrap_t: int = GL_CLAMP_TO_EDGE,
-                 min_filter: int = GL_LINEAR,
-                 mag_filter: int = GL_LINEAR) -> None:
+    def allocate(self, width: int, height: int, internal_format) -> None:
         """Allocate texture and PBO for CUDA-OpenGL interop.
 
         Args:
             width: Texture width in pixels
             height: Texture height in pixels
             internal_format: OpenGL internal format (GL_R8, GL_R16F, GL_R32F, GL_RGB8, GL_RGB16F, GL_RGB32F, etc.)
-            wrap_s: Horizontal wrap mode (default: GL_CLAMP_TO_EDGE)
-            wrap_t: Vertical wrap mode (default: GL_CLAMP_TO_EDGE)
-            min_filter: Minification filter (default: GL_LINEAR)
-            mag_filter: Magnification filter (default: GL_LINEAR)
         """
         # Allocate texture via parent class
-        super().allocate(width, height, internal_format, wrap_s, wrap_t, min_filter, mag_filter)
+        super().allocate(width, height, internal_format)
         if not self.allocated:
             return
 
