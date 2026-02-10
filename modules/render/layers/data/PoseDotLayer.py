@@ -66,5 +66,5 @@ class PoseDotLayer(LayerBase):
 
         self._fbo.begin()
         clear_color()
-        self._shader.use(pose.points, dot_size=dot_size, dot_smooth=dot_smooth)
+        self._shader.use(pose.points, dot_size=dot_size, dot_smooth=dot_smooth, color=self.color)
         self._fbo.end()

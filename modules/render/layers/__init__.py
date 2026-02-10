@@ -1,6 +1,7 @@
 from .LayerBase import                      LayerBase, Rect
 
 from .cam.BBoxRenderer import               BBoxRenderer, BBoxRendererConfig
+from .cam.PoseRenderer import               PoseRenderer, PoseRendererConfig
 from .cam.PoseCompositor import             PoseCompositor, PoseCompositorConfig
 from .cam.TrackerCompositor import          TrackerCompositor, TrackerCompositorConfig
 from .cam.TrackletRenderer import           TrackletRenderer

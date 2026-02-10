@@ -14,9 +14,10 @@ const ivec2 segments[NUM_SEGMENTS] = ivec2[NUM_SEGMENTS](
     ivec2(11, 13), ivec2(13, 15), ivec2(12, 14), ivec2(14, 16)
 );
 
-const vec3 POSE_COLOR_CENTER = vec3(1.0, 1.0, 1.0);
-const vec3 POSE_COLOR_LEFT = vec3(1.0, 0.5, 0.0);
-const vec3 POSE_COLOR_RIGHT = vec3(0.0, 1.0, 1.0);
+// Anatomical colors - synchronized with modules/render/layers/colors.py
+const vec3 POSE_COLOR_CENTER = vec3(1.0, 1.0, 1.0);    // White
+const vec3 POSE_COLOR_LEFT = vec3(1.0, 0.5, 0.0);      // Orange
+const vec3 POSE_COLOR_RIGHT = vec3(0.0, 1.0, 1.0);     // Cyan
 
 const vec3 joint_colors[17] = vec3[17](
     POSE_COLOR_CENTER,

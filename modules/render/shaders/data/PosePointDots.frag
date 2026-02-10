@@ -4,6 +4,7 @@ uniform int num_points;
 uniform float dot_size = 0.01;
 uniform float dot_smooth = 0.01;
 uniform float aspect_ratio = 1.0;  // width / height
+uniform vec4 dot_color = vec4(1.0, 1.0, 1.0, 1.0);  // Default white
 
 // Array of packed point data: [x, y, score, visibility]
 uniform vec4 points[64];  // Max 64 points, more than enough for pose keypoints
@@ -36,10 +37,10 @@ void main() {
         // Apply score-based alpha
         alpha *= score;
 
-        // Use premultiplied alpha blending
-        vec3 dot_color = vec3(1.0) * alpha;  // White premultiplied by alpha
-        color.rgb = color.rgb + dot_color * (1.0 - color.a);
-        color.a = color.a + alpha * (1.0 - color.a);
+        // Use premultiplied alpha blending with configured color
+        vec3 dot_rgb = dot_color.rgb * alpha * dot_color.a;  // Premultiplied by alpha
+        color.rgb = color.rgb + dot_rgb * (1.0 - color.a);
+        color.a = color.a + alpha * dot_color.a * (1.0 - color.a);
     }
 
     fragColor = color;

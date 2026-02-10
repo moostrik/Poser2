@@ -18,15 +18,10 @@ from modules.utils.PointsAndRects import Rect, Point2f
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render import layers as ls
+from modules.render.layers.colors import TRACK_COLORS
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-
-COLORS: list[tuple[float, float, float, float]] = [
-    (1.0, 0.0, 0.0, 1.85),
-    (0.0, 0.0, 1.0, 1.85),
-    (0.0, 1.0, 0.0, 1.85),
-]
 
 class Layers(IntEnum):
     # source layers
@@ -96,23 +91,18 @@ PREVIEW_CENTRE: list[Layers] = [
 
 SHOW_CAM: list[Layers] = [
     Layers.poser
-    # Layers.cam_image,
-    # Layers.bbox_bbox,
-    # Layers.bbox_pose_A
-    # Layers.cam_mask,
-    # Layers.cam_frg,
-]
-
-SHOW_CENTRE: list[Layers] = [
-    Layers.centre_cam,
-    Layers.centre_mask,
-    # Layers.centre_frg,
-    # Layers.centre_motion,
-    Layers.centre_pose,
 ]
 
 SHOW_POSE: list[Layers] = [
     Layers.tracker,
+]
+
+SHOW_CENTRE: list[Layers] = [
+    Layers.centre_cam,
+    # Layers.centre_frg,
+    Layers.centre_mask,
+    # Layers.centre_motion,
+    Layers.centre_pose,
 ]
 
 SHOW_MASK: list[Layers] = [
@@ -177,7 +167,7 @@ class RenderManager(RenderBase):
 
         # Shared configs for Cam layers
         bbox_config =           ls.BBoxRendererConfig(      stage=Stage.LERP, line_width=2)
-        cam_composite_config =  ls.TrackerCompositorConfig( stage=Stage.LERP, track_line_width=2.0, bbox_line_width=2)
+        cam_composite_config =  ls.TrackerCompositorConfig( stage=Stage.LERP, pose_line_width=2.0, bbox_line_width=2)
 
         # Shared configs for Pose renderers
         pose_line_A_config =    ls.PoseLineConfig(     stage=Stage.LERP, line_width=3.0, line_smooth=0.0, use_scores=True, use_bbox=False)
@@ -186,7 +176,7 @@ class RenderManager(RenderBase):
         cam_crop_config =       ls.CropConfig(      stage=Stage.LERP)
         track_pose_composite_config = ls.PoseCompositorConfig(stage=Stage.LERP, line_width=2.0, line_smooth=0.0)
         for i in range(self.num_cams):
-            color: tuple[float, float, float, float] = COLORS[i % len(COLORS)]
+            color: tuple[float, float, float, float] = TRACK_COLORS[i % len(TRACK_COLORS)]
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
             cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.data_hub)
@@ -304,14 +294,8 @@ class RenderManager(RenderBase):
             for layer_type in self._preview_layers:
                 self.L[layer_type][i].draw()
 
-            # DO TEST SETTINGS HERE
-            self.L[Layers.centre_cam][i].use_mask = True    #type: ignore
-            self.L[Layers.centre_frg][i].use_mask = True    #type: ignore
-            self.L[Layers.centre_mask][i].blur_steps = 0    #type: ignore
-
         self._update_layers = UPDATE_LAYERS
         self._draw_layers = FINAL_LAYERS
-        # self._draw_layers = BOX_LAYERS
         self._preview_layers = PREVIEW_LAYERS
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:

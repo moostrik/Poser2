@@ -6,7 +6,7 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.pose.features import Points2D
 
 class PosePointDots(Shader):
-    def use(self, points: Points2D, dot_size: float = 0.01, dot_smooth: float = 0.01) -> None:
+    def use(self, points: Points2D, dot_size: float = 0.01, dot_smooth: float = 0.01, color: tuple[float, float, float, float] | None = None) -> None:
         if not self.allocated or not self.shader_program:
             print("PosePointDots shader not allocated or shader program missing.")
             return
@@ -29,6 +29,10 @@ class PosePointDots(Shader):
         glUniform1i(self.get_uniform_loc("num_points"), n_points)
         glUniform1f(self.get_uniform_loc("dot_size"), dot_size)
         glUniform1f(self.get_uniform_loc("dot_smooth"), dot_smooth)
+        if color is not None:
+            glUniform4f(self.get_uniform_loc("dot_color"), *color)
+        else:
+            glUniform4f(self.get_uniform_loc("dot_color"), 1.0, 1.0, 1.0, 1.0)  # White default
         glUniform4fv(self.get_uniform_loc("points"), n_points, packed_data.flatten())
 
         # Render
