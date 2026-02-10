@@ -20,7 +20,7 @@ class ImageProcessor:
 
     def process_pose_image(self, roi: Rect, image: np.ndarray) -> tuple[np.ndarray, Rect]:
         """Process a pose image: extract region from normalised roi and resize to configured dimensions.
-        
+
         Args:
             roi: Normalized bounding box (0-1 range) - expansion should be applied before calling this
         """

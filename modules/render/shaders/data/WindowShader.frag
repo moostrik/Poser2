@@ -47,7 +47,7 @@ void main() {
 
     // Draw stream separator lines
     if (isBetweenStreamLine(stream_uv, stream_step, line_width / output_aspect_ratio * 0.5, num_streams, used_height)) {
-        fragColor = vec4(0.5, 0.5, 0.5, 1.0);  // Grey separator lines
+        fragColor = vec4(1.0, 1.0, 1.0, 1.0);  // White separator lines
         return;
     }
 
