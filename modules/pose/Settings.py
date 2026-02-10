@@ -91,7 +91,8 @@ class Settings:
     confidence_low: float =             field(default=0.5)
     confidence_high: float =            field(default=0.7)
     verbose: bool =                     field(default=False)
-    crop_expansion: float =             field(default=0.0)
+    crop_expansion_width: float =       field(default=0.0)
+    crop_expansion_height: float =      field(default=0.0)
 
     # Feature toggles
     segmentation_enabled: bool =        field(default=True)

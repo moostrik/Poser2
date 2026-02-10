@@ -9,21 +9,24 @@ from modules.utils.PointsAndRects import Rect, Point2f
 class ImageProcessor:
     """Handles image cropping and processing for pose detection"""
 
-    def __init__(self, crop_scale: float = 1.1, output_width: int = 192, output_height: int = 256):
+    def __init__(self, expansion_width: float = 0.1, expansion_height: float = 0.1, output_width: int = 192, output_height: int = 256):
         if output_width <= 0 or output_height <= 0:
             raise ValueError(f"Output dimensions must be positive, got {output_width}x{output_height}")
-        if crop_scale <= 0:
-            raise ValueError(f"Crop scale must be positive, got {crop_scale}")
-        self.crop_scale: float = crop_scale
+        self.expansion_width: float = expansion_width
+        self.expansion_height: float = expansion_height
         self.output_width: int = output_width
         self.output_height: int = output_height
         self.aspect_ratio: float = output_width / output_height
 
     def process_pose_image(self, roi: Rect, image: np.ndarray) -> tuple[np.ndarray, Rect]:
-        """Process a pose image: extract region from normalised roi and resize to configured dimensions."""
+        """Process a pose image: extract region from normalised roi and resize to configured dimensions.
+        
+        Args:
+            roi: Normalized bounding box (0-1 range) - expansion should be applied before calling this
+        """
         image_rect = Rect(0.0, 0.0, float(image.shape[1]), float(image.shape[0]))
 
-        roi = roi.zoom(self.crop_scale)
+        # Convert to pixel coordinates
         roi = roi.affine_transform(image_rect)
 
         # Determine extraction rectangle: scales to cover ROI while maintaining output aspect ratio

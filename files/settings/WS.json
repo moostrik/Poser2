@@ -45,7 +45,8 @@
     "model_path": "models",
     "confidence_threshold": 0.5,
     "verbose": true,
-    "crop_expansion": 0.1
+    "crop_expansion_width": 0.1,
+    "crop_expansion_height": 0.1
   },
 
   "pd_stream": {

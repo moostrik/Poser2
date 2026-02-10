@@ -10,6 +10,7 @@ from modules.pose.nodes._utils.ImageProcessor import ImageProcessor
 from modules.pose.Frame import FrameDict
 from modules.cam.depthcam.Definitions import FrameType
 from modules.utils.PerformanceTimer import PerformanceTimer
+from modules.utils.PointsAndRects import Point2f
 
 
 CropCallback = Callable[[FrameDict, dict[int, np.ndarray]], None]
@@ -18,8 +19,9 @@ PairCropCallback = Callable[[FrameDict, dict[int, tuple[np.ndarray, np.ndarray]]
 class ImageCropProcessorConfig:
     """Configuration for image cropping."""
 
-    def __init__(self, expansion: float = 0.1, output_width: int = 192, output_height: int = 256) -> None:
-        self.crop_scale: float = 1.0 + expansion
+    def __init__(self, expansion_width: float = 0.1, expansion_height: float = 0.1, output_width: int = 192, output_height: int = 256) -> None:
+        self.expansion_width: float = expansion_width
+        self.expansion_height: float = expansion_height
         self.output_width: int = output_width
         self.output_height: int = output_height
 
@@ -34,7 +36,8 @@ class ImageCropProcessor:
     def __init__(self, config: ImageCropProcessorConfig) -> None:
         self._config: ImageCropProcessorConfig = config
         self._image_processor: ImageProcessor = ImageProcessor(
-            crop_scale=self._config.crop_scale,
+            expansion_width=self._config.expansion_width,
+            expansion_height=self._config.expansion_height,
             output_width=self._config.output_width,
             output_height=self._config.output_height
         )
@@ -78,7 +81,7 @@ class ImageCropProcessor:
             if pose_id in self._images:
                 try:
                     image = self._images[pose_id]
-                    bbox_rect = pose.bbox.to_rect()
+                    bbox_rect = pose.bbox.to_rect().zoom(Point2f(1.0 + self._config.expansion_width, 1.0 + self._config.expansion_height))
 
                     # Crop current frame
                     result_image, result_roi = self._image_processor.process_pose_image(bbox_rect, image)

@@ -23,8 +23,9 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 class GPUCropProcessorConfig:
     """Configuration for GPU-based image cropping."""
 
-    def __init__(self, expansion: float = 0.0, output_width: int = 384, output_height: int = 512, max_poses: int = 4, enable_prev_crop: bool = True, verbose: bool = False) -> None:
-        self.crop_scale: float = 1.0 + expansion
+    def __init__(self, expansion_width: float = 0.0, expansion_height: float = 0.0, output_width: int = 384, output_height: int = 512, max_poses: int = 4, enable_prev_crop: bool = True, verbose: bool = False) -> None:
+        self.expansion_width: float = expansion_width
+        self.expansion_height: float = expansion_height
         self.output_width: int = output_width
         self.output_height: int = output_height
         self.max_poses: int = max_poses
@@ -53,7 +54,8 @@ class GPUCropProcessor:
         self._config: GPUCropProcessorConfig = config
         self._crop_width: int = config.output_width
         self._crop_height: int = config.output_height
-        self._crop_scale: float = config.crop_scale
+        self._expansion_width: float = config.expansion_width
+        self._expansion_height: float = config.expansion_height
         self._max_poses: int = config.max_poses
         self._aspect_ratio: float = config.output_width / config.output_height
         self._enable_prev_crop: bool = config.enable_prev_crop
@@ -142,7 +144,7 @@ class GPUCropProcessor:
                     gpu_image = self._gpu_images[pose_id]
                     # CHW format: (3, H, W)
                     img_height, img_width = gpu_image.shape[1:3]
-                    bbox_rect = pose.bbox.to_rect()
+                    bbox_rect = pose.bbox.to_rect().zoom(Point2f(1.0 + self._expansion_width, 1.0 + self._expansion_height))
 
                     # Calculate crop region (same logic as ImageProcessor)
                     crop_roi = self._calculate_crop_roi(bbox_rect, img_width, img_height)
@@ -205,7 +207,7 @@ class GPUCropProcessor:
         """Calculate crop region maintaining aspect ratio.
 
         Args:
-            bbox_rect: Normalized bounding box (0-1 range)
+            bbox_rect: Normalized expanded bounding box (0-1 range)
             img_width: Source image width
             img_height: Source image height
 
@@ -215,9 +217,8 @@ class GPUCropProcessor:
 
         image_rect = Rect(0.0, 0.0, float(img_width), float(img_height))
 
-        # Apply expansion and convert to pixel coordinates
-        roi = bbox_rect.zoom(self._crop_scale)
-        roi = roi.affine_transform(image_rect)
+        # Convert to pixel coordinates
+        roi = bbox_rect.affine_transform(image_rect)
 
         # Scale to cover ROI while maintaining output aspect ratio
         crop_roi = Rect(0, 0, self._crop_width, self._crop_height)

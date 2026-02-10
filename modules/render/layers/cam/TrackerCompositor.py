@@ -33,8 +33,11 @@ class TrackerCompositor(LayerBase):
         self._cam_texture: Texture = cam_texture
         self._depth_track_renderer: TrackletRenderer = TrackletRenderer(cam_id, data)
 
-        bbox_config: BBoxRendererConfig = BBoxRendererConfig(stage=self._config.stage, line_width=self._config.bbox_line_width)
-        self._bbox_renderer: BBoxRenderer = BBoxRenderer(cam_id, data, (1.0, 1.0, 1.0, 1.0), bbox_config)
+        bbox_config_A: BBoxRendererConfig = BBoxRendererConfig(stage=Stage.RAW, line_width=self._config.bbox_line_width * 2.0)
+        self._bbox_renderer_A: BBoxRenderer = BBoxRenderer(cam_id, data, (0.5, 0.5, 0.5, 0.5), bbox_config_A)
+
+        bbox_config_B: BBoxRendererConfig = BBoxRendererConfig(stage=Stage.LERP, line_width=self._config.bbox_line_width)
+        self._bbox_renderer_B: BBoxRenderer = BBoxRenderer(cam_id, data, (1.0, 1.0, 1.0, 1.0), bbox_config_B)
 
         pose_config: PoseRendererConfig = PoseRendererConfig(stage=self._config.stage, line_width=self._config.pose_line_width, line_smooth=0.0, use_scores=False, use_bbox=True)
         self._pose_renderer: PoseRenderer = PoseRenderer(cam_id, data, colors=None, config=pose_config)
@@ -45,35 +48,32 @@ class TrackerCompositor(LayerBase):
     def texture(self) -> Texture:
         return self._fbo.texture
 
-    @property
-    def bbox_color(self) -> tuple[float, float, float, float]:
-        return self._bbox_renderer.bbox_color
-    @bbox_color.setter
-    def bbox_color(self, value: tuple[float, float, float, float]) -> None:
-        self._bbox_renderer.bbox_color = value
-
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._depth_track_renderer.allocate(width, height, internal_format)
-        self._bbox_renderer.allocate(width, height, internal_format)
+        self._bbox_renderer_A.allocate(width, height, internal_format)
+        self._bbox_renderer_B.allocate(width, height, internal_format)
         self._pose_renderer.allocate(width, height, internal_format)
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._depth_track_renderer.deallocate()
-        self._bbox_renderer.deallocate()
+        self._bbox_renderer_A.deallocate()
+        self._bbox_renderer_B.deallocate()
         self._pose_renderer.deallocate()
 
     def update(self) -> None:
         # Update sub-layers
         self._depth_track_renderer.update()
-        self._bbox_renderer.update()
+        self._bbox_renderer_A.update()
+        self._bbox_renderer_B.update()
         self._pose_renderer.update()
 
         # Composite: camera + tracklets + bboxes + all pose lines
         self._fbo.begin()
         Blit.use(self._cam_texture)
         self._depth_track_renderer.draw()
-        self._bbox_renderer.draw()
+        self._bbox_renderer_A.draw()
+        self._bbox_renderer_B.draw()
         self._pose_renderer.draw()
         self._fbo.end()

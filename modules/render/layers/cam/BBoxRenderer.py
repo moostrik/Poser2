@@ -15,7 +15,7 @@ from modules.render.shaders import DrawRectangleOutline
 @dataclass
 class BBoxRendererConfig(ConfigBase):
     stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
-    line_width: int = config_field(2, min=1, max=10, description="Bounding box line width in pixels")
+    line_width: float = config_field(2, min=1, max=10, description="Bounding box line width in pixels")
 
 
 class BBoxRenderer(LayerBase):

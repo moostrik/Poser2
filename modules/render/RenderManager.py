@@ -18,7 +18,7 @@ from modules.utils.PointsAndRects import Rect, Point2f
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render import layers as ls
-from modules.render.layers.data.colors import TRACK_COLORS
+from modules.render.layers.data.colors import TRACK_COLORS, HISTORY_COLOR
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -160,9 +160,8 @@ class RenderManager(RenderBase):
         centre_cam_config =     ls.CentreCamConfig(     blend_factor=0.5, mask_opacity=1.0, use_mask=True)
         centre_frg_config =     ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
         centre_pose_config =    ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
-        grey: tuple[float, float, float, float] = (0.5, 0.5, 0.5, 1.0)
         data_A_config =         ls.DataLayerConfig(stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
-        data_B_config =         ls.DataLayerConfig(stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[grey])
+        data_B_config =         ls.DataLayerConfig(stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[HISTORY_COLOR])
         data_time_config =      ls.MTimeRendererConfig(     stage=Stage.LERP)
 
         for i in range(self.num_cams):

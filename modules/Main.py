@@ -73,8 +73,8 @@ class Main():
         self.data_gui = ConfigGuiGenerator(settings.render, self.gui, "Render")
 
         # POSE CONFIGURATION
-        # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
-        self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion=settings.pose.crop_expansion, output_width=768, output_height=1024, max_poses=settings.pose.max_poses, verbose=False, enable_prev_crop=False)
+        # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
+        self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=768, output_height=1024, max_poses=settings.pose.max_poses, verbose=False, enable_prev_crop=False)
         self.prediction_config =    nodes.PredictorConfig(frequency=settings.camera.fps)
 
         self.b_box_smooth_config =  nodes.EuroSmootherConfig()
