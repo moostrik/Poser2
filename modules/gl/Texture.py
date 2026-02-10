@@ -211,3 +211,32 @@ class Texture():
         if flip:
             pixels = np.flipud(pixels)
         return pixels
+
+    def clear(self, r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 0.0) -> None:
+        """Clear texture to specified color using glClearTexImage (OpenGL 4.4+).
+
+        Args:
+            r: Red component [0.0, 1.0]
+            g: Green component [0.0, 1.0]
+            b: Blue component [0.0, 1.0]
+            a: Alpha component [0.0, 1.0]
+        """
+        if not self.allocated:
+            return
+
+        # Get channel count to know how many components to pass
+        channels = get_channel_count(self.format)
+        if channels is None:
+            return
+
+        # Prepare clear color data based on data_type
+        if self.data_type == GL_UNSIGNED_BYTE:
+            # Convert [0.0, 1.0] to [0, 255]
+            clear_data = np.array([r * 255, g * 255, b * 255, a * 255][:channels], dtype=np.uint8)
+        elif self.data_type == GL_HALF_FLOAT:
+            clear_data = np.array([r, g, b, a][:channels], dtype=np.float16)
+        else:  # GL_FLOAT
+            clear_data = np.array([r, g, b, a][:channels], dtype=np.float32)
+
+        # Clear texture directly (OpenGL 4.4+) - use self.format directly
+        glClearTexImage(self.tex_id, 0, self.format, self.data_type, clear_data)

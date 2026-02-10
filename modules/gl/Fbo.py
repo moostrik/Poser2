@@ -35,12 +35,6 @@ class Fbo(Texture):
         """End rendering to FBO and restore previous state."""
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-    def clear(self, r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
-        self.begin()
-        glClearColor(r, g, b, a)
-        glClear(GL_COLOR_BUFFER_BIT) # type: ignore
-        self.end()
-
 class SwapFbo(Fbo):
     """Double-buffered FBO that swaps between two buffers.
 

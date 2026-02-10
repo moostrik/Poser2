@@ -37,6 +37,9 @@ class FrgSourceLayer(LayerBase):
         foreground: torch.Tensor | None = gpu_frame.foreground if gpu_frame else None
         self._data_cache.update(foreground)
 
+        if self._data_cache.lost:
+            self._cuda_image.clear()
+
         if self._data_cache.idle or foreground is None:
             return
 

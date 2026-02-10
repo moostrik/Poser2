@@ -44,6 +44,9 @@ class MaskSourceLayer(LayerBase):
         mask_tensor: torch.Tensor | None = gpu_frame.mask if gpu_frame else None
         self._data_cache.update(mask_tensor)
 
+        if self._data_cache.lost:
+            self._cuda_image.clear()
+
         if self._data_cache.idle or mask_tensor is None:
             return
 

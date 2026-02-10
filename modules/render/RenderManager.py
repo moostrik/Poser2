@@ -157,8 +157,8 @@ class RenderManager(RenderBase):
         self.pose_comp_config =     ls.PoseCompositorConfig(stage=Stage.LERP, line_width=2.0, line_smooth=0.0, use_gpu_crop=True)
 
         self.centre_gmtr_config=    ls.CentreGeometryConfig(stage=Stage.LERP, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
-        self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.2, blur_steps=0, blur_radius=8.0, dilation_steps=0)
-        self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.5, mask_opacity=1.0, use_mask=True)
+        self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.3, blur_steps=0, blur_radius=1.0, dilation_steps=0)
+        self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
         self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
         self.centre_pose_config =   ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
 
@@ -288,11 +288,6 @@ class RenderManager(RenderBase):
         self._update_layers = UPDATE_LAYERS
         self._draw_layers = FINAL_LAYERS
         self._preview_layers = PREVIEW_LAYERS
-
-        self.centre_mask_config.blend_factor = 0.2
-        self.centre_mask_config.blur_steps = 0
-        self.centre_mask_config.blur_radius = 8.0
-        self.centre_mask_config.dilation_steps = 0
 
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
