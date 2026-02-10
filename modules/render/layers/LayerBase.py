@@ -30,7 +30,7 @@ class LayerBase(ABC):
     def draw(self) -> None:
         """Default implementation: draw texture to rect."""
         if self.texture.allocated:
-            Blit().use(self.texture)
+            Blit.use(self.texture)
 
 T = TypeVar('T')
 
