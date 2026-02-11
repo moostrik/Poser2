@@ -204,6 +204,8 @@ class FlowLayer(LayerBase):
         self.config.density_bridge.saturation = 1.2
         self.config.density_bridge.brightness = 0.5
 
+        self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_OUTPUT
+
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
         motion = pose.angle_motion.value if pose is not None else 0.0
@@ -222,9 +224,11 @@ class FlowLayer(LayerBase):
         self._velocity_magnitude.set_input(self._velocity_trail.velocity)
         self._velocity_magnitude.update()
 
-        self._density_bridge.set_color(self._motion)
+        self._density_bridge.set_color(self._mask)
         self._density_bridge.set_velocity(self._mask)
-        self._density_bridge.update(motion / 60.0)
+        self._density_bridge.update(motion)
+        # self._density_bridge.set_velocity(self._optical_flow.velocity)
+        # self._density_bridge.update()
 
         self._temperature_bridge.set_color(self._mask)
         self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)

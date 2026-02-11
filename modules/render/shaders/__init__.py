@@ -6,6 +6,7 @@ from .generic.Tint import               Tint
 from .generic.DrawRoi import            DrawRoi
 from .generic.DrawCircles import        DrawCircles
 from .generic.DenseFlowFilter import    DenseFlowFilter
+from .generic.DensityColorize import    DensityColorize
 
 from .mask.MaskAA import                MaskAA
 from .mask.MaskApply import             MaskApply

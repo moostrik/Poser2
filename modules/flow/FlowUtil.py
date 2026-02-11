@@ -174,6 +174,30 @@ class FlowUtil:
         dst_fbo.end()
 
     @staticmethod
+    def add_channel(dst_fbo: SwapFbo, src: Texture, channel: int, strength: float = 1.0) -> None:
+        """Add single-channel texture to specific channel of destination.
+
+        Uses ping-pong buffer: reads from current state, writes to swapped state.
+
+        Args:
+            dst_fbo: Destination SwapFbo (RGBA, will be swapped)
+            src: Source single-channel texture (R32F)
+            channel: Target channel (0=R, 1=G, 2=B, 3=A)
+            strength: Multiplier for the addition
+        """
+        # Lazy init shader
+        if not hasattr(FlowUtil, '_channel_add_shader'):
+            from .shaders.ChannelAdd import ChannelAdd
+            FlowUtil._channel_add_shader = ChannelAdd()
+            FlowUtil._channel_add_shader.allocate()
+
+        # Swap and add: preserve other channels from prev, add to target channel
+        dst_fbo.swap()
+        dst_fbo.begin()
+        FlowUtil._channel_add_shader.use(dst_fbo.back_texture, src, channel, strength)
+        dst_fbo.end()
+
+    @staticmethod
     def clamp(dst_fbo: SwapFbo, min_val: float = 0.0, max_val: float = 1.0) -> None:
         """Clamp all channels to a min/max range.
 

@@ -4,23 +4,26 @@
 from __future__ import annotations
 from enum import IntEnum, auto
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 # Third-party imports
 from OpenGL.GL import *  # type: ignore
+import numpy as np
 
 # Local application imports
-from modules.gl import Texture, Style
+from modules.gl import Texture, Style, Fbo
 from modules.render.layers.LayerBase import LayerBase, Blit
-from modules.DataHub import DataHub
+from modules.DataHub import DataHub, Stage
+from modules.pose.Frame import Frame, MotionGate, Similarity
 
 from modules.flow import Visualizer, VisualisationFieldConfig
 from modules.flow.fluid import FluidFlow, FluidFlowConfig
+from modules.render.shaders import DensityColorize
+
+from modules.render.layers.data.colors import TRACK_COLORS
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
-if TYPE_CHECKING:
-    from .FlowLayer import FlowLayer
+from .FlowLayer import FlowLayer
 
 
 class FluidDrawMode(IntEnum):
@@ -28,7 +31,8 @@ class FluidDrawMode(IntEnum):
 
     Outputs from fluid simulation:
         VELOCITY - Advected velocity field (RG16F)
-        DENSITY - Advected density field (RGBA16F)
+        DENSITY - Colorized density field (RGBA16F, colored by track)
+        DENSITY_RAW - Raw density field before colorization (RGBA16F)
         PRESSURE - Pressure field (R32F)
         TEMPERATURE - Temperature field (R32F)
         DIVERGENCE - Velocity divergence (R32F)
@@ -38,6 +42,7 @@ class FluidDrawMode(IntEnum):
     """
     VELOCITY = 0
     DENSITY = auto()
+    DENSITY_RAW = auto()
     PRESSURE = auto()
     TEMPERATURE = auto()
     DIVERGENCE = auto()
@@ -50,14 +55,10 @@ class FluidDrawMode(IntEnum):
 class FluidLayerConfig:
     """Configuration for FluidLayer (fluid simulation)."""
     fps: float = 60.0
+    num_players: int = 3
     draw_mode: FluidDrawMode = FluidDrawMode.DENSITY
     blend_mode: Style.BlendMode = Style.BlendMode.ADDITIVE
     simulation_scale: float = 0.25
-
-    # Scale factors for inputs
-    velocity_scale: float = 1.0
-    density_scale: float = 1.0
-    temperature_scale: float = 1.0
 
     # Nested configs
     visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)
@@ -107,6 +108,16 @@ class FluidLayer(LayerBase):
 
         self._fluid_flow: FluidFlow = FluidFlow(self.config.simulation_scale, self.config.fluid_flow)
         self._visualizer: Visualizer = Visualizer(self.config.visualisation)
+
+        # Colorization resources (rendering concern, not simulation)
+        self._colorized_fbo: Fbo = Fbo()
+        self._density_colorize_shader: DensityColorize = DensityColorize()
+
+        # Track colors for per-channel density colorization (up to 4 channels)
+        self._track_colors: list[tuple[float, float, float, float]] = list(TRACK_COLORS[:4])
+        # Pad with transparent black if fewer than 4 colors
+        while len(self._track_colors) < 4:
+            self._track_colors.append((0.0, 0.0, 0.0, 0.0))
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -174,10 +185,16 @@ class FluidLayer(LayerBase):
         self._fluid_flow.allocate(sim_width, sim_height, width, height)
         self._visualizer.allocate(sim_width, sim_height)
 
+        # Allocate colorization FBO at simulation resolution
+        self._colorized_fbo.allocate(sim_width, sim_height, GL_RGBA16F)
+        self._density_colorize_shader.allocate()
+
     def deallocate(self) -> None:
         """Deallocate all resources."""
         self._fluid_flow.deallocate()
         self._visualizer.deallocate()
+        self._colorized_fbo.deallocate()
+        self._density_colorize_shader.deallocate()
 
     def reset(self) -> None:
         """Reset fluid simulation state."""
@@ -188,17 +205,20 @@ class FluidLayer(LayerBase):
     def update(self) -> None:
         """Update fluid simulation with inputs from all flow layers."""
         # Configuration overrides (for hot-reload testing)
-        self.config.fluid_flow.vel_speed = 0.9
+        self.config.fluid_flow.vel_speed = 10.0
         self.config.fluid_flow.vel_decay = 6.0
-        self.config.fluid_flow.vel_vorticity = 0.0
+
+        self.config.fluid_flow.vel_vorticity = 1.0
         self.config.fluid_flow.vel_vorticity_radius = 20.0
         self.config.fluid_flow.vel_viscosity = 10
         self.config.fluid_flow.vel_viscosity_iter = 20
 
-        self.config.fluid_flow.den_speed = 1.0
-        self.config.fluid_flow.den_decay = 6.0
+        self.config.fluid_flow.den_speed = 5
+        self.config.fluid_flow.den_decay = 6
+
         self.config.fluid_flow.tmp_speed = 0.33
         self.config.fluid_flow.tmp_decay = 3.0
+
         self.config.fluid_flow.prs_speed = 0.0
         self.config.fluid_flow.prs_decay = 0.0
         self.config.fluid_flow.prs_iterations = 40
@@ -208,31 +228,46 @@ class FluidLayer(LayerBase):
 
         self.config.draw_mode = FluidDrawMode.DENSITY
 
+
+        # Get motion data from pose
+        pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
+        similarities: np.ndarray = pose.similarity.values if pose is not None else np.full((self.config.num_players,), 0.0)
+        motion_gates: np.ndarray = pose.motion_gate.values if pose is not None else np.full((self.config.num_players,), 0.0)
+        motion: float = pose.angle_motion.value if pose is not None else 0.0
+        m_s = similarities * motion_gates  # Modulate similarity by motion gate
+        # print(f"FluidLayer cam_id {self._cam_id} similarities: {similarities}, motion_gates: {motion_gates}")  # DEBUG
+
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         # Aggregate inputs from all flow layers (cross-camera)
+        vel_strength: float
+        den_strength: float
         for cam_id, flow_layer in self._flow_layers.items():
-            if cam_id != self._cam_id:
-                continue
-
-            # Scale factor: own camera gets full strength, others can be scaled
-            scale = 1.0 if cam_id == self._cam_id else 1.0
+            if cam_id == self._cam_id:
+                vel_strength = 0.1
+                den_strength =  1.0
+            else:
+                vel_strength = 0 # m_s[cam_id]  # Cross-camera influence modulated by similarity and motion gate
+                den_strength = 0 # (m_s[cam_id] * motion) / 60  # Cross-camera influence modulated by similarity, motion gate, and motion value
 
             # Add velocity from each flow layer
-            velocity_strength = self.config.velocity_scale * scale
-            self._fluid_flow.add_velocity(flow_layer.velocity, 1.0)
+            self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
 
-            # Add density from each flow layer
-            density_strength = self.config.density_scale * scale
-            self._fluid_flow.add_density(flow_layer.density)
+            # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
+            channel: int = cam_id % 4  # Map camera to RGBA channel
+            self._fluid_flow.add_density_channel(flow_layer.density, channel, den_strength)
+            self._fluid_flow.clamp_density(0.0, 1.1)
+
 
             # Add temperature from each flow layer
-            temperature_strength = self.config.temperature_scale * scale
-            self._fluid_flow.add_temperature(flow_layer.temperature)
+            self._fluid_flow.add_temperature(flow_layer.temperature, 0.0)
 
         # Update fluid simulation
         self._fluid_flow.update(self._delta_time)
+
+        # Colorize density channels with track colors
+        self._colorize_density()
 
         # Update visualization
         self._visualizer.update(self._get_draw_texture())
@@ -257,7 +292,8 @@ class FluidLayer(LayerBase):
         """Get texture to draw based on draw_mode."""
         textures = {
             FluidDrawMode.VELOCITY: self._fluid_flow.velocity,
-            FluidDrawMode.DENSITY: self._fluid_flow.density,
+            FluidDrawMode.DENSITY: self._colorized_fbo.texture,
+            FluidDrawMode.DENSITY_RAW: self._fluid_flow.density,
             FluidDrawMode.PRESSURE: self._fluid_flow.pressure,
             FluidDrawMode.TEMPERATURE: self._fluid_flow.temperature,
             FluidDrawMode.DIVERGENCE: self._fluid_flow.divergence,
@@ -266,3 +302,13 @@ class FluidLayer(LayerBase):
             FluidDrawMode.OBSTACLE: self._fluid_flow.obstacle,
         }
         return textures.get(self.config.draw_mode, self._fluid_flow.density)
+
+    def _colorize_density(self) -> None:
+        """Colorize density channels with track colors.
+
+        Maps each RGBA density channel to a corresponding track color and
+        composites them additively.
+        """
+        self._colorized_fbo.begin()
+        self._density_colorize_shader.use(self._fluid_flow.density, self._track_colors)
+        self._colorized_fbo.end()

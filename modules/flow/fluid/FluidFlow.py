@@ -353,13 +353,17 @@ class FluidFlow(FlowBase):
         """Set single-channel texture to one of the density channels. """
         FlowUtil.set_channel(self._output_fbo, texture, channel)
 
-    def clamp_density(self, min_value: float = 0.0, max_value: float = 1.0) -> None:
-        """Clamp density values to a specified range."""
-        FlowUtil.clamp(self._output_fbo, min_value, max_value)
-
     def add_density(self, texture: Texture, strength: float = 1.0) -> None:
         """Add to density field."""
         FlowUtil.add(self._output_fbo, texture, strength)
+
+    def add_density_channel(self, texture: Texture, channel: int, strength: float = 1.0) -> None:
+        """Add single-channel texture to one of the density channels."""
+        FlowUtil.add_channel(self._output_fbo, texture, channel, strength)
+
+    def clamp_density(self, min_value: float = 0.0, max_value: float = 1.0) -> None:
+        """Clamp density values to a specified range."""
+        FlowUtil.clamp(self._output_fbo, min_value, max_value)
 
     def set_temperature(self, texture: Texture) -> None:
         """Set temperature field."""
