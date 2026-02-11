@@ -54,7 +54,8 @@ class Layers(IntEnum):
     motion =        auto()
     flow =          auto()
     fluid =         auto()
-    ms_mask = auto()
+    ms_mask =       auto()
+    composite =     auto()
 
     # hdt_prep =      auto()
     # hdt_blend =     auto()
@@ -76,6 +77,7 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.ms_mask,
     Layers.flow,
     Layers.fluid,
+    Layers.composite,
 
     # Layers.hdt_prep,
     # Layers.hdt_blend,
@@ -92,6 +94,7 @@ LARGE_LAYERS: list[Layers] = [
     Layers.centre_pose,
     Layers.flow,
     Layers.fluid,
+    Layers.composite,
 ]
 
 PREVIEW_CENTRE: list[Layers] = [
@@ -128,13 +131,14 @@ SHOW_COMP: list[Layers] = [
     # Layers.centre_frg,
     # Layers.flow,
     # Layers.centre_mask,
-    Layers.motion,
-    Layers.fluid,
-    Layers.ms_mask,
+    # Layers.motion,
+    # Layers.fluid,
+    # Layers.ms_mask,
     # Layers.sim_blend,
     # Layers.centre_pose,
     # Layers.centre_motion,
     # Layers.cam_frg,
+    Layers.composite,
 ]
 
 SHOW_DATA: list[Layers] = [
@@ -182,6 +186,11 @@ class RenderManager(RenderBase):
         self.data_A_config =        ls.DataLayerConfig(     stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
         self.data_B_config =        ls.DataLayerConfig(     stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[HISTORY_COLOR])
         self.data_time_config =     ls.MTimeRendererConfig( stage=Stage.LERP)
+        self.composite_config =     ls.CompositeLayerConfig(lut=settings.lut, lut_strength=settings.lut_strength)
+
+        # Watch settings for LUT changes and propagate to composite config
+        settings.watch(lambda v: setattr(self.composite_config, 'lut', v), 'lut')
+        settings.watch(lambda v: setattr(self.composite_config, 'lut_strength', v), 'lut_strength')
 
         flows: dict[int, ls.FlowLayer] = {}
         mask_textures: dict[int, Texture] = {}
@@ -203,9 +212,11 @@ class RenderManager(RenderBase):
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_gmtry,    color,                                      self.centre_pose_config)
 
             motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,   centre_mask.texture, color)
+            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub, mask_textures, list(TRACK_COLORS))
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   centre_mask.texture, list(TRACK_COLORS))
             fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS))
-            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub, mask_textures, list(TRACK_COLORS))
+
+            self.L[Layers.composite][i] = ls.CompositeLayer([centre_pose, ms_mask, fluid], self.composite_config)
 
             # centre_motion = self.L[Layers.hdt_prep][i]=     ls.HDTPrepare(          i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
             # sim_blend =     self.L[Layers.hdt_blend][i] =   ls.HDTBlend(            i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.HDTPrepare], self.L[Layers.hdt_prep]))
@@ -279,6 +290,9 @@ class RenderManager(RenderBase):
                 layer.deallocate()
 
     def draw_main(self, width: int, height: int) -> None:
+
+        Style.reset_state()
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
         self.data_hub.notify_update()
         seen: set[Layers] = set()
         for layer_type in self._update_layers + self._interface_layers + self._draw_layers + self._preview_layers:

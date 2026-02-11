@@ -1,3 +1,4 @@
 models/*.onnx filter=lfs diff=lfs merge=lfs -text
 models/*.blob filter=lfs diff=lfs merge=lfs -text
 models/**/*.pth filter=lfs diff=lfs merge=lfs -text
+files/lut/*.cube filter=lfs diff=lfs merge=lfs -text

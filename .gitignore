@@ -5,7 +5,7 @@ BACKUP/
 recordings/*
 logs/*
 files/audio/UMU*
-files/lut/*
+# files/lut/*
 RobustVideoMatting/*
 ofxFlowTools_new/*
 openFrameworks/*

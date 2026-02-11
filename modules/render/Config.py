@@ -5,6 +5,7 @@ from typing import Protocol
 from modules.ConfigBase import ConfigBase, config_field
 from modules.DataHub import Stage
 from modules.pose.Frame import FrameField, ScalarFrameField
+from modules.render.layers.generic.CompositeLayer import LutSelection
 
 
 # Auto-generated list of scalar features from Frame definition
@@ -69,6 +70,10 @@ class Config(ConfigBase):
     mode: LayerMode =        config_field(LayerMode.WINDOW)
     A: Stage =          config_field(Stage.SMOOTH)
     B: Stage =          config_field(Stage.LERP)
+
+    # LUT config (mutable — runtime switching)
+    lut: LutSelection =      config_field(default_factory=lambda: LutSelection.NONE)  # type: ignore[assignment]
+    lut_strength: float =    config_field(1.0, min=0.0, max=1.0)
 
     def bind(self,
              windows_a: dict[int, DataLayer], frames_a: dict[int, DataLayer], angvel_a: dict[int, DataLayer],
