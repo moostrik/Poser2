@@ -347,6 +347,7 @@ class ConfigBase:
                 "type": f.type,
                 "default": default_val,
                 "value": getattr(self, f.name),
+                "repr": f.repr,
             }
             # Add standard keys with defaults only if not present
             result[f.name].setdefault("label", _generate_label(f.name))

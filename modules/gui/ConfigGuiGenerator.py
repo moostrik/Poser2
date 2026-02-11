@@ -52,6 +52,9 @@ class ConfigGuiGenerator:
         all_element_pairs = []
 
         for field_name, metadata in self.config.info().items():
+            # Skip fields with repr=False
+            if not metadata.get("repr", True):
+                continue
             element_pair = self._create_element_row(field_name, metadata)
             if element_pair:
                 all_element_pairs.append(element_pair)
@@ -164,6 +167,9 @@ class ConfigGuiGenerator:
         for field_name, metadata in self.config.info().items():
             # Skip fixed fields - they never change after init
             if metadata["fixed"]:
+                continue
+            # Skip fields with repr=False
+            if not metadata.get("repr", True):
                 continue
 
             key = f"{self.name}_{field_name}"

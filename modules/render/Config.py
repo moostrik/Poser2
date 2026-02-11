@@ -11,12 +11,17 @@ from modules.pose.Frame import FrameField, ScalarFrameField
 DATA_FEATURES: list[FrameField] = FrameField.get_scalar_fields()
 
 
-class SlotStage(IntEnum):
-    """Stage selection for data layer slots. NONE disables the slot."""
-    NONE =      -1
-    RAW =       Stage.RAW
-    SMOOTH =    Stage.SMOOTH
-    LERP =      Stage.LERP
+class RenderFeature(IntEnum):
+    """Feature field selection for rendering. NONE disables the feature."""
+    NONE =          -1
+    bbox =          ScalarFrameField.bbox
+    angles =        ScalarFrameField.angles
+    angle_vel =     ScalarFrameField.angle_vel
+    angle_motion =  ScalarFrameField.angle_motion
+    angle_sym =     ScalarFrameField.angle_sym
+    similarity =    ScalarFrameField.similarity
+    leader =        ScalarFrameField.leader
+    motion_gate =   ScalarFrameField.motion_gate
 
 
 class LayerMode(IntEnum):
@@ -40,7 +45,7 @@ class DataLayerConfig(Protocol):
 @dataclass
 class Config(ConfigBase):
     """Render configuration with data layer binding."""
-    title: str =         config_field("Poser",  fixed=True)
+    title: str =         config_field("Poser",   fixed=True)
     monitor: int =       config_field(0,         fixed=True)
     width: int =         config_field(1920,      fixed=True)
     height: int =        config_field(1000,      fixed=True)
@@ -60,18 +65,18 @@ class Config(ConfigBase):
     stream_capacity: int = config_field(600,     fixed=True, description="10 seconds at 60 FPS")
 
     # Data layer config (mutable — runtime switching via GUI / watch)
-    feature: ScalarFrameField = config_field(ScalarFrameField.angle_motion)
-    mode: LayerMode =           config_field(LayerMode.WINDOW)
-    stage_a: SlotStage =        config_field(SlotStage.SMOOTH)
-    stage_b: SlotStage =        config_field(SlotStage.LERP)
+    feature: RenderFeature = config_field(RenderFeature.angle_motion)
+    mode: LayerMode =        config_field(LayerMode.WINDOW)
+    A: Stage =          config_field(Stage.SMOOTH)
+    B: Stage =          config_field(Stage.LERP)
 
     def bind(self,
              windows_a: dict[int, DataLayer], frames_a: dict[int, DataLayer], angvel_a: dict[int, DataLayer],
              windows_b: dict[int, DataLayer], frames_b: dict[int, DataLayer], angvel_b: dict[int, DataLayer]) -> None:
         """Bind layer instances to this config. Config changes propagate active state to layers."""
         self._slots = [
-            (windows_a, frames_a, angvel_a, 'stage_a'),
-            (windows_b, frames_b, angvel_b, 'stage_b'),
+            (windows_a, frames_a, angvel_a, 'A'),
+            (windows_b, frames_b, angvel_b, 'B'),
         ]
         self.watch(self._propagate)
         self._propagate()
@@ -79,22 +84,23 @@ class Config(ConfigBase):
     def _propagate(self) -> None:
         """Push current config to bound layers, setting active state and shared properties."""
         ff = self.feature
-        is_angles = (ff == ScalarFrameField.angles)
+        scalar_field = None if ff == RenderFeature.NONE else ScalarFrameField(ff.value)
+        is_angles = (scalar_field == ScalarFrameField.angles) if scalar_field else False
 
         for windows, frames, angvel, stage_attr in self._slots:
-            slot_stage: SlotStage = getattr(self, stage_attr)
+            stage: Stage = getattr(self, stage_attr)
             for i in windows:
                 # Deactivate all three layer types
                 windows[i].set_active(False)
                 frames[i].set_active(False)
                 angvel[i].set_active(False)
 
-                # Activate and configure the selected layer
-                if slot_stage != SlotStage.NONE:
+                # Activate and configure the selected layer if feature is not NONE
+                if scalar_field is not None:
                     layer = windows[i] if self.mode == LayerMode.WINDOW else (angvel[i] if is_angles else frames[i])
                     layer.set_active(True)
 
                     # Update shared config properties (all layers see these changes)
                     cfg = layer._config
-                    cfg.feature_field = ff
-                    cfg.stage = Stage(slot_stage)
+                    cfg.feature_field = scalar_field
+                    cfg.stage = stage
