@@ -16,6 +16,7 @@ from .filters.DualConfidenceFilters import      DualConfFilterConfig,       BBox
 from .filters.Predictors import                 PredictorConfig,    BBoxPredictor,      PointPredictor,     AnglePredictor,     AngleVelPredictor,      AngleSymPredictor
 from .filters.EmaSmoothers import               EmaSmootherConfig,  BBoxEmaSmoother,    PointEmaSmoother,   AngleEmaSmoother,   AngleVelEmaSmoother,    AngleSymEmaSmoother,    SimilarityEmaSmoother,  AngleMotionEmaSmoother
 from .filters.EuroSmoothers import              EuroSmootherConfig, BBoxEuroSmoother,   PointEuroSmoother,  AngleEuroSmoother,  AngleVelEuroSmoother,   AngleSymEuroSmoother,   SimilarityEuroSmoother
+from .filters.MovingAverageSmoothers import     MovingAverageConfig, WindowType, AngleMotionMovingAverageSmoother, SimilarityMovingAverageSmoother
 from .filters.StickyFillers import              StickyFillerConfig, BBoxStickyFiller,   PointStickyFiller,  AngleStickyFiller,  AngleVelStickyFiller,   AngleSymStickyFiller,   SimilarityStickyFiller
 from .filters.RateLimiters import               RateLimiterConfig,  BBoxRateLimiter,    PointRateLimiter,   AngleRateLimiter,   AngleVelRateLimiter,    AngleSymRateLimiter,    SimilarityRateLimiter,  AngleMotionRateLimiter
 from .filters.EasingNode import                 EasingConfig,       EasingNode,         AngleMotionEasingNode

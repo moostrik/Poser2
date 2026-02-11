@@ -1,5 +1,6 @@
 from .EmaSmootherGui import         EmaSmootherGui
 from .EuroSmootherGui import        EuroSmootherGui
+from .MovingAverageSmootherGui import MovingAverageSmootherGui
 from .PredictionGui import          PredictionGui
 from .InterpolatorGui import        InterpolatorGui
 from .RateLimitSmootherGui import   RateLimitSmootherGui
