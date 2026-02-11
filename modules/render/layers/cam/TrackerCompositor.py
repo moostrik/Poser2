@@ -42,7 +42,7 @@ class TrackerCompositor(LayerBase):
         pose_config: PoseRendererConfig = PoseRendererConfig(stage=self._config.stage, line_width=self._config.pose_line_width, line_smooth=0.0, use_scores=False, use_bbox=True)
         self._pose_renderer: PoseRenderer = PoseRenderer(cam_id, data, colors=None, config=pose_config)
 
-        self.hot_reload = HotReloadMethods(self.__class__)
+        # self.hot_reload = HotReloadMethods(self.__class__)
 
     @property
     def texture(self) -> Texture:

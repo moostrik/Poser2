@@ -1,8 +1,6 @@
 from modules.gui.PyReallySimpleGui import Gui, eType as eT
 from modules.gui.PyReallySimpleGui import Element as E, Frame as Frame
 from modules.cam.recorder.SyncRecorder import SyncRecorder
-from modules.cam.depthcam.Definitions import FrameType
-from modules.utils.HotReloadMethods import HotReloadMethods
 import time
 from threading import Thread
 
@@ -35,7 +33,6 @@ class SyncRecorderGui(SyncRecorder):
                      E(eT.ITXT, 'Group ID', self.receive_text_for_no_reason, 'no_id')])
 
         self._frame = Frame('RECORDER', elem, 60)
-        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def get_gui_frame(self):
         return self._frame

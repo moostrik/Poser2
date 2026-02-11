@@ -12,10 +12,7 @@ from modules.DataHub import DataHub, Stage
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.layers.source import ImageSourceLayer
 from modules.render.shaders import DrawRoi
-
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
@@ -34,8 +31,6 @@ class CropLayer(LayerBase):
 
         # Add DrawRoi shader
         self._roi_shader = DrawRoi()
-
-        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

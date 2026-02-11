@@ -10,8 +10,6 @@ from modules.gl import Tensor, Texture
 from modules.render.layers.LayerBase import LayerBase, DataCache
 from modules.pose.batch.ImageFrame import ImageFrame
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 class CropSourceLayer(LayerBase):
     """Renders the cropped region from GPUFrame.
@@ -24,9 +22,6 @@ class CropSourceLayer(LayerBase):
         self._data_hub: DataHub = data_hub
         self._cuda_image: Tensor = Tensor()
         self._data_cache: DataCache[ImageFrame] = DataCache[ImageFrame]()
-
-        # hot reloader
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

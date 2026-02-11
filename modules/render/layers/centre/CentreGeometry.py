@@ -76,7 +76,7 @@ class CentreGeometry(LayerBase):
         )
         self._transformed_points: Points2D | None = None
 
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
+        # self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def present(self) -> bool:

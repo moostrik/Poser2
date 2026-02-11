@@ -14,8 +14,6 @@ from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import FeatureShader
 from modules.render.layers.data.DataLayerConfig import FEATURE_COLORS, DEFAULT_COLORS, DataLayerConfig
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 class FeatureFrameLayer(LayerBase):
     """Visualizes a single pose feature as horizontal lines per joint.
@@ -39,8 +37,6 @@ class FeatureFrameLayer(LayerBase):
 
         self._shader: FeatureShader = FeatureShader()
         self._text_renderer: Text = Text()
-
-        self._hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def set_active(self, active: bool) -> None:
         """Set active state and trigger cleanup on deactivation."""

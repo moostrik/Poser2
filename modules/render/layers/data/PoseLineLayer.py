@@ -15,8 +15,6 @@ from modules.pose.features.Points2D import Points2D
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import PosePointLines as shader
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 @dataclass
 class PoseLineConfig(ConfigBase):
@@ -40,7 +38,6 @@ class PoseLineLayer(LayerBase):
         self.color: tuple[float, float, float, float] | None = color
 
         self._shader: shader = shader()
-        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

@@ -15,7 +15,7 @@ class OnePerCamTrackletManager:
         self._max_size: int = max_players
         self._tracklets: dict[int, Tracklet] = {}
 
-        hot_reload = HotReloadMethods(self.__class__, True)
+        # hot_reload = HotReloadMethods(self.__class__, True)
 
     def __contains__(self, tracklet: Tracklet) -> bool:
         return self.get_id_by_cam_and_external_id(tracklet.cam_id, tracklet.external_id) is not None

@@ -17,7 +17,6 @@ from modules.utils.PointsAndRects import Rect, Point2f
 from modules.utils.PerformanceTimer import PerformanceTimer
 
 from modules.cam.depthcam.Definitions import FrameType
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class ImageCropConfig:
@@ -66,8 +65,6 @@ class ImageCropProcessor:
         # Performance timers and accumulators
         self._accumulated_upload_ms: float = 0.0
         self._process_timer: PerformanceTimer = PerformanceTimer(name="GPU Image Upload  ", sample_count=200, report_interval=100, color="green", omit_init=25)
-
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def set_image(self, cam_id: int, frame_type: 'FrameType', image: np.ndarray) -> None:
         """Upload image from a specific camera to GPU. Only VIDEO frames are stored.

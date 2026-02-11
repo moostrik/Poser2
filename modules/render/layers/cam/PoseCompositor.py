@@ -69,7 +69,7 @@ class PoseCompositor(LayerBase):
         )
         self._pose_lerp_layer: PoseLineLayer = PoseLineLayer(track_id, data, track_color, pose_lerp_config)
 
-        self.hot_reload = HotReloadMethods(self.__class__)
+        # self.hot_reload = HotReloadMethods(self.__class__)
 
     @property
     def texture(self) -> Texture:

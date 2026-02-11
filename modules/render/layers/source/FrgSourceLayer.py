@@ -6,12 +6,9 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
-from modules.gl import Tensor, SwapFbo, Texture, Blit
+from modules.gl import Tensor, Texture
 from modules.pose.batch.ImageFrame import ImageFrame
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.shaders import MaskDilate
-
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.render.layers.LayerBase import LayerBase, DataCache
 
 
 class FrgSourceLayer(LayerBase):
@@ -21,9 +18,6 @@ class FrgSourceLayer(LayerBase):
         self._data_hub: DataHub = data_hub
         self._cuda_image: Tensor = Tensor()
         self._data_cache: DataCache[torch.Tensor]= DataCache[torch.Tensor]()
-
-        # hot reloader
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

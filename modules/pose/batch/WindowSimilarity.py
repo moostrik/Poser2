@@ -96,7 +96,7 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
 
         self.Timer: PerformanceTimer = PerformanceTimer(name="similarity  ", sample_count=200, report_interval=100, color="red", omit_init=0)
 
-        self._hot_reloader = HotReloadMethods(self.__class__, True, True)
+        # self._hot_reloader = HotReloadMethods(self.__class__, True, True)
 
 
     def start(self) -> None:

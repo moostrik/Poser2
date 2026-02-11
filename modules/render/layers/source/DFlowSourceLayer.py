@@ -7,12 +7,10 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub, DataHubType
 from modules.gui.PyReallySimpleGui import Frame
-from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.gl import Tensor, SwapFbo, Texture, Blit, clear_color
+from modules.render.layers.LayerBase import LayerBase, DataCache
+from modules.gl import Tensor, SwapFbo, Texture, Blit
 
 from modules.render.shaders import DenseFlowFilter as shader
-
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class DFlowSourceLayer(LayerBase):
@@ -35,9 +33,6 @@ class DFlowSourceLayer(LayerBase):
         self.noise_threshold: float = 0.2
 
         self._shader: shader = shader()
-
-        # hot reloader
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

@@ -46,7 +46,7 @@ class CentreMaskLayer(LayerBase):
         self._mask_dilate_shader = MaskDilate()
         self._mask_blur_shader = MaskBlur()
 
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
+        # self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

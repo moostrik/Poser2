@@ -4,9 +4,7 @@ import numpy as np
 import time
 from collections import deque
 
-from modules.cam.depthcam.Definitions import FrameType
 from modules.cam.Config import Config
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class FrameSyncBang:
@@ -22,8 +20,6 @@ class FrameSyncBang:
         self._timestamp_history: deque[tuple[int, float]] = deque(maxlen=10 * num_cams)
         self._callbacks: set[Callable[[], None]] = set()
         self._lock = Lock()
-
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def add_frame(self, *args) -> None:
         cam_id: int = args[0]

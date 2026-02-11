@@ -61,7 +61,7 @@ class PanoramicTracker(Thread, BaseTracker):
         self.tracklet_callbacks: set[TrackletDictCallback] = set()
         self.gui = PanoramicTrackerGui(gui, self)
 
-        hot_reload = HotReloadMethods(self.__class__)
+        # hot_reload = HotReloadMethods(self.__class__)
 
     @property
     def tracker_type(self) -> TrackerType:

@@ -38,7 +38,7 @@ class CentrePoseLayer(LayerBase):
         self.config: CentrePoseConfig = config or CentrePoseConfig()
         self.color: tuple[float, float, float, float] | None = color
 
-        HotReloadMethods(self.__class__, True, True)
+        # HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

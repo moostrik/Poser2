@@ -45,7 +45,7 @@ class PanoramicTrackletManager:
         self._id_pool = TrackletIdPool(max_players)
         self._lock = Lock()
 
-        hot_reload = HotReloadMethods(self.__class__, True)
+        # hot_reload = HotReloadMethods(self.__class__, True)
 
     def add_tracklet(self, tracklet: Tracklet) -> Optional[int]:
         with self._lock:

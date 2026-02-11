@@ -9,8 +9,6 @@ from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import AngleVelShader
 from modules.render.layers.data.DataLayerConfig import FEATURE_COLORS, DEFAULT_COLORS, DataLayerConfig
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 class AngleVelLayer(LayerBase):
     """Visualizes angles with line thickness modulated by angular velocity.
@@ -34,8 +32,6 @@ class AngleVelLayer(LayerBase):
 
         self._shader: AngleVelShader = AngleVelShader()
         self._text_renderer: Text = Text()
-
-        self._hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def set_active(self, active: bool) -> None:
         """Set active state and trigger cleanup on deactivation."""

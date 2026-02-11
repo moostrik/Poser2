@@ -37,7 +37,7 @@ class PoseDotLayer(LayerBase):
 
         self._shader: shader = shader()
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

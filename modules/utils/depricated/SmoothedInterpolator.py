@@ -48,8 +48,6 @@ from collections import deque
 from time import time
 from typing import Callable
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 @dataclass
 class OneEuroSettings:
@@ -155,8 +153,6 @@ class SmoothedInterpolator:
 
         # Register for setting changes
         settings.add_observer(self._update_filter_from_settings)
-
-        self.hotreload = HotReloadMethods(self.__class__, True, True)
 
     def __del__(self) -> None:
         """Cleanup observer registration on deletion."""
@@ -395,8 +391,6 @@ class SmoothedAngleInterpolator:
         self._smooth_value: float = math.nan
         self._smooth_velocity: float = math.nan
         self._smooth_acceleration: float = math.nan
-
-        self.hotreload = HotReloadMethods(self.__class__, True, True)
 
     def __repr__(self) -> str:
         """Debug representation."""

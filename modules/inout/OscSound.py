@@ -51,7 +51,7 @@ class OscSound:
             OscSound._build_inactive_message(id, bundle_builder, self._config.num_players)
             self._inactive_messages[id] = bundle_builder._contents
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def running(self) -> bool:

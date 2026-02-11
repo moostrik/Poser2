@@ -49,7 +49,7 @@ class OnePerCamTracker(Thread, BaseTracker):
 
         self.gui = OnePerCamTrackerGui(gui, self)
 
-        hot_reload = HotReloadMethods(self.__class__)
+        # hot_reload = HotReloadMethods(self.__class__)
 
     @property
     def tracker_type(self) -> TrackerType:

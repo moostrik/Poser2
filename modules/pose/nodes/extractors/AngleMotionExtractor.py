@@ -42,7 +42,7 @@ class AngleMotionExtractor(FilterNode):
             [ANGLE_MOTION_NORMALISATION[landmark] for landmark in AngleLandmark],
             dtype=np.float32
         )
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def process(self, pose: Frame) -> Frame:
         # Get absolute angular velocities

@@ -10,9 +10,7 @@ from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import Blend, DrawRoi, MaskApply
 
 # GL
-from modules.gl import Fbo, SwapFbo, Texture, Style, clear_color
-
-from modules.utils import HotReloadMethods
+from modules.gl import Fbo, SwapFbo, Texture
 
 
 @dataclass
@@ -47,8 +45,6 @@ class CentreCamLayer(LayerBase):
         self._roi_shader = DrawRoi()
         self._blend_shader = Blend()
         self._mask_shader = MaskApply()
-
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

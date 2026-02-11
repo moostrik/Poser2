@@ -6,10 +6,6 @@ import warnings
 
 # Third-party imports
 import numpy as np
-
-# Local application imports
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 MAX_EXTRAPOLATION = 1.1  # 10% overshoot for timing jitter
 
 
@@ -554,8 +550,6 @@ class VectorPredictiveAngleHermite:
         self.last_update_time: float = 0.0
         self.interpolated_value: np.ndarray = np.full(vector_size, np.nan)
         self._initialized = False
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def add_sample(self, value: np.ndarray, sample_time: float | None = None) -> None:
         """Add a new sample to the interpolator.

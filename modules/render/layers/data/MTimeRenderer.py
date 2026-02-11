@@ -9,10 +9,8 @@ from OpenGL.GL import * # type: ignore
 from modules.ConfigBase import ConfigBase, config_field
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
-from modules.render.layers.LayerBase import LayerBase, DataCache
+from modules.render.layers.LayerBase import LayerBase
 from modules.gl import Text
-
-from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 @dataclass
@@ -31,8 +29,6 @@ class MTimeRenderer(LayerBase):
         self._text_renderer: Text = Text()
         self._width: int = 0
         self._height: int = 0
-
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         if width and height:

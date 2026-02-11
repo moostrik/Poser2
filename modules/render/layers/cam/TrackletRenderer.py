@@ -11,9 +11,7 @@ from modules.render.shaders import DrawColoredRectangle
 from modules.cam.depthcam.Definitions import Tracklet as DepthTracklet
 
 from modules.DataHub import DataHub, DataHubType
-from modules.render.layers.LayerBase import LayerBase, Rect
-
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.render.layers.LayerBase import LayerBase
 
 
 
@@ -24,8 +22,6 @@ class TrackletRenderer(LayerBase):
         self._tracklets: list[DepthTracklet] = []
         self._shader: DrawColoredRectangle = DrawColoredRectangle()
         self._text_renderer: Text = Text()
-
-        self._hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._shader.allocate()
