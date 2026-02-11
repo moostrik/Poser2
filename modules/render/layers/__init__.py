@@ -25,9 +25,9 @@ from .flow.FlowSourceLayer import           FlowSourceLayer
 from .flow.OpticalFlowLayer import          OpticalFlowLayer
 from .flow.FlowLayer import                 FlowLayer, FlowConfig
 
-from .generic.MotionMultiply import         MotionMultiply
+from .generic.HDTPrepare import         HDTPrepare
 from .cam.CropLayer import                  CropLayer, CropConfig
-from .generic.HDTBlend import               SimilarityBlend
+from .generic.HDTBlend import               HDTBlend
 
 from .source.DFlowSourceLayer import        DFlowSourceLayer
 from .source.ImageSourceLayer import        ImageSourceLayer

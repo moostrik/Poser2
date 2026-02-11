@@ -4,6 +4,8 @@
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
+from pytweening import *    # type: ignore
+
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
@@ -17,7 +19,7 @@ from modules.pose.Frame import Frame
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class MotionMultiply(LayerBase):
+class HDTPrepare(LayerBase):
 
     def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, centre_mask: Texture) -> None:
         self._cam_id: int = cam_id
@@ -68,8 +70,6 @@ class MotionMultiply(LayerBase):
         self._tint_shader.deallocate()
 
     def draw(self) -> None:
-        # self._fbo.draw()
-        # self._cam_fbo.draw()
         if self._mask_fbo.allocated:
             Blit().use(self._mask_fbo)
 
@@ -94,7 +94,8 @@ class MotionMultiply(LayerBase):
 
         # Motion value is already normalized [0,1] and eased by pipeline
         motion: float = pose.angle_motion.value
-        self._motion = motion
+        self._motion = easeInSine(motion)
+        # self._motion = motion
 
         self._cam_fbo.begin()
         self._tint_shader.use(cam, 1.0, 1.0, 1.0, motion)

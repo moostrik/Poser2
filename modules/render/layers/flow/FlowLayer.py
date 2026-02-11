@@ -225,10 +225,10 @@ class FlowLayer(LayerBase):
         # self._fluid_flow.reset()
 
 
-        # self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
-        self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
+        self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
+        # self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_INPUT
-        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
+        # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY

@@ -15,6 +15,8 @@ class AngleMotionExtractorGui:
         elm: list = []
         elm.append([
             E(eT.TEXT, 'Motion   '),
+            E(eT.TEXT, 'n'),
+            E(eT.SLDR, name + '_n', self.set_n_top_motions, config.n_top_motions, [1, 10], 1),
             E(eT.TEXT, 'noise'),
             E(eT.SLDR, name + '_noise', self.set_noise_threshold, config.noise_threshold, [0.0, 0.2], 0.01),
             E(eT.TEXT, 'max'),
@@ -26,6 +28,9 @@ class AngleMotionExtractorGui:
 
     def get_gui_frame(self):
         return self.frame
+
+    def set_n_top_motions(self, value: float) -> None:
+        self.config.n_top_motions = int(value)
 
     def set_noise_threshold(self, value: float) -> None:
         self.config.noise_threshold = value

@@ -20,7 +20,7 @@ class MovingAverageSmootherGui:
         elm.append([
             E(eT.TEXT, 'Window   '),
             E(eT.TEXT, 'size'),
-            E(eT.SLDR, name + 'window_size', self.set_window_size, config.window_size, [5, 120], 1),
+            E(eT.SLDR, name + 'window_size', self.set_window_size, config.window_size, [1, 120], 1),
             E(eT.TEXT, 'type'),
             E(eT.CMBO, name + 'window_type', self.set_window_type, config.window_type.name, WINDOW_TYPE_NAMES),
         ])

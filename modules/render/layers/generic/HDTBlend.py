@@ -10,18 +10,18 @@ from modules.DataHub import DataHub, DataHubType, PoseDataHubTypes
 from modules.gl import Fbo, Texture, Style, clear_color
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
-from modules.render.layers.generic.MotionMultiply import MotionMultiply
+from modules.render.layers.generic.HDTPrepare import HDTPrepare
 from modules.render.shaders import MaskApply, MaskMultiply, HDTTripleBlend
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class SimilarityBlend(LayerBase):
+class HDTBlend(LayerBase):
 
-    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, layers: dict[int, MotionMultiply]) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, data_type: PoseDataHubTypes, layers: dict[int, HDTPrepare]) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
-        self._layers: dict[int, MotionMultiply] = layers
+        self._layers: dict[int, HDTPrepare] = layers
         self._fbo: Fbo = Fbo()
 
         self._cam_fbo: Fbo = Fbo()

@@ -20,17 +20,19 @@ class AngleMotionExtractorConfig(NodeConfigBase):
         self,
         noise_threshold: float = 0.075,
         max_threshold: float = 0.5,
+        n_top_motions: int = 3,
     ) -> None:
         super().__init__()
         self.noise_threshold: float = noise_threshold  # Noise floor - ignore motion below this
         self.max_threshold: float = max_threshold      # Upper limit for normalization
+        self.n_top_motions: int = n_top_motions        # Number of highest motions to average
 
 
 class AngleMotionExtractor(FilterNode):
     """Extracts a single normalized motion value from angular velocities.
 
     Computes per-joint motion from angle_vel, applies noise floor and
-    joint-specific weights, then takes MAX to produce a single [0, 1] value.
+    joint-specific weights, then averages the top N highest motions to produce a single [0, 1] value.
     """
 
     def __init__(self, config: AngleMotionExtractorConfig | None = None) -> None:
@@ -44,26 +46,34 @@ class AngleMotionExtractor(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         # Get absolute angular velocities
-        motion: np.ndarray = np.abs(pose.angle_vel.values)
+        motions: np.ndarray = np.abs(pose.angle_vel.values)
 
         # Remove noise: subtract threshold and clip negative values to 0
-        motion = np.maximum(motion - self._config.noise_threshold, 0.0)
+        motions = np.maximum(motions - self._config.noise_threshold, 0.0)
 
         # Normalize by joint-specific factors (gives motion semantic meaning)
-        motion *= self._normalisation_factors
+        motions *= self._normalisation_factors
 
         # Scale to [0, 1] range based on max_threshold
-        motion /= self._config.max_threshold
+        motions /= self._config.max_threshold
 
-        # Take MAX across all joints - this is our single motion value
-        max_motion: float = float(np.nanmax(motion)) if not np.all(np.isnan(motion)) else 0.0
-        max_motion = min(1.0, max(0.0, max_motion))
+        # Get top N motions and average them
+        valid_motions = motions[~np.isnan(motions)]
+        if len(valid_motions) > 0:
+            # Sort and get top n values
+            n = min(self._config.n_top_motions, len(valid_motions))
+            top_n_motions = np.partition(valid_motions, -n)[-n:]
+            # Clamp each motion to [0, 1] before averaging
+            top_n_motions = np.clip(top_n_motions, 0.0, 1.0)
+            avg_motion = float(np.mean(top_n_motions))
+        else:
+            avg_motion = 0.0
 
         # Compute average score from valid joints
         valid_mask = ~np.isnan(pose.angle_vel.values)
         avg_score = float(np.mean(pose.angle_vel.scores[valid_mask])) if np.any(valid_mask) else 0.0
 
-        angle_motion: AngleMotion = AngleMotion.from_value(max_motion, avg_score)
+        angle_motion: AngleMotion = AngleMotion.from_value(avg_motion, avg_score)
         return replace(pose, angle_motion=angle_motion)
 
     def reset(self) -> None:
