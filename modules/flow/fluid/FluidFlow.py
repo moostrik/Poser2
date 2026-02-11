@@ -187,7 +187,7 @@ class FluidFlow(FlowBase):
         self._obstacle_border_shader: ObstacleBorder = ObstacleBorder()
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     # ========== Properties (Domain-specific API) ==========
 
@@ -348,6 +348,14 @@ class FluidFlow(FlowBase):
     def set_density(self, texture: Texture) -> None:
         """Set density field."""
         FlowUtil.blit(self._output_fbo, texture)
+
+    def set_density_channel(self, texture: Texture, channel: int) -> None:
+        """Set single-channel texture to one of the density channels. """
+        FlowUtil.set_channel(self._output_fbo, texture, channel)
+
+    def clamp_density(self, min_value: float = 0.0, max_value: float = 1.0) -> None:
+        """Clamp density values to a specified range."""
+        FlowUtil.clamp(self._output_fbo, min_value, max_value)
 
     def add_density(self, texture: Texture, strength: float = 1.0) -> None:
         """Add to density field."""

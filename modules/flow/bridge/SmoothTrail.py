@@ -12,8 +12,6 @@ from modules.gl import Texture
 from .. import FlowBase, FlowUtil, ConfigBase
 from .shaders import Trail, GaussianBlur
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 @dataclass
 class SmoothTrailConfig(ConfigBase):
@@ -73,8 +71,6 @@ class SmoothTrail(FlowBase):
         # Shaders
         self._trail_shader: Trail = Trail()
         self._blur_shader: GaussianBlur = GaussianBlur()
-
-        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def set_input(self, input_field: Texture) -> None:
         """Set input field with optional scaling."""

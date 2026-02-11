@@ -9,12 +9,11 @@ from OpenGL.GL import *  # type: ignore
 
 # Local application imports
 from modules.gl import Texture, Style
-from modules.render.layers.LayerBase import LayerBase, Rect, Blit
-from modules.DataHub import DataHub, DataHubType, Stage
-from modules.pose.Frame import Frame, MotionGate, Similarity
+from modules.render.layers.LayerBase import LayerBase, Blit
+from modules.DataHub import DataHub, Stage
+from modules.pose.Frame import Frame
 
 from modules.flow import (
-    FlowBase,
     OpticalFlow, OpticalFlowConfig,
     VelocitySmoothTrail, SmoothTrailConfig,
     Magnitude, VelocityMagnitude,

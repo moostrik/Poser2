@@ -56,8 +56,8 @@ class MotionLayer(LayerBase):
         if self._data_cache.idle or pose is None:
             return
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        # Style.push_style()
+        # Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         mask = self._centre_mask  # MotionMultiply currently doesn't use mask separately
         # print("Motion value:", pose.angle_motion.value)
@@ -69,4 +69,4 @@ class MotionLayer(LayerBase):
         self._shader.use(mask, self._color[0], self._color[1], self._color[2], motion)
         self._fbo.end()
 
-        Style.pop_style()
+        # Style.pop_style()

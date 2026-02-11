@@ -151,6 +151,52 @@ class FlowUtil:
         dst_fbo.end()
 
     @staticmethod
+    def set_channel(dst_fbo: SwapFbo, src: Texture, channel: int) -> None:
+        """Set single-channel texture to specific channel of destination.
+
+        Uses ping-pong buffer: reads from current state, writes to swapped state.
+
+        Args:
+            dst_fbo: Destination SwapFbo (RGBA, will be swapped)
+            src: Source single-channel texture (R32F)
+            channel: Target channel (0=R, 1=G, 2=B, 3=A)
+        """
+        # Lazy init shader
+        if not hasattr(FlowUtil, '_channel_copy_shader'):
+            from .shaders.ChannelCopy import ChannelCopy
+            FlowUtil._channel_copy_shader = ChannelCopy()
+            FlowUtil._channel_copy_shader.allocate()
+
+        # Swap and copy: preserve other channels from prev, replace target channel
+        dst_fbo.swap()
+        dst_fbo.begin()
+        FlowUtil._channel_copy_shader.use(dst_fbo.back_texture, src, channel)
+        dst_fbo.end()
+
+    @staticmethod
+    def clamp(dst_fbo: SwapFbo, min_val: float = 0.0, max_val: float = 1.0) -> None:
+        """Clamp all channels to a min/max range.
+
+        Uses ping-pong buffer: reads from current state, writes clamped to swapped state.
+
+        Args:
+            dst_fbo: Destination SwapFbo (will be swapped)
+            min_val: Minimum value for all channels
+            max_val: Maximum value for all channels
+        """
+        # Lazy init shader
+        if not hasattr(FlowUtil, '_clamp_shader'):
+            from .shaders.Clamp import Clamp
+            FlowUtil._clamp_shader = Clamp()
+            FlowUtil._clamp_shader.allocate()
+
+        # Swap and clamp: read from back, write clamped to front
+        dst_fbo.swap()
+        dst_fbo.begin()
+        FlowUtil._clamp_shader.use(dst_fbo.back_texture, min_val, max_val)
+        dst_fbo.end()
+
+    @staticmethod
     def get_num_channels(internal_format) -> int:
         """Get number of channels from OpenGL internal format.
 

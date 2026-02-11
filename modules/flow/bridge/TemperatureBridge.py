@@ -19,8 +19,6 @@ from modules.gl import Texture, SwapFbo
 from .. import FlowBase, FlowUtil, ConfigBase
 from .shaders.TemperatureBridge import TemperatureBridge as TemperatureBridgeShader
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 @dataclass
 class TemperatureBridgeConfig(ConfigBase):
@@ -69,8 +67,6 @@ class TemperatureBridge(FlowBase):
 
         # Shader
         self._temperature_bridge_shader: TemperatureBridgeShader = TemperatureBridgeShader()
-
-        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def temperature(self) -> Texture:

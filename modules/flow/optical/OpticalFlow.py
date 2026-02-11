@@ -67,7 +67,7 @@ class OpticalFlow(FlowBase):
         self._luminance_shader: Luminance = Luminance()
         self._merge_rgb_shader: MergeRGB = MergeRGB()
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def velocity(self) -> Texture:

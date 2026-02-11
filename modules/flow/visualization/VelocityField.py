@@ -42,7 +42,7 @@ class VelocityField(FieldBase):
 
         self._needs_update: bool = True
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def allocate(self, width: int, height: int) -> None:
         """Allocate visualization layer."""

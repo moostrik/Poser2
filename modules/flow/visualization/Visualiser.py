@@ -39,7 +39,7 @@ class Visualizer:
         self._current_texture: Texture | None = None
         self._use_velocity_field: bool = False
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def config(self) -> VisualisationFieldConfig:

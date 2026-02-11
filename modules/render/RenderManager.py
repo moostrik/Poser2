@@ -123,9 +123,11 @@ SHOW_MASK: list[Layers] = [
 ]
 
 SHOW_COMP: list[Layers] = [
-    Layers.motion,
+    # Layers.motion,
     Layers.flow,
     Layers.fluid,
+    # Layers.motion,
+    # Layers.centre_mask,
     # Layers.sim_blend,
     # Layers.centre_pose,
     # Layers.centre_motion,
@@ -313,4 +315,5 @@ class RenderManager(RenderBase):
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
         for layer_type in self._draw_layers:
+            # print(f"Style for layer type {layer_type}: {Style._current_state}")
             self.L[layer_type][camera_id].draw()

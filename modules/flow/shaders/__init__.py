@@ -1,5 +1,7 @@
 from .Blend import      Blend
 from .Blit import       Blit
+from .ChannelCopy import ChannelCopy
+from .Clamp import      Clamp
 from .GaussianBlur import GaussianBlur
 from .HSV import        HSV
 from .Magnitude import  Magnitude

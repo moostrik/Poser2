@@ -27,9 +27,9 @@ class CentreMaskConfig(ConfigBase):
 class CentreMaskLayer(LayerBase):
     """Renders mask image cropped and rotated with temporal blending and blur."""
 
-    def __init__(self, geometry: CentreGeometry, cam_texture: Texture, config: CentreMaskConfig | None = None) -> None:
+    def __init__(self, geometry: CentreGeometry, mask_texture: Texture, config: CentreMaskConfig | None = None) -> None:
         self._geometry: CentreGeometry = geometry
-        self._cam_texture: Texture = cam_texture
+        self._mask_src: Texture = mask_texture
 
         # Configuration
         self.config: CentreMaskConfig = config or CentreMaskConfig()
@@ -91,7 +91,7 @@ class CentreMaskLayer(LayerBase):
         # Render ROI to temp buffer
         self._roi_fbo.begin()
         self._roi_shader.use(
-            self._cam_texture,
+            self._mask_src,
             self._geometry.bbox_geometry.crop_roi,
             self._geometry.bbox_geometry.rotation,
             self._geometry.bbox_geometry.rotation_center,

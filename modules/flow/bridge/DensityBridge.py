@@ -13,8 +13,6 @@ from .. import FlowBase, FlowUtil, ConfigBase
 from .shaders.DensityBridgeShader import DensityBridgeShader
 from ..shaders.HSV import HSV
 
-from modules.utils.HotReloadMethods import HotReloadMethods
-
 
 @dataclass
 class DensityBridgeConfig(ConfigBase):
@@ -64,8 +62,6 @@ class DensityBridge(FlowBase):
         # Shaders
         self._density_bridge_shader: DensityBridgeShader = DensityBridgeShader()
         self._hsv_shader: HSV = HSV()
-
-        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def density(self) -> Texture:
