@@ -7,6 +7,7 @@ from .Contrast import Contrast
 from .Exposure import Exposure
 from .Hsl import Hsl
 from .Hsv import Hsv
+from .Lut import Lut
 from .Noise import Noise
 from .NoiseSimplex import NoiseSimplex
 
@@ -18,6 +19,7 @@ __all__ = [
     'Exposure',
     'Hsl',
     'Hsv',
+    'Lut',
     'Noise',
     'NoiseSimplex',
 ]
