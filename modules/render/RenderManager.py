@@ -40,7 +40,6 @@ class Layers(IntEnum):
     centre_mask =   auto()
     centre_frg =    auto()
     centre_pose =   auto()
-    centre_motion = auto()
 
     # Data layers (configurable slots A and B, all pre-allocated)
     data_B_W =      auto()
@@ -52,7 +51,10 @@ class Layers(IntEnum):
     data_time =     auto()
 
     # composition layers
-    sim_blend =     auto()
+    hdt_prep =      auto()
+    hdt_blend =     auto()
+
+    motion =        auto()
     flow =          auto()
 
 
@@ -68,8 +70,10 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.centre_frg,
     Layers.centre_pose,
 
-    Layers.centre_motion,
-    Layers.sim_blend,
+    Layers.motion,
+
+    Layers.hdt_prep,
+    Layers.hdt_blend,
 ]
 
 INTERFACE_LAYERS: list[Layers] = [
@@ -79,7 +83,7 @@ INTERFACE_LAYERS: list[Layers] = [
 LARGE_LAYERS: list[Layers] = [
     Layers.centre_cam,
     Layers.centre_mask,
-    Layers.sim_blend,
+    Layers.hdt_blend,
     Layers.centre_pose,
 ]
 
@@ -101,7 +105,7 @@ SHOW_CENTRE: list[Layers] = [
     # Layers.centre_cam,
     Layers.centre_frg,
     Layers.centre_mask,
-    # Layers.centre_motion,
+    # Layers.hdt_prep,
     Layers.centre_pose,
 ]
 
@@ -114,11 +118,11 @@ SHOW_MASK: list[Layers] = [
 ]
 
 SHOW_COMP: list[Layers] = [
-    Layers.centre_motion,
+    Layers.motion,
     Layers.flow,
     # Layers.sim_blend,
-    Layers.centre_pose,
-    Layers.centre_motion,
+    # Layers.centre_pose,
+    # Layers.centre_motion,
     # Layers.cam_frg,
 ]
 
@@ -175,8 +179,8 @@ class RenderManager(RenderBase):
             cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.data_hub)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
 
-            cam_comp =      self.L[Layers.poser][i] =   ls.TrackerCompositor(       i, self.data_hub,   cam_image.texture,  HISTORY_COLOR, color,  self.tracker_comp_config)
-            track_comp =    self.L[Layers.tracker][i] = ls.PoseCompositor(          i, self.data_hub,   cam_image.texture,  color,                  self.pose_comp_config)
+            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.data_hub,   cam_image.texture,  HISTORY_COLOR, color,  self.tracker_comp_config)
+            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.data_hub,   cam_image.texture,  color,                  self.pose_comp_config)
 
             centre_gmtry=   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,                                               self.centre_gmtr_config)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_gmtry,    cam_mask.texture,                           self.centre_mask_config)
@@ -184,9 +188,11 @@ class RenderManager(RenderBase):
             centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_gmtry,    cam_frg.texture,    centre_mask.texture,    self.centre_frg_config)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_gmtry,    color,                                      self.centre_pose_config)
 
-            centre_motion = self.L[Layers.centre_motion][i]=ls.HDTPrepare(          i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
-            sim_blend =     self.L[Layers.sim_blend][i] =   ls.HDTBlend(     i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.HDTPrepare], self.L[Layers.centre_motion]))
-            flow =          self.L[Layers.flow][i] =        ls.FlowLayer(              centre_mask)
+            motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,   centre_mask.texture, color)
+            flow =          self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   centre_mask.texture, motion.texture, TRACK_COLORS)
+
+            centre_motion = self.L[Layers.hdt_prep][i]=     ls.HDTPrepare(          i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
+            sim_blend =     self.L[Layers.hdt_blend][i] =   ls.HDTBlend(            i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.HDTPrepare], self.L[Layers.hdt_prep]))
 
 
             self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, self.data_A_config)

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl.Fbo import Fbo
-from modules.gl.Texture import Texture
+from modules.gl import Texture, Blit
 
 from .. import FlowBase, FlowUtil, ConfigBase
 from .shaders import Luminance, MergeRGB, OpticalFlow as OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
@@ -132,7 +132,7 @@ class OpticalFlow(FlowBase):
 
         # Pass output_fbo directly since it's now a Fbo
         self._output_fbo.begin()
-        self._optical_flow_shader.use(
+        self._optical_flow_shader_mm.use(
             prev_frame,
             curr_frame,
             offset=self.config.offset,
@@ -143,28 +143,33 @@ class OpticalFlow(FlowBase):
         )
         self._output_fbo.end()
 
-    def set_color(self, texture: Texture) -> None:
+    def set_input(self, texture: Texture) -> None:
         """Set input frame texture.
 
         Args:
             texture: Input texture (will be converted to luminance)
         """
-        if not self._allocated:
+        if not self._allocated or not texture.allocated:
             return
 
-        # Swap to next frame slot in input_fbo
         self._input_fbo.swap()
-        self._merge_rgb_shader.reload()
 
-        self._input_fbo.begin()
-        # self._luminance_shader.use(texture)
-        self._merge_rgb_shader.use(texture)
-        self._input_fbo.end()
+        if texture.format == GL_RED:
+            # Input is already single-channel luminance
+            self._input_fbo.begin()
+            Blit.use(texture)
+            self._input_fbo.end()
+
+        else:
+            # Convert to luminance using shader
+            self._input_fbo.begin()
+            self._luminance_shader.use(texture)
+            self._input_fbo.end()
 
         # Generate mipmaps after rendering to FBO
-        glBindTexture(GL_TEXTURE_2D, self._input_fbo.texture.tex_id)
-        glGenerateMipmap(GL_TEXTURE_2D)
-        glBindTexture(GL_TEXTURE_2D, 0)
+        # glBindTexture(GL_TEXTURE_2D, self._input_fbo.texture.tex_id)
+        # glGenerateMipmap(GL_TEXTURE_2D)
+        # glBindTexture(GL_TEXTURE_2D, 0)
 
         self._frame_count += 1
         self._needs_update = True

@@ -12,6 +12,8 @@ from OpenGL.GL import *  # type: ignore
 # Local application imports
 from modules.gl import Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Rect, Blit
+from modules.DataHub import DataHub, DataHubType, Stage
+from modules.pose.Frame import Frame, MotionGate, Similarity
 
 from modules.flow import (
     FlowBase,
@@ -102,19 +104,22 @@ class FlowLayer(LayerBase):
         density = flow.density    # RGBA32F colored density
     """
 
-    def __init__(self, source: LayerBase, config: FlowConfig | None = None) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, mask: Texture, motion: Texture, colors: list[tuple[float, float, float, float]], config: FlowConfig | None = None) -> None:
         """Initialize unified flow layer.
 
         Args:
-            source: Source layer providing RGB frames (e.g., FlowSourceLayer)
+            mask: Mask texture for the flow layer
+            frg: Fragment texture for the flow layer
             fps: Target framerate for timestep calculation
         """
+        self._cam_id: int = cam_id
+        self._data_hub: DataHub = data_hub
+        self._mask: Texture = mask
+        self._motion: Texture = motion
+        self._colors: list[tuple[float, float, float, float]] = colors
         self.config: FlowConfig = config or FlowConfig()
 
-        self._source: LayerBase = source
         self._delta_time: float = 1 / self.config.fps
-
-        self._flows: list[FlowBase] = []
 
         self._optical_flow: OpticalFlow = OpticalFlow(self.config.optical_flow)
 
@@ -123,10 +128,8 @@ class FlowLayer(LayerBase):
         self._density_bridge: DensityBridge = DensityBridge(self.config.density_bridge)
         self._temperature_bridge: TemperatureBridge = TemperatureBridge(self.config.TemperatureBridge)
 
-        # Fluid simulation
         self._fluid_flow: FluidFlow = FluidFlow(self.config.simulation_scale, self.config.fluid_flow)
 
-        # Visualization
         self._visualizer: Visualizer = Visualizer(self.config.visualisation)
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -190,7 +193,7 @@ class FlowLayer(LayerBase):
         self.config.visualisation.toggle_scalar = False
 
         self.config.optical_flow.offset = 3
-        self.config.optical_flow.threshold = 0.01
+        self.config.optical_flow.threshold = 0.0
         self.config.optical_flow.strength_x = 3.3
         self.config.optical_flow.strength_y = 3.3
         self.config.optical_flow.boost = 0.0
@@ -207,7 +210,7 @@ class FlowLayer(LayerBase):
 
         self.config.fluid_flow.vel_speed = 0.9
         self.config.fluid_flow.vel_decay = 6.0
-        self.config.fluid_flow.vel_vorticity = 5.0
+        self.config.fluid_flow.vel_vorticity = 0.0
         self.config.fluid_flow.vel_vorticity_radius = 20.0
         self.config.fluid_flow.vel_viscosity = 10
         self.config.fluid_flow.vel_viscosity_iter = 20
@@ -225,10 +228,10 @@ class FlowLayer(LayerBase):
         # self._fluid_flow.reset()
 
 
-        self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
-        # self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
-        # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_INPUT
-        # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
+        # self.config.draw_mode = FlowDrawMode.OPTICAL_INPUT
+        self.config.draw_mode = FlowDrawMode.OPTICAL_OUTPUT
+        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_INPUT
+        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
         # self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR
         # self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY
@@ -237,7 +240,7 @@ class FlowLayer(LayerBase):
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_INPUT_MASK
         # self.config.draw_mode = FlowDrawMode.TEMP_BRIDGE_OUTPUT
         # self.config.draw_mode = FlowDrawMode.FLUID_VELOCITY
-        # self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
+        self.config.draw_mode = FlowDrawMode.FLUID_DENSITY
         # self.config.draw_mode = FlowDrawMode.FLUID_TEMPERATURE
         # self.config.draw_mode = FlowDrawMode.FLUID_PRESSURE
         # self.config.draw_mode = FlowDrawMode.FLUID_DIVERGENCE
@@ -246,27 +249,19 @@ class FlowLayer(LayerBase):
         # self.config.draw_mode = FlowDrawMode.FLUID_OBSTACLE
 
 
+        pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
+
+        motion_gate = pose.motion_gate.values if pose is not None else None
+
+        motion = pose.angle_motion.value if pose is not None else 0.0
+
         """Update full processing pipeline."""
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         # Check if source is active
-        active: bool = getattr(self._source, "available", True)
-        if not active:
-            self.reset()
-            Style.pop_style()
-            return
-
-        # Stage 1: Compute optical flow
-        dirty: bool = getattr(self._source, "dirty", True)
-        if dirty:
-            prev_tex: Texture | None = getattr(self._source, "prev_texture", None)
-            if prev_tex is not None:
-                self._optical_flow.set_color(prev_tex)
-
-            curr_tex: Texture = self._source.texture
-            self._optical_flow.set_color(curr_tex)
-            self._optical_flow.update()
+        self._optical_flow.set_input(self._mask)
+        self._optical_flow.update()
 
         # img = self._optical_flow.velocity.read_to_numpy()
         # if img is not None:
@@ -276,20 +271,22 @@ class FlowLayer(LayerBase):
         # Stage 2: Bridge
         self._velocity_trail.set_velocity(self._optical_flow.velocity)
         self._velocity_trail.update()
-
         self._velocity_magnitude.set_input(self._velocity_trail.velocity)
         self._velocity_magnitude.update()
-        self._density_bridge.set_color(self._source.texture)
-        self._density_bridge.set_velocity(self._velocity_trail.velocity)
-        self._density_bridge.update()
-        self._temperature_bridge.set_color(self._source.texture)
+
+        self._density_bridge.set_color(self._motion)
+        self._density_bridge.set_velocity(self._mask)
+        self._density_bridge.update(motion  / 60.0)
+        # self._density_bridge.set_velocity(self._velocity_trail.velocity)
+        # self._density_bridge.update(1.0)
+        self._temperature_bridge.set_color(self._mask)
         self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
         self._temperature_bridge.update()
 
         # Stage 3: Fluid simulation
         # Add velocity with delta_time scaling
         velocity_strength: float = self._delta_time * self.config.fluid_velocity_scale
-        self._fluid_flow.add_velocity(self._velocity_trail.velocity)
+        self._fluid_flow.add_velocity(self._velocity_trail.velocity, 3.0)
 
         # Add density from bridge (already has color+magnitude combined)
         self._fluid_flow.add_density(self._density_bridge.density) # Intentional to check what is happening
@@ -361,4 +358,4 @@ class FlowLayer(LayerBase):
         elif self.config.draw_mode == FlowDrawMode.FLUID_OBSTACLE:
             return self._fluid_flow.obstacle
         else:
-            return self._source.texture
+            return self._mask
