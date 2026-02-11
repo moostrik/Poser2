@@ -51,11 +51,12 @@ class Layers(IntEnum):
     data_time =     auto()
 
     # composition layers
-    hdt_prep =      auto()
-    hdt_blend =     auto()
-
     motion =        auto()
     flow =          auto()
+    fluid =         auto()
+
+    # hdt_prep =      auto()
+    # hdt_blend =     auto()
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -71,9 +72,11 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.centre_pose,
 
     Layers.motion,
+    Layers.flow,
+    Layers.fluid,
 
-    Layers.hdt_prep,
-    Layers.hdt_blend,
+    # Layers.hdt_prep,
+    # Layers.hdt_blend,
 ]
 
 INTERFACE_LAYERS: list[Layers] = [
@@ -81,10 +84,12 @@ INTERFACE_LAYERS: list[Layers] = [
 ]
 
 LARGE_LAYERS: list[Layers] = [
-    Layers.centre_cam,
-    Layers.centre_mask,
-    Layers.hdt_blend,
+    # Layers.centre_cam,
+    # Layers.centre_mask,
+    # Layers.hdt_blend,
     Layers.centre_pose,
+    Layers.flow,
+    Layers.fluid,
 ]
 
 PREVIEW_CENTRE: list[Layers] = [
@@ -120,6 +125,7 @@ SHOW_MASK: list[Layers] = [
 SHOW_COMP: list[Layers] = [
     Layers.motion,
     Layers.flow,
+    Layers.fluid,
     # Layers.sim_blend,
     # Layers.centre_pose,
     # Layers.centre_motion,
@@ -172,6 +178,7 @@ class RenderManager(RenderBase):
         self.data_B_config =        ls.DataLayerConfig(     stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[HISTORY_COLOR])
         self.data_time_config =     ls.MTimeRendererConfig( stage=Stage.LERP)
 
+        flows: dict[int, ls.FlowLayer] = {}
         for i in range(self.num_cams):
             color: tuple[float, float, float, float] = TRACK_COLORS[i % len(TRACK_COLORS)]
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
@@ -189,11 +196,11 @@ class RenderManager(RenderBase):
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_gmtry,    color,                                      self.centre_pose_config)
 
             motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,   centre_mask.texture, color)
-            flow =          self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   centre_mask.texture, motion.texture, TRACK_COLORS)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   centre_mask.texture, motion.texture, TRACK_COLORS)
+            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows)
 
-            centre_motion = self.L[Layers.hdt_prep][i]=     ls.HDTPrepare(          i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
-            sim_blend =     self.L[Layers.hdt_blend][i] =   ls.HDTBlend(            i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.HDTPrepare], self.L[Layers.hdt_prep]))
-
+            # centre_motion = self.L[Layers.hdt_prep][i]=     ls.HDTPrepare(          i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
+            # sim_blend =     self.L[Layers.hdt_blend][i] =   ls.HDTBlend(            i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.HDTPrepare], self.L[Layers.hdt_prep]))
 
             self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, self.data_A_config)
             self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, self.data_A_config)
@@ -201,8 +208,7 @@ class RenderManager(RenderBase):
             self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, self.data_B_config)
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, self.data_B_config)
             self.L[Layers.data_B_AV][i] = ls.AngleVelLayer(     i, self.data_hub, self.data_B_config)
-
-            mtime_data =    self.L[Layers.data_time][i] =  ls.MTimeRenderer(       i, self.data_hub, self.data_time_config)
+            self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub, self.data_time_config)
 
         # Bind data layers (not configs) to settings - propagates active state and shared properties
         settings.bind(

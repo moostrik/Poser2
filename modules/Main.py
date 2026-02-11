@@ -70,7 +70,7 @@ class Main():
 
         # RENDER
         self.render = RenderManager(self.gui, self.data_hub, settings.render)
-        self.data_gui = ConfigGuiGenerator(settings.render, self.gui, "Render")
+        self.data_gui = ConfigGuiGenerator(settings.render, self.gui, "Render", 4)
 
         # POSE CONFIGURATION
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
@@ -183,6 +183,7 @@ class Main():
             [
                 lambda: nodes.PointPredictor(self.prediction_config),
                 lambda: nodes.AnglePredictor(self.prediction_config),
+                lambda: nodes.AngleVelPredictor(self.prediction_config),
                 lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=True)),
                 lambda: nodes.SimilarityStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
                 lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
@@ -196,6 +197,7 @@ class Main():
                 lambda: nodes.BBoxChaseInterpolator(self.b_box_interp_config),
                 lambda: nodes.PointChaseInterpolator(self.point_interp_config),
                 lambda: nodes.AngleChaseInterpolator(self.angle_interp_config),
+                lambda: nodes.AngleVelChaseInterpolator(self.angle_interp_config),
                 lambda: nodes.SimilarityChaseInterpolator(self.simil_interp_config),
             ]
         )
@@ -203,7 +205,7 @@ class Main():
         self.pose_interpolation_pipeline = trackers.FilterTracker(
             settings.num_players,
             [
-                lambda: nodes.AngleVelExtractor(fps=settings.render.fps),
+                # lambda: nodes.AngleVelExtractor(fps=settings.render.fps),
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
                 nodes.AgeExtractor,
