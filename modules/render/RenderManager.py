@@ -6,7 +6,7 @@ from typing import cast
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color
+from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color, Texture
 from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub, Stage, DataHubType, PoseDataHubTypes
@@ -54,6 +54,7 @@ class Layers(IntEnum):
     motion =        auto()
     flow =          auto()
     fluid =         auto()
+    ms_mask = auto()
 
     # hdt_prep =      auto()
     # hdt_blend =     auto()
@@ -71,7 +72,8 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.centre_frg,
     Layers.centre_pose,
 
-    Layers.motion,
+    # Layers.motion,
+    Layers.ms_mask,
     Layers.flow,
     Layers.fluid,
 
@@ -85,8 +87,8 @@ INTERFACE_LAYERS: list[Layers] = [
 
 LARGE_LAYERS: list[Layers] = [
     # Layers.centre_cam,
-    # Layers.centre_mask,
-    # Layers.hdt_blend,
+    Layers.centre_mask,
+    Layers.ms_mask,
     Layers.centre_pose,
     Layers.flow,
     Layers.fluid,
@@ -123,11 +125,12 @@ SHOW_MASK: list[Layers] = [
 ]
 
 SHOW_COMP: list[Layers] = [
-    # Layers.motion,
-    Layers.flow,
-    Layers.fluid,
-    # Layers.motion,
+    # Layers.centre_frg,
+    # Layers.flow,
     # Layers.centre_mask,
+    Layers.motion,
+    Layers.fluid,
+    Layers.ms_mask,
     # Layers.sim_blend,
     # Layers.centre_pose,
     # Layers.centre_motion,
@@ -181,6 +184,7 @@ class RenderManager(RenderBase):
         self.data_time_config =     ls.MTimeRendererConfig( stage=Stage.LERP)
 
         flows: dict[int, ls.FlowLayer] = {}
+        mask_textures: dict[int, Texture] = {}
         for i in range(self.num_cams):
             color: tuple[float, float, float, float] = TRACK_COLORS[i % len(TRACK_COLORS)]
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
@@ -193,13 +197,15 @@ class RenderManager(RenderBase):
 
             centre_gmtry=   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,                                               self.centre_gmtr_config)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_gmtry,    cam_mask.texture,                           self.centre_mask_config)
+            mask_textures[i] = centre_mask.texture
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_gmtry,    cam_image.texture,  centre_mask.texture,    self.centre_cam_config)
             centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_gmtry,    cam_frg.texture,    centre_mask.texture,    self.centre_frg_config)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_gmtry,    color,                                      self.centre_pose_config)
 
             motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,   centre_mask.texture, color)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   centre_mask.texture, motion.texture, TRACK_COLORS)
-            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   centre_mask.texture, list(TRACK_COLORS))
+            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS))
+            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub, mask_textures, list(TRACK_COLORS))
 
             # centre_motion = self.L[Layers.hdt_prep][i]=     ls.HDTPrepare(          i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
             # sim_blend =     self.L[Layers.hdt_blend][i] =   ls.HDTBlend(            i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.HDTPrepare], self.L[Layers.hdt_prep]))
@@ -311,9 +317,12 @@ class RenderManager(RenderBase):
         clear_color()
 
         Style.reset_state()
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.ADDITIVE)
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
         for layer_type in self._draw_layers:
             # print(f"Style for layer type {layer_type}: {Style._current_state}")
             self.L[layer_type][camera_id].draw()
+
+        Style.pop_style()

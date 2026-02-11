@@ -19,8 +19,6 @@ from modules.flow import Visualizer, VisualisationFieldConfig
 from modules.flow.fluid import FluidFlow, FluidFlowConfig
 from modules.render.shaders import DensityColorize
 
-from modules.render.layers.data.colors import TRACK_COLORS
-
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from .FlowLayer import FlowLayer
@@ -83,20 +81,21 @@ class FluidLayer(LayerBase):
     Usage:
         # In RenderManager:
         flow_layers = {i: FlowLayer(...) for i in range(num_cams)}
-        fluid = FluidLayer(cam_id, data_hub, flow_layers, config)
+        fluid = FluidLayer(cam_id, data_hub, flow_layers, colors, config)
 
         # Each frame:
         fluid.update()
         density_texture = fluid.density
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, flow_layers: dict[int, FlowLayer], config: FluidLayerConfig | None = None ) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, flow_layers: dict[int, FlowLayer], colors: list[tuple[float, float, float, float]], config: FluidLayerConfig | None = None) -> None:
         """Initialize fluid layer.
 
         Args:
             cam_id: Camera ID for this layer's output
             data_hub: Data hub for pose data
             flow_layers: Dict of all FlowLayers (cam_id -> FlowLayer)
+            colors: Per-camera colors for density colorization (passed from RenderManager)
             config: Layer configuration
         """
         self._cam_id: int = cam_id
@@ -114,10 +113,10 @@ class FluidLayer(LayerBase):
         self._density_colorize_shader: DensityColorize = DensityColorize()
 
         # Track colors for per-channel density colorization (up to 4 channels)
-        self._track_colors: list[tuple[float, float, float, float]] = list(TRACK_COLORS[:4])
+        self._colors: list[tuple[float, float, float, float]] = list(colors[:4])
         # Pad with transparent black if fewer than 4 colors
-        while len(self._track_colors) < 4:
-            self._track_colors.append((0.0, 0.0, 0.0, 0.0))
+        while len(self._colors) < 4:
+            self._colors.append((0.0, 0.0, 0.0, 0.0))
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -205,7 +204,7 @@ class FluidLayer(LayerBase):
     def update(self) -> None:
         """Update fluid simulation with inputs from all flow layers."""
         # Configuration overrides (for hot-reload testing)
-        self.config.fluid_flow.vel_speed = 10.0
+        self.config.fluid_flow.vel_speed = 1.0
         self.config.fluid_flow.vel_decay = 6.0
 
         self.config.fluid_flow.vel_vorticity = 1.0
@@ -213,7 +212,7 @@ class FluidLayer(LayerBase):
         self.config.fluid_flow.vel_viscosity = 10
         self.config.fluid_flow.vel_viscosity_iter = 20
 
-        self.config.fluid_flow.den_speed = 5
+        self.config.fluid_flow.den_speed = 1.0
         self.config.fluid_flow.den_decay = 6
 
         self.config.fluid_flow.tmp_speed = 0.33
@@ -246,10 +245,10 @@ class FluidLayer(LayerBase):
         for cam_id, flow_layer in self._flow_layers.items():
             if cam_id == self._cam_id:
                 vel_strength = 0.1
-                den_strength =  1.0
+                den_strength = motion
             else:
-                vel_strength = 0 # m_s[cam_id]  # Cross-camera influence modulated by similarity and motion gate
-                den_strength = 0 # (m_s[cam_id] * motion) / 60  # Cross-camera influence modulated by similarity, motion gate, and motion value
+                vel_strength = 0.1 * (m_s[cam_id]) # m_s[cam_id]  # Cross-camera influence modulated by similarity and motion gate
+                den_strength = (m_s[cam_id])   # Cross-camera influence modulated by similarity, motion gate, and motion value
 
             # Add velocity from each flow layer
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
@@ -271,8 +270,6 @@ class FluidLayer(LayerBase):
 
         # Update visualization
         self._visualizer.update(self._get_draw_texture())
-
-        self.config.blend_mode = Style.BlendMode.DISABLED
 
         Style.pop_style()
 
@@ -310,5 +307,5 @@ class FluidLayer(LayerBase):
         composites them additively.
         """
         self._colorized_fbo.begin()
-        self._density_colorize_shader.use(self._fluid_flow.density, self._track_colors)
+        self._density_colorize_shader.use(self._fluid_flow.density, self._colors)
         self._colorized_fbo.end()

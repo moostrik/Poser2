@@ -15,6 +15,7 @@ from .mask.MaskBlur import              MaskBlur
 from .mask.MaskDilate import            MaskDilate
 from .mask.MaskHardStep import          MaskHardStep
 from .mask.MaskMultiply import          MaskMultiply
+from .hdt.MSColorMask import            MSColorMask
 
 from .data.FeatureShader import         FeatureShader
 from .data.AngleVelShader import        AngleVelShader

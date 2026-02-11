@@ -24,6 +24,7 @@ from .data.PoseLineLayer import             PoseLineLayer, PoseLineConfig
 
 
 from .generic.MotionLayer import            MotionLayer
+from .generic.MSColorMaskLayer import       MSColorMaskLayer, MSColorMaskLayerConfig
 from .flow.FlowLayer import                 FlowLayer, FlowLayerConfig, FlowConfig, FlowDrawMode
 from .flow.FluidLayer import                FluidLayer, FluidLayerConfig, FluidDrawMode
 

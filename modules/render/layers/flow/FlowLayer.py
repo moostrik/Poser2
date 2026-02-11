@@ -91,7 +91,7 @@ class FlowLayer(LayerBase):
         fluid.add_temperature(flow.temperature)
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, mask: Texture, motion: Texture, colors: list[tuple[float, float, float, float]], config: FlowLayerConfig | None = None) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, mask: Texture, colors: list[tuple[float, float, float, float]], config: FlowLayerConfig | None = None) -> None:
         """Initialize flow layer.
 
         Args:
@@ -105,7 +105,6 @@ class FlowLayer(LayerBase):
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._mask: Texture = mask
-        self._motion: Texture = motion
         self._colors: list[tuple[float, float, float, float]] = colors
         self.config: FlowLayerConfig = config or FlowLayerConfig()
 
@@ -204,7 +203,7 @@ class FlowLayer(LayerBase):
         self.config.density_bridge.saturation = 1.2
         self.config.density_bridge.brightness = 0.5
 
-        self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_OUTPUT
+        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
 
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
@@ -225,10 +224,10 @@ class FlowLayer(LayerBase):
         self._velocity_magnitude.update()
 
         self._density_bridge.set_color(self._mask)
-        self._density_bridge.set_velocity(self._mask)
-        self._density_bridge.update(motion)
-        # self._density_bridge.set_velocity(self._optical_flow.velocity)
-        # self._density_bridge.update()
+        # self._density_bridge.set_velocity(self._mask)
+        # self._density_bridge.update(motion)
+        self._density_bridge.set_velocity(self._optical_flow.velocity)
+        self._density_bridge.update()
 
         self._temperature_bridge.set_color(self._mask)
         self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
