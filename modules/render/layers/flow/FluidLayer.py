@@ -52,7 +52,7 @@ class FluidLayerConfig:
     fps: float = 60.0
     draw_mode: FluidDrawMode = FluidDrawMode.DENSITY
     blend_mode: Style.BlendMode = Style.BlendMode.ADDITIVE
-    simulation_scale: float = 0.125
+    simulation_scale: float = 0.25
 
     # Scale factors for inputs
     velocity_scale: float = 1.0
@@ -221,7 +221,7 @@ class FluidLayer(LayerBase):
 
             # Add velocity from each flow layer
             velocity_strength = self.config.velocity_scale * scale
-            self._fluid_flow.add_velocity(flow_layer.velocity, 3.0)
+            self._fluid_flow.add_velocity(flow_layer.velocity, 1.0)
 
             # Add density from each flow layer
             density_strength = self.config.density_scale * scale
@@ -255,21 +255,14 @@ class FluidLayer(LayerBase):
 
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
-        if self.config.draw_mode == FluidDrawMode.VELOCITY:
-            return self._fluid_flow.velocity
-        elif self.config.draw_mode == FluidDrawMode.DENSITY:
-            return self._fluid_flow.density
-        elif self.config.draw_mode == FluidDrawMode.PRESSURE:
-            return self._fluid_flow.pressure
-        elif self.config.draw_mode == FluidDrawMode.TEMPERATURE:
-            return self._fluid_flow.temperature
-        elif self.config.draw_mode == FluidDrawMode.DIVERGENCE:
-            return self._fluid_flow.divergence
-        elif self.config.draw_mode == FluidDrawMode.VORTICITY:
-            return self._fluid_flow.vorticity_curl
-        elif self.config.draw_mode == FluidDrawMode.BUOYANCY:
-            return self._fluid_flow.buoyancy
-        elif self.config.draw_mode == FluidDrawMode.OBSTACLE:
-            return self._fluid_flow.obstacle
-        else:
-            return self._fluid_flow.density
+        textures = {
+            FluidDrawMode.VELOCITY: self._fluid_flow.velocity,
+            FluidDrawMode.DENSITY: self._fluid_flow.density,
+            FluidDrawMode.PRESSURE: self._fluid_flow.pressure,
+            FluidDrawMode.TEMPERATURE: self._fluid_flow.temperature,
+            FluidDrawMode.DIVERGENCE: self._fluid_flow.divergence,
+            FluidDrawMode.VORTICITY: self._fluid_flow.vorticity_curl,
+            FluidDrawMode.BUOYANCY: self._fluid_flow.buoyancy,
+            FluidDrawMode.OBSTACLE: self._fluid_flow.obstacle,
+        }
+        return textures.get(self.config.draw_mode, self._fluid_flow.density)

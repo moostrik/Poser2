@@ -167,9 +167,9 @@ class OpticalFlow(FlowBase):
             self._input_fbo.end()
 
         # Generate mipmaps after rendering to FBO
-        # glBindTexture(GL_TEXTURE_2D, self._input_fbo.texture.tex_id)
-        # glGenerateMipmap(GL_TEXTURE_2D)
-        # glBindTexture(GL_TEXTURE_2D, 0)
+        glBindTexture(GL_TEXTURE_2D, self._input_fbo.texture.tex_id)
+        glGenerateMipmap(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, 0)
 
         self._frame_count += 1
         self._needs_update = True

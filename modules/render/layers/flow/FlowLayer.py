@@ -57,7 +57,7 @@ class FlowLayerConfig:
     fps: float = 60.0
     draw_mode: FlowDrawMode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
     blend_mode: Style.BlendMode = Style.BlendMode.ADDITIVE
-    simulation_scale: float = 0.125
+    simulation_scale: float = 0.25
 
     visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)
     optical_flow: OpticalFlowConfig = field(default_factory=OpticalFlowConfig)
@@ -231,12 +231,8 @@ class FlowLayer(LayerBase):
         self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
         self._temperature_bridge.update()
 
-        # Update visualization
-        self._visualizer.update(self._get_draw_texture())
-
-        self.config.blend_mode = Style.BlendMode.DISABLED
-
         Style.pop_style()
+        self._visualizer.update(self._get_draw_texture())
 
     # ========== Rendering ==========
 
@@ -252,27 +248,17 @@ class FlowLayer(LayerBase):
 
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
-        if self.config.draw_mode == FlowDrawMode.OPTICAL_INPUT:
-            return self._optical_flow.color_input
-        elif self.config.draw_mode == FlowDrawMode.OPTICAL_OUTPUT:
-            return self._optical_flow.velocity
-        elif self.config.draw_mode == FlowDrawMode.SMOOTH_VELOCITY_INPUT:
-            return self._velocity_trail.velocity_input
-        elif self.config.draw_mode == FlowDrawMode.SMOOTH_VELOCITY_OUTPUT:
-            return self._velocity_trail.velocity
-        elif self.config.draw_mode == FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE:
-            return self._velocity_magnitude.magnitude
-        elif self.config.draw_mode == FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR:
-            return self._density_bridge.color_input
-        elif self.config.draw_mode == FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY:
-            return self._density_bridge.velocity_input
-        elif self.config.draw_mode == FlowDrawMode.DENSITY_BRIDGE_OUTPUT:
-            return self._density_bridge.density
-        elif self.config.draw_mode == FlowDrawMode.TEMP_BRIDGE_INPUT_COLOR:
-            return self._temperature_bridge.color_input
-        elif self.config.draw_mode == FlowDrawMode.TEMP_BRIDGE_INPUT_MASK:
-            return self._temperature_bridge.mask_input
-        elif self.config.draw_mode == FlowDrawMode.TEMP_BRIDGE_OUTPUT:
-            return self._temperature_bridge.temperature
-        else:
-            return self._mask
+        textures = {
+            FlowDrawMode.OPTICAL_INPUT: self._optical_flow.color_input,
+            FlowDrawMode.OPTICAL_OUTPUT: self._optical_flow.velocity,
+            FlowDrawMode.SMOOTH_VELOCITY_INPUT: self._velocity_trail.velocity_input,
+            FlowDrawMode.SMOOTH_VELOCITY_OUTPUT: self._velocity_trail.velocity,
+            FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE: self._velocity_magnitude.magnitude,
+            FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,
+            FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: self._density_bridge.velocity_input,
+            FlowDrawMode.DENSITY_BRIDGE_OUTPUT: self._density_bridge.density,
+            FlowDrawMode.TEMP_BRIDGE_INPUT_COLOR: self._temperature_bridge.color_input,
+            FlowDrawMode.TEMP_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
+            FlowDrawMode.TEMP_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
+        }
+        return textures.get(self.config.draw_mode, self._mask)
