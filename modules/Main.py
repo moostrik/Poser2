@@ -151,7 +151,7 @@ class Main():
                 # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerConfig()),
                 nodes.AngleExtractor,
                 lambda: nodes.AngleVelExtractor(fps=settings.camera.fps),
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
             ]
         )
 
@@ -173,7 +173,7 @@ class Main():
                 lambda: self.similarity_applicator,
                 lambda: self.leader_applicator,
                 lambda: nodes.SimilarityEuroSmoother(self.simil_smooth_config),
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
             ]
         )
 
@@ -186,14 +186,13 @@ class Main():
                 lambda: nodes.AngleVelPredictor(self.prediction_config),
                 lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=True)),
                 lambda: nodes.SimilarityStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
             ]
         )
 
         self.interpolator = trackers.InterpolatorTracker(
             settings.num_players,
             [
-                # lambda: nodes.BBoxLerpInterpolator(self.b_box_interp_config),
                 lambda: nodes.BBoxChaseInterpolator(self.b_box_interp_config),
                 lambda: nodes.PointChaseInterpolator(self.point_interp_config),
                 lambda: nodes.AngleChaseInterpolator(self.angle_interp_config),
@@ -213,9 +212,7 @@ class Main():
                 lambda: nodes.AngleVelEuroSmoother(self.a_vel_smooth_config),
                 lambda: nodes.AngleMotionExtractor(self.motion_extractor_config),
                 lambda: nodes.AngleMotionMovingAverageSmoother(self.motion_ma_config),
-                # lambda: nodes.AngleMotionEmaSmoother(self.motion_smooth_config),
-                # lambda: nodes.AngleMotionEasingNode(self.motion_easing_config),
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
             ]
         )
 

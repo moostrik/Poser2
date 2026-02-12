@@ -9,7 +9,7 @@ from modules.pose.features import Points2D, Angles, AngleVelocity, AngleMotion, 
 from modules.pose.features.base import BaseFeature, BaseScalarFeature
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Frame:
     """Immutable pose data structure"""
     track_id: int
