@@ -55,8 +55,8 @@
   "gui": {
     "title": "Poser",
     "on_top": false,
-    "location_x": 400,
-    "location_y": 20,
+    "location_x": 60,
+    "location_y": 100,
     "file_path": "files",
     "default_file": "default"
   },
@@ -86,7 +86,7 @@
     },
     {
       "verbose": false,
-      "ip_address": "10.0.0.3",
+      "ip_address": "10.0.0.5",
       "base_universe": 0,
       "fps": 40,
       "r": 0.0,
@@ -101,7 +101,7 @@
     },
     {
       "verbose": false,
-      "ip_address": "10.0.0.5",
+      "ip_address": "10.0.0.6",
       "base_universe": 0,
       "fps": 40,
       "r": 0.68,

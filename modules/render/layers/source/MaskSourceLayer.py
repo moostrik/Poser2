@@ -21,7 +21,7 @@ class MaskSourceLayer(LayerBase):
     def __init__(self, track_id: int, data_hub: DataHub) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
-        self._cuda_image: Tensor = Tensor()
+        self._cuda_image: Tensor = Tensor(wrap=GL_CLAMP_TO_BORDER)
         self._data_cache: DataCache[torch.Tensor] = DataCache[torch.Tensor]()
 
     @property

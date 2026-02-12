@@ -9,10 +9,9 @@ from OpenGL.GL import * # type: ignore
 from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color, Texture
 from modules.render.layers import LayerBase
 
-from modules.DataHub import DataHub, Stage, DataHubType, PoseDataHubTypes
+from modules.DataHub import DataHub, Stage
 from modules.gui.PyReallySimpleGui import Gui
-from modules.pose.Frame import FrameField
-from modules.render.Config import Config, LayerMode, DataLayer
+from modules.render.Config import Config, DataLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -149,7 +148,7 @@ SHOW_DATA: list[Layers] = [
     Layers.data_A_W,
     Layers.data_A_F,
     Layers.data_A_AV,
-    Layers.data_time,
+    # Layers.data_time,
 ]
 
 
@@ -216,7 +215,7 @@ class RenderManager(RenderBase):
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   centre_mask.texture, list(TRACK_COLORS))
             fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS))
 
-            self.L[Layers.composite][i] = ls.CompositeLayer([centre_pose, ms_mask, fluid], self.composite_config)
+            self.L[Layers.composite][i] = ls.CompositeLayer([ms_mask, fluid], self.composite_config)
 
             # centre_motion = self.L[Layers.hdt_prep][i]=     ls.HDTPrepare(          i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
             # sim_blend =     self.L[Layers.hdt_blend][i] =   ls.HDTBlend(            i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.HDTPrepare], self.L[Layers.hdt_prep]))
@@ -324,6 +323,8 @@ class RenderManager(RenderBase):
         self._update_layers = UPDATE_LAYERS
         self._draw_layers = FINAL_LAYERS
         self._preview_layers = PREVIEW_LAYERS
+
+        self.centre_mask_config.blend_factor = 0.2
 
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
