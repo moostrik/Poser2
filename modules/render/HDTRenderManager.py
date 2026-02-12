@@ -145,8 +145,9 @@ SHOW_MASK: list[Layers] = [
 
 SHOW_COMP: list[Layers] = [
     Layers.flow,
-    # Layers.centre_pose,
+    Layers.centre_pose,
     Layers.sim_blend,
+    # Layers.centre_pose,
 ]
 
 
