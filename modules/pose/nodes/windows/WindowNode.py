@@ -156,10 +156,13 @@ class WindowNode(NodeBase, Generic[TFeature]):
 
         Always returns window_size buffer. Unfilled slots have mask=False.
         """
-        # Always use np.roll to reorder so oldest is first
-        # _head points to next insert = oldest slot
-        values = np.roll(self._values, -self._head, axis=0).copy()
-        mask = np.roll(self._mask, -self._head, axis=0).copy()
+        if self._head == 0:
+            values = self._values.copy()
+            mask = self._mask.copy()
+        else:
+            # Slice concatenation - avoids roll overhead
+            values = np.concatenate([self._values[self._head:], self._values[:self._head]], axis=0)
+            mask = np.concatenate([self._mask[self._head:], self._mask[:self._head]], axis=0)
 
         return FeatureWindow(
             values=values,
