@@ -286,7 +286,7 @@ class Tensor(Texture):
 
         # Synchronize to ensure all prior CUDA operations are complete
         # This is critical when tensor comes from TensorRT on different streams
-        torch.cuda.synchronize()
+        # torch.cuda.synchronize()
 
         # Map graphics resource to get CUDA device pointer
         (err,) = runtime.cudaGraphicsMapResources(1, self._cuda_gl_resource, torch.cuda.current_stream().cuda_stream)
