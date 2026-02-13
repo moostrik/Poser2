@@ -10,8 +10,10 @@ from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# Quad utilities - imported from Utils for backward compatibility
-from modules.gl.Utils import draw_quad
+
+def draw_quad() -> None:
+    """Draw fullscreen quad. Assumes VAO already bound by WindowManager."""
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
 
 class FileModifiedHandler(FileSystemEventHandler):
     def __init__(self, callback):

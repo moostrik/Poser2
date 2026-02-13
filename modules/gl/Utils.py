@@ -3,13 +3,6 @@ import math
 
 from OpenGL.GL import glDrawArrays, GL_TRIANGLE_FAN, glClearColor, glClear, GL_COLOR_BUFFER_BIT, glClearDepth, GL_DEPTH_BUFFER_BIT  # type: ignore
 
-# -----------------------------------------------------------------------------
-# Quad drawing (VAO must be bound by WindowManager before calling)
-# -----------------------------------------------------------------------------
-
-def draw_quad() -> None:
-    """Draw fullscreen quad. Assumes VAO already bound by WindowManager."""
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
 
 def clear_color(r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
     """Clear framebuffer. Must be called between begin() and end()."""
