@@ -95,8 +95,8 @@ class JacobiPressureCompute(ComputeShader):
         glUniform1i(self.get_uniform_loc("uObstacleOffset"), 2)
 
         # Bind pressure textures as images for imageLoad/imageStore
-        self.bind_image_read(0, pressure_in, GL_R32F)
-        self.bind_image_write(1, pressure_out, GL_R32F)
+        self.bind_image_read(0, pressure_in, GL_R16F)
+        self.bind_image_write(1, pressure_out, GL_R16F)
 
         # Set uniforms
         glUniform2f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y)

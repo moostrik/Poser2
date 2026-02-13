@@ -187,7 +187,7 @@ class FluidFlow(FlowBase):
         self._obstacle_border_shader: ObstacleBorder = ObstacleBorder()
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
-        # hot_reload = HotReloadMethods(self.__class__, True, True)
+        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     # ========== Properties (Domain-specific API) ==========
 
@@ -258,26 +258,26 @@ class FluidFlow(FlowBase):
         super().allocate(width, height, self._density_width, self._density_height)
 
         # Allocate simulation fields
-        self._temperature_fbo.allocate(width, height, GL_R32F)
+        self._temperature_fbo.allocate(width, height, GL_R16F)
         FlowUtil.zero(self._temperature_fbo)
 
-        self._pressure_fbo.allocate(width, height, GL_R32F)
+        self._pressure_fbo.allocate(width, height, GL_R16F)
         FlowUtil.zero(self._pressure_fbo)
 
         self._obstacle_fbo.allocate(width, height, GL_R8)
         FlowUtil.zero(self._obstacle_fbo)
 
         # Allocate intermediate FBOs
-        self._divergence_fbo.allocate(width, height, GL_R32F)
+        self._divergence_fbo.allocate(width, height, GL_R16F)
         FlowUtil.zero(self._divergence_fbo)
 
-        self._vorticity_curl_fbo.allocate(width, height, GL_R32F)
+        self._vorticity_curl_fbo.allocate(width, height, GL_R16F)
         FlowUtil.zero(self._vorticity_curl_fbo)
 
-        self._vorticity_force_fbo.allocate(width, height, GL_RG32F)
+        self._vorticity_force_fbo.allocate(width, height, GL_RG16F)
         FlowUtil.zero(self._vorticity_force_fbo)
 
-        self._buoyancy_fbo.allocate(width, height, GL_RG32F)
+        self._buoyancy_fbo.allocate(width, height, GL_RG16F)
         FlowUtil.zero(self._buoyancy_fbo)
 
         self._obstacle_offset_fbo.allocate(width, height, GL_RGBA8)
