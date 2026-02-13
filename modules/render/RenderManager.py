@@ -88,9 +88,9 @@ INTERFACE_LAYERS: list[Layers] = [
 
 LARGE_LAYERS: list[Layers] = [
     # Layers.centre_cam,
-    Layers.centre_mask,
-    Layers.ms_mask,
-    Layers.centre_pose,
+    # Layers.centre_mask,
+    # Layers.ms_mask,
+    # Layers.centre_pose,
     Layers.flow,
     Layers.fluid,
     Layers.composite,
