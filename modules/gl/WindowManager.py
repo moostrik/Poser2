@@ -11,7 +11,7 @@ import glfw
 
 # Local application imports
 from modules.gl.RenderBase import RenderBase
-from modules.gl.Utils import FpsCounter
+from modules.gl.Utils import FpsCounter, invalidate_quad_cache
 
 
 class Button(Enum):
@@ -243,6 +243,7 @@ class WindowManager():
 
 
         glfw.make_context_current(self.main_window)
+        invalidate_quad_cache()
         glfw.swap_interval(1 if self.v_sync else 0)
 
         try:
@@ -321,6 +322,7 @@ class WindowManager():
         width, height = glfw.get_window_size(window)
 
         glfw.make_context_current(window)  # <-- Make this window's context current
+        invalidate_quad_cache()
         glfw.swap_interval(0)
         try:
             self.renderer.draw_secondary(monitor_id, width, height)

@@ -9,6 +9,12 @@ from OpenGL.GL import * # type: ignore
 # -----------------------------------------------------------------------------
 
 _quad_data: dict[int, tuple[int, int]] = {}  # context_id -> (VAO, VBO)
+_cached_vao: int | None = None  # Per-frame cache to avoid repeated context lookups
+
+def invalidate_quad_cache() -> None:
+    """Reset cached VAO. Call after glfw.make_context_current()."""
+    global _cached_vao
+    _cached_vao = None
 
 def _get_context_id() -> int:
     """Get a unique ID for the current OpenGL context using the raw pointer address."""
@@ -61,8 +67,10 @@ def init_quad() -> None:
 
 def draw_quad() -> None:
     """Draw a fullscreen quad using VAO/VBO. Much faster than immediate mode."""
-    vao = _get_or_create_quad_vao()
-    glBindVertexArray(vao)
+    global _cached_vao
+    if _cached_vao is None:
+        _cached_vao = _get_or_create_quad_vao()
+    glBindVertexArray(_cached_vao)
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
 
 # -----------------------------------------------------------------------------
