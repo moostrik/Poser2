@@ -1,6 +1,8 @@
 from OpenGL.GL import * # type: ignore
 from modules.gl.Texture import Texture
 
+_current_viewport: tuple[int, int, int, int] = (0, 0, 0, 0)
+
 class Fbo(Texture):
     def __init__(self,
                  interpolation: int = GL_LINEAR,
@@ -28,12 +30,18 @@ class Fbo(Texture):
 
     def begin(self)  -> None:
         """Begin rendering to FBO. Uses top-left origin (see COORDINATE_SYSTEM.md)."""
+        global _current_viewport
+
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
-        glViewport(0, 0, self.width, self.height)
+        new_vp = (0, 0, self.width, self.height)
+        if _current_viewport != new_vp:
+            glViewport(*new_vp)
+            _current_viewport = new_vp
 
     def end(self)  -> None:
         """End rendering to FBO and restore previous state."""
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        pass
+        # glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
 class SwapFbo(Fbo):
     """Double-buffered FBO that swaps between two buffers.

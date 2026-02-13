@@ -11,7 +11,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 # Quad utilities - imported from Utils for backward compatibility
-from modules.gl.Utils import init_quad, draw_quad
+from modules.gl.Utils import draw_quad
 
 class FileModifiedHandler(FileSystemEventHandler):
     def __init__(self, callback):

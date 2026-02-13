@@ -1,81 +1,15 @@
 from time import time
 import math
-import ctypes
 
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import glDrawArrays, GL_TRIANGLE_FAN, glClearColor, glClear, GL_COLOR_BUFFER_BIT, glClearDepth, GL_DEPTH_BUFFER_BIT  # type: ignore
 
 # -----------------------------------------------------------------------------
-# Quad geometry utilities (VAO/VBO per-context for multi-window support)
+# Quad drawing (VAO must be bound by WindowManager before calling)
 # -----------------------------------------------------------------------------
-
-_quad_data: dict[int, tuple[int, int]] = {}  # context_id -> (VAO, VBO)
-_cached_vao: int | None = None  # Per-frame cache to avoid repeated context lookups
-
-def invalidate_quad_cache() -> None:
-    """Reset cached VAO. Call after glfw.make_context_current()."""
-    global _cached_vao
-    _cached_vao = None
-
-def _get_context_id() -> int:
-    """Get a unique ID for the current OpenGL context using the raw pointer address."""
-    import glfw
-    ctx = glfw.get_current_context()
-    if ctx is None:
-        return 0
-    return ctypes.cast(ctx, ctypes.c_void_p).value or 0
-
-def _get_or_create_quad_vao() -> int:
-    """Get or create a VAO/VBO for the current context."""
-    global _quad_data
-
-    ctx_id = _get_context_id()
-
-    if ctx_id in _quad_data:
-        return _quad_data[ctx_id][0]
-
-    import numpy as np
-    quad_vertices = np.array([
-        # x     y     u    v
-        -1.0, -1.0,  0.0, 0.0,
-         1.0, -1.0,  1.0, 0.0,
-         1.0,  1.0,  1.0, 1.0,
-        -1.0,  1.0,  0.0, 1.0,
-    ], dtype=np.float32)
-
-    vbo = glGenBuffers(1)
-    glBindBuffer(GL_ARRAY_BUFFER, vbo)
-    glBufferData(GL_ARRAY_BUFFER, quad_vertices.nbytes, quad_vertices, GL_STATIC_DRAW)
-
-    vao = glGenVertexArrays(1)
-    glBindVertexArray(vao)
-
-    glEnableVertexAttribArray(0)
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * 4, ctypes.c_void_p(0))
-
-    glEnableVertexAttribArray(1)
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * 4, ctypes.c_void_p(2 * 4))
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0)
-    glBindVertexArray(0)
-
-    _quad_data[ctx_id] = (vao, vbo)
-    return vao
-
-def init_quad() -> None:
-    """Initialize quad for current context. Called automatically by draw_quad()."""
-    _get_or_create_quad_vao()
 
 def draw_quad() -> None:
-    """Draw a fullscreen quad using VAO/VBO. Much faster than immediate mode."""
-    global _cached_vao
-    if _cached_vao is None:
-        _cached_vao = _get_or_create_quad_vao()
-    glBindVertexArray(_cached_vao)
+    """Draw fullscreen quad. Assumes VAO already bound by WindowManager."""
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
-
-# -----------------------------------------------------------------------------
-# FPS utilities
-# -----------------------------------------------------------------------------
 
 def clear_color(r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:
     """Clear framebuffer. Must be called between begin() and end()."""
@@ -86,6 +20,10 @@ def clear_depth(depth: float = 1.0) -> None:
     """Clear depth buffer. Must be called between begin() and end()."""
     glClearDepth(depth)
     glClear(GL_DEPTH_BUFFER_BIT)
+
+# -----------------------------------------------------------------------------
+# FPS utilities
+# -----------------------------------------------------------------------------
 
 
 class FpsCounter:

@@ -288,11 +288,17 @@ class RenderManager(RenderBase):
             for layer in cam_dict.values():
                 layer.deallocate()
 
-    def draw_main(self, width: int, height: int) -> None:
+    def update(self) -> None:
+        self.data_hub.notify_update()
+
+        self._update_layers = UPDATE_LAYERS
+        self._draw_layers = FINAL_LAYERS
+        self._preview_layers = PREVIEW_LAYERS
+
+        self.centre_mask_config.blend_factor = 0.25
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
-        self.data_hub.notify_update()
         seen: set[Layers] = set()
         for layer_type in self._update_layers + self._interface_layers + self._draw_layers + self._preview_layers:
             if layer_type not in seen:
@@ -300,11 +306,11 @@ class RenderManager(RenderBase):
                 for layer in self.L[layer_type].values():
                     layer.update()
 
+    def draw_main(self, width: int, height: int) -> None:
+        clear_color()
+
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
-
-        glViewport(0, 0, width, height)
-        clear_color()
 
         # Interface layers
         for i in range(self.num_cams):
@@ -320,15 +326,8 @@ class RenderManager(RenderBase):
             for layer_type in self._preview_layers:
                 self.L[layer_type][i].draw()
 
-        self._update_layers = UPDATE_LAYERS
-        self._draw_layers = FINAL_LAYERS
-        self._preview_layers = PREVIEW_LAYERS
-
-        self.centre_mask_config.blend_factor = 0.2
-
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        glViewport(0, 0, width, height)
         clear_color()
 
         Style.reset_state()
