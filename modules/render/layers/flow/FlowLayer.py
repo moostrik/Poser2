@@ -56,7 +56,7 @@ class FlowLayerConfig:
     fps: float = 60.0
     draw_mode: FlowDrawMode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
     blend_mode: Style.BlendMode = Style.BlendMode.ADDITIVE
-    simulation_scale: float = 0.25
+    simulation_scale: float = 0.5
 
     visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)
     optical_flow: OpticalFlowConfig = field(default_factory=OpticalFlowConfig)

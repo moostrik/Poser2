@@ -56,7 +56,7 @@ class FluidLayerConfig:
     num_players: int = 3
     draw_mode: FluidDrawMode = FluidDrawMode.DENSITY
     blend_mode: Style.BlendMode = Style.BlendMode.ADDITIVE
-    simulation_scale: float = 0.25
+    simulation_scale: float = 0.5
 
     # Nested configs
     visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)
@@ -204,16 +204,16 @@ class FluidLayer(LayerBase):
     def update(self) -> None:
         """Update fluid simulation with inputs from all flow layers."""
         # Configuration overrides (for hot-reload testing)
-        self.config.fluid_flow.vel_speed = 1.0
+        self.config.fluid_flow.vel_speed = 0.1
         self.config.fluid_flow.vel_decay = 6.0
 
-        self.config.fluid_flow.vel_vorticity = 1.0
-        self.config.fluid_flow.vel_vorticity_radius = 20.0
-        self.config.fluid_flow.vel_viscosity = 10
-        self.config.fluid_flow.vel_viscosity_iter = 20
+        self.config.fluid_flow.vel_vorticity = 10
+        self.config.fluid_flow.vel_vorticity_radius = 3.0
+        self.config.fluid_flow.vel_viscosity = 8.0
+        self.config.fluid_flow.vel_viscosity_iter = 40
 
-        self.config.fluid_flow.den_speed = 1.0
-        self.config.fluid_flow.den_decay = 6
+        self.config.fluid_flow.den_speed = 1.1
+        self.config.fluid_flow.den_decay = 12
 
         self.config.fluid_flow.tmp_speed = 0.33
         self.config.fluid_flow.tmp_decay = 3.0
@@ -226,6 +226,9 @@ class FluidLayer(LayerBase):
         self.config.fluid_flow.tmp_weight = -10.0
 
         self.config.draw_mode = FluidDrawMode.DENSITY
+        self.config.visualisation.toggle_scalar = True
+        self.config.visualisation.spacing = 4.0
+        self.config.visualisation.element_width = 0.5
 
 
         # Get motion data from pose
