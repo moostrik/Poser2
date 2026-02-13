@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from modules.ConfigBase import ConfigBase, config_field
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
-from modules.render.shaders import DrawRoi, Blend, MaskApply
+from modules.render.shaders import DrawRoi, Blend, MaskApply, EdgeSketch
 from modules.gl import Fbo, SwapFbo, Texture
+from modules.gl.shaders import Sharpen
 
 
 @dataclass
@@ -16,6 +17,11 @@ class CentreFrgConfig(ConfigBase):
     """Configuration for CentreFrgLayer foreground rendering."""
     blend_factor: float = config_field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
     mask_opacity: float = config_field(1.0, min=0.0, max=1.0, description="Foreground mask strength")
+    # Edge sketch parameters
+    edge_threshold: float = config_field(0.1, min=0.0, max=1.0, description="Edge detection threshold")
+    edge_strength: float = config_field(1.0, min=0.0, max=3.0, description="Edge line strength")
+    edge_invert: bool = config_field(False, description="Invert edges (black on white)")
+    sharpen: float = config_field(0.5, min=0.0, max=2.0, description="Sharpen edges (0.0 = off)")
     use_mask: bool = config_field(True, description="Apply mask to foreground")
 
 
@@ -43,6 +49,11 @@ class CentreFrgLayer(LayerBase):
         self._roi_shader = DrawRoi()
         self._blend_shader = Blend()
         self._mask_shader = MaskApply()
+        self._edge_sketch_shader = EdgeSketch()
+        self._sharpen_shader = Sharpen()
+
+        # Effects FBO for chained processing
+        self._effect_fbo: SwapFbo = SwapFbo()
 
     @property
     def texture(self) -> Texture:
@@ -57,6 +68,9 @@ class CentreFrgLayer(LayerBase):
         self._roi_shader.allocate()
         self._blend_shader.allocate()
         self._mask_shader.allocate()
+        self._edge_sketch_shader.allocate()
+        self._sharpen_shader.allocate()
+        self._effect_fbo.allocate(width, height, internal_format)
 
     def deallocate(self) -> None:
         self._frg_fbo.deallocate()
@@ -65,6 +79,9 @@ class CentreFrgLayer(LayerBase):
         self._roi_shader.deallocate()
         self._blend_shader.deallocate()
         self._mask_shader.deallocate()
+        self._edge_sketch_shader.deallocate()
+        self._sharpen_shader.deallocate()
+        self._effect_fbo.deallocate()
 
     def update(self) -> None:
         """Render foreground crop using bbox geometry, with temporal blending and optional mask."""
@@ -100,16 +117,34 @@ class CentreFrgLayer(LayerBase):
         )
         self._frg_blend_fbo.end()
 
+        # Edge sketch processing (always on)
+        self._effect_fbo.swap()
+        self._effect_fbo.begin()
+        self._edge_sketch_shader.use(
+            self._frg_blend_fbo.texture,
+            self.config.edge_threshold,
+            self.config.edge_strength,
+            self.config.edge_invert
+        )
+        self._effect_fbo.end()
+
+        # Sharpen edges (if enabled)
+        if self.config.sharpen > 0.0:
+            self._effect_fbo.swap()
+            self._effect_fbo.begin()
+            self._sharpen_shader.use(self._effect_fbo.back_texture, self.config.sharpen)
+            self._effect_fbo.end()
+
         # Apply mask if provided and enabled
         if self._mask_texture and self.config.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._masked_fbo.begin()
             self._mask_shader.use(
-                self._frg_blend_fbo.texture,
+                self._effect_fbo.texture,
                 self._mask_texture,
                 self.config.mask_opacity
             )
             self._masked_fbo.end()
             self._output_fbo = self._masked_fbo
         else:
-            self._output_fbo = self._frg_blend_fbo
+            self._output_fbo = self._effect_fbo
