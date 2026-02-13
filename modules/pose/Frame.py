@@ -15,7 +15,7 @@ class Frame:
     track_id: int
     cam_id: int
 
-    is_removed: bool    # depricated, for use in stream
+    # is_removed: bool    # depricated, for use in stream
 
     time_stamp: float =         field(default_factory=time.time)
     bbox: BBox =                field(default_factory=BBox.create_dummy)

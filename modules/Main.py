@@ -254,7 +254,7 @@ class Main():
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
 
         # MOTION GATE (after interpolation pipeline, before DataHub)
-        self.pose_interpolation_pipeline.add_poses_callback(self.motion_gate_applicator.submit)
+        self.pose_interpolation_pipeline.add_poses_callback(self.motion_gate_applicator.submit) # dit slaat nergens op??
         self.pose_interpolation_pipeline.add_poses_callback(self.motion_gate_tracker.process)
         self.motion_gate_tracker.add_poses_callback(partial(self.data_hub.set_poses, Stage.LERP))
         self.motion_gate_tracker.add_poses_callback(self.window_tracker_I.process)

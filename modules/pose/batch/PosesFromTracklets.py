@@ -61,7 +61,7 @@ class PosesFromTracklets(PoseDictCallbackMixin):
                     # batch_id=batch_id,
                     bbox=bounding_box,
                     time_stamp=tracklet.time_stamp,
-                    is_removed=tracklet.is_removed
+                    # is_removed=tracklet.is_removed
                 )
             except Exception as e:
                 print(f"PoseFromTrackletGenerator: Error generating pose {track_id}: {e}")
