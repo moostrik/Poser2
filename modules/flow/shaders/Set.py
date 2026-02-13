@@ -9,7 +9,7 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
 
-class Scale(Shader):
+class Set(Shader):
     """Multiply texture by scalar force value."""
 
     def use(self, src: Texture, scale: float) -> None:

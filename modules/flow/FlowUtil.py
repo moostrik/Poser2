@@ -48,7 +48,7 @@ class FlowUtil:
 
         # Lazy init shader
         if not hasattr(FlowUtil, '_stretch_shader'):
-            from .shaders.Blit import Blit
+            from .shaders import Blit
             FlowUtil._stretch_shader = Blit()
             FlowUtil._stretch_shader.allocate()
 
@@ -79,8 +79,8 @@ class FlowUtil:
         """
         # Lazy init shader
         if not hasattr(FlowUtil, '_add_shader'):
-            from .shaders.Blend import Blend
-            FlowUtil._add_shader = Blend()
+            from .shaders import Add
+            FlowUtil._add_shader = Add()
             FlowUtil._add_shader.allocate()
 
         # Swap and add: curr = prev + (src * strength)
@@ -99,14 +99,14 @@ class FlowUtil:
             strength: Attenuation factor (1.0 = full copy, 0.0 = clear)
         """
         # Lazy init shader
-        if not hasattr(FlowUtil, '_scale_shader'):
-            from .shaders.Scale import Scale
-            FlowUtil._scale_shader = Scale()
-            FlowUtil._scale_shader.allocate()
+        if not hasattr(FlowUtil, '_set_shader'):
+            from .shaders import Set
+            FlowUtil._set_shader = Set()
+            FlowUtil._set_shader.allocate()
 
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._scale_shader.use(src, strength)
+        FlowUtil._set_shader.use(src, strength)
         dst_fbo.end()
 
     @staticmethod
@@ -121,7 +121,7 @@ class FlowUtil:
         """
         # Lazy init shader
         if not hasattr(FlowUtil, '_magnitude_shader'):
-            from .shaders.Magnitude import Magnitude
+            from .shaders import Magnitude
             FlowUtil._magnitude_shader = Magnitude()
             FlowUtil._magnitude_shader.allocate()
 
@@ -142,7 +142,7 @@ class FlowUtil:
         """
         # Lazy init shader
         if not hasattr(FlowUtil, '_normalize_shader'):
-            from .shaders.Normalize import Normalize
+            from .shaders import Normalize
             FlowUtil._normalize_shader = Normalize()
             FlowUtil._normalize_shader.allocate()
 
@@ -163,7 +163,7 @@ class FlowUtil:
         """
         # Lazy init shader
         if not hasattr(FlowUtil, '_channel_copy_shader'):
-            from .shaders.ChannelCopy import ChannelCopy
+            from .shaders import ChannelCopy
             FlowUtil._channel_copy_shader = ChannelCopy()
             FlowUtil._channel_copy_shader.allocate()
 
@@ -187,7 +187,7 @@ class FlowUtil:
         """
         # Lazy init shader
         if not hasattr(FlowUtil, '_channel_add_shader'):
-            from .shaders.ChannelAdd import ChannelAdd
+            from .shaders import ChannelAdd
             FlowUtil._channel_add_shader = ChannelAdd()
             FlowUtil._channel_add_shader.allocate()
 
@@ -210,7 +210,7 @@ class FlowUtil:
         """
         # Lazy init shader
         if not hasattr(FlowUtil, '_clamp_shader'):
-            from .shaders.Clamp import Clamp
+            from .shaders import Clamp
             FlowUtil._clamp_shader = Clamp()
             FlowUtil._clamp_shader.allocate()
 
@@ -220,8 +220,117 @@ class FlowUtil:
         FlowUtil._clamp_shader.use(dst_fbo.back_texture, min_val, max_val)
         dst_fbo.end()
 
+    # ========== Region Operations ==========
+
     @staticmethod
-    def get_num_channels(internal_format) -> int:
+    def set_region(dst_fbo: SwapFbo, src_texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Set a specific region of destination to source texture.
+
+        The source texture is stretched to fill the target region.
+        Outside the region, destination is preserved.
+
+        Args:
+            dst_fbo: Destination SwapFbo (will be swapped)
+            src_texture: Source texture (stretched to fill region)
+            x: X position in UV coordinates [0, 1]
+            y: Y position in UV coordinates [0, 1]
+            w: Width in UV coordinates
+            h: Height in UV coordinates
+            strength: Multiplier for source texture
+        """
+        if not hasattr(FlowUtil, '_set_region_shader'):
+            from .shaders import SetRegion
+            FlowUtil._set_region_shader = SetRegion()
+            FlowUtil._set_region_shader.allocate()
+
+        dst_fbo.swap()
+        dst_fbo.begin()
+        FlowUtil._set_region_shader.use(dst_fbo.back_texture, src_texture, x, y, w, h, strength)
+        dst_fbo.end()
+
+    @staticmethod
+    def set_channel_region(dst_fbo: SwapFbo, src_texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Set a specific channel at a specific region to source texture.
+
+        The source's R channel replaces the specified channel of the output
+        within the given region only. Other channels and outside region preserved.
+
+        Args:
+            dst_fbo: Destination SwapFbo (RGBA, will be swapped)
+            src_texture: Source texture (uses R channel)
+            channel: Target channel (0=R, 1=G, 2=B, 3=A)
+            x: X position in UV coordinates [0, 1]
+            y: Y position in UV coordinates [0, 1]
+            w: Width in UV coordinates
+            h: Height in UV coordinates
+            strength: Multiplier for source value
+        """
+        if not hasattr(FlowUtil, '_channel_set_region_shader'):
+            from .shaders import ChannelSetRegion
+            FlowUtil._channel_set_region_shader = ChannelSetRegion()
+            FlowUtil._channel_set_region_shader.allocate()
+
+        dst_fbo.swap()
+        dst_fbo.begin()
+        FlowUtil._channel_set_region_shader.use(dst_fbo.back_texture, src_texture, channel, x, y, w, h, strength)
+        dst_fbo.end()
+
+    @staticmethod
+    def add_region(dst_fbo: SwapFbo, src_texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Add source texture to a specific region of destination.
+
+        The source texture is stretched to fill the target region and added
+        with the specified strength using in-shader blending.
+
+        Args:
+            dst_fbo: Destination SwapFbo (will be swapped)
+            src_texture: Source texture to add (stretched to fill region)
+            x: X position in UV coordinates [0, 1]
+            y: Y position in UV coordinates [0, 1]
+            w: Width in UV coordinates
+            h: Height in UV coordinates
+            strength: Multiplier for source texture
+        """
+        if not hasattr(FlowUtil, '_add_region_shader'):
+            from .shaders import AddRegion
+            FlowUtil._add_region_shader = AddRegion()
+            FlowUtil._add_region_shader.allocate()
+
+        dst_fbo.swap()
+        dst_fbo.begin()
+        FlowUtil._add_region_shader.use(dst_fbo.back_texture, src_texture, x, y, w, h, strength)
+        dst_fbo.end()
+
+    @staticmethod
+    def add_channel_region(dst_fbo: SwapFbo, src_texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Add source texture to a specific channel at a specific region.
+
+        The source's R channel is added to the specified channel of the output
+        within the given region only.
+
+        Args:
+            dst_fbo: Destination SwapFbo (RGBA, will be swapped)
+            src_texture: Source texture (uses R channel)
+            channel: Target channel (0=R, 1=G, 2=B, 3=A)
+            x: X position in UV coordinates [0, 1]
+            y: Y position in UV coordinates [0, 1]
+            w: Width in UV coordinates
+            h: Height in UV coordinates
+            strength: Multiplier for the addition
+        """
+        # Lazy init shader
+        if not hasattr(FlowUtil, '_channel_add_region_shader'):
+            from .shaders import ChannelAddRegion
+            FlowUtil._channel_add_region_shader = ChannelAddRegion()
+            FlowUtil._channel_add_region_shader.allocate()
+
+        dst_fbo.swap()
+        dst_fbo.begin()
+        FlowUtil._channel_add_region_shader.use(dst_fbo.back_texture, src_texture, channel, x, y, w, h, strength)
+        dst_fbo.end()
+
+    @staticmethod
+    def get_num_channels(internal_format) -> int:  # type: ignore
         """Get number of channels from OpenGL internal format.
 
         Args:

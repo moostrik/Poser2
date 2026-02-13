@@ -9,7 +9,7 @@ from modules.gl.Shader import Shader, draw_quad
 from modules.gl import Texture
 
 
-class Blend(Shader):
+class Add(Shader):
     """Add two textures with individual strength multipliers."""
 
     def use(self, dst: Texture, src: Texture,
@@ -17,7 +17,7 @@ class Blend(Shader):
         """Render blended result to FBO.
 
         Args:
-            target_fbo: Target framebuffer
+            dst: Destination texture
             tex0: First source texture
             tex1: Second source texture
             strength0: Multiplier for first texture
