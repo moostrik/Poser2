@@ -179,7 +179,7 @@ class RenderManager(RenderBase):
         self.centre_gmtr_config=    ls.CentreGeometryConfig(stage=Stage.LERP, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
         self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.3, blur_steps=0, blur_radius=1.0, dilation_steps=0)
         self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
-        self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, edge_threshold=0.1, edge_strength=1.0, edge_invert=True, sharpen=0.5, use_mask=True)
+        self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, sketch_mode=ls.SketchMode.DETAIL, detail_threshold=0.5, detail_boost=1.0, detail_radius=5.0, invert=True, sharpen=0.5, use_mask=True)
         self.centre_pose_config =   ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
 
         self.data_A_config =        ls.DataLayerConfig(     stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
@@ -295,11 +295,14 @@ class RenderManager(RenderBase):
         self._draw_layers = FINAL_LAYERS
         self._preview_layers = PREVIEW_LAYERS
 
+        #?hotreload settings
         self.centre_mask_config.blend_factor = 0.25
-        self.centre_frg_config.edge_threshold = 0.1
-        self.centre_frg_config.edge_strength = 1.5
+        self.centre_frg_config.sketch_mode = ls.SketchMode.DETAIL
+        self.centre_frg_config.detail_threshold = 0.5
+        self.centre_frg_config.detail_boost = 1.0
+        self.centre_frg_config.detail_radius = 5.0
+        self.centre_frg_config.invert = True
         self.centre_frg_config.sharpen = 0.5
-        self.centre_frg_config.edge_invert = True
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)

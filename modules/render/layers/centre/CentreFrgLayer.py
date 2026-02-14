@@ -2,14 +2,21 @@
 
 # Standard library imports
 from dataclasses import dataclass
+from enum import Enum
 
 # Local application imports
 from modules.ConfigBase import ConfigBase, config_field
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
-from modules.render.shaders import DrawRoi, Blend, MaskApply, EdgeSketch
+from modules.render.shaders import DrawRoi, Blend, MaskApply, EdgeSketch, DetailThreshold
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.gl.shaders import Sharpen
+
+
+class SketchMode(Enum):
+    """Available sketch/stylization modes."""
+    EDGE = "edge"              # Sobel edge detection (contour lines)
+    DETAIL = "detail"          # Adaptive threshold (preserves face detail)
 
 
 @dataclass
@@ -17,11 +24,18 @@ class CentreFrgConfig(ConfigBase):
     """Configuration for CentreFrgLayer foreground rendering."""
     blend_factor: float = config_field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
     mask_opacity: float = config_field(1.0, min=0.0, max=1.0, description="Foreground mask strength")
-    # Edge sketch parameters
+    # Sketch mode selection
+    sketch_mode: SketchMode = config_field(SketchMode.DETAIL, description="Sketch stylization mode")
+    # Edge sketch parameters (when mode=EDGE)
     edge_threshold: float = config_field(0.1, min=0.0, max=1.0, description="Edge detection threshold")
     edge_strength: float = config_field(1.0, min=0.0, max=3.0, description="Edge line strength")
-    edge_invert: bool = config_field(False, description="Invert edges (black on white)")
-    sharpen: float = config_field(0.5, min=0.0, max=2.0, description="Sharpen edges (0.0 = off)")
+    # Detail threshold parameters (when mode=DETAIL)
+    detail_threshold: float = config_field(0.5, min=0.0, max=1.0, description="Black/white cutoff")
+    detail_boost: float = config_field(1.0, min=0.0, max=2.0, description="Face detail preservation")
+    detail_radius: float = config_field(5.0, min=1.0, max=15.0, description="Local contrast radius")
+    # Common parameters
+    invert: bool = config_field(True, description="Invert output (black on white)")
+    sharpen: float = config_field(0.5, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
     use_mask: bool = config_field(True, description="Apply mask to foreground")
 
 
@@ -50,6 +64,7 @@ class CentreFrgLayer(LayerBase):
         self._blend_shader = Blend()
         self._mask_shader = MaskApply()
         self._edge_sketch_shader = EdgeSketch()
+        self._detail_threshold_shader = DetailThreshold()
         self._sharpen_shader = Sharpen()
 
         # Effects FBO for chained processing
@@ -69,6 +84,7 @@ class CentreFrgLayer(LayerBase):
         self._blend_shader.allocate()
         self._mask_shader.allocate()
         self._edge_sketch_shader.allocate()
+        self._detail_threshold_shader.allocate()
         self._sharpen_shader.allocate()
         self._effect_fbo.allocate(width, height, internal_format)
 
@@ -80,6 +96,7 @@ class CentreFrgLayer(LayerBase):
         self._blend_shader.deallocate()
         self._mask_shader.deallocate()
         self._edge_sketch_shader.deallocate()
+        self._detail_threshold_shader.deallocate()
         self._sharpen_shader.deallocate()
         self._effect_fbo.deallocate()
 
@@ -117,18 +134,27 @@ class CentreFrgLayer(LayerBase):
         )
         self._frg_blend_fbo.end()
 
-        # Edge sketch processing (always on)
+        # Sketch processing based on mode
         self._effect_fbo.swap()
         self._effect_fbo.begin()
-        self._edge_sketch_shader.use(
-            self._frg_blend_fbo.texture,
-            self.config.edge_threshold,
-            self.config.edge_strength,
-            self.config.edge_invert
-        )
+        if self.config.sketch_mode == SketchMode.EDGE:
+            self._edge_sketch_shader.use(
+                self._frg_blend_fbo.texture,
+                self.config.edge_threshold,
+                self.config.edge_strength,
+                self.config.invert
+            )
+        else:  # SketchMode.DETAIL
+            self._detail_threshold_shader.use(
+                self._frg_blend_fbo.texture,
+                self.config.detail_threshold,
+                self.config.detail_boost,
+                self.config.detail_radius,
+                self.config.invert
+            )
         self._effect_fbo.end()
 
-        # Sharpen edges (if enabled)
+        # Sharpen result (if enabled)
         if self.config.sharpen > 0.0:
             self._effect_fbo.swap()
             self._effect_fbo.begin()
