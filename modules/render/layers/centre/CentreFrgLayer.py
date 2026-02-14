@@ -28,7 +28,7 @@ class CentreFrgConfig(ConfigBase):
     levels: int = config_field(4, min=2, max=8, description="Number of color bands")
     smoothness: float = config_field(0.1, min=0.0, max=0.5, description="Gradient between bands")
     # Hue shift
-    hue_strength: float = config_field(0.5, min=0.0, max=1.0, description="Hue shift toward track color (0.0 = off)")
+    colorize: float = config_field(0.5, min=0.0, max=1.0, description="Hue shift toward track color (0.0 = off)")
     # Post
     sharpen: float = config_field(0.5, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
     use_mask: bool = config_field(True, description="Apply mask to foreground")
@@ -139,11 +139,11 @@ class CentreFrgLayer(LayerBase):
         self._effect_fbo.end()
 
         # Hue shift toward track color
-        if self.config.hue_strength > 0.0:
+        if self.config.colorize > 0.0:
             self._effect_fbo.swap()
             self._effect_fbo.begin()
             r, g, b = self._track_color
-            self._hue_shift_shader.use(self._effect_fbo.back_texture, r, g, b, self.config.hue_strength)
+            self._hue_shift_shader.use(self._effect_fbo.back_texture, r, g, b, self.config.colorize)
             self._effect_fbo.end()
 
         # Sharpen

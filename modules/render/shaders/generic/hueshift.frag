@@ -26,13 +26,13 @@ void main() {
     vec4 color = texture(tex, texCoord);
     vec3 srcHsv = rgb2hsv(color.rgb);
     vec3 targetHsv = rgb2hsv(targetColor);
-    
+
     // Shift hue toward target, boost saturation toward target
     float newHue = mix(srcHsv.x, targetHsv.x, strength);
     float newSat = mix(srcHsv.y, max(srcHsv.y, targetHsv.y * 0.8), strength);
-    
+
     // Keep original value (luminance)
     vec3 result = hsv2rgb(vec3(newHue, newSat, srcHsv.z));
-    
+
     fragColor = vec4(result, color.a);
 }

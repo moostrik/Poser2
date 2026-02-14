@@ -38,10 +38,12 @@ class Fbo(Texture):
             glViewport(*new_vp)
             _current_viewport = new_vp
 
+        glViewport(*new_vp)
+
     def end(self)  -> None:
         """End rendering to FBO and restore previous state."""
-        pass
-        # glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        # pass
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
 class SwapFbo(Fbo):
     """Double-buffered FBO that swaps between two buffers.

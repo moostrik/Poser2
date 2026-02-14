@@ -6,7 +6,7 @@ from modules.gl import Texture
 class HueShift(Shader):
     """Shift image hue toward a target color while preserving luminance."""
 
-    def use(self, tex: Texture, 
+    def use(self, tex: Texture,
             target_r: float = 1.0, target_g: float = 0.0, target_b: float = 0.0,
             strength: float = 0.5) -> None:
         if not self.allocated or not self.shader_program:

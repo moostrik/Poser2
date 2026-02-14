@@ -132,12 +132,12 @@ SHOW_COMP: list[Layers] = [
     # Layers.centre_mask,
     # Layers.motion,
     # Layers.fluid,
-    # Layers.ms_mask,
+    Layers.ms_mask,
     # Layers.sim_blend,
     # Layers.centre_pose,
     # Layers.centre_motion,
-    Layers.centre_frg,
-    Layers.fluid,
+    # Layers.centre_frg,
+    # Layers.fluid,
     # Layers.composite,
 ]
 
@@ -179,8 +179,8 @@ class RenderManager(RenderBase):
 
         self.centre_gmtr_config=    ls.CentreGeometryConfig(stage=Stage.LERP, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
         self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.3, blur_steps=0, blur_radius=1.0, dilation_steps=0)
-        self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
-        self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.2, levels=4, smoothness=0.1, saturation=1.2, exposure=1.0, gamma=1.0, offset=0.0, contrast=1.0, sharpen=0.0, use_mask=True)
+        self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.25, mask_opacity=1.0, use_mask=True)
+        self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.25,  exposure=1.2, gamma=1.0, offset=0.0, contrast=1.1, saturation=2.0, levels=9, smoothness=0.33, sharpen=0.0, colorize=0.96, use_mask=True)
         self.centre_pose_config =   ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=False)
 
         self.data_A_config =        ls.DataLayerConfig(     stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
@@ -212,7 +212,7 @@ class RenderManager(RenderBase):
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_gmtry,    color,                                      self.centre_pose_config)
 
             motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,   centre_mask.texture, color)
-            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub,   mask_textures, list(TRACK_COLORS))
+            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub,   mask_textures, centre_frg.texture, list(TRACK_COLORS))
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   centre_mask.texture, list(TRACK_COLORS))
             fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS))
 
@@ -296,20 +296,20 @@ class RenderManager(RenderBase):
         self._draw_layers = FINAL_LAYERS
         self._preview_layers = PREVIEW_LAYERS
 
-        #?hotreload settings
-        self.centre_mask_config.blend_factor = 0.25
+        # hotreload settings
+        # self.centre_mask_config.blend_factor = 0.25
 
-        self.centre_frg_config.exposure = 1.2
-        self.centre_frg_config.gamma = 1.0
-        self.centre_frg_config.offset = 0.
-        self.centre_frg_config.contrast = 1.1
-        self.centre_frg_config.saturation = 2.5
+        # self.centre_frg_config.exposure = 1.2
+        # self.centre_frg_config.gamma = 1.0
+        # self.centre_frg_config.offset = 0.0
+        # self.centre_frg_config.contrast = 1.1
+        # self.centre_frg_config.saturation = 2.0
 
-        self.centre_frg_config.levels = 9
-        self.centre_frg_config.smoothness = 0.2
-        self.centre_frg_config.sharpen = 0
+        # self.centre_frg_config.levels = 9
+        # self.centre_frg_config.smoothness = 0.3
+        # self.centre_frg_config.sharpen = 0.0
 
-        self.centre_frg_config.hue_strength = 0.95
+        # self.centre_frg_config.colorize = 0.96
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
