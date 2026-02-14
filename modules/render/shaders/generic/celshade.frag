@@ -34,11 +34,11 @@ vec3 hsv2rgb(vec3 c) {
 void main() {
     vec4 color = texture(tex, texCoord);
     vec2 texelSize = 1.0 / vec2(textureSize(tex, 0));
-    
+
     // Check if we're in a dark area - if so, blur first
     float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
     float blurAmount = smoothstep(0.3, 0.05, lum);  // More blur in darker areas
-    
+
     if (blurAmount > 0.01) {
         // 3x3 gaussian-ish blur for dark areas
         vec3 blurred = vec3(0.0);
@@ -82,7 +82,7 @@ void main() {
     float upperBand = lowerBand + levelSize;
     v = mix(lowerBand, upperBand, smooth_t);
     float posterizedV = v * v;  // Perceptual back to linear
-    
+
     // Blend to original in dark areas to avoid blocky shadows
     float shadowBlend = smoothstep(0.0, 0.25, originalV);
     hsv.z = mix(originalV, posterizedV, shadowBlend);

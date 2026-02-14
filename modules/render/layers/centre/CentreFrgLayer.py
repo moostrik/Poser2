@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from modules.ConfigBase import ConfigBase, config_field
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
-from modules.render.shaders import DrawRoi, Blend, MaskApply, CelShade
+from modules.render.shaders import DrawRoi, Blend, MaskApply, CelShade, HueShift
 from modules.gl import Fbo, SwapFbo, Texture, Blit
 from modules.gl.shaders import Sharpen
 from modules.gl import Style
@@ -27,6 +27,8 @@ class CentreFrgConfig(ConfigBase):
     # Cel shade
     levels: int = config_field(4, min=2, max=8, description="Number of color bands")
     smoothness: float = config_field(0.1, min=0.0, max=0.5, description="Gradient between bands")
+    # Hue shift
+    hue_strength: float = config_field(0.5, min=0.0, max=1.0, description="Hue shift toward track color (0.0 = off)")
     # Post
     sharpen: float = config_field(0.5, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
     use_mask: bool = config_field(True, description="Apply mask to foreground")
@@ -38,10 +40,11 @@ class CentreFrgLayer(LayerBase):
     Uses bbox_geometry for rendering. Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, geometry: CentreGeometry, frg_texture: Texture, mask_texture: Texture | None = None, config: CentreFrgConfig | None = None) -> None:
+    def __init__(self, geometry: CentreGeometry, frg_texture: Texture, mask_texture: Texture | None = None, config: CentreFrgConfig | None = None, track_color: tuple[float, float, float] = (1.0, 1.0, 1.0)) -> None:
         self._geometry: CentreGeometry = geometry
         self._frg_texture: Texture = frg_texture
         self._mask_texture: Texture | None = mask_texture
+        self._track_color: tuple[float, float, float] = track_color
 
         # Configuration
         self.config: CentreFrgConfig = config or CentreFrgConfig()
@@ -55,6 +58,7 @@ class CentreFrgLayer(LayerBase):
         self._roi_shader = DrawRoi()
         self._blend_shader = Blend()
         self._cel_shade_shader = CelShade()
+        self._hue_shift_shader = HueShift()
         self._sharpen_shader = Sharpen()
         self._mask_shader = MaskApply()
         self.hot_reload = HotReloadMethods(self.__class__)
@@ -73,6 +77,7 @@ class CentreFrgLayer(LayerBase):
         self._blend_shader.allocate()
         self._mask_shader.allocate()
         self._cel_shade_shader.allocate()
+        self._hue_shift_shader.allocate()
         self._sharpen_shader.allocate()
         self._mask_shader.allocate()
 
@@ -84,6 +89,7 @@ class CentreFrgLayer(LayerBase):
         self._roi_shader.deallocate()
         self._blend_shader.deallocate()
         self._cel_shade_shader.deallocate()
+        self._hue_shift_shader.deallocate()
         self._sharpen_shader.deallocate()
         self._mask_shader.deallocate()
 
@@ -131,6 +137,14 @@ class CentreFrgLayer(LayerBase):
             self.config.saturation
         )
         self._effect_fbo.end()
+
+        # Hue shift toward track color
+        if self.config.hue_strength > 0.0:
+            self._effect_fbo.swap()
+            self._effect_fbo.begin()
+            r, g, b = self._track_color
+            self._hue_shift_shader.use(self._effect_fbo.back_texture, r, g, b, self.config.hue_strength)
+            self._effect_fbo.end()
 
         # Sharpen
         if self.config.sharpen > 0.0:

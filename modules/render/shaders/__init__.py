@@ -10,6 +10,7 @@ from .generic.DensityColorize import    DensityColorize
 from .generic.EdgeSketch import         EdgeSketch
 from .generic.DetailThreshold import    DetailThreshold
 from .generic.CelShade import           CelShade
+from .generic.HueShift import           HueShift
 
 from .mask.MaskAA import                MaskAA
 from .mask.MaskApply import             MaskApply
