@@ -141,9 +141,12 @@ class MSColorMaskLayer(LayerBase):
             sorted_similarities = np.sort(motion_similarities)  # Ascending
             lowest_similarity = float(sorted_similarities[-(active_poses - 1)])
 
-        foreground_blend: float = (lowest_similarity - 0.25) * 2.0
+        # foreground_blend: float = (lowest_similarity - 0.25) * 2.0
+        # foreground_blend = max(0.0, min(1.0, foreground_blend))
+        threshold = 0.33
+        foreground_blend: float = (lowest_similarity - threshold) / (1.0 - threshold)
         foreground_blend = max(0.0, min(1.0, foreground_blend))
-
+        # foreground_blend = easeInOutSine(foreground_blend)
 
         other_cam_ids: list[int] = []
         for cam_id in sorted(self._mask_textures.keys()):

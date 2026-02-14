@@ -267,9 +267,9 @@ class RenderManager(RenderBase):
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 if layer_type in LARGE_LAYERS:
-                    layer.allocate(1080 * 2, 1920 * 2, GL_RGBA32F)
+                    layer.allocate(1080 * 2, 1920 * 2, GL_RGBA16F)
                 else:
-                    layer.allocate(1080, 1920, GL_RGBA32F)
+                    layer.allocate(1080, 1920, GL_RGBA16F)
         self.allocate_window_renders()
         Shader.enable_hot_reload()
 
