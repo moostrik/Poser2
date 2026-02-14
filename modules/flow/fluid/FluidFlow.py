@@ -187,7 +187,7 @@ class FluidFlow(FlowBase):
         self._obstacle_border_shader: ObstacleBorder = ObstacleBorder()
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
-        hot_reload = HotReloadMethods(self.__class__, True, True)
+        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     # ========== Properties (Domain-specific API) ==========
 

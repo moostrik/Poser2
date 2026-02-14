@@ -1,4 +1,4 @@
-"""MSColorMask shader - Blend multiple masks with colors and weights."""
+"""MSColorMask shader - Composite pre-styled RGBA textures."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
@@ -6,53 +6,30 @@ from modules.gl import Texture
 
 
 class MSColorMask(Shader):
-    """Blend multiple mask textures with per-mask colors and weights.
-
-    Takes up to 3 mask textures (R16F), colors, and weights.
-    Outputs non-premultiplied RGBA where:
-    - RGB = weighted color blend
-    - A = combined mask alpha
-    """
+    """Composite up to 3 pre-styled RGBA textures with weights."""
 
     def __init__(self) -> None:
         super().__init__()
 
-    def use(
-        self,
-        masks: list[Texture],
-        colors: list[tuple[float, float, float, float]],
-        weights: list[float]
-    ) -> None:
-        """Colorize and blend masks with weights.
+    def use(self, textures: list[Texture], weights: list[float]) -> None:
+        """Composite pre-styled textures.
 
         Args:
-            masks: List of up to 3 mask textures (R16F single channel)
-            colors: List of up to 3 RGBA colors, one per mask
-            weights: List of up to 3 weights, one per mask
+            textures: Up to 3 pre-styled RGBA textures
+            weights: Weight per texture
         """
-        if not self.allocated or not self.shader_program:
-            return
-
         glUseProgram(self.shader_program)
 
-        # Bind mask textures (pad with first mask if fewer than 3)
-        texture_units = [GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2]
+        # Bind textures to slots 0-2
         for i in range(3):
-            glActiveTexture(texture_units[i])
-            if i < len(masks) and masks[i].allocated:
-                glBindTexture(GL_TEXTURE_2D, masks[i].tex_id)
-            elif len(masks) > 0 and masks[0].allocated:
-                glBindTexture(GL_TEXTURE_2D, masks[0].tex_id)
-            glUniform1i(self.get_uniform_loc(f"uMask{i}"), i)
+            glActiveTexture(int(GL_TEXTURE0) + i)
+            if i < len(textures):
+                glBindTexture(GL_TEXTURE_2D, textures[i].tex_id)
+            glUniform1i(self.get_uniform_loc(f"uTex{i}"), i)
 
-        # Set color uniforms (pad to 3 if fewer provided)
-        padded_colors = list(colors) + [(0.0, 0.0, 0.0, 0.0)] * (3 - len(colors))
-        for i, color in enumerate(padded_colors[:3]):
-            glUniform4f(self.get_uniform_loc(f"uColors[{i}]"), *color)
-
-        # Set weight uniforms (pad to 3 if fewer provided)
-        padded_weights = list(weights) + [0.0] * (3 - len(weights))
-        for i, weight in enumerate(padded_weights[:3]):
-            glUniform1f(self.get_uniform_loc(f"uWeights[{i}]"), weight)
+        # Weights
+        for i in range(3):
+            w = weights[i] if i < len(weights) else 0.0
+            glUniform1f(self.get_uniform_loc(f"uWeights[{i}]"), w)
 
         draw_quad()

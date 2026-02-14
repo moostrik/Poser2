@@ -1,4 +1,4 @@
-"""AddDodgeBlend shader - Transition from additive to color dodge lighting."""
+"""AddDodgeBlend shader - Blend foreground onto colored mask with add-to-dodge transition."""
 
 from OpenGL.GL import *  # type: ignore
 from modules.gl.Shader import Shader, draw_quad
@@ -6,9 +6,10 @@ from modules.gl import Texture
 
 
 class AddDodgeBlend(Shader):
-    """Blend foreground with track color, transitioning from additive to dodge.
+    """Blend foreground onto a pre-colored mask, transitioning from additive to dodge.
 
-    Starts with bright additive blending, gradually shifts to vibrant color dodge.
+    Base is the own camera's tinted mask. Foreground (already hue-shifted)
+    adds energy/brightness, shifting from additive to color dodge.
     """
 
     def __init__(self) -> None:
@@ -18,42 +19,37 @@ class AddDodgeBlend(Shader):
         self,
         base: Texture,
         frg: Texture,
-        mask: Texture,
-        track_r: float,
-        track_g: float,
-        track_b: float,
-        strength: float
+        strength: float,
+        dodge_intensity: float = 0.5,
+        add_curve: float = 2.0,
+        dodge_curve: float = 1.5,
+        opacity_curve: float = 0.3
     ) -> None:
         """Apply add-to-dodge blend.
 
         Args:
-            base: Base texture (ms_mask output)
-            frg: Foreground texture
-            mask: Mask texture for this camera (R16F)
-            track_r, track_g, track_b: Track color RGB
-            strength: Blend strength (0 = base only, 1 = full effect)
+            base: Own camera's tinted mask (RGBA from Tint pass)
+            frg: Foreground texture (cel-shaded + hue-shifted, with alpha)
+            strength: Blend strength (0 = base only, 1 = full dodge)
+            dodge_intensity: How strongly foreground dodges base (0-1)
+            add_curve: Additive falloff exponent (higher = stays longer)
+            dodge_curve: Dodge ramp exponent (higher = kicks in later)
+            opacity_curve: Foreground visibility ramp (lower = appears faster)
         """
-        if not self.allocated or not self.shader_program:
-            return
-
         glUseProgram(self.shader_program)
 
         glActiveTexture(GL_TEXTURE0)
-        if base.allocated:
-            glBindTexture(GL_TEXTURE_2D, base.tex_id)
+        glBindTexture(GL_TEXTURE_2D, base.tex_id)
         glUniform1i(self.get_uniform_loc("uBase"), 0)
 
         glActiveTexture(GL_TEXTURE1)
-        if frg.allocated:
-            glBindTexture(GL_TEXTURE_2D, frg.tex_id)
+        glBindTexture(GL_TEXTURE_2D, frg.tex_id)
         glUniform1i(self.get_uniform_loc("uFrg"), 1)
 
-        glActiveTexture(GL_TEXTURE2)
-        if mask.allocated:
-            glBindTexture(GL_TEXTURE_2D, mask.tex_id)
-        glUniform1i(self.get_uniform_loc("uMask"), 2)
-
-        glUniform3f(self.get_uniform_loc("uTrackColor"), track_r, track_g, track_b)
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
+        glUniform1f(self.get_uniform_loc("uDodgeIntensity"), dodge_intensity)
+        glUniform1f(self.get_uniform_loc("uAddCurve"), add_curve)
+        glUniform1f(self.get_uniform_loc("uDodgeCurve"), dodge_curve)
+        glUniform1f(self.get_uniform_loc("uOpacityCurve"), opacity_curve)
 
         draw_quad()

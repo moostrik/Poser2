@@ -5,31 +5,24 @@ precision highp float;
 in vec2 texCoord;
 out vec4 fragColor;
 
-// Input mask textures (R16F single channel each)
-uniform sampler2D uMask0;
-uniform sampler2D uMask1;
-uniform sampler2D uMask2;
-
-// Per-mask colors and weights
-uniform vec4 uColors[3];
+// All 3 slots: pre-styled RGBA (already tinted)
+uniform sampler2D uTex0;
+uniform sampler2D uTex1;
+uniform sampler2D uTex2;
 uniform float uWeights[3];
 
 void main() {
-    // Sample masks (single channel R16F)
-    float m0 = texture(uMask0, texCoord).r * uWeights[0];
-    float m1 = texture(uMask1, texCoord).r * uWeights[1];
-    float m2 = texture(uMask2, texCoord).r * uWeights[2];
+    vec4 t0 = texture(uTex0, texCoord);
+    vec4 t1 = texture(uTex1, texCoord);
+    vec4 t2 = texture(uTex2, texCoord);
 
-    // Combined alpha from all masks
-    float totalAlpha = clamp(m0 + m1 + m2, 0.0, 1.0);
+    float a0 = t0.a * uWeights[0];
+    float a1 = t1.a * uWeights[1];
+    float a2 = t2.a * uWeights[2];
 
-    // Weighted color blend (non-premultiplied)
-    // Each mask contributes its color proportionally
-    vec3 color = vec3(0.0);
-    if (totalAlpha > 0.001) {
-        color = (m0 * uColors[0].rgb + m1 * uColors[1].rgb + m2 * uColors[2].rgb) / totalAlpha;
-    }
+    float totalAlpha = clamp(a0 + a1 + a2, 0.0, 1.0);
+    vec3 premult = t0.rgb * a0 + t1.rgb * a1 + t2.rgb * a2;
+    vec3 color = (totalAlpha > 0.001) ? premult / totalAlpha : vec3(0.0);
 
-    // Output non-premultiplied RGBA
     fragColor = vec4(color, totalAlpha);
 }
