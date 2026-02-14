@@ -298,14 +298,14 @@ class RenderManager(RenderBase):
         #?hotreload settings
         self.centre_mask_config.blend_factor = 0.25
 
-        self.centre_frg_config.exposure = 1.0
+        self.centre_frg_config.exposure = 1.2
         self.centre_frg_config.gamma = 1.
         self.centre_frg_config.offset = 0.0
         self.centre_frg_config.contrast = 1.0
         self.centre_frg_config.saturation = 1.5
 
-        self.centre_frg_config.levels = 6
-        self.centre_frg_config.smoothness = 0.0
+        self.centre_frg_config.levels = 9
+        self.centre_frg_config.smoothness = 0.2
         self.centre_frg_config.sharpen = 0
 
         Style.reset_state()

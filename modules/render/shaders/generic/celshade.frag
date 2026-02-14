@@ -33,6 +33,28 @@ vec3 hsv2rgb(vec3 c) {
 
 void main() {
     vec4 color = texture(tex, texCoord);
+    vec2 texelSize = 1.0 / vec2(textureSize(tex, 0));
+    
+    // Check if we're in a dark area - if so, blur first
+    float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+    float blurAmount = smoothstep(0.3, 0.05, lum);  // More blur in darker areas
+    
+    if (blurAmount > 0.01) {
+        // 3x3 gaussian-ish blur for dark areas
+        vec3 blurred = vec3(0.0);
+        float weights[9] = float[](1.0, 2.0, 1.0, 2.0, 4.0, 2.0, 1.0, 2.0, 1.0);
+        float totalWeight = 16.0;
+        int idx = 0;
+        for (int y = -1; y <= 1; y++) {
+            for (int x = -1; x <= 1; x++) {
+                vec2 offset_uv = texCoord + vec2(x, y) * texelSize * 2.0;
+                blurred += texture(tex, offset_uv).rgb * weights[idx];
+                idx++;
+            }
+        }
+        blurred /= totalWeight;
+        color.rgb = mix(color.rgb, blurred, blurAmount);
+    }
 
     // === COLOR CORRECTION ===
     // Exposure: multiply then add offset
@@ -45,6 +67,7 @@ void main() {
 
     // === CEL SHADING ===
     vec3 hsv = rgb2hsv(corrected);
+    float originalV = hsv.z;
 
     // Apply saturation
     hsv.y = clamp(hsv.y * saturation, 0.0, 1.0);
@@ -58,13 +81,17 @@ void main() {
     float lowerBand = floor(v / levelSize) * levelSize;
     float upperBand = lowerBand + levelSize;
     v = mix(lowerBand, upperBand, smooth_t);
-    hsv.z = v * v;  // Perceptual back to linear
+    float posterizedV = v * v;  // Perceptual back to linear
+    
+    // Blend to original in dark areas to avoid blocky shadows
+    float shadowBlend = smoothstep(0.0, 0.25, originalV);
+    hsv.z = mix(originalV, posterizedV, shadowBlend);
 
-    // Quantize hue into 12 bands
+    // Quantize hue into 12 bands (only for non-shadow areas)
     float hueSteps = 12.0;
-    hsv.x = floor(hsv.x * hueSteps + 0.5) / hueSteps;
+    float quantizedHue = floor(hsv.x * hueSteps + 0.5) / hueSteps;
+    hsv.x = mix(hsv.x, quantizedHue, shadowBlend);
 
     vec3 result = hsv2rgb(hsv);
     fragColor = vec4(result, color.a);
 }
-
