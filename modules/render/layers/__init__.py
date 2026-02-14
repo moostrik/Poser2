@@ -10,7 +10,7 @@ from .cam.TrackletRenderer import           TrackletRenderer
 from .centre.CentreGeometry import          CentreGeometry, CentreGeometryConfig
 from .centre.CentreCamLayer import          CentreCamLayer, CentreCamConfig
 from .centre.CentreMaskLayer import         CentreMaskLayer, CentreMaskConfig
-from .centre.CentreFrgLayer import          CentreFrgLayer, CentreFrgConfig, SketchMode
+from .centre.CentreFrgLayer import          CentreFrgLayer, CentreFrgConfig
 from .centre.CentrePoseLayer import         CentrePoseLayer, CentrePoseConfig
 from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer, CentreDlowConfig
 

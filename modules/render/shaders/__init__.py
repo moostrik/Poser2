@@ -9,6 +9,7 @@ from .generic.DenseFlowFilter import    DenseFlowFilter
 from .generic.DensityColorize import    DensityColorize
 from .generic.EdgeSketch import         EdgeSketch
 from .generic.DetailThreshold import    DetailThreshold
+from .generic.CelShade import           CelShade
 
 from .mask.MaskAA import                MaskAA
 from .mask.MaskApply import             MaskApply
