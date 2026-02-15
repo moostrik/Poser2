@@ -118,7 +118,7 @@ class Main():
         self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
 
-        self.window_similator_config = batch.WindowSimilarityConfig(window_length=int(0.5 * settings.camera.fps), exponent=2.5)
+        self.window_similator_config = batch.WindowSimilarityConfig(window_length=int(0.5 * settings.camera.fps))
         self.window_similator=      batch.WindowSimilarity(self.window_similator_config)
         self.window_similarity_gui = guis.WindowSimilarityGui(self.window_similator_config, self.gui, 'SIMILARITY')
 

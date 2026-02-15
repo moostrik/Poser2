@@ -57,7 +57,10 @@ class WindowSimilarityConfig(ConfigBase):
     max_poses: int = config_field(3, min=1, max=10, description="Maximum number of tracked poses")
     window_length: int = config_field(30, min=1, max=300, description="Number of frames to compare")
     method: AggregationMethod = AggregationMethod.HARMONIC_MEAN
-    exponent: float = config_field(3.5, min=0.5, max=4.0, description="Similarity decay exponent")
+    use_angle_similarity: bool = config_field(True, description="Use angle similarity")
+    angle_scale: float = config_field(0.8, min=0.1, max=2.0, description="Angle similarity scale (rad, ~π/4 for steep)")
+    use_velocity_similarity: bool = config_field(True, description="Multiply by velocity similarity")
+    vel_scale: float = config_field(0.5, min=0.1, max=2.0, description="Velocity similarity scale (rad/frame)")
     use_motion_weighting: bool = config_field(True, description="Weight similarity by motion (motion_i × motion_j)")
     use_time_penalty: bool = config_field(True, description="Penalize matches to older frames in window")
     time_decay_exp: float = config_field(1.0, min=0.1, max=4.0, description="Time decay exponent (1.0=linear, >1=exponential)")
@@ -222,8 +225,13 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         if self._config.use_motion_weighting and motion_windows:
             motion_values = np.stack([w.values[-window_length:, 0] for w in motion_windows.values()], axis=0)
 
+        # Step 1c: Stack velocity windows if enabled (N, T, F)
+        velocity_values: np.ndarray | None = None
+        if self._config.use_velocity_similarity and velocity_windows:
+            velocity_values = np.stack([w.values[-window_length:] for w in velocity_windows.values()], axis=0)
+
         # Step 2: Compute similarity tensor
-        best_sim, confidence_scores, leader_scores = self._compute_similarity_tensor(values, motion_values)
+        best_sim, confidence_scores, leader_scores = self._compute_similarity_tensor(values, motion_values, velocity_values)
         # Step 3: Build per-pose dicts
         similarity_dict = self._build_similarity_dict(track_ids, best_sim, confidence_scores)
         leader_dict = self._build_leader_dict(track_ids, leader_scores)
@@ -250,23 +258,28 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
     def _compute_similarity_tensor(
         self,
         values: np.ndarray,
-        motion_values: np.ndarray | None = None
+        motion_values: np.ndarray | None = None,
+        velocity_values: np.ndarray | None = None
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute pairwise similarity tensor using current×all comparison.
 
         Compares each person's current frame against all frames in others' windows.
-        This is more efficient than all×all and provides clearer leader interpretation.
+        Uses Gaussian similarity for both angles and velocities.
 
         Args:
-            values: Stacked window values (N, T, F)
+            values: Stacked angle window values (N, T, F)
             motion_values: Stacked motion values (N, T) for weighting, or None
+            velocity_values: Stacked velocity values (N, T, F) for similarity, or None
 
         Returns:
             best_sim: Best similarity per joint (N, N, F)
             confidence_scores: Confidence scores (N, N, F)
             leader_scores: Leader score [0, 1] (N, N) - 0=sync, 1=j leads by full window
         """
-        exponent = self._config.exponent
+        # print(self._config)
+
+        angle_scale = self._config.angle_scale
+        vel_scale = self._config.vel_scale
         N, T, F = values.shape
 
         # Current frame of each person: (N, F)
@@ -277,10 +290,20 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         # Result: (N, N, T, F) - i's current vs j's full window
         raw_diff = current[:, None, None, :] - values[None, :, :, :]
 
-        # Wrap angular difference to [-π, π] and compute similarity
-        angular_diff = np.mod(raw_diff + np.pi, 2 * np.pi) - np.pi
-        similarity = np.power(1.0 - np.abs(angular_diff) / np.pi, exponent)
-        # NaN propagates automatically through all operations
+        # Compute angle similarity if enabled
+        if self._config.use_angle_similarity:
+            angular_diff = np.mod(raw_diff + np.pi, 2 * np.pi) - np.pi
+            similarity = np.exp(-np.square(angular_diff / angle_scale))
+        else:
+            # Start with ones (neutral), NaN where input is NaN
+            similarity = np.where(np.isnan(raw_diff), np.nan, 1.0)
+
+        # Apply velocity similarity if enabled (per-joint)
+        if velocity_values is not None:
+            vel_current = velocity_values[:, -1, :]  # (N, F)
+            vel_diff = vel_current[:, None, None, :] - velocity_values[None, :, :, :]  # (N, N, T, F)
+            vel_sim = np.exp(-np.square(vel_diff / vel_scale))
+            similarity = similarity * vel_sim  # element-wise per joint
 
         # Compute whole-body similarity per time step (mean across features)
         # (N, N, T, F) -> (N, N, T)
@@ -305,12 +328,15 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
             whole_body_sim = whole_body_sim * time_weight  # broadcast (N, N, T)
 
         # Apply motion weighting: motion_i[current] × motion_j[t]
+        # This affects BOTH leader selection AND final similarity score
         if motion_values is not None:
             # motion_values[:, -1] -> (N,) current motion
             # motion_values        -> (N, T) full window
-            # Result: (N, N, T)
+            # Result: (N, N, T) -> broadcast to (N, N, T, 1) for per-joint
             motion_weight = motion_values[:, None, -1:] * motion_values[None, :, :]  # (N, N, T)
             whole_body_sim = whole_body_sim * motion_weight
+            # Apply to per-joint similarity tensor too
+            similarity = similarity * motion_weight[:, :, :, None]  # (N, N, T, F)
 
         # Find best match time index for each pair
         best_t = np.nanargmax(whole_body_sim, axis=2)  # (N, N)
@@ -323,14 +349,15 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         else:
             leader_scores = np.zeros((N, N), dtype=np.float32)
 
-        # Best per joint via nanmax over time axis
-        # (N, N, T, F) -> (N, N, F)
-        best_sim = np.nanmax(similarity, axis=2)
+        # Extract per-joint similarity AT best_t (not max over all time)
+        # (N, N, T, F) -> (N, N, F) using advanced indexing
+        i_idx = np.arange(N)[:, None]  # (N, 1)
+        j_idx = np.arange(N)[None, :]  # (1, N)
+        best_sim = similarity[i_idx, j_idx, best_t, :]  # (N, N, F)
         best_sim = np.nan_to_num(best_sim, nan=0.0).astype(np.float32)
 
-        # Scores from valid comparison proportion
-        confidence_scores = 1.0 - np.mean(np.isnan(similarity), axis=2)
-        confidence_scores = confidence_scores.astype(np.float32)
+        # Confidence scores at best_t
+        confidence_scores = 1.0 - np.isnan(similarity[i_idx, j_idx, best_t, :]).astype(np.float32)  # (N, N, F)
 
         return best_sim, confidence_scores, leader_scores
 
@@ -375,8 +402,7 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
                 # Aggregate per-joint similarities into single scalar
                 aggregated_sim = temp_feature.aggregate(
                     method=self._config.method,
-                    min_confidence=0.0,
-                    exponent=self._config.exponent
+                    min_confidence=0.0
                 )
 
                 # Store at absolute pose ID index
