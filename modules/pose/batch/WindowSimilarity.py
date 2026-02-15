@@ -66,6 +66,7 @@ class WindowSimilarityConfig(ConfigBase):
     time_decay_exp: float = config_field(1.0, min=0.1, max=4.0, description="Time decay exponent (1.0=linear, >1=exponential)")
     remap_low: float = config_field(0.05, min=0.0, max=1.0, description="Raw similarity that maps to 0")
     remap_high: float = config_field(0.8, min=0.0, max=1.0, description="Raw similarity that maps to 1")
+    enabled: bool = config_field(True, description="Enable similarity computation")
     verbose: bool = config_field(False, description="Enable verbose logging")
 
 

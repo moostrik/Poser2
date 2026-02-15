@@ -122,6 +122,10 @@ class Main():
         self.window_similator=      batch.WindowSimilarity(self.window_similator_config)
         self.window_similarity_gui = guis.WindowSimilarityGui(self.window_similator_config, self.gui, 'SIMILARITY')
 
+        self.window_correlator_config = batch.WindowCorrelationConfig(window_length=int(0.5 * settings.camera.fps))
+        self.window_correlator =    batch.WindowCorrelation(self.window_correlator_config)
+        self.window_correlation_gui = guis.WindowCorrelationGui(self.window_correlator_config, self.gui, 'CORRELATION')
+
         # Feature applicators (replace SimilarityExtractor)
         self.similarity_applicator = nodes.SimilarityApplicator(max_poses=settings.pose.max_poses)
         self.leader_applicator =     nodes.LeaderScoreApplicator(max_poses=settings.pose.max_poses)
@@ -266,6 +270,12 @@ class Main():
         self.window_similator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
         self.window_similator.start()
 
+        # CORRELATION COMPUTATION (alternative to similarity)
+        self.window_tracker_S.add_callback(self.window_correlator.submit_all)
+        self.window_correlator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
+        self.window_correlator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
+        self.window_correlator.start()
+
         # POSE ESTIMATION
         self.gpu_crop_processor.add_callback(self.point_extractor.process)
         self.point_extractor.start()
@@ -316,8 +326,8 @@ class Main():
         self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame(), self.timer_gui.frame])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame(), self.a_vel_smooth_gui.get_gui_frame()])
-        self.gui.addFrame([self.motion_extractor_gui.get_gui_frame(), self.motion_ma_gui.get_gui_frame()])
-        self.gui.addFrame([self.window_similarity_gui.get_gui_frame(), self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.motion_extractor_gui.get_gui_frame(), self.motion_ma_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.window_correlation_gui.get_gui_frame(),self.window_similarity_gui.get_gui_frame(), self.simil_smooth_gui.get_gui_frame()])
         if self.player:
             self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.data_gui.frame])
         if self.recorder:
@@ -369,6 +379,7 @@ class Main():
         self.flow_extractor.stop()
 
         self.window_similator.stop()
+        self.window_correlator.stop()
 
 
         self.gui.stop()

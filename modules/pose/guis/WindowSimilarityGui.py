@@ -34,6 +34,8 @@ class WindowSimilarityGui:
             E(eT.CHCK, name + 'verbose', self.set_verbose, config.verbose),
         ])
         elm.append([
+            E(eT.TEXT, 'Enable'),
+            E(eT.CHCK, name + 'enabled', self.set_enabled, config.enabled),
             E(eT.TEXT, 'Remap'),
             E(eT.TEXT, 'Low'),
             E(eT.SLDR, name + 'remap_low', self.set_remap_low, config.remap_low, [0.0, 1.0], 0.01),
@@ -47,6 +49,9 @@ class WindowSimilarityGui:
 
     def get_gui_frame(self):
         return self.frame
+
+    def set_enabled(self, value: bool) -> None:
+        self.config.enabled = value
 
     def set_window_length(self, value: float) -> None:
         self.config.window_length = int(value)
