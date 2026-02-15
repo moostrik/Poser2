@@ -12,7 +12,7 @@ ANGLE_MOTION_NORMALISATION: dict[AngleLandmark, float] = {
     AngleLandmark.right_hip:       2.0,
     AngleLandmark.left_knee:       2.0,
     AngleLandmark.right_knee:      2.0,
-    AngleLandmark.head:            3.0,
+    AngleLandmark.head:            1.0,
 }
 
 
