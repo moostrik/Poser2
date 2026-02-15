@@ -33,9 +33,16 @@ class WindowSimilarityGui:
             E(eT.TEXT, 'Print'),
             E(eT.CHCK, name + 'verbose', self.set_verbose, config.verbose),
         ])
+        elm.append([
+            E(eT.TEXT, 'Remap'),
+            E(eT.TEXT, 'Low'),
+            E(eT.SLDR, name + 'remap_low', self.set_remap_low, config.remap_low, [0.0, 1.0], 0.01),
+            E(eT.TEXT, 'High'),
+            E(eT.SLDR, name + 'remap_high', self.set_remap_high, config.remap_high, [0.0, 1.0], 0.01),
+        ])
 
         # Calculate height: 3 rows
-        gui_height: int = SLIDERHEIGHT * 2 + BASEHEIGHT
+        gui_height: int = SLIDERHEIGHT * 3 + BASEHEIGHT
         self.frame = Frame(name, elm, gui_height)
 
     def get_gui_frame(self):
@@ -70,3 +77,9 @@ class WindowSimilarityGui:
 
     def set_verbose(self, value: bool) -> None:
         self.config.verbose = value
+
+    def set_remap_low(self, value: float) -> None:
+        self.config.remap_low = value
+
+    def set_remap_high(self, value: float) -> None:
+        self.config.remap_high = value

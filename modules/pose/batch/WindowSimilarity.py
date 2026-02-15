@@ -64,6 +64,8 @@ class WindowSimilarityConfig(ConfigBase):
     use_motion_weighting: bool = config_field(True, description="Weight similarity by motion (motion_i × motion_j)")
     use_time_penalty: bool = config_field(True, description="Penalize matches to older frames in window")
     time_decay_exp: float = config_field(1.0, min=0.1, max=4.0, description="Time decay exponent (1.0=linear, >1=exponential)")
+    remap_low: float = config_field(0.05, min=0.0, max=1.0, description="Raw similarity that maps to 0")
+    remap_high: float = config_field(0.8, min=0.0, max=1.0, description="Raw similarity that maps to 1")
     verbose: bool = config_field(False, description="Enable verbose logging")
 
 
@@ -404,6 +406,13 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
                     method=self._config.method,
                     min_confidence=0.0
                 )
+
+                # Remap [remap_low, remap_high] → [0, 1]
+                low, high = self._config.remap_low, self._config.remap_high
+                # print(low, high)
+                if high > low and not np.isnan(aggregated_sim):
+                    aggregated_sim = (aggregated_sim - low) / (high - low)
+                    aggregated_sim = float(np.clip(aggregated_sim, 0.0, 1.0))
 
                 # Store at absolute pose ID index
                 pose_id_j = track_ids[j]

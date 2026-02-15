@@ -104,11 +104,11 @@ class Main():
         # self.motion_smooth_config = nodes.EmaSmootherConfig(attack=0.95, release=0.8)
         # self.motion_smooth_gui =    guis.EmaSmootherGui(self.motion_smooth_config, self.gui, 'MOTION')
         self.motion_ma_config =     nodes.MovingAverageConfig(window_size=30, window_type=nodes.WindowType.TRIANGULAR)
-        self.motion_ma_gui =        guis.MovingAverageSmootherGui(self.motion_ma_config, self.gui, 'MOTION_MA')
+        self.motion_ma_gui =        guis.MovingAverageSmootherGui(self.motion_ma_config, self.gui, 'MOTION')
         self.motion_easing_config = nodes.EasingConfig(easing_name='easeInOutSine')
         self.motion_easing_gui =    guis.EasingGui(self.motion_easing_config, self.gui, 'MOTION_EASE')
         self.motion_extractor_config = nodes.AngleMotionExtractorConfig(noise_threshold=0.05, max_threshold=0.5)
-        self.motion_extractor_gui = guis.AngleMotionExtractorGui(self.motion_extractor_config, self.gui, 'MOTION_EXT')
+        self.motion_extractor_gui = guis.AngleMotionExtractorGui(self.motion_extractor_config, self.gui, 'MOTION')
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
@@ -313,15 +313,15 @@ class Main():
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
         self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame, self.artnet_guis[2].frame])
-        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame(), self.data_gui.frame])
+        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame(), self.timer_gui.frame])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame(), self.a_vel_smooth_gui.get_gui_frame()])
         self.gui.addFrame([self.motion_extractor_gui.get_gui_frame(), self.motion_ma_gui.get_gui_frame()])
         self.gui.addFrame([self.window_similarity_gui.get_gui_frame(), self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
         if self.player:
-            self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.timer_gui.frame])
+            self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.data_gui.frame])
         if self.recorder:
-            self.gui.addFrame([self.recorder.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.timer_gui.frame])
+            self.gui.addFrame([self.recorder.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.data_gui.frame])
         self.gui.start()
         self.gui.bringToFront()
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
