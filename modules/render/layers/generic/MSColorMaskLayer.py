@@ -32,10 +32,8 @@ class MSColorMaskLayerConfig:
     similarity_threshold: float = 0.33
     motion_exponent: float = 1.5
     # AddDodgeBlend parameters
-    dodge_intensity: float = 0.5
     add_curve: float = 2.0
     dodge_curve: float = 1.5
-    opacity_curve: float = 0.3
     # MSColorMask parameters
     layered: float = 1.0  # 0 = additive, 1 = own in front
 
@@ -178,25 +176,23 @@ class MSColorMaskLayer(LayerBase):
             self._tint_fbos[self._cam_id],
             self._frg_texture,
             foreground_blend,
-            self.config.dodge_intensity,
-            self.config.add_curve,
-            self.config.dodge_curve,
-            self.config.opacity_curve
         )
         self._blend_fbo.end()
+        # print(motion)
 
         # Step 3: Composite - own (dodged) + others (tinted)
         styled_textures: list[Texture] = [self._blend_fbo.texture]
-        weights: list[float] = [1.0]
+        weights: list[float] = [motion]
 
         # Style.set_blend_mode(Style.BlendMode.ADD)
 
         for cam_id in other_cam_ids:
             styled_textures.append(self._tint_fbos[cam_id])
-            # weights.append(float(motion_similarities[cam_id]))
-            weights.append(1.0)
+            weights.append(float(motion_similarities[cam_id]))
+            # weights.append(0.0)
 
         self._output_fbo.begin()
+        # Blit.use(self._blend_fbo)
         self._shader.use(styled_textures, weights, 0.8)
         self._output_fbo.end()
 

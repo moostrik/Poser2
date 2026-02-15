@@ -20,21 +20,16 @@ class AddDodgeBlend(Shader):
         base: Texture,
         frg: Texture,
         strength: float,
-        dodge_intensity: float = 0.5,
-        add_curve: float = 2.0,
-        dodge_curve: float = 1.5,
-        opacity_curve: float = 0.3
     ) -> None:
         """Apply add-to-dodge blend.
 
         Args:
             base: Own camera's tinted mask (RGBA from Tint pass)
-            frg: Foreground texture (cel-shaded + hue-shifted, with alpha)
-            strength: Blend strength (0 = base only, 1 = full dodge)
-            dodge_intensity: How strongly foreground dodges base (0-1)
-            add_curve: Additive falloff exponent (higher = stays longer)
-            dodge_curve: Dodge ramp exponent (higher = kicks in later)
-            opacity_curve: Foreground visibility ramp (lower = appears faster)
+            frg: Foreground texture (cel-shaded + hue-shifted)
+            strength: Blend strength (0 = base only, 1 = full effect)
+            add_curve: Additive peaks early then fades (higher = stays longer)
+            dodge_curve: Dodge ramps up (higher = kicks in later)
+            frg_curve: Foreground visibility curve (lower = appears faster)
         """
         glUseProgram(self.shader_program)
 
@@ -47,9 +42,5 @@ class AddDodgeBlend(Shader):
         glUniform1i(self.get_uniform_loc("uFrg"), 1)
 
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
-        glUniform1f(self.get_uniform_loc("uDodgeIntensity"), dodge_intensity)
-        glUniform1f(self.get_uniform_loc("uAddCurve"), add_curve)
-        glUniform1f(self.get_uniform_loc("uDodgeCurve"), dodge_curve)
-        glUniform1f(self.get_uniform_loc("uOpacityCurve"), opacity_curve)
 
         draw_quad()

@@ -1,43 +1,25 @@
 #version 460 core
 
-uniform sampler2D uBase;    // Own camera's tinted mask (RGBA)
-uniform sampler2D uFrg;     // Foreground (cel-shaded + hue-shifted)
-uniform float uStrength;    // Blend strength (0 = base only, 1 = full effect)
-uniform float uDodgeIntensity;  // Dodge blend intensity (0.0 - 1.0)
-uniform float uAddCurve;        // Additive falloff exponent
-uniform float uDodgeCurve;      // Dodge ramp exponent
-uniform float uOpacityCurve;    // Foreground visibility ramp
+uniform sampler2D uBase;
+uniform sampler2D uFrg;
+uniform float uStrength;
+uniform float uAddCurve = 0.3;    // Higher = additive peaks later
+uniform float uBlendCurve = 1.5;  // Higher = dodge kicks in later
 
 in vec2 texCoord;
 out vec4 fragColor;
 
-vec3 colorDodge(vec3 base, vec3 blend) {
-    return base / max(1.0 - blend, 0.001);
-}
-
 void main() {
-    vec4 base = texture(uBase, texCoord);   // Tinted own mask
-    vec4 frg = texture(uFrg, texCoord);     // Already has track color from HueShift
+    vec4 base = texture(uBase, texCoord);
+    vec4 frg = texture(uFrg, texCoord);
 
-    // Blend modes: foreground brightens the colored mask
-    vec3 added = clamp(base.rgb + frg.rgb, 0.0, 1.0);
-    vec3 dodged = colorDodge(base.rgb, frg.rgb * uDodgeIntensity);
-    dodged = clamp(dodged, 0.0, 1.0);
+    float strength = uStrength;
 
-    // Crossfade from additive to dodge based on strength
-    float addWeight = 1.0 - pow(uStrength, uAddCurve);
-    float dodgeWeight = pow(uStrength, uDodgeCurve);
+    vec3 added = base.rgb + frg.rgb * pow(strength, uAddCurve);
+    vec3 blended = mix(added, frg.rgb, pow(strength, uBlendCurve));
+    blended = clamp(blended, 0.0, 1.0);
 
-    vec3 combined = added * addWeight + dodged * dodgeWeight;
-
-    // Foreground opacity ramp
-    float frgOpacity = pow(uStrength, uOpacityCurve);
-
-    // Blend: base (colored mask) → combined (with foreground energy)
-    vec3 result = mix(base.rgb, combined, frg.a * frgOpacity);
-
-    // Alpha: union of mask and foreground
     float alpha = base.a;
 
-    fragColor = vec4(result, alpha);
+    fragColor = vec4(blended, alpha);
 }
