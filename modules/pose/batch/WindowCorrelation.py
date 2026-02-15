@@ -116,6 +116,9 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
         Args:
             all_windows: Combined dict {track_id: {FrameField: FeatureWindow}}
         """
+        if not self._config.enabled:
+            return
+
         angle_windows: WindowDict = {}
         motion_windows: WindowDict = {}
 
