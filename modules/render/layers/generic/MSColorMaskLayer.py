@@ -129,11 +129,12 @@ class MSColorMaskLayer(LayerBase):
         motion = easeInOutSine(motion)
 
         # Apply similarity threshold and exponent
-        threshold = self.config.similarity_threshold
-        exponent = self.config.motion_exponent
+        threshold = 0.1# self.config.similarity_threshold
+        exponent = 1.0# self.config.motion_exponent
         similarities = np.clip((similarities - threshold) / (1.0 - threshold), 0.0, 1.0)
         similarities = np.power(similarities, exponent)
         motion_similarities = similarities # * motion_gates
+        # print(motion)
 
         # Foreground blend: 0 if single person, otherwise Nth highest similarity
         lowest_similarity: float = 0.0
@@ -143,10 +144,10 @@ class MSColorMaskLayer(LayerBase):
 
         # foreground_blend: float = (lowest_similarity - 0.25) * 2.0
         # foreground_blend = max(0.0, min(1.0, foreground_blend))
-        threshold = 0.0
+        threshold = 0.2
         foreground_blend: float = (lowest_similarity - threshold) / (1.0 - threshold)
         foreground_blend = max(0.0, min(1.0, foreground_blend))
-        # foreground_blend = easeInOutSine(foreground_blend)
+        foreground_blend = easeInSine(foreground_blend)
 
         other_cam_ids: list[int] = []
         for cam_id in sorted(self._mask_textures.keys()):

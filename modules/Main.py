@@ -165,7 +165,7 @@ class Main():
                 lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
                 # lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=False)),
                 lambda: nodes.AngleMotionExtractor(self.motion_extractor_config),
-                # lambda: nodes.AngleMotionEmaSmoother(self.motion_smooth_config),
+                lambda: nodes.AngleMotionMovingAverageSmoother(self.motion_ma_config),
                 # lambda: nodes.AngleMotionEasingNode(self.motion_easing_config),
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
