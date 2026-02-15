@@ -18,8 +18,8 @@ class AngleMotionExtractorConfig(NodeConfigBase):
 
     def __init__(
         self,
-        noise_threshold: float = 0.075,
-        max_threshold: float = 0.5,
+        noise_threshold: float = 0.1,
+        max_threshold: float = 1.0,
         n_top_motions: int = 3,
     ) -> None:
         super().__init__()

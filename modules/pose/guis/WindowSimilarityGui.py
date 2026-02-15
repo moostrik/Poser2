@@ -19,11 +19,16 @@ class WindowSimilarityGui:
             E(eT.TEXT, 'Exponent'),
             E(eT.SLDR, name + 'exponent', self.set_exponent, config.exponent, [0.5, 4.0], 0.1),
             E(eT.TEXT, 'Method'),
-            E(eT.CMBO, name + 'method', self.set_method, config.method.name, method_names),
+            E(eT.CMBO, name + 'method', self.set_method, config.method.name, method_names)])
+        elm.append([
+            E(eT.TEXT, 'Time Decay'),
+            E(eT.SLDR, name + 'time_decay_exp', self.set_time_decay_exp, config.time_decay_exp, [0.1, 4.0], 0.1),
+            E(eT.CHCK, name + 'use_time_penalty', self.set_use_time_penalty, config.use_time_penalty),
+            E(eT.CHCK, name + 'use_motion_weighting', self.set_use_motion_weighting, config.use_motion_weighting),
         ])
 
-        # Calculate height: 2 slider rows + 1 combo row + 1 checkbox row
-        gui_height: int = SLIDERHEIGHT + BASEHEIGHT
+        # Calculate height: 2 slider rows + checkboxes
+        gui_height: int = SLIDERHEIGHT * 2 + BASEHEIGHT
         self.frame = Frame(name, elm, gui_height)
 
     def get_gui_frame(self):
@@ -37,3 +42,12 @@ class WindowSimilarityGui:
 
     def set_method(self, value: str) -> None:
         self.config.method = AggregationMethod[value]
+
+    def set_time_decay_exp(self, value: float) -> None:
+        self.config.time_decay_exp = value
+
+    def set_use_time_penalty(self, value: bool) -> None:
+        self.config.use_time_penalty = value
+
+    def set_use_motion_weighting(self, value: bool) -> None:
+        self.config.use_motion_weighting = value

@@ -59,6 +59,8 @@ class WindowSimilarityConfig(ConfigBase):
     method: AggregationMethod = AggregationMethod.HARMONIC_MEAN
     exponent: float = config_field(3.5, min=0.5, max=4.0, description="Similarity decay exponent")
     use_motion_weighting: bool = config_field(True, description="Weight similarity by motion (motion_i × motion_j)")
+    use_time_penalty: bool = config_field(True, description="Penalize matches to older frames in window")
+    time_decay_exp: float = config_field(1.0, min=0.1, max=4.0, description="Time decay exponent (1.0=linear, >1=exponential)")
     verbose: bool = config_field(False, description="Enable verbose logging")
 
 
@@ -250,7 +252,10 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         values: np.ndarray,
         motion_values: np.ndarray | None = None
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Compute pairwise similarity tensor using vectorized operations.
+        """Compute pairwise similarity tensor using current×all comparison.
+
+        Compares each person's current frame against all frames in others' windows.
+        This is more efficient than all×all and provides clearer leader interpretation.
 
         Args:
             values: Stacked window values (N, T, F)
@@ -259,30 +264,30 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         Returns:
             best_sim: Best similarity per joint (N, N, F)
             confidence_scores: Confidence scores (N, N, F)
-            leader_scores: Leader score [-1, 1] (N, N) - negative=first leads, positive=second leads, 0=sync
+            leader_scores: Leader score [0, 1] (N, N) - 0=sync, 1=j leads by full window
         """
         exponent = self._config.exponent
-        window_length = self._config.window_length
         N, T, F = values.shape
 
-        # Broadcast to compute all pairwise angular differences
-        # values[:, None, :, None, :] -> (N, 1, T, 1, F)
-        # values[None, :, None, :, :] -> (1, N, 1, T, F)
-        # Result: (N, N, T, T, F) - all person pairs, all time pairs, all features
-        raw_diff = values[:, None, :, None, :] - values[None, :, None, :, :]
+        # Current frame of each person: (N, F)
+        current = values[:, -1, :]
+
+        # Broadcast: current[:, None, None, :] -> (N, 1, 1, F)
+        #            values[None, :, :, :]     -> (1, N, T, F)
+        # Result: (N, N, T, F) - i's current vs j's full window
+        raw_diff = current[:, None, None, :] - values[None, :, :, :]
 
         # Wrap angular difference to [-π, π] and compute similarity
         angular_diff = np.mod(raw_diff + np.pi, 2 * np.pi) - np.pi
         similarity = np.power(1.0 - np.abs(angular_diff) / np.pi, exponent)
         # NaN propagates automatically through all operations
 
-        # Compute whole-body similarity per time pair (mean across features)
-        # Weight by confidence (proportion of valid joints)
-        # (N, N, T, T, F) -> (N, N, T, T)
+        # Compute whole-body similarity per time step (mean across features)
+        # (N, N, T, F) -> (N, N, T)
 
-        # Count valid joints per time pair
-        valid_mask = ~np.isnan(similarity)  # (N, N, T, T, F)
-        joint_count = np.sum(valid_mask, axis=4)  # (N, N, T, T)
+        # Count valid joints per time step
+        valid_mask = ~np.isnan(similarity)  # (N, N, T, F)
+        joint_count = np.sum(valid_mask, axis=3)  # (N, N, T)
 
         # Penalize by proportion of missing joints
         confidence_penalty = joint_count / F  # [0, 1]
@@ -290,34 +295,41 @@ class WindowSimilarity(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int,
         # Suppress warning for all-NaN slices (handled by nanmean returning NaN)
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='Mean of empty slice')
-            whole_body_sim = np.nanmean(similarity, axis=4) * confidence_penalty
+            whole_body_sim = np.nanmean(similarity, axis=3) * confidence_penalty  # (N, N, T)
 
-        # Apply motion weighting: weight = motion[i, t_a] × motion[j, t_b]
+        # Apply time penalty: favor recent matches (t close to T-1)
+        if self._config.use_time_penalty and T > 1:
+            # t=0 oldest → t=T-1 newest (current)
+            t_normalized = np.arange(T) / (T - 1)  # [0, 1]
+            time_weight = np.power(t_normalized, self._config.time_decay_exp)  # (T,)
+            whole_body_sim = whole_body_sim * time_weight  # broadcast (N, N, T)
+
+        # Apply motion weighting: motion_i[current] × motion_j[t]
         if motion_values is not None:
-            # motion_values: (N, T)
-            # Broadcast: motion_values[:, None, :, None] -> (N, 1, T, 1)
-            #            motion_values[None, :, None, :] -> (1, N, 1, T)
-            # Result: (N, N, T, T)
-            motion_weight = motion_values[:, None, :, None] * motion_values[None, :, None, :]
+            # motion_values[:, -1] -> (N,) current motion
+            # motion_values        -> (N, T) full window
+            # Result: (N, N, T)
+            motion_weight = motion_values[:, None, -1:] * motion_values[None, :, :]  # (N, N, T)
             whole_body_sim = whole_body_sim * motion_weight
 
-        # Find best (t_a, t_b) alignment per pair
-        # Reshape to (N, N, T*T) for argmax, then convert back to (t_a, t_b)
-        flat_indices = np.nanargmax(whole_body_sim.reshape(N, N, -1), axis=2)  # (N, N)
-        t_a_indices = flat_indices // T  # Row index
-        t_b_indices = flat_indices % T   # Column index
+        # Find best match time index for each pair
+        best_t = np.nanargmax(whole_body_sim, axis=2)  # (N, N)
 
-        # Compute leader scores: (t_b - t_a) / window_length → [-1, 1]
-        # Negative = first person leads, Positive = second person leads, 0 = synchronized
-        leader_scores = ((t_b_indices - t_a_indices) / window_length).astype(np.float32)  # (N, N)
+        # Leader score: (T-1 - best_t) / (T-1) → 0=sync, 1=j leads by full window
+        # When best_t = T-1 (matched current): leader = 0 (synchronized)
+        # When best_t = 0 (matched oldest): leader = 1 (j leads)
+        if T > 1:
+            leader_scores = ((T - 1 - best_t) / (T - 1)).astype(np.float32)  # (N, N)
+        else:
+            leader_scores = np.zeros((N, N), dtype=np.float32)
 
-        # Best per joint via nanmax over time axes
-        # (N, N, T, T, F) -> (N, N, F)
-        best_sim = np.nanmax(similarity, axis=(2, 3))
+        # Best per joint via nanmax over time axis
+        # (N, N, T, F) -> (N, N, F)
+        best_sim = np.nanmax(similarity, axis=2)
         best_sim = np.nan_to_num(best_sim, nan=0.0).astype(np.float32)
 
         # Scores from valid comparison proportion
-        confidence_scores = 1.0 - np.mean(np.isnan(similarity), axis=(2, 3))
+        confidence_scores = 1.0 - np.mean(np.isnan(similarity), axis=2)
         confidence_scores = confidence_scores.astype(np.float32)
 
         return best_sim, confidence_scores, leader_scores

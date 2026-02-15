@@ -132,13 +132,13 @@ SHOW_COMP: list[Layers] = [
     # Layers.centre_mask,
     # Layers.motion,
     # Layers.fluid,
-    # Layers.ms_mask,
+    Layers.ms_mask,
     # Layers.sim_blend,
     # Layers.centre_pose,
     # Layers.centre_motion,
     # Layers.centre_frg,
     # Layers.fluid,
-    Layers.composite,
+    # Layers.composite,
 ]
 
 SHOW_DATA: list[Layers] = [

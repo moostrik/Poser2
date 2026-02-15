@@ -143,7 +143,7 @@ class MSColorMaskLayer(LayerBase):
 
         # foreground_blend: float = (lowest_similarity - 0.25) * 2.0
         # foreground_blend = max(0.0, min(1.0, foreground_blend))
-        threshold = 0.33
+        threshold = 0.0
         foreground_blend: float = (lowest_similarity - threshold) / (1.0 - threshold)
         foreground_blend = max(0.0, min(1.0, foreground_blend))
         # foreground_blend = easeInOutSine(foreground_blend)
