@@ -65,11 +65,11 @@ port = 'PySimpleGUI'
 
     Now available - "The Official PySimpleGUI Course" on Udemy!
     https://www.udemy.com/pysimplegui
-    
+
     Watch for a coupon codes in the documentation on PySimpleGUI.org
 
     Please consider sponsoring all open source developers that make software you or your business use. They need your help.
-    
+
 
     This software is available for your use under a LGPL3+ license
 
@@ -77,14 +77,14 @@ port = 'PySimpleGUI'
 
 
 
-    888      .d8888b.  8888888b.  888      .d8888b.          
-    888     d88P  Y88b 888   Y88b 888     d88P  Y88b         
+    888      .d8888b.  8888888b.  888      .d8888b.
+    888     d88P  Y88b 888   Y88b 888     d88P  Y88b
     888     888    888 888    888 888          .d88P
-    888     888        888   d88P 888         8888"    888   
-    888     888  88888 8888888P"  888          "Y8b. 8888888 
-    888     888    888 888        888     888    888   888   
-    888     Y88b  d88P 888        888     Y88b  d88P         
-    88888888 "Y8888P88 888        88888888 "Y8888P"          
+    888     888        888   d88P 888         8888"    888
+    888     888  88888 8888888P"  888          "Y8b. 8888888
+    888     888    888 888        888     888    888   888
+    888     Y88b  d88P 888        888     Y88b  d88P
+    88888888 "Y8888P88 888        88888888 "Y8888P"
 
 
     In addition to the normal publishing requirements of LGPL3+, these also apply:
@@ -95,7 +95,7 @@ port = 'PySimpleGUI'
            2. PyPI - pip install PySimpleGUI is the customary way of obtaining the latest release
 
            THE official documentation location is:
-              Read the Docs (via http://www.PySimpleGUI.org).  Currently is pointed at: 
+              Read the Docs (via http://www.PySimpleGUI.org).  Currently is pointed at:
               https://pysimplegui.readthedocs.io/en/latest/
        If you've obtained this software in any other way, then those listed here, then SUPPORT WILL NOT BE PROVIDED.
     3. If you use PySimpleGUI in your project/product, a notice of its use needs to be displayed in your readme file as per the license agreement
@@ -103,13 +103,13 @@ port = 'PySimpleGUI'
     -----------------------------------------------------------------------------------------------------------------
 
 
-    The first bit of good news for you is that literally 100s of pages of documentation await you. 
+    The first bit of good news for you is that literally 100s of pages of documentation await you.
     300 Demo Programs have been written as a "jump start" mechanism to get your running as quickly as possible.
 
     Some general bits of advice:
     Upgrade your software!  python -m pip install --upgrade --no-cache-dir PySimpleGUI
     If you're thinking of filing an Issue or posting a problem, Upgrade your software first
-    There are constantly something new and interesting coming out of this project so stay current if you can 
+    There are constantly something new and interesting coming out of this project so stay current if you can
 
     The FASTEST WAY to learn PySimpleGUI is to begin to play with it, and to read the documentation.
     http://www.PySimpleGUI.org
@@ -119,14 +119,14 @@ port = 'PySimpleGUI'
     The User Manual and the Cookbook are both designed to paint some nice looking GUIs on your screen within 5 minutes of you deciding to PySimpleGUI out.
 
     A final note from mike...
-    
-        “Don’t aim at success. The more you aim at it and make it a target, the more you are going to miss it. 
+
+        “Don’t aim at success. The more you aim at it and make it a target, the more you are going to miss it.
         For success, like happiness, cannot be pursued; it must ensue, and it only does so as the unintended side effect of one’s personal dedication to a cause greater.”
             — Viktor Frankl
-    
+
         I first saw this quote in a truncated format:
-            "Happiness, cannot be pursued; it must ensue, and it only does so as the unintended side effect of one’s personal dedication to a cause greater."    
-    
+            "Happiness, cannot be pursued; it must ensue, and it only does so as the unintended side effect of one’s personal dedication to a cause greater."
+
         Everyone is different, but my experience with the PySimpleGUI project matches this theory.  It's taken a lifetime of trying and "failing" and trying
         to find happiness before I finally figured this truth-for-me out.  If I do a long list of things, and live life in a kind & loving way, then the
         result is happiness.  It's a biproduct, not a directly produced thing.  This should be taught in school.  Or maybe it can't.
@@ -372,8 +372,8 @@ def running_replit():
 
     It's a mess.... really... it's a mess internally... it's the external-facing interfaces that
     are not a mess.  The Elements and the methods for them are well-designed.
-    PEP8 - this code is far far from PEP8 compliant. 
-    It was written PRIOR to learning that PEP8 existed. 
+    PEP8 - this code is far far from PEP8 compliant.
+    It was written PRIOR to learning that PEP8 existed.
 
     I'll be honest.... started learning Python in Nov 2017, started writing PySimpleGUI in Feb 2018.
     Released PySimpleGUI in July 2018.  I knew so little about Python that my parameters were all named
@@ -381,14 +381,14 @@ def running_replit():
     parameters to lower case.  Unfortunately, the internal naming conventions have been set.  Mixing them
     with PEP8 at this moment would be even MORE confusing.
 
-    Code I write now, outside PySimpleGUI, IS PEP8 compliant.  
+    Code I write now, outside PySimpleGUI, IS PEP8 compliant.
 
     The variable and function naming in particular are not compliant.  There is
     liberal use of CamelVariableAndFunctionNames, but for anything externally facing, there are aliases
     available for all functions.  If you've got a serious enough problem with 100% PEP8 compliance
     that you'll pass on this package, then that's your right and I invite you to do so.  However, if
     perhaps you're a practical thinker where it's the results that matter, then you'll have no
-    trouble with this code base.  There is consisency however.  
+    trouble with this code base.  There is consisency however.
 
     I truly hope you get a lot of enjoyment out of using PySimpleGUI.  It came from good intentions.
 """
@@ -6470,7 +6470,7 @@ class Graph(Element):
         Not called by the user.  It's called from another method/function that tkinter calledback
 
         :param event: (event) event info from tkinter. Contains the x and y coordinates of a click
-        :type event:  
+        :type event:
         """
 
         self.ClickPosition = self._convert_canvas_xy_to_xy(event.x, event.y)
@@ -21457,7 +21457,7 @@ class UserSettings:
                 os.makedirs(self.path)
             with open(self.full_filename, 'w') as f:
                 if not self.use_config_file:
-                    json.dump(self.dict, f)
+                    json.dump(self.dict, f, indent=2)
                 else:
                     self.config.write(f)
         except Exception as e:
@@ -21947,14 +21947,14 @@ def user_settings_object():
  ##:::::::: ##:. ##:: ##::::::: ##::: ##: ##:::: ##:::: ##:::: ##:::::::
  ########: ##:::. ##: ########:. ######::. #######::::: ##:::: ########:
 ........::..:::::..::........:::......::::.......::::::..:::::........::
-:::'###::::'########::'####::'######::                                  
-::'## ##::: ##.... ##:. ##::'##... ##:                                  
-:'##:. ##:: ##:::: ##:: ##:: ##:::..::                                  
-'##:::. ##: ########::: ##::. ######::                                  
- #########: ##.....:::: ##:::..... ##:                                  
- ##.... ##: ##::::::::: ##::'##::: ##:                                  
- ##:::: ##: ##::::::::'####:. ######::                                  
-..:::::..::..:::::::::....:::......:::        
+:::'###::::'########::'####::'######::
+::'## ##::: ##.... ##:. ##::'##... ##:
+:'##:. ##:: ##:::: ##:: ##:: ##:::..::
+'##:::. ##: ########::: ##::. ######::
+ #########: ##.....:::: ##:::..... ##:
+ ##.... ##: ##::::::::: ##::'##::: ##:
+ ##:::: ##: ##::::::::'####:. ######::
+..:::::..::..:::::::::....:::......:::
 
 
 
@@ -22269,7 +22269,7 @@ def _get_editor():
 '''
 The Mac problems have been significant enough to warrant the addition of a series of settings that allow
 users to turn specific patches and features on or off depending on their setup.  There is not enough information
-available to make this process more atuomatic.  
+available to make this process more atuomatic.
 
 '''
 
@@ -22396,7 +22396,7 @@ def main_mac_feature_control():
  ##:::: ##: ##...:::: ##.... ##: ##:::: ##: ##::: ##:: ##::: ##:: ##...:::: ##.. ##:::
  ##:::: ##: ##::::::: ##:::: ##: ##:::: ##: ##::: ##:: ##::: ##:: ##::::::: ##::. ##::
  ########:: ########: ########::. #######::. ######:::. ######::: ########: ##:::. ##:
-........:::........::........::::.......::::......:::::......::::........::..:::::..::                                                                    
+........:::........::........::::.......::::......:::::......::::........::..:::::..::
 '''
 
 #####################################################################################################
@@ -22668,7 +22668,7 @@ class _Debugger:
         #       #    # #####  #    # #####     #  #  # # #  # # #    # #    # # ## #
         #       #    # #      #    # #         #  #  # # #   ## #    # #    # ##  ##
         #        ####  #       ####  #          ## ##  # #    # #####   ####  #    #
-    
+
         ######                                    #                     #     #
         #     # #    # #    # #####   ####       # #   #      #         #     #   ##   #####   ####
         #     # #    # ##  ## #    # #          #   #  #      #         #     #  #  #  #    # #
@@ -22710,7 +22710,7 @@ class _Debugger:
        #       #    # #    # #    #      # #         #  #  # ######   #   #      #    #
        #     # #    # #    # #    # #    # #         #  #  # #    #   #   #    # #    #
         #####  #    #  ####   ####   ####  ######     ## ##  #    #   #    ####  #    #
-    
+
         #     #                                                       #     #
         #     #   ##   #####  #   ##   #####  #      ######  ####     #  #  # # #    #
         #     #  #  #  #    # #  #  #  #    # #      #      #         #  #  # # ##   #
@@ -22785,7 +22785,7 @@ class _Debugger:
         #     # #    # # #      #    #    #       #      #    # ######   #   # #  # # #  ###
         #     # #    # # #      #    #    #       #      #    # #    #   #   # #   ## #    #
         ######   ####  # ###### #####     #       ######  ####  #    #   #   # #    #  ####
-    
+
         #     #
         #  #  # # #    # #####   ####  #    #
         #  #  # # ##   # #    # #    # #    #
@@ -22858,7 +22858,7 @@ class _Debugger:
         #   #   #      #      #####  #           # #    #
         #    #  #      #      #   #  #      #    # #    #
         #     # ###### #      #    # ######  ####  #    #
-    
+
         #######
         #       #       ####    ##   ##### # #    #  ####
         #       #      #    #  #  #    #   # ##   # #    #
@@ -22866,7 +22866,7 @@ class _Debugger:
         #       #      #    # ######   #   # #  # # #  ###
         #       #      #    # #    #   #   # #   ## #    #
         #       ######  ####  #    #   #   # #    #  ####
-    
+
         #     #
         #  #  # # #    # #####   ####  #    #
         #  #  # # ##   # #    # #    # #    #
@@ -23138,29 +23138,29 @@ def _random_happy_emoji():
 
 
 '''
-M"""""`'"""`YM                            
-M  mm.  mm.  M                            
-M  MMM  MMM  M .d8888b. 88d888b. .d8888b. 
-M  MMM  MMM  M 88'  `88 88'  `88 88ooood8 
-M  MMM  MMM  M 88.  .88 88       88.  ... 
-M  MMM  MMM  M `88888P' dP       `88888P' 
-MMMMMMMMMMMMMM                            
-                                          
-M#"""""""'M                             .d8888P dP   dP 
-##  mmmm. `M                            88'     88   88 
-#'        .M .d8888b. .d8888b. .d8888b. 88baaa. 88aaa88 
-M#  MMMb.'YM 88'  `88 Y8ooooo. 88ooood8 88` `88      88 
-M#  MMMM'  M 88.  .88       88 88.  ... 8b. .d8      88 
-M#       .;M `88888P8 `88888P' `88888P' `Y888P'      dP 
-M#########M                                             
-                                                        
-M""M                                                
-M  M                                                
-M  M 88d8b.d8b. .d8888b. .d8888b. .d8888b. .d8888b. 
-M  M 88'`88'`88 88'  `88 88'  `88 88ooood8 Y8ooooo. 
-M  M 88  88  88 88.  .88 88.  .88 88.  ...       88 
-M  M dP  dP  dP `88888P8 `8888P88 `88888P' `88888P' 
-MMMM                          .88                   
+M"""""`'"""`YM
+M  mm.  mm.  M
+M  MMM  MMM  M .d8888b. 88d888b. .d8888b.
+M  MMM  MMM  M 88'  `88 88'  `88 88ooood8
+M  MMM  MMM  M 88.  .88 88       88.  ...
+M  MMM  MMM  M `88888P' dP       `88888P'
+MMMMMMMMMMMMMM
+
+M#"""""""'M                             .d8888P dP   dP
+##  mmmm. `M                            88'     88   88
+#'        .M .d8888b. .d8888b. .d8888b. 88baaa. 88aaa88
+M#  MMMb.'YM 88'  `88 Y8ooooo. 88ooood8 88` `88      88
+M#  MMMM'  M 88.  .88       88 88.  ... 8b. .d8      88
+M#       .;M `88888P8 `88888P' `88888P' `Y888P'      dP
+M#########M
+
+M""M
+M  M
+M  M 88d8b.d8b. .d8888b. .d8888b. .d8888b. .d8888b.
+M  M 88'`88'`88 88'  `88 88'  `88 88ooood8 Y8ooooo.
+M  M 88  88  88 88.  .88 88.  .88 88.  ...       88
+M  M dP  dP  dP `88888P8 `8888P88 `88888P' `88888P'
+MMMM                          .88
                           d8888P
 '''
 
@@ -23190,20 +23190,20 @@ GREEN_CHECK_BASE64 = b'iVBORw0KGgoAAAANSUhEUgAAAFoAAABaCAYAAAA4qEECAAAJV0lEQVR4n
 
 
 '''
-M""MMMMM""M                                           dP          
-M  MMMMM  M                                           88          
-M  MMMMM  M 88d888b. .d8888b. 88d888b. .d8888b. .d888b88 .d8888b. 
-M  MMMMM  M 88'  `88 88'  `88 88'  `88 88'  `88 88'  `88 88ooood8 
-M  `MMM'  M 88.  .88 88.  .88 88       88.  .88 88.  .88 88.  ... 
-Mb       dM 88Y888P' `8888P88 dP       `88888P8 `88888P8 `88888P' 
-MMMMMMMMMMM 88            .88                                     
-            dP        d8888P                                      
-MP""""""`MM                            oo                   
-M  mmmmm..M                                                 
-M.      `YM .d8888b. 88d888b. dP   .dP dP .d8888b. .d8888b. 
-MMMMMMM.  M 88ooood8 88'  `88 88   d8' 88 88'  `"" 88ooood8 
-M. .MMM'  M 88.  ... 88       88 .88'  88 88.  ... 88.  ... 
-Mb.     .dM `88888P' dP       8888P'   dP `88888P' `88888P' 
+M""MMMMM""M                                           dP
+M  MMMMM  M                                           88
+M  MMMMM  M 88d888b. .d8888b. 88d888b. .d8888b. .d888b88 .d8888b.
+M  MMMMM  M 88'  `88 88'  `88 88'  `88 88'  `88 88'  `88 88ooood8
+M  `MMM'  M 88.  .88 88.  .88 88       88.  .88 88.  .88 88.  ...
+Mb       dM 88Y888P' `8888P88 dP       `88888P8 `88888P8 `88888P'
+MMMMMMMMMMM 88            .88
+            dP        d8888P
+MP""""""`MM                            oo
+M  mmmmm..M
+M.      `YM .d8888b. 88d888b. dP   .dP dP .d8888b. .d8888b.
+MMMMMMM.  M 88ooood8 88'  `88 88   d8' 88 88'  `"" 88ooood8
+M. .MMM'  M 88.  ... 88       88 .88'  88 88.  ... 88.  ...
+Mb.     .dM `88888P' dP       8888P'   dP `88888P' `88888P'
 MMMMMMMMMMM
 '''
 
@@ -23488,7 +23488,7 @@ def _github_issue_post_make_markdown(issue_type, operating_system, os_ver, psg_p
 
 ----------------------------------------
 
-## Environment 
+## Environment
 
 #### Operating System
 
@@ -23905,33 +23905,33 @@ def main_open_github_issue():
 
 
 '''
-MM'"""""`MM oo   dP   M""MMMMM""MM          dP       
-M' .mmm. `M      88   M  MMMMM  MM          88       
-M  MMMMMMMM dP d8888P M         `M dP    dP 88d888b. 
-M  MMM   `M 88   88   M  MMMMM  MM 88    88 88'  `88 
-M. `MMM' .M 88   88   M  MMMMM  MM 88.  .88 88.  .88 
-MM.     .MM dP   dP   M  MMMMM  MM `88888P' 88Y8888' 
-MMMMMMMMMMM           MMMMMMMMMMMM                   
-                                                     
-M""MMMMM""M                                           dP          
-M  MMMMM  M                                           88          
-M  MMMMM  M 88d888b. .d8888b. 88d888b. .d8888b. .d888b88 .d8888b. 
-M  MMMMM  M 88'  `88 88'  `88 88'  `88 88'  `88 88'  `88 88ooood8 
-M  `MMM'  M 88.  .88 88.  .88 88       88.  .88 88.  .88 88.  ... 
-Mb       dM 88Y888P' `8888P88 dP       `88888P8 `88888P8 `88888P' 
-MMMMMMMMMMM 88            .88                                     
+MM'"""""`MM oo   dP   M""MMMMM""MM          dP
+M' .mmm. `M      88   M  MMMMM  MM          88
+M  MMMMMMMM dP d8888P M         `M dP    dP 88d888b.
+M  MMM   `M 88   88   M  MMMMM  MM 88    88 88'  `88
+M. `MMM' .M 88   88   M  MMMMM  MM 88.  .88 88.  .88
+MM.     .MM dP   dP   M  MMMMM  MM `88888P' 88Y8888'
+MMMMMMMMMMM           MMMMMMMMMMMM
+
+M""MMMMM""M                                           dP
+M  MMMMM  M                                           88
+M  MMMMM  M 88d888b. .d8888b. 88d888b. .d8888b. .d888b88 .d8888b.
+M  MMMMM  M 88'  `88 88'  `88 88'  `88 88'  `88 88'  `88 88ooood8
+M  `MMM'  M 88.  .88 88.  .88 88       88.  .88 88.  .88 88.  ...
+Mb       dM 88Y888P' `8888P88 dP       `88888P8 `88888P8 `88888P'
+MMMMMMMMMMM 88            .88
             dP        d8888P
 
 '''
 
 
 '''
-M""""""""M dP                                        dP 
-Mmmm  mmmM 88                                        88 
-MMMM  MMMM 88d888b. 88d888b. .d8888b. .d8888b. .d888b88 
-MMMM  MMMM 88'  `88 88'  `88 88ooood8 88'  `88 88'  `88 
-MMMM  MMMM 88    88 88       88.  ... 88.  .88 88.  .88 
-MMMM  MMMM dP    dP dP       `88888P' `88888P8 `88888P8 
+M""""""""M dP                                        dP
+Mmmm  mmmM 88                                        88
+MMMM  MMMM 88d888b. 88d888b. .d8888b. .d8888b. .d888b88
+MMMM  MMMM 88'  `88 88'  `88 88ooood8 88'  `88 88'  `88
+MMMM  MMMM 88    88 88       88.  ... 88.  .88 88.  .88
+MMMM  MMMM dP    dP dP       `88888P' `88888P8 `88888P8
 MMMMMMMMMM
 '''
 
@@ -24369,7 +24369,7 @@ def main_global_pysimplegui_settings():
     ttk_theme_list = ttk.Style().theme_names()
 
     window['-TTK THEME-'].update(value=DEFAULT_TTK_THEME, values=ttk_theme_list)
-    
+
     while True:
         event, values = window.read()
         if event in ('Cancel', WIN_CLOSED):
@@ -24735,7 +24735,7 @@ def _create_main_window():
         [Combo(['Combo item %s' % i for i in range(5)], size=(20, 3), default_value='Combo item 2', key='-COMBO1-', )],
         [Combo(['Combo item %s' % i for i in range(5)], size=(20, 3), font='Courier 14', default_value='Combo item 2', key='-COMBO2-', )],
         # [Combo(['Combo item 1', 2,3,4], size=(20, 3), readonly=False, text_color='blue', background_color='red', key='-COMBO2-')],
-        
+
     ]
 
     frame3 = [
