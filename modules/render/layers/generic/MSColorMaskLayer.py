@@ -133,7 +133,7 @@ class MSColorMaskLayer(LayerBase):
         exponent = self.config.motion_exponent
         similarities = np.clip((similarities - threshold) / (1.0 - threshold), 0.0, 1.0)
         similarities = np.power(similarities, exponent)
-        motion_similarities = similarities * motion_gates
+        motion_similarities = similarities # * motion_gates
 
         # Foreground blend: 0 if single person, otherwise Nth highest similarity
         lowest_similarity: float = 0.0

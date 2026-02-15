@@ -260,8 +260,8 @@ class Main():
         self.motion_gate_tracker.add_poses_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_callback(partial(self.data_hub.set_feature_windows, Stage.LERP))
 
-        # SIMILARITY COMPUTATION
-        self.window_tracker_S.add_window_callback(FrameField.angles, self.window_similator.submit)
+        # SIMILARITY COMPUTATION (uses combined callback for motion gate and velocity weighting)
+        self.window_tracker_S.add_callback(self.window_similator.submit_all)
         self.window_similator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
         self.window_similator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
         self.window_similator.start()

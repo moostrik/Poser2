@@ -236,7 +236,7 @@ class FluidLayer(LayerBase):
         similarities: np.ndarray = pose.similarity.values if pose is not None else np.full((self.config.num_players,), 0.0)
         motion_gates: np.ndarray = pose.motion_gate.values if pose is not None else np.full((self.config.num_players,), 0.0)
         motion: float = pose.angle_motion.value if pose is not None else 0.0
-        m_s = similarities * motion_gates  # Modulate similarity by motion gate
+        m_s = similarities # * motion_gates  # Modulate similarity by motion gate
         # print(f"FluidLayer cam_id {self._cam_id} similarities: {similarities}, motion_gates: {motion_gates}")  # DEBUG
 
         Style.push_style()
