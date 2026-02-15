@@ -55,7 +55,7 @@ class FluidLayerConfig:
     fps: float = 60.0
     num_players: int = 3
     draw_mode: FluidDrawMode = FluidDrawMode.DENSITY
-    blend_mode: Style.BlendMode = Style.BlendMode.ADDITIVE
+    blend_mode: Style.BlendMode = Style.BlendMode.ADD
     simulation_scale: float = 0.5
 
     # Nested configs

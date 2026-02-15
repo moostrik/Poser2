@@ -37,7 +37,7 @@ void main() {
     vec3 result = mix(base.rgb, combined, frg.a * frgOpacity);
 
     // Alpha: union of mask and foreground
-    float alpha = max(base.a, frg.a * frgOpacity);
+    float alpha = base.a;
 
     fragColor = vec4(result, alpha);
 }

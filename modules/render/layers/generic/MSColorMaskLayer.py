@@ -18,7 +18,7 @@ from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 
 from modules.render.shaders.hdt.MSColorMask import MSColorMask
-from modules.render.shaders.generic.AddDodgeBlend import AddDodgeBlend
+from modules.render.shaders.hdt.AddDodgeBlend import AddDodgeBlend
 from modules.render.shaders.generic.Tint import Tint
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -36,6 +36,8 @@ class MSColorMaskLayerConfig:
     add_curve: float = 2.0
     dodge_curve: float = 1.5
     opacity_curve: float = 0.3
+    # MSColorMask parameters
+    layered: float = 1.0  # 0 = additive, 1 = own in front
 
 
 class MSColorMaskLayer(LayerBase):
@@ -158,6 +160,7 @@ class MSColorMaskLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
+        self._tint.reload()
         self._add_dodge.reload()
         self._shader.reload()
 
@@ -186,12 +189,15 @@ class MSColorMaskLayer(LayerBase):
         styled_textures: list[Texture] = [self._blend_fbo.texture]
         weights: list[float] = [1.0]
 
+        # Style.set_blend_mode(Style.BlendMode.ADD)
+
         for cam_id in other_cam_ids:
             styled_textures.append(self._tint_fbos[cam_id])
-            weights.append(float(motion_similarities[cam_id]))
+            # weights.append(float(motion_similarities[cam_id]))
+            weights.append(1.0)
 
         self._output_fbo.begin()
-        self._shader.use(styled_textures, weights)
+        self._shader.use(styled_textures, weights, 0.8)
         self._output_fbo.end()
 
         Style.pop_style()

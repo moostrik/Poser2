@@ -346,7 +346,7 @@ class RenderManager(RenderBase):
 
         Style.reset_state()
         Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.ADDITIVE)
+        Style.set_blend_mode(Style.BlendMode.ADD)
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
         for layer_type in self._draw_layers:

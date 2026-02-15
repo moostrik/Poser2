@@ -12,7 +12,7 @@ class BlendMode(Enum):
     """Common OpenGL blend modes for intuitive blending control."""
 
     ALPHA = (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)  # Standard transparency
-    ADDITIVE = (GL_SRC_ALPHA, GL_ONE)  # Additive blending (brightens)
+    ADD = (GL_SRC_ALPHA, GL_ONE)  # Additive blending (brightens)
     MULTIPLY = (GL_DST_COLOR, GL_ZERO)  # Multiply blending (darkens)
     SCREEN = (GL_ONE, GL_ONE_MINUS_SRC_COLOR)  # Screen blending (lightens)
     DISABLED = (GL_ONE, GL_ZERO)  # No blending (replaces destination)

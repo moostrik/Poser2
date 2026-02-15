@@ -11,12 +11,13 @@ class MSColorMask(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, textures: list[Texture], weights: list[float]) -> None:
+    def use(self, textures: list[Texture], weights: list[float], layered: float = 1.0) -> None:
         """Composite pre-styled textures.
 
         Args:
             textures: Up to 3 pre-styled RGBA textures
             weights: Weight per texture
+            layered: 0 = all additive, 1 = own (slot 0) in front
         """
         glUseProgram(self.shader_program)
 
@@ -31,5 +32,7 @@ class MSColorMask(Shader):
         for i in range(3):
             w = weights[i] if i < len(weights) else 0.0
             glUniform1f(self.get_uniform_loc(f"uWeights[{i}]"), w)
+
+        glUniform1f(self.get_uniform_loc("uLayered"), layered)
 
         draw_quad()

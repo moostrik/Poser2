@@ -66,7 +66,7 @@ class UnifiedFluidLayerConfig:
     num_players: int = 3
     gap_ratio: float = 0.5  # Gap = 0.5 * slot width
     draw_mode: UnifiedFluidDrawMode = UnifiedFluidDrawMode.DENSITY
-    blend_mode: Style.BlendMode = Style.BlendMode.ADDITIVE
+    blend_mode: Style.BlendMode = Style.BlendMode.ADD
     simulation_scale: float = 0.25
 
     visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)

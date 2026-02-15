@@ -58,7 +58,7 @@ LutSelection = _discover_luts()
 @dataclass
 class CompositeLayerConfig:
     """Configuration for CompositeLayer."""
-    blend_mode: Style.BlendMode = Style.BlendMode.ADDITIVE
+    blend_mode: Style.BlendMode = Style.BlendMode.ADD
     lut: LutSelection = field(default_factory=lambda: LutSelection.NONE)  # type: ignore
     lut_strength: float = 1.0
 
