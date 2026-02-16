@@ -153,8 +153,8 @@ SHOW_DATA: list[Layers] = [
 ]
 
 
-PREVIEW_LAYERS: list[Layers] = PREVIEW_CENTRE
-FINAL_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
+PREVIEW_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
+FINAL_LAYERS: list[Layers] = SHOW_COMP
 
 class RenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, settings: Config) -> None:
