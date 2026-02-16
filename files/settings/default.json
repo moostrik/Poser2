@@ -127,8 +127,8 @@
     "fps": 60,
     "v_sync": true,
     "secondary_list": [
-      2,
       1,
+      2,
       3
     ],
     "num_cams": 3,
