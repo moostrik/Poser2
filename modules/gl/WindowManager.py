@@ -45,9 +45,10 @@ class WindowManager():
         self.windowed_fullscreen: bool = False
         self.v_sync: bool = v_sync
         self.frame_interval: None | int = None
-        if fps and fps > 0:
-            self.frame_interval = int((1.0 / fps) * 1_000_000_000)
-            self.v_sync = False  # Disable v-sync if we are controlling FPS manually
+        # if fps and fps > 0:
+        #     self.frame_interval = int((1.0 / fps) * 1_000_000_000)
+            # self.v_sync = False  # Disable v-sync if we are controlling FPS manually
+        print(f"WindowManager initialized with width={width}, height={height}, fullscreen={fullscreen}, v_sync={v_sync}, fps={fps}, frame_interval={self.frame_interval}ns")
         self.windowName: str = name
         self.fps = FpsCounter()
         self.window_x: int = posX

@@ -52,7 +52,7 @@ class FluidDrawMode(IntEnum):
 @dataclass
 class FluidLayerConfig:
     """Configuration for FluidLayer (fluid simulation)."""
-    fps: float = 60.0
+    fps: float = 110.0
     num_players: int = 3
     draw_mode: FluidDrawMode = FluidDrawMode.DENSITY
     blend_mode: Style.BlendMode = Style.BlendMode.ADD
@@ -204,15 +204,15 @@ class FluidLayer(LayerBase):
     def update(self) -> None:
         """Update fluid simulation with inputs from all flow layers."""
         # Configuration overrides (for hot-reload testing)
-        self.config.fluid_flow.vel_speed = 0.1
-        self.config.fluid_flow.vel_decay = 6.0
+        self.config.fluid_flow.vel_speed = 0.05
+        self.config.fluid_flow.vel_decay = 30.0
 
-        self.config.fluid_flow.vel_vorticity = 10
+        self.config.fluid_flow.vel_vorticity = 3
         self.config.fluid_flow.vel_vorticity_radius = 3.0
         self.config.fluid_flow.vel_viscosity = 3.0
         self.config.fluid_flow.vel_viscosity_iter = 40
 
-        self.config.fluid_flow.den_speed = 2.1
+        self.config.fluid_flow.den_speed = 1.1
         self.config.fluid_flow.den_decay = 12.0
 
         self.config.fluid_flow.tmp_speed = 0.33
@@ -239,6 +239,11 @@ class FluidLayer(LayerBase):
         m_s = similarities # * motion_gates  # Modulate similarity by motion gate
         # print(f"FluidLayer cam_id {self._cam_id} similarities: {similarities}, motion_gates: {motion_gates}")  # DEBUG
 
+        my_similarity = np.max(similarities)
+        self.config.fluid_flow.vel_viscosity = 4.0 * (1.1 - my_similarity)  # More similar = less viscosity
+        self.config.fluid_flow.vel_viscosity = 3.0 * (1.1 - my_similarity)  # More similar = less viscosity
+        self.config.fluid_flow.vel_speed = 0.01 + motion * 0.3
+
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
@@ -248,14 +253,14 @@ class FluidLayer(LayerBase):
         for cam_id, flow_layer in self._flow_layers.items():
             if cam_id == self._cam_id:
                 vel_strength = 0.1 * motion
-                den_strength = motion * 1.0
+                den_strength = motion * 1.2
                 # if motion > 0:
                 #     m = 0.95
                 #     print (m, m - pow(m, 8))
                 #     pass
             else:
                 vel_strength = 0.1 * (m_s[cam_id]) # m_s[cam_id]  # Cross-camera influence modulated by similarity and motion gate
-                den_strength = 0.5 * (m_s[cam_id])   # Cross-camera influence modulated by similarity, motion gate, and motion value
+                den_strength = 0.9 * (m_s[cam_id])   # Cross-camera influence modulated by similarity, motion gate, and motion value
 
             # Add velocity from each flow layer
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
