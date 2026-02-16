@@ -19,8 +19,8 @@ layout(binding = 1) uniform sampler2D uObstacle;        // Obstacle mask (R8/R32
 layout(binding = 2) uniform sampler2D uObstacleOffset;  // Neighbor obstacle info (RGBA8)
 
 // Pressure field - read/write via image
-layout(r32f, binding = 0) uniform image2D uPressureIn;   // Previous pressure
-layout(r32f, binding = 1) uniform image2D uPressureOut;  // Output pressure
+layout(r16f, binding = 0) uniform image2D uPressureIn;   // Previous pressure
+layout(r16f, binding = 1) uniform image2D uPressureOut;  // Output pressure
 
 // Solver parameters
 uniform vec2 uAlpha;      // Laplacian weights (1/dx², 1/dy²)

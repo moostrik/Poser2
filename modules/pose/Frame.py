@@ -9,13 +9,13 @@ from modules.pose.features import Points2D, Angles, AngleVelocity, AngleMotion, 
 from modules.pose.features.base import BaseFeature, BaseScalarFeature
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Frame:
     """Immutable pose data structure"""
     track_id: int
     cam_id: int
 
-    is_removed: bool    # depricated, for use in stream
+    # is_removed: bool    # depricated, for use in stream
 
     time_stamp: float =         field(default_factory=time.time)
     bbox: BBox =                field(default_factory=BBox.create_dummy)

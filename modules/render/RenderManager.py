@@ -88,9 +88,9 @@ INTERFACE_LAYERS: list[Layers] = [
 
 LARGE_LAYERS: list[Layers] = [
     # Layers.centre_cam,
-    Layers.centre_mask,
-    Layers.ms_mask,
-    Layers.centre_pose,
+    # Layers.centre_mask,
+    # Layers.ms_mask,
+    # Layers.centre_pose,
     Layers.flow,
     Layers.fluid,
     Layers.composite,
@@ -113,7 +113,7 @@ SHOW_POSE: list[Layers] = [
 SHOW_CENTRE: list[Layers] = [
     # Layers.centre_cam,
     Layers.centre_frg,
-    Layers.centre_mask,
+    # Layers.centre_mask,
     # Layers.hdt_prep,
     Layers.centre_pose,
 ]
@@ -136,7 +136,8 @@ SHOW_COMP: list[Layers] = [
     # Layers.sim_blend,
     # Layers.centre_pose,
     # Layers.centre_motion,
-    # Layers.cam_frg,
+    # Layers.centre_frg,
+    # Layers.fluid,
     Layers.composite,
 ]
 
@@ -178,9 +179,9 @@ class RenderManager(RenderBase):
 
         self.centre_gmtr_config=    ls.CentreGeometryConfig(stage=Stage.LERP, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
         self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.3, blur_steps=0, blur_radius=1.0, dilation_steps=0)
-        self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
-        self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
-        self.centre_pose_config =   ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=True)
+        self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.25, mask_opacity=1.0, use_mask=True)
+        self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.25,  exposure=1.2, gamma=1.0, offset=0.0, contrast=1.1, saturation=2.0, levels=9, smoothness=0.33, sharpen=0.0, colorize=0.96, use_mask=True)
+        self.centre_pose_config =   ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=False)
 
         self.data_A_config =        ls.DataLayerConfig(     stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
         self.data_B_config =        ls.DataLayerConfig(     stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[HISTORY_COLOR])
@@ -207,11 +208,11 @@ class RenderManager(RenderBase):
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_gmtry,    cam_mask.texture,                           self.centre_mask_config)
             mask_textures[i] = centre_mask.texture
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_gmtry,    cam_image.texture,  centre_mask.texture,    self.centre_cam_config)
-            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_gmtry,    cam_frg.texture,    centre_mask.texture,    self.centre_frg_config)
+            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_gmtry,    cam_frg.texture,    centre_mask.texture,    self.centre_frg_config,    color[:3])
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_gmtry,    color,                                      self.centre_pose_config)
 
             motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,   centre_mask.texture, color)
-            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub, mask_textures, list(TRACK_COLORS))
+            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub,   mask_textures, centre_frg.texture, list(TRACK_COLORS))
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   centre_mask.texture, list(TRACK_COLORS))
             fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS))
 
@@ -266,9 +267,9 @@ class RenderManager(RenderBase):
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 if layer_type in LARGE_LAYERS:
-                    layer.allocate(1080 * 2, 1920 * 2, GL_RGBA32F)
+                    layer.allocate(1080 * 2, 1920 * 2, GL_RGBA16F)
                 else:
-                    layer.allocate(1080, 1920, GL_RGBA32F)
+                    layer.allocate(1080, 1920, GL_RGBA16F)
         self.allocate_window_renders()
         Shader.enable_hot_reload()
 
@@ -288,11 +289,30 @@ class RenderManager(RenderBase):
             for layer in cam_dict.values():
                 layer.deallocate()
 
-    def draw_main(self, width: int, height: int) -> None:
+    def update(self) -> None:
+        self.data_hub.notify_update()
+
+        self._update_layers = UPDATE_LAYERS
+        self._draw_layers = FINAL_LAYERS
+        self._preview_layers = PREVIEW_LAYERS
+
+        # hotreload settings
+        # self.centre_mask_config.blend_factor = 0.25
+
+        # self.centre_frg_config.exposure = 1.2
+        # self.centre_frg_config.gamma = 1.0
+        # self.centre_frg_config.offset = 0.0
+        # self.centre_frg_config.contrast = 1.1
+        # self.centre_frg_config.saturation = 2.0
+
+        # self.centre_frg_config.levels = 9
+        # self.centre_frg_config.smoothness = 0.3
+        # self.centre_frg_config.sharpen = 0.0
+
+        # self.centre_frg_config.colorize = 0.96
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
-        self.data_hub.notify_update()
         seen: set[Layers] = set()
         for layer_type in self._update_layers + self._interface_layers + self._draw_layers + self._preview_layers:
             if layer_type not in seen:
@@ -300,11 +320,11 @@ class RenderManager(RenderBase):
                 for layer in self.L[layer_type].values():
                     layer.update()
 
+    def draw_main(self, width: int, height: int) -> None:
+        clear_color()
+
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
-
-        glViewport(0, 0, width, height)
-        clear_color()
 
         # Interface layers
         for i in range(self.num_cams):
@@ -320,20 +340,13 @@ class RenderManager(RenderBase):
             for layer_type in self._preview_layers:
                 self.L[layer_type][i].draw()
 
-        self._update_layers = UPDATE_LAYERS
-        self._draw_layers = FINAL_LAYERS
-        self._preview_layers = PREVIEW_LAYERS
-
-        self.centre_mask_config.blend_factor = 0.2
-
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        glViewport(0, 0, width, height)
         clear_color()
 
         Style.reset_state()
         Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.ADDITIVE)
+        Style.set_blend_mode(Style.BlendMode.ADD)
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
         for layer_type in self._draw_layers:

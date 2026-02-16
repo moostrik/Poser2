@@ -6,3 +6,4 @@ from .PosesFromTracklets import                 PosesFromTracklets
 from .ImageCropProcessor import                 ImageCropProcessor, ImageCropConfig
 from .ImageFrame import                         ImageFrame, ImageFrameDict
 from .WindowSimilarity import                   WindowSimilarity, WindowSimilarityConfig
+from .WindowCorrelation import                  WindowCorrelation, WindowCorrelationConfig

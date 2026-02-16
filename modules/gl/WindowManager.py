@@ -6,8 +6,15 @@ import traceback
 from typing import Callable, Optional
 
 # Third-party imports
-from OpenGL.GL import glGetString, GL_VERSION
+from OpenGL.GL import (  # type: ignore
+    glGetString, GL_VERSION, glBindFramebuffer, GL_FRAMEBUFFER, glViewport,
+    glGenBuffers, glBindBuffer, GL_ARRAY_BUFFER, glBufferData, GL_STATIC_DRAW,
+    glGenVertexArrays, glBindVertexArray, glEnableVertexAttribArray,
+    glVertexAttribPointer, GL_FLOAT, GL_FALSE
+)
 import glfw
+import numpy as np
+import ctypes
 
 # Local application imports
 from modules.gl.RenderBase import RenderBase
@@ -64,6 +71,7 @@ class WindowManager():
         self.secondary_monitor_ids: list[int] = secondary_monitor_ids
         self.secondary_windows: list[glfw._GLFWwindow] = []
         self.secondary_fullscreen = True
+        self._quad_vaos: dict[int, int] = {}  # id(window) -> VAO (not shared between contexts)
 
     def start(self) -> None:
         """Start the rendering thread"""
@@ -180,12 +188,49 @@ class WindowManager():
         if self.fullscreen:
             self.set_main_windowed_fullscreen(True)
 
+    def _create_quad_vao(self) -> int:
+        """Create VAO/VBO for fullscreen quad. Call once after context is current."""
+        vertices = np.array([
+            # x     y     u    v
+            -1.0, -1.0,  0.0, 0.0,
+             1.0, -1.0,  1.0, 0.0,
+             1.0,  1.0,  1.0, 1.0,
+            -1.0,  1.0,  0.0, 1.0,
+        ], dtype=np.float32)
+
+        vbo = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+
+        vao = glGenVertexArrays(1)
+        glBindVertexArray(vao)
+
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * 4, ctypes.c_void_p(0))
+
+        glEnableVertexAttribArray(1)
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * 4, ctypes.c_void_p(2 * 4))
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        return vao
+
+    def _bind_quad_vao(self, window: glfw._GLFWwindow) -> None:
+        """Bind quad VAO for the given window, creating it if needed."""
+        key = id(window)
+        if key not in self._quad_vaos:
+            self._quad_vaos[key] = self._create_quad_vao()
+        glBindVertexArray(self._quad_vaos[key])
+
     def _render_loop(self) -> None:
         """Main rendering loop with improved frame timing"""
+        assert self.main_window is not None
+        self._bind_quad_vao(self.main_window)  # Bind VAO before allocate (shaders may use draw_quad)
         self.renderer.allocate()
 
         next_frame_time = time_ns()
         while not glfw.window_should_close(self.main_window):
+
+            self._update()
 
             self._draw_main_window()
             for win in self.secondary_windows:
@@ -215,6 +260,17 @@ class WindowManager():
 
         self.renderer.deallocate()
 
+    def _update(self) -> None:
+        self.fps.tick()
+        """Update renderer state. Called once per frame."""
+        try:
+            self.renderer.update()
+        except Exception as e:
+            print(f"Error in update: {e}")
+            traceback.print_exc()
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
     def _cleanup(self) -> None:
         """Clean up resources"""
 
@@ -237,6 +293,7 @@ class WindowManager():
         self.renderer.on_main_window_resize(width, height)
 
     def _draw_main_window(self) -> None:
+        assert self.main_window is not None
         fps = str(self.fps.get_fps())
         min_fps = str(self.fps.get_min_fps())
         glfw.set_window_title(self.main_window, f'{self.windowName} - FPS: {fps} (Min: {min_fps})')
@@ -244,7 +301,9 @@ class WindowManager():
 
         glfw.make_context_current(self.main_window)
         glfw.swap_interval(1 if self.v_sync else 0)
+        self._bind_quad_vao(self.main_window)
 
+        glViewport(0, 0, self.window_width, self.window_height)  # Set viewport here
         try:
             self.renderer.draw_main(self.window_width, self.window_height)
         except Exception as e:
@@ -252,7 +311,6 @@ class WindowManager():
             traceback.print_exc()
 
         glfw.swap_buffers(self.main_window)
-        self.fps.tick()
 
     # SECONDARY WINDOWS
     def _create_secondary_window(self, name:str, monitor_id: int) -> Optional[glfw._GLFWwindow]:
@@ -318,10 +376,12 @@ class WindowManager():
         if title:
             monitor_id = int(title)
 
-        width, height = glfw.get_window_size(window)
-
         glfw.make_context_current(window)  # <-- Make this window's context current
         glfw.swap_interval(0)
+        self._bind_quad_vao(window)
+        width, height = glfw.get_window_size(window)
+        glViewport(0, 0, width, height)  # Set viewport for this window
+
         try:
             self.renderer.draw_secondary(monitor_id, width, height)
         except Exception as e:

@@ -8,14 +8,18 @@ from dataclasses import dataclass
 from OpenGL.GL import *  # type: ignore
 from pytweening import *    # type: ignore
 import numpy as np
+from time import time
+import math
 
 # Local application imports
-from modules.gl import Fbo, Texture, Style
+from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 
 from modules.render.shaders.hdt.MSColorMask import MSColorMask
+from modules.render.shaders.hdt.AddDodgeBlend import AddDodgeBlend
+from modules.render.shaders.generic.Tint import Tint
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -27,26 +31,22 @@ class MSColorMaskLayerConfig:
     blend_mode: Style.BlendMode = Style.BlendMode.ALPHA
     similarity_threshold: float = 0.33
     motion_exponent: float = 1.5
+    # AddDodgeBlend parameters
+    add_curve: float = 2.0
+    dodge_curve: float = 1.5
+    # MSColorMask parameters
+    layered: float = 1.0  # 0 = additive, 1 = own in front
 
 
 class MSColorMaskLayer(LayerBase):
-    """Cross-camera mask visualization based on similarity and motion.
+    """Cross-camera mask visualization with per-camera coloring pipeline.
 
-    Aggregates masks from all cameras and blends them based on:
-    - Own camera: weighted by angle_motion.value
-    - Other cameras: weighted by similarity * motion_gate
+    Pipeline:
+        1. Tint own camera's mask with track color → _fbo
+        2. AddDodgeBlend foreground onto tinted mask → _blend_fbo
+        3. MSColorMask composites own styled result with other cameras → _fbo
 
-    Outputs non-premultiplied RGBA where each camera's mask is colorized
-    with its assigned track color.
-
-    Usage:
-        # In RenderManager, after creating all CentreMaskLayers:
-        mask_layers = {i: centre_mask_layer[i] for i in range(num_cams)}
-        sync_mask = MSColorMaskLayer(cam_id, data_hub, mask_layers, colors, config)
-
-        # Each frame:
-        sync_mask.update()
-        output_texture = sync_mask.texture
+    Each camera's contribution is colored exactly once.
     """
 
     def __init__(
@@ -54,25 +54,24 @@ class MSColorMaskLayer(LayerBase):
         cam_id: int,
         data_hub: DataHub,
         mask_textures: dict[int, Texture],
+        frg_texture: Texture,
         colors: list[tuple[float, float, float, float]],
         config: MSColorMaskLayerConfig | None = None
     ) -> None:
-        """Initialize MSColorMaskLayer.
-
-        Args:
-            cam_id: Camera ID for this layer's output
-            data_hub: Data hub for pose data (similarity, motion)
-            mask_textures: Dict of mask textures (cam_id -> Texture)
-            colors: Per-camera colors (passed from RenderManager)
-            config: Layer configuration
-        """
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._mask_textures: dict[int, Texture] = mask_textures
+        self._frg_texture: Texture = frg_texture
         self._colors: list[tuple[float, float, float, float]] = colors
         self.config: MSColorMaskLayerConfig = config or MSColorMaskLayerConfig()
 
-        self._fbo: Fbo = Fbo()
+        self._tint_fbos: list[Fbo] = [Fbo() for _ in range(self.config.num_players)]
+        self._blend_fbo: SwapFbo = SwapFbo()
+        self._output_fbo: Fbo = Fbo()
+
+        # Shaders
+        self._tint: Tint = Tint()
+        self._add_dodge: AddDodgeBlend = AddDodgeBlend()
         self._shader: MSColorMask = MSColorMask()
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -82,37 +81,45 @@ class MSColorMaskLayer(LayerBase):
     @property
     def texture(self) -> Texture:
         """Output texture (non-premultiplied RGBA)."""
-        return self._fbo.texture
+        return self._output_fbo
 
     # ========== Lifecycle Methods ==========
 
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
-        """Allocate output buffer.
-
-        Args:
-            width: Output width
-            height: Output height
-            internal_format: GL format for output (e.g., GL_RGBA16F)
-        """
         fmt = internal_format if internal_format is not None else GL_RGBA16F
-        self._fbo.allocate(width, height, fmt)
+        self._output_fbo.allocate(width, height, fmt)
+        self._blend_fbo.allocate(width, height, fmt)
+        for fbo in self._tint_fbos:
+            fbo.allocate(width, height, fmt)
+        self._tint.allocate()
+        self._add_dodge.allocate()
         self._shader.allocate()
 
     def deallocate(self) -> None:
-        """Deallocate all resources."""
-        self._fbo.deallocate()
+        self._output_fbo.deallocate()
+        self._blend_fbo.deallocate()
+        for fbo in self._tint_fbos:
+            fbo.deallocate()
+        self._tint.deallocate()
+        self._add_dodge.deallocate()
         self._shader.deallocate()
 
     def reset(self) -> None:
-        """Reset layer state."""
-        self._fbo.clear()
+        self._output_fbo.clear()
 
     # ========== Processing ==========
 
     def update(self) -> None:
-        """Update mask blend based on similarity and motion from pose data."""
+        """Update mask blend based on similarity and motion from pose data.
+
+        Pipeline:
+            Step 1: Tint own mask with track color → _fbo
+            Step 2: AddDodgeBlend(tinted mask, foreground) → _blend_fbo
+            Step 3: MSColorMask(own styled, other masks, colors, weights) → _fbo
+        """
         # Get pose data for this camera
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
+        active_poses = self._data_hub.get_pose_count(Stage.LERP)
 
         # Extract similarity and motion data
         num_players = self.config.num_players
@@ -122,39 +129,72 @@ class MSColorMaskLayer(LayerBase):
         motion = easeInOutSine(motion)
 
         # Apply similarity threshold and exponent
-        threshold = self.config.similarity_threshold
-        exponent = self.config.motion_exponent
+        threshold = 0.1# self.config.similarity_threshold
+        exponent = 1.0# self.config.motion_exponent
         similarities = np.clip((similarities - threshold) / (1.0 - threshold), 0.0, 1.0)
         similarities = np.power(similarities, exponent)
+        motion_similarities = similarities # * motion_gates
+        # print(motion)
 
-        # Calculate weights for each camera
-        weights: list[float] = []
-        masks: list[Texture] = []
-        colors: list[tuple[float, float, float, float]] = []
+        # Foreground blend: 0 if single person, otherwise Nth highest similarity
+        lowest_similarity: float = 0.0
+        if active_poses >= 2:
+            sorted_similarities = np.sort(motion_similarities)  # Ascending
+            lowest_similarity = float(sorted_similarities[-(active_poses - 1)])
 
+        # foreground_blend: float = (lowest_similarity - 0.25) * 2.0
+        # foreground_blend = max(0.0, min(1.0, foreground_blend))
+        threshold = 0.2
+        foreground_blend: float = (lowest_similarity - threshold) / (1.0 - threshold)
+        foreground_blend = max(0.0, min(1.0, foreground_blend))
+        foreground_blend = easeInSine(foreground_blend)
+
+        other_cam_ids: list[int] = []
         for cam_id in sorted(self._mask_textures.keys()):
-            mask_tex = self._mask_textures[cam_id]
-            if not mask_tex.allocated:
-                continue
+            if cam_id != self._cam_id:
+                other_cam_ids.append(cam_id)
 
-            masks.append(mask_tex)
-            colors.append(self._colors[cam_id % len(self._colors)])
-
-            if cam_id == self._cam_id:
-                # Own camera: weight by motion
-                weights.append(motion)
-            else:
-                # Other cameras: weight by similarity * motion_gate
-                weight = float(similarities[cam_id] * motion_gates[cam_id])
-                weights.append(weight)
-
-        # Render blended output
+        # ---- Render pipeline ----
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
-        self._fbo.begin()
-        self._shader.use(masks, colors, weights)
-        self._fbo.end()
+        self._tint.reload()
+        self._add_dodge.reload()
+        self._shader.reload()
+
+        # Step 1: Tint all cameras' masks
+        for cam_id, mask_tex in self._mask_textures.items():
+            color = self._colors[cam_id % len(self._colors)]
+            self._tint_fbos[cam_id].begin()
+            self._tint.use(mask_tex, color[0], color[1], color[2], 1.0)
+            self._tint_fbos[cam_id].end()
+
+        # Step 2: AddDodgeBlend own camera's tinted mask with foreground
+        self._blend_fbo.swap()
+        self._blend_fbo.begin()
+        self._add_dodge.use(
+            self._tint_fbos[self._cam_id],
+            self._frg_texture,
+            foreground_blend,
+        )
+        self._blend_fbo.end()
+        # print(motion)
+
+        # Step 3: Composite - own (dodged) + others (tinted)
+        styled_textures: list[Texture] = [self._blend_fbo.texture]
+        weights: list[float] = [motion]
+
+        # Style.set_blend_mode(Style.BlendMode.ADD)
+
+        for cam_id in other_cam_ids:
+            styled_textures.append(self._tint_fbos[cam_id])
+            weights.append(float(motion_similarities[cam_id]))
+            # weights.append(0.0)
+
+        self._output_fbo.begin()
+        # Blit.use(self._blend_fbo)
+        self._shader.use(styled_textures, weights, 0.8)
+        self._output_fbo.end()
 
         Style.pop_style()
 
@@ -164,6 +204,5 @@ class MSColorMaskLayer(LayerBase):
         """Draw with configured blend mode."""
         Style.push_style()
         Style.set_blend_mode(self.config.blend_mode)
-        if self.texture.allocated:
-            Blit.use(self.texture)
+        Blit.use(self._output_fbo)
         Style.pop_style()

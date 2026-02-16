@@ -2,6 +2,8 @@
 from dataclasses import replace
 from threading import Lock
 
+import numpy as np
+
 from modules.pose.features.Similarity import Similarity, configure_similarity
 from modules.pose.nodes.Nodes import FilterNode
 from modules.pose.Frame import Frame
@@ -19,6 +21,7 @@ class SimilarityApplicator(FilterNode):
 
     def __init__(self, max_poses: int) -> None:
         configure_similarity(max_poses)
+        self._max_poses = max_poses
         self._similarity_dict: dict[int, Similarity] = {}
         self._lock: Lock = Lock()
 
@@ -43,7 +46,7 @@ class SimilarityApplicator(FilterNode):
         with self._lock:
             similarity: Similarity | None = self._similarity_dict.get(pose.track_id)
 
-        if similarity is not None:
-            pose = replace(pose, similarity=similarity)
-
-        return pose
+        # Always update - use empty Similarity if not found (clears stale data)
+        if similarity is None:
+            similarity = Similarity.create_dummy()
+        return replace(pose, similarity=similarity)

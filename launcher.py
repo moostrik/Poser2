@@ -5,9 +5,12 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import os
 os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning"
 
+
 import sys
+import logging
 from datetime import datetime
 from pathlib import Path
+
 
 # Tee class to write output to both console and log file
 class Tee:
@@ -23,6 +26,7 @@ class Tee:
     def flush(self):
         self.console.flush()
         self.log_file.flush()
+
 
 # Setup logging to file with timestamp
 log_dir = Path(__file__).parent / "logs"
@@ -40,7 +44,18 @@ original_stderr = sys.stderr
 sys.stdout = Tee(original_stdout, log_handle)
 sys.stderr = Tee(original_stderr, log_handle)
 
-print(f"Logging to: {log_file}")
+# Setup logging module
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    handlers=[
+        logging.StreamHandler(original_stdout),
+        logging.FileHandler(log_file, encoding='utf-8')
+    ]
+)
+
+logging.info(f"Logging to: {log_file}")
+logging.info(f"Process PID: {os.getpid()}")
 
 
 
@@ -82,7 +97,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings_path: str = f"files/settings/{args.settings}.json"
 
-    print(f"Loading settings from: {settings_path}")
+    logging.info(f"Loading settings from: {settings_path}")
     settings: Settings = Settings.load(settings_path)
 
     if args.cameras < len(settings.camera.ids):
@@ -111,7 +126,7 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     shutdown_event = Event()
 
     def signal_handler_exit(sig, frame) -> None:
-        print("Received interrupt signal, shutting down...")
+        logging.info("Received interrupt signal, shutting down...")
         shutdown_event.set()
         if app.is_running:
             app.stop()

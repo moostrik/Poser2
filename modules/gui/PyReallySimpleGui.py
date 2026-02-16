@@ -73,8 +73,7 @@ def Element(type: eType, key: str, callback=None, value: bool| int | float | str
         element = sg.Button(button_text=key, key = key, expand_x = expand, metadata = callback)
 
     elif type == eType.CHCK :
-        # Use 'text' parameter if provided for display, otherwise fall back to 'key'
-        display_text = text if text is not None else key
+        display_text = text if text is not None else ''
         element = sg.Checkbox(text = display_text, key = key, default = bool(value), metadata = callback, enable_events=enable_events, disabled=disabled)
 
     elif type == eType.SLDR:

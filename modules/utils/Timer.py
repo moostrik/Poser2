@@ -22,10 +22,10 @@ class TimerConfig(ConfigBase):
 
     fps: float = config_field(60.0, min=1.0, max=240.0, fixed=True, description="Update rate in frames per second")
     run: bool = config_field(False, description="Run the timer")
-    auto: bool = config_field(False, description="Automatically restart after intermezzo")
     duration: float = config_field(10.0, min=0.1, max=600.0, description="Timer duration in seconds")
     intermezzo: float = config_field(0.0, min=0.0, max=60.0, description="Wait duration before going idle")
-    verbose: bool = config_field(False, description="Print timer state and time updates")
+    auto: bool = config_field(False, repr=False, description="Automatically restart after intermezzo")
+    verbose: bool = config_field(False, repr=False, description="Print timer state and time updates")
 
 
 class Timer(threading.Thread):

@@ -20,8 +20,8 @@ layout(binding = 0) uniform sampler2D uObstacle;        // Obstacle mask (R8/R32
 layout(binding = 1) uniform sampler2D uObstacleOffset;  // Neighbor obstacle info (RGBA8)
 
 // Velocity field - read/write via image (RG32F for velocity x,y)
-layout(rg32f, binding = 0) uniform image2D uVelocityIn;   // Previous velocity
-layout(rg32f, binding = 1) uniform image2D uVelocityOut;  // Output velocity
+layout(rg16f, binding = 0) uniform image2D uVelocityIn;
+layout(rg16f, binding = 1) uniform image2D uVelocityOut;
 
 // Solver parameters
 uniform vec2 uAlpha;      // Laplacian weights (1/dx², 1/dy²)

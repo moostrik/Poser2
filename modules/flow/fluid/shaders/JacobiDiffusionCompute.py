@@ -90,8 +90,8 @@ class JacobiDiffusionCompute(ComputeShader):
         glUniform1i(self.get_uniform_loc("uObstacleOffset"), 1)
 
         # Bind velocity textures as images
-        self.bind_image_read(0, velocity_in, GL_RG32F)
-        self.bind_image_write(1, velocity_out, GL_RG32F)
+        self.bind_image_read(0, velocity_in, GL_RG16F)
+        self.bind_image_write(1, velocity_out, GL_RG16F)
 
         # Set uniforms
         glUniform2f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y)

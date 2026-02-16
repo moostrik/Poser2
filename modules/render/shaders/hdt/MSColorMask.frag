@@ -5,31 +5,38 @@ precision highp float;
 in vec2 texCoord;
 out vec4 fragColor;
 
-// Input mask textures (R16F single channel each)
-uniform sampler2D uMask0;
-uniform sampler2D uMask1;
-uniform sampler2D uMask2;
-
-// Per-mask colors and weights
-uniform vec4 uColors[3];
+// All 3 slots: pre-styled RGBA (already tinted)
+uniform sampler2D uTex0;
+uniform sampler2D uTex1;
+uniform sampler2D uTex2;
 uniform float uWeights[3];
+uniform float uLayered;  // 0 = additive, 1 = own in front
 
 void main() {
-    // Sample masks (single channel R16F)
-    float m0 = texture(uMask0, texCoord).r * uWeights[0];
-    float m1 = texture(uMask1, texCoord).r * uWeights[1];
-    float m2 = texture(uMask2, texCoord).r * uWeights[2];
+    vec4 t0 = texture(uTex0, texCoord);
+    vec4 t1 = texture(uTex1, texCoord);
+    vec4 t2 = texture(uTex2, texCoord);
 
-    // Combined alpha from all masks
-    float totalAlpha = clamp(m0 + m1 + m2, 0.0, 1.0);
+    vec3 c0 = t0.rgb * t0.a * uWeights[0];
+    vec3 c1 = t1.rgb * t1.a * uWeights[1];
+    vec3 c2 = t2.rgb * t2.a * uWeights[2];
 
-    // Weighted color blend (non-premultiplied)
-    // Each mask contributes its color proportionally
-    vec3 color = vec3(0.0);
-    if (totalAlpha > 0.001) {
-        color = (m0 * uColors[0].rgb + m1 * uColors[1].rgb + m2 * uColors[2].rgb) / totalAlpha;
-    }
+    float a0 = t0.a * uWeights[0];
+    float a1 = t1.a * uWeights[1];
+    float a2 = t2.a * uWeights[2];
 
-    // Output non-premultiplied RGBA
-    fragColor = vec4(color, totalAlpha);
+    // Additive mode
+    vec3 addColor = c0 + c1 + c2;
+    float addAlpha = clamp(a0 + a1 + a2, 0.0, 1.0);
+
+    // Layered mode: own over additive others
+    vec3 bg = c1 + c2;
+    vec3 layerColor = c0 + bg * (1.0 - a0);
+    float layerAlpha = clamp(a0 + (a1 + a2) * (1.0 - a0), 0.0, 1.0);
+
+    // Mix based on uLayered
+    vec3 color = mix(addColor, layerColor, uLayered);
+    float alpha = mix(addAlpha, layerAlpha, uLayered);
+
+    fragColor = vec4(color, alpha);
 }

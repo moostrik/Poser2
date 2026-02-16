@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from threading import Thread, Event, Lock
 import socket
+import time
 
 from stupidArtnet import StupidArtnet
 
@@ -148,6 +149,10 @@ class ArtNetLed:
         self._update_event: Event = Event()
         self._thread: Thread | None = None
         self._dirty: bool = True  # Frame needs recalculation
+
+        # Periodic sending
+        self._last_periodic_time: float = 0.0
+        self._periodic_interval: float = 1.0  # Send at least once per second
 
         # Watch config changes to trigger immediate update
         self._unwatchers: list = []
@@ -402,12 +407,18 @@ class ArtNetLed:
 
         while self._running:
             try:
+                # Periodic dirty trigger: ensure send at least once per interval
+                current_time: float = time.perf_counter()
+                if current_time - self._last_periodic_time >= self._periodic_interval:
+                    self._dirty = True
+                    self._last_periodic_time = current_time
+
                 if self._dirty:
                     with self._lock:
                         self._compute_frame()
                     self._dirty = False
-                # Send outside lock to avoid blocking config updates during I/O
-                self._send_frame()
+                    # Send outside lock to avoid blocking config updates during I/O
+                    self._send_frame()
 
                 # Wait for next frame or config change
                 frame_time: float = 1.0 / self._config.fps

@@ -10,8 +10,10 @@ from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# Quad utilities - imported from Utils for backward compatibility
-from modules.gl.Utils import init_quad, draw_quad
+
+def draw_quad() -> None:
+    """Draw fullscreen quad. Assumes VAO already bound by WindowManager."""
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
 
 class FileModifiedHandler(FileSystemEventHandler):
     def __init__(self, callback):
@@ -97,7 +99,7 @@ class Shader():
                 Shader._watch_directory(self.shader_dir)
 
         # Now try to compile - sets self.allocated on success
-        self.allocated = self._compile_shaders(True)
+        self.allocated = self._compile_shaders(False)
 
     def deallocate(self) -> None:
         """Clean up OpenGL resources and unregister from hot-reload."""
@@ -271,7 +273,7 @@ class Shader():
         if shader_dir not in cls._directory_observers:
             observer = monitor_path(str(shader_dir), cls._on_any_file_changed)
             cls._directory_observers[shader_dir] = observer
-            logging.info(f"Watching shader directory: {shader_dir}")
+            # logging.info(f"Watching shader directory: {shader_dir}")
 
     @classmethod
     def disable_hot_reload(cls) -> None:

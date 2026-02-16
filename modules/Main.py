@@ -104,11 +104,11 @@ class Main():
         # self.motion_smooth_config = nodes.EmaSmootherConfig(attack=0.95, release=0.8)
         # self.motion_smooth_gui =    guis.EmaSmootherGui(self.motion_smooth_config, self.gui, 'MOTION')
         self.motion_ma_config =     nodes.MovingAverageConfig(window_size=30, window_type=nodes.WindowType.TRIANGULAR)
-        self.motion_ma_gui =        guis.MovingAverageSmootherGui(self.motion_ma_config, self.gui, 'MOTION_MA')
+        self.motion_ma_gui =        guis.MovingAverageSmootherGui(self.motion_ma_config, self.gui, 'MOTION')
         self.motion_easing_config = nodes.EasingConfig(easing_name='easeInOutSine')
         self.motion_easing_gui =    guis.EasingGui(self.motion_easing_config, self.gui, 'MOTION_EASE')
         self.motion_extractor_config = nodes.AngleMotionExtractorConfig(noise_threshold=0.05, max_threshold=0.5)
-        self.motion_extractor_gui = guis.AngleMotionExtractorGui(self.motion_extractor_config, self.gui, 'MOTION_EXT')
+        self.motion_extractor_gui = guis.AngleMotionExtractorGui(self.motion_extractor_config, self.gui, 'MOTION')
 
         # POSE PROCESSING PIPELINES
         self.poses_from_tracklets = batch.PosesFromTracklets(num_players)
@@ -118,9 +118,13 @@ class Main():
         self.mask_extractor =       batch.MaskBatchExtractor(settings.pose)   # GPU-based segmentation mask extractor
         self.flow_extractor =       batch.FlowBatchExtractor(settings.pose)   # GPU-based optical flow extractor
 
-        self.window_similator_config = batch.WindowSimilarityConfig(window_length=int(0.5 * settings.camera.fps), exponent=2.5)
+        self.window_similator_config = batch.WindowSimilarityConfig(window_length=int(0.5 * settings.camera.fps))
         self.window_similator=      batch.WindowSimilarity(self.window_similator_config)
         self.window_similarity_gui = guis.WindowSimilarityGui(self.window_similator_config, self.gui, 'SIMILARITY')
+
+        self.window_correlator_config = batch.WindowCorrelationConfig(window_length=int(0.5 * settings.camera.fps))
+        self.window_correlator =    batch.WindowCorrelation(self.window_correlator_config)
+        self.window_correlation_gui = guis.WindowCorrelationGui(self.window_correlator_config, self.gui, 'CORRELATION')
 
         # Feature applicators (replace SimilarityExtractor)
         self.similarity_applicator = nodes.SimilarityApplicator(max_poses=settings.pose.max_poses)
@@ -151,7 +155,7 @@ class Main():
                 # lambda: nodes.PointTemporalStabilizer(nodes.TemporalStabilizerConfig()),
                 nodes.AngleExtractor,
                 lambda: nodes.AngleVelExtractor(fps=settings.camera.fps),
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Raw")),
             ]
         )
 
@@ -165,7 +169,7 @@ class Main():
                 lambda: nodes.AngleEuroSmoother(self.angle_smooth_config),
                 # lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=False)),
                 lambda: nodes.AngleMotionExtractor(self.motion_extractor_config),
-                # lambda: nodes.AngleMotionEmaSmoother(self.motion_smooth_config),
+                lambda: nodes.AngleMotionMovingAverageSmoother(self.motion_ma_config),
                 # lambda: nodes.AngleMotionEasingNode(self.motion_easing_config),
                 nodes.AngleSymExtractor,
                 nodes.MotionTimeExtractor,
@@ -173,7 +177,7 @@ class Main():
                 lambda: self.similarity_applicator,
                 lambda: self.leader_applicator,
                 lambda: nodes.SimilarityEuroSmoother(self.simil_smooth_config),
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Smooth")),
             ]
         )
 
@@ -186,14 +190,13 @@ class Main():
                 lambda: nodes.AngleVelPredictor(self.prediction_config),
                 lambda: nodes.AngleStickyFiller(nodes.StickyFillerConfig(init_to_zero=False, hold_scores=True)),
                 lambda: nodes.SimilarityStickyFiller(nodes.StickyFillerConfig(init_to_zero=True, hold_scores=False)),
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Prediction")),
             ]
         )
 
         self.interpolator = trackers.InterpolatorTracker(
             settings.num_players,
             [
-                # lambda: nodes.BBoxLerpInterpolator(self.b_box_interp_config),
                 lambda: nodes.BBoxChaseInterpolator(self.b_box_interp_config),
                 lambda: nodes.PointChaseInterpolator(self.point_interp_config),
                 lambda: nodes.AngleChaseInterpolator(self.angle_interp_config),
@@ -213,9 +216,7 @@ class Main():
                 lambda: nodes.AngleVelEuroSmoother(self.a_vel_smooth_config),
                 lambda: nodes.AngleMotionExtractor(self.motion_extractor_config),
                 lambda: nodes.AngleMotionMovingAverageSmoother(self.motion_ma_config),
-                # lambda: nodes.AngleMotionEmaSmoother(self.motion_smooth_config),
-                # lambda: nodes.AngleMotionEasingNode(self.motion_easing_config),
-                lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
+                # lambda: nodes.PoseValidator(nodes.ValidatorConfig(name="Interpolation")),
             ]
         )
 
@@ -257,17 +258,23 @@ class Main():
         self.interpolator.add_poses_callback(self.pose_interpolation_pipeline.process)
 
         # MOTION GATE (after interpolation pipeline, before DataHub)
-        self.pose_interpolation_pipeline.add_poses_callback(self.motion_gate_applicator.submit)
+        self.pose_interpolation_pipeline.add_poses_callback(self.motion_gate_applicator.submit) # dit slaat nergens op??
         self.pose_interpolation_pipeline.add_poses_callback(self.motion_gate_tracker.process)
         self.motion_gate_tracker.add_poses_callback(partial(self.data_hub.set_poses, Stage.LERP))
         self.motion_gate_tracker.add_poses_callback(self.window_tracker_I.process)
         self.window_tracker_I.add_callback(partial(self.data_hub.set_feature_windows, Stage.LERP))
 
-        # SIMILARITY COMPUTATION
-        self.window_tracker_S.add_window_callback(FrameField.angles, self.window_similator.submit)
+        # SIMILARITY COMPUTATION (uses combined callback for motion gate and velocity weighting)
+        self.window_tracker_S.add_callback(self.window_similator.submit_all)
         self.window_similator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
         self.window_similator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
         self.window_similator.start()
+
+        # CORRELATION COMPUTATION (alternative to similarity)
+        self.window_tracker_S.add_callback(self.window_correlator.submit_all)
+        self.window_correlator.add_callback(lambda result: self.similarity_applicator.submit(result[0]))
+        self.window_correlator.add_callback(lambda result: self.leader_applicator.submit(result[1]))
+        self.window_correlator.start()
 
         # POSE ESTIMATION
         self.gpu_crop_processor.add_callback(self.point_extractor.process)
@@ -316,15 +323,15 @@ class Main():
                 self.gui.addFrame([self.cameras[c].gui.get_gui_frame()])
 
         self.gui.addFrame([self.artnet_guis[0].frame, self.artnet_guis[1].frame, self.artnet_guis[2].frame])
-        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame(), self.data_gui.frame])
+        self.gui.addFrame([self.b_box_smooth_gui.get_gui_frame(), self.b_box_interp_gui.get_gui_frame(), self.timer_gui.frame])
         self.gui.addFrame([self.point_smooth_gui.get_gui_frame(), self.point_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.angle_smooth_gui.get_gui_frame(), self.angle_interp_gui.get_gui_frame(), self.a_vel_smooth_gui.get_gui_frame()])
-        self.gui.addFrame([self.motion_extractor_gui.get_gui_frame(), self.motion_ma_gui.get_gui_frame()])
-        self.gui.addFrame([self.window_similarity_gui.get_gui_frame(), self.simil_smooth_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.motion_extractor_gui.get_gui_frame(), self.motion_ma_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
+        self.gui.addFrame([self.window_correlation_gui.get_gui_frame(),self.window_similarity_gui.get_gui_frame(), self.simil_smooth_gui.get_gui_frame()])
         if self.player:
-            self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.timer_gui.frame])
+            self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.data_gui.frame])
         if self.recorder:
-            self.gui.addFrame([self.recorder.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.timer_gui.frame])
+            self.gui.addFrame([self.recorder.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.data_gui.frame])
         self.gui.start()
         self.gui.bringToFront()
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI
@@ -372,6 +379,7 @@ class Main():
         self.flow_extractor.stop()
 
         self.window_similator.stop()
+        self.window_correlator.stop()
 
 
         self.gui.stop()

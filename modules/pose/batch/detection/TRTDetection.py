@@ -355,7 +355,7 @@ class TRTDetection(Thread):
 
             # Execute on dedicated CUDA stream (preprocessing already complete on this stream)
             self.context.execute_async_v3(stream_handle=self.stream.cuda_stream)
-            self.stream.synchronize()
+            self.stream.synchronize() # .cpu() below syncs anyway
 
         # Transfer to CPU (no clone needed - output buffers are fresh each call)
         simcc_x_cpu = simcc_x_out.cpu().numpy()
