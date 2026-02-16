@@ -256,7 +256,7 @@ class OscSound:
         bundle_builder.add_content(gate_msg.build()) # type: ignore
 
         # range [0, 1] - motion-gated similarity (similarity * motion_gate)
-        motion_sim_values: list[float] = (pose.similarity.values * pose.motion_gate.values).tolist()
+        motion_sim_values: list[float] = (pose.similarity.values).tolist()
         motion_sim_values = [0.0 if np.isnan(v) else v for v in motion_sim_values]
         motion_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
         for val in motion_sim_values:
@@ -271,24 +271,11 @@ class OscSound:
         bundle_builder.add_content(leader_msg.build()) # type: ignore
 
         # DEPRECATED: Compute motion-gated similarity using old method (backward compatibility)
-        # TODO: Remove this once all OSC receivers migrate to /similarity/motion
-        motions: dict[int, float] = {}
-        for pid in range(num_players):
-            if pid not in poses:
-                motions[pid] = 0.0
-            else:
-                # Motion value is already normalized [0,1] and eased by pipeline
-                motions[pid] = poses[pid].angle_motion.value
 
         similarity_values: list[float] = np.nan_to_num(pose.similarity.values, nan=0.0).tolist()
-        other_ids = [i for i in range(3) if i != id]  # Hardcoded to first 3 poses
-        for o_id in other_ids:
-            similarity_values[o_id] *= min(motions[id], motions[o_id])
 
         # range [0, 1] - DEPRECATED backward-compatible motion-gated similarity
         similarity_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
         for similarity in similarity_values:
             similarity_msg.add_arg(similarity, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(similarity_msg.build()) # type: ignore
-
-

@@ -212,8 +212,8 @@ class FluidLayer(LayerBase):
         self.config.fluid_flow.vel_viscosity = 3.0
         self.config.fluid_flow.vel_viscosity_iter = 40
 
-        self.config.fluid_flow.den_speed = 1.1
-        self.config.fluid_flow.den_decay = 12.0
+        self.config.fluid_flow.den_speed = 5.1
+        self.config.fluid_flow.den_decay = 8.0
 
         self.config.fluid_flow.tmp_speed = 0.33
         self.config.fluid_flow.tmp_decay = 3.0
@@ -242,7 +242,11 @@ class FluidLayer(LayerBase):
         my_similarity = np.max(similarities)
         self.config.fluid_flow.vel_viscosity = 4.0 * (1.1 - my_similarity)  # More similar = less viscosity
         self.config.fluid_flow.vel_viscosity = 3.0 * (1.1 - my_similarity)  # More similar = less viscosity
-        self.config.fluid_flow.vel_speed = 0.01 + motion * 0.3
+        self.config.fluid_flow.vel_speed = 0.01#0.01 + motion * 0.3
+
+
+        self.config.fluid_flow.den_decay = 60.0 - (pow(motion, 2.0) * 50.0)  # More motion = faster decay
+        self.config.fluid_flow.den_speed = 1.0 + motion * 3.0
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -253,7 +257,7 @@ class FluidLayer(LayerBase):
         for cam_id, flow_layer in self._flow_layers.items():
             if cam_id == self._cam_id:
                 vel_strength = 0.1 * motion
-                den_strength = motion * 1.2
+                den_strength = motion
                 # if motion > 0:
                 #     m = 0.95
                 #     print (m, m - pow(m, 8))
