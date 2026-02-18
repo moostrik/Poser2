@@ -208,8 +208,8 @@ class FluidLayer(LayerBase):
         self.config.fluid_flow.vel_decay = 30.0
 
         self.config.fluid_flow.vel_vorticity = 3
-        self.config.fluid_flow.vel_vorticity_radius = 3.0
-        self.config.fluid_flow.vel_viscosity = 3.0
+        self.config.fluid_flow.vel_vorticity_radius = 9.0
+        self.config.fluid_flow.vel_viscosity = 3
         self.config.fluid_flow.vel_viscosity_iter = 40
 
         self.config.fluid_flow.den_speed = 5.1
@@ -239,14 +239,8 @@ class FluidLayer(LayerBase):
         m_s = similarities # * motion_gates  # Modulate similarity by motion gate
         # print(f"FluidLayer cam_id {self._cam_id} similarities: {similarities}, motion_gates: {motion_gates}")  # DEBUG
 
-        my_similarity = np.max(similarities)
-        self.config.fluid_flow.vel_viscosity = 4.0 * (1.1 - my_similarity)  # More similar = less viscosity
-        self.config.fluid_flow.vel_viscosity = 3.0 * (1.1 - my_similarity)  # More similar = less viscosity
-        self.config.fluid_flow.vel_speed = 0.01#0.01 + motion * 0.3
-
-
-        self.config.fluid_flow.den_decay = 60.0 - (pow(motion, 2.0) * 50.0)  # More motion = faster decay
-        self.config.fluid_flow.den_speed = 1.0 + motion * 3.0
+        self.config.fluid_flow.den_decay = 60.0 - (pow(motion, 2.0) * 45.0)  # More motion = faster decay
+        self.config.fluid_flow.den_speed = 3.0 + motion
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -272,7 +266,7 @@ class FluidLayer(LayerBase):
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
             channel: int = cam_id % 4  # Map camera to RGBA channel
             self._fluid_flow.add_density_channel(flow_layer.density, channel, den_strength)
-            self._fluid_flow.clamp_density(0.0, 1.2)
+            self._fluid_flow.clamp_density(0.0, 1.0)
 
 
             # Add temperature from each flow layer

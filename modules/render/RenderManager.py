@@ -216,7 +216,7 @@ class RenderManager(RenderBase):
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   centre_mask.texture, list(TRACK_COLORS))
             fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS))
 
-            self.L[Layers.composite][i] = ls.CompositeLayer([ms_mask, fluid], self.composite_config)
+            self.L[Layers.composite][i] = ls.CompositeLayer([fluid, ms_mask], self.composite_config)
 
             # centre_motion = self.L[Layers.hdt_prep][i]=     ls.HDTPrepare(          i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
             # sim_blend =     self.L[Layers.hdt_blend][i] =   ls.HDTBlend(            i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.HDTPrepare], self.L[Layers.hdt_prep]))

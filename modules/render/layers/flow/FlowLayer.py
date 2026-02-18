@@ -201,7 +201,7 @@ class FlowLayer(LayerBase):
         self.config.velocity_trail.blur_radius = 3.0
 
         self.config.density_bridge.saturation = 1.2
-        self.config.density_bridge.brightness = 0.5
+        self.config.density_bridge.brightness = 1.0
 
         self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
 

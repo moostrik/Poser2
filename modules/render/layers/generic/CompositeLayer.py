@@ -11,6 +11,8 @@ from modules.gl import Fbo, Texture, Style
 from modules.gl.shaders import Blit, Lut
 from modules.render.layers.LayerBase import LayerBase
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
 
 # ============================================================================
 # LUT Selection Enum - Dynamically generated from files/lut/*.cube
@@ -58,7 +60,7 @@ LutSelection = _discover_luts()
 @dataclass
 class CompositeLayerConfig:
     """Configuration for CompositeLayer."""
-    blend_mode: Style.BlendMode = Style.BlendMode.ADD
+    blend_mode: Style.BlendMode = Style.BlendMode.ALPHA
     lut: LutSelection = field(default_factory=lambda: LutSelection.NONE)  # type: ignore
     lut_strength: float = 1.0
 
@@ -106,6 +108,8 @@ class CompositeLayer(LayerBase):
 
         # Blit shader for passthrough when no LUT
         self._blit: Blit = Blit()
+
+        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:
