@@ -7,10 +7,15 @@ TRACK_COLORS_BRIGHT: list[tuple[float, float, float, float]] = [
 ]
 
 # Track colors for person identification (red, blue, yellow - matched perceived brightness Y=0.33)
+# TRACK_COLORS: list[tuple[float, float, float, float]] = [
+#     (0.60, 0.20, 0.20, 1.0),    # Red    Y = 0.33
+#     (0.28, 0.28, 1.0, 1.0),    # Blue   Y = 0.33
+#     (0.60, 0.52, 0.23, 1.0),   # Yellow Y = 0.33
+# ]
 TRACK_COLORS: list[tuple[float, float, float, float]] = [
-    (0.60, 0.20, 0.20, 1.0),    # Red    Y = 0.33
-    (0.28, 0.28, 1.0, 1.0),    # Blue   Y = 0.33
-    (0.50, 0.44, 0.23, 1.0),   # Yellow Y = 0.33
+    (1.0, 0.0, 0.0, 1.0),    # Red    Y = 0.33
+    (0.0, 0.0, 1.0, 1.0),    # Blue   Y = 0.33
+    (0.0, 1.0, 0.0, 1.0),   # Yellow Y = 0.33
 ]
 
 # TRACK_COLORS = TRACK_COLORS_BRIGHT

@@ -239,7 +239,7 @@ class FluidLayer(LayerBase):
         m_s = similarities # * motion_gates  # Modulate similarity by motion gate
         # print(f"FluidLayer cam_id {self._cam_id} similarities: {similarities}, motion_gates: {motion_gates}")  # DEBUG
 
-        self.config.fluid_flow.den_decay = 60.0 - (pow(motion, 2.0) * 45.0)  # More motion = faster decay
+        self.config.fluid_flow.den_decay = 30.0 - (pow(motion, 2.0) * 20.0)  # More motion = faster decay
         self.config.fluid_flow.den_speed = 3.0 + motion
 
         Style.push_style()
@@ -250,7 +250,7 @@ class FluidLayer(LayerBase):
         den_strength: float
         for cam_id, flow_layer in self._flow_layers.items():
             if cam_id == self._cam_id:
-                vel_strength = 0.1 * motion
+                vel_strength = 0.05 * motion
                 den_strength = motion
                 # if motion > 0:
                 #     m = 0.95
@@ -316,6 +316,7 @@ class FluidLayer(LayerBase):
         Maps each RGBA density channel to a corresponding track color and
         composites them additively.
         """
+        self._density_colorize_shader.reload()
         self._colorized_fbo.begin()
         self._density_colorize_shader.use(self._fluid_flow.density, self._colors)
         self._colorized_fbo.end()
