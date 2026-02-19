@@ -219,22 +219,22 @@ class UnifiedFluidLayer(LayerBase):
         import numpy as np
 
         # Hot-reload config overrides
-        self.config.fluid_flow.vel_speed = 0.1
-        self.config.fluid_flow.vel_decay = 6.0
+        self.config.fluid_flow.vel_self_advection = 0.01
+        self.config.fluid_flow.vel_lifetime = 30.0
 
         self.config.fluid_flow.vel_vorticity = 10
         self.config.fluid_flow.vel_vorticity_radius = 3.0
         self.config.fluid_flow.vel_viscosity = 8.0
         self.config.fluid_flow.vel_viscosity_iter = 40
 
-        self.config.fluid_flow.den_speed = 1.1
-        self.config.fluid_flow.den_decay = 12
+        self.config.fluid_flow.speed = 0.1
+        self.config.fluid_flow.den_speed_offset = 0.0
+        self.config.fluid_flow.den_lifetime = 12
 
-        self.config.fluid_flow.tmp_speed = 0.33
-        self.config.fluid_flow.tmp_decay = 3.0
+        self.config.fluid_flow.tmp_lifetime = 3.0
 
         self.config.fluid_flow.prs_speed = 0.0
-        self.config.fluid_flow.prs_decay = 0.0
+        self.config.fluid_flow.prs_lifetime = 0.3
         self.config.fluid_flow.prs_iterations = 40
 
         self.config.fluid_flow.tmp_buoyancy = 0.0

@@ -142,6 +142,11 @@ class FlowLayer(LayerBase):
         return self._density_bridge.density
 
     @property
+    def magnitude(self) -> Texture:
+        """Velocity magnitude output (RR16F) for fluid simulation."""
+        return self._velocity_magnitude.magnitude
+
+    @property
     def temperature(self) -> Texture:
         """Temperature output (R16F) for fluid simulation."""
         return self._temperature_bridge.temperature
@@ -199,15 +204,15 @@ class FlowLayer(LayerBase):
         self.config.optical_flow.strength_y = 3.3
         self.config.optical_flow.boost = 0.0
 
-        self.config.velocity_trail.scale = 0.5
-        self.config.velocity_trail.trail_weight = 0.05
-        self.config.velocity_trail.blur_steps = 6
+        self.config.velocity_trail.scale = 1.0
+        self.config.velocity_trail.trail_weight = 0.9
+        self.config.velocity_trail.blur_steps = 4
         self.config.velocity_trail.blur_radius = 8.0
 
         self.config.density_bridge.saturation = 1.2
         self.config.density_bridge.brightness = 1.0
 
-        self.config.draw_mode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
+        self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR
 
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
@@ -232,7 +237,7 @@ class FlowLayer(LayerBase):
         self._density_bridge.set_color(self._mask)
         # self._density_bridge.set_velocity(self._mask)
         # self._density_bridge.update(motion)
-        self._density_bridge.set_velocity(self._optical_flow.velocity)
+        self._density_bridge.set_velocity(self._velocity_trail.velocity)
         self._density_bridge.update()
 
         self._temperature_bridge.set_color(self._mask)

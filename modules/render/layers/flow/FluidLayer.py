@@ -204,22 +204,23 @@ class FluidLayer(LayerBase):
     def update(self) -> None:
         """Update fluid simulation with inputs from all flow layers."""
         # Configuration overrides (for hot-reload testing)
-        self.config.fluid_flow.vel_speed = 0.03
-        self.config.fluid_flow.vel_decay = 30.0
+        self.config.fluid_flow.vel_self_advection = 0.01
+        self.config.fluid_flow.vel_lifetime = 30.0
 
-        self.config.fluid_flow.vel_vorticity = 3
-        self.config.fluid_flow.vel_vorticity_radius = 9.0
-        self.config.fluid_flow.vel_viscosity = 3
+        self.config.fluid_flow.vel_vorticity = 30
+        self.config.fluid_flow.vel_vorticity_radius = 10.0
+        self.config.fluid_flow.vel_viscosity = 50
         self.config.fluid_flow.vel_viscosity_iter = 40
 
-        self.config.fluid_flow.den_speed = 3.1
-        self.config.fluid_flow.den_decay = 8.0
+        # print("dinges")
+        self.config.fluid_flow.speed = 1.0
+        self.config.fluid_flow.den_speed_offset = 0.0
+        self.config.fluid_flow.den_lifetime = 30.0
 
-        self.config.fluid_flow.tmp_speed = 0.33
-        self.config.fluid_flow.tmp_decay = 3.0
+        self.config.fluid_flow.tmp_lifetime = 3.0
 
         self.config.fluid_flow.prs_speed = 0.0
-        self.config.fluid_flow.prs_decay = 8.0
+        self.config.fluid_flow.prs_lifetime = 8.0
         self.config.fluid_flow.prs_iterations = 40
 
         self.config.fluid_flow.tmp_buoyancy = 0.0
@@ -239,8 +240,8 @@ class FluidLayer(LayerBase):
         m_s = similarities # * motion_gates  # Modulate similarity by motion gate
         # print(f"FluidLayer cam_id {self._cam_id} similarities: {similarities}, motion_gates: {motion_gates}")  # DEBUG
 
-        self.config.fluid_flow.den_decay = 30.0 - (pow(motion, 2.0) * 20.0)  # More motion = faster decay
-        self.config.fluid_flow.den_speed = 3.0 + motion
+        self.config.fluid_flow.den_lifetime = 18.0 - (pow(motion, 2.0) * 14.0)  # More motion = faster decay
+        # self.config.fluid_flow.den_speed_offset = motion
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -250,23 +251,23 @@ class FluidLayer(LayerBase):
         den_strength: float
         for cam_id, flow_layer in self._flow_layers.items():
             if cam_id == self._cam_id:
-                vel_strength = 0.05 * motion
-                den_strength = motion
+                vel_strength = self._delta_time * motion
+                den_strength = motion * 0.02
                 # if motion > 0:
                 #     m = 0.95
                 #     print (m, m - pow(m, 8))
                 #     pass
             else:
-                vel_strength = 0.05 * (m_s[cam_id]) # m_s[cam_id]  # Cross-camera influence modulated by similarity and motion gate
-                den_strength = 0.9 * (m_s[cam_id])   # Cross-camera influence modulated by similarity, motion gate, and motion value
+                vel_strength = self._delta_time * (m_s[cam_id]) # m_s[cam_id]  # Cross-camera influence modulated by similarity and motion gate
+                den_strength = 0.02 * (m_s[cam_id])   # Cross-camera influence modulated by similarity, motion gate, and motion value
 
             # Add velocity from each flow layer
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
 
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
             channel: int = cam_id % 4  # Map camera to RGBA channel
-            self._fluid_flow.add_density_channel(flow_layer.density, channel, den_strength)
-            self._fluid_flow.clamp_density(0.0, 1.0)
+            self._fluid_flow.add_density_channel(flow_layer.magnitude, channel, den_strength)
+            self._fluid_flow.clamp_density(0.0, 1.2)
 
 
             # Add temperature from each flow layer
@@ -316,6 +317,7 @@ class FluidLayer(LayerBase):
         Maps each RGBA density channel to a corresponding track color and
         composites them additively.
         """
+
         self._density_colorize_shader.reload()
         self._colorized_fbo.begin()
         self._density_colorize_shader.use(self._fluid_flow.density, self._colors)

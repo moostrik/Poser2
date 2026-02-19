@@ -26,18 +26,50 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 @dataclass
 class FluidFlowConfig(ConfigBase):
-    """Configuration for fluid simulation."""
+    """Configuration for fluid simulation.
 
-    # Velocity parameters
-    vel_speed: float = field(
-        default=0.3,
-        metadata={"min": 0.0, "max": 10.0, "label": "Velocity Speed",
-                  "description": "Velocity advection speed multiplier"}
+    Speed model:
+        One 'speed' parameter controls all passive scalar transport (density,
+        temperature, pressure). At speed=1.0, a velocity value of 1.0 moves
+        fluid across the full texture width in 1 second.
+
+        vel_self_advection is a separate stability parameter that controls how
+        much the velocity field advects itself. Keep low to prevent numerical
+        blowup from the self-advection feedback loop.
+
+        den_speed_offset adds to base speed for density transport only.
+        0 = physically coupled to velocity (density rides the flow).
+        Positive = density flings further. Negative = density lags.
+
+    Lifetime model:
+        Exponential frame-rate-independent decay: multiplier = 0.01^(dt/lifetime).
+        lifetime=3.0 means the field retains ~1% after 3 seconds.
+    """
+
+    # ---- Transport speed ----
+    speed: float = field(
+        default=1.0,
+        metadata={"min": 0.0, "max": 5.0, "label": "Flow Speed",
+                  "description": "Base fluid transport rate. At 1.0, velocity=1.0 crosses full texture/s. "
+                                 "Controls density, temperature, and pressure transport."}
     )
-    vel_decay: float = field(
+    vel_self_advection: float = field(
+        default=0.01,
+        metadata={"min": 0.0, "max": 0.2, "label": "Velocity Self-Advection",
+                  "description": "How much velocity advects itself. Keep low for stability (prevents blowup)."}
+    )
+    den_speed_offset: float = field(
+        default=0.0,
+        metadata={"min": -5.0, "max": 5.0, "label": "Density Speed Offset",
+                  "description": "Added to base speed for density only. 0 = physically coupled. "
+                                 "Positive = density spreads further than the fluid."}
+    )
+
+    # ---- Velocity parameters ----
+    vel_lifetime: float = field(
         default=3.0,
-        metadata={"min": 0.01, "max": 60.0, "label": "Velocity Decay Time",
-                  "description": "Time in seconds for velocity to decay to 1%"}
+        metadata={"min": 0.01, "max": 60.0, "label": "Velocity Lifetime",
+                  "description": "Seconds until velocity fades to ~1%. Higher = longer persistence."}
     )
     vel_vorticity: float = field(
         default=0.0,
@@ -60,16 +92,16 @@ class FluidFlowConfig(ConfigBase):
                   "description": "Solver iterations for viscosity (higher = more accurate)"}
     )
 
-    # Pressure parameters
+    # ---- Pressure parameters ----
     prs_speed: float = field(
         default=0.33,
-        metadata={"min": 0.0, "max": 10.0, "label": "Pressure Speed",
+        metadata={"min": 0.0, "max": 2.0, "label": "Pressure Speed",
                   "description": "Pressure advection speed (usually 0 for physical accuracy)"}
     )
-    prs_decay: float = field(
-        default=0.3,  # Fast decay for pressure
-        metadata={"min": 0.01, "max": 60.0, "label": "Pressure Decay Time",
-                  "description": "Time in seconds for pressure to decay to 1%"}
+    prs_lifetime: float = field(
+        default=0.3,
+        metadata={"min": 0.01, "max": 60.0, "label": "Pressure Lifetime",
+                  "description": "Seconds until pressure fades to ~1%. Higher = longer persistence."}
     )
     prs_iterations: int = field(
         default=40,
@@ -77,28 +109,18 @@ class FluidFlowConfig(ConfigBase):
                   "description": "Solver iterations for pressure (higher = more incompressible)"}
     )
 
-    # Density parameters
-    den_speed: float = field(
-        default=0.3,
-        metadata={"min": 0.0, "max": 10.0, "label": "Density Speed",
-                  "description": "Density advection speed"}
-    )
-    den_decay: float = field(
+    # ---- Density parameters ----
+    den_lifetime: float = field(
         default=3.0,
-        metadata={"min": 0.01, "max": 60.0, "label": "Density Decay Time",
-                  "description": "Time in seconds for density to decay to 1%"}
+        metadata={"min": 0.01, "max": 60.0, "label": "Density Lifetime",
+                  "description": "Seconds until density fades to ~1%. Higher = longer persistence."}
     )
 
-    # Temperature parameters
-    tmp_speed: float = field(
-        default=0.3,
-        metadata={"min": 0.0, "max": 10.0, "label": "Temperature Speed",
-                  "description": "Temperature advection speed"}
-    )
-    tmp_decay: float = field(
+    # ---- Temperature parameters ----
+    tmp_lifetime: float = field(
         default=3.0,
-        metadata={"min": 0.01, "max": 60.0, "label": "Temperature Decay Time",
-                  "description": "Time in seconds for temperature to decay to 1%"}
+        metadata={"min": 0.01, "max": 60.0, "label": "Temperature Lifetime",
+                  "description": "Seconds until temperature fades to ~1%. Higher = longer persistence."}
     )
     tmp_buoyancy: float = field(
         default=0.0,
@@ -444,8 +466,9 @@ class FluidFlow(FlowBase):
         self._aspect = self._width / self._height if self._height > 0 else 1.0
 
         # ===== STEP 1: DENSITY ADVECT & DISSIPATE =====
-        advect_den_step: float = delta_time * self._simulation_scale * self.config.den_speed
-        dissipate_den: float = FluidFlow._calculate_dissipation(delta_time, self.config.den_decay)
+        # Density uses base speed + artistic offset (0 offset = physically coupled)
+        advect_den_step: float = delta_time * (self.config.speed + self.config.den_speed_offset)
+        dissipate_den: float = FluidFlow._calculate_dissipation(delta_time, self.config.den_lifetime)
 
         self._output_fbo.swap()
         self._output_fbo.begin()
@@ -453,15 +476,16 @@ class FluidFlow(FlowBase):
             self._output_fbo.back_texture,  # Source density
             self._input_fbo.texture,        # Velocity
             self._obstacle_fbo.texture,     # Obstacles
-            self._simulation_scale,
+            self._aspect,
             advect_den_step,
             dissipate_den
         )
         self._output_fbo.end()
 
         # ===== STEP 2: VELOCITY ADVECT & DISSIPATE =====
-        advect_vel_step: float = delta_time * self._simulation_scale * self.config.vel_speed
-        dissipate_vel: float = FluidFlow._calculate_dissipation(delta_time, self.config.vel_decay)
+        # Velocity self-advection uses separate low damper for numerical stability
+        advect_vel_step: float = delta_time * self.config.vel_self_advection
+        dissipate_vel: float = FluidFlow._calculate_dissipation(delta_time, self.config.vel_lifetime)
 
         self._input_fbo.swap()
         self._input_fbo.begin()
@@ -469,7 +493,7 @@ class FluidFlow(FlowBase):
             self._input_fbo.back_texture,   # Source velocity (self-advection)
             self._input_fbo.back_texture,   # Velocity
             self._obstacle_fbo.texture,     # Obstacles
-            self._simulation_scale,
+            self._aspect,
             advect_vel_step,
             dissipate_vel
         )
@@ -548,9 +572,9 @@ class FluidFlow(FlowBase):
         if self.config.tmp_buoyancy == 0.0:
             FlowUtil.zero(self._temperature_fbo)
         else:
-            # 5a. Advect temperature
-            advect_tmp_step: float = delta_time * self._simulation_scale * self.config.tmp_speed
-            dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.tmp_decay)
+            # 5a. Advect temperature (coupled to base flow speed)
+            advect_tmp_step: float = delta_time * self.config.speed
+            dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.tmp_lifetime)
 
             self._temperature_fbo.swap()
             self._temperature_fbo.begin()
@@ -558,7 +582,7 @@ class FluidFlow(FlowBase):
                 self._temperature_fbo.back_texture,  # Source temperature
                 self._input_fbo.texture,            # Velocity
                 self._obstacle_fbo.texture,         # Obstacles
-                self._simulation_scale,
+                self._aspect,
                 advect_tmp_step,
                 dissipate_tmp
             )
@@ -589,8 +613,8 @@ class FluidFlow(FlowBase):
         # # Only advect pressure for artistic effects (non-physical)
         # When prs_speed = 0, pressure is purely from projection (physical)
         if self.config.prs_speed > 0.0:
-            advect_prs_step: float = delta_time * self._simulation_scale * self.config.prs_speed
-            dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.prs_decay)
+            advect_prs_step: float = delta_time * self.config.prs_speed
+            dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.prs_lifetime)
 
             self._pressure_fbo.swap()
             self._pressure_fbo.begin()
@@ -598,7 +622,7 @@ class FluidFlow(FlowBase):
                 self._pressure_fbo.back_texture,  # Source pressure
                 self._input_fbo.texture,          # Velocity
                 self._obstacle_fbo.texture,       # Obstacles
-                self._simulation_scale,
+                self._aspect,
                 advect_prs_step,
                 dissipate_prs
             )
