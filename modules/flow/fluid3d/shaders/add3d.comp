@@ -1,0 +1,27 @@
+#version 460 core
+
+/*
+ * Add3D - In-place 3D volume addition.
+ *
+ * dst[pos] += src[pos] * strength
+ *
+ * Uses image load/store for exact voxel-to-voxel addition.
+ * No filtering needed — both volumes have identical dimensions.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(rgba16f, binding = 0) uniform image3D uDst;     // Read-write: velocity or target field
+layout(rgba16f, binding = 1) readonly uniform image3D uSrc;  // Read-only: force to add
+
+uniform float uStrength;  // Addition multiplier
+uniform ivec3 uSize;      // Volume dimensions
+
+void main() {
+    ivec3 pos = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(pos, uSize))) return;
+
+    vec4 current = imageLoad(uDst, pos);
+    vec4 addend  = imageLoad(uSrc, pos);
+    imageStore(uDst, pos, current + addend * uStrength);
+}

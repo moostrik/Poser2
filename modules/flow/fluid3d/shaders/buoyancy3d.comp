@@ -1,0 +1,42 @@
+#version 460 core
+
+/*
+ * Buoyancy3D - Temperature-driven buoyancy force for 3D fluid.
+ *
+ * F = σ(T - T_ambient) - κ·density
+ * Force applied primarily in Y direction (hot rises, dense falls).
+ * Output is a 3-component force vector (RGBA16F: xyz).
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler3D uTemperature;  // Temperature (R16F)
+layout(binding = 1) uniform sampler3D uDensity;       // Density (RGBA16F)
+
+layout(rgba16f, binding = 0) writeonly uniform image3D uForce;
+
+uniform float uSigma;               // Thermal buoyancy (includes dt * scale)
+uniform float uKappa;               // Density weight (includes dt * scale)
+uniform float uAmbientTemperature;  // Reference temperature
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+
+    float temperature = texture(uTemperature, st).r;
+    float dtemp = temperature - uAmbientTemperature;
+
+    vec3 buoyancy = vec3(0.0);
+
+    if (abs(dtemp) > 0.0001) {
+        float density = texture(uDensity, st).a;
+        float force = dtemp * uSigma - density * uKappa;
+        // Apply in Y direction (negative Y = up in screen space)
+        buoyancy = vec3(0.0, -1.0, 0.0) * force;
+    }
+
+    imageStore(uForce, gid, vec4(buoyancy, 0.0));
+}

@@ -1,0 +1,122 @@
+#version 460 core
+
+/*
+ * JacobiDiffusion3D - Multi-iteration viscosity diffusion for 3D velocity.
+ *
+ * 6-neighbor 3D Jacobi diffusion:
+ *   v^(k+1) = β * (αx*(vL + vR) + αy*(vB + vT) + αz*(vF + vK) + γ*vC)
+ *   γ = 1/(ν·Δt), β = 1/(2αx + 2αy + 2αz + γ)
+ *
+ * Shared memory tiling for XY (18x18), Z from global memory.
+ * Velocity is vec4 (xyz = u,v,w).
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Samplers
+layout(binding = 0) uniform sampler3D uObstacle;  // Obstacle mask (R8)
+
+// Velocity images (read/write)
+layout(rgba16f, binding = 0) uniform image3D uVelocityIn;
+layout(rgba16f, binding = 1) uniform image3D uVelocityOut;
+
+// Parameters
+uniform vec3  uAlpha;       // (1/dx², 1/dy², 1/dz²)
+uniform float uGamma;       // 1/(ν·Δt)
+uniform float uBeta;        // 1/(2αx + 2αy + 2αz + γ)
+uniform int   uIterations;
+uniform ivec3 uSize;
+
+// Shared memory: store xyz velocity for XY tile with halo
+shared vec4 s_velocity[18][18];
+
+vec4 loadVelocity(ivec3 coord) {
+    coord = clamp(coord, ivec3(0), uSize - 1);
+    return imageLoad(uVelocityIn, coord);
+}
+
+bool isObstacle(ivec3 coord) {
+    vec3 uv = (vec3(coord) + 0.5) / vec3(uSize);
+    return texture(uObstacle, uv).r > 0.5;
+}
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    ivec2 lid = ivec2(gl_LocalInvocationID.xy);
+    ivec2 sid = lid + 1;
+    ivec2 tileBase = ivec2(gl_WorkGroupID.xy) * 16;
+    int z = int(gl_WorkGroupID.z);
+
+    bool validPixel = all(lessThan(gid, uSize));
+    bool obstacle = validPixel && isObstacle(gid);
+
+    // Check Z neighbor obstacles
+    bool obsFront = (z + 1 < uSize.z) ? isObstacle(ivec3(gid.xy, z + 1)) : false;
+    bool obsBack  = (z - 1 >= 0)      ? isObstacle(ivec3(gid.xy, z - 1)) : false;
+
+    // Initial shared memory load
+    vec4 myVelocity = validPixel ? loadVelocity(gid) : vec4(0.0);
+    s_velocity[sid.y][sid.x] = myVelocity;
+
+    // Halo loads
+    if (lid.y == 0)  s_velocity[0][sid.x]  = loadVelocity(ivec3(tileBase + ivec2(lid.x, -1), z));
+    if (lid.y == 15) s_velocity[17][sid.x] = loadVelocity(ivec3(tileBase + ivec2(lid.x, 16), z));
+    if (lid.x == 0)  s_velocity[sid.y][0]  = loadVelocity(ivec3(tileBase + ivec2(-1, lid.y), z));
+    if (lid.x == 15) s_velocity[sid.y][17] = loadVelocity(ivec3(tileBase + ivec2(16, lid.y), z));
+
+    if (lid.x == 0  && lid.y == 0)  s_velocity[0][0]   = loadVelocity(ivec3(tileBase + ivec2(-1, -1), z));
+    if (lid.x == 15 && lid.y == 0)  s_velocity[0][17]  = loadVelocity(ivec3(tileBase + ivec2(16, -1), z));
+    if (lid.x == 0  && lid.y == 15) s_velocity[17][0]  = loadVelocity(ivec3(tileBase + ivec2(-1, 16), z));
+    if (lid.x == 15 && lid.y == 15) s_velocity[17][17] = loadVelocity(ivec3(tileBase + ivec2(16, 16), z));
+
+    barrier();
+
+    vec4 newVelocity = myVelocity;
+
+    for (int iter = 0; iter < uIterations; iter++) {
+        if (validPixel && !obstacle) {
+            vec4 vC = s_velocity[sid.y][sid.x];
+
+            // XY neighbors from shared memory
+            vec4 vR = s_velocity[sid.y][sid.x + 1];
+            vec4 vL = s_velocity[sid.y][sid.x - 1];
+            vec4 vT = s_velocity[sid.y + 1][sid.x];
+            vec4 vB = s_velocity[sid.y - 1][sid.x];
+
+            // Z neighbors from global memory
+            vec4 vF = (z + 1 < uSize.z) ? loadVelocity(ivec3(gid.xy, z + 1)) : vC;
+            vec4 vK = (z - 1 >= 0)      ? loadVelocity(ivec3(gid.xy, z - 1)) : vC;
+
+            // Neumann BCs for interior obstacles
+            vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+            vec3 texel = 1.0 / vec3(uSize);
+            float oR = texture(uObstacle, st + vec3(texel.x, 0, 0)).r;
+            float oL = texture(uObstacle, st - vec3(texel.x, 0, 0)).r;
+            float oT = texture(uObstacle, st + vec3(0, texel.y, 0)).r;
+            float oB = texture(uObstacle, st - vec3(0, texel.y, 0)).r;
+
+            vR = mix(vR, vC, step(0.5, oR));
+            vL = mix(vL, vC, step(0.5, oL));
+            vT = mix(vT, vC, step(0.5, oT));
+            vB = mix(vB, vC, step(0.5, oB));
+            vF = obsFront ? vC : vF;
+            vK = obsBack  ? vC : vK;
+
+            // Jacobi diffusion: v^(k+1) = β * (αx*(vL+vR) + αy*(vB+vT) + αz*(vK+vF) + γ*vC)
+            newVelocity = uBeta * (uAlpha.x * (vL + vR)
+                                 + uAlpha.y * (vB + vT)
+                                 + uAlpha.z * (vK + vF)
+                                 + uGamma * vC);
+        } else if (obstacle) {
+            newVelocity = vec4(0.0);
+        }
+
+        barrier();
+        s_velocity[sid.y][sid.x] = newVelocity;
+        barrier();
+    }
+
+    if (validPixel) {
+        imageStore(uVelocityOut, gid, newVelocity);
+    }
+}

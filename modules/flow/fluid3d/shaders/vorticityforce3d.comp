@@ -1,0 +1,55 @@
+#version 460 core
+
+/*
+ * VorticityForce3D - 3D vorticity confinement force.
+ *
+ * F = ε * (N × ω) * Δt
+ * where N = ∇|ω| / |∇|ω||  (normalized gradient of curl magnitude)
+ *
+ * In 3D, the confinement force is computed via cross product of N and ω.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler3D uCurl;  // Curl vector field (RGBA16F: xyz)
+
+layout(rgba16f, binding = 0) writeonly uniform image3D uForce;
+
+uniform vec3  uHalfRdxInv;  // (0.5/dx, 0.5/dy, 0.5/dz)
+uniform float uTimestep;     // Vorticity strength * dt
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+    vec3 texel = 1.0 / vec3(uSize);
+
+    // Center curl
+    vec3 curlC = texture(uCurl, st).xyz;
+    float magC = length(curlC);
+
+    // Gradient of curl magnitude (6 neighbors)
+    float magR = length(texture(uCurl, st + vec3(texel.x, 0, 0)).xyz);
+    float magL = length(texture(uCurl, st - vec3(texel.x, 0, 0)).xyz);
+    float magT = length(texture(uCurl, st + vec3(0, texel.y, 0)).xyz);
+    float magB = length(texture(uCurl, st - vec3(0, texel.y, 0)).xyz);
+    float magF = length(texture(uCurl, st + vec3(0, 0, texel.z)).xyz);
+    float magK = length(texture(uCurl, st - vec3(0, 0, texel.z)).xyz);
+
+    vec3 gradMag = vec3(
+        uHalfRdxInv.x * (magR - magL),
+        uHalfRdxInv.y * (magT - magB),
+        uHalfRdxInv.z * (magF - magK)
+    );
+
+    // Normalize
+    float gradLen = length(gradMag);
+    vec3 N = (gradLen > 1e-6) ? gradMag / gradLen : vec3(0.0);
+
+    // Confinement force: F = ε * (N × ω) * dt
+    vec3 force = uTimestep * cross(N, curlC);
+
+    imageStore(uForce, gid, vec4(force, 0.0));
+}

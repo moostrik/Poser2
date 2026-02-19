@@ -25,6 +25,7 @@ from OpenGL.GL import *  # type: ignore
 
 from .Shader import Shader
 from .Texture import Texture
+from .Texture3D import Texture3D
 
 
 class ComputeShader(Shader):
@@ -215,10 +216,40 @@ class ComputeShader(Shader):
         """Bind texture as read-write image (for in-place operations)."""
         self.bind_image(unit, texture, GL_READ_WRITE, internal_format)
 
+    # ========== 3D Image Binding Methods ==========
+
+    def bind_image_3d(self, unit: int, texture: Texture3D, access: int,
+                      internal_format: int | None = None) -> None:
+        """Bind 3D texture as layered image for imageLoad/imageStore.
+
+        Args:
+            unit: Image unit (0, 1, 2, ...)
+            texture: Texture3D to bind
+            access: GL_READ_ONLY, GL_WRITE_ONLY, or GL_READ_WRITE
+            internal_format: Override format (defaults to texture's format)
+        """
+        fmt = internal_format if internal_format is not None else texture.internal_format
+        glBindImageTexture(unit, texture.tex_id, 0, GL_TRUE, 0, access, fmt)
+
+    def bind_image_3d_read(self, unit: int, texture: Texture3D,
+                           internal_format: int | None = None) -> None:
+        """Bind 3D texture as read-only layered image."""
+        self.bind_image_3d(unit, texture, GL_READ_ONLY, internal_format)
+
+    def bind_image_3d_write(self, unit: int, texture: Texture3D,
+                            internal_format: int | None = None) -> None:
+        """Bind 3D texture as write-only layered image."""
+        self.bind_image_3d(unit, texture, GL_WRITE_ONLY, internal_format)
+
+    def bind_image_3d_readwrite(self, unit: int, texture: Texture3D,
+                                internal_format: int | None = None) -> None:
+        """Bind 3D texture as read-write layered image."""
+        self.bind_image_3d(unit, texture, GL_READ_WRITE, internal_format)
+
     # ========== Texture Sampling (for hybrid read) ==========
 
     def bind_texture(self, unit: int, texture: Texture, uniform_name: str) -> None:
-        """Bind texture for sampler access (traditional texture() calls).
+        """Bind 2D texture for sampler access (traditional texture() calls).
 
         Useful when you need filtered sampling alongside image access.
 
@@ -229,6 +260,18 @@ class ComputeShader(Shader):
         """
         glActiveTexture(int(GL_TEXTURE0) + unit)
         glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+        glUniform1i(self.get_uniform_loc(uniform_name), unit)
+
+    def bind_texture_3d(self, unit: int, texture: Texture3D, uniform_name: str) -> None:
+        """Bind 3D texture for sampler3D access (trilinear filtered sampling).
+
+        Args:
+            unit: Texture unit (0, 1, 2, ...)
+            texture: Texture3D to bind
+            uniform_name: Name of sampler3D uniform in shader
+        """
+        glActiveTexture(int(GL_TEXTURE0) + unit)
+        glBindTexture(GL_TEXTURE_3D, texture.tex_id)
         glUniform1i(self.get_uniform_loc(uniform_name), unit)
 
     # ========== Memory Barriers ==========

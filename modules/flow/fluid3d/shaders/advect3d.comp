@@ -1,0 +1,54 @@
+#version 460 core
+
+/*
+ * Advect3D - Semi-Lagrangian advection for 3D volumetric fields.
+ *
+ * Backward-traces along the 3D velocity field and samples the source
+ * using trilinear interpolation (sampler3D). Border colors provide
+ * implicit boundary conditions — no explicit obstacle border needed.
+ *
+ * Velocity is stored as RGBA16F with xyz = (u, v, w).
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Input textures (sampler3D for trilinear filtered backtrace)
+layout(binding = 0) uniform sampler3D uVelocity;  // Velocity field (RGBA16F: xyz = u,v,w)
+layout(binding = 1) uniform sampler3D uSource;     // Field to advect (any format)
+layout(binding = 2) uniform sampler3D uObstacle;   // Obstacle mask (R8)
+
+// Output image
+layout(rgba16f, binding = 0) writeonly uniform image3D uResult;
+
+// Parameters
+uniform float uTimestep;      // dt * speed
+uniform vec3  uRdx;           // (1.0, 1.0/aspect, 1.0/depth_scale) — aspect-corrected inverse grid
+uniform float uDissipation;   // Exponential decay multiplier
+uniform ivec3 uSize;          // Volume dimensions (width, height, depth)
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+
+    // Bounds check
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    // Normalized 3D texture coordinates (center of voxel)
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+
+    // Obstacle check
+    float obstacle = texture(uObstacle, st).r;
+    if (obstacle > 0.5) {
+        imageStore(uResult, gid, vec4(0.0));
+        return;
+    }
+
+    // Backward trace along 3D velocity
+    vec3 velocity = texture(uVelocity, st).xyz;
+    vec3 st_back = st - uTimestep * uRdx * velocity;
+    // No clamp needed — wrap mode (CLAMP_TO_BORDER) handles out-of-bounds
+
+    // Sample source with trilinear interpolation and apply dissipation
+    vec4 result = uDissipation * texture(uSource, st_back);
+
+    imageStore(uResult, gid, result);
+}

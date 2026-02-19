@@ -1,0 +1,132 @@
+#version 460 core
+
+/*
+ * JacobiPressure3D - Multi-iteration Jacobi pressure solver for 3D volumes.
+ *
+ * 6-neighbor 3D Jacobi iteration:
+ *   p^(k+1) = β * (αx*(pL + pR) + αy*(pB + pT) + αz*(pF + pK) - div)
+ *   β = 1 / (2*αx + 2*αy + 2*αz)
+ *
+ * Uses shared memory tiling for XY plane (18x18 with halo).
+ * Z±1 neighbors loaded from global memory (only 2 extra reads per thread).
+ *
+ * Boundary: pressure uses CLAMP_TO_EDGE → Neumann at domain walls.
+ * Interior obstacles: Neumann via pCenter substitution.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Samplers for read access (filtered)
+layout(binding = 0) uniform sampler3D uDivergence;  // Velocity divergence (R16F)
+layout(binding = 1) uniform sampler3D uObstacle;     // Obstacle mask (R8)
+
+// Pressure images (read/write)
+layout(r16f, binding = 0) uniform image3D uPressureIn;
+layout(r16f, binding = 1) uniform image3D uPressureOut;
+
+// Parameters
+uniform vec3  uAlpha;       // (1/dx², 1/dy², 1/dz²) — Laplacian weights
+uniform float uBeta;        // 1 / (2*αx + 2*αy + 2*αz)
+uniform int   uIterations;  // Iterations per dispatch
+uniform ivec3 uSize;        // Volume dimensions
+
+// Shared memory: XY tile with 1-pixel halo
+shared float s_pressure[18][18];
+
+float loadPressure(ivec3 coord) {
+    coord = clamp(coord, ivec3(0), uSize - 1);
+    return imageLoad(uPressureIn, coord).r;
+}
+
+bool isObstacle(ivec3 coord) {
+    vec3 uv = (vec3(coord) + 0.5) / vec3(uSize);
+    return texture(uObstacle, uv).r > 0.5;
+}
+
+float sampleDivergence(ivec3 coord) {
+    vec3 uv = (vec3(coord) + 0.5) / vec3(uSize);
+    return texture(uDivergence, uv).r;
+}
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    ivec2 lid = ivec2(gl_LocalInvocationID.xy);
+    ivec2 sid = lid + 1;
+    ivec2 tileBase = ivec2(gl_WorkGroupID.xy) * 16;
+    int z = int(gl_WorkGroupID.z);
+
+    bool validPixel = all(lessThan(gid, uSize));
+    bool obstacle = validPixel && isObstacle(gid);
+    float divergence = validPixel ? sampleDivergence(gid) : 0.0;
+
+    // Check obstacle status of Z neighbors (for Neumann BCs)
+    bool obsFront = (z + 1 < uSize.z) ? isObstacle(ivec3(gid.xy, z + 1)) : false;
+    bool obsBack  = (z - 1 >= 0)      ? isObstacle(ivec3(gid.xy, z - 1)) : false;
+
+    // ===== Initial shared memory load =====
+    float myPressure = validPixel ? loadPressure(gid) : 0.0;
+    s_pressure[sid.y][sid.x] = myPressure;
+
+    // Halo loads
+    if (lid.y == 0)  s_pressure[0][sid.x]  = loadPressure(ivec3(tileBase + ivec2(lid.x, -1), z));
+    if (lid.y == 15) s_pressure[17][sid.x] = loadPressure(ivec3(tileBase + ivec2(lid.x, 16), z));
+    if (lid.x == 0)  s_pressure[sid.y][0]  = loadPressure(ivec3(tileBase + ivec2(-1, lid.y), z));
+    if (lid.x == 15) s_pressure[sid.y][17] = loadPressure(ivec3(tileBase + ivec2(16, lid.y), z));
+
+    if (lid.x == 0  && lid.y == 0)  s_pressure[0][0]   = loadPressure(ivec3(tileBase + ivec2(-1, -1), z));
+    if (lid.x == 15 && lid.y == 0)  s_pressure[0][17]  = loadPressure(ivec3(tileBase + ivec2(16, -1), z));
+    if (lid.x == 0  && lid.y == 15) s_pressure[17][0]  = loadPressure(ivec3(tileBase + ivec2(-1, 16), z));
+    if (lid.x == 15 && lid.y == 15) s_pressure[17][17] = loadPressure(ivec3(tileBase + ivec2(16, 16), z));
+
+    barrier();
+
+    // ===== Jacobi iterations =====
+    float newPressure = myPressure;
+
+    for (int iter = 0; iter < uIterations; iter++) {
+        if (validPixel && !obstacle) {
+            float pC = s_pressure[sid.y][sid.x];
+
+            // XY neighbors from shared memory
+            float pR = s_pressure[sid.y][sid.x + 1];
+            float pL = s_pressure[sid.y][sid.x - 1];
+            float pT = s_pressure[sid.y + 1][sid.x];
+            float pB = s_pressure[sid.y - 1][sid.x];
+
+            // Z neighbors from global memory (can't tile Z affordably)
+            float pF = (z + 1 < uSize.z) ? loadPressure(ivec3(gid.xy, z + 1)) : pC;
+            float pK = (z - 1 >= 0)      ? loadPressure(ivec3(gid.xy, z - 1)) : pC;
+
+            // Neumann BCs for interior obstacles
+            // XY obstacles: check via obstacle texture sampling
+            vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+            vec3 texel = 1.0 / vec3(uSize);
+            float oR = texture(uObstacle, st + vec3(texel.x, 0, 0)).r;
+            float oL = texture(uObstacle, st - vec3(texel.x, 0, 0)).r;
+            float oT = texture(uObstacle, st + vec3(0, texel.y, 0)).r;
+            float oB = texture(uObstacle, st - vec3(0, texel.y, 0)).r;
+
+            pR = mix(pR, pC, step(0.5, oR));
+            pL = mix(pL, pC, step(0.5, oL));
+            pT = mix(pT, pC, step(0.5, oT));
+            pB = mix(pB, pC, step(0.5, oB));
+            pF = obsFront ? pC : pF;
+            pK = obsBack  ? pC : pK;
+
+            newPressure = uBeta * (uAlpha.x * (pL + pR)
+                                 + uAlpha.y * (pB + pT)
+                                 + uAlpha.z * (pK + pF)
+                                 - divergence);
+        } else if (obstacle) {
+            newPressure = 0.0;
+        }
+
+        barrier();
+        s_pressure[sid.y][sid.x] = newPressure;
+        barrier();
+    }
+
+    if (validPixel) {
+        imageStore(uPressureOut, gid, vec4(newPressure, 0.0, 0.0, 0.0));
+    }
+}

@@ -1,0 +1,55 @@
+#version 460 core
+
+/*
+ * VorticityCurl3D - Compute 3D curl (vorticity vector) of velocity field.
+ *
+ * In 3D, curl is a vector:
+ *   ω = (∂w/∂y - ∂v/∂z, ∂u/∂z - ∂w/∂x, ∂v/∂x - ∂u/∂y)
+ *
+ * Uses sampler3D for filtered neighbor access.
+ * Border color (0) handles domain boundaries naturally.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler3D uVelocity;  // Velocity (RGBA16F: xyz)
+layout(binding = 1) uniform sampler3D uObstacle;   // Obstacle mask (R8)
+
+layout(rgba16f, binding = 0) writeonly uniform image3D uCurl;
+
+uniform vec3  uHalfRdxInv;  // (0.5/dx, 0.5/dy, 0.5/dz)
+uniform float uRadius;       // Sampling radius in texels
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+
+    float obs = texture(uObstacle, st).r;
+    if (obs > 0.5) {
+        imageStore(uCurl, gid, vec4(0.0));
+        return;
+    }
+
+    // Sampling offsets scaled by radius
+    vec3 dx = vec3(uRadius / float(uSize.x), 0.0, 0.0);
+    vec3 dy = vec3(0.0, uRadius / float(uSize.y), 0.0);
+    vec3 dz = vec3(0.0, 0.0, uRadius / float(uSize.z));
+
+    vec3 vR = texture(uVelocity, st + dx).xyz;
+    vec3 vL = texture(uVelocity, st - dx).xyz;
+    vec3 vT = texture(uVelocity, st + dy).xyz;
+    vec3 vB = texture(uVelocity, st - dy).xyz;
+    vec3 vF = texture(uVelocity, st + dz).xyz;
+    vec3 vK = texture(uVelocity, st - dz).xyz;
+
+    // 3D curl = (∂w/∂y - ∂v/∂z, ∂u/∂z - ∂w/∂x, ∂v/∂x - ∂u/∂y)
+    vec3 curl;
+    curl.x = uHalfRdxInv.y * (vT.z - vB.z) - uHalfRdxInv.z * (vF.y - vK.y);
+    curl.y = uHalfRdxInv.z * (vF.x - vK.x) - uHalfRdxInv.x * (vR.z - vL.z);
+    curl.z = uHalfRdxInv.x * (vR.y - vL.y) - uHalfRdxInv.y * (vT.x - vB.x);
+
+    imageStore(uCurl, gid, vec4(curl, 0.0));
+}

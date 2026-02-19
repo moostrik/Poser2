@@ -1,0 +1,80 @@
+#version 460 core
+
+/*
+ * Gradient3D - Subtract 3D pressure gradient from velocity.
+ *
+ * v_new = v_old - ∇p
+ * ∇p = (∂p/∂x, ∂p/∂y, ∂p/∂z) using central differences.
+ *
+ * Boundary conditions:
+ *   - Pressure uses CLAMP_TO_EDGE → Neumann (∂p/∂n ≈ 0) at walls
+ *   - Interior obstacles: Neumann via pCenter substitution
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Input textures
+layout(binding = 0) uniform sampler3D uVelocity;   // Current velocity (RGBA16F)
+layout(binding = 1) uniform sampler3D uPressure;    // Pressure field (R16F)
+layout(binding = 2) uniform sampler3D uObstacle;    // Obstacle mask (R8)
+
+// Output image
+layout(rgba16f, binding = 0) writeonly uniform image3D uResult;
+
+// Parameters
+uniform vec3  uHalfRdxInv;  // (0.5/dx, 0.5/dy, 0.5/dz)
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+    vec3 texel = 1.0 / vec3(uSize);
+
+    // Obstacle check
+    float obstacle = texture(uObstacle, st).r;
+    if (obstacle > 0.5) {
+        imageStore(uResult, gid, vec4(0.0));
+        return;
+    }
+
+    // Center pressure
+    float pC = texture(uPressure, st).r;
+
+    // Sample pressure at 6 neighbors
+    float pR = texture(uPressure, st + vec3(texel.x, 0.0, 0.0)).r;
+    float pL = texture(uPressure, st - vec3(texel.x, 0.0, 0.0)).r;
+    float pT = texture(uPressure, st + vec3(0.0, texel.y, 0.0)).r;
+    float pB = texture(uPressure, st - vec3(0.0, texel.y, 0.0)).r;
+    float pF = texture(uPressure, st + vec3(0.0, 0.0, texel.z)).r;
+    float pK = texture(uPressure, st - vec3(0.0, 0.0, texel.z)).r;
+
+    // Neumann BCs for interior obstacles: use pCenter if neighbor is obstacle
+    float oR = texture(uObstacle, st + vec3(texel.x, 0.0, 0.0)).r;
+    float oL = texture(uObstacle, st - vec3(texel.x, 0.0, 0.0)).r;
+    float oT = texture(uObstacle, st + vec3(0.0, texel.y, 0.0)).r;
+    float oB = texture(uObstacle, st - vec3(0.0, texel.y, 0.0)).r;
+    float oF = texture(uObstacle, st + vec3(0.0, 0.0, texel.z)).r;
+    float oK = texture(uObstacle, st - vec3(0.0, 0.0, texel.z)).r;
+
+    pR = mix(pR, pC, step(0.5, oR));
+    pL = mix(pL, pC, step(0.5, oL));
+    pT = mix(pT, pC, step(0.5, oT));
+    pB = mix(pB, pC, step(0.5, oB));
+    pF = mix(pF, pC, step(0.5, oF));
+    pK = mix(pK, pC, step(0.5, oK));
+
+    // Compute gradient
+    vec3 grad = vec3(
+        uHalfRdxInv.x * (pR - pL),
+        uHalfRdxInv.y * (pT - pB),
+        uHalfRdxInv.z * (pF - pK)
+    );
+
+    // Subtract gradient from velocity
+    vec3 vOld = texture(uVelocity, st).xyz;
+    vec3 vNew = vOld - grad;
+
+    imageStore(uResult, gid, vec4(vNew, 0.0));
+}

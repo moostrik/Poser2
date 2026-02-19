@@ -1,0 +1,72 @@
+#version 460 core
+
+/*
+ * Divergence3D - Compute divergence of 3D velocity field.
+ *
+ * div(v) = ∂u/∂x + ∂v/∂y + ∂w/∂z  using central differences.
+ *
+ * Boundary conditions:
+ *   - Velocity uses CLAMP_TO_BORDER(0) → out-of-bounds = zero velocity
+ *   - Interior obstacles: no-slip via -vCenter substitution
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Input textures
+layout(binding = 0) uniform sampler3D uVelocity;   // Velocity field (RGBA16F: xyz = u,v,w)
+layout(binding = 1) uniform sampler3D uObstacle;    // Obstacle mask (R8)
+
+// Output image
+layout(r16f, binding = 0) writeonly uniform image3D uDivergence;
+
+// Parameters
+uniform vec3  uHalfRdxInv;  // (0.5/dx, 0.5/dy, 0.5/dz) — aspect & depth corrected
+uniform ivec3 uSize;         // Volume dimensions
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+    vec3 texel = 1.0 / vec3(uSize);
+
+    // Obstacle check
+    float obstacle = texture(uObstacle, st).r;
+    if (obstacle > 0.5) {
+        imageStore(uDivergence, gid, vec4(0.0));
+        return;
+    }
+
+    // Center velocity
+    vec3 vC = texture(uVelocity, st).xyz;
+
+    // Sample 6 neighbors
+    vec3 vR = texture(uVelocity, st + vec3(texel.x, 0.0, 0.0)).xyz;
+    vec3 vL = texture(uVelocity, st - vec3(texel.x, 0.0, 0.0)).xyz;
+    vec3 vT = texture(uVelocity, st + vec3(0.0, texel.y, 0.0)).xyz;
+    vec3 vB = texture(uVelocity, st - vec3(0.0, texel.y, 0.0)).xyz;
+    vec3 vF = texture(uVelocity, st + vec3(0.0, 0.0, texel.z)).xyz;  // Front (+z)
+    vec3 vK = texture(uVelocity, st - vec3(0.0, 0.0, texel.z)).xyz;  // Back  (-z)
+
+    // No-slip boundary: if neighbor is interior obstacle, use -vCenter
+    float oR = texture(uObstacle, st + vec3(texel.x, 0.0, 0.0)).r;
+    float oL = texture(uObstacle, st - vec3(texel.x, 0.0, 0.0)).r;
+    float oT = texture(uObstacle, st + vec3(0.0, texel.y, 0.0)).r;
+    float oB = texture(uObstacle, st - vec3(0.0, texel.y, 0.0)).r;
+    float oF = texture(uObstacle, st + vec3(0.0, 0.0, texel.z)).r;
+    float oK = texture(uObstacle, st - vec3(0.0, 0.0, texel.z)).r;
+
+    vR = mix(vR, -vC, step(0.5, oR));
+    vL = mix(vL, -vC, step(0.5, oL));
+    vT = mix(vT, -vC, step(0.5, oT));
+    vB = mix(vB, -vC, step(0.5, oB));
+    vF = mix(vF, -vC, step(0.5, oF));
+    vK = mix(vK, -vC, step(0.5, oK));
+
+    // Divergence: ∂u/∂x + ∂v/∂y + ∂w/∂z
+    float div = uHalfRdxInv.x * (vR.x - vL.x)
+              + uHalfRdxInv.y * (vT.y - vB.y)
+              + uHalfRdxInv.z * (vF.z - vK.z);
+
+    imageStore(uDivergence, gid, vec4(div, 0.0, 0.0, 0.0));
+}

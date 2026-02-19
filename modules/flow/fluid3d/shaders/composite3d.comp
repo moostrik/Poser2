@@ -1,0 +1,70 @@
+#version 460 core
+
+/*
+ * Composite3D - Composite 3D density volume into 2D output.
+ *
+ * Supports multiple compositing modes:
+ *   0 = Front-to-back alpha compositing (standard over operator)
+ *   1 = Additive blending (sum all layers)
+ *   2 = Maximum intensity projection
+ *
+ * Dispatched as a 2D compute (one thread per output pixel).
+ * Each thread iterates through all depth layers.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Input: 3D density volume
+layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F
+
+// Output: 2D composited image
+layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
+
+// Parameters
+uniform int   uMode;       // 0=alpha, 1=additive, 2=max
+uniform int   uDepth;      // Number of depth layers
+uniform ivec2 uOutputSize; // 2D output dimensions
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(gid, uOutputSize))) return;
+
+    vec2 uv = (vec2(gid) + 0.5) / vec2(uOutputSize);
+    vec4 result = vec4(0.0);
+
+    if (uMode == 0) {
+        // Front-to-back alpha compositing
+        // Iterate layers front (z=0) to back (z=depth-1)
+        float accum_alpha = 0.0;
+        for (int z = 0; z < uDepth; z++) {
+            float z_norm = (float(z) + 0.5) / float(uDepth);
+            vec4 sample_val = texture(uDensity, vec3(uv, z_norm));
+
+            // Standard over operator: C_out = C_in + (1 - α_accum) * C_layer
+            float layer_alpha = sample_val.a;
+            float weight = (1.0 - accum_alpha) * layer_alpha;
+            result.rgb += weight * sample_val.rgb;
+            accum_alpha += weight;
+
+            // Early exit if nearly opaque
+            if (accum_alpha > 0.99) break;
+        }
+        result.a = accum_alpha;
+    }
+    else if (uMode == 1) {
+        // Additive: sum all layers
+        for (int z = 0; z < uDepth; z++) {
+            float z_norm = (float(z) + 0.5) / float(uDepth);
+            result += texture(uDensity, vec3(uv, z_norm));
+        }
+    }
+    else if (uMode == 2) {
+        // Maximum intensity projection
+        for (int z = 0; z < uDepth; z++) {
+            float z_norm = (float(z) + 0.5) / float(uDepth);
+            result = max(result, texture(uDensity, vec3(uv, z_norm)));
+        }
+    }
+
+    imageStore(uOutput, gid, result);
+}
