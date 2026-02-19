@@ -18,7 +18,7 @@ from .. import FlowBase, FlowUtil, ConfigBase
 from .shaders import (
     Advect, Divergence, Gradient, JacobiPressure, JacobiPressureCompute,
     JacobiDiffusion, JacobiDiffusionCompute,
-    VorticityCurl, VorticityForce, Buoyancy, ObstacleOffset, ObstacleBorder, AddBoolean
+    VorticityCurl, VorticityForce, Buoyancy, ObstacleOffset, AddBoolean
 )
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -147,10 +147,17 @@ class FluidFlow(FlowBase):
         self._input_internal_format = GL_RG16F     # Velocity (inherited as _input_fbo)
         self._output_internal_format = GL_RGBA16F  # Density (inherited as _output_fbo)
 
+        # Override FlowBase FBOs with border-color wrap for boundary conditions:
+        # Velocity: CLAMP_TO_BORDER(0) = no-slip (velocity->0 at walls)
+        # Density:  CLAMP_TO_BORDER(0) = nothing leaks out
+        self._input_fbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
+        self._output_fbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
+
         # Additional simulation fields (SwapFbo for ping-pong)
-        self._temperature_fbo: SwapFbo = SwapFbo()
-        self._pressure_fbo: SwapFbo = SwapFbo()
-        self._obstacle_fbo: SwapFbo = SwapFbo()
+        self._temperature_fbo: SwapFbo = SwapFbo()  # CLAMP_TO_EDGE = insulated walls (Neumann)
+        self._pressure_fbo: SwapFbo = SwapFbo()      # CLAMP_TO_EDGE = zero-gradient walls (Neumann)
+        # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds reads as obstacle
+        self._obstacle_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 1.0, 1.0, 1.0))
 
         # Intermediate result FBOs (single buffer, no ping-pong)
         self._divergence_fbo: Fbo = Fbo()
@@ -184,7 +191,6 @@ class FluidFlow(FlowBase):
         self._vorticity_force_shader: VorticityForce = VorticityForce()
         self._buoyancy_shader: Buoyancy = Buoyancy()
         self._obstacle_offset_shader: ObstacleOffset = ObstacleOffset()
-        self._obstacle_border_shader: ObstacleBorder = ObstacleBorder()
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -295,10 +301,9 @@ class FluidFlow(FlowBase):
         self._vorticity_force_shader.allocate()
         self._buoyancy_shader.allocate()
         self._obstacle_offset_shader.allocate()
-        self._obstacle_border_shader.allocate()
         self._add_boolean_shader.allocate()
 
-        # Initialize obstacles with border
+        # Initialize obstacle offset (border handled by GL_CLAMP_TO_BORDER)
         self._init_obstacle()
 
     def deallocate(self) -> None:
@@ -324,7 +329,6 @@ class FluidFlow(FlowBase):
         self._vorticity_force_shader.deallocate()
         self._buoyancy_shader.deallocate()
         self._obstacle_offset_shader.deallocate()
-        self._obstacle_border_shader.deallocate()
         self._add_boolean_shader.deallocate()
 
     def reset(self) -> None:
@@ -662,14 +666,14 @@ class FluidFlow(FlowBase):
     # ========== Obstacle Initialization ==========
 
     def _init_obstacle(self) -> None:
-        """Initialize obstacles with 1-pixel border using shader."""
-        border = 1
-        width: int = self._obstacle_fbo.width
-        height: int = self._obstacle_fbo.height
+        """Initialize obstacles — clear to zero, recompute offset.
 
-        self._obstacle_fbo.begin()
-        self._obstacle_border_shader.use(width, height, border)
-        self._obstacle_fbo.end()
+        Domain boundaries are handled by GL_CLAMP_TO_BORDER on the obstacle
+        texture (border_color=1 → out-of-bounds reads as obstacle). The
+        ObstacleOffset shader's textureOffset calls at edge pixels will
+        sample the border color, correctly flagging wall neighbors.
+        """
+        FlowUtil.zero(self._obstacle_fbo)
 
         # Compute obstacle offset (neighbor flags)
         self._obstacle_offset_fbo.begin()

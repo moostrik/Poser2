@@ -6,7 +6,7 @@ Ported from ofxFlowTools ftFlow.h/cpp
 from abc import ABC, abstractmethod
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import SwapFbo, Texture
+from modules.gl import SwapFbo, Texture, Blit
 from .FlowUtil import FlowUtil
 from modules.utils.PointsAndRects import Rect
 
@@ -126,6 +126,5 @@ class FlowBase(ABC):
             self._visualization_field = Visualizer()
             if self._allocated:
                 self._visualization_field.allocate(self._output_fbo.width, self._output_fbo.height)
-
-        self._visualization_field.draw(texture)
+        Blit.use(self._visualization_field.texture)  # Draw visualization background if needed
 

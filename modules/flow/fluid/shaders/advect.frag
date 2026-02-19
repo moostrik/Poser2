@@ -27,8 +27,8 @@ void main() {
     // Backward trace along velocity
     vec2 velocity = texture(uVelocity, st).xy;
     vec2 st_back = st - uTimestep * uRdx * velocity;
-    // Clamp to avoid sampling outside texture
-    st_back = clamp(st_back, vec2(0.001), vec2(0.999));
+    // No clamp — GL_CLAMP_TO_BORDER returns 0 for out-of-bounds samples,
+    // providing natural boundary decay without explicit obstacle checks.
 
     // Sample and dissipate
     fragColor = uDissipation * texture(uSource, st_back);

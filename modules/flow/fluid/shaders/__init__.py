@@ -11,7 +11,6 @@ from .VorticityCurl import VorticityCurl
 from .VorticityForce import VorticityForce
 from .Buoyancy import Buoyancy
 from .ObstacleOffset import ObstacleOffset
-from .ObstacleBorder import ObstacleBorder
 from .AddBoolean import AddBoolean
 
 __all__ = [
@@ -26,6 +25,5 @@ __all__ = [
     "VorticityForce",
     "Buoyancy",
     "ObstacleOffset",
-    "ObstacleBorder",
     "AddBoolean",
 ]
