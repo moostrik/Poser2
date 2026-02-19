@@ -18,15 +18,21 @@ class FrgSourceLayer(LayerBase):
         self._data_hub: DataHub = data_hub
         self._cuda_image: Tensor = Tensor()
         self._data_cache: DataCache[torch.Tensor]= DataCache[torch.Tensor]()
+        self._dirty: bool = False
 
     @property
     def texture(self) -> Texture:
         return self._cuda_image.texture
 
+    @property
+    def dirty(self) -> bool:
+        return self._dirty
+
     def deallocate(self) -> None:
         self._cuda_image.deallocate()
 
     def update(self) -> None:
+        self._dirty = False
         gpu_frame: ImageFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._track_id)
         foreground: torch.Tensor | None = gpu_frame.foreground if gpu_frame else None
         self._data_cache.update(foreground)
@@ -39,3 +45,4 @@ class FrgSourceLayer(LayerBase):
 
         self._cuda_image.set_tensor(foreground)
         self._cuda_image.update()
+        self._dirty = True

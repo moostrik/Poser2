@@ -19,17 +19,22 @@ class ImageSourceLayer(LayerBase):
         self._data_hub: DataHub = data
         self._cuda_image: Tensor = Tensor()
         self._data_cache: DataCache[ImageFrame]= DataCache[ImageFrame]()
-
+        self._dirty: bool = False
 
     @property
     def texture(self) -> Texture:
         return self._cuda_image
+
+    @property
+    def dirty(self) -> bool:
+        return self._dirty
 
     def deallocate(self) -> None:
         if self._cuda_image.allocated:
             self._cuda_image.deallocate()
 
     def update(self) -> None:
+        self._dirty = False
         gpu_frame: ImageFrame | None = self._data_hub.get_item(DataHubType.gpu_frames, self._cam_id)
         self._data_cache.update(gpu_frame)
 
@@ -41,5 +46,4 @@ class ImageSourceLayer(LayerBase):
 
         self._cuda_image.set_tensor(gpu_frame.full_image)
         self._cuda_image.update()
-
-
+        self._dirty = True

@@ -24,6 +24,12 @@ class SimilarityApplicator(FilterNode):
         self._max_poses = max_poses
         self._similarity_dict: dict[int, Similarity] = {}
         self._lock: Lock = Lock()
+        # Zero similarity with valid scores - used when a track is absent so that
+        # downstream SimilarityStickyFiller receives real (zero) data instead of NaN,
+        # which would cause it to hold the last stale value indefinitely.
+        values = np.zeros(max_poses, dtype=np.float32)
+        scores = np.ones(max_poses, dtype=np.float32)
+        self._zero_similarity: Similarity = Similarity(values, scores)
 
     def submit(self, similarity_dict: dict[int, Similarity]) -> None:
         """Store the per-pose similarity dict for processing.
@@ -46,7 +52,8 @@ class SimilarityApplicator(FilterNode):
         with self._lock:
             similarity: Similarity | None = self._similarity_dict.get(pose.track_id)
 
-        # Always update - use empty Similarity if not found (clears stale data)
+        # Always update - use zero Similarity if not found (resets stale data and
+        # signals the downstream SimilarityStickyFiller with valid zeros instead of NaN)
         if similarity is None:
-            similarity = Similarity.create_dummy()
+            similarity = self._zero_similarity
         return replace(pose, similarity=similarity)

@@ -33,10 +33,15 @@ class DFlowSourceLayer(LayerBase):
         self.noise_threshold: float = 0.2
 
         self._shader: shader = shader()
+        self._dirty: bool = False
 
     @property
     def texture(self) -> Texture:
         return self._fbo.texture
+
+    @property
+    def dirty(self) -> bool:
+        return self._dirty
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         """Initialize renderer resources."""
@@ -55,6 +60,7 @@ class DFlowSourceLayer(LayerBase):
 
     def update(self) -> None:
         """Update flow texture from DataHub."""
+        self._dirty = False
         flow_tensor: torch.Tensor | None = self._data_hub.get_item(DataHubType.flow_tensor, self._track_id)
 
         self._data_cache.update(flow_tensor)
@@ -89,3 +95,4 @@ class DFlowSourceLayer(LayerBase):
             self._fbo.begin()
             self._shader.use(self._fbo.back_texture, self.flow_scale, self.flow_gamma, self.noise_threshold)
             self._fbo.end()
+        self._dirty = True

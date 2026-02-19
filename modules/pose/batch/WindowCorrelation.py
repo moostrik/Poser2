@@ -318,7 +318,7 @@ class WindowCorrelation(TypedCallbackMixin[tuple[dict[int, Similarity], dict[int
         result: dict[int, Similarity] = {}
 
         for i in range(N):
-            values = np.full(max_poses, np.nan, dtype=np.float32)
+            values = np.full(max_poses, 0.0, dtype=np.float32)
             scores = np.zeros(max_poses, dtype=np.float32)
 
             for j in range(N):
