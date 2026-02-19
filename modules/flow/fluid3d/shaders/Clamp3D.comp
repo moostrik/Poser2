@@ -1,0 +1,26 @@
+#version 460 core
+
+/*
+ * Clamp3D - Clamp all voxels of a 3D volume to [uMin, uMax].
+ *
+ * Simple per-voxel clamp applied in-place via imageLoad/imageStore.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// 3D volume (read-write, in-place clamp)
+layout(rgba16f, binding = 0) uniform image3D uVolume;
+
+// Clamp range
+uniform float uMin;
+uniform float uMax;
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    vec4 val = imageLoad(uVolume, gid);
+    val = clamp(val, uMin, uMax);
+    imageStore(uVolume, gid, val);
+}

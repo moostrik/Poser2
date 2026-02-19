@@ -1,0 +1,58 @@
+#version 460 core
+
+/*
+ * InjectChannel3D - Inject a single-channel 2D input into one RGBA channel
+ *                   of a 3D volume at a target depth layer.
+ *
+ * Uses the same gaussian spread as Inject3D but writes to only one channel
+ * (R=0, G=1, B=2, A=3), leaving the other channels untouched.
+ *
+ * Weight = exp(-0.5 * ((z_norm - target) / spread)²) * strength
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// 2D input texture (single-channel, read from .r)
+layout(binding = 0) uniform sampler2D uInput;
+
+// 3D output volume (read-write for additive)
+layout(rgba16f, binding = 0) uniform image3D uVolume;
+
+// Parameters
+uniform float uTargetLayer;  // Normalized depth [0, 1] — center of injection
+uniform float uSpread;       // Gaussian sigma in normalized depth units
+uniform float uStrength;     // Injection strength multiplier
+uniform int   uChannel;      // Target RGBA channel: 0=R, 1=G, 2=B, 3=A
+uniform int   uMode;         // 0 = additive, 1 = set
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    // Normalized Z position of this voxel
+    float z_norm = (float(gid.z) + 0.5) / float(uSize.z);
+
+    // Gaussian weight along depth
+    float dz = (z_norm - uTargetLayer) / max(uSpread, 0.001);
+    float weight = exp(-0.5 * dz * dz) * uStrength;
+
+    if (weight < 0.001) return;  // Skip negligible contributions
+
+    // Sample 2D input at this XY position (read .r component)
+    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    float input_val = texture(uInput, uv).r * weight;
+
+    // Load current voxel value
+    vec4 current = imageLoad(uVolume, gid);
+
+    if (uMode == 0) {
+        // Additive: add to the target channel only
+        current[uChannel] += input_val;
+    } else {
+        // Set: replace the target channel only
+        current[uChannel] = input_val;
+    }
+
+    imageStore(uVolume, gid, current);
+}

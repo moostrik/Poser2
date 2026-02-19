@@ -9,5 +9,7 @@ from .VorticityCurl3D import VorticityCurl3D
 from .VorticityForce3D import VorticityForce3D
 from .Buoyancy3D import Buoyancy3D
 from .Inject3D import Inject3D
+from .InjectChannel3D import InjectChannel3D
+from .Clamp3D import Clamp3D
 from .Composite3D import Composite3D
 from .Add3D import Add3D

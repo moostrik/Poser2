@@ -33,7 +33,7 @@ from .shaders import (
     Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
-    Inject3D, Composite3D, Add3D
+    Inject3D, InjectChannel3D, Clamp3D, Composite3D, Add3D
 )
 
 # Combined memory barrier bits (cast to int for Pylance compatibility)
@@ -270,6 +270,8 @@ class FluidFlow3D:
         self._vorticity_force_shader: VorticityForce3D = VorticityForce3D()
         self._buoyancy_shader: Buoyancy3D = Buoyancy3D()
         self._inject_shader: Inject3D = Inject3D()
+        self._inject_channel_shader: InjectChannel3D = InjectChannel3D()
+        self._clamp_shader: Clamp3D = Clamp3D()
         self._composite_shader: Composite3D = Composite3D()
         self._add_shader: Add3D = Add3D()
 
@@ -397,6 +399,8 @@ class FluidFlow3D:
         self._vorticity_force_shader.allocate()
         self._buoyancy_shader.allocate()
         self._inject_shader.allocate()
+        self._inject_channel_shader.allocate()
+        self._clamp_shader.allocate()
         self._composite_shader.allocate()
         self._add_shader.allocate()
 
@@ -424,6 +428,8 @@ class FluidFlow3D:
         self._vorticity_force_shader.deallocate()
         self._buoyancy_shader.deallocate()
         self._inject_shader.deallocate()
+        self._inject_channel_shader.deallocate()
+        self._clamp_shader.deallocate()
         self._composite_shader.deallocate()
         self._add_shader.deallocate()
 
@@ -498,6 +504,43 @@ class FluidFlow3D:
             self.config.injection_layer,
             self.config.injection_spread,
             strength, mode=1,
+            internal_format=GL_RGBA16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def add_density_channel(self, texture: Texture, channel: int,
+                            strength: float = 1.0) -> None:
+        """Inject single-channel 2D texture into one RGBA channel of the 3D density volume.
+
+        Uses gaussian depth spread centered at config.injection_layer.
+
+        Args:
+            texture: 2D source texture (reads .r component)
+            channel: Target RGBA channel (0=R, 1=G, 2=B, 3=A)
+            strength: Injection strength multiplier
+        """
+        if not self._allocated:
+            return
+        self._inject_channel_shader.use(
+            texture, self._density.texture,
+            self.config.injection_layer,
+            self.config.injection_spread,
+            channel, strength, mode=0,
+            internal_format=GL_RGBA16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def clamp_density(self, min_value: float = 0.0, max_value: float = 1.0) -> None:
+        """Clamp 3D density volume voxels to [min_value, max_value].
+
+        Args:
+            min_value: Minimum clamp value (applied to all channels)
+            max_value: Maximum clamp value (applied to all channels)
+        """
+        if not self._allocated:
+            return
+        self._clamp_shader.use(
+            self._density.texture, min_value, max_value,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)

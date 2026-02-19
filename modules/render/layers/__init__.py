@@ -28,6 +28,7 @@ from .generic.MSColorMaskLayer import       MSColorMaskLayer, MSColorMaskLayerCo
 from .generic.CompositeLayer import         CompositeLayer, CompositeLayerConfig, LutSelection
 from .flow.FlowLayer import                 FlowLayer, FlowLayerConfig, FlowConfig, FlowDrawMode
 from .flow.FluidLayer import                FluidLayer, FluidLayerConfig, FluidDrawMode
+from .flow.Fluid3DLayer import              Fluid3DLayer, Fluid3DLayerConfig, Fluid3DDrawMode
 
 from .generic.HDTPrepare import             HDTPrepare
 from .generic.HDTBlend import               HDTBlend
