@@ -204,7 +204,7 @@ class FluidLayer(LayerBase):
     def update(self) -> None:
         """Update fluid simulation with inputs from all flow layers."""
         # Configuration overrides (for hot-reload testing)
-        self.config.fluid_flow.vel_speed = 0.05
+        self.config.fluid_flow.vel_speed = 0.03
         self.config.fluid_flow.vel_decay = 30.0
 
         self.config.fluid_flow.vel_vorticity = 3
@@ -212,14 +212,14 @@ class FluidLayer(LayerBase):
         self.config.fluid_flow.vel_viscosity = 3
         self.config.fluid_flow.vel_viscosity_iter = 40
 
-        self.config.fluid_flow.den_speed = 5.1
+        self.config.fluid_flow.den_speed = 3.1
         self.config.fluid_flow.den_decay = 8.0
 
         self.config.fluid_flow.tmp_speed = 0.33
         self.config.fluid_flow.tmp_decay = 3.0
 
         self.config.fluid_flow.prs_speed = 0.0
-        self.config.fluid_flow.prs_decay = 0.0
+        self.config.fluid_flow.prs_decay = 8.0
         self.config.fluid_flow.prs_iterations = 40
 
         self.config.fluid_flow.tmp_buoyancy = 0.0
@@ -257,7 +257,7 @@ class FluidLayer(LayerBase):
                 #     print (m, m - pow(m, 8))
                 #     pass
             else:
-                vel_strength = 0.1 * (m_s[cam_id]) # m_s[cam_id]  # Cross-camera influence modulated by similarity and motion gate
+                vel_strength = 0.05 * (m_s[cam_id]) # m_s[cam_id]  # Cross-camera influence modulated by similarity and motion gate
                 den_strength = 0.9 * (m_s[cam_id])   # Cross-camera influence modulated by similarity, motion gate, and motion value
 
             # Add velocity from each flow layer

@@ -13,6 +13,8 @@ from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 
+from modules.render.layers.source.MaskSourceLayer import MaskSourceLayer
+
 from modules.flow import (
     OpticalFlow, OpticalFlowConfig,
     VelocitySmoothTrail, SmoothTrailConfig,
@@ -91,12 +93,13 @@ class FlowLayer(LayerBase):
         fluid.add_temperature(flow.temperature)
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, mask: Texture, colors: list[tuple[float, float, float, float]], config: FlowLayerConfig | None = None) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, mask_source: MaskSourceLayer, mask: Texture, colors: list[tuple[float, float, float, float]], config: FlowLayerConfig | None = None) -> None:
         """Initialize flow layer.
 
         Args:
             cam_id: Camera ID
             data_hub: Data hub for pose data
+            mask_source: Mask source layer for optical flow update
             mask: Mask texture for optical flow input
             motion: Motion texture for density bridge color input
             colors: Track colors (unused, kept for compatibility)
@@ -104,6 +107,7 @@ class FlowLayer(LayerBase):
         """
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
+        self._mask_source: MaskSourceLayer = mask_source
         self._mask: Texture = mask
         self._colors: list[tuple[float, float, float, float]] = colors
         self.config: FlowLayerConfig = config or FlowLayerConfig()
@@ -195,10 +199,10 @@ class FlowLayer(LayerBase):
         self.config.optical_flow.strength_y = 3.3
         self.config.optical_flow.boost = 0.0
 
-        self.config.velocity_trail.scale = 1.0
-        self.config.velocity_trail.trail_weight = 0.1
-        self.config.velocity_trail.blur_steps = 2
-        self.config.velocity_trail.blur_radius = 3.0
+        self.config.velocity_trail.scale = 0.5
+        self.config.velocity_trail.trail_weight = 0.05
+        self.config.velocity_trail.blur_steps = 6
+        self.config.velocity_trail.blur_radius = 8.0
 
         self.config.density_bridge.saturation = 1.2
         self.config.density_bridge.brightness = 1.0
@@ -212,9 +216,11 @@ class FlowLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
-        # Stage 1: Optical flow
-        self._optical_flow.set_input(self._mask)
-        self._optical_flow.update()
+        if self._mask_source.dirty:
+            # pass
+            # Stage 1: Optical flow
+            self._optical_flow.set_input(self._mask)
+            self._optical_flow.update()
 
         # Stage 2: Bridges
         self._velocity_trail.set_velocity(self._optical_flow.velocity)
@@ -233,8 +239,11 @@ class FlowLayer(LayerBase):
         self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
         self._temperature_bridge.update()
 
-        Style.pop_style()
+
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
+
         self._visualizer.update(self._get_draw_texture())
+        Style.pop_style()
 
     # ========== Rendering ==========
 
