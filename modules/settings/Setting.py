@@ -1,13 +1,18 @@
 """Setting descriptor with type coercion, callbacks, and thread safety."""
 
+from __future__ import annotations
+
 import logging
 import threading
 from enum import Enum
+from typing import Generic, TypeVar, overload, Any
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
 
-class Setting:
+
+class Setting(Generic[T]):
     """Descriptor-based setting field with type coercion, callbacks, and thread safety.
 
     Declare as a class attribute on a BaseSettings subclass::
@@ -23,17 +28,17 @@ class Setting:
 
     def __init__(
         self,
-        type_,
-        default,
+        type_: type[T],
+        default: T,
         *,
-        min=None,
-        max=None,
-        step=None,
-        description="",
-        readonly=False,
-        init_only=False,
-        visible=True,
-    ):
+        min: T | None = None,
+        max: T | None = None,
+        step: T | None = None,
+        description: str = "",
+        readonly: bool = False,
+        init_only: bool = False,
+        visible: bool = True,
+    ) -> None:
         self.type_ = type_
         self.default = default
         self.min = min
@@ -51,12 +56,16 @@ class Setting:
 
     # -- Descriptor protocol -------------------------------------------------
 
-    def __get__(self, obj, objtype=None):
+    @overload
+    def __get__(self, obj: None, objtype: type) -> Setting[T]: ...
+    @overload
+    def __get__(self, obj: Any, objtype: type) -> T: ...
+    def __get__(self, obj: Any | None, objtype: type | None = None) -> Setting[T] | T:
         if obj is None:
             return self  # class-level access returns the descriptor itself
         return obj._values[self.name]
 
-    def __set__(self, obj, value):
+    def __set__(self, obj: Any, value: T) -> None:
         self.set(obj, value)
 
     # -- Public set (respects init_only) ------------------------------------
@@ -90,13 +99,16 @@ class Setting:
 
     def _coerce(self, value):
         """Coerce *value* to self.type_, or raise TypeError."""
-        # Reject bool when int is expected (bool is a subclass of int)
-        if self.type_ is int and isinstance(value, bool):
+        # Reject bool when int or float is expected (bool is a subclass of int)
+        if self.type_ in (int, float) and isinstance(value, bool):
             raise TypeError(
-                f"Setting '{self.name}' expects int, got bool: {value!r}"
+                f"Setting '{self.name}' expects {self.type_.__name__}, got bool: {value!r}"
             )
         if isinstance(value, self.type_):
             return value
+        # Promote int → float (lossless)
+        if self.type_ is float and isinstance(value, int):
+            return float(value)
         # Enum: reconstruct from stored .value
         if isinstance(self.type_, type) and issubclass(self.type_, Enum):
             try:

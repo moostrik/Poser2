@@ -9,6 +9,7 @@ from enum import Enum
 
 from modules.settings.Setting import Setting
 from modules.settings.Action import Action
+from modules.settings.Child import Child
 from modules.settings.BaseSettings import BaseSettings
 from modules.settings.Registry import SettingsRegistry
 
@@ -726,6 +727,178 @@ class TestRegistryGroups(unittest.TestCase):
         r = repr(reg)
         self.assertIn("camera", r)
         self.assertIn("cam", r)
+
+
+# ===== Child descriptor tests =============================================
+
+class InnerConfig(BaseSettings):
+    speed = Setting(float, 1.0, min=0.0, max=10.0)
+    scale = Setting(float, 0.5)
+
+
+class OuterConfig(BaseSettings):
+    fps = Setting(float, 60.0, min=1.0, max=240.0)
+    inner = Child(InnerConfig)
+
+
+class DoubleChildConfig(BaseSettings):
+    name = Setting(str, "default")
+    alpha = Child(InnerConfig)
+    beta = Child(InnerConfig)
+
+
+class TestChild(unittest.TestCase):
+    """Tests for the Child descriptor."""
+
+    # -- Basic access -------------------------------------------------------
+
+    def test_child_access(self):
+        cfg = OuterConfig()
+        self.assertIsInstance(cfg.inner, InnerConfig)
+        self.assertEqual(cfg.inner.speed, 1.0)
+        self.assertEqual(cfg.inner.scale, 0.5)
+
+    def test_child_field_mutation(self):
+        cfg = OuterConfig()
+        cfg.inner.speed = 5.0
+        self.assertEqual(cfg.inner.speed, 5.0)
+
+    def test_child_not_replaceable(self):
+        cfg = OuterConfig()
+        with self.assertRaises(AttributeError):
+            cfg.inner = InnerConfig()
+
+    def test_each_instance_gets_own_child(self):
+        a = OuterConfig()
+        b = OuterConfig()
+        a.inner.speed = 9.0
+        self.assertEqual(b.inner.speed, 1.0)
+
+    # -- Children property --------------------------------------------------
+
+    def test_children_property(self):
+        cfg = OuterConfig()
+        children = cfg.children
+        self.assertIn("inner", children)
+        self.assertIsInstance(children["inner"], InnerConfig)
+
+    def test_children_property_returns_copy(self):
+        cfg = OuterConfig()
+        children = cfg.children
+        children["fake"] = None
+        self.assertNotIn("fake", cfg.children)
+
+    # -- Multiple children --------------------------------------------------
+
+    def test_multiple_children_independent(self):
+        cfg = DoubleChildConfig()
+        cfg.alpha.speed = 3.0
+        cfg.beta.speed = 7.0
+        self.assertEqual(cfg.alpha.speed, 3.0)
+        self.assertEqual(cfg.beta.speed, 7.0)
+
+    # -- Serialization: to_dict ---------------------------------------------
+
+    def test_to_dict_includes_children(self):
+        cfg = OuterConfig()
+        cfg.inner.speed = 2.5
+        d = cfg.to_dict()
+        self.assertIn("fps", d)
+        self.assertIn("inner", d)
+        self.assertEqual(d["inner"]["speed"], 2.5)
+        self.assertEqual(d["inner"]["scale"], 0.5)
+
+    def test_to_dict_nested_structure(self):
+        cfg = DoubleChildConfig()
+        cfg.alpha.speed = 1.0
+        cfg.beta.speed = 2.0
+        d = cfg.to_dict()
+        self.assertEqual(d["alpha"]["speed"], 1.0)
+        self.assertEqual(d["beta"]["speed"], 2.0)
+        self.assertEqual(d["name"], "default")
+
+    # -- Serialization: update_from_dict ------------------------------------
+
+    def test_update_from_dict_restores_children(self):
+        cfg = OuterConfig()
+        cfg.update_from_dict({"fps": 120.0, "inner": {"speed": 8.0, "scale": 0.25}})
+        self.assertEqual(cfg.fps, 120.0)
+        self.assertEqual(cfg.inner.speed, 8.0)
+        self.assertEqual(cfg.inner.scale, 0.25)
+
+    def test_update_from_dict_partial_child(self):
+        cfg = OuterConfig()
+        cfg.update_from_dict({"inner": {"speed": 4.0}})
+        self.assertEqual(cfg.inner.speed, 4.0)
+        self.assertEqual(cfg.inner.scale, 0.5)  # Unchanged
+
+    def test_update_from_dict_ignores_unknown_child_keys(self):
+        cfg = OuterConfig()
+        cfg.update_from_dict({"inner": {"speed": 3.0, "nonexistent": 99}})
+        self.assertEqual(cfg.inner.speed, 3.0)
+
+    # -- Round-trip ---------------------------------------------------------
+
+    def test_json_round_trip(self):
+        cfg1 = OuterConfig()
+        cfg1.fps = 144.0
+        cfg1.inner.speed = 3.5
+        cfg1.inner.scale = 0.75
+
+        serialized = json.dumps(cfg1.to_dict())
+        data = json.loads(serialized)
+
+        cfg2 = OuterConfig()
+        cfg2.update_from_dict(data)
+        self.assertEqual(cfg2.fps, 144.0)
+        self.assertEqual(cfg2.inner.speed, 3.5)
+        self.assertEqual(cfg2.inner.scale, 0.75)
+
+    # -- Callbacks on child fields ------------------------------------------
+
+    def test_child_field_callbacks_still_fire(self):
+        cfg = OuterConfig()
+        received = []
+        cfg.inner.on_change("speed", lambda v: received.append(v))
+        cfg.inner.speed = 7.0
+        self.assertEqual(received, [7.0])
+
+    # -- Repr ---------------------------------------------------------------
+
+    def test_repr_shows_children(self):
+        cfg = OuterConfig()
+        r = repr(cfg)
+        self.assertIn("InnerConfig(...)", r)
+        self.assertIn("fps=", r)
+
+    # -- Class-level descriptor access --------------------------------------
+
+    def test_class_level_access_returns_descriptor(self):
+        self.assertIsInstance(OuterConfig.inner, Child)
+
+    # -- Registry with children ---------------------------------------------
+
+    def test_registry_save_load_with_children(self):
+        reg = SettingsRegistry()
+        cfg = OuterConfig()
+        cfg.fps = 30.0
+        cfg.inner.speed = 2.0
+        reg.register("outer", cfg)
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            path = f.name
+        try:
+            reg.save(path)
+
+            reg2 = SettingsRegistry()
+            cfg2 = OuterConfig()
+            reg2.register("outer", cfg2)
+            reg2.load(path)
+
+            self.assertEqual(cfg2.fps, 30.0)
+            self.assertEqual(cfg2.inner.speed, 2.0)
+        finally:
+            os.unlink(path)
 
 
 if __name__ == "__main__":

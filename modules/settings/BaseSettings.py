@@ -4,6 +4,7 @@ import threading
 
 from modules.settings.Setting import Setting
 from modules.settings.Action import Action
+from modules.settings.Child import Child
 
 
 class BaseSettings:
@@ -26,8 +27,10 @@ class BaseSettings:
         object.__setattr__(self, "_callbacks", {})
         object.__setattr__(self, "_locks", {})
         object.__setattr__(self, "_actions", {})
+        object.__setattr__(self, "_children", {})
+        object.__setattr__(self, "_child_descriptors", {})
 
-        # Collect Setting and Action descriptors from the class hierarchy
+        # Collect Setting, Action, and Child descriptors from the class hierarchy
         for cls in type(self).__mro__:
             for attr_name, attr_value in vars(cls).items():
                 if isinstance(attr_value, Setting) and attr_name not in self._fields:
@@ -39,6 +42,9 @@ class BaseSettings:
                     self._actions[attr_name] = attr_value
                     self._callbacks[attr_name] = []
                     self._locks[attr_name] = threading.Lock()
+                elif isinstance(attr_value, Child) and attr_name not in self._child_descriptors:
+                    self._child_descriptors[attr_name] = attr_value
+                    self._children[attr_name] = attr_value.settings_type()
 
         # Apply kwargs (init_only fields are still writable here)
         for name, value in kwargs.items():
@@ -72,6 +78,9 @@ class BaseSettings:
         fields = object.__getattribute__(self, "_fields")
         if name in fields:
             return object.__getattribute__(self, "_values")[name]
+        children = object.__getattribute__(self, "_children")
+        if name in children:
+            return children[name]
         raise AttributeError(
             f"'{type(self).__name__}' has no setting '{name}'"
         )
@@ -95,6 +104,11 @@ class BaseSettings:
     def actions(self):
         """Read-only view of all Action descriptors, keyed by name."""
         return dict(self._actions)
+
+    @property
+    def children(self):
+        """Read-only view of all Child instances, keyed by name."""
+        return dict(self._children)
 
     # -- Callback registration -----------------------------------------------
 
@@ -153,17 +167,27 @@ class BaseSettings:
     # -- Serialization -------------------------------------------------------
 
     def to_dict(self):
-        """Serialize mutable fields to a dict (excludes readonly and init_only)."""
+        """Serialize mutable fields to a dict (excludes readonly and init_only).
+
+        Children are serialized as nested dicts.
+        """
         result = {}
         for name, field in self._fields.items():
             if not field.readonly and not field.init_only:
                 result[name] = field.to_json_value(self)
+        for name, child in self._children.items():
+            result[name] = child.to_dict()
         return result
 
     def update_from_dict(self, data):
-        """Restore fields from a dict. Skips init_only fields after init."""
+        """Restore fields from a dict. Skips init_only fields after init.
+
+        Nested dicts matching child names are forwarded to the child.
+        """
         for name, raw in data.items():
-            if name in self._fields:
+            if name in self._children and isinstance(raw, dict):
+                self._children[name].update_from_dict(raw)
+            elif name in self._fields:
                 field = self._fields[name]
                 if field.init_only and self._initialized:
                     continue
@@ -177,5 +201,7 @@ class BaseSettings:
             if field.visible:
                 value = self._values[name]
                 parts.append(f"{name}={value!r}")
+        for name, child in self._children.items():
+            parts.append(f"{name}={type(child).__name__}(...)")
         class_name = type(self).__name__
         return f"{class_name}({', '.join(parts)})"
