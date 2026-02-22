@@ -3,7 +3,7 @@
 import threading
 
 from modules.settings.Setting_ import Setting
-from modules.settings.Action import Action
+from modules.settings.Action_ import Action
 from modules.settings.Child_ import Child
 
 

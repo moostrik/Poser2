@@ -8,7 +8,7 @@ import unittest
 from enum import Enum
 
 from modules.settings.Setting_ import Setting
-from modules.settings.Action import Action
+from modules.settings.Action_ import Action
 from modules.settings.Child_ import Child
 from modules.settings.base_settings import BaseSettings
 from modules.settings.Registry_ import SettingsRegistry
