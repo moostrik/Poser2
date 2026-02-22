@@ -6,22 +6,31 @@ import json
 from pathlib import Path
 from typing import Any
 
-from modules.settings.base import BaseSettings
+from modules.settings.BaseSettings import BaseSettings
 
 
 class SettingsRegistry:
-    """Stores multiple BaseSettings instances. Handles save/load to JSON."""
+    """Stores multiple BaseSettings instances with group organization and JSON persistence."""
 
     def __init__(self) -> None:
         self._modules: dict[str, BaseSettings] = {}
+        self._groups: dict[str, list[str]] = {}
 
-    def register(self, name: str, settings: BaseSettings) -> None:
-        """Register a settings module."""
+    def register(self, name: str, settings: BaseSettings, group: str = "default") -> None:
+        """Register a settings module under a group."""
         self._modules[name] = settings
+        if group not in self._groups:
+            self._groups[group] = []
+        if name not in self._groups[group]:
+            self._groups[group].append(name)
 
     def get(self, name: str) -> BaseSettings:
         """Retrieve a registered settings module."""
         return self._modules[name]
+
+    def groups(self) -> dict[str, list[str]]:
+        """Return a copy of {group: [config_names]} mapping."""
+        return {g: list(names) for g, names in self._groups.items()}
 
     def save(self, path: str | Path) -> None:
         """Save all modules to a JSON file."""
@@ -56,5 +65,4 @@ class SettingsRegistry:
         return self._modules[name]
 
     def __repr__(self) -> str:
-        names = list(self._modules.keys())
-        return f"SettingsRegistry({names})"
+        return f"SettingsRegistry(groups={dict(self._groups)})"

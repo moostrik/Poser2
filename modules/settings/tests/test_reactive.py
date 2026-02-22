@@ -8,7 +8,8 @@ import unittest
 from enum import Enum
 
 from modules.settings.setting import Setting
-from modules.settings.base import BaseSettings
+from modules.settings.action import Action
+from modules.settings.BaseSettings import BaseSettings
 from modules.settings.registry import SettingsRegistry
 
 
@@ -61,6 +62,12 @@ class CameraSettings(BaseSettings):
 
 class MinimalSettings(BaseSettings):
     value = Setting(int, 0)
+
+
+class SettingsWithActions(BaseSettings):
+    exposure = Setting(int, 1000)
+    reset = Action(description="Reset all values")
+    hidden_action = Action(visible=False)
 
 
 # ---------------------------------------------------------------------------
@@ -592,6 +599,133 @@ class TestRegistryExtras(unittest.TestCase):
             reg.load(path)  # should not raise
         finally:
             os.unlink(path)
+
+
+class TestAction(unittest.TestCase):
+    """Tests for the Action descriptor."""
+
+    def test_action_fires_callbacks(self):
+        s = SettingsWithActions()
+        results = []
+        s.on_action("reset", lambda: results.append("fired"))
+        s._actions["reset"].fire(s)
+        self.assertEqual(results, ["fired"])
+
+    def test_action_multiple_callbacks(self):
+        s = SettingsWithActions()
+        a, b = [], []
+        s.on_action("reset", lambda: a.append(1))
+        s.on_action("reset", lambda: b.append(2))
+        s._actions["reset"].fire(s)
+        self.assertEqual(a, [1])
+        self.assertEqual(b, [2])
+
+    def test_action_no_callbacks_ok(self):
+        s = SettingsWithActions()
+        s._actions["reset"].fire(s)  # should not raise
+
+    def test_action_not_assignable(self):
+        s = SettingsWithActions()
+        with self.assertRaises(AttributeError):
+            s.reset = True
+
+    def test_action_decorator_syntax(self):
+        s = SettingsWithActions()
+        results = []
+
+        @s.on_action("reset")
+        def on_reset():
+            results.append("decorated")
+
+        s._actions["reset"].fire(s)
+        self.assertEqual(results, ["decorated"])
+
+    def test_on_action_unknown_raises(self):
+        s = SettingsWithActions()
+        with self.assertRaises(KeyError):
+            s.on_action("nonexistent", lambda: None)
+
+    def test_remove_action_callback(self):
+        s = SettingsWithActions()
+        results = []
+        cb = lambda: results.append(1)
+        s.on_action("reset", cb)
+        s.remove_action_callback("reset", cb)
+        s._actions["reset"].fire(s)
+        self.assertEqual(results, [])
+
+    def test_actions_property(self):
+        s = SettingsWithActions()
+        a = s.actions
+        self.assertIsInstance(a, dict)
+        self.assertIn("reset", a)
+        self.assertIn("hidden_action", a)
+
+    def test_actions_property_is_copy(self):
+        s = SettingsWithActions()
+        a = s.actions
+        a["fake"] = None
+        self.assertNotIn("fake", s.actions)
+
+    def test_action_repr(self):
+        s = SettingsWithActions()
+        r = repr(s._actions["reset"])
+        self.assertIn("Reset all values", r)
+
+    def test_action_class_access_returns_descriptor(self):
+        self.assertIsInstance(SettingsWithActions.reset, Action)
+
+    def test_action_broken_callback_doesnt_crash(self):
+        s = SettingsWithActions()
+        results = []
+        s.on_action("reset", lambda: 1 / 0)  # will raise
+        s.on_action("reset", lambda: results.append("ok"))
+        s._actions["reset"].fire(s)  # should not raise
+        self.assertEqual(results, ["ok"])
+
+
+class TestRegistryGroups(unittest.TestCase):
+    """Tests for registry group support."""
+
+    def test_default_group(self):
+        reg = SettingsRegistry()
+        reg.register("cam", CameraSettings())
+        self.assertEqual(reg.groups(), {"default": ["cam"]})
+
+    def test_custom_group(self):
+        reg = SettingsRegistry()
+        reg.register("cam", CameraSettings(), group="camera")
+        reg.register("timer", MinimalSettings(), group="general")
+        groups = reg.groups()
+        self.assertEqual(groups["camera"], ["cam"])
+        self.assertEqual(groups["general"], ["timer"])
+
+    def test_multiple_in_same_group(self):
+        reg = SettingsRegistry()
+        reg.register("a", MinimalSettings(), group="pose")
+        reg.register("b", MinimalSettings(), group="pose")
+        self.assertEqual(reg.groups()["pose"], ["a", "b"])
+
+    def test_groups_returns_copy(self):
+        reg = SettingsRegistry()
+        reg.register("cam", CameraSettings(), group="camera")
+        g = reg.groups()
+        g["camera"].append("fake")
+        self.assertEqual(reg.groups()["camera"], ["cam"])
+
+    def test_register_preserves_order(self):
+        reg = SettingsRegistry()
+        reg.register("c", MinimalSettings(), group="g")
+        reg.register("a", MinimalSettings(), group="g")
+        reg.register("b", MinimalSettings(), group="g")
+        self.assertEqual(reg.groups()["g"], ["c", "a", "b"])
+
+    def test_repr_shows_groups(self):
+        reg = SettingsRegistry()
+        reg.register("cam", CameraSettings(), group="camera")
+        r = repr(reg)
+        self.assertIn("camera", r)
+        self.assertIn("cam", r)
 
 
 if __name__ == "__main__":

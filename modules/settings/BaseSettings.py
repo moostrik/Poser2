@@ -7,6 +7,7 @@ from typing import Any, Callable
 import threading
 
 from modules.settings.setting import Setting
+from modules.settings.action import Action
 
 
 class BaseSettings:
@@ -28,8 +29,11 @@ class BaseSettings:
         object.__setattr__(self, "_values", {})
         object.__setattr__(self, "_callbacks", {})
         object.__setattr__(self, "_locks", {})
+        object.__setattr__(self, "_actions", {})
+        object.__setattr__(self, "_action_callbacks", {})
+        object.__setattr__(self, "_action_locks", {})
 
-        # Collect Setting descriptors from the class hierarchy
+        # Collect Setting and Action descriptors from the class hierarchy
         for cls in type(self).__mro__:
             for attr_name, attr_value in vars(cls).items():
                 if isinstance(attr_value, Setting) and attr_name not in self._fields:
@@ -37,6 +41,10 @@ class BaseSettings:
                     self._values[attr_name] = attr_value.default
                     self._callbacks[attr_name] = []
                     self._locks[attr_name] = threading.Lock()
+                elif isinstance(attr_value, Action) and attr_name not in self._actions:
+                    self._actions[attr_name] = attr_value
+                    self._action_callbacks[attr_name] = []
+                    self._action_locks[attr_name] = threading.Lock()
 
         # Apply kwargs (init_only fields are still writable here)
         for name, value in kwargs.items():
@@ -54,6 +62,10 @@ class BaseSettings:
         if name.startswith("_"):
             object.__setattr__(self, name, value)
             return
+        if name in self._actions:
+            raise AttributeError(
+                f"Action '{name}' is not assignable — call fire() instead"
+            )
         if name not in self._fields:
             raise AttributeError(
                 f"'{type(self).__name__}' has no setting '{name}'"
@@ -85,6 +97,11 @@ class BaseSettings:
         """Read-only view of all Setting descriptors, keyed by name."""
         return dict(self._fields)
 
+    @property
+    def actions(self) -> dict[str, Action]:
+        """Read-only view of all Action descriptors, keyed by name."""
+        return dict(self._actions)
+
     # -- Callback registration -----------------------------------------------
 
     def remove_callback(self, name: str, callback: Callable) -> None:
@@ -92,6 +109,25 @@ class BaseSettings:
         if name not in self._fields:
             raise KeyError(f"Unknown setting '{name}'")
         self._fields[name].remove_callback(self, callback)
+
+    def on_action(self, name: str, callback: Callable | None = None) -> Callable:
+        """Register a callback for an action. Works as direct call or decorator."""
+        if name not in self._actions:
+            raise KeyError(f"Unknown action '{name}'")
+        action = self._actions[name]
+        if callback is not None:
+            action.add_callback(self, callback)
+            return callback
+        def decorator(fn: Callable) -> Callable:
+            action.add_callback(self, fn)
+            return fn
+        return decorator
+
+    def remove_action_callback(self, name: str, callback: Callable) -> None:
+        """Remove a previously registered action callback."""
+        if name not in self._actions:
+            raise KeyError(f"Unknown action '{name}'")
+        self._actions[name].remove_callback(self, callback)
 
     def on_change(self, name: str, callback: Callable | None = None) -> Callable:
         """Register a callback for a field. Works as direct call or decorator.
