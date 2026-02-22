@@ -1,11 +1,8 @@
 """Setting descriptor with type coercion, callbacks, and thread safety."""
 
-from __future__ import annotations
-
 import logging
 import threading
 from enum import Enum
-from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +23,17 @@ class Setting:
 
     def __init__(
         self,
-        type_: type,
-        default: Any,
+        type_,
+        default,
         *,
-        min: float | None = None,
-        max: float | None = None,
-        step: float | None = None,
-        description: str = "",
-        readonly: bool = False,
-        init_only: bool = False,
-        visible: bool = True,
-    ) -> None:
+        min=None,
+        max=None,
+        step=None,
+        description="",
+        readonly=False,
+        init_only=False,
+        visible=True,
+    ):
         self.type_ = type_
         self.default = default
         self.min = min
@@ -47,24 +44,24 @@ class Setting:
         self.init_only = init_only
         self.visible = visible
         # Set by __set_name__
-        self.name: str = ""
+        self.name = ""
 
-    def __set_name__(self, owner: type, name: str) -> None:
+    def __set_name__(self, owner, name):
         self.name = name
 
     # -- Descriptor protocol -------------------------------------------------
 
-    def __get__(self, obj: Any, objtype: type | None = None) -> Any:
+    def __get__(self, obj, objtype=None):
         if obj is None:
             return self  # class-level access returns the descriptor itself
         return obj._values[self.name]
 
-    def __set__(self, obj: Any, value: Any) -> None:
+    def __set__(self, obj, value):
         self.set(obj, value)
 
     # -- Public set (respects init_only) ------------------------------------
 
-    def set(self, obj: Any, value: Any) -> None:
+    def set(self, obj, value):
         """Set value. Only enforces init_only after initialization."""
         if self.init_only and obj._initialized:
             raise AttributeError(
@@ -72,7 +69,7 @@ class Setting:
             )
         value = self._coerce(value)
         lock = obj._locks[self.name]
-        callbacks_to_fire: list[Callable] = []
+        callbacks_to_fire = []
 
         with lock:
             if obj._values[self.name] != value:
@@ -91,7 +88,7 @@ class Setting:
 
     # -- Type coercion -------------------------------------------------------
 
-    def _coerce(self, value: Any) -> Any:
+    def _coerce(self, value):
         """Coerce *value* to self.type_, or raise TypeError."""
         # Reject bool when int is expected (bool is a subclass of int)
         if self.type_ is int and isinstance(value, bool):
@@ -129,12 +126,12 @@ class Setting:
 
     # -- Callbacks -----------------------------------------------------------
 
-    def add_callback(self, obj: Any, callback: Callable) -> None:
+    def add_callback(self, obj, callback):
         with obj._locks[self.name]:
             if callback not in obj._callbacks[self.name]:
                 obj._callbacks[self.name].append(callback)
 
-    def remove_callback(self, obj: Any, callback: Callable) -> None:
+    def remove_callback(self, obj, callback):
         with obj._locks[self.name]:
             try:
                 obj._callbacks[self.name].remove(callback)
@@ -143,7 +140,7 @@ class Setting:
 
     # -- Serialization -------------------------------------------------------
 
-    def to_json_value(self, obj: Any) -> Any:
+    def to_json_value(self, obj):
         """Return a JSON-serializable representation of the current value."""
         value = obj._values[self.name]
         if hasattr(value, "to_dict"):
@@ -152,7 +149,7 @@ class Setting:
             return value.value
         return value
 
-    def from_json_value(self, obj: Any, raw: Any) -> None:
+    def from_json_value(self, obj, raw):
         """Restore value from JSON via set().
 
         Will raise AttributeError on init_only fields after initialization.
@@ -162,7 +159,7 @@ class Setting:
 
     # -- Repr ----------------------------------------------------------------
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         parts = [f"{self.type_.__name__}", f"default={self.default!r}"]
         if self.readonly:
             parts.append("readonly=True")

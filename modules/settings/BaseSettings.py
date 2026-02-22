@@ -1,9 +1,5 @@
 """BaseSettings — collection of Setting descriptors with attribute access, callbacks, and serialization."""
 
-from __future__ import annotations
-
-from typing import Any, Callable
-
 import threading
 
 from modules.settings.Setting import Setting
@@ -23,15 +19,13 @@ class BaseSettings:
         settings = CameraSettings(resolution=720)
     """
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, **kwargs):
         object.__setattr__(self, "_initialized", False)
         object.__setattr__(self, "_fields", {})
         object.__setattr__(self, "_values", {})
         object.__setattr__(self, "_callbacks", {})
         object.__setattr__(self, "_locks", {})
         object.__setattr__(self, "_actions", {})
-        object.__setattr__(self, "_action_callbacks", {})
-        object.__setattr__(self, "_action_locks", {})
 
         # Collect Setting and Action descriptors from the class hierarchy
         for cls in type(self).__mro__:
@@ -43,8 +37,8 @@ class BaseSettings:
                     self._locks[attr_name] = threading.Lock()
                 elif isinstance(attr_value, Action) and attr_name not in self._actions:
                     self._actions[attr_name] = attr_value
-                    self._action_callbacks[attr_name] = []
-                    self._action_locks[attr_name] = threading.Lock()
+                    self._callbacks[attr_name] = []
+                    self._locks[attr_name] = threading.Lock()
 
         # Apply kwargs (init_only fields are still writable here)
         for name, value in kwargs.items():
@@ -58,7 +52,7 @@ class BaseSettings:
 
     # -- Attribute access guard ----------------------------------------------
 
-    def __setattr__(self, name: str, value: Any) -> None:
+    def __setattr__(self, name, value):
         if name.startswith("_"):
             object.__setattr__(self, name, value)
             return
@@ -72,7 +66,7 @@ class BaseSettings:
             )
         self._fields[name].set(self, value)
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name):
         # Fallback — normally the descriptor __get__ handles known fields.
         # This catches edge cases (e.g. dynamic lookup via getattr()).
         fields = object.__getattribute__(self, "_fields")
@@ -82,7 +76,7 @@ class BaseSettings:
             f"'{type(self).__name__}' has no setting '{name}'"
         )
 
-    def __delattr__(self, name: str) -> None:
+    def __delattr__(self, name):
         if name.startswith("_"):
             object.__delattr__(self, name)
             return
@@ -93,24 +87,24 @@ class BaseSettings:
     # -- Field access --------------------------------------------------------
 
     @property
-    def fields(self) -> dict[str, Setting]:
+    def fields(self):
         """Read-only view of all Setting descriptors, keyed by name."""
         return dict(self._fields)
 
     @property
-    def actions(self) -> dict[str, Action]:
+    def actions(self):
         """Read-only view of all Action descriptors, keyed by name."""
         return dict(self._actions)
 
     # -- Callback registration -----------------------------------------------
 
-    def remove_callback(self, name: str, callback: Callable) -> None:
+    def remove_callback(self, name, callback):
         """Remove a previously registered callback for *name*."""
         if name not in self._fields:
             raise KeyError(f"Unknown setting '{name}'")
         self._fields[name].remove_callback(self, callback)
 
-    def on_action(self, name: str, callback: Callable | None = None) -> Callable:
+    def on_action(self, name, callback=None):
         """Register a callback for an action. Works as direct call or decorator."""
         if name not in self._actions:
             raise KeyError(f"Unknown action '{name}'")
@@ -118,18 +112,18 @@ class BaseSettings:
         if callback is not None:
             action.add_callback(self, callback)
             return callback
-        def decorator(fn: Callable) -> Callable:
+        def decorator(fn):
             action.add_callback(self, fn)
             return fn
         return decorator
 
-    def remove_action_callback(self, name: str, callback: Callable) -> None:
+    def remove_action_callback(self, name, callback):
         """Remove a previously registered action callback."""
         if name not in self._actions:
             raise KeyError(f"Unknown action '{name}'")
         self._actions[name].remove_callback(self, callback)
 
-    def on_change(self, name: str, callback: Callable | None = None) -> Callable:
+    def on_change(self, name, callback=None):
         """Register a callback for a field. Works as direct call or decorator.
 
         Direct::
@@ -151,14 +145,14 @@ class BaseSettings:
             return callback
 
         # Decorator mode
-        def decorator(fn: Callable) -> Callable:
+        def decorator(fn):
             field.add_callback(self, fn)
             return fn
         return decorator
 
     # -- Serialization -------------------------------------------------------
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self):
         """Serialize mutable fields to a dict (excludes readonly and init_only)."""
         result = {}
         for name, field in self._fields.items():
@@ -166,7 +160,7 @@ class BaseSettings:
                 result[name] = field.to_json_value(self)
         return result
 
-    def update_from_dict(self, data: dict[str, Any]) -> None:
+    def update_from_dict(self, data):
         """Restore fields from a dict. Skips init_only fields after init."""
         for name, raw in data.items():
             if name in self._fields:
@@ -177,7 +171,7 @@ class BaseSettings:
 
     # -- Repr ----------------------------------------------------------------
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         parts = []
         for name, field in self._fields.items():
             if field.visible:

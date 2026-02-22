@@ -1,9 +1,6 @@
 """NiceGUI settings panel — auto-generates a tabbed UI from a SettingsRegistry."""
 
-from __future__ import annotations
-
 from enum import Enum
-from typing import Any
 
 from nicegui import ui
 
@@ -13,7 +10,7 @@ from modules.settings.Action import Action
 from modules.settings.Registry import SettingsRegistry
 
 
-def generate_label(name: str) -> str:
+def generate_label(name):
     """Convert field/config name to a human-readable label.
 
     Examples:
@@ -31,9 +28,7 @@ def generate_label(name: str) -> str:
     return " ".join(result)
 
 
-def _build_field_control(
-    settings: BaseSettings, name: str, field: Setting
-) -> None:
+def _build_field_control(settings, name, field):
     """Create a NiceGUI control for a single Setting field."""
     value = getattr(settings, name)
     label = generate_label(name)
@@ -48,12 +43,12 @@ def _build_field_control(
             label=label,
         ).props("dense outlined" + (" disable" if is_disabled else ""))
 
-        def on_select_change(e: Any, f=field) -> None:
+        def on_select_change(e, f=field):
             setattr(settings, name, f.type_(e.value))
 
         sel.on_value_change(on_select_change)
 
-        def update_select(v: Any, sel=sel) -> None:
+        def update_select(v, sel=sel):
             sel.set_value(v.value if isinstance(v, Enum) else v)
 
         settings.on_change(name, update_select)
@@ -65,12 +60,12 @@ def _build_field_control(
             "dense" + (" disable" if is_disabled else "")
         )
 
-        def on_switch_change(e: Any) -> None:
+        def on_switch_change(e):
             setattr(settings, name, e.value)
 
         sw.on_value_change(on_switch_change)
 
-        def update_switch(v: Any, sw=sw) -> None:
+        def update_switch(v, sw=sw):
             sw.set_value(v)
 
         settings.on_change(name, update_switch)
@@ -90,12 +85,12 @@ def _build_field_control(
                 format=f"%.0f" if field.type_ is int else f"%.2f",
             ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
-        def on_slider_change(e: Any, num=num) -> None:
+        def on_slider_change(e, num=num):
             val = field.type_(e.value)
             setattr(settings, name, val)
             num.set_value(val)
 
-        def on_number_change(e: Any, sl=sl) -> None:
+        def on_number_change(e, sl=sl):
             if e.value is not None:
                 val = field.type_(e.value)
                 setattr(settings, name, val)
@@ -104,7 +99,7 @@ def _build_field_control(
         sl.on_value_change(on_slider_change)
         num.on_value_change(on_number_change)
 
-        def update_slider(v: Any, sl=sl, num=num) -> None:
+        def update_slider(v, sl=sl, num=num):
             sl.set_value(v)
             num.set_value(v)
 
@@ -121,13 +116,13 @@ def _build_field_control(
                 format=f"%.0f" if field.type_ is int else f"%.2f",
             ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-32")
 
-        def on_num_change(e: Any) -> None:
+        def on_num_change(e):
             if e.value is not None:
                 setattr(settings, name, field.type_(e.value))
 
         num.on_value_change(on_num_change)
 
-        def update_num(v: Any, num=num) -> None:
+        def update_num(v, num=num):
             num.set_value(v)
 
         settings.on_change(name, update_num)
@@ -139,12 +134,12 @@ def _build_field_control(
             "dense outlined" + (" disable" if is_disabled else "")
         )
 
-        def on_input_change(e: Any) -> None:
+        def on_input_change(e):
             setattr(settings, name, e.value)
 
         inp.on_value_change(on_input_change)
 
-        def update_input(v: Any, inp=inp) -> None:
+        def update_input(v, inp=inp):
             inp.set_value(v)
 
         settings.on_change(name, update_input)
@@ -155,19 +150,19 @@ def _build_field_control(
         ui.label(label).classes("w-32 text-sm")
         lbl = ui.label(str(value)).classes("text-sm text-gray-500")
 
-    def update_label(v: Any, lbl=lbl) -> None:
+    def update_label(v, lbl=lbl):
         lbl.set_text(str(v))
 
     settings.on_change(name, update_label)
 
 
-def _build_action_button(settings: BaseSettings, name: str, action: Action) -> None:
+def _build_action_button(settings, name, action):
     """Create a NiceGUI button for an Action."""
     label = generate_label(name)
     ui.button(label, on_click=lambda: action.fire(settings)).props("dense")
 
 
-def _build_settings_card(name: str, settings: BaseSettings) -> None:
+def _build_settings_card(name, settings):
     """Build a collapsible card for one BaseSettings instance."""
     with ui.expansion(generate_label(name), icon="settings").classes("w-full"):
         with ui.column().classes("w-full gap-1 p-2"):
@@ -195,7 +190,7 @@ def _build_settings_card(name: str, settings: BaseSettings) -> None:
                         _build_action_button(settings, action_name, action)
 
 
-def create_settings_panel(registry: SettingsRegistry) -> None:
+def create_settings_panel(registry):
     """Build a full tabbed settings panel from a SettingsRegistry.
 
     Call this inside a NiceGUI page context::

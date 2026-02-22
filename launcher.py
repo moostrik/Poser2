@@ -27,6 +27,9 @@ class Tee:
         self.console.flush()
         self.log_file.flush()
 
+    def isatty(self):
+        return self.console.isatty() if hasattr(self.console, 'isatty') else False
+
 
 # Setup logging to file with timestamp
 log_dir = Path(__file__).parent / "logs"
@@ -72,6 +75,8 @@ from signal import signal, SIGINT
 
 from modules.Main import Main
 from modules.Settings import Settings, ModelType
+from modules.settings import Setting, Action, BaseSettings, SettingsRegistry
+from modules.gui import settings_server
 
 import multiprocessing as mp
 
@@ -117,8 +122,22 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
     settings.render.num_players = args.players
     settings.render.num_cams = args.cameras
 
-    # Settings.make_paths_absolute(settings, path.dirname(__file__))
-    # print(settings)
+    # -- Settings UI (NiceGUI on port 666) -----------------------------------
+    class DemoSettings(BaseSettings):
+        exposure = Setting(int, 1000, min=100, max=10000, step=100, description="Exposure time (µs)")
+        gain = Setting(float, 1.0, min=0.0, max=16.0, step=0.1, description="Gain")
+        simulation = Setting(bool, False, description="Use simulated camera input")
+        fps = Setting(float, args.fps, readonly=True, description="Current FPS")
+        num_players = Setting(int, args.players, init_only=True, description="Number of players")
+        reset = Action(description="Reset to defaults")
+
+    registry = SettingsRegistry()
+    registry.register("demo", DemoSettings(
+        simulation=args.simulation,
+        num_players=args.players,
+    ), group="camera")
+    settings_server.start(registry, port=666)
+    # ------------------------------------------------------------------------
 
     app = Main(settings)
     app.start()

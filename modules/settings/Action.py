@@ -1,10 +1,7 @@
 """Action descriptor — a stateless trigger with callbacks."""
 
-from __future__ import annotations
-
 import logging
 import threading
-from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -23,33 +20,33 @@ class Action:
     def __init__(
         self,
         *,
-        description: str = "",
-        visible: bool = True,
-    ) -> None:
+        description="",
+        visible=True,
+    ):
         self.description = description
         self.visible = visible
-        self.name: str = ""
+        self.name = ""
 
-    def __set_name__(self, owner: type, name: str) -> None:
+    def __set_name__(self, owner, name):
         self.name = name
 
-    def __get__(self, obj: Any, objtype: type | None = None) -> "Action":
+    def __get__(self, obj, objtype=None):
         if obj is None:
             return self
         return self
 
-    def __set__(self, obj: Any, value: Any) -> None:
+    def __set__(self, obj, value):
         raise AttributeError(
             f"Action '{self.name}' is not assignable — call fire() instead"
         )
 
     # -- Fire ----------------------------------------------------------------
 
-    def fire(self, obj: Any) -> None:
+    def fire(self, obj):
         """Invoke all registered callbacks."""
-        lock = obj._action_locks[self.name]
+        lock = obj._locks[self.name]
         with lock:
-            callbacks = list(obj._action_callbacks[self.name])
+            callbacks = list(obj._callbacks[self.name])
 
         for cb in callbacks:
             try:
@@ -62,21 +59,21 @@ class Action:
 
     # -- Callback management -------------------------------------------------
 
-    def add_callback(self, obj: Any, callback: Callable) -> None:
-        with obj._action_locks[self.name]:
-            if callback not in obj._action_callbacks[self.name]:
-                obj._action_callbacks[self.name].append(callback)
+    def add_callback(self, obj, callback):
+        with obj._locks[self.name]:
+            if callback not in obj._callbacks[self.name]:
+                obj._callbacks[self.name].append(callback)
 
-    def remove_callback(self, obj: Any, callback: Callable) -> None:
-        with obj._action_locks[self.name]:
+    def remove_callback(self, obj, callback):
+        with obj._locks[self.name]:
             try:
-                obj._action_callbacks[self.name].remove(callback)
+                obj._callbacks[self.name].remove(callback)
             except ValueError:
                 pass
 
     # -- Repr ----------------------------------------------------------------
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         parts = [f"description={self.description!r}"]
         if not self.visible:
             parts.append("visible=False")
