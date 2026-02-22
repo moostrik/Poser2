@@ -1,11 +1,8 @@
 {
   "flow_layer": {
     "fps": 60.0,
-    "draw_mode": 5,
-    "blend_mode": [
-      770,
-      1
-    ],
+    "draw_mode": "DENSITY_BRIDGE_INPUT_COLOR",
+    "blend_mode": "ADD",
     "simulation_scale": 0.5,
     "visualisation": {
       "toggle_scalar": false,
@@ -38,11 +35,8 @@
   "fluid_layer": {
     "fps": 110.0,
     "num_players": 3,
-    "draw_mode": 1,
-    "blend_mode": [
-      770,
-      1
-    ],
+    "draw_mode": "DENSITY",
+    "blend_mode": "ADD",
     "simulation_scale": 0.5,
     "visualisation": {
       "toggle_scalar": false,
@@ -63,7 +57,7 @@
       "prs_speed": 0.0,
       "prs_lifetime": 8.0,
       "prs_iterations": 40,
-      "den_lifetime": 6.529006750651934,
+      "den_lifetime": 30.0,
       "tmp_lifetime": 3.0,
       "tmp_buoyancy": 0.0,
       "tmp_weight": -10.0,

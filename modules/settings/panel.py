@@ -45,20 +45,20 @@ def _build_field_control(settings, name, field):
 
     # -- Enum → select -------------------------------------------------------
     if isinstance(field.type_, type) and issubclass(field.type_, Enum):
-        options = {m.value: m.name for m in field.type_}
+        options = {m.name: m.name for m in field.type_}
         sel = ui.select(
             options=options,
-            value=value.value,
+            value=value.name,
             label=label,
         ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]")
 
         def on_select_change(e, f=field):
-            setattr(settings, name, f.type_(e.value))
+            setattr(settings, name, f.type_[e.value])
 
         sel.on_value_change(on_select_change)
 
         def update_select(v, sel=sel):
-            sel.set_value(v.value if isinstance(v, Enum) else v)
+            sel.set_value(v.name if isinstance(v, Enum) else v)
 
         settings.on_change(name, update_select)
         return 'small'

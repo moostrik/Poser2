@@ -311,10 +311,10 @@ class TestSerialization(unittest.TestCase):
         d = s.to_dict()
         self.assertEqual(d["overlay_color"], {"r": 1, "g": 0, "b": 0})
 
-    def test_to_dict_enum_uses_value(self):
+    def test_to_dict_enum_uses_name(self):
         s = CameraSettings()
         d = s.to_dict()
-        self.assertEqual(d["mode"], "solid")
+        self.assertEqual(d["mode"], "SOLID")
 
     def test_round_trip(self):
         s1 = CameraSettings(exposure=4000)

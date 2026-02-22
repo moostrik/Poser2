@@ -109,11 +109,15 @@ class Setting(Generic[T]):
         # Promote int → float (lossless)
         if self.type_ is float and isinstance(value, int):
             return float(value)
-        # Enum: reconstruct from stored .value
+        # Enum: reconstruct from name (str) or value (int, etc.)
         if isinstance(self.type_, type) and issubclass(self.type_, Enum):
-            # JSON round-trips tuples as lists — restore tuple for hashable lookup
-            if isinstance(value, list):
-                value = tuple(value)
+            if isinstance(value, str):
+                try:
+                    return self.type_[value]
+                except KeyError:
+                    raise TypeError(
+                        f"Cannot construct {self.type_.__name__} from name {value!r}"
+                    )
             try:
                 return self.type_(value)
             except (ValueError, KeyError):
@@ -161,7 +165,7 @@ class Setting(Generic[T]):
         if hasattr(value, "to_dict"):
             return value.to_dict()
         if isinstance(value, Enum):
-            return value.value
+            return value.name
         return value
 
     def from_json_value(self, obj, raw):
