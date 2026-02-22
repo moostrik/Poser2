@@ -7,10 +7,10 @@ import threading
 import unittest
 from enum import Enum
 
-from modules.settings.setting import Setting
-from modules.settings.action import Action
+from modules.settings.Setting import Setting
+from modules.settings.Action import Action
 from modules.settings.BaseSettings import BaseSettings
-from modules.settings.registry import SettingsRegistry
+from modules.settings.Registry import SettingsRegistry
 
 
 # ---------------------------------------------------------------------------
@@ -560,7 +560,7 @@ class TestFieldsProperty(unittest.TestCase):
     def test_fields_is_a_copy(self):
         s = CameraSettings()
         f = s.fields
-        f["fake"] = None
+        f["fake"] = None # type: ignore
         self.assertNotIn("fake", s.fields)
 
 
@@ -570,8 +570,8 @@ class TestRegistryExtras(unittest.TestCase):
     def test_contains(self):
         reg = SettingsRegistry()
         reg.register("cam", CameraSettings())
-        self.assertIn("cam", reg)
-        self.assertNotIn("nope", reg)
+        self.assertIn("cam", reg) # type: ignore
+        self.assertNotIn("nope", reg) # type: ignore
 
     def test_getitem(self):
         reg = SettingsRegistry()
@@ -664,7 +664,7 @@ class TestAction(unittest.TestCase):
     def test_actions_property_is_copy(self):
         s = SettingsWithActions()
         a = s.actions
-        a["fake"] = None
+        a["fake"] = None # type: ignore
         self.assertNotIn("fake", s.actions)
 
     def test_action_repr(self):

@@ -6,8 +6,8 @@ from typing import Any, Callable
 
 import threading
 
-from modules.settings.setting import Setting
-from modules.settings.action import Action
+from modules.settings.Setting import Setting
+from modules.settings.Action import Action
 
 
 class BaseSettings:

@@ -8,9 +8,9 @@ from typing import Any
 from nicegui import ui
 
 from modules.settings.BaseSettings import BaseSettings
-from modules.settings.setting import Setting
-from modules.settings.action import Action
-from modules.settings.registry import SettingsRegistry
+from modules.settings.Setting import Setting
+from modules.settings.Action import Action
+from modules.settings.Registry import SettingsRegistry
 
 
 def generate_label(name: str) -> str:

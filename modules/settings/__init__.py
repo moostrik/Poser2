@@ -1,6 +1,6 @@
 """Thread-safe reactive settings system with descriptor-based field definitions."""
 
-from modules.settings.setting import Setting
-from modules.settings.action import Action
+from modules.settings.Setting import Setting
+from modules.settings.Action import Action
 from modules.settings.BaseSettings import BaseSettings
-from modules.settings.registry import SettingsRegistry
+from modules.settings.Registry import SettingsRegistry
