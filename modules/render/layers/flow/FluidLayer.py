@@ -3,7 +3,6 @@
 # Standard library imports
 from __future__ import annotations
 from enum import IntEnum, auto
-from dataclasses import dataclass, field
 
 # Third-party imports
 from OpenGL.GL import *  # type: ignore
@@ -15,6 +14,7 @@ from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame, MotionGate, Similarity
 
+from modules.settings import Setting, Child, BaseSettings
 from modules.flow import Visualizer, VisualisationFieldConfig
 from modules.flow.fluid import FluidFlow, FluidFlowConfig
 from modules.render.shaders import DensityColorize
@@ -49,18 +49,16 @@ class FluidDrawMode(IntEnum):
     OBSTACLE = auto()
 
 
-@dataclass
-class FluidLayerConfig:
+class FluidLayerConfig(BaseSettings):
     """Configuration for FluidLayer (fluid simulation)."""
-    fps: float = 110.0
-    num_players: int = 3
-    draw_mode: FluidDrawMode = FluidDrawMode.DENSITY
-    blend_mode: Style.BlendMode = Style.BlendMode.ADD
-    simulation_scale: float = 0.5
+    fps = Setting(float, 110.0, min=1.0, max=240.0)
+    num_players = Setting(int, 3, min=1, max=8)
+    draw_mode = Setting(FluidDrawMode, FluidDrawMode.DENSITY)
+    blend_mode = Setting(Style.BlendMode, Style.BlendMode.ADD)
+    simulation_scale = Setting(float, 0.5, min=0.1, max=2.0)
 
-    # Nested configs
-    visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)
-    fluid_flow: FluidFlowConfig = field(default_factory=FluidFlowConfig)
+    visualisation = Child(VisualisationFieldConfig)
+    fluid_flow = Child(FluidFlowConfig)
 
 
 class FluidLayer(LayerBase):
@@ -203,42 +201,12 @@ class FluidLayer(LayerBase):
 
     def update(self) -> None:
         """Update fluid simulation with inputs from all flow layers."""
-        # Configuration overrides (for hot-reload testing)
-        self.config.fluid_flow.vel_self_advection = 0.01
-        self.config.fluid_flow.vel_lifetime = 30.0
-
-        self.config.fluid_flow.vel_vorticity = 30
-        self.config.fluid_flow.vel_vorticity_radius = 10.0
-        self.config.fluid_flow.vel_viscosity = 50
-        self.config.fluid_flow.vel_viscosity_iter = 40
-
-        # print("dinges")
-        self.config.fluid_flow.speed = 1.0
-        self.config.fluid_flow.den_speed_offset = 0.0
-        self.config.fluid_flow.den_lifetime = 30.0
-
-        self.config.fluid_flow.tmp_lifetime = 3.0
-
-        self.config.fluid_flow.prs_speed = 0.0
-        self.config.fluid_flow.prs_lifetime = 8.0
-        self.config.fluid_flow.prs_iterations = 40
-
-        self.config.fluid_flow.tmp_buoyancy = 0.0
-        self.config.fluid_flow.tmp_weight = -10.0
-
-        self.config.draw_mode = FluidDrawMode.DENSITY
-        self.config.visualisation.toggle_scalar = True
-        self.config.visualisation.spacing = 4.0
-        self.config.visualisation.element_width = 0.5
-
-
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
         similarities: np.ndarray = pose.similarity.values if pose is not None else np.full((self.config.num_players,), 0.0)
         motion_gates: np.ndarray = pose.motion_gate.values if pose is not None else np.full((self.config.num_players,), 0.0)
         motion: float = pose.angle_motion.value if pose is not None else 0.0
         m_s = similarities # * motion_gates  # Modulate similarity by motion gate
-        # print(f"FluidLayer cam_id {self._cam_id} similarities: {similarities}, motion_gates: {motion_gates}")  # DEBUG
 
         self.config.fluid_flow.den_lifetime = 18.0 - (pow(motion, 2.0) * 14.0)  # More motion = faster decay
         # self.config.fluid_flow.den_speed_offset = motion

@@ -3,41 +3,24 @@
 Computes optical flow velocity field from input frames.
 Ported from ofxFlowTools ftOpticalFlow.h
 """
-from dataclasses import dataclass, field
-
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl.Fbo import Fbo
 from modules.gl import Texture, Blit
 
-from .. import FlowBase, FlowUtil, ConfigBase
+from modules.settings import Setting, BaseSettings
+from .. import FlowBase, FlowUtil
 from .shaders import Luminance, MergeRGB, OpticalFlow as OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-@dataclass
-class OpticalFlowConfig(ConfigBase):
-    offset: int = field(
-        default=3,
-        metadata={"min": 1, "max": 10, "label": "Offset", "description": "Gradient sample offset in pixels"}
-    )
-    threshold: float = field(
-        default=0.1,
-        metadata={"min": 0.0, "max": 0.2, "label": "Threshold", "description": "Motion detection threshold"}
-    )
-    strength_x: float = field(
-        default=3.0,
-        metadata={"min": -10.0, "max": 10.0, "label": "Strength X", "description": "X velocity multiplier (negative inverts)"}
-    )
-    strength_y: float = field(
-        default=3.0,
-        metadata={"min": -10.0, "max": 10.0, "label": "Strength Y", "description": "Y velocity multiplier (negative inverts)"}
-    )
-    boost: float = field(
-        default=0.0,
-        metadata={"min": -0.5, "max": 0.9, "label": "Boost", "description": "Power boost for small motions"}
-    )
+class OpticalFlowConfig(BaseSettings):
+    offset = Setting(int, 3, min=1, max=10, description="Gradient sample offset in pixels")
+    threshold = Setting(float, 0.0, min=0.0, max=0.2, description="Motion detection threshold")
+    strength_x = Setting(float, 3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
+    strength_y = Setting(float, 3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
+    boost = Setting(float, 0.0, min=-0.5, max=0.9, description="Power boost for small motions")
 
 
 class OpticalFlow(FlowBase):
@@ -55,7 +38,8 @@ class OpticalFlow(FlowBase):
 
         # Configuration with change notification
         self.config: OpticalFlowConfig = config or OpticalFlowConfig()
-        self.config.watch(self._on_config_changed)
+        for name in self.config.fields:
+            self.config.on_change(name, lambda v: self._on_config_changed())
 
         # State
         self._frame_count: int = 0  # 0=no frames, 1=first frame, 2+=can compute flow

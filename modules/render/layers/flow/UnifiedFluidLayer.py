@@ -11,7 +11,6 @@ Grid Layout (3 players, gap_ratio=0.5):
 
 from __future__ import annotations
 from enum import IntEnum, auto
-from dataclasses import dataclass, field
 
 from OpenGL.GL import *  # type: ignore
 
@@ -21,6 +20,7 @@ from modules.render.layers.LayerBase import LayerBase
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 
+from modules.settings import Setting, Child, BaseSettings
 from modules.flow import Visualizer, VisualisationFieldConfig
 from modules.flow.fluid import FluidFlow, FluidFlowConfig
 from modules.render.shaders import DensityColorize
@@ -59,18 +59,17 @@ class UnifiedFluidDrawMode(IntEnum):
     PRESSURE = auto()
 
 
-@dataclass
-class UnifiedFluidLayerConfig:
+class UnifiedFluidLayerConfig(BaseSettings):
     """Configuration for UnifiedFluidLayer."""
-    fps: float = 60.0
-    num_players: int = 3
-    gap_ratio: float = 0.5  # Gap = 0.5 * slot width
-    draw_mode: UnifiedFluidDrawMode = UnifiedFluidDrawMode.DENSITY
-    blend_mode: Style.BlendMode = Style.BlendMode.ADD
-    simulation_scale: float = 0.25
+    fps = Setting(float, 60.0, min=1.0, max=240.0)
+    num_players = Setting(int, 3, min=1, max=8)
+    gap_ratio = Setting(float, 0.5, min=0.0, max=2.0, description="Gap = ratio * slot width")
+    draw_mode = Setting(UnifiedFluidDrawMode, UnifiedFluidDrawMode.DENSITY)
+    blend_mode = Setting(Style.BlendMode, Style.BlendMode.ADD)
+    simulation_scale = Setting(float, 0.25, min=0.1, max=2.0)
 
-    visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)
-    fluid_flow: FluidFlowConfig = field(default_factory=FluidFlowConfig)
+    visualisation = Child(VisualisationFieldConfig)
+    fluid_flow = Child(FluidFlowConfig)
 
 
 class UnifiedFluidLayer(LayerBase):
@@ -217,31 +216,6 @@ class UnifiedFluidLayer(LayerBase):
     def update(self) -> None:
         """Update unified fluid simulation with inputs from all flow layers."""
         import numpy as np
-
-        # Hot-reload config overrides
-        self.config.fluid_flow.vel_self_advection = 0.01
-        self.config.fluid_flow.vel_lifetime = 30.0
-
-        self.config.fluid_flow.vel_vorticity = 10
-        self.config.fluid_flow.vel_vorticity_radius = 3.0
-        self.config.fluid_flow.vel_viscosity = 8.0
-        self.config.fluid_flow.vel_viscosity_iter = 40
-
-        self.config.fluid_flow.speed = 0.1
-        self.config.fluid_flow.den_speed_offset = 0.0
-        self.config.fluid_flow.den_lifetime = 12
-
-        self.config.fluid_flow.tmp_lifetime = 3.0
-
-        self.config.fluid_flow.prs_speed = 0.0
-        self.config.fluid_flow.prs_lifetime = 0.3
-        self.config.fluid_flow.prs_iterations = 40
-
-        self.config.fluid_flow.tmp_buoyancy = 0.0
-        self.config.fluid_flow.tmp_weight = -10.0
-
-        draw_mode: UnifiedFluidDrawMode = UnifiedFluidDrawMode.VELOCITY
-
 
         # Get pose data for motion/similarity modulation (like original FluidLayer)
         motions: dict[int, float] = {}

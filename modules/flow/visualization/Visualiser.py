@@ -3,8 +3,6 @@
 Automatically chooses visualization method based on texture format.
 Ported from ofxFlowTools ftVisualizationField.h
 """
-from dataclasses import dataclass, field
-
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture
@@ -30,7 +28,8 @@ class Visualizer:
 
     def __init__(self, config: VisualisationFieldConfig | None = None) -> None:
         self._config: VisualisationFieldConfig = config or VisualisationFieldConfig()
-        self._config.watch(self._on_config_changed)
+        for name in self._config.fields:
+            self._config.on_change(name, lambda v: self._on_config_changed())
 
         # Velocity visualization for 2-channel data
         self.velocity_field: VelocityField = VelocityField(self._config)

@@ -12,6 +12,7 @@ from modules.render.layers import LayerBase
 from modules.DataHub import DataHub, Stage
 from modules.gui.PyReallySimpleGui import Gui
 from modules.render.Config import Config, DataLayer
+from modules.settings import SettingsRegistry
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -157,7 +158,7 @@ PREVIEW_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
 FINAL_LAYERS: list[Layers] = SHOW_COMP
 
 class RenderManager(RenderBase):
-    def __init__(self, gui: Gui, data_hub: DataHub, settings: Config) -> None:
+    def __init__(self, gui: Gui, data_hub: DataHub, settings: Config, registry: SettingsRegistry | None = None) -> None:
         self.num_players: int = settings.num_players
         self.num_cams: int =    settings.num_cams
 
@@ -188,6 +189,14 @@ class RenderManager(RenderBase):
         self.data_time_config =     ls.MTimeRendererConfig( stage=Stage.LERP)
         self.composite_config =     ls.CompositeLayerConfig(lut=settings.lut, lut_strength=settings.lut_strength)
 
+        # Flow / fluid configs (shared across all cameras)
+        self.flow_config =          ls.FlowLayerConfig()
+        self.fluid_config =         ls.FluidLayerConfig()
+
+        if registry is not None:
+            registry.register("flow_layer", self.flow_config, group="flow")
+            registry.register("fluid_layer", self.fluid_config, group="flow")
+
         # Watch settings for LUT changes and propagate to composite config
         settings.watch(lambda v: setattr(self.composite_config, 'lut', v), 'lut')
         settings.watch(lambda v: setattr(self.composite_config, 'lut_strength', v), 'lut_strength')
@@ -213,8 +222,8 @@ class RenderManager(RenderBase):
 
             motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,   centre_mask.texture, color)
             ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub,   mask_textures, centre_frg.texture, list(TRACK_COLORS))
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask, centre_mask.texture, list(TRACK_COLORS))
-            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS))
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask, centre_mask.texture, list(TRACK_COLORS), config=self.flow_config)
+            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS), config=self.fluid_config)
 
             self.L[Layers.composite][i] = ls.CompositeLayer([fluid, ms_mask], self.composite_config)
 

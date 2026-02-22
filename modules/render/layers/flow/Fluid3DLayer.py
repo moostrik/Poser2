@@ -9,7 +9,6 @@ the same DensityColorize pipeline as FluidLayer.
 # Standard library imports
 from __future__ import annotations
 from enum import IntEnum, auto
-from dataclasses import dataclass, field
 
 # Third-party imports
 from OpenGL.GL import *  # type: ignore
@@ -21,6 +20,7 @@ from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame, MotionGate, Similarity
 
+from modules.settings import Setting, Child, BaseSettings
 from modules.flow import Visualizer, VisualisationFieldConfig
 from modules.flow.fluid3d import FluidFlow3D, FluidFlow3DConfig
 from modules.render.shaders import DensityColorize
@@ -41,18 +41,16 @@ class Fluid3DDrawMode(IntEnum):
     DENSITY_RAW = auto()
 
 
-@dataclass
-class Fluid3DLayerConfig:
+class Fluid3DLayerConfig(BaseSettings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
-    fps: float = 30.0
-    num_players: int = 3
-    draw_mode: Fluid3DDrawMode = Fluid3DDrawMode.DENSITY
-    blend_mode: Style.BlendMode = Style.BlendMode.ADD
-    simulation_scale: float = 0.5
+    fps = Setting(float, 30.0, min=1.0, max=240.0)
+    num_players = Setting(int, 3, min=1, max=8)
+    draw_mode = Setting(Fluid3DDrawMode, Fluid3DDrawMode.DENSITY)
+    blend_mode = Setting(Style.BlendMode, Style.BlendMode.ADD)
+    simulation_scale = Setting(float, 0.5, min=0.1, max=2.0)
 
-    # Nested configs
-    visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)
-    fluid_flow: FluidFlow3DConfig = field(default_factory=FluidFlow3DConfig)
+    visualisation = Child(VisualisationFieldConfig)
+    fluid_flow = Child(FluidFlow3DConfig)
 
 
 class Fluid3DLayer(LayerBase):
@@ -164,37 +162,6 @@ class Fluid3DLayer(LayerBase):
 
     def update(self) -> None:
         """Update 3D fluid simulation with inputs from all flow layers."""
-        # Configuration overrides (for hot-reload testing)
-        # 3D needs more conservative values than 2D:
-        # - 3D curl is a vector (cross product amplifies forces)
-        # - 6-neighbor Jacobi converges slower than 4-neighbor
-        # - vorticity energy injection compounds across depth layers
-        self.config.fluid_flow.vel_self_advection = 0.01
-        self.config.fluid_flow.vel_lifetime = 10.0
-
-        self.config.fluid_flow.vel_vorticity = 5
-        self.config.fluid_flow.vel_vorticity_radius = 3.0
-        self.config.fluid_flow.vel_viscosity = 15
-        self.config.fluid_flow.vel_viscosity_iter = 40
-
-        self.config.fluid_flow.speed = 1.0
-        self.config.fluid_flow.den_speed_offset = 0.0
-        self.config.fluid_flow.den_lifetime = 30.0
-
-        self.config.fluid_flow.tmp_lifetime = 3.0
-
-        self.config.fluid_flow.prs_speed = 0.0
-        self.config.fluid_flow.prs_lifetime = 8.0
-        self.config.fluid_flow.prs_iterations = 40
-
-        self.config.fluid_flow.tmp_buoyancy = 0.0
-        self.config.fluid_flow.tmp_weight = -10.0
-
-        self.config.draw_mode = Fluid3DDrawMode.DENSITY
-        self.config.visualisation.toggle_scalar = True
-        self.config.visualisation.spacing = 4.0
-        self.config.visualisation.element_width = 0.5
-
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
         similarities: np.ndarray = (

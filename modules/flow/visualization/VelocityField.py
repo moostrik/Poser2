@@ -3,9 +3,6 @@
 Renders velocity fields with color encoding or arrow visualization.
 Ported from ofxFlowTools ftVisualizationField.h
 """
-from dataclasses import dataclass, field
-from enum import Enum
-
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture
@@ -32,7 +29,8 @@ class VelocityField(FieldBase):
 
         # Configuration with change notification
         self.config: VisualisationFieldConfig = config or VisualisationFieldConfig()
-        self.config.watch(self._on_config_changed)
+        for name in self.config.fields:
+            self.config.on_change(name, lambda v: self._on_config_changed())
 
         self._velocity_texture: Texture | None = None
 

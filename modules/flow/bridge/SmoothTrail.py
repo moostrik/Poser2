@@ -4,42 +4,20 @@ Provides temporal smoothing (trail effect) and spatial smoothing (Gaussian blur)
 for any field type (velocity, density, etc).
 """
 
-from dataclasses import dataclass, field
-
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture
-from .. import FlowBase, FlowUtil, ConfigBase
+from modules.settings import Setting, BaseSettings
+from .. import FlowBase, FlowUtil
 from .shaders import Trail, GaussianBlur
 
 
-@dataclass
-class SmoothTrailConfig(ConfigBase):
+class SmoothTrailConfig(BaseSettings):
     """Configuration for trail smoothing."""
-    scale: float = field(
-        default=1.0,
-        metadata={
-            "min": -10.0,
-            "max": 10.0,
-            "label": "Velocity Scale",
-            "description": "Converts optical flow to simulation velocity"
-        }
-    )
-    trail_weight: float = field(
-        default=0.3,
-        metadata={"min": 0.0, "max": 0.99, "label": "Trail Weight",
-                  "description": "Temporal smoothing (0=no trail, 0.99=long trail)"}
-    )
-    blur_radius: float = field(
-        default=3.0,
-        metadata={"min": 0.0, "max": 10.0, "label": "Blur Radius",
-                  "description": "Gaussian blur radius in pixels"}
-    )
-    blur_steps: int = field(
-        default=1,
-        metadata={"min": 0, "max": 8, "label": "Blur Steps",
-                  "description": "Number of Gaussian blur passes"}
-    )
+    scale = Setting(float, 1.0, min=-10.0, max=10.0, description="Converts optical flow to simulation velocity")
+    trail_weight = Setting(float, 0.9, min=0.0, max=0.99, description="Temporal smoothing (0=no trail, 0.99=long trail)")
+    blur_radius = Setting(float, 8.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
+    blur_steps = Setting(int, 4, min=0, max=8, description="Number of Gaussian blur passes")
 
 
 class SmoothTrail(FlowBase):

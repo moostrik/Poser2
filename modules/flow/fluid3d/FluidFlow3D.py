@@ -21,14 +21,12 @@ Boundary conditions via per-field wrap modes (no explicit border obstacles):
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo, Fbo
 from modules.gl.Texture3D import Texture3D, SwapTexture3D
 from modules.gl.ComputeShader import ComputeShader
-from .. import ConfigBase
+from modules.settings import Setting, BaseSettings
 from .shaders import (
     Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
@@ -45,142 +43,45 @@ _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 # Configuration
 # ---------------------------------------------------------------------------
 
-@dataclass
-class FluidFlow3DConfig(ConfigBase):
+class FluidFlow3DConfig(BaseSettings):
     """Configuration for 3D fluid simulation.
 
-    Inherits the same speed/lifetime/vorticity/buoyancy model as FluidFlowConfig,
+    Same speed/lifetime/vorticity/buoyancy model as FluidFlowConfig,
     with additional depth-specific parameters.
-
-    Speed model:
-        One 'speed' parameter controls all passive scalar transport (density,
-        temperature, pressure). At speed=1.0, a velocity value of 1.0 moves
-        fluid across the full texture width in 1 second.
-
-    Lifetime model:
-        Exponential frame-rate-independent decay: multiplier = 0.01^(dt/lifetime).
-        lifetime=3.0 means the field retains ~1% after 3 seconds.
     """
 
     # ---- Depth parameters ----
-    depth_layers: int = field(
-        default=16,
-        metadata={"min": 4, "max": 64, "label": "Depth Layers",
-                  "description": "Number of depth layers in the 3D volume (4-64). "
-                                 "Higher values = more detail in Z but more VRAM."}
-    )
-    depth_scale: float = field(
-        default=1.0,
-        metadata={"min": 0.1, "max": 4.0, "label": "Depth Scale",
-                  "description": "Z grid spacing relative to XY. 1.0 = isotropic voxels, "
-                                 "<1.0 = thinner, >1.0 = deeper volume."}
-    )
-    composite_mode: int = field(
-        default=1,
-        metadata={"min": 0, "max": 2, "label": "Composite Mode",
-                  "description": "3D->2D compositing: 0=front-to-back alpha, "
-                                 "1=additive, 2=max intensity projection"}
-    )
-    injection_layer: float = field(
-        default=0.5,
-        metadata={"min": 0.0, "max": 1.0, "label": "Injection Layer",
-                  "description": "Normalized depth [0,1] for 2D->3D injection center"}
-    )
-    injection_spread: float = field(
-        default=0.15,
-        metadata={"min": 0.01, "max": 0.5, "label": "Injection Spread",
-                  "description": "Gaussian sigma for depth spread during injection"}
-    )
+    depth_layers = Setting(int, 16, min=4, max=64, description="Number of depth layers in the 3D volume")
+    depth_scale = Setting(float, 1.0, min=0.1, max=4.0, description="Z grid spacing relative to XY")
+    composite_mode = Setting(int, 1, min=0, max=2, description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
+    injection_layer = Setting(float, 0.5, min=0.0, max=1.0, description="Normalized depth for 2D->3D injection center")
+    injection_spread = Setting(float, 0.15, min=0.01, max=0.5, description="Gaussian sigma for depth spread during injection")
 
     # ---- Transport speed ----
-    speed: float = field(
-        default=1.0,
-        metadata={"min": 0.0, "max": 5.0, "label": "Flow Speed",
-                  "description": "Base fluid transport rate. At 1.0, velocity=1.0 crosses full texture/s."}
-    )
-    vel_self_advection: float = field(
-        default=0.01,
-        metadata={"min": 0.0, "max": 0.2, "label": "Velocity Self-Advection",
-                  "description": "How much velocity advects itself. Keep low for stability."}
-    )
-    den_speed_offset: float = field(
-        default=0.0,
-        metadata={"min": -5.0, "max": 5.0, "label": "Density Speed Offset",
-                  "description": "Added to base speed for density only. 0 = physically coupled."}
-    )
+    speed = Setting(float, 1.0, min=0.0, max=5.0, description="Base fluid transport rate")
+    vel_self_advection = Setting(float, 0.01, min=0.0, max=0.2, description="How much velocity advects itself")
+    den_speed_offset = Setting(float, 0.0, min=-5.0, max=5.0, description="Added to base speed for density only")
 
     # ---- Velocity parameters ----
-    vel_lifetime: float = field(
-        default=3.0,
-        metadata={"min": 0.01, "max": 60.0, "label": "Velocity Lifetime",
-                  "description": "Seconds until velocity fades to ~1%."}
-    )
-    vel_vorticity: float = field(
-        default=0.0,
-        metadata={"min": 0.0, "max": 60.0, "label": "Vorticity",
-                  "description": "Vortex confinement strength (adds turbulence)"}
-    )
-    vel_vorticity_radius: float = field(
-        default=1.0,
-        metadata={"min": 1.0, "max": 30.0, "label": "Vorticity Radius",
-                  "description": "Curl sampling radius in texels (larger = bigger swirls)"}
-    )
-    vel_viscosity: float = field(
-        default=0.0,
-        metadata={"min": 0, "max": 4, "label": "Viscosity",
-                  "description": "Fluid thickness/resistance to flow"}
-    )
-    vel_viscosity_iter: int = field(
-        default=20,
-        metadata={"min": 1, "max": 60, "label": "Viscosity Iterations",
-                  "description": "Solver iterations for viscosity"}
-    )
+    vel_lifetime = Setting(float, 10.0, min=0.01, max=60.0, description="Seconds until velocity fades to ~1%")
+    vel_vorticity = Setting(float, 5.0, min=0.0, max=60.0, description="Vortex confinement strength")
+    vel_vorticity_radius = Setting(float, 3.0, min=1.0, max=30.0, description="Curl sampling radius in texels")
+    vel_viscosity = Setting(float, 15.0, min=0.0, max=100.0, description="Fluid thickness/resistance to flow")
+    vel_viscosity_iter = Setting(int, 40, min=1, max=60, description="Solver iterations for viscosity")
 
     # ---- Pressure parameters ----
-    prs_speed: float = field(
-        default=0.33,
-        metadata={"min": 0.0, "max": 2.0, "label": "Pressure Speed",
-                  "description": "Pressure advection speed (0 = physical accuracy)"}
-    )
-    prs_lifetime: float = field(
-        default=0.3,
-        metadata={"min": 0.01, "max": 60.0, "label": "Pressure Lifetime",
-                  "description": "Seconds until pressure fades to ~1%."}
-    )
-    prs_iterations: int = field(
-        default=40,
-        metadata={"min": 1, "max": 60, "label": "Pressure Iterations",
-                  "description": "Solver iterations for pressure projection"}
-    )
+    prs_speed = Setting(float, 0.0, min=0.0, max=2.0, description="Pressure advection speed")
+    prs_lifetime = Setting(float, 8.0, min=0.01, max=60.0, description="Seconds until pressure fades to ~1%")
+    prs_iterations = Setting(int, 40, min=1, max=60, description="Solver iterations for pressure")
 
     # ---- Density parameters ----
-    den_lifetime: float = field(
-        default=3.0,
-        metadata={"min": 0.01, "max": 60.0, "label": "Density Lifetime",
-                  "description": "Seconds until density fades to ~1%."}
-    )
+    den_lifetime = Setting(float, 30.0, min=0.01, max=60.0, description="Seconds until density fades to ~1%")
 
     # ---- Temperature parameters ----
-    tmp_lifetime: float = field(
-        default=3.0,
-        metadata={"min": 0.01, "max": 60.0, "label": "Temperature Lifetime",
-                  "description": "Seconds until temperature fades to ~1%."}
-    )
-    tmp_buoyancy: float = field(
-        default=0.0,
-        metadata={"min": 0.0, "max": 10.0, "label": "Buoyancy",
-                  "description": "Thermal buoyancy coefficient (sigma): hot air rises"}
-    )
-    tmp_weight: float = field(
-        default=0.25,
-        metadata={"min": 0.0, "max": 2.0, "label": "Density Weight Ratio",
-                  "description": "Ratio of gravity/settling effect vs thermal lift"}
-    )
-    tmp_ambient: float = field(
-        default=0.2,
-        metadata={"min": 0.0, "max": 1.0, "label": "Ambient Temperature",
-                  "description": "Reference temperature (buoyancy = 0 at this temp)"}
-    )
+    tmp_lifetime = Setting(float, 3.0, min=0.01, max=60.0, description="Seconds until temperature fades to ~1%")
+    tmp_buoyancy = Setting(float, 0.0, min=0.0, max=10.0, description="Thermal buoyancy coefficient: hot air rises")
+    tmp_weight = Setting(float, -10.0, min=-20.0, max=2.0, description="Ratio of gravity/settling vs thermal lift")
+    tmp_ambient = Setting(float, 0.2, min=0.0, max=1.0, description="Reference temperature (buoyancy = 0 at this temp)")
 
 
 # ---------------------------------------------------------------------------

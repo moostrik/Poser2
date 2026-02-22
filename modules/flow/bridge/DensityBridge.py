@@ -4,30 +4,19 @@ Combines RGB density with velocity magnitude for fluid simulation.
 
 Ported from ofxFlowTools ftDensityBridgeFlow.h
 """
-from dataclasses import dataclass, field
-
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo
-from .. import FlowBase, FlowUtil, ConfigBase
+from modules.settings import Setting, BaseSettings
+from .. import FlowBase, FlowUtil
 from .shaders.DensityBridgeShader import DensityBridgeShader
 from ..shaders.HSV import HSV
 
 
-@dataclass
-class DensityBridgeConfig(ConfigBase):
+class DensityBridgeConfig(BaseSettings):
     """Configuration for density bridge."""
-
-    saturation: float = field(
-        default=2.5,
-        metadata={"min": 0.0, "max": 5.0, "label": "Saturation",
-                  "description": "Color saturation boost"}
-    )
-    brightness: float = field(
-        default=1.0,
-        metadata={"min": 0.0, "max": 2.0, "label": "Brightness",
-                  "description": "Brightness/value adjustment"}
-    )
+    saturation = Setting(float, 1.2, min=0.0, max=5.0, description="Color saturation boost")
+    brightness = Setting(float, 1.0, min=0.0, max=2.0, description="Brightness/value adjustment")
 
 
 class DensityBridge(FlowBase):

@@ -2,7 +2,6 @@
 
 # Standard library imports
 from enum import IntEnum, auto
-from dataclasses import dataclass, field
 
 # Third-party imports
 from OpenGL.GL import *  # type: ignore
@@ -15,6 +14,7 @@ from modules.pose.Frame import Frame
 
 from modules.render.layers.source.MaskSourceLayer import MaskSourceLayer
 
+from modules.settings import Setting, Child, BaseSettings
 from modules.flow import (
     OpticalFlow, OpticalFlowConfig,
     VelocitySmoothTrail, SmoothTrailConfig,
@@ -52,19 +52,18 @@ class FlowDrawMode(IntEnum):
     TEMP_BRIDGE_OUTPUT = auto()
 
 
-@dataclass
-class FlowLayerConfig:
+class FlowLayerConfig(BaseSettings):
     """Configuration for FlowLayer (optical flow + bridges)."""
-    fps: float = 60.0
-    draw_mode: FlowDrawMode = FlowDrawMode.SMOOTH_VELOCITY_OUTPUT
-    blend_mode: Style.BlendMode = Style.BlendMode.ADD
-    simulation_scale: float = 0.5
+    fps = Setting(float, 60.0, min=1.0, max=240.0)
+    draw_mode = Setting(FlowDrawMode, FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
+    blend_mode = Setting(Style.BlendMode, Style.BlendMode.ADD)
+    simulation_scale = Setting(float, 0.5, min=0.1, max=2.0)
 
-    visualisation: VisualisationFieldConfig = field(default_factory=VisualisationFieldConfig)
-    optical_flow: OpticalFlowConfig = field(default_factory=OpticalFlowConfig)
-    velocity_trail: SmoothTrailConfig = field(default_factory=SmoothTrailConfig)
-    density_bridge: DensityBridgeConfig = field(default_factory=DensityBridgeConfig)
-    temperature_bridge: TemperatureBridgeConfig = field(default_factory=TemperatureBridgeConfig)
+    visualisation = Child(VisualisationFieldConfig)
+    optical_flow = Child(OpticalFlowConfig)
+    velocity_trail = Child(SmoothTrailConfig)
+    density_bridge = Child(DensityBridgeConfig)
+    temperature_bridge = Child(TemperatureBridgeConfig)
 
 
 # Keep FlowConfig as alias for backward compatibility
@@ -191,29 +190,6 @@ class FlowLayer(LayerBase):
 
     def update(self) -> None:
         """Update optical flow and bridges."""
-        # Configuration overrides (for hot-reload testing)
-        self.config.visualisation.element_width = 1.0
-        self.config.visualisation.spacing = 20
-        self.config.visualisation.element_length = 40.0
-        self.config.visualisation.scale = 1.0
-        self.config.visualisation.toggle_scalar = False
-
-        self.config.optical_flow.offset = 3
-        self.config.optical_flow.threshold = 0.0
-        self.config.optical_flow.strength_x = 3.3
-        self.config.optical_flow.strength_y = 3.3
-        self.config.optical_flow.boost = 0.0
-
-        self.config.velocity_trail.scale = 1.0
-        self.config.velocity_trail.trail_weight = 0.9
-        self.config.velocity_trail.blur_steps = 4
-        self.config.velocity_trail.blur_radius = 8.0
-
-        self.config.density_bridge.saturation = 1.2
-        self.config.density_bridge.brightness = 1.0
-
-        self.config.draw_mode = FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR
-
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
         motion = pose.angle_motion.value if pose is not None else 0.0

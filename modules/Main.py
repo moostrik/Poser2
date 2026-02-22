@@ -17,6 +17,8 @@ from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBan
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
 from modules.utils import Timer, TimerConfig
+from modules.settings import SettingsRegistry
+from modules.settings import server as settings_server
 
 class Main():
     def __init__(self, settings: Settings) -> None:
@@ -68,9 +70,15 @@ class Main():
         self.timer = Timer(self.timer_config)
         self.timer_gui = ConfigGuiGenerator(self.timer_config, self.gui, "Timer")
 
+        # SETTINGS REGISTRY
+        self.registry = SettingsRegistry()
+
         # RENDER
-        self.render = RenderManager(self.gui, self.data_hub, settings.render)
+        self.render = RenderManager(self.gui, self.data_hub, settings.render, self.registry)
         self.data_gui = ConfigGuiGenerator(settings.render, self.gui, "Render", 4)
+
+        # SETTINGS SERVER (NiceGUI on port 666)
+        settings_server.start(self.registry, port=666)
 
         # POSE CONFIGURATION
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=384, output_height=512, max_poses=settings.pose.max_poses)

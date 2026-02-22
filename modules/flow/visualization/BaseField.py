@@ -3,40 +3,22 @@
 Ported from ofxFlowTools ftVisualization.h
 """
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Fbo, Texture, Blit
 from modules.utils.PointsAndRects import Rect
 
-from .. import ConfigBase
+from modules.settings import Setting, BaseSettings
 
 
-@dataclass
-class VisualisationFieldConfig(ConfigBase):
+class VisualisationFieldConfig(BaseSettings):
     """Base configuration for field visualizations."""
-    toggle_scalar: bool = field(
-        default=False,
-        metadata={"label": "Toggle Scalar",
-                  "description": "Toggle between direction map and arrow field"}
-    )
-    scale: float = field(
-        default=1.0,
-        metadata={"min": 0.0, "max": 10.0, "label": "Scale",
-                  "description": "Visualization scale multiplier"}
-    )
-    spacing: float = field(
-        default=20.0,
-        metadata={"min": 4.0, "max": 64.0, "label": "Grid Spacing", "description": "Distance between elements (pixels)"}
-    )
-    element_length: float = field(
-        default=40.0,
-    )
-    element_width: float = field(
-        default=0.8,
-        metadata={"min": 0.5, "max": 2.5, "label": "Element Width", "description": "Element line width"}
-    )
+    toggle_scalar = Setting(bool, False, description="Toggle between direction map and arrow field")
+    scale = Setting(float, 1.0, min=0.0, max=10.0, description="Visualization scale multiplier")
+    spacing = Setting(float, 20.0, min=4.0, max=64.0, description="Distance between elements (pixels)")
+    element_length = Setting(float, 40.0, description="Arrow element length")
+    element_width = Setting(float, 1.0, min=0.5, max=2.5, description="Element line width")
 
 
 class FieldBase(ABC):
