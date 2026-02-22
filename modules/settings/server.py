@@ -3,13 +3,14 @@
 import logging
 import threading
 
-from nicegui import ui
+from nicegui import ui, app as nicegui_app
 
 from modules.settings.panel import create_settings_panel
 
 logger = logging.getLogger(__name__)
 
 _server_thread = None
+_server = None
 
 
 def start(registry, port=666):
@@ -18,7 +19,7 @@ def start(registry, port=666):
     Call once during app startup. The server shuts down automatically
     when the main process exits (daemon thread).
     """
-    global _server_thread
+    global _server_thread, _server
 
     if _server_thread is not None and _server_thread.is_alive():
         logger.warning("Settings server already running")
@@ -45,3 +46,17 @@ def start(registry, port=666):
     _server_thread = threading.Thread(target=_run, daemon=True, name="settings-ui")
     _server_thread.start()
     logger.info(f"Settings UI started on http://localhost:{port}")
+
+    import webbrowser
+    webbrowser.open(f"http://localhost:{port}")
+
+
+def stop():
+    """Shut down the NiceGUI settings server."""
+    global _server_thread
+    try:
+        nicegui_app.shutdown()
+        logger.info("Settings server stopped")
+    except Exception:
+        logger.warning("Settings server shutdown failed", exc_info=True)
+    _server_thread = None

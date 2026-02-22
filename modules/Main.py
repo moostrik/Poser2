@@ -389,6 +389,7 @@ class Main():
         self.window_similator.stop()
         self.window_correlator.stop()
 
+        settings_server.stop()
 
         self.gui.stop()
 

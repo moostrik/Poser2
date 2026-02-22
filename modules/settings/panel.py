@@ -71,7 +71,7 @@ def _build_field_control(settings, name, field):
         settings.on_change(name, update_switch)
         return
 
-    # -- int/float with min+max → slider + number ----------------------------
+    # -- int/float with min+max → slider -------------------------------------
     if field.type_ in (int, float) and field.min is not None and field.max is not None:
         step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
 
@@ -80,28 +80,14 @@ def _build_field_control(settings, name, field):
             sl = ui.slider(
                 min=field.min, max=field.max, step=step, value=value
             ).props("dense label-always" + (" disable" if is_disabled else "")).classes("flex-grow")
-            num = ui.number(
-                value=value, min=field.min, max=field.max, step=step,
-                format=f"%.0f" if field.type_ is int else f"%.2f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
-        def on_slider_change(e, num=num):
-            val = field.type_(e.value)
-            setattr(settings, name, val)
-            num.set_value(val)
-
-        def on_number_change(e, sl=sl):
-            if e.value is not None:
-                val = field.type_(e.value)
-                setattr(settings, name, val)
-                sl.set_value(val)
+        def on_slider_change(e):
+            setattr(settings, name, field.type_(e.value))
 
         sl.on_value_change(on_slider_change)
-        num.on_value_change(on_number_change)
 
-        def update_slider(v, sl=sl, num=num):
+        def update_slider(v, sl=sl):
             sl.set_value(v)
-            num.set_value(v)
 
         settings.on_change(name, update_slider)
         return
