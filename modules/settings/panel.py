@@ -5,9 +5,9 @@ from enum import Enum
 from nicegui import ui
 
 from modules.settings.base_settings import BaseSettings
-from modules.settings.Setting_ import Setting
-from modules.settings.Action_ import Action
-from modules.settings.Registry_ import SettingsRegistry
+from modules.settings.setting import Setting
+from modules.settings.action import Action
+from modules.settings.registry import SettingsRegistry
 
 
 def generate_label(name):
