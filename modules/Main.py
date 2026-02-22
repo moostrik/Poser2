@@ -77,8 +77,16 @@ class Main():
         self.render = RenderManager(self.gui, self.data_hub, settings.render, self.registry)
         self.data_gui = ConfigGuiGenerator(settings.render, self.gui, "Render", 4)
 
+        # Load default preset (after all subsystems have registered)
+        from modules.settings.panel import SETTINGS_DIR, PRESET_SUFFIX
+        default_path = SETTINGS_DIR / f"default{PRESET_SUFFIX}"
+        if default_path.exists():
+            self.registry.load(default_path)
+        else:
+            self.registry.save(default_path)
+
         # SETTINGS SERVER (NiceGUI on port 666)
-        settings_server.start(self.registry, port=666)
+        settings_server.start(self.registry, port=666, on_exit=self.stop)
 
         # POSE CONFIGURATION
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=384, output_height=512, max_poses=settings.pose.max_poses)

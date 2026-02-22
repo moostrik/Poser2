@@ -1,6 +1,7 @@
 """NiceGUI settings panel — auto-generates a tabbed UI from a SettingsRegistry."""
 
 from enum import Enum
+from pathlib import Path
 
 from nicegui import ui
 
@@ -8,6 +9,9 @@ from modules.settings.base_settings import BaseSettings
 from modules.settings.setting import Setting
 from modules.settings.action import Action
 from modules.settings.registry import SettingsRegistry
+
+SETTINGS_DIR = Path("files/settings")
+PRESET_SUFFIX = ".reactive.json"
 
 
 def generate_label(name):
@@ -216,6 +220,83 @@ def _build_settings_card(name, settings):
             _build_settings_card(child_name, child)
 
 
+def _scan_presets():
+    """Return sorted list of preset names (without suffix) from the settings directory."""
+    SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
+    return sorted(
+        p.name.removesuffix(PRESET_SUFFIX)
+        for p in SETTINGS_DIR.glob(f"*{PRESET_SUFFIX}")
+    )
+
+
+def _build_save_load_toolbar(registry):
+    """Build a preset toolbar: dropdown, name input, Save / Load / Delete buttons."""
+    presets = _scan_presets()
+
+    with ui.row().classes("w-full items-end gap-2 flex-nowrap"):
+        dropdown = ui.select(
+            options=presets,
+            value=presets[0] if presets else None,
+            label="Preset",
+        ).props("dense outlined clearable").classes("min-w-[180px] flex-1")
+
+        name_input = ui.input(
+            label="Name",
+            value=dropdown.value or "",
+        ).props("dense outlined").classes("min-w-[140px] flex-1")
+
+        # Sync: selecting a preset fills the name input
+        def on_dropdown_change(e):
+            if e.value:
+                name_input.set_value(e.value)
+
+        dropdown.on_value_change(on_dropdown_change)
+
+        def _refresh_dropdown():
+            updated = _scan_presets()
+            dropdown.set_options(updated)
+
+        def do_save():
+            preset_name = (name_input.value or "").strip()
+            if not preset_name:
+                ui.notify("Enter a preset name", type="warning")
+                return
+            path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
+            registry.save(path)
+            _refresh_dropdown()
+            dropdown.set_value(preset_name)
+            ui.notify(f"Saved '{preset_name}'", type="positive")
+
+        def do_load():
+            preset_name = dropdown.value
+            if not preset_name:
+                ui.notify("Select a preset to load", type="warning")
+                return
+            path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
+            if not path.exists():
+                ui.notify(f"Preset '{preset_name}' not found", type="negative")
+                return
+            registry.load(path)
+            ui.notify(f"Loaded '{preset_name}'", type="positive")
+
+        def do_delete():
+            preset_name = dropdown.value
+            if not preset_name:
+                ui.notify("Select a preset to delete", type="warning")
+                return
+            path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
+            if path.exists():
+                path.unlink()
+            _refresh_dropdown()
+            dropdown.set_value(None)
+            name_input.set_value("")
+            ui.notify(f"Deleted '{preset_name}'", type="info")
+
+        ui.button(icon="save", on_click=do_save).props("dense flat").tooltip("Save preset")
+        ui.button(icon="file_open", on_click=do_load).props("dense flat").tooltip("Load preset")
+        ui.button(icon="delete", on_click=do_delete).props("dense flat color=negative").tooltip("Delete preset")
+
+
 def create_settings_panel(registry):
     """Build a full tabbed settings panel from a SettingsRegistry.
 
@@ -225,6 +306,8 @@ def create_settings_panel(registry):
         def index():
             create_settings_panel(registry)
     """
+    _build_save_load_toolbar(registry)
+
     group_map = registry.groups()
     if not group_map:
         ui.label("No settings registered.")

@@ -111,6 +111,9 @@ class Setting(Generic[T]):
             return float(value)
         # Enum: reconstruct from stored .value
         if isinstance(self.type_, type) and issubclass(self.type_, Enum):
+            # JSON round-trips tuples as lists — restore tuple for hashable lookup
+            if isinstance(value, list):
+                value = tuple(value)
             try:
                 return self.type_(value)
             except (ValueError, KeyError):
