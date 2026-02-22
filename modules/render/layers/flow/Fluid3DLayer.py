@@ -44,7 +44,7 @@ class Fluid3DDrawMode(IntEnum):
 @dataclass
 class Fluid3DLayerConfig:
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
-    fps: float = 110.0
+    fps: float = 30.0
     num_players: int = 3
     draw_mode: Fluid3DDrawMode = Fluid3DDrawMode.DENSITY
     blend_mode: Style.BlendMode = Style.BlendMode.ADD
@@ -165,12 +165,16 @@ class Fluid3DLayer(LayerBase):
     def update(self) -> None:
         """Update 3D fluid simulation with inputs from all flow layers."""
         # Configuration overrides (for hot-reload testing)
+        # 3D needs more conservative values than 2D:
+        # - 3D curl is a vector (cross product amplifies forces)
+        # - 6-neighbor Jacobi converges slower than 4-neighbor
+        # - vorticity energy injection compounds across depth layers
         self.config.fluid_flow.vel_self_advection = 0.01
-        self.config.fluid_flow.vel_lifetime = 30.0
+        self.config.fluid_flow.vel_lifetime = 10.0
 
-        self.config.fluid_flow.vel_vorticity = 30
-        self.config.fluid_flow.vel_vorticity_radius = 10.0
-        self.config.fluid_flow.vel_viscosity = 50
+        self.config.fluid_flow.vel_vorticity = 5
+        self.config.fluid_flow.vel_vorticity_radius = 3.0
+        self.config.fluid_flow.vel_viscosity = 15
         self.config.fluid_flow.vel_viscosity_iter = 40
 
         self.config.fluid_flow.speed = 1.0

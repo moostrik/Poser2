@@ -44,7 +44,12 @@ class VorticityCurl3D(ComputeShader):
         dx = grid_scale
         dy = grid_scale * aspect
         dz = grid_scale * depth_scale
-        glUniform3f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / dx, 0.5 / dy, 0.5 / dz)
+        # Scale by radius: actual sample spacing is radius texels, not 1 texel
+        # half_rdx = 0.5 / (dx * radius) to match the shader's sampling at uRadius texels
+        glUniform3f(self.get_uniform_loc("uHalfRdxInv"),
+                    0.5 / (dx * max(radius, 1e-6)),
+                    0.5 / (dy * max(radius, 1e-6)),
+                    0.5 / (dz * max(radius, 1e-6)))
         glUniform1f(self.get_uniform_loc("uRadius"), radius)
         glUniform3i(self.get_uniform_loc("uSize"),
                     curl_out.width, curl_out.height, curl_out.depth)

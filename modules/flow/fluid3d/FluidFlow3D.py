@@ -76,7 +76,7 @@ class FluidFlow3DConfig(ConfigBase):
                                  "<1.0 = thinner, >1.0 = deeper volume."}
     )
     composite_mode: int = field(
-        default=0,
+        default=1,
         metadata={"min": 0, "max": 2, "label": "Composite Mode",
                   "description": "3D->2D compositing: 0=front-to-back alpha, "
                                  "1=additive, 2=max intensity projection"}
@@ -218,8 +218,6 @@ class FluidFlow3D:
         self._simulation_scale: float = sim_scale
         self._width: int = 0
         self._height: int = 0
-        self._simulation_width: int = 0
-        self._simulation_height: int = 0
         self._density_width: int = 0
         self._density_height: int = 0
         self._depth: int = 0
@@ -346,18 +344,16 @@ class FluidFlow3D:
         """
         self._width = width
         self._height = height
-        self._simulation_width = int(width * self._simulation_scale)
-        self._simulation_height = int(height * self._simulation_scale)
         self._density_width = output_width if output_width is not None else width
         self._density_height = output_height if output_height is not None else height
         self._aspect = width / height if height > 0 else 1.0
         self._depth = self.config.depth_layers
 
-        sim_w = self._simulation_width
-        sim_h = self._simulation_height
+        sim_w = self._width
+        sim_h = self._height
         d = self._depth
 
-        # Allocate volumetric fields
+        # Allocate volumetric fields (at incoming simulation resolution)
         self._velocity.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._velocity.clear_all()
 
