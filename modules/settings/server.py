@@ -28,6 +28,8 @@ def start(registry, port=666):
     @ui.page("/")
     def index():
         ui.dark_mode(True)
+        # Disable all transition animations for snappy UI
+        ui.add_head_html('<style>* { transition-duration: 0s !important; animation-duration: 0s !important; }</style>')
         with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
             ui.label("Settings").classes("text-2xl font-bold mb-4")
             create_settings_panel(registry)
