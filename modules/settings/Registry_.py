@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from modules.settings.BaseSettings import BaseSettings
+from modules.settings.base_settings import BaseSettings
 
 
 class SettingsRegistry:

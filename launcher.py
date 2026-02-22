@@ -76,7 +76,7 @@ from signal import signal, SIGINT
 from modules.Main import Main
 from modules.Settings import Settings, ModelType
 from modules.settings import Setting, Action, BaseSettings, SettingsRegistry
-from modules.gui import settings_server
+from modules.settings import server as settings_server
 
 import multiprocessing as mp
 

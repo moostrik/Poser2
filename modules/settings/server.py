@@ -5,7 +5,7 @@ import threading
 
 from nicegui import ui
 
-from modules.gui.settings_panel import create_settings_panel
+from modules.settings.panel import create_settings_panel
 
 logger = logging.getLogger(__name__)
 

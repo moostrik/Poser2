@@ -7,11 +7,11 @@ import threading
 import unittest
 from enum import Enum
 
-from modules.settings.Setting import Setting
+from modules.settings.Setting_ import Setting
 from modules.settings.Action import Action
-from modules.settings.Child import Child
-from modules.settings.BaseSettings import BaseSettings
-from modules.settings.Registry import SettingsRegistry
+from modules.settings.Child_ import Child
+from modules.settings.base_settings import BaseSettings
+from modules.settings.Registry_ import SettingsRegistry
 
 
 # ---------------------------------------------------------------------------
@@ -747,6 +747,16 @@ class DoubleChildConfig(BaseSettings):
     beta = Child(InnerConfig)
 
 
+class MiddleConfig(BaseSettings):
+    weight = Setting(float, 0.5, min=0.0, max=1.0)
+    inner = Child(InnerConfig)
+
+
+class DeepConfig(BaseSettings):
+    label = Setting(str, "root")
+    middle = Child(MiddleConfig)
+
+
 class TestChild(unittest.TestCase):
     """Tests for the Child descriptor."""
 
@@ -899,6 +909,93 @@ class TestChild(unittest.TestCase):
             self.assertEqual(cfg2.inner.speed, 2.0)
         finally:
             os.unlink(path)
+
+    # -- Deep nesting (3 levels) --------------------------------------------
+
+    def test_deep_access(self):
+        cfg = DeepConfig()
+        self.assertEqual(cfg.label, "root")
+        self.assertIsInstance(cfg.middle, MiddleConfig)
+        self.assertEqual(cfg.middle.weight, 0.5)
+        self.assertIsInstance(cfg.middle.inner, InnerConfig)
+        self.assertEqual(cfg.middle.inner.speed, 1.0)
+        self.assertEqual(cfg.middle.inner.scale, 0.5)
+
+    def test_deep_mutation(self):
+        cfg = DeepConfig()
+        cfg.middle.inner.speed = 9.9
+        self.assertEqual(cfg.middle.inner.speed, 9.9)
+        cfg.middle.weight = 0.1
+        self.assertEqual(cfg.middle.weight, 0.1)
+
+    def test_deep_to_dict(self):
+        cfg = DeepConfig()
+        cfg.middle.inner.speed = 3.0
+        cfg.middle.weight = 0.8
+        d = cfg.to_dict()
+        self.assertEqual(d["label"], "root")
+        self.assertIn("middle", d)
+        self.assertEqual(d["middle"]["weight"], 0.8)
+        self.assertIn("inner", d["middle"])
+        self.assertEqual(d["middle"]["inner"]["speed"], 3.0)
+        self.assertEqual(d["middle"]["inner"]["scale"], 0.5)
+
+    def test_deep_update_from_dict(self):
+        cfg = DeepConfig()
+        cfg.update_from_dict({
+            "label": "updated",
+            "middle": {
+                "weight": 0.2,
+                "inner": {"speed": 7.0, "scale": 0.1}
+            }
+        })
+        self.assertEqual(cfg.label, "updated")
+        self.assertEqual(cfg.middle.weight, 0.2)
+        self.assertEqual(cfg.middle.inner.speed, 7.0)
+        self.assertEqual(cfg.middle.inner.scale, 0.1)
+
+    def test_deep_update_from_dict_partial(self):
+        cfg = DeepConfig()
+        cfg.update_from_dict({"middle": {"inner": {"speed": 5.5}}})
+        self.assertEqual(cfg.middle.inner.speed, 5.5)
+        self.assertEqual(cfg.middle.inner.scale, 0.5)  # unchanged
+        self.assertEqual(cfg.middle.weight, 0.5)        # unchanged
+        self.assertEqual(cfg.label, "root")              # unchanged
+
+    def test_deep_json_round_trip(self):
+        cfg1 = DeepConfig()
+        cfg1.label = "trip"
+        cfg1.middle.weight = 0.3
+        cfg1.middle.inner.speed = 4.4
+        cfg1.middle.inner.scale = 0.9
+
+        serialized = json.dumps(cfg1.to_dict())
+        data = json.loads(serialized)
+
+        cfg2 = DeepConfig()
+        cfg2.update_from_dict(data)
+        self.assertEqual(cfg2.label, "trip")
+        self.assertEqual(cfg2.middle.weight, 0.3)
+        self.assertEqual(cfg2.middle.inner.speed, 4.4)
+        self.assertEqual(cfg2.middle.inner.scale, 0.9)
+
+    def test_deep_callback(self):
+        cfg = DeepConfig()
+        received = []
+        cfg.middle.inner.on_change("speed", lambda v: received.append(v))
+        cfg.middle.inner.speed = 6.6
+        self.assertEqual(received, [6.6])
+
+    def test_deep_instances_independent(self):
+        a = DeepConfig()
+        b = DeepConfig()
+        a.middle.inner.speed = 100.0
+        self.assertEqual(b.middle.inner.speed, 1.0)
+
+    def test_deep_children_property(self):
+        cfg = DeepConfig()
+        self.assertIn("middle", cfg.children)
+        self.assertIn("inner", cfg.middle.children)
 
 
 if __name__ == "__main__":

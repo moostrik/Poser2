@@ -2,9 +2,9 @@
 
 import threading
 
-from modules.settings.Setting import Setting
+from modules.settings.Setting_ import Setting
 from modules.settings.Action import Action
-from modules.settings.Child import Child
+from modules.settings.Child_ import Child
 
 
 class BaseSettings:
@@ -28,7 +28,6 @@ class BaseSettings:
         object.__setattr__(self, "_locks", {})
         object.__setattr__(self, "_actions", {})
         object.__setattr__(self, "_children", {})
-        object.__setattr__(self, "_child_descriptors", {})
 
         # Collect Setting, Action, and Child descriptors from the class hierarchy
         for cls in type(self).__mro__:
@@ -42,8 +41,7 @@ class BaseSettings:
                     self._actions[attr_name] = attr_value
                     self._callbacks[attr_name] = []
                     self._locks[attr_name] = threading.Lock()
-                elif isinstance(attr_value, Child) and attr_name not in self._child_descriptors:
-                    self._child_descriptors[attr_name] = attr_value
+                elif isinstance(attr_value, Child) and attr_name not in self._children:
                     self._children[attr_name] = attr_value.settings_type()
 
         # Apply kwargs (init_only fields are still writable here)
@@ -66,6 +64,10 @@ class BaseSettings:
             raise AttributeError(
                 f"Action '{name}' is not assignable — call fire() instead"
             )
+        if name in self._children:
+            raise AttributeError(
+                f"Cannot replace child '{name}' — mutate its fields instead"
+            )
         if name not in self._fields:
             raise AttributeError(
                 f"'{type(self).__name__}' has no setting '{name}'"
@@ -78,9 +80,6 @@ class BaseSettings:
         fields = object.__getattribute__(self, "_fields")
         if name in fields:
             return object.__getattribute__(self, "_values")[name]
-        children = object.__getattribute__(self, "_children")
-        if name in children:
-            return children[name]
         raise AttributeError(
             f"'{type(self).__name__}' has no setting '{name}'"
         )

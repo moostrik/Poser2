@@ -4,10 +4,10 @@ from enum import Enum
 
 from nicegui import ui
 
-from modules.settings.BaseSettings import BaseSettings
-from modules.settings.Setting import Setting
+from modules.settings.base_settings import BaseSettings
+from modules.settings.Setting_ import Setting
 from modules.settings.Action import Action
-from modules.settings.Registry import SettingsRegistry
+from modules.settings.Registry_ import SettingsRegistry
 
 
 def generate_label(name):
@@ -188,6 +188,10 @@ def _build_settings_card(name, settings):
                 with ui.row().classes("gap-2"):
                     for action_name, action in action_items:
                         _build_action_button(settings, action_name, action)
+
+            # Children (recursive)
+            for child_name, child in settings.children.items():
+                _build_settings_card(child_name, child)
 
 
 def create_settings_panel(registry):
