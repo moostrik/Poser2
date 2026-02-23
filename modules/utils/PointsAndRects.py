@@ -127,19 +127,32 @@ class Point2f:
         """Return a zero point (0.0, 0.0)."""
         return Point2f(0.0, 0.0)
 
+    def to_array(self) -> np.ndarray:
+        """Return the point as a numpy array [x, y]."""
+        return np.array([self.x, self.y], dtype=np.float32)
+
     @staticmethod
     def from_array(arr: np.ndarray) -> "Point2f":
         """Create a Point2f from a numpy array [x, y]."""
         return Point2f(float(arr[0]), float(arr[1]))
+
+    def to_tuple(self) -> tuple[float, float]:
+        """Return the point as a tuple (x, y)."""
+        return (self.x, self.y)
 
     @staticmethod
     def from_tuple(coords: tuple[float, float]) -> "Point2f":
         """Create a Point2f from a tuple (x, y)."""
         return Point2f(coords[0], coords[1])
 
-    def to_tuple(self) -> tuple[float, float]:
-        """Return the point as a tuple (x, y)."""
-        return (self.x, self.y)
+    def to_dict(self) -> dict:
+        """Return the point as a dict for JSON serialization."""
+        return {"x": self.x, "y": self.y}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Point2f":
+        """Create a Point2f from a dict."""
+        return cls(data["x"], data["y"])
 
 @dataclass
 class Rect:
@@ -435,6 +448,10 @@ class Rect:
             height=self.height
         )
 
+    def to_points(self) -> tuple[Point2f, Point2f]:
+        """Return the top-left and bottom-right points of the rectangle."""
+        return (self.top_left, self.bottom_right)
+
     @staticmethod
     def from_points(top_left: Point2f, bottom_right: Point2f) -> "Rect":
         """Create a Rect from top-left and bottom-right points."""
@@ -444,6 +461,10 @@ class Rect:
             width=bottom_right.x - top_left.x,
             height=bottom_right.y - top_left.y
         )
+
+    def to_array(self) -> np.ndarray:
+        """Return the rectangle as a numpy array [x, y, width, height]."""
+        return np.array([self.x, self.y, self.width, self.height], dtype=np.float32)
 
     @staticmethod
     def from_array(arr: np.ndarray) -> "Rect":
@@ -455,11 +476,20 @@ class Rect:
             height=float(arr[3])
         )
 
+    def to_tuple(self) -> tuple[float, float, float, float]:
+        """Return the rectangle as a tuple (x, y, width, height)."""
+        return (self.x, self.y, self.width, self.height)
+
     @staticmethod
     def from_tuple(coords: tuple[float, float, float, float]) -> "Rect":
         """Create a Rect from a tuple (x, y, width, height)."""
         return Rect(coords[0], coords[1], coords[2], coords[3])
 
-    def as_tuple(self) -> tuple[float, float, float, float]:
-        """Return the rectangle as a tuple (x, y, width, height)."""
-        return (self.x, self.y, self.width, self.height)
+    def to_dict(self) -> dict:
+        """Return the rectangle as a dict for JSON serialization."""
+        return {"x": self.x, "y": self.y, "width": self.width, "height": self.height}
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Rect":
+        """Create a Rect from a dict."""
+        return cls(data["x"], data["y"], data["width"], data["height"])

@@ -19,4 +19,5 @@ from .Interpolation import (
     VectorPredictiveAngleHermite,
 )
 from .PointsAndRects import Point2f, Rect
+from .Color import Color
 from .pool import ObjectPool

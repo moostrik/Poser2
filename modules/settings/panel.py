@@ -10,6 +10,7 @@ from modules.settings.base_settings import BaseSettings
 from modules.settings import presets
 from modules.settings.registry import SettingsRegistry
 from modules.settings.setting import Setting
+from modules.utils import Color, Point2f, Rect
 
 # ---------------------------------------------------------------------------
 # Poll rate for setting → UI synchronisation.
@@ -120,6 +121,128 @@ def _build_field_control(settings, name, field, polls):
         polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
         return 'small'
 
+    # -- Color → color picker ------------------------------------------------
+    if field.type_ is Color:
+        hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
+        with ui.row().classes("items-end gap-2"):
+            ci = ui.color_input(
+                label=label, value=hex_val
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-40")
+
+            alpha_num = ui.number(
+                label="A", value=round(value.a, 3) if isinstance(value, Color) else 1.0,
+                min=0.0, max=1.0, step=0.01, format="%.2f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-20")
+
+        if not is_disabled:
+            def on_color_change(e, _alpha=alpha_num):
+                if e.value:
+                    c = Color.from_hex(e.value)
+                    a_val = _alpha.value if _alpha.value is not None else 1.0
+                    setattr(settings, name, Color(c.r, c.g, c.b, float(a_val)))
+            ci.on_value_change(on_color_change)
+
+            def on_alpha_change(e, _ci=ci):
+                if e.value is not None:
+                    cur = getattr(settings, name)
+                    setattr(settings, name, Color(cur.r, cur.g, cur.b, float(e.value)))
+            alpha_num.on_value_change(on_alpha_change)
+
+        def _color_setter(v, _ci=ci, _a=alpha_num):
+            if isinstance(v, Color):
+                _ci.set_value(v.to_hex())
+                _a.set_value(round(v.a, 3))
+        polls.append((settings, name, [value], _color_setter))
+        return 'full'
+
+    # -- Point2f → x/y number row --------------------------------------------
+    if field.type_ is Point2f:
+        with ui.row().classes("items-end gap-2"):
+            ui.label(label).classes("text-xs text-gray-400 self-center")
+            x_num = ui.number(
+                label="X", value=value.x if isinstance(value, Point2f) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            y_num = ui.number(
+                label="Y", value=value.y if isinstance(value, Point2f) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+
+        if not is_disabled:
+            def on_x_change(e, _y=y_num):
+                if e.value is not None:
+                    cur = getattr(settings, name)
+                    setattr(settings, name, Point2f(float(e.value), cur.y))
+            x_num.on_value_change(on_x_change)
+
+            def on_y_change(e, _x=x_num):
+                if e.value is not None:
+                    cur = getattr(settings, name)
+                    setattr(settings, name, Point2f(cur.x, float(e.value)))
+            y_num.on_value_change(on_y_change)
+
+        def _point_setter(v, _x=x_num, _y=y_num):
+            if isinstance(v, Point2f):
+                _x.set_value(v.x)
+                _y.set_value(v.y)
+        polls.append((settings, name, [value], _point_setter))
+        return 'full'
+
+    # -- Rect → x/y/w/h number row -------------------------------------------
+    if field.type_ is Rect:
+        with ui.row().classes("items-end gap-2"):
+            ui.label(label).classes("text-xs text-gray-400 self-center")
+            rx = ui.number(
+                label="X", value=value.x if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ry = ui.number(
+                label="Y", value=value.y if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            rw = ui.number(
+                label="W", value=value.width if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            rh = ui.number(
+                label="H", value=value.height if isinstance(value, Rect) else 0.0,
+                step=0.01, format="%.3f",
+            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+
+        if not is_disabled:
+            def on_rx(e, _ry=ry, _rw=rw, _rh=rh):
+                if e.value is not None:
+                    cur = getattr(settings, name)
+                    setattr(settings, name, Rect(float(e.value), cur.y, cur.width, cur.height))
+            rx.on_value_change(on_rx)
+
+            def on_ry(e, _rx=rx, _rw=rw, _rh=rh):
+                if e.value is not None:
+                    cur = getattr(settings, name)
+                    setattr(settings, name, Rect(cur.x, float(e.value), cur.width, cur.height))
+            ry.on_value_change(on_ry)
+
+            def on_rw(e, _rx=rx, _ry=ry, _rh=rh):
+                if e.value is not None:
+                    cur = getattr(settings, name)
+                    setattr(settings, name, Rect(cur.x, cur.y, float(e.value), cur.height))
+            rw.on_value_change(on_rw)
+
+            def on_rh(e, _rx=rx, _ry=ry, _rw=rw):
+                if e.value is not None:
+                    cur = getattr(settings, name)
+                    setattr(settings, name, Rect(cur.x, cur.y, cur.width, float(e.value)))
+            rh.on_value_change(on_rh)
+
+        def _rect_setter(v, _rx=rx, _ry=ry, _rw=rw, _rh=rh):
+            if isinstance(v, Rect):
+                _rx.set_value(v.x)
+                _ry.set_value(v.y)
+                _rw.set_value(v.width)
+                _rh.set_value(v.height)
+        polls.append((settings, name, [value], _rect_setter))
+        return 'full'
+
     # -- str → text input ----------------------------------------------------
     if field.type_ is str:
         inp = ui.input(label=label, value=value).props(
@@ -204,6 +327,8 @@ def _build_settings_card(name, settings, timers):
             if field.type_ in (int, float) and field.min is not None and field.max is not None:
                 full_fields.append(field_name)
             elif field.type_ is str:
+                full_fields.append(field_name)
+            elif field.type_ in (Color, Point2f, Rect):
                 full_fields.append(field_name)
             else:
                 small_fields.append(field_name)
