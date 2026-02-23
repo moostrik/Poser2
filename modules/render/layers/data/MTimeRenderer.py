@@ -1,21 +1,17 @@
 
-# Standard library imports
-from dataclasses import dataclass
-
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Setting, BaseSettings
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase
 from modules.gl import Text
 
 
-@dataclass
-class MTimeRendererConfig(ConfigBase):
-    stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
+class MTimeRendererConfig(BaseSettings):
+    stage: Setting[Stage] = Setting(Stage, Stage.LERP, init_only=True, description="Pipeline stage for pose data")
 
 
 class MTimeRenderer(LayerBase):

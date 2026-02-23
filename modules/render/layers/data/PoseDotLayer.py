@@ -1,13 +1,10 @@
 """ Renders pose keypoints as dots into an offscreen buffer """
 
-# Standard library imports
-from dataclasses import dataclass
-
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Setting, BaseSettings
 from modules.DataHub import DataHub, Stage
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.Frame import Frame
@@ -18,11 +15,10 @@ from modules.utils.PointsAndRects import Rect
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-@dataclass
-class PoseDotConfig(ConfigBase):
-    stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
-    dot_size: float = config_field(4.0, min=1.0, max=20.0, description="Dot size in pixels")
-    dot_smooth: float = config_field(2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")
+class PoseDotConfig(BaseSettings):
+    stage:      Setting[Stage] = Setting(Stage, Stage.LERP, init_only=True, description="Pipeline stage for pose data")
+    dot_size:   Setting[float] = Setting(float, 4.0, min=1.0, max=20.0, description="Dot size in pixels")
+    dot_smooth: Setting[float] = Setting(float, 2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")
 
 
 class PoseDotLayer(LayerBase):

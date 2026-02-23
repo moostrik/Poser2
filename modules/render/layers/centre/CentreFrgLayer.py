@@ -1,10 +1,7 @@
 """Renders centered and rotated foreground with temporal blending and optional mask."""
 
-# Standard library imports
-from dataclasses import dataclass
-
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Setting, BaseSettings
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, Blend, MaskApply, CelShade, HueShift
@@ -15,23 +12,22 @@ from modules.gl import Style
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-@dataclass
-class CentreFrgConfig(ConfigBase):
+class CentreFrgConfig(BaseSettings):
     """Configuration for CentreFrgLayer foreground rendering."""
-    blend_factor: float = config_field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
-    exposure: float = config_field(1.0, min=0.1, max=3.0, description="Exposure multiplier")
-    gamma: float = config_field(1.0, min=0.5, max=2.0, description="Gamma correction")
-    offset: float = config_field(0.0, min=-0.5, max=0.5, description="Exposure offset")
-    contrast: float = config_field(1.0, min=0.5, max=2.0, description="Contrast")
-    saturation: float = config_field(1.2, min=0.5, max=2.0, description="Color saturation")
+    blend_factor:   Setting[float] = Setting(float, 0.2, min=0.0, max=1.0, description="Foreground temporal blending")
+    exposure:       Setting[float] = Setting(float, 1.2, min=0.1, max=3.0, description="Exposure multiplier")
+    gamma:          Setting[float] = Setting(float, 1.0, min=0.5, max=2.0, description="Gamma correction")
+    offset:         Setting[float] = Setting(float, 0.0, min=-0.5, max=0.5, description="Exposure offset")
+    contrast:       Setting[float] = Setting(float, 1.1, min=0.5, max=2.0, description="Contrast")
+    saturation:     Setting[float] = Setting(float, 2.0, min=0.5, max=2.0, description="Color saturation")
     # Cel shade
-    levels: int = config_field(4, min=2, max=8, description="Number of color bands")
-    smoothness: float = config_field(0.1, min=0.0, max=0.5, description="Gradient between bands")
+    levels:         Setting[int]   = Setting(int, 9, min=2, max=12, description="Number of color bands")
+    smoothness:     Setting[float] = Setting(float, 0.33, min=0.0, max=0.5, description="Gradient between bands")
     # Hue shift
-    colorize: float = config_field(0.5, min=0.0, max=1.0, description="Hue shift toward track color (0.0 = off)")
+    colorize:       Setting[float] = Setting(float, 0.96, min=0.0, max=1.0, description="Hue shift toward track color (0.0 = off)")
     # Post
-    sharpen: float = config_field(0.5, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
-    use_mask: bool = config_field(True, description="Apply mask to foreground")
+    sharpen:        Setting[float] = Setting(float, 0.0, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
+    use_mask:       Setting[bool]  = Setting(bool, True, description="Apply mask to foreground")
 
 
 class CentreFrgLayer(LayerBase):

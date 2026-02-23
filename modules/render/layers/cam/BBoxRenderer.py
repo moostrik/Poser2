@@ -1,21 +1,19 @@
 # Standard library imports
-from dataclasses import dataclass
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Setting, BaseSettings
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import DrawRectangleOutline
 
 
-@dataclass
-class BBoxRendererConfig(ConfigBase):
-    stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
-    line_width: float = config_field(2, min=1, max=10, description="Bounding box line width in pixels")
+class BBoxRendererConfig(BaseSettings):
+    stage:      Setting[Stage] = Setting(Stage, Stage.LERP, description="Pipeline stage for pose data")
+    line_width: Setting[float] = Setting(float, 2.0, min=1.0, max=10.0, description="Bounding box line width in pixels")
 
 
 class BBoxRenderer(LayerBase):

@@ -12,9 +12,23 @@ from typing import Protocol
 
 from modules.DataHub import Stage
 from modules.pose.Frame import ScalarFrameField
-from modules.render.layers.generic.CompositeLayer import LutSelection
+
+from modules.render.layers.generic.CompositeLayer import CompositeLayerConfig
+from modules.render.layers.generic.MSColorMaskLayer import MSColorMaskLayerConfig
 from modules.render.layers.flow.FlowLayer import FlowLayerConfig
 from modules.render.layers.flow.FluidLayer import FluidLayerConfig
+
+from modules.render.layers.centre.CentreGeometry import CentreGeometryConfig
+from modules.render.layers.centre.CentreMaskLayer import CentreMaskConfig
+from modules.render.layers.centre.CentreCamLayer import CentreCamConfig
+from modules.render.layers.centre.CentreFrgLayer import CentreFrgConfig
+from modules.render.layers.centre.CentrePoseLayer import CentrePoseConfig
+
+from modules.render.layers.cam.TrackerCompositor import TrackerCompConfig
+from modules.render.layers.cam.PoseCompositor import PoseCompConfig
+
+from modules.render.layers.data.DataLayerConfig import DataLayerConfig
+from modules.render.layers.data.MTimeRenderer import MTimeRendererConfig
 
 from modules.settings import Setting, Child, BaseSettings
 from modules.gl.WindowManager import WindowSettings
@@ -45,15 +59,9 @@ class LayerMode(IntEnum):
 
 class DataLayer(Protocol):
     """Protocol for data layer instances with active state and shared config."""
-    _config: 'DataLayerConfig'
+    _config: DataLayerConfig
 
     def set_active(self, active: bool) -> None: ...
-
-
-class DataLayerConfig(Protocol):
-    """Protocol for data layer shared configs."""
-    feature_field: ScalarFrameField
-    stage: Stage
 
 
 # ---------------------------------------------------------------------------
@@ -78,9 +86,25 @@ class RenderSettings(BaseSettings):
     # Data layer control (foldable child)
     data_layer: Child[DataLayerSettings] =  Child(DataLayerSettings)
 
-    # LUT
-    lut: Setting[LutSelection] =           Setting(LutSelection, LutSelection.NONE)  # type: ignore[attr-defined]
-    lut_strength: Setting[float] =  Setting(float, 1.0, min=0.0, max=1.0)
+    # Centre layers
+    centre_geometry: Child[CentreGeometryConfig] = Child(CentreGeometryConfig)
+    centre_mask:     Child[CentreMaskConfig]     = Child(CentreMaskConfig)
+    centre_cam:      Child[CentreCamConfig]       = Child(CentreCamConfig)
+    centre_frg:      Child[CentreFrgConfig]       = Child(CentreFrgConfig)
+    centre_pose:     Child[CentrePoseConfig]      = Child(CentrePoseConfig)
+
+    # Cam compositors
+    tracker:         Child[TrackerCompConfig] = Child(TrackerCompConfig)
+    pose_comp:       Child[PoseCompConfig]    = Child(PoseCompConfig)
+
+    # Data layers
+    data_a:          Child[DataLayerConfig]      = Child(DataLayerConfig)
+    data_b:          Child[DataLayerConfig]      = Child(DataLayerConfig)
+    data_time:       Child[MTimeRendererConfig]  = Child(MTimeRendererConfig)
+
+    # Composite / mask
+    composite:       Child[CompositeLayerConfig]     = Child(CompositeLayerConfig)
+    ms_mask:         Child[MSColorMaskLayerConfig]   = Child(MSColorMaskLayerConfig)
 
     # Flow / Fluid (child configs, shared across all cameras)
     flow: Child[FlowLayerConfig] =          Child(FlowLayerConfig)

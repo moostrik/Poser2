@@ -1,13 +1,10 @@
 """ Composite layer showing track camera crop with RAW, SMOOTH, and LERP pose overlays """
 
-# Standard library imports
-from dataclasses import dataclass
-
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Setting, BaseSettings
 from modules.gl import Fbo, Texture, Blit
 from modules.DataHub import DataHub, Stage
 from modules.render.layers.LayerBase import LayerBase
@@ -19,12 +16,11 @@ from modules.render.layers.data.PoseLineLayer import PoseLineLayer, PoseLineConf
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-@dataclass
-class PoseCompConfig(ConfigBase):
-    stage: Stage = config_field(Stage.LERP, description="Pipeline stage for camera crop", fixed=True)
-    line_width: float = config_field(3.0, min=0.5, max=20.0, description="Base line width (multiplied per stage)")
-    line_smooth: float = config_field(0.0, min=0.0, max=10.0, description="Base line smoothing (multiplied per stage)")
-    use_gpu_crop: bool = config_field(False, description="Use GPU crop source (model input) instead of camera crop")
+class PoseCompConfig(BaseSettings):
+    stage:      Setting[Stage] = Setting(Stage, Stage.LERP, description="Pipeline stage for camera crop")
+    line_width: Setting[float] = Setting(float, 2.0, min=0.5, max=20.0, description="Base line width (multiplied per stage)")
+    line_smooth:Setting[float] = Setting(float, 0.0, min=0.0, max=10.0, description="Base line smoothing (multiplied per stage)")
+    use_gpu_crop:Setting[bool] = Setting(bool, True, description="Use GPU crop source (model input) instead of camera crop")
 
 
 class PoseCompositor(LayerBase):

@@ -1,13 +1,10 @@
 """ Renders pose keypoints as lines into an offscreen buffer """
 
-# Standard library imports
-from dataclasses import dataclass
-
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Setting, BaseSettings
 from modules.DataHub import DataHub, Stage
 from modules.gl import Fbo, Texture, Blit, clear_color
 from modules.pose.Frame import Frame
@@ -16,13 +13,12 @@ from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import PosePointLines as shader
 
 
-@dataclass
-class PoseLineConfig(ConfigBase):
-    stage: Stage = config_field(Stage.LERP, description="Pipeline stage for pose data", fixed=True)
-    line_width: float = config_field(4.0, min=0.5, max=20.0, description="Line width in pixels")
-    line_smooth: float = config_field(2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
-    use_scores: bool = config_field(True, description="Use confidence scores for line opacity")
-    use_bbox: bool = config_field(False, description="Transform points to image space using bbox")
+class PoseLineConfig(BaseSettings):
+    stage:      Setting[Stage] = Setting(Stage, Stage.LERP, init_only=True, description="Pipeline stage for pose data")
+    line_width: Setting[float] = Setting(float, 4.0, min=0.5, max=20.0, description="Line width in pixels")
+    line_smooth:Setting[float] = Setting(float, 2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
+    use_scores: Setting[bool]  = Setting(bool, True, description="Use confidence scores for line opacity")
+    use_bbox:   Setting[bool]  = Setting(bool, False, description="Transform points to image space using bbox")
 
 
 

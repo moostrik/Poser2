@@ -1,7 +1,6 @@
 """CompositeLayer - Composites multiple layer textures with optional LUT color grading."""
 
 from __future__ import annotations
-from dataclasses import dataclass, field
 from enum import IntEnum
 from pathlib import Path
 
@@ -10,6 +9,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Fbo, Texture, Style
 from modules.gl.shaders import Blit, Lut
 from modules.render.layers.LayerBase import LayerBase
+from modules.settings import Setting, BaseSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -57,12 +57,11 @@ LutSelection = _discover_luts()
 # Configuration
 # ============================================================================
 
-@dataclass
-class CompositeLayerConfig:
+class CompositeLayerConfig(BaseSettings):
     """Configuration for CompositeLayer."""
-    blend_mode: Style.BlendMode = Style.BlendMode.ALPHA
-    lut: LutSelection = field(default_factory=lambda: LutSelection.NONE)  # type: ignore
-    lut_strength: float = 1.0
+    blend_mode:     Setting[Style.BlendMode] = Setting(Style.BlendMode, Style.BlendMode.ALPHA)
+    lut:            Setting[LutSelection]    = Setting(LutSelection, LutSelection.NONE)  # type: ignore
+    lut_strength:   Setting[float]           = Setting(float, 1.0, min=0.0, max=1.0)
 
 
 # ============================================================================

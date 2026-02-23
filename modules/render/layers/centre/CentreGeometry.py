@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
 from modules.DataHub import DataHub, DataHubType, Stage
+from modules.settings import Setting, BaseSettings
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.render.layers.LayerBase import LayerBase, DataCache
@@ -20,16 +20,15 @@ from modules.gl import Texture
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-@dataclass
-class CentreGeometryConfig(ConfigBase):
+class CentreGeometryConfig(BaseSettings):
     """Configuration for CentreGeometry anchor point positioning."""
-    stage: Stage = config_field(Stage.LERP, fixed=True, description="Pose data pipeline stage")
-    cam_aspect: float = config_field(1.7778, fixed=True, description="Camera aspect ratio (16/9 = 1.7778)")
-    target_top_x: float = config_field(0.5, min=0.0, max=1.0, description="Top anchor X position (normalized)")
-    target_top_y: float = config_field(0.33, min=0.0, max=1.0, description="Top anchor Y position (normalized)")
-    target_bottom_x: float = config_field(0.5, min=0.0, max=1.0, description="Bottom anchor X position (normalized)")
-    target_bottom_y: float = config_field(0.6, min=0.0, max=1.0, description="Bottom anchor Y position (normalized)")
-    dst_aspectratio: float = config_field(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
+    stage:              Setting[Stage] = Setting(Stage, Stage.SMOOTH, description="Pose data pipeline stage")
+    cam_aspect:         Setting[float] = Setting(float, 1.7778, init_only=True, description="Camera aspect ratio (16/9 = 1.7778)")
+    target_top_x:       Setting[float] = Setting(float, 0.5, min=0.0, max=1.0, description="Top anchor X position (normalized)")
+    target_top_y:       Setting[float] = Setting(float, 0.33, min=0.0, max=1.0, description="Top anchor Y position (normalized)")
+    target_bottom_x:    Setting[float] = Setting(float, 0.5, min=0.0, max=1.0, description="Bottom anchor X position (normalized)")
+    target_bottom_y:    Setting[float] = Setting(float, 0.6, min=0.0, max=1.0, description="Bottom anchor Y position (normalized)")
+    dst_aspectratio:    Setting[float] = Setting(float, 0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
 
 
 @dataclass

@@ -2,13 +2,12 @@
 
 # Standard library imports
 import numpy as np
-from dataclasses import dataclass
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Setting, BaseSettings
 from modules.gl import Fbo, Texture, clear_color
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
@@ -16,13 +15,12 @@ from modules.render.shaders import PosePointLines, DrawCircles
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-@dataclass
-class CentrePoseConfig(ConfigBase):
+class CentrePoseConfig(BaseSettings):
     """Configuration for CentrePoseLayer pose line rendering."""
-    line_width: float = config_field(4.0, min=0.5, max=10.0, description="Pose line thickness")
-    line_smooth: float = config_field(2.0, min=0.0, max=5.0, description="Line anti-aliasing radius")
-    use_scores: bool = config_field(False, description="Color lines by confidence scores")
-    draw_anchors: bool = config_field(True, description="Show anchor points as circles")
+    line_width:     Setting[float] = Setting(float, 3.0, min=0.5, max=10.0, description="Pose line thickness")
+    line_smooth:    Setting[float] = Setting(float, 0.0, min=0.0, max=5.0, description="Line anti-aliasing radius")
+    use_scores:     Setting[bool]  = Setting(bool, False, description="Color lines by confidence scores")
+    draw_anchors:   Setting[bool]  = Setting(bool, False, description="Show anchor points as circles")
 
 
 class CentrePoseLayer(LayerBase):

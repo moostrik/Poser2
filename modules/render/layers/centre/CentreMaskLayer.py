@@ -1,13 +1,10 @@
 """Renders centered and rotated mask with temporal blending and blur."""
 
-# Standard library imports
-from dataclasses import dataclass
-
 # Third-party imports
 from OpenGL.GL import GL_R16F
 
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Setting, BaseSettings
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate
@@ -15,13 +12,12 @@ from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.utils import HotReloadMethods
 
 
-@dataclass
-class CentreMaskConfig(ConfigBase):
+class CentreMaskConfig(BaseSettings):
     """Configuration for CentreMaskLayer temporal blending and blur."""
-    blend_factor: float = config_field(0.2, min=0.0, max=1.0, description="Temporal blending strength (0=static, 1=instant)")
-    dilation_steps: int = config_field(0, min=0, max=5, description="Number of mask dilation iterations")
-    blur_steps: int = config_field(0, min=0, max=10, description="Number of blur iterations")
-    blur_radius: float = config_field(8.0, min=0.0, max=20.0, description="Blur kernel radius in pixels")
+    blend_factor:   Setting[float] = Setting(float, 0.2, min=0.0, max=1.0, description="Temporal blending strength (0=static, 1=instant)")
+    dilation_steps: Setting[int]   = Setting(int, 0, min=0, max=5, description="Number of mask dilation iterations")
+    blur_steps:     Setting[int]   = Setting(int, 0, min=0, max=10, description="Number of blur iterations")
+    blur_radius:    Setting[float] = Setting(float, 1.0, min=0.0, max=20.0, description="Blur kernel radius in pixels")
 
 
 class CentreMaskLayer(LayerBase):

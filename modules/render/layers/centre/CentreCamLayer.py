@@ -1,10 +1,7 @@
 """Renders centered and rotated camera view based on pose anchor points with optional mask."""
 
-# Standard library imports
-from dataclasses import dataclass
-
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Setting, BaseSettings
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import Blend, DrawRoi, MaskApply
@@ -13,12 +10,11 @@ from modules.render.shaders import Blend, DrawRoi, MaskApply
 from modules.gl import Fbo, SwapFbo, Texture
 
 
-@dataclass
-class CentreCamConfig(ConfigBase):
+class CentreCamConfig(BaseSettings):
     """Configuration for CentreCamLayer camera rendering."""
-    blend_factor: float = config_field(0.5, min=0.0, max=1.0, description="Camera frame temporal blending")
-    mask_opacity: float = config_field(1.0, min=0.0, max=1.0, description="Mask alpha strength")
-    use_mask: bool = config_field(True, description="Apply mask to camera output")
+    blend_factor:   Setting[float] = Setting(float, 0.2, min=0.0, max=1.0, description="Camera frame temporal blending")
+    mask_opacity:   Setting[float] = Setting(float, 1.0, min=0.0, max=1.0, description="Mask alpha strength")
+    use_mask:       Setting[bool]  = Setting(bool, True, description="Apply mask to camera output")
 
 class CentreCamLayer(LayerBase):
     """Renders camera image cropped and rotated around pose anchor points.
