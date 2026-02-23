@@ -157,8 +157,7 @@ PREVIEW_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
 FINAL_LAYERS: list[Layers] = SHOW_COMP
 
 class RenderManager(RenderBase):
-    def __init__(self, gui: Gui, data_hub: DataHub, settings: RenderSettings,
-                 num_cams: int = 3, num_players: int = 3) -> None:
+    def __init__(self, data_hub: DataHub, settings: RenderSettings, num_cams: int = 3, num_players: int = 3) -> None:
         self.num_players: int = num_players
         self.num_cams: int =    num_cams
         self.settings: RenderSettings = settings
@@ -173,8 +172,6 @@ class RenderManager(RenderBase):
         self._draw_layers: list[Layers] =       FINAL_LAYERS
 
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
-
-        # Reactive render settings (feature, mode, stages, LUT, flow, fluid, all configs)
 
         # Set data_b overrides (class defaults match data_a)
         settings.data_b.line_width = 6.0
