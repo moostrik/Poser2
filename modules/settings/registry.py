@@ -1,8 +1,6 @@
-"""SettingsRegistry — stores multiple BaseSettings instances with JSON persistence."""
+"""SettingsRegistry — pure data container for named BaseSettings modules."""
 
-import json
 import logging
-from pathlib import Path
 
 from modules.settings.base_settings import BaseSettings
 
@@ -10,7 +8,10 @@ logger = logging.getLogger(__name__)
 
 
 class SettingsRegistry:
-    """Stores multiple BaseSettings instances with group organization and JSON persistence."""
+    """Stores multiple BaseSettings instances organised by group.
+
+    This is a pure data container — all file I/O lives in ``presets``.
+    """
 
     def __init__(self):
         self._modules = {}
@@ -32,28 +33,15 @@ class SettingsRegistry:
         """Return a copy of {group: [config_names]} mapping."""
         return {g: list(names) for g, names in self._groups.items()}
 
-    def save(self, path):
-        """Save all modules to a JSON file."""
-        data = {name: settings.to_dict() for name, settings in self._modules.items()}
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+    def to_dict(self) -> dict:
+        """Serialize every module to a plain dict."""
+        return {name: settings.to_dict() for name, settings in self._modules.items()}
 
-    def load(self, path):
-        """Load settings from a JSON file.
+    def from_dict(self, data: dict) -> None:
+        """Restore modules from a plain dict (as produced by ``to_dict``).
 
-        Skips unknown modules and init_only fields. Silently handles
-        corrupt or missing files.
+        Unknown module names are silently skipped.
         """
-        path = Path(path)
-        if not path.exists():
-            return
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            return
         for name, module_data in data.items():
             if name in self._modules:
                 try:

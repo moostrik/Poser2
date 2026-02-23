@@ -19,6 +19,7 @@ from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
 from modules.utils import Timer, TimerConfig
 from modules.settings import SettingsRegistry
+from modules.settings import presets
 from modules.settings.server import SettingsServer, ServerSettings
 
 class Main():
@@ -87,13 +88,8 @@ class Main():
         self.server_settings = ServerSettings(title="POSER", port=666)
         self.registry.register("server", self.server_settings, group="server")
 
-        # Load default preset (after all subsystems have registered)
-        from modules.settings.panel import SETTINGS_DIR, PRESET_SUFFIX
-        default_path = SETTINGS_DIR / f"default{PRESET_SUFFIX}"
-        if default_path.exists():
-            self.registry.load(default_path)
-        else:
-            self.registry.save(default_path)
+        # Load startup preset (after all subsystems have registered)
+        presets.load_startup(self.registry)
 
         # Start settings server
         self.settings_server = SettingsServer(self.registry, self.server_settings, on_exit=self.stop)

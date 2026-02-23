@@ -12,6 +12,7 @@ from modules.settings.action import Action
 from modules.settings.child import Child
 from modules.settings.base_settings import BaseSettings
 from modules.settings.registry import SettingsRegistry
+from modules.settings import presets
 
 
 # ---------------------------------------------------------------------------
@@ -113,28 +114,28 @@ class TestTypeCoercion(unittest.TestCase):
 
     def test_tuple_coercion(self):
         s = CameraSettings()
-        s.overlay_color = (0.5, 0.5, 0.5)
+        s.overlay_color = (0.5, 0.5, 0.5) # type: ignore
         self.assertEqual(s.overlay_color, Color(0.5, 0.5, 0.5))
 
     def test_list_coercion(self):
         s = CameraSettings()
-        s.overlay_color = [0.2, 0.3, 0.4]
+        s.overlay_color = [0.2, 0.3, 0.4] # type: ignore
         self.assertEqual(s.overlay_color, Color(0.2, 0.3, 0.4))
 
     def test_dict_coercion_from_dict(self):
         s = CameraSettings()
-        s.overlay_color = {"r": 0.1, "g": 0.2, "b": 0.3}
+        s.overlay_color = {"r": 0.1, "g": 0.2, "b": 0.3} # type: ignore
         self.assertEqual(s.overlay_color, Color(0.1, 0.2, 0.3))
 
     def test_wrong_type_raises(self):
         s = CameraSettings()
         with self.assertRaises(TypeError):
-            s.exposure = "not a number"
+            s.exposure = "not a number"     # type: ignore
 
     def test_wrong_tuple_raises(self):
         s = MinimalSettings()
         with self.assertRaises(TypeError):
-            s.value = (1, 2, 3)  # int(*[1,2,3]) fails
+            s.value = (1, 2, 3)  # type: ignore
 
     def test_enum_direct(self):
         s = CameraSettings()
@@ -411,7 +412,7 @@ class TestSettingsRegistry(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "settings.json")
-            reg.save(path)
+            presets.save(reg, path)
 
             # Verify JSON file content
             with open(path, "r") as f:
@@ -423,7 +424,7 @@ class TestSettingsRegistry(unittest.TestCase):
             s2 = CameraSettings()
             reg2 = SettingsRegistry()
             reg2.register("camera", s2)
-            reg2.load(path)
+            presets.load(reg2, path)
 
             self.assertEqual(s2.exposure, 3000)
             # init_only fields stay at default
@@ -441,13 +442,13 @@ class TestSettingsRegistry(unittest.TestCase):
             path = os.path.join(tmpdir, "settings.json")
             # Save with different value
             s.exposure = 5000
-            reg.save(path)
+            presets.save(reg, path)
             results.clear()
 
             # Reset and load
             s.exposure = 1000
             results.clear()
-            reg.load(path)
+            presets.load(reg, path)
             self.assertEqual(results, [5000])
 
     def test_repr(self):
@@ -568,7 +569,7 @@ class TestRegistryExtras(unittest.TestCase):
     def test_load_missing_file_no_error(self):
         reg = SettingsRegistry()
         reg.register("cam", CameraSettings())
-        reg.load("nonexistent_path_12345.json")  # should not raise
+        presets.load(reg, "nonexistent_path_12345.json")  # should not raise
 
     def test_load_corrupt_file_no_error(self):
         reg = SettingsRegistry()
@@ -577,7 +578,7 @@ class TestRegistryExtras(unittest.TestCase):
             f.write("{corrupt json!!!")
             path = f.name
         try:
-            reg.load(path)  # should not raise
+            presets.load(reg, path)  # should not raise
         finally:
             os.unlink(path)
 
@@ -867,12 +868,12 @@ class TestChild(unittest.TestCase):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             path = f.name
         try:
-            reg.save(path)
+            presets.save(reg, path)
 
             reg2 = SettingsRegistry()
             cfg2 = OuterConfig()
             reg2.register("outer", cfg2)
-            reg2.load(path)
+            presets.load(reg2, path)
 
             self.assertEqual(cfg2.fps, 30.0)
             self.assertEqual(cfg2.inner.speed, 2.0)
@@ -1000,7 +1001,7 @@ class TestListSetting(unittest.TestCase):
 
     def test_coercion_int_elements(self):
         s = ListSettings()
-        s.ids = [1.0, 2.0, 3.0]  # float → int per element
+        s.ids = [1.0, 2.0, 3.0]  # type: ignore
         self.assertEqual(s.ids, [1, 2, 3])
         self.assertIsInstance(s.ids[0], int)
 

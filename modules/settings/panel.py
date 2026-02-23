@@ -7,11 +7,9 @@ from nicegui import app, ui
 
 from modules.settings.action import Action
 from modules.settings.base_settings import BaseSettings
+from modules.settings import presets
 from modules.settings.registry import SettingsRegistry
 from modules.settings.setting import Setting
-
-SETTINGS_DIR = Path("files/settings")
-PRESET_SUFFIX = ".reactive.json"
 
 
 def generate_label(name):
@@ -271,36 +269,66 @@ def _build_settings_card(name, settings, cleanup):
             _build_settings_card(child_name, child, cleanup)
 
 
-def _scan_presets():
-    """Return sorted list of preset names (without suffix) from the settings directory."""
-    SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
-    return sorted(
-        p.name.removesuffix(PRESET_SUFFIX)
-        for p in SETTINGS_DIR.glob(f"*{PRESET_SUFFIX}")
-    )
-
-
 def _build_preset_controls(registry):
     """Emit preset dropdown + action buttons (no wrapping row — caller provides layout)."""
-    presets = _scan_presets()
+    preset_list = presets.scan()
+    startup = presets.get_startup()
+    initial = startup if startup in preset_list else (preset_list[0] if preset_list else None)
 
+    # -- Star button (left of dropdown) ------------------------------------
+    def do_set_startup():
+        preset_name = dropdown.value
+        if not preset_name:
+            ui.notify("Select a preset first", type="warning")
+            return
+        presets.set_startup(preset_name)
+        _update_star(preset_name)
+        ui.notify(f"'{preset_name}' will load on next startup", type="positive")
+
+    star_btn = ui.button(
+        icon="star", on_click=do_set_startup,
+    ).props("dense flat").tooltip("Set as startup preset")
+
+    def _update_star(selected):
+        if selected and selected == presets.get_startup():
+            star_btn._props["color"] = "warning"
+            star_btn._props.pop("outline", None)
+        else:
+            star_btn._props["color"] = "grey"
+            star_btn._props["outline"] = True
+        star_btn.update()
+
+    _update_star(initial)
+
+    # -- Preset dropdown ---------------------------------------------------
     dropdown = ui.select(
-        options=presets,
-        value=presets[0] if presets else None,
+        options=preset_list,
+        value=initial,
         label="Preset",
-    ).props("dense outlined clearable").classes("min-w-[180px]")
+    ).props("dense outlined").classes("min-w-[180px]")
 
     def _refresh_dropdown():
-        updated = _scan_presets()
-        dropdown.set_options(updated)
+        dropdown.set_options(presets.scan())
 
+    def _on_preset_change(e):
+        name = e.value
+        _update_star(name)
+        if not name:
+            return
+        p = presets.path(name)
+        if p.exists():
+            presets.load(registry, p)
+            ui.notify(f"Loaded '{name}'", type="positive")
+
+    dropdown.on_value_change(_on_preset_change)
+
+    # -- Action buttons ----------------------------------------------------
     def do_save():
         preset_name = dropdown.value
         if not preset_name:
             ui.notify("Select a preset to overwrite, or use Save As", type="warning")
             return
-        path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
-        registry.save(path)
+        presets.save(registry, presets.path(preset_name))
         ui.notify(f"Saved '{preset_name}'", type="positive")
 
     async def do_save_as():
@@ -316,8 +344,7 @@ def _build_preset_controls(registry):
                     if not preset_name:
                         ui.notify("Enter a preset name", type="warning")
                         return
-                    path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
-                    registry.save(path)
+                    presets.save(registry, presets.path(preset_name))
                     _refresh_dropdown()
                     dropdown.set_value(preset_name)
                     ui.notify(f"Saved '{preset_name}'", type="positive")
@@ -330,33 +357,32 @@ def _build_preset_controls(registry):
 
         dialog.open()
 
-    def do_load():
-        preset_name = dropdown.value
-        if not preset_name:
-            ui.notify("Select a preset to load", type="warning")
-            return
-        path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
-        if not path.exists():
-            ui.notify(f"Preset '{preset_name}' not found", type="negative")
-            return
-        registry.load(path)
-        ui.notify(f"Loaded '{preset_name}'", type="positive")
-
-    def do_delete():
+    async def do_delete():
         preset_name = dropdown.value
         if not preset_name:
             ui.notify("Select a preset to delete", type="warning")
             return
-        path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
-        if path.exists():
-            path.unlink()
-        _refresh_dropdown()
-        dropdown.set_value(None)
-        ui.notify(f"Deleted '{preset_name}'", type="info")
+
+        with ui.dialog() as dialog, ui.card():
+            ui.label(f"Delete '{preset_name}'?")
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+
+                def confirm_delete():
+                    p = presets.path(preset_name)
+                    if p.exists():
+                        p.unlink()
+                    _refresh_dropdown()
+                    dropdown.set_value(None)
+                    ui.notify(f"Deleted '{preset_name}'", type="info")
+                    dialog.close()
+
+                ui.button("Delete", on_click=confirm_delete).props("flat color=negative")
+
+        dialog.open()
 
     ui.button(icon="save", on_click=do_save).props("dense flat").tooltip("Save (overwrite selected)")
     ui.button(icon="save_as", on_click=do_save_as).props("dense flat").tooltip("Save as new preset")
-    ui.button(icon="file_open", on_click=do_load).props("dense flat").tooltip("Load preset")
     ui.button(icon="delete", on_click=do_delete).props("dense flat color=negative").tooltip("Delete preset")
 
 
