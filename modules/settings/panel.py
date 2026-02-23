@@ -3,7 +3,7 @@
 from enum import Enum
 from pathlib import Path
 
-from nicegui import ui
+from nicegui import app, ui
 
 from modules.settings.base_settings import BaseSettings
 from modules.settings.setting import Setting
@@ -32,12 +32,15 @@ def generate_label(name):
     return " ".join(result)
 
 
-def _build_field_control(settings, name, field):
+def _build_field_control(settings, name, field, cleanup):
     """Create a NiceGUI control for a single Setting field.
 
     Returns the control's "size class":
         'full'  — needs a full row (slider, text input)
         'small' — compact inline control (switch, select, number)
+
+    *cleanup* collects (settings, name, callback) tuples so the caller
+    can deregister them when the browser client disconnects.
     """
     value = getattr(settings, name)
     label = generate_label(name)
@@ -61,6 +64,7 @@ def _build_field_control(settings, name, field):
             sel.set_value(v.name if isinstance(v, Enum) else v)
 
         settings.on_change(name, update_select)
+        cleanup.append((settings, name, update_select))
         return 'small'
 
     # -- bool → switch -------------------------------------------------------
@@ -78,6 +82,7 @@ def _build_field_control(settings, name, field):
             sw.set_value(v)
 
         settings.on_change(name, update_switch)
+        cleanup.append((settings, name, update_switch))
         return 'small'
 
     # -- int/float with min+max → slider -------------------------------------
@@ -99,6 +104,7 @@ def _build_field_control(settings, name, field):
             sl.set_value(v)
 
         settings.on_change(name, update_slider)
+        cleanup.append((settings, name, update_slider))
         return 'full'
 
     # -- int/float without range → number input ------------------------------
@@ -120,6 +126,7 @@ def _build_field_control(settings, name, field):
             num.set_value(v)
 
         settings.on_change(name, update_num)
+        cleanup.append((settings, name, update_num))
         return 'small'
 
     # -- str → text input ----------------------------------------------------
@@ -137,6 +144,7 @@ def _build_field_control(settings, name, field):
             inp.set_value(v)
 
         settings.on_change(name, update_input)
+        cleanup.append((settings, name, update_input))
         return 'full'
 
     # -- Fallback: read-only label -------------------------------------------
@@ -148,6 +156,7 @@ def _build_field_control(settings, name, field):
         lbl.set_text(str(v))
 
     settings.on_change(name, update_label)
+    cleanup.append((settings, name, update_label))
     return 'small'
 
 
@@ -157,7 +166,7 @@ def _build_action_button(settings, name, action):
     ui.button(label, on_click=lambda: action.fire(settings)).props("dense")
 
 
-def _build_settings_card(name, settings):
+def _build_settings_card(name, settings, cleanup):
     """Build a collapsible card for one BaseSettings instance.
 
     Uses a 2-column grid for sliders and flows small controls (switches,
@@ -197,13 +206,13 @@ def _build_settings_card(name, settings):
         if small_fields:
             with ui.row().classes("w-full gap-4 flex-wrap items-end"):
                 for field_name in small_fields:
-                    _build_field_control(settings, field_name, settings.fields[field_name])
+                    _build_field_control(settings, field_name, settings.fields[field_name], cleanup)
 
         # Full-width controls (sliders, text) in a 2-column grid
         if full_fields:
             with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-2"):
                 for field_name in full_fields:
-                    _build_field_control(settings, field_name, settings.fields[field_name])
+                    _build_field_control(settings, field_name, settings.fields[field_name], cleanup)
 
         # Actions
         action_items = [
@@ -217,7 +226,7 @@ def _build_settings_card(name, settings):
 
         # Children (recursive)
         for child_name, child in settings.children.items():
-            _build_settings_card(child_name, child)
+            _build_settings_card(child_name, child, cleanup)
 
 
 def _scan_presets():
@@ -306,6 +315,9 @@ def create_settings_panel(registry):
         def index():
             create_settings_panel(registry)
     """
+    # Track all (settings, field_name, callback) for this client session
+    cleanup: list[tuple] = []
+
     _build_save_load_toolbar(registry)
 
     group_map = registry.groups()
@@ -325,4 +337,15 @@ def create_settings_panel(registry):
             with ui.tab_panel(tab_map[group]):
                 for config_name in config_names:
                     settings = registry.get(config_name)
-                    _build_settings_card(config_name, settings)
+                    _build_settings_card(config_name, settings, cleanup)
+
+    # Deregister UI callbacks when the browser tab / client disconnects
+    def _on_disconnect():
+        for s, field_name, cb in cleanup:
+            try:
+                s.remove_callback(field_name, cb)
+            except (KeyError, ValueError):
+                pass
+        cleanup.clear()
+
+    app.on_disconnect(_on_disconnect)

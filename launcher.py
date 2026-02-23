@@ -117,9 +117,6 @@ if __name__ == '__main__': # For Windows compatibility with multiprocessing
 
     settings.sound_osc.num_players = args.players
 
-    settings.render.num_players = args.players
-    settings.render.num_cams = args.cameras
-
     app = Main(settings)
     app.start()
 

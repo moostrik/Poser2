@@ -2,6 +2,16 @@
   "render": {
     "lut": "NONE",
     "lut_strength": 1.0,
+    "window": {
+      "v_sync": true,
+      "fullscreen": false,
+      "monitor": 0,
+      "x": 0,
+      "y": 80,
+      "width": 1920,
+      "height": 1000,
+      "secondary_list": [0, 1, 2]
+    },
     "data_layer": {
       "feature": "NONE",
       "mode": "WINDOW",
