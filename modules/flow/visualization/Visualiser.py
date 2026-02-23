@@ -28,8 +28,7 @@ class Visualizer:
 
     def __init__(self, config: VisualisationFieldConfig | None = None) -> None:
         self._config: VisualisationFieldConfig = config or VisualisationFieldConfig()
-        for name in self._config.fields:
-            self._config.on_change(name, lambda v: self._on_config_changed())
+        self._config.bind_all(lambda v: self._on_config_changed())
 
         # Velocity visualization for 2-channel data
         self.velocity_field: VelocityField = VelocityField(self._config)

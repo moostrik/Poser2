@@ -158,7 +158,7 @@ class TestReadOnly(unittest.TestCase):
     def test_readonly_callback_fires_on_set(self):
         s = CameraSettings()
         results = []
-        s.on_change("fps", lambda v: results.append(v))
+        s.bind(CameraSettings.fps, lambda v: results.append(v))
         s.fps = 60.0
         self.assertEqual(results, [60.0])
 
@@ -196,22 +196,22 @@ class TestCallbacks(unittest.TestCase):
     def test_callback_fires_on_change(self):
         s = CameraSettings()
         results = []
-        s.on_change("exposure", lambda v: results.append(v))
+        s.bind(CameraSettings.exposure, lambda v: results.append(v))
         s.exposure = 2000
         self.assertEqual(results, [2000])
 
     def test_callback_not_fired_on_same_value(self):
         s = CameraSettings()
         results = []
-        s.on_change("exposure", lambda v: results.append(v))
+        s.bind(CameraSettings.exposure, lambda v: results.append(v))
         s.exposure = 1000  # same as default
         self.assertEqual(results, [])
 
     def test_multiple_callbacks(self):
         s = CameraSettings()
         a, b = [], []
-        s.on_change("exposure", lambda v: a.append(v))
-        s.on_change("exposure", lambda v: b.append(v))
+        s.bind(CameraSettings.exposure, lambda v: a.append(v))
+        s.bind(CameraSettings.exposure, lambda v: b.append(v))
         s.exposure = 3000
         self.assertEqual(a, [3000])
         self.assertEqual(b, [3000])
@@ -220,35 +220,15 @@ class TestCallbacks(unittest.TestCase):
         s = CameraSettings()
         results = []
         cb = lambda v: results.append(v)
-        s.on_change("exposure", cb)
-        s.remove_callback("exposure", cb)
+        s.bind(CameraSettings.exposure, cb)
+        s.unbind(CameraSettings.exposure, cb)
         s.exposure = 5000
         self.assertEqual(results, [])
 
-    def test_decorator_syntax(self):
-        s = CameraSettings()
-        results = []
-
-        @s.on_change("exposure")
-        def on_exp(value):
-            results.append(value)
-
-        s.exposure = 4000
-        self.assertEqual(results, [4000])
-
-    def test_decorator_returns_function(self):
-        s = CameraSettings()
-
-        @s.on_change("gain")
-        def on_gain(value):
-            pass
-
-        self.assertTrue(callable(on_gain))
-
-    def test_on_change_unknown_field_raises(self):
+    def test_bind_unknown_field_raises(self):
         s = CameraSettings()
         with self.assertRaises(KeyError):
-            s.on_change("nonexistent", lambda v: None)
+            s.bind(MinimalSettings.value, lambda v: None)
 
 
 class TestAttributeGuard(unittest.TestCase):
@@ -279,8 +259,8 @@ class TestInstanceIsolation(unittest.TestCase):
         a = CameraSettings()
         b = CameraSettings()
         results_a, results_b = [], []
-        a.on_change("exposure", lambda v: results_a.append(v))
-        b.on_change("exposure", lambda v: results_b.append(v))
+        a.bind(CameraSettings.exposure, lambda v: results_a.append(v))
+        b.bind(CameraSettings.exposure, lambda v: results_b.append(v))
         a.exposure = 9000
         self.assertEqual(results_a, [9000])
         self.assertEqual(results_b, [])
@@ -333,7 +313,7 @@ class TestSerialization(unittest.TestCase):
     def test_update_from_dict_fires_callbacks(self):
         s = CameraSettings()
         results = []
-        s.on_change("exposure", lambda v: results.append(v))
+        s.bind(CameraSettings.exposure, lambda v: results.append(v))
         s.update_from_dict({"exposure": 7777})
         self.assertEqual(results, [7777])
 
@@ -393,7 +373,7 @@ class TestThreadSafety(unittest.TestCase):
             with lock:
                 counter["n"] += 1
 
-        s.on_change("value", increment)
+        s.bind(MinimalSettings.value, increment)
 
         def writer(start):
             for i in range(100):
@@ -455,7 +435,7 @@ class TestSettingsRegistry(unittest.TestCase):
         reg = SettingsRegistry()
         reg.register("camera", s)
         results = []
-        s.on_change("exposure", lambda v: results.append(v))
+        s.bind(CameraSettings.exposure, lambda v: results.append(v))
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "settings.json")
@@ -608,15 +588,15 @@ class TestAction(unittest.TestCase):
     def test_action_fires_callbacks(self):
         s = SettingsWithActions()
         results = []
-        s.on_action("reset", lambda: results.append("fired"))
+        s.bind(SettingsWithActions.reset, lambda: results.append("fired"))
         s._actions["reset"].fire(s)
         self.assertEqual(results, ["fired"])
 
     def test_action_multiple_callbacks(self):
         s = SettingsWithActions()
         a, b = [], []
-        s.on_action("reset", lambda: a.append(1))
-        s.on_action("reset", lambda: b.append(2))
+        s.bind(SettingsWithActions.reset, lambda: a.append(1))
+        s.bind(SettingsWithActions.reset, lambda: b.append(2))
         s._actions["reset"].fire(s)
         self.assertEqual(a, [1])
         self.assertEqual(b, [2])
@@ -630,28 +610,17 @@ class TestAction(unittest.TestCase):
         with self.assertRaises(AttributeError):
             s.reset = True
 
-    def test_action_decorator_syntax(self):
-        s = SettingsWithActions()
-        results = []
-
-        @s.on_action("reset")
-        def on_reset():
-            results.append("decorated")
-
-        s._actions["reset"].fire(s)
-        self.assertEqual(results, ["decorated"])
-
-    def test_on_action_unknown_raises(self):
+    def test_bind_action_unknown_raises(self):
         s = SettingsWithActions()
         with self.assertRaises(KeyError):
-            s.on_action("nonexistent", lambda: None)
+            s.bind(MinimalSettings.value, lambda: None)
 
-    def test_remove_action_callback(self):
+    def test_unbind_action(self):
         s = SettingsWithActions()
         results = []
         cb = lambda: results.append(1)
-        s.on_action("reset", cb)
-        s.remove_action_callback("reset", cb)
+        s.bind(SettingsWithActions.reset, cb)
+        s.unbind(SettingsWithActions.reset, cb)
         s._actions["reset"].fire(s)
         self.assertEqual(results, [])
 
@@ -679,8 +648,8 @@ class TestAction(unittest.TestCase):
     def test_action_broken_callback_doesnt_crash(self):
         s = SettingsWithActions()
         results = []
-        s.on_action("reset", lambda: 1 / 0)  # will raise
-        s.on_action("reset", lambda: results.append("ok"))
+        s.bind(SettingsWithActions.reset, lambda: 1 / 0)  # will raise
+        s.bind(SettingsWithActions.reset, lambda: results.append("ok"))
         s._actions["reset"].fire(s)  # should not raise
         self.assertEqual(results, ["ok"])
 
@@ -869,7 +838,7 @@ class TestChild(unittest.TestCase):
     def test_child_field_callbacks_still_fire(self):
         cfg = OuterConfig()
         received = []
-        cfg.inner.on_change("speed", lambda v: received.append(v))
+        cfg.inner.bind(InnerConfig.speed, lambda v: received.append(v))
         cfg.inner.speed = 7.0
         self.assertEqual(received, [7.0])
 
@@ -982,7 +951,7 @@ class TestChild(unittest.TestCase):
     def test_deep_callback(self):
         cfg = DeepConfig()
         received = []
-        cfg.middle.inner.on_change("speed", lambda v: received.append(v))
+        cfg.middle.inner.bind(InnerConfig.speed, lambda v: received.append(v))
         cfg.middle.inner.speed = 6.6
         self.assertEqual(received, [6.6])
 
@@ -1048,7 +1017,7 @@ class TestListSetting(unittest.TestCase):
     def test_callback_fires(self):
         s = ListSettings()
         received = []
-        s.on_change("ids", lambda v: received.append(v))
+        s.bind(ListSettings.ids, lambda v: received.append(v))
         s.ids = [7, 8, 9]
         self.assertEqual(received, [[7, 8, 9]])
 
@@ -1056,7 +1025,7 @@ class TestListSetting(unittest.TestCase):
         s = ListSettings()
         s.ids = [1, 2, 3]  # same as default
         received = []
-        s.on_change("ids", lambda v: received.append(v))
+        s.bind(ListSettings.ids, lambda v: received.append(v))
         s.ids = [1, 2, 3]  # equal — should NOT fire
         self.assertEqual(received, [])
 

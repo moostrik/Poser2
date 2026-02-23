@@ -59,12 +59,12 @@ class Action:
 
     # -- Callback management -------------------------------------------------
 
-    def add_callback(self, obj, callback):
+    def bind(self, obj, callback):
         with obj._locks[self.name]:
             if callback not in obj._callbacks[self.name]:
                 obj._callbacks[self.name].append(callback)
 
-    def remove_callback(self, obj, callback):
+    def unbind(self, obj, callback):
         with obj._locks[self.name]:
             try:
                 obj._callbacks[self.name].remove(callback)

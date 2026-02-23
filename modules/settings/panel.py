@@ -39,7 +39,7 @@ def _build_field_control(settings, name, field, cleanup):
         'full'  — needs a full row (slider, text input)
         'small' — compact inline control (switch, select, number)
 
-    *cleanup* collects (settings, name, callback) tuples so the caller
+    *cleanup* collects (settings, field, callback) tuples so the caller
     can deregister them when the browser client disconnects.
     """
     value = getattr(settings, name)
@@ -63,8 +63,8 @@ def _build_field_control(settings, name, field, cleanup):
         def update_select(v, sel=sel):
             sel.set_value(v.name if isinstance(v, Enum) else v)
 
-        settings.on_change(name, update_select)
-        cleanup.append((settings, name, update_select))
+        settings.bind(field, update_select)
+        cleanup.append((settings, field, update_select))
         return 'small'
 
     # -- bool → switch -------------------------------------------------------
@@ -81,8 +81,8 @@ def _build_field_control(settings, name, field, cleanup):
         def update_switch(v, sw=sw):
             sw.set_value(v)
 
-        settings.on_change(name, update_switch)
-        cleanup.append((settings, name, update_switch))
+        settings.bind(field, update_switch)
+        cleanup.append((settings, field, update_switch))
         return 'small'
 
     # -- int/float with min+max → slider -------------------------------------
@@ -103,8 +103,8 @@ def _build_field_control(settings, name, field, cleanup):
         def update_slider(v, sl=sl):
             sl.set_value(v)
 
-        settings.on_change(name, update_slider)
-        cleanup.append((settings, name, update_slider))
+        settings.bind(field, update_slider)
+        cleanup.append((settings, field, update_slider))
         return 'full'
 
     # -- int/float without range → number input ------------------------------
@@ -125,8 +125,8 @@ def _build_field_control(settings, name, field, cleanup):
         def update_num(v, num=num):
             num.set_value(v)
 
-        settings.on_change(name, update_num)
-        cleanup.append((settings, name, update_num))
+        settings.bind(field, update_num)
+        cleanup.append((settings, field, update_num))
         return 'small'
 
     # -- str → text input ----------------------------------------------------
@@ -143,8 +143,8 @@ def _build_field_control(settings, name, field, cleanup):
         def update_input(v, inp=inp):
             inp.set_value(v)
 
-        settings.on_change(name, update_input)
-        cleanup.append((settings, name, update_input))
+        settings.bind(field, update_input)
+        cleanup.append((settings, field, update_input))
         return 'full'
 
     # -- Fallback: read-only label -------------------------------------------
@@ -155,8 +155,8 @@ def _build_field_control(settings, name, field, cleanup):
     def update_label(v, lbl=lbl):
         lbl.set_text(str(v))
 
-    settings.on_change(name, update_label)
-    cleanup.append((settings, name, update_label))
+    settings.bind(field, update_label)
+    cleanup.append((settings, field, update_label))
     return 'small'
 
 
@@ -341,9 +341,9 @@ def create_settings_panel(registry):
 
     # Deregister UI callbacks when the browser tab / client disconnects
     def _on_disconnect():
-        for s, field_name, cb in cleanup:
+        for s, fld, cb in cleanup:
             try:
-                s.remove_callback(field_name, cb)
+                s.unbind(fld, cb)
             except (KeyError, ValueError):
                 pass
         cleanup.clear()

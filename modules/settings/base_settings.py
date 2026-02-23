@@ -112,57 +112,33 @@ class BaseSettings:
 
     # -- Callback registration -----------------------------------------------
 
-    def remove_callback(self, name, callback):
-        """Remove a previously registered callback for *name*."""
-        if name not in self._fields:
-            raise KeyError(f"Unknown setting '{name}'")
-        self._fields[name].remove_callback(self, callback)
+    def bind(self, field: 'Setting | Action', callback) -> None:
+        """Register a callback for a Setting or Action descriptor.
 
-    def on_action(self, name, callback=None):
-        """Register a callback for an action. Works as direct call or decorator."""
-        if name not in self._actions:
-            raise KeyError(f"Unknown action '{name}'")
-        action = self._actions[name]
-        if callback is not None:
-            action.add_callback(self, callback)
-            return callback
-        def decorator(fn):
-            action.add_callback(self, fn)
-            return fn
-        return decorator
+        Usage::
 
-    def remove_action_callback(self, name, callback):
-        """Remove a previously registered action callback."""
-        if name not in self._actions:
-            raise KeyError(f"Unknown action '{name}'")
-        self._actions[name].remove_callback(self, callback)
-
-    def on_change(self, name, callback=None):
-        """Register a callback for a field. Works as direct call or decorator.
-
-        Direct::
-
-            settings.on_change("exposure", my_callback)
-
-        Decorator::
-
-            @settings.on_change("exposure")
-            def on_exposure(value): ...
+            settings.bind(MySettings.exposure, on_exposure_changed)
+            settings.bind(MySettings.reset, on_reset_fired)
         """
-        if name not in self._fields:
-            raise KeyError(f"Unknown setting '{name}'")
+        if field.name not in self._fields and field.name not in self._actions:
+            raise KeyError(
+                f"'{type(self).__name__}' has no setting or action '{field.name}'"
+            )
+        field.bind(self, callback)
 
-        field = self._fields[name]
+    def unbind(self, field: 'Setting | Action', callback) -> None:
+        """Remove a previously registered callback for a Setting or Action."""
+        field.unbind(self, callback)
 
-        if callback is not None:
-            field.add_callback(self, callback)
-            return callback
+    def bind_all(self, callback) -> None:
+        """Register *callback* on every Setting field in this instance."""
+        for field in self._fields.values():
+            field.bind(self, callback)
 
-        # Decorator mode
-        def decorator(fn):
-            field.add_callback(self, fn)
-            return fn
-        return decorator
+    def unbind_all(self, callback) -> None:
+        """Remove *callback* from every Setting field in this instance."""
+        for field in self._fields.values():
+            field.unbind(self, callback)
 
     # -- Serialization -------------------------------------------------------
 

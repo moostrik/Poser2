@@ -11,7 +11,7 @@ from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub, Stage
 from modules.gui.PyReallySimpleGui import Gui
-from modules.render.render_settings import RenderSettings, DataLayer
+from modules.render.render_settings import RenderSettings, WindowSettings, DataLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -179,9 +179,9 @@ class RenderManager(RenderBase):
         self.pose_comp_config =     ls.PoseCompConfig(      stage=Stage.LERP, line_width=2.0, line_smooth=0.0, use_gpu_crop=True)
 
         self.centre_gmtr_config=    ls.CentreGeometryConfig(stage=Stage.SMOOTH, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
-        self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.3, blur_steps=0, blur_radius=1.0, dilation_steps=0)
-        self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.25, mask_opacity=1.0, use_mask=True)
-        self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.25,  exposure=1.2, gamma=1.0, offset=0.0, contrast=1.1, saturation=2.0, levels=9, smoothness=0.33, sharpen=0.0, colorize=0.96, use_mask=True)
+        self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.2, blur_steps=0, blur_radius=1.0, dilation_steps=0)
+        self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
+        self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.2,  exposure=1.2, gamma=1.0, offset=0.0, contrast=1.1, saturation=2.0, levels=9, smoothness=0.33, sharpen=0.0, colorize=0.96, use_mask=True)
         self.centre_pose_config =   ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=False)
 
         self.data_A_config =        ls.DataLayerConfig(     stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
@@ -193,8 +193,8 @@ class RenderManager(RenderBase):
         self.render_settings = render_settings
 
         # Propagate LUT changes to composite config
-        self.render_settings.on_change('lut', lambda v: setattr(self.composite_config, 'lut', v))
-        self.render_settings.on_change('lut_strength', lambda v: setattr(self.composite_config, 'lut_strength', v))
+        self.render_settings.bind(RenderSettings.lut, lambda v: setattr(self.composite_config, 'lut', v))
+        self.render_settings.bind(RenderSettings.lut_strength, lambda v: setattr(self.composite_config, 'lut_strength', v))
 
         flows: dict[int, ls.FlowLayer] = {}
         mask_textures: dict[int, Texture] = {}
@@ -222,9 +222,6 @@ class RenderManager(RenderBase):
 
             self.L[Layers.composite][i] = ls.CompositeLayer([fluid, ms_mask], self.composite_config)
 
-            # centre_motion = self.L[Layers.hdt_prep][i]=     ls.HDTPrepare(          i, self.data_hub,   PoseDataHubTypes.pose_I,    centre_mask.texture)
-            # sim_blend =     self.L[Layers.hdt_blend][i] =   ls.HDTBlend(            i, self.data_hub,   PoseDataHubTypes.pose_I,    cast(dict[int, ls.HDTPrepare], self.L[Layers.hdt_prep]))
-
             self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, self.data_A_config)
             self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, self.data_A_config)
             self.L[Layers.data_A_AV][i] = ls.AngleVelLayer(     i, self.data_hub, self.data_A_config)
@@ -234,7 +231,7 @@ class RenderManager(RenderBase):
             self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub, self.data_time_config)
 
         # Bind data layers to render_settings — propagates active state and shared properties
-        self.render_settings.bind(
+        self.render_settings.bind_data_layers(
             {i: cast(DataLayer, self.L[Layers.data_A_W][i]) for i in range(self.num_cams)},
             {i: cast(DataLayer, self.L[Layers.data_A_F][i]) for i in range(self.num_cams)},
             {i: cast(DataLayer, self.L[Layers.data_A_AV][i]) for i in range(self.num_cams)},
@@ -259,6 +256,19 @@ class RenderManager(RenderBase):
             win.x, win.y,
             win.monitor, win.secondary_list
         )
+
+        # Bind window settings → window manager (reactive runtime control)
+        wm = self.window_manager
+        win.bind(WindowSettings.v_sync,     lambda v: wm.set_v_sync(v))
+        win.bind(WindowSettings.fullscreen, lambda v: wm.set_main_fullscreen(v))
+        win.bind(WindowSettings.monitor,    lambda v: wm.set_monitor(v))
+        win.bind(WindowSettings.x,         lambda _: wm.set_position(win.x, win.y))
+        win.bind(WindowSettings.y,         lambda _: wm.set_position(win.x, win.y))
+        win.bind(WindowSettings.width,     lambda _: wm.set_size(win.width, win.height))
+        win.bind(WindowSettings.height,    lambda _: wm.set_size(win.width, win.height))
+
+        # FPS feedback: WindowManager pushes measured FPS into the readonly setting
+        wm.fps_callback = lambda fps: setattr(win, 'fps', fps)
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -300,23 +310,6 @@ class RenderManager(RenderBase):
         self._draw_layers = FINAL_LAYERS
         self._preview_layers = PREVIEW_LAYERS
 
-        # hotreload settings
-        self.centre_mask_config.blend_factor = 0.2
-        self.centre_frg_config.blend_factor = 0.2
-        # self.centre_gmtr_config.stage = Stage.SMOOTH
-
-        # self.centre_frg_config.exposure = 1.2
-        # self.centre_frg_config.gamma = 1.0
-        # self.centre_frg_config.offset = 0.0
-        # self.centre_frg_config.contrast = 1.1
-        # self.centre_frg_config.saturation = 2.0
-
-        # self.centre_frg_config.levels = 9
-        # self.centre_frg_config.smoothness = 0.3
-        # self.centre_frg_config.sharpen = 0.0
-
-        # self.centre_frg_config.colorize = 0.96
-
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
@@ -356,7 +349,6 @@ class RenderManager(RenderBase):
 
         camera_id: int = self.secondary_order_list.index(monitor_id)
         for layer_type in self._draw_layers:
-            # print(f"Style for layer type {layer_type}: {Style._current_state}")
             self.L[layer_type][camera_id].draw()
 
         Style.pop_style()

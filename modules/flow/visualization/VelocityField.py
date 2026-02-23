@@ -29,8 +29,7 @@ class VelocityField(FieldBase):
 
         # Configuration with change notification
         self.config: VisualisationFieldConfig = config or VisualisationFieldConfig()
-        for name in self.config.fields:
-            self.config.on_change(name, lambda v: self._on_config_changed())
+        self.config.bind_all(lambda v: self._on_config_changed())
 
         self._velocity_texture: Texture | None = None
 

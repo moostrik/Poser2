@@ -61,48 +61,48 @@ class DataLayerConfig(Protocol):
 
 class WindowSettings(BaseSettings):
     """Window / init configuration — set once before RenderManager starts."""
-    title =         Setting(str,  "Poser", init_only=True, visible=False)
-    fps =           Setting(int,  60, readonly=True)
-    v_sync =        Setting(bool, True)
-    fullscreen =    Setting(bool, False)
-    monitor =       Setting(int,  0)
-    secondary_list = Setting(list[int], [])
-    x =             Setting(int,  0)
-    y =             Setting(int,  80)
-    width =         Setting(int,  1920)
-    height =        Setting(int,  1000)
+    title: Setting[str] =           Setting(str,  "Poser", init_only=True, visible=False)
+    fps: Setting[int] =             Setting(int,  60, readonly=True)
+    v_sync: Setting[bool] =         Setting(bool, True)
+    fullscreen: Setting[bool] =     Setting(bool, False)
+    monitor: Setting[int] =         Setting(int,  0)
+    secondary_list: Setting[list[int]] = Setting(list[int], [])
+    x: Setting[int] =               Setting(int,  0)
+    y: Setting[int] =               Setting(int,  80)
+    width: Setting[int] =           Setting(int,  1920)
+    height: Setting[int] =          Setting(int,  1000)
 
 
 class DataLayerSettings(BaseSettings):
     """Data layer control — feature selection, display mode, stages."""
-    feature =       Setting(RenderFeature, RenderFeature.angle_motion)
-    mode =          Setting(LayerMode, LayerMode.WINDOW)
-    stage_a =       Setting(Stage, Stage.SMOOTH)
-    stage_b =       Setting(Stage, Stage.LERP)
+    feature: Setting[RenderFeature] =   Setting(RenderFeature, RenderFeature.angle_motion)
+    mode: Setting[LayerMode] =      Setting(LayerMode, LayerMode.WINDOW)
+    stage_a: Setting[Stage] =       Setting(Stage, Stage.SMOOTH)
+    stage_b: Setting[Stage] =       Setting(Stage, Stage.LERP)
 
 
 class RenderSettings(BaseSettings):
     """Mutable render-pipeline settings (registered in SettingsRegistry)."""
 
     # Window / init-only (foldable child)
-    window =        Child(WindowSettings)
+    window: Child[WindowSettings] =     Child(WindowSettings)
 
     # Data layer control (foldable child)
-    data_layer =    Child(DataLayerSettings)
+    data_layer: Child[DataLayerSettings] =  Child(DataLayerSettings)
 
     # LUT
-    lut =           Setting(LutSelection, LutSelection.NONE)  # type: ignore[attr-defined]
-    lut_strength =  Setting(float, 1.0, min=0.0, max=1.0)
+    lut: Setting[LutSelection] =           Setting(LutSelection, LutSelection.NONE)  # type: ignore[attr-defined]
+    lut_strength: Setting[float] =  Setting(float, 1.0, min=0.0, max=1.0)
 
     # Flow / Fluid (child configs, shared across all cameras)
-    flow =          Child(FlowLayerConfig)
-    fluid =         Child(FluidLayerConfig)
+    flow: Child[FlowLayerConfig] =          Child(FlowLayerConfig)
+    fluid: Child[FluidLayerConfig] =         Child(FluidLayerConfig)
 
     # ------------------------------------------------------------------
     # Data-layer binding (replaces Config.bind / _propagate)
     # ------------------------------------------------------------------
 
-    def bind(self,
+    def bind_data_layers(self,
              windows_a: dict[int, DataLayer], frames_a: dict[int, DataLayer], angvel_a: dict[int, DataLayer],
              windows_b: dict[int, DataLayer], frames_b: dict[int, DataLayer], angvel_b: dict[int, DataLayer]) -> None:
         """Bind data-layer instances so config changes propagate active state."""
@@ -112,8 +112,8 @@ class RenderSettings(BaseSettings):
         ])
         # Wire _propagate to each relevant field on the data_layer child
         dl = self.data_layer
-        for field_name in ('feature', 'mode', 'stage_a', 'stage_b'):
-            dl.on_change(field_name, lambda _v: self._propagate())
+        for field in (DataLayerSettings.feature, DataLayerSettings.mode, DataLayerSettings.stage_a, DataLayerSettings.stage_b):
+            dl.bind(field, lambda _v: self._propagate())
         self._propagate()
 
     def _propagate(self) -> None:

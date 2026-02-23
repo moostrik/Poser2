@@ -65,6 +65,7 @@ class WindowManager():
         self.exit_callbacks: set[Callable[[], None]] = set()
         self.mouse_callbacks: set[Callable] = set()
         self.key_callbacks: set[Callable] = set()
+        self.fps_callback: Optional[Callable[[int], None]] = None
 
         # List of secondary windows sharing the main context
 
@@ -264,6 +265,8 @@ class WindowManager():
     def _update(self) -> None:
         self.fps.tick()
         """Update renderer state. Called once per frame."""
+        if self.fps_callback:
+            self.fps_callback(self.fps.get_fps())
         try:
             self.renderer.update()
         except Exception as e:
@@ -556,6 +559,39 @@ class WindowManager():
                 self.prev_window_width, self.prev_window_height, 0
             )
             # glfw.set_input_mode(self.main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+
+    def set_v_sync(self, value: bool) -> None:
+        """Toggle V-Sync. Takes effect next frame (swap_interval is set per-frame)."""
+        self.v_sync = value
+
+    def set_monitor(self, monitor_id: int) -> None:
+        """Move the main window to the given monitor (by sorted index)."""
+        if not self.main_window:
+            return
+        if monitor_id < 0 or monitor_id >= len(self._ordered_monitor_ids):
+            return
+        self.monitor_id = monitor_id
+        real_id = self._ordered_monitor_ids[monitor_id]
+        monitors = glfw.get_monitors()
+        if real_id >= len(monitors):
+            return
+        self.monitor = monitors[real_id]
+        posX, posY = glfw.get_monitor_pos(self.monitor)
+        glfw.set_window_pos(self.main_window, posX, posY)
+
+    def set_position(self, x: int, y: int) -> None:
+        """Move the main window to (x, y)."""
+        if not self.main_window:
+            return
+        self.window_x = x
+        self.window_y = y
+        glfw.set_window_pos(self.main_window, x, y)
+
+    def set_size(self, width: int, height: int) -> None:
+        """Resize the main window."""
+        if not self.main_window:
+            return
+        glfw.set_window_size(self.main_window, width, height)
 
     def set_secondary_fullscreen(self, value: bool) -> None:
         """Set all secondary windows to fullscreen or windowed mode"""

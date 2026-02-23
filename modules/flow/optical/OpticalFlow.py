@@ -38,8 +38,7 @@ class OpticalFlow(FlowBase):
 
         # Configuration with change notification
         self.config: OpticalFlowConfig = config or OpticalFlowConfig()
-        for name in self.config.fields:
-            self.config.on_change(name, lambda v: self._on_config_changed())
+        self.config.bind_all(lambda v: self._on_config_changed())
 
         # State
         self._frame_count: int = 0  # 0=no frames, 1=first frame, 2+=can compute flow
