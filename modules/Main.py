@@ -7,6 +7,7 @@ import os
 
 # Local application imports
 from modules.render.RenderManager import RenderManager
+from modules.render.render_settings import RenderSettings
 from modules.Settings import Settings
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import FrameField
@@ -74,8 +75,13 @@ class Main():
         self.registry = SettingsRegistry()
 
         # RENDER
-        self.render = RenderManager(self.gui, self.data_hub, settings.render, self.registry)
-        self.data_gui = ConfigGuiGenerator(settings.render, self.gui, "Render", 4)
+        self.render_settings = RenderSettings()
+        self.registry.register("render", self.render_settings, group="render")
+
+        self.render = RenderManager(
+            self.gui, self.data_hub, self.render_settings,
+            num_cams=len(self.cameras), num_players=settings.num_players,
+        )
 
         # Load default preset (after all subsystems have registered)
         from modules.settings.panel import SETTINGS_DIR, PRESET_SUFFIX
@@ -153,7 +159,7 @@ class Main():
         # WINDOW TRACKERS
         self.window_tracker_R =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * settings.camera.fps)))
         self.window_tracker_S =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * settings.camera.fps)))
-        self.window_tracker_I =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * settings.render.fps)))
+        self.window_tracker_I =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * self.render_settings.window.fps)))
 
         self.bbox_filters =      trackers.FilterTracker(
             settings.num_players,
@@ -345,9 +351,9 @@ class Main():
         self.gui.addFrame([self.motion_extractor_gui.get_gui_frame(), self.motion_ma_gui.get_gui_frame(), self.simil_interp_gui.get_gui_frame()])
         self.gui.addFrame([self.window_correlation_gui.get_gui_frame(),self.window_similarity_gui.get_gui_frame(), self.simil_smooth_gui.get_gui_frame()])
         if self.player:
-            self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.data_gui.frame])
+            self.gui.addFrame([self.player.get_gui_frame(), self.tracker.gui.get_gui_frame()])
         if self.recorder:
-            self.gui.addFrame([self.recorder.get_gui_frame(), self.tracker.gui.get_gui_frame(), self.data_gui.frame])
+            self.gui.addFrame([self.recorder.get_gui_frame(), self.tracker.gui.get_gui_frame()])
         self.gui.start()
         self.gui.bringToFront()
         # GUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUIGUI

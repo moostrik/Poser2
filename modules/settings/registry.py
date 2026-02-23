@@ -1,9 +1,12 @@
 """SettingsRegistry — stores multiple BaseSettings instances with JSON persistence."""
 
 import json
+import logging
 from pathlib import Path
 
 from modules.settings.base_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class SettingsRegistry:
@@ -53,7 +56,13 @@ class SettingsRegistry:
             return
         for name, module_data in data.items():
             if name in self._modules:
-                self._modules[name].update_from_dict(module_data)
+                try:
+                    self._modules[name].update_from_dict(module_data)
+                except Exception:
+                    logger.warning(
+                        "Failed to load settings for '%s', using defaults", name,
+                        exc_info=True,
+                    )
 
     def __contains__(self, name):
         return name in self._modules

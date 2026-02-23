@@ -108,7 +108,7 @@ def _build_field_control(settings, name, field):
             value=value,
             step=field.step or (1 if field.type_ is int else 0.01),
             format=f"%.0f" if field.type_ is int else f"%.2f",
-        ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[100px]")
+        ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
         def on_num_change(e):
             if e.value is not None:

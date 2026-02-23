@@ -11,8 +11,7 @@ from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub, Stage
 from modules.gui.PyReallySimpleGui import Gui
-from modules.render.Config import Config, DataLayer
-from modules.settings import SettingsRegistry
+from modules.render.render_settings import RenderSettings, DataLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -158,13 +157,14 @@ PREVIEW_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
 FINAL_LAYERS: list[Layers] = SHOW_COMP
 
 class RenderManager(RenderBase):
-    def __init__(self, gui: Gui, data_hub: DataHub, settings: Config, registry: SettingsRegistry | None = None) -> None:
-        self.num_players: int = settings.num_players
-        self.num_cams: int =    settings.num_cams
+    def __init__(self, gui: Gui, data_hub: DataHub, render_settings: RenderSettings,
+                 num_cams: int = 3, num_players: int = 3) -> None:
+        win = render_settings.window
+        self.num_players: int = num_players
+        self.num_cams: int =    num_cams
 
         # data
         self.data_hub: DataHub = data_hub
-        self._settings: Config = settings
 
         # layers
         self._update_layers: list[Layers] =     UPDATE_LAYERS
@@ -187,19 +187,14 @@ class RenderManager(RenderBase):
         self.data_A_config =        ls.DataLayerConfig(     stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
         self.data_B_config =        ls.DataLayerConfig(     stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[HISTORY_COLOR])
         self.data_time_config =     ls.MTimeRendererConfig( stage=Stage.LERP)
-        self.composite_config =     ls.CompositeLayerConfig(lut=settings.lut, lut_strength=settings.lut_strength)
+        self.composite_config =     ls.CompositeLayerConfig()
 
-        # Flow / fluid configs (shared across all cameras)
-        self.flow_config =          ls.FlowLayerConfig()
-        self.fluid_config =         ls.FluidLayerConfig()
+        # Reactive render settings (feature, mode, stages, LUT, flow, fluid)
+        self.render_settings = render_settings
 
-        if registry is not None:
-            registry.register("flow_layer", self.flow_config, group="flow")
-            registry.register("fluid_layer", self.fluid_config, group="flow")
-
-        # Watch settings for LUT changes and propagate to composite config
-        settings.watch(lambda v: setattr(self.composite_config, 'lut', v), 'lut')
-        settings.watch(lambda v: setattr(self.composite_config, 'lut_strength', v), 'lut_strength')
+        # Propagate LUT changes to composite config
+        self.render_settings.on_change('lut', lambda v: setattr(self.composite_config, 'lut', v))
+        self.render_settings.on_change('lut_strength', lambda v: setattr(self.composite_config, 'lut_strength', v))
 
         flows: dict[int, ls.FlowLayer] = {}
         mask_textures: dict[int, Texture] = {}
@@ -222,8 +217,8 @@ class RenderManager(RenderBase):
 
             motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,   centre_mask.texture, color)
             ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub,   mask_textures, centre_frg.texture, list(TRACK_COLORS))
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask, centre_mask.texture, list(TRACK_COLORS), config=self.flow_config)
-            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS), config=self.fluid_config)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask, centre_mask.texture, list(TRACK_COLORS), config=self.render_settings.flow)
+            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS), config=self.render_settings.fluid)
 
             self.L[Layers.composite][i] = ls.CompositeLayer([fluid, ms_mask], self.composite_config)
 
@@ -238,8 +233,8 @@ class RenderManager(RenderBase):
             self.L[Layers.data_B_AV][i] = ls.AngleVelLayer(     i, self.data_hub, self.data_B_config)
             self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub, self.data_time_config)
 
-        # Bind data layers (not configs) to settings - propagates active state and shared properties
-        settings.bind(
+        # Bind data layers to render_settings — propagates active state and shared properties
+        self.render_settings.bind(
             {i: cast(DataLayer, self.L[Layers.data_A_W][i]) for i in range(self.num_cams)},
             {i: cast(DataLayer, self.L[Layers.data_A_F][i]) for i in range(self.num_cams)},
             {i: cast(DataLayer, self.L[Layers.data_A_AV][i]) for i in range(self.num_cams)},
@@ -253,16 +248,16 @@ class RenderManager(RenderBase):
             SubdivisionRow(name='track',        columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name='preview',      columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
         ]
-        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.width, settings.height, False)
+        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, win.width, win.height, False)
 
         # window manager
-        self.secondary_order_list: list[int] = settings.secondary_list
+        self.secondary_order_list: list[int] = win.secondary_list
         self.window_manager: WindowManager = WindowManager(
             self, self.subdivision.width, self.subdivision.height,
-            settings.title, settings.fullscreen,
-            settings.v_sync, settings.fps,
-            settings.x, settings.y,
-            settings.monitor, settings.secondary_list
+            win.title, win.fullscreen,
+            win.v_sync, win.fps,
+            win.x, win.y,
+            win.monitor, win.secondary_list
         )
 
         # hot reloader

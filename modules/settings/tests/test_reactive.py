@@ -998,5 +998,103 @@ class TestChild(unittest.TestCase):
         self.assertIn("inner", cfg.middle.children)
 
 
+# ── List Setting ───────────────────────────────────────────────────────────
+
+class ListSettings(BaseSettings):
+    tags = Setting(list[str], [])
+    ids = Setting(list[int], [1, 2, 3])
+
+
+class TestListSetting(unittest.TestCase):
+    """Tests for list[T] support in Setting."""
+
+    def test_default_value(self):
+        s = ListSettings()
+        self.assertEqual(s.tags, [])
+        self.assertEqual(s.ids, [1, 2, 3])
+
+    def test_defaults_are_independent(self):
+        a = ListSettings()
+        b = ListSettings()
+        a.tags.append("x")
+        # b should be unaffected — Setting stores a separate list per instance
+        # (coerce runs list(value) which copies)
+        # Actually, defaults share the same list object until first set.
+        # We verify via set:
+        a.tags = ["a"]
+        self.assertEqual(b.tags, [])
+
+    def test_set_list(self):
+        s = ListSettings()
+        s.ids = [10, 20]
+        self.assertEqual(s.ids, [10, 20])
+
+    def test_coercion_int_elements(self):
+        s = ListSettings()
+        s.ids = [1.0, 2.0, 3.0]  # float → int per element
+        self.assertEqual(s.ids, [1, 2, 3])
+        self.assertIsInstance(s.ids[0], int)
+
+    def test_coercion_str_elements(self):
+        s = ListSettings()
+        s.tags = ["hello", "world"]
+        self.assertEqual(s.tags, ["hello", "world"])
+
+    def test_reject_non_list(self):
+        s = ListSettings()
+        with self.assertRaises(TypeError):
+            s.ids = 42  # type: ignore
+
+    def test_callback_fires(self):
+        s = ListSettings()
+        received = []
+        s.on_change("ids", lambda v: received.append(v))
+        s.ids = [7, 8, 9]
+        self.assertEqual(received, [[7, 8, 9]])
+
+    def test_callback_skip_equal(self):
+        s = ListSettings()
+        s.ids = [1, 2, 3]  # same as default
+        received = []
+        s.on_change("ids", lambda v: received.append(v))
+        s.ids = [1, 2, 3]  # equal — should NOT fire
+        self.assertEqual(received, [])
+
+    def test_to_dict(self):
+        s = ListSettings()
+        s.ids = [4, 5]
+        d = s.to_dict()
+        self.assertEqual(d["ids"], [4, 5])
+        # Verify it's a copy, not the same list
+        d["ids"].append(99)
+        self.assertEqual(s.ids, [4, 5])
+
+    def test_update_from_dict(self):
+        s = ListSettings()
+        s.update_from_dict({"ids": [10, 20, 30], "tags": ["a", "b"]})
+        self.assertEqual(s.ids, [10, 20, 30])
+        self.assertEqual(s.tags, ["a", "b"])
+
+    def test_json_round_trip(self):
+        import json
+        s1 = ListSettings()
+        s1.ids = [100, 200]
+        s1.tags = ["foo"]
+        data = json.loads(json.dumps(s1.to_dict()))
+        s2 = ListSettings()
+        s2.update_from_dict(data)
+        self.assertEqual(s2.ids, [100, 200])
+        self.assertEqual(s2.tags, ["foo"])
+
+    def test_repr(self):
+        desc = repr(ListSettings.__dict__["ids"])
+        self.assertIn("list[int]", desc)
+
+    def test_empty_list_assignment(self):
+        s = ListSettings()
+        s.ids = []
+        self.assertEqual(s.ids, [])
+
+
 if __name__ == "__main__":
     unittest.main()

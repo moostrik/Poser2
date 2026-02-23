@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import threading
 from enum import Enum
-from typing import Generic, TypeVar, overload, Any
+from typing import Generic, TypeVar, overload, Any, get_origin, get_args
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,9 @@ class Setting(Generic[T]):
         self.readonly = readonly
         self.init_only = init_only
         self.visible = visible
+        # Generic list support: list[int], list[str], etc.
+        self._origin = get_origin(type_)          # list | None
+        self._element_type = get_args(type_)[0] if get_args(type_) else None  # int | str | …
         # Set by __set_name__
         self.name = ""
 
@@ -99,10 +102,20 @@ class Setting(Generic[T]):
 
     def _coerce(self, value):
         """Coerce *value* to self.type_, or raise TypeError."""
+        # Generic list: list[int], list[str], etc.
+        if self._origin is list:
+            if not isinstance(value, list):
+                raise TypeError(
+                    f"Setting '{self.name}' expects list, "
+                    f"got {type(value).__name__}: {value!r}"
+                )
+            if self._element_type is not None:
+                return [self._element_type(v) for v in value]
+            return list(value)
         # Reject bool when int or float is expected (bool is a subclass of int)
         if self.type_ in (int, float) and isinstance(value, bool):
             raise TypeError(
-                f"Setting '{self.name}' expects {self.type_.__name__}, got bool: {value!r}"
+                f"Setting '{self.name}' expects {self._type_name}, got bool: {value!r}"
             )
         if isinstance(value, self.type_):
             return value
@@ -116,30 +129,30 @@ class Setting(Generic[T]):
                     return self.type_[value]
                 except KeyError:
                     raise TypeError(
-                        f"Cannot construct {self.type_.__name__} from name {value!r}"
+                        f"Cannot construct {self._type_name} from name {value!r}"
                     )
             try:
                 return self.type_(value)
             except (ValueError, KeyError):
                 raise TypeError(
-                    f"Cannot construct {self.type_.__name__} from {value!r}"
+                    f"Cannot construct {self._type_name} from {value!r}"
                 )
         if isinstance(value, (tuple, list)):
             try:
                 return self.type_(*value)
             except Exception:
                 raise TypeError(
-                    f"Cannot construct {self.type_.__name__} from {type(value).__name__}: {value!r}"
+                    f"Cannot construct {self._type_name} from {type(value).__name__}: {value!r}"
                 )
         if isinstance(value, dict) and hasattr(self.type_, "from_dict"):
             try:
                 return self.type_.from_dict(value)  # type: ignore[union-attr]
             except Exception:
                 raise TypeError(
-                    f"Cannot construct {self.type_.__name__} from dict: {value!r}"
+                    f"Cannot construct {self._type_name} from dict: {value!r}"
                 )
         raise TypeError(
-            f"Setting '{self.name}' expects {self.type_.__name__}, "
+            f"Setting '{self.name}' expects {self._type_name}, "
             f"got {type(value).__name__}: {value!r}"
         )
 
@@ -166,6 +179,8 @@ class Setting(Generic[T]):
             return value.to_dict()
         if isinstance(value, Enum):
             return value.name
+        if isinstance(value, list):
+            return list(value)  # shallow copy, elements are primitives
         return value
 
     def from_json_value(self, obj, raw):
@@ -178,8 +193,14 @@ class Setting(Generic[T]):
 
     # -- Repr ----------------------------------------------------------------
 
+    @property
+    def _type_name(self) -> str:
+        if self._origin is not None:
+            return repr(self.type_)  # e.g. "list[int]"
+        return getattr(self.type_, '__name__', repr(self.type_))
+
     def __repr__(self):
-        parts = [f"{self.type_.__name__}", f"default={self.default!r}"]
+        parts = [self._type_name, f"default={self.default!r}"]
         if self.readonly:
             parts.append("readonly=True")
         if self.init_only:

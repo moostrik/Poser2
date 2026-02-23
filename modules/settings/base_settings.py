@@ -34,7 +34,8 @@ class BaseSettings:
             for attr_name, attr_value in vars(cls).items():
                 if isinstance(attr_value, Setting) and attr_name not in self._fields:
                     self._fields[attr_name] = attr_value
-                    self._values[attr_name] = attr_value.default
+                    default = attr_value.default
+                    self._values[attr_name] = list(default) if isinstance(default, list) else default
                     self._callbacks[attr_name] = []
                     self._locks[attr_name] = threading.Lock()
                 elif isinstance(attr_value, Action) and attr_name not in self._actions:
