@@ -22,9 +22,11 @@ class Action:
         *,
         description="",
         visible=True,
+        pinned=False,
     ):
         self.description = description
         self.visible = visible
+        self.pinned = pinned
         self.name = ""
 
     def __set_name__(self, owner, name):

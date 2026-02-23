@@ -38,6 +38,7 @@ class Setting(Generic[T]):
         readonly: bool = False,
         init_only: bool = False,
         visible: bool = True,
+        pinned: bool = False,
     ) -> None:
         self.type_ = type_
         self.default = default
@@ -48,6 +49,7 @@ class Setting(Generic[T]):
         self.readonly = readonly
         self.init_only = init_only
         self.visible = visible
+        self.pinned = pinned
         # Generic list support: list[int], list[str], etc.
         self._origin = get_origin(type_)          # list | None
         self._element_type = get_args(type_)[0] if get_args(type_) else None  # int | str | …

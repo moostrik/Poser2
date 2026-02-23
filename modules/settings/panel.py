@@ -5,10 +5,10 @@ from pathlib import Path
 
 from nicegui import app, ui
 
-from modules.settings.base_settings import BaseSettings
-from modules.settings.setting import Setting
 from modules.settings.action import Action
+from modules.settings.base_settings import BaseSettings
 from modules.settings.registry import SettingsRegistry
+from modules.settings.setting import Setting
 
 SETTINGS_DIR = Path("files/settings")
 PRESET_SUFFIX = ".reactive.json"
@@ -250,42 +250,55 @@ def _scan_presets():
 
 
 def _build_save_load_toolbar(registry):
-    """Build a preset toolbar: dropdown, name input, Save / Load / Delete buttons."""
+    """Build a preset toolbar: dropdown, Save / Save As / Load / Delete buttons."""
     presets = _scan_presets()
 
-    with ui.row().classes("w-full items-end gap-2 flex-nowrap"):
+    with ui.row().classes("w-full items-center gap-2 flex-nowrap"):
         dropdown = ui.select(
             options=presets,
             value=presets[0] if presets else None,
             label="Preset",
         ).props("dense outlined clearable").classes("min-w-[180px] flex-1")
 
-        name_input = ui.input(
-            label="Name",
-            value=dropdown.value or "",
-        ).props("dense outlined").classes("min-w-[140px] flex-1")
-
-        # Sync: selecting a preset fills the name input
-        def on_dropdown_change(e):
-            if e.value:
-                name_input.set_value(e.value)
-
-        dropdown.on_value_change(on_dropdown_change)
-
         def _refresh_dropdown():
             updated = _scan_presets()
             dropdown.set_options(updated)
 
         def do_save():
-            preset_name = (name_input.value or "").strip()
+            preset_name = dropdown.value
             if not preset_name:
-                ui.notify("Enter a preset name", type="warning")
+                ui.notify("Select a preset to overwrite, or use Save As", type="warning")
                 return
             path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
             registry.save(path)
-            _refresh_dropdown()
-            dropdown.set_value(preset_name)
             ui.notify(f"Saved '{preset_name}'", type="positive")
+
+        async def do_save_as():
+            with ui.dialog() as dialog, ui.card().classes("min-w-[300px]"):
+                ui.label("Save As").classes("text-lg font-bold")
+                name_input = ui.input(label="Preset name", value=dropdown.value or "").props("dense outlined autofocus")
+
+                with ui.row().classes("w-full justify-end gap-2"):
+                    ui.button("Cancel", on_click=dialog.close).props("flat")
+
+                    def confirm():
+                        preset_name = (name_input.value or "").strip()
+                        if not preset_name:
+                            ui.notify("Enter a preset name", type="warning")
+                            return
+                        path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
+                        registry.save(path)
+                        _refresh_dropdown()
+                        dropdown.set_value(preset_name)
+                        ui.notify(f"Saved '{preset_name}'", type="positive")
+                        dialog.close()
+
+                    ui.button("Save", on_click=confirm).props("flat color=primary")
+
+                # Allow Enter key to confirm
+                name_input.on("keydown.enter", lambda _: confirm())
+
+            dialog.open()
 
         def do_load():
             preset_name = dropdown.value
@@ -309,10 +322,10 @@ def _build_save_load_toolbar(registry):
                 path.unlink()
             _refresh_dropdown()
             dropdown.set_value(None)
-            name_input.set_value("")
             ui.notify(f"Deleted '{preset_name}'", type="info")
 
-        ui.button(icon="save", on_click=do_save).props("dense flat").tooltip("Save preset")
+        ui.button(icon="save", on_click=do_save).props("dense flat").tooltip("Save (overwrite selected)")
+        ui.button(icon="save_as", on_click=do_save_as).props("dense flat").tooltip("Save as new preset")
         ui.button(icon="file_open", on_click=do_load).props("dense flat").tooltip("Load preset")
         ui.button(icon="delete", on_click=do_delete).props("dense flat color=negative").tooltip("Delete preset")
 
@@ -330,6 +343,31 @@ def create_settings_panel(registry):
     cleanup: list[tuple] = []
 
     _build_save_load_toolbar(registry)
+
+    # Collect pinned fields and actions from all registered modules (recursing into children)
+    pinned_fields: list[tuple[BaseSettings, str, Setting]] = []
+    pinned_actions: list[tuple[BaseSettings, str, Action]] = []
+
+    def _collect_pinned(settings: BaseSettings) -> None:
+        for field_name, field in settings.fields.items():
+            if field.pinned and field.visible:
+                pinned_fields.append((settings, field_name, field))
+        for action_name, action in settings.actions.items():
+            if action.pinned and action.visible:
+                pinned_actions.append((settings, action_name, action))
+        for child in settings.children.values():
+            _collect_pinned(child)
+
+    for module_name in registry._modules:
+        _collect_pinned(registry.get(module_name))
+
+    # Render pinned fields and actions in a compact row above the tabs
+    if pinned_fields or pinned_actions:
+        with ui.row().classes("w-full gap-4 flex-wrap items-end"):
+            for settings, field_name, field in pinned_fields:
+                _build_field_control(settings, field_name, field, cleanup)
+            for settings, action_name, action in pinned_actions:
+                _build_action_button(settings, action_name, action)
 
     # Filter out groups where all settings have no visible content
     group_map = {

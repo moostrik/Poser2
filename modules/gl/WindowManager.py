@@ -25,7 +25,8 @@ from modules.settings import Setting, BaseSettings
 class WindowSettings(BaseSettings):
     """Window / init configuration — set once before RenderManager starts."""
     title: Setting[str] =           Setting(str,  "Poser", init_only=True, visible=False)
-    fps: Setting[int] =             Setting(int,  60, readonly=True)
+    fps: Setting[int] =             Setting(int,  60, readonly=True, pinned=True)
+    min_fps: Setting[int] =         Setting(int,  60, readonly=True, pinned=True)
     v_sync: Setting[bool] =         Setting(bool, True)
     fullscreen: Setting[bool] =     Setting(bool, False)
     monitor: Setting[int] =         Setting(int,  0)
@@ -88,8 +89,11 @@ class WindowManager():
         s.bind(WindowSettings.width,     lambda _: self.set_size(s.width, s.height))
         s.bind(WindowSettings.height,    lambda _: self.set_size(s.width, s.height))
 
-        # FPS feedback: push measured FPS into the readonly setting
-        self.fps_callback = lambda fps: setattr(s, 'fps', fps)
+        # FPS feedback: push measured FPS into the readonly settings
+        def _push_fps(fps: int) -> None:
+            s.fps = fps
+            s.min_fps = self.fps.get_min_fps()
+        self.fps_callback = _push_fps
 
     def start(self) -> None:
         """Start the rendering thread"""
@@ -332,10 +336,6 @@ class WindowManager():
 
     def _draw_main_window(self) -> None:
         assert self.main_window is not None
-        fps = str(self.fps.get_fps())
-        min_fps = str(self.fps.get_min_fps())
-        glfw.set_window_title(self.main_window, f'{self.settings.title} - FPS: {fps} (Min: {min_fps})')
-
 
         glfw.make_context_current(self.main_window)
         glfw.swap_interval(1 if self.settings.v_sync else 0)
