@@ -119,12 +119,12 @@ class RenderSettings(BaseSettings):
     # ------------------------------------------------------------------
 
     def bind_data_layers(self,
-             windows_a: dict[int, DataLayer], frames_a: dict[int, DataLayer], angvel_a: dict[int, DataLayer],
-             windows_b: dict[int, DataLayer], frames_b: dict[int, DataLayer], angvel_b: dict[int, DataLayer]) -> None:
+             windows_a: dict[int, DataLayer], frames_a: dict[int, DataLayer],
+             windows_b: dict[int, DataLayer], frames_b: dict[int, DataLayer]) -> None:
         """Bind data-layer instances so config changes propagate active state."""
         object.__setattr__(self, '_slots', [
-            (windows_a, frames_a, angvel_a, 'stage_a'),
-            (windows_b, frames_b, angvel_b, 'stage_b'),
+            (windows_a, frames_a, 'stage_a'),
+            (windows_b, frames_b, 'stage_b'),
         ])
         # Wire _propagate to each relevant field on the data_layer child
         dl = self.data_layer
@@ -137,19 +137,17 @@ class RenderSettings(BaseSettings):
         dl = self.data_layer
         ff = dl.feature
         scalar_field = None if ff == RenderFeature.NONE else ScalarFrameField(ff.value)
-        is_angles = (scalar_field == ScalarFrameField.angles) if scalar_field else False
 
-        for windows, frames, angvel, stage_attr in self._slots:
+        for windows, frames, stage_attr in self._slots:
             stage: Stage = getattr(dl, stage_attr)
             for i in windows:
-                # Deactivate all three layer types
+                # Deactivate both layer types
                 windows[i].set_active(False)
                 frames[i].set_active(False)
-                angvel[i].set_active(False)
 
                 # Activate and configure the selected layer
                 if scalar_field is not None:
-                    layer = windows[i] if dl.mode == LayerMode.WINDOW else (angvel[i] if is_angles else frames[i])
+                    layer = windows[i] if dl.mode == LayerMode.WINDOW else frames[i]
                     layer.set_active(True)
 
                     cfg = layer._config

@@ -9,7 +9,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.DataHub import DataHub, Stage
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
 from modules.pose.features import PoseFeatureType
-from modules.pose.Frame import Frame, FrameField
+from modules.pose.Frame import Frame, FrameField, ScalarFrameField
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import FeatureShader
 from modules.render.layers.data.DataLayerSettings import DataLayerSettings
@@ -96,6 +96,9 @@ class FeatureFrameLayer(LayerBase):
         if not isinstance(feature, PoseFeatureType):
             raise ValueError(f"FeatureFrameLayer expected PoseFeatureType, got {type(feature)}")
 
+        # If showing angles, also fetch velocity for thickness modulation
+        deltas = pose.angle_vel.values if self._config.feature_field == ScalarFrameField.angles else None
+
         # Resolve colors from config (override → track colors → DEFAULT_COLORS)
         colors = self._config.get_colors()
 
@@ -105,7 +108,7 @@ class FeatureFrameLayer(LayerBase):
 
         self._fbo.begin()
         clear_color()
-        self._shader.use(feature, colors, line_width, line_smooth, self._config.use_scores, display_range)
+        self._shader.use(feature, colors, line_width, line_smooth, self._config.use_scores, display_range, deltas=deltas)
         self._fbo.end()
 
         # Render labels if changed

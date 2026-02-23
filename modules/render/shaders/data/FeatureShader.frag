@@ -6,9 +6,11 @@ uniform vec2 display_range;
 uniform float line_width = 0.01;
 uniform float line_smooth = 0.01;
 uniform int use_scores = 0;
+uniform int use_deltas = 0;
 
 uniform float values[32];
 uniform float scores[32];
+uniform float deltas[32];
 uniform vec4 colors[8];  // Cycle through these colors
 
 in vec2 texCoord;
@@ -37,13 +39,28 @@ void main() {
 
     // Normalize value to [0, 1]
     float normalized_value = (value - display_range.x) / (display_range.y - display_range.x);
-    normalized_value = clamp(normalized_value, 0.0, 1.0);
 
-    // Calculate distance from horizontal line
-    float dist = abs(texCoord.y - normalized_value);
+    float dist;
+    float thickness = line_width;
+
+    if (use_deltas != 0) {
+        // Velocity-modulated mode: wrap value and modulate line thickness by delta
+        normalized_value = fract(normalized_value);
+        float delta = deltas[joint_index];
+        thickness = max(abs(delta) * line_width * 10.0, line_width);
+        dist = abs(texCoord.y - normalized_value);
+        // Also check wrapped distance (for values that wrap around)
+        dist = min(dist, min(abs(texCoord.y - (normalized_value + 1.0)),
+                             abs(texCoord.y - (normalized_value - 1.0))));
+        score = 1.0;  // Hardcode score in delta mode
+    } else {
+        // Standard mode: clamp value
+        normalized_value = clamp(normalized_value, 0.0, 1.0);
+        dist = abs(texCoord.y - normalized_value);
+    }
 
     // Smooth antialiased line
-    float alpha = 1.0 - smoothstep(line_width, line_width + line_smooth, dist);
+    float alpha = 1.0 - smoothstep(thickness, thickness + line_smooth, dist);
 
     if (alpha > 0.01) {
         fragColor = vec4(line_color.rgb, line_color.a * alpha * score);

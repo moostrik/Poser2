@@ -43,10 +43,8 @@ class Layers(IntEnum):
     # Data layers (configurable slots A and B, all pre-allocated)
     data_B_W =      auto()
     data_B_F =      auto()
-    data_B_AV =     auto()
     data_A_W =      auto()
     data_A_F =      auto()
-    data_A_AV =     auto()
     data_time =     auto()
 
     # composition layers
@@ -145,10 +143,8 @@ SHOW_DATA: list[Layers] = [
     # Layers.centre_motion,
     Layers.data_B_W,
     Layers.data_B_F,
-    Layers.data_B_AV,
     Layers.data_A_W,
     Layers.data_A_F,
-    Layers.data_A_AV,
     # Layers.data_time,
 ]
 
@@ -208,20 +204,16 @@ class RenderManager(RenderBase):
 
             self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data_a)
             self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data_a)
-            self.L[Layers.data_A_AV][i] = ls.AngleVelLayer(     i, self.data_hub, settings.data_a)
             self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data_b)
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data_b)
-            self.L[Layers.data_B_AV][i] = ls.AngleVelLayer(     i, self.data_hub, settings.data_b)
             self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub, settings.data_time)
 
         # Bind data layers to render_settings — propagates active state and shared properties
         self.settings.bind_data_layers(
             {i: cast(DataLayer, self.L[Layers.data_A_W][i]) for i in range(self.num_cams)},
             {i: cast(DataLayer, self.L[Layers.data_A_F][i]) for i in range(self.num_cams)},
-            {i: cast(DataLayer, self.L[Layers.data_A_AV][i]) for i in range(self.num_cams)},
             {i: cast(DataLayer, self.L[Layers.data_B_W][i]) for i in range(self.num_cams)},
             {i: cast(DataLayer, self.L[Layers.data_B_F][i]) for i in range(self.num_cams)},
-            {i: cast(DataLayer, self.L[Layers.data_B_AV][i]) for i in range(self.num_cams)},
         )
 
         # composition

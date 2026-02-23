@@ -17,7 +17,6 @@ from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer, CentreDlowSett
 from .data.DataLayerSettings import           DataLayerSettings, ScalarFrameField
 from .data.FeatureFrameLayer import         FeatureFrameLayer
 from .data.FeatureWindowLayer import        FeatureWindowLayer
-from .data.AngleVelLayer import             AngleVelLayer
 from .data.MTimeRenderer import             MTimeRenderer, MTimeRendererSettings
 from .data.PoseDotLayer import              PoseDotLayer, PoseDotSettings
 from .data.PoseLineLayer import             PoseLineLayer, PoseLineSettings

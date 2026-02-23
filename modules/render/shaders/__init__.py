@@ -22,7 +22,6 @@ from .mask.MaskMultiply import          MaskMultiply
 from .hdt.MSColorMask import            MSColorMask
 
 from .data.FeatureShader import         FeatureShader
-from .data.AngleVelShader import        AngleVelShader
 from .data.WindowShader import          WindowShader
 from .data.PosePointDots import         PosePointDots
 from .data.PosePointLines import        PosePointLines
