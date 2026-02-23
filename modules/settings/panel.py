@@ -166,6 +166,17 @@ def _build_action_button(settings, name, action):
     ui.button(label, on_click=lambda: action.fire(settings)).props("dense")
 
 
+def _has_visible_content(settings):
+    """Return True if settings has any visible fields, actions, or children."""
+    if any(f.visible for f in settings.fields.values()):
+        return True
+    if any(a.visible for a in settings.actions.values()):
+        return True
+    if settings.children:
+        return True
+    return False
+
+
 def _build_settings_card(name, settings, cleanup):
     """Build a collapsible card for one BaseSettings instance.
 
@@ -320,7 +331,13 @@ def create_settings_panel(registry):
 
     _build_save_load_toolbar(registry)
 
-    group_map = registry.groups()
+    # Filter out groups where all settings have no visible content
+    group_map = {
+        g: [n for n in names if _has_visible_content(registry.get(n))]
+        for g, names in registry.groups().items()
+    }
+    group_map = {g: names for g, names in group_map.items() if names}
+
     if not group_map:
         ui.label("No settings registered.")
         return

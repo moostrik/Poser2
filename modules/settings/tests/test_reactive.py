@@ -278,8 +278,8 @@ class TestSerialization(unittest.TestCase):
         s = CameraSettings()
         d = s.to_dict()
         self.assertIn("exposure", d)
-        # init_only fields are excluded from serialization
-        self.assertNotIn("resolution", d)
+        # init_only fields are included in serialization (editable in JSON)
+        self.assertIn("resolution", d)
 
     def test_to_dict_values(self):
         s = CameraSettings(exposure=2000)

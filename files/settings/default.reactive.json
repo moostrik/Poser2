@@ -3,6 +3,7 @@
     "lut": "NONE",
     "lut_strength": 1.0,
     "window": {
+      "title": "Poser",
       "v_sync": false,
       "fullscreen": false,
       "monitor": 0,
@@ -87,5 +88,9 @@
         "tmp_ambient": 0.2
       }
     }
+  },
+  "server": {
+    "title": "POSER",
+    "port": 666
   }
 }

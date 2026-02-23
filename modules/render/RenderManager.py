@@ -246,10 +246,6 @@ class RenderManager(RenderBase):
             SubdivisionRow(name='preview',      columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, render_settings.window.width, render_settings.window.height, False)
-
-        # window manager
-        render_settings.window.width = self.subdivision.width
-        render_settings.window.height = self.subdivision.height
         self.window_manager: WindowManager = WindowManager(self, render_settings.window)
 
         # hot reloader

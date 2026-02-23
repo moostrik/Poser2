@@ -19,7 +19,7 @@ from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
 from modules.utils import Timer, TimerConfig
 from modules.settings import SettingsRegistry
-from modules.settings import server as settings_server
+from modules.settings.server import SettingsServer, ServerSettings
 
 class Main():
     def __init__(self, settings: Settings) -> None:
@@ -83,6 +83,10 @@ class Main():
             num_cams=len(self.cameras), num_players=settings.num_players,
         )
 
+        # SETTINGS SERVER (register settings before preset load, start after)
+        self.server_settings = ServerSettings(title="POSER", port=666)
+        self.registry.register("server", self.server_settings, group="server")
+
         # Load default preset (after all subsystems have registered)
         from modules.settings.panel import SETTINGS_DIR, PRESET_SUFFIX
         default_path = SETTINGS_DIR / f"default{PRESET_SUFFIX}"
@@ -91,8 +95,9 @@ class Main():
         else:
             self.registry.save(default_path)
 
-        # SETTINGS SERVER (NiceGUI on port 666)
-        settings_server.start(self.registry, port=666, on_exit=self.stop)
+        # Start settings server
+        self.settings_server = SettingsServer(self.registry, self.server_settings, on_exit=self.stop)
+        self.settings_server.start()
 
         # POSE CONFIGURATION
         # self.gpu_crop_config =      batch.GPUCropProcessorConfig(expansion_width=settings.pose.crop_expansion_width, expansion_height=settings.pose.crop_expansion_height, output_width=384, output_height=512, max_poses=settings.pose.max_poses)
@@ -403,7 +408,7 @@ class Main():
         self.window_similator.stop()
         self.window_correlator.stop()
 
-        settings_server.stop()
+        self.settings_server.stop()
 
         self.gui.stop()
 

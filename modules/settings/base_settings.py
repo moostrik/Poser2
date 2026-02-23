@@ -149,7 +149,7 @@ class BaseSettings:
         """
         result = {}
         for name, field in self._fields.items():
-            if not field.readonly and not field.init_only:
+            if not field.readonly:
                 result[name] = field.to_json_value(self)
         for name, child in self._children.items():
             result[name] = child.to_dict()
