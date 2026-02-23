@@ -464,20 +464,17 @@ def create_settings_panel(
                     settings = registry.get(config_name)
                     _build_settings_card(config_name, settings, cleanup)
 
-    # Deregister UI callbacks and stop timers when the browser tab disconnects
+    # Deregister UI callbacks when the browser tab disconnects.
+    # Timers are managed by NiceGUI's client lifecycle automatically.
     def _on_disconnect():
         for item in cleanup:
             if item[0] == 'timer':
-                try:
-                    item[1].deactivate()
-                except Exception:
-                    pass
-            else:
-                s, fld, cb = item
-                try:
-                    s.unbind(fld, cb)
-                except (KeyError, ValueError):
-                    pass
+                continue
+            s, fld, cb = item
+            try:
+                s.unbind(fld, cb)
+            except (KeyError, ValueError):
+                pass
         cleanup.clear()
 
     app.on_disconnect(_on_disconnect)
