@@ -12,7 +12,7 @@ from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import FeatureShader
-from modules.render.layers.data.DataLayerSettings import FEATURE_COLORS, DEFAULT_COLORS, DataLayerSettings
+from modules.render.layers.data.DataLayerSettings import DataLayerSettings
 
 
 class FeatureFrameLayer(LayerBase):
@@ -96,8 +96,8 @@ class FeatureFrameLayer(LayerBase):
         if not isinstance(feature, PoseFeatureType):
             raise ValueError(f"FeatureFrameLayer expected PoseFeatureType, got {type(feature)}")
 
-        # Use config colors or fallback to FEATURE_COLORS
-        colors = self._config.colors or FEATURE_COLORS.get(self._config.feature_field, DEFAULT_COLORS)
+        # Resolve colors from config (override → track colors → DEFAULT_COLORS)
+        colors = self._config.get_colors()
 
         line_width = 1.0 / self._fbo.height * self._config.line_width
         line_smooth = 1.0 / self._fbo.height * self._config.line_smooth
@@ -131,8 +131,8 @@ class FeatureFrameLayer(LayerBase):
 
         step: float = rect.width / num_labels
 
-        # Use config colors or fallback to FEATURE_COLORS
-        colors = self._config.colors or FEATURE_COLORS.get(self._config.feature_field, DEFAULT_COLORS)
+        # Resolve colors from config (override → track colors → DEFAULT_COLORS)
+        colors = self._config.get_colors()
 
         for i in range(num_labels):
             string: str = labels[i]

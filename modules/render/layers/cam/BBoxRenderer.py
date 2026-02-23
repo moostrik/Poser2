@@ -1,5 +1,3 @@
-# Standard library imports
-
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
@@ -9,23 +7,23 @@ from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import DrawRectangleOutline
+from modules.utils import Color
 
 
 class BBoxRendererSettings(BaseSettings):
     stage:      Setting[Stage] = Setting(Stage.LERP, description="Pipeline stage for pose data")
     line_width: Setting[float] = Setting(2.0, min=1.0, max=10.0, description="Bounding box line width in pixels")
+    color:      Setting[Color] = Setting(Color(1.0, 1.0, 1.0), description="Bounding box color")
 
 
 class BBoxRenderer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, bbox_color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0), config: BBoxRendererSettings | None = None) -> None:
-        self._config: BBoxRendererSettings = config or BBoxRendererSettings()
+    def __init__(self, cam_id: int, data: DataHub, settings: BBoxRendererSettings | None = None) -> None:
+        self.settings: BBoxRendererSettings = settings or BBoxRendererSettings()
         self._data: DataHub = data
         self._cam_id: int = cam_id
         self._cam_bbox_rects: list[Rect] = []
         self._width: int = 0
         self._height: int = 0
-
-        self.bbox_color: tuple[float, float, float, float] = bbox_color
 
         self._shader: DrawRectangleOutline = DrawRectangleOutline()
 
@@ -40,21 +38,22 @@ class BBoxRenderer(LayerBase):
         self._shader.deallocate()
 
     def draw(self) -> None:
+        color = self.settings.color.to_tuple()
         for bbox_rect in self._cam_bbox_rects:
             # Convert pixel line width to normalized coordinates relative to the rectangle
             rect_w_pixels = bbox_rect.width * self._width
             rect_h_pixels = bbox_rect.height * self._height
-            line_width_x = self._config.line_width / rect_w_pixels
-            line_width_y = self._config.line_width / rect_h_pixels
+            line_width_x = self.settings.line_width / rect_w_pixels
+            line_width_y = self.settings.line_width / rect_h_pixels
 
             self._shader.use(
                 bbox_rect.x, bbox_rect.y, bbox_rect.width, bbox_rect.height,
-                *self.bbox_color,
+                *color,
                 line_width_x, line_width_y
             )
 
     def update(self) -> None:
-        cam_poses: set[Frame] = self._data.get_poses_for_cam(self._config.stage, self._cam_id)
+        cam_poses: set[Frame] = self._data.get_poses_for_cam(self.settings.stage, self._cam_id)
         self._cam_bbox_rects = []
         for pose in cam_poses:
             self._cam_bbox_rects.append(pose.bbox.to_rect())

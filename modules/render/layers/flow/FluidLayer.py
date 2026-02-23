@@ -1,7 +1,6 @@
 """Fluid Layer - Navier-Stokes fluid simulation with cross-camera flow inputs."""
 
 # Standard library imports
-from __future__ import annotations
 from enum import IntEnum, auto
 
 # Third-party imports
@@ -22,6 +21,7 @@ from modules.render.shaders import DensityColorize
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 from .FlowLayer import FlowLayer
+from modules.render.color_settings import ColorSettings
 
 
 class FluidDrawMode(IntEnum):
@@ -86,35 +86,30 @@ class FluidLayer(LayerBase):
         density_texture = fluid.density
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, flow_layers: dict[int, FlowLayer], colors: list[tuple[float, float, float, float]], config: FluidLayerSettings | None = None) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, flow_layers: dict[int, FlowLayer], settings: FluidLayerSettings, color_settings: ColorSettings) -> None:
         """Initialize fluid layer.
 
         Args:
             cam_id: Camera ID for this layer's output
             data_hub: Data hub for pose data
             flow_layers: Dict of all FlowLayers (cam_id -> FlowLayer)
-            colors: Per-camera colors for density colorization (passed from RenderManager)
+            color_settings: Shared color settings for density colorization
             config: Layer configuration
         """
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._flow_layers: dict[int, FlowLayer] = flow_layers
-        self.config: FluidLayerSettings = config or FluidLayerSettings()
+        self.settings: FluidLayerSettings = settings
+        self._color_settings: ColorSettings = color_settings
 
-        self._delta_time: float = 1 / self.config.fps
+        self._delta_time: float = 1 / self.settings.fps
 
-        self._fluid_flow: FluidFlow = FluidFlow(self.config.simulation_scale, self.config.fluid_flow)
-        self._visualizer: Visualizer = Visualizer(self.config.visualisation)
+        self._fluid_flow: FluidFlow = FluidFlow(self.settings.simulation_scale, self.settings.fluid_flow)
+        self._visualizer: Visualizer = Visualizer(self.settings.visualisation)
 
         # Colorization resources (rendering concern, not simulation)
         self._colorized_fbo: Fbo = Fbo()
         self._density_colorize_shader: DensityColorize = DensityColorize()
-
-        # Track colors for per-channel density colorization (up to 4 channels)
-        self._colors: list[tuple[float, float, float, float]] = list(colors[:4])
-        # Pad with transparent black if fewer than 4 colors
-        while len(self._colors) < 4:
-            self._colors.append((0.0, 0.0, 0.0, 0.0))
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -176,8 +171,8 @@ class FluidLayer(LayerBase):
             internal_format: Ignored (formats determined by FluidFlow)
         """
         # Fluid simulation: low-res simulation, high-res density output
-        sim_width = int(width * self.config.simulation_scale)
-        sim_height = int(height * self.config.simulation_scale)
+        sim_width = int(width * self.settings.simulation_scale)
+        sim_height = int(height * self.settings.simulation_scale)
 
         self._fluid_flow.allocate(sim_width, sim_height, width, height)
         self._visualizer.allocate(sim_width, sim_height)
@@ -203,12 +198,12 @@ class FluidLayer(LayerBase):
         """Update fluid simulation with inputs from all flow layers."""
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
-        similarities: np.ndarray = pose.similarity.values if pose is not None else np.full((self.config.num_players,), 0.0)
-        motion_gates: np.ndarray = pose.motion_gate.values if pose is not None else np.full((self.config.num_players,), 0.0)
+        similarities: np.ndarray = pose.similarity.values if pose is not None else np.full((self.settings.num_players,), 0.0)
+        motion_gates: np.ndarray = pose.motion_gate.values if pose is not None else np.full((self.settings.num_players,), 0.0)
         motion: float = pose.angle_motion.value if pose is not None else 0.0
         m_s = similarities # * motion_gates  # Modulate similarity by motion gate
 
-        self.config.fluid_flow.den_lifetime = 18.0 - (pow(motion, 2.0) * 14.0)  # More motion = faster decay
+        self.settings.fluid_flow.den_lifetime = 18.0 - (pow(motion, 2.0) * 14.0)  # More motion = faster decay
         # self.config.fluid_flow.den_speed_offset = motion
 
         Style.push_style()
@@ -257,7 +252,7 @@ class FluidLayer(LayerBase):
     def draw(self) -> None:
         """Draw with configured blend mode."""
         Style.push_style()
-        Style.set_blend_mode(self.config.blend_mode)
+        Style.set_blend_mode(self.settings.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
         Style.pop_style()
@@ -277,7 +272,7 @@ class FluidLayer(LayerBase):
             FluidDrawMode.BUOYANCY: self._fluid_flow.buoyancy,
             FluidDrawMode.OBSTACLE: self._fluid_flow.obstacle,
         }
-        return textures.get(self.config.draw_mode, self._fluid_flow.density)
+        return textures.get(self.settings.draw_mode, self._fluid_flow.density)
 
     def _colorize_density(self) -> None:
         """Colorize density channels with track colors.
@@ -285,8 +280,12 @@ class FluidLayer(LayerBase):
         Maps each RGBA density channel to a corresponding track color and
         composites them additively.
         """
+        # Build padded color list (up to 4 channels) from settings each frame
+        colors: list[tuple[float, float, float, float]] = list(self._color_settings.track_color_tuples[:4])
+        while len(colors) < 4:
+            colors.append((0.0, 0.0, 0.0, 0.0))
 
         self._density_colorize_shader.reload()
         self._colorized_fbo.begin()
-        self._density_colorize_shader.use(self._fluid_flow.density, self._colors)
+        self._density_colorize_shader.use(self._fluid_flow.density, colors)
         self._colorized_fbo.end()

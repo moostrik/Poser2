@@ -12,6 +12,8 @@ from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.cam.CropLayer import CropLayer, CropSettings
 from modules.render.layers.source.CropSourceLayer import CropSourceLayer
 from modules.render.layers.data.PoseLineLayer import PoseLineLayer, PoseLineSettings
+from modules.render.color_settings import ColorSettings
+from modules.utils import Color
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -24,13 +26,13 @@ class PoseCompSettings(BaseSettings):
 
 
 class PoseCompositor(LayerBase):
-    def __init__(self, track_id: int, data: DataHub, cam_texture: Texture, track_color: tuple[float, float, float, float], config: PoseCompSettings | None = None) -> None:
-        self._config: PoseCompSettings = config or PoseCompSettings()
+    def __init__(self, track_id: int, data: DataHub, cam_texture: Texture, settings: PoseCompSettings, color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
+        self.settings: PoseCompSettings = settings or PoseCompSettings()
         self._fbo: Fbo = Fbo()
 
         # Camera crop layers (one of these will be used based on config)
-        crop_config: CropSettings = CropSettings(stage=self._config.stage)
+        crop_config: CropSettings = CropSettings(stage=self.settings.stage)
         self._cam_crop_layer: CropLayer = CropLayer(track_id, data, cam_texture, crop_config)
         self._gpu_crop_layer: CropSourceLayer = CropSourceLayer(track_id, data)
 
@@ -38,32 +40,35 @@ class PoseCompositor(LayerBase):
         # RAW = 3x thickness, drawn first (back layer)
         pose_raw_config: PoseLineSettings = PoseLineSettings(
             stage=Stage.RAW,
-            line_width=self._config.line_width * 3.0,
-            line_smooth=self._config.line_smooth * 3.0,
+            line_width=self.settings.line_width * 3.0,
+            line_smooth=self.settings.line_smooth * 3.0,
             use_scores=True,
-            use_bbox=False
+            use_bbox=False,
+            color=Color(0.0, 0.0, 0.0)
         )
-        self._pose_raw_layer: PoseLineLayer = PoseLineLayer(track_id, data, (0.0, 0.0, 0.0, 1.0), pose_raw_config)
+        self._pose_raw_layer: PoseLineLayer = PoseLineLayer(track_id, data, pose_raw_config)
 
         # SMOOTH = 2x thickness, drawn second (middle layer)
         pose_smooth_config: PoseLineSettings = PoseLineSettings(
             stage=Stage.SMOOTH,
-            line_width=self._config.line_width * 2.0,
-            line_smooth=self._config.line_smooth * 2.0,
+            line_width=self.settings.line_width * 2.0,
+            line_smooth=self.settings.line_smooth * 2.0,
             use_scores=True,
-            use_bbox=False
+            use_bbox=False,
+            color=Color(1.0, 1.0, 1.0)
         )
-        self._pose_smooth_layer: PoseLineLayer = PoseLineLayer(track_id, data, (1.0, 1.0, 1.0, 1.0), pose_smooth_config)
+        self._pose_smooth_layer: PoseLineLayer = PoseLineLayer(track_id, data, pose_smooth_config)
 
         # LERP = 1x thickness, drawn last (top layer)
         pose_lerp_config: PoseLineSettings = PoseLineSettings(
             stage=Stage.LERP,
-            line_width=self._config.line_width,
-            line_smooth=self._config.line_smooth,
+            line_width=self.settings.line_width,
+            line_smooth=self.settings.line_smooth,
             use_scores=True,
-            use_bbox=False
+            use_bbox=False,
+            color=color_settings.track_colors[track_id]
         )
-        self._pose_lerp_layer: PoseLineLayer = PoseLineLayer(track_id, data, track_color, pose_lerp_config)
+        self._pose_lerp_layer: PoseLineLayer = PoseLineLayer(track_id, data, pose_lerp_config)
 
         # self.hot_reload = HotReloadMethods(self.__class__)
 
@@ -89,7 +94,7 @@ class PoseCompositor(LayerBase):
 
     def update(self) -> None:
         # Update all layers
-        crop_layer = self._gpu_crop_layer if self._config.use_gpu_crop else self._cam_crop_layer
+        crop_layer = self._gpu_crop_layer if self.settings.use_gpu_crop else self._cam_crop_layer
         crop_layer.update()
         self._pose_raw_layer.update()
         self._pose_smooth_layer.update()

@@ -23,7 +23,8 @@ class CentreMaskSettings(BaseSettings):
 class CentreMaskLayer(LayerBase):
     """Renders mask image cropped and rotated with temporal blending and blur."""
 
-    def __init__(self, geometry: CentreGeometry, mask_texture: Texture, config: CentreMaskSettings | None = None) -> None:
+    def __init__(self, cam_id: int, geometry: CentreGeometry, mask_texture: Texture, config: CentreMaskSettings | None = None) -> None:
+        self._cam_id: int = cam_id
         self._geometry: CentreGeometry = geometry
         self._mask_src: Texture = mask_texture
 

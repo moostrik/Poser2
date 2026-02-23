@@ -92,7 +92,7 @@ class FlowLayer(LayerBase):
         fluid.add_temperature(flow.temperature)
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, mask_source: MaskSourceLayer, mask: Texture, colors: list[tuple[float, float, float, float]], config: FlowLayerSettings | None = None) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, mask_source: MaskSourceLayer, mask: Texture, settings: FlowLayerSettings | None = None) -> None:
         """Initialize flow layer.
 
         Args:
@@ -100,16 +100,13 @@ class FlowLayer(LayerBase):
             data_hub: Data hub for pose data
             mask_source: Mask source layer for optical flow update
             mask: Mask texture for optical flow input
-            motion: Motion texture for density bridge color input
-            colors: Track colors (unused, kept for compatibility)
             config: Layer configuration
         """
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._mask_source: MaskSourceLayer = mask_source
         self._mask: Texture = mask
-        self._colors: list[tuple[float, float, float, float]] = colors
-        self.config: FlowLayerSettings = config or FlowLayerSettings()
+        self.config: FlowLayerSettings = settings or FlowLayerSettings()
 
         self._delta_time: float = 1 / self.config.fps
 

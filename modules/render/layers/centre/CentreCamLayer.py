@@ -23,10 +23,11 @@ class CentreCamLayer(LayerBase):
     followed by temporal blending. Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, geometry: CentreGeometry, cam_texture: Texture, mask_texture: Texture | None = None, config: CentreCamSettings | None = None) -> None:
+    def __init__(self, cam_id: int, geometry: CentreGeometry, cam_texture: Texture, mask_texture: Texture, config: CentreCamSettings) -> None:
+        self._cam_id: int = cam_id
         self._geometry: CentreGeometry = geometry
         self._cam_texture: Texture = cam_texture
-        self._mask_texture: Texture | None = mask_texture
+        self._mask_texture: Texture = mask_texture
 
         # Configuration
         self.config: CentreCamSettings = config or CentreCamSettings()
@@ -100,7 +101,7 @@ class CentreCamLayer(LayerBase):
         self._cam_blend_fbo.end()
 
         # Apply mask if provided and enabled
-        if self._mask_texture and self.config.use_mask:
+        if self.config.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._masked_fbo.begin()
             self._mask_shader.use(

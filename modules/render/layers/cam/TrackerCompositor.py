@@ -9,8 +9,7 @@ from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.layers.cam.BBoxRenderer import BBoxRenderer, BBoxRendererSettings
 from modules.render.layers.cam.TrackletRenderer import TrackletRenderer
 from modules.render.layers.cam.PoseRenderer import PoseRenderer, PoseRendererSettings
-
-from modules.utils.HotReloadMethods import HotReloadMethods
+from modules.render.color_settings import ColorSettings
 
 
 class TrackerCompSettings(BaseSettings):
@@ -20,8 +19,9 @@ class TrackerCompSettings(BaseSettings):
 
 
 class TrackerCompositor(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, cam_texture: Texture, bbox_a_color: tuple[float, float, float, float], bbox_b_color: tuple[float, float, float, float], config: TrackerCompSettings | None = None) -> None:
-        self._config: TrackerCompSettings = config or TrackerCompSettings()
+    def __init__(self, cam_id: int, data: DataHub, cam_texture: Texture, settings: TrackerCompSettings, color_settings: ColorSettings) -> None:
+        self.settings: TrackerCompSettings = settings
+        self._color_settings: ColorSettings = color_settings
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data
         self._fbo: Fbo = Fbo()
@@ -29,16 +29,14 @@ class TrackerCompositor(LayerBase):
         self._cam_texture: Texture = cam_texture
         self._depth_track_renderer: TrackletRenderer = TrackletRenderer(cam_id, data)
 
-        bbox_config_A: BBoxRendererSettings = BBoxRendererSettings(stage=Stage.RAW, line_width=self._config.bbox_line_width * 2.0)
-        self._bbox_renderer_A: BBoxRenderer = BBoxRenderer(cam_id, data, bbox_a_color, bbox_config_A)
+        bbox_config_A: BBoxRendererSettings = BBoxRendererSettings(stage=Stage.RAW, line_width=self.settings.bbox_line_width * 2.0, color=color_settings.history)
+        self._bbox_renderer_A: BBoxRenderer = BBoxRenderer(cam_id, data, bbox_config_A)
 
-        bbox_config_B: BBoxRendererSettings = BBoxRendererSettings(stage=Stage.LERP, line_width=self._config.bbox_line_width)
-        self._bbox_renderer_B: BBoxRenderer = BBoxRenderer(cam_id, data, bbox_b_color, bbox_config_B)
+        bbox_config_B: BBoxRendererSettings = BBoxRendererSettings(stage=Stage.LERP, line_width=self.settings.bbox_line_width, color=color_settings.track_colors[cam_id])
+        self._bbox_renderer_B: BBoxRenderer = BBoxRenderer(cam_id, data, bbox_config_B)
 
-        pose_config: PoseRendererSettings = PoseRendererSettings(stage=self._config.stage, line_width=self._config.pose_line_width, line_smooth=0.0, use_scores=False, use_bbox=True)
-        self._pose_renderer: PoseRenderer = PoseRenderer(cam_id, data, colors=None, config=pose_config)
-
-        # self.hot_reload = HotReloadMethods(self.__class__)
+        pose_config: PoseRendererSettings = PoseRendererSettings(stage=self.settings.stage, line_width=self.settings.pose_line_width, line_smooth=0.0, use_scores=False, use_bbox=True)
+        self._pose_renderer: PoseRenderer = PoseRenderer(cam_id, data, color_settings=None, settings=pose_config)
 
     @property
     def texture(self) -> Texture:
@@ -69,7 +67,9 @@ class TrackerCompositor(LayerBase):
         self._fbo.begin()
         Blit.use(self._cam_texture)
         self._depth_track_renderer.draw()
+        self._bbox_renderer_A.settings.color = self._color_settings.history
         self._bbox_renderer_A.draw()
+        self._bbox_renderer_B.settings.color = self._color_settings.track_colors[self._cam_id]
         self._bbox_renderer_B.draw()
         self._pose_renderer.draw()
         self._fbo.end()

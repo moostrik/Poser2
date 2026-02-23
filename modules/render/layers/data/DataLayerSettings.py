@@ -1,22 +1,16 @@
-# Standard library imports
-
 # Local application imports
 from modules.settings import Setting, BaseSettings
 from modules.DataHub import Stage
 from modules.pose.Frame import FrameField, ScalarFrameField
-from modules.render.layers.data.colors import DEFAULT_COLORS, TRACK_COLORS
+from modules.render.layers.data.colors import DEFAULT_COLORS
+from modules.render.color_settings import ColorSettings
 
 
-# ScalarFrameField → color list lookup
-FEATURE_COLORS: dict[ScalarFrameField, list[tuple[float, float, float, float]]] = {
-    ScalarFrameField.bbox:            DEFAULT_COLORS,
-    ScalarFrameField.angles:          DEFAULT_COLORS,
-    ScalarFrameField.angle_vel:       DEFAULT_COLORS,
-    ScalarFrameField.angle_motion:    DEFAULT_COLORS,
-    ScalarFrameField.angle_sym:       DEFAULT_COLORS,
-    ScalarFrameField.similarity:      TRACK_COLORS,
-    ScalarFrameField.leader:          TRACK_COLORS,
-    ScalarFrameField.motion_gate:     TRACK_COLORS,
+# Fields that use track colors (the rest use DEFAULT_COLORS)
+_TRACK_COLOR_FIELDS: set[ScalarFrameField] = {
+    ScalarFrameField.similarity,
+    ScalarFrameField.leader,
+    ScalarFrameField.motion_gate,
 }
 
 
@@ -35,6 +29,7 @@ class DataLayerSettings(BaseSettings):
         super().__init__(**kwargs)
         # Not a Setting — stays outside the descriptor system
         self._colors: list[tuple[float, float, float, float]] | None = None
+        self._color_settings: ColorSettings | None = None
 
     @property
     def colors(self) -> list[tuple[float, float, float, float]] | None:
@@ -43,3 +38,22 @@ class DataLayerSettings(BaseSettings):
     @colors.setter
     def colors(self, value: list[tuple[float, float, float, float]] | None) -> None:
         self._colors = value
+
+    @property
+    def color_settings(self) -> ColorSettings | None:
+        return self._color_settings
+
+    @color_settings.setter
+    def color_settings(self, value: ColorSettings) -> None:
+        self._color_settings = value
+
+    def get_colors(self) -> list[tuple[float, float, float, float]]:
+        """Resolve colors for the current feature field.
+
+        Priority: explicit _colors override → track colors from ColorSettings → DEFAULT_COLORS.
+        """
+        if self._colors is not None:
+            return self._colors
+        if self._color_settings is not None and self.feature_field in _TRACK_COLOR_FIELDS:
+            return self._color_settings.track_color_tuples
+        return DEFAULT_COLORS

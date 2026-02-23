@@ -13,7 +13,7 @@ from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.nodes import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import WindowShader
-from modules.render.layers.data.DataLayerSettings import FEATURE_COLORS, DEFAULT_COLORS, DataLayerSettings
+from modules.render.layers.data.DataLayerSettings import DataLayerSettings
 
 
 class FeatureWindowLayer(LayerBase):
@@ -119,8 +119,8 @@ class FeatureWindowLayer(LayerBase):
         # Use window's display_range
         display_range = window.display_range
 
-        # Use config colors or fallback to FEATURE_COLORS
-        colors = self._config.colors or FEATURE_COLORS.get(self._config.feature_field, DEFAULT_COLORS)
+        # Resolve colors from config (override → track colors → DEFAULT_COLORS)
+        colors = self._config.get_colors()
 
         # Render using shader
         self._fbo.begin()
@@ -162,7 +162,7 @@ class FeatureWindowLayer(LayerBase):
         clear_color()
 
         feature_num: int = len(feature_names)
-        colors = self._config.colors or FEATURE_COLORS.get(self._config.feature_field, DEFAULT_COLORS)
+        colors = self._config.get_colors()
 
         for i in range(feature_num):
             string: str = feature_names[i]

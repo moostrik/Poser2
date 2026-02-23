@@ -21,13 +21,13 @@ class CentreDenseFlowLayer(LayerBase):
     Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, geometry: CentreGeometry, flow_texture: Texture, mask_texture: Texture | None = None, config: CentreDlowSettings | None = None) -> None:
+    def __init__(self, geometry: CentreGeometry, flow_texture: Texture, mask_texture: Texture, settings: CentreDlowSettings) -> None:
         self._geometry: CentreGeometry = geometry
         self._flow_texture: Texture = flow_texture
-        self._mask_texture: Texture | None = mask_texture
+        self._mask_texture: Texture = mask_texture
 
         # Configuration
-        self.config: CentreDlowSettings = config or CentreDlowSettings()
+        self.config: CentreDlowSettings = settings or CentreDlowSettings()
 
         # FBOs
         self._flow_fbo: Fbo = Fbo()
@@ -45,8 +45,7 @@ class CentreDenseFlowLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._flow_fbo.allocate(width, height, internal_format)
-        if self._mask_texture:
-            self._masked_fbo.allocate(width, height, internal_format)
+        self._masked_fbo.allocate(width, height, internal_format)
         self._roi_shader.allocate()
         self._mask_shader.allocate()
 
@@ -60,7 +59,7 @@ class CentreDenseFlowLayer(LayerBase):
         """Render flow crop using anchor geometry, optionally with mask."""
         if self._geometry.lost:
             self._flow_fbo.clear()
-            if self._mask_texture and self.config.use_mask:
+            if self.config.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             return
 
@@ -80,7 +79,7 @@ class CentreDenseFlowLayer(LayerBase):
         self._flow_fbo.end()
 
         # Apply mask if provided and enabled
-        if self._mask_texture and self.config.use_mask:
+        if self.config.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._masked_fbo.begin()
             self._mask_shader.use(

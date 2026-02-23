@@ -1,8 +1,5 @@
 """MSColorMaskLayer - Cross-camera mask visualization based on similarity and motion."""
 
-# Standard library imports
-from __future__ import annotations
-
 # Third-party imports
 from OpenGL.GL import *  # type: ignore
 from pytweening import *    # type: ignore
@@ -22,6 +19,8 @@ from modules.render.shaders.hdt.AddDodgeBlend import AddDodgeBlend
 from modules.render.shaders.generic.Tint import Tint
 
 from modules.utils.HotReloadMethods import HotReloadMethods
+
+from modules.render.color_settings import ColorSettings
 
 
 class MSColorMaskLayerSettings(BaseSettings):
@@ -48,21 +47,13 @@ class MSColorMaskLayer(LayerBase):
     Each camera's contribution is colored exactly once.
     """
 
-    def __init__(
-        self,
-        cam_id: int,
-        data_hub: DataHub,
-        mask_textures: dict[int, Texture],
-        frg_texture: Texture,
-        colors: list[tuple[float, float, float, float]],
-        config: MSColorMaskLayerSettings | None = None
-    ) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, mask_textures: dict[int, Texture], frg_texture: Texture, settings: MSColorMaskLayerSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._mask_textures: dict[int, Texture] = mask_textures
         self._frg_texture: Texture = frg_texture
-        self._colors: list[tuple[float, float, float, float]] = colors
-        self.config: MSColorMaskLayerSettings = config or MSColorMaskLayerSettings()
+        self.config: MSColorMaskLayerSettings = settings
+        self._color_settings: ColorSettings = color_settings
 
         self._tint_fbos: list[Fbo] = [Fbo() for _ in range(self.config.num_players)]
         self._blend_fbo: SwapFbo = SwapFbo()
@@ -162,8 +153,9 @@ class MSColorMaskLayer(LayerBase):
         self._shader.reload()
 
         # Step 1: Tint all cameras' masks
+        colors = self._color_settings.track_color_tuples
         for cam_id, mask_tex in self._mask_textures.items():
-            color = self._colors[cam_id % len(self._colors)]
+            color = colors[cam_id % len(colors)]
             self._tint_fbos[cam_id].begin()
             self._tint.use(mask_tex, color[0], color[1], color[2], 1.0)
             self._tint_fbos[cam_id].end()

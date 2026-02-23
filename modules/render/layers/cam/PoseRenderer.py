@@ -1,7 +1,5 @@
 """ Renders pose lines for all tracks visible in a camera """
 
-# Standard library imports
-
 # Third-party imports
 from OpenGL.GL import * # type: ignore
 
@@ -11,8 +9,8 @@ from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D
 from modules.render.layers.LayerBase import LayerBase, Rect
-from modules.render.layers.data.colors import TRACK_COLORS
 from modules.render.shaders import PosePointLines
+from modules.render.color_settings import ColorSettings
 
 
 class PoseRendererSettings(BaseSettings):
@@ -24,11 +22,11 @@ class PoseRendererSettings(BaseSettings):
 
 
 class PoseRenderer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, colors: list[tuple[float, float, float, float]] | None = None, config: PoseRendererSettings | None = None) -> None:
-        self._config: PoseRendererSettings = config or PoseRendererSettings()
+    def __init__(self, cam_id: int, data: DataHub, color_settings: ColorSettings | None = None, settings: PoseRendererSettings | None = None) -> None:
+        self.settings: PoseRendererSettings = settings or PoseRendererSettings()
         self._data: DataHub = data
         self._cam_id: int = cam_id
-        self._colors: list[tuple[float, float, float, float]] | None = colors
+        self._color_settings: ColorSettings | None = color_settings
         self._cam_poses: set[Frame] = set()
         self._height: int = 1
 
@@ -43,24 +41,25 @@ class PoseRenderer(LayerBase):
         self._shader.deallocate()
 
     def draw(self) -> None:
-        line_width: float = 1.0 / self._height * self._config.line_width
-        line_smooth: float = 1.0 / self._height * self._config.line_smooth
+        line_width: float = 1.0 / self._height * self.settings.line_width
+        line_smooth: float = 1.0 / self._height * self.settings.line_smooth
 
         for pose in self._cam_poses:
-            # Get color for this track if colors provided, otherwise use anatomical colors (None)
+            # Get color for this track from color settings, otherwise use anatomical colors (None)
             color: tuple[float, float, float, float] | None = None
-            if self._colors is not None:
-                color = self._colors[pose.track_id % len(self._colors)]
+            if self._color_settings is not None:
+                colors = self._color_settings.track_color_tuples
+                color = colors[pose.track_id % len(colors)]
 
             # Transform points to image space if use_bbox is enabled
             points: Points2D = pose.points
-            if self._config.use_bbox:
+            if self.settings.use_bbox:
                 points = self._transform_to_image_space(points, pose.bbox.to_rect())
 
-            self._shader.use(points, line_width, line_smooth, color=color, use_scores=self._config.use_scores)
+            self._shader.use(points, line_width, line_smooth, color=color, use_scores=self.settings.use_scores)
 
     def update(self) -> None:
-        self._cam_poses = self._data.get_poses_for_cam(self._config.stage, self._cam_id)
+        self._cam_poses = self._data.get_poses_for_cam(self.settings.stage, self._cam_id)
 
     @staticmethod
     def _transform_to_image_space(points: Points2D, bbox: Rect) -> Points2D:

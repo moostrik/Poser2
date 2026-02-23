@@ -12,6 +12,7 @@ from modules.gl import Fbo, Texture, clear_color
 from modules.render.layers.LayerBase import LayerBase
 from modules.render.layers.centre.CentreGeometry import CentreGeometry
 from modules.render.shaders import PosePointLines, DrawCircles
+from modules.render.color_settings import ColorSettings
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
@@ -26,7 +27,8 @@ class CentrePoseSettings(BaseSettings):
 class CentrePoseLayer(LayerBase):
     """Renders pose keypoint lines in crop space."""
 
-    def __init__(self, geometry: CentreGeometry, color: tuple[float, float, float, float] | None = None, config: CentrePoseSettings | None = None) -> None:
+    def __init__(self, cam_id: int, geometry: CentreGeometry, color_settings: ColorSettings, config: CentrePoseSettings | None = None) -> None:
+        self._cam_id: int = cam_id
         self._geometry: CentreGeometry = geometry
         self._fbo: Fbo = Fbo()
         self._shader: PosePointLines = PosePointLines()
@@ -34,7 +36,7 @@ class CentrePoseLayer(LayerBase):
 
         # Configuration
         self.config: CentrePoseSettings = config or CentrePoseSettings()
-        self.color: tuple[float, float, float, float] | None = color
+        self._color_settings: ColorSettings = color_settings
 
         # HotReloadMethods(self.__class__, True, True)
 
@@ -78,7 +80,8 @@ class CentrePoseLayer(LayerBase):
 
         self._fbo.begin()
         clear_color()
-        self._shader.use(transformed_points, line_width, line_smooth, self.color, self.config.use_scores)
+        color = self._color_settings.track_colors[self._cam_id % len(self._color_settings.track_colors)].to_tuple()
+        self._shader.use(transformed_points, line_width, line_smooth, color, self.config.use_scores)
         if self.config.draw_anchors:
             self._circle_shader.use(positions, anchor_size, anchor_smooth, anchor_color, aspect_ratio)
         self._fbo.end()

@@ -4,10 +4,10 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.DataHub import DataHub
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
-from modules.pose.Frame import Frame, ScalarFrameField
+from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import AngleVelShader
-from modules.render.layers.data.DataLayerSettings import FEATURE_COLORS, DEFAULT_COLORS, DataLayerSettings
+from modules.render.layers.data.DataLayerSettings import DataLayerSettings
 
 
 class AngleVelLayer(LayerBase):
@@ -90,8 +90,8 @@ class AngleVelLayer(LayerBase):
         angles = pose.angles
         velocity = pose.angle_vel
 
-        # Use config colors or fallback to FEATURE_COLORS (angles)
-        colors = self._config.colors or FEATURE_COLORS.get(ScalarFrameField.angles, DEFAULT_COLORS)
+        # Resolve colors from config (override → track colors → DEFAULT_COLORS)
+        colors = self._config.get_colors()
 
         line_width = 1.0 / self._fbo.height * self._config.line_width
         line_smooth = 1.0 / self._fbo.height * self._config.line_smooth
@@ -125,10 +125,7 @@ class AngleVelLayer(LayerBase):
 
         step: float = rect.width / num_labels
 
-        colors = self._config.colors or FEATURE_COLORS.get(ScalarFrameField.angles, DEFAULT_COLORS)
-        # Ensure we have at least one color
-        if not colors:
-            colors = DEFAULT_COLORS
+        colors = self._config.get_colors()
 
         for i in range(num_labels):
             string: str = labels[i]

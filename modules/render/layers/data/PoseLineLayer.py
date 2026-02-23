@@ -11,6 +11,7 @@ from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import PosePointLines as shader
+from modules.utils import Color
 
 
 class PoseLineSettings(BaseSettings):
@@ -19,19 +20,17 @@ class PoseLineSettings(BaseSettings):
     line_smooth:Setting[float] = Setting(2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
     use_scores: Setting[bool]  = Setting(True, description="Use confidence scores for line opacity")
     use_bbox:   Setting[bool]  = Setting(False, description="Transform points to image space using bbox")
-
+    color:      Setting[Color] = Setting(Color(1.0, 1.0, 1.0), description="Line color")
 
 
 class PoseLineLayer(LayerBase):
 
-    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseLineSettings | None = None) -> None:
+    def __init__(self, track_id: int, data: DataHub, config: PoseLineSettings | None = None) -> None:
         self._config: PoseLineSettings = config or PoseLineSettings()
         self._track_id: int = track_id
         self._data_hub: DataHub = data
         self._fbo: Fbo = Fbo()
         self._data_cache: DataCache[Frame]= DataCache[Frame]()
-
-        self.color: tuple[float, float, float, float] | None = color
 
         self._shader: shader = shader()
 
@@ -71,7 +70,7 @@ class PoseLineLayer(LayerBase):
 
         self._fbo.begin()
         clear_color()
-        self._shader.use(points, line_width=line_width, line_smooth=line_smooth, color=self.color, use_scores=self._config.use_scores)
+        self._shader.use(points, line_width=line_width, line_smooth=line_smooth, color=self._config.color.to_tuple(), use_scores=self._config.use_scores)
         self._fbo.end()
 
     @staticmethod

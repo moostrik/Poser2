@@ -32,6 +32,7 @@ from modules.render.layers.data.MTimeRenderer import MTimeRendererSettings
 
 from modules.settings import Setting, Child, BaseSettings
 from modules.gl.WindowManager import WindowSettings
+from modules.render.color_settings import ColorSettings
 
 
 # ---------------------------------------------------------------------------
@@ -82,6 +83,9 @@ class RenderSettings(BaseSettings):
 
     # Window / init-only (foldable child)
     window: Child[WindowSettings] =     Child(WindowSettings)
+
+    # Colors
+    colors: Child[ColorSettings] =      Child(ColorSettings)
 
     # Data layer control (foldable child)
     data_layer: Child[DataLayerControl] =  Child(DataLayerControl)

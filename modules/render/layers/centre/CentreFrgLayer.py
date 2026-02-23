@@ -8,6 +8,7 @@ from modules.render.shaders import DrawRoi, Blend, MaskApply, CelShade, HueShift
 from modules.gl import Fbo, SwapFbo, Texture, Blit
 from modules.gl.shaders import Sharpen
 from modules.gl import Style
+from modules.render.color_settings import ColorSettings
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -36,14 +37,15 @@ class CentreFrgLayer(LayerBase):
     Uses bbox_geometry for rendering. Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, geometry: CentreGeometry, frg_texture: Texture, mask_texture: Texture | None = None, config: CentreFrgSettings | None = None, track_color: tuple[float, float, float] = (1.0, 1.0, 1.0)) -> None:
+    def __init__(self, cam_id: int, geometry: CentreGeometry, frg_texture: Texture, mask_texture: Texture, settings: CentreFrgSettings, color_settings: ColorSettings) -> None:
+        self._cam_id: int = cam_id
         self._geometry: CentreGeometry = geometry
         self._frg_texture: Texture = frg_texture
-        self._mask_texture: Texture | None = mask_texture
-        self._track_color: tuple[float, float, float] = track_color
+        self._mask_texture: Texture = mask_texture
+        self._color_settings: ColorSettings = color_settings
 
         # Configuration
-        self.config: CentreFrgSettings = config or CentreFrgSettings()
+        self.settings: CentreFrgSettings = settings
 
         # FBOs
         self._roi_fbo: Fbo = Fbo()
@@ -119,7 +121,7 @@ class CentreFrgLayer(LayerBase):
         self._blend_shader.use(
             self._blend_fbo.back_texture,
             self._roi_fbo.texture,
-            self.config.blend_factor
+            self.settings.blend_factor
         )
         self._blend_fbo.end()
 
@@ -127,30 +129,30 @@ class CentreFrgLayer(LayerBase):
         self._effect_fbo.begin()
         self._cel_shade_shader.use(
             self._blend_fbo.texture,
-            self.config.exposure, self.config.gamma, self.config.offset,
-            self.config.contrast,
-            self.config.levels, self.config.smoothness,
-            self.config.saturation
+            self.settings.exposure, self.settings.gamma, self.settings.offset,
+            self.settings.contrast,
+            self.settings.levels, self.settings.smoothness,
+            self.settings.saturation
         )
         self._effect_fbo.end()
 
         # Hue shift toward track color
-        if self.config.colorize > 0.0:
+        if self.settings.colorize > 0.0 and self._color_settings is not None:
             self._effect_fbo.swap()
             self._effect_fbo.begin()
-            r, g, b = self._track_color
-            self._hue_shift_shader.use(self._effect_fbo.back_texture, r, g, b, self.config.colorize)
+            r, g, b = self._color_settings.track_colors[self._cam_id % len(self._color_settings.track_colors)].rgb
+            self._hue_shift_shader.use(self._effect_fbo.back_texture, r, g, b, self.settings.colorize)
             self._effect_fbo.end()
 
         # Sharpen
-        if self.config.sharpen > 0.0:
+        if self.settings.sharpen > 0.0:
             self._effect_fbo.swap()
             self._effect_fbo.begin()
-            self._sharpen_shader.use(self._effect_fbo.back_texture, self.config.sharpen)
+            self._sharpen_shader.use(self._effect_fbo.back_texture, self.settings.sharpen)
             self._effect_fbo.end()
 
         # Mask
-        if self._mask_texture and self.config.use_mask:
+        if self._mask_texture and self.settings.use_mask:
             self._effect_fbo.swap()
             self._effect_fbo.begin()
             self._mask_shader.use(self._effect_fbo.back_texture, self._mask_texture)

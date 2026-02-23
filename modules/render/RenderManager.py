@@ -17,7 +17,6 @@ from modules.utils.PointsAndRects import Rect, Point2f
 # Render Imports
 from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render import layers as ls
-from modules.render.layers.data.colors import TRACK_COLORS, HISTORY_COLOR
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
@@ -179,31 +178,35 @@ class RenderManager(RenderBase):
         # Set data_b overrides (class defaults match data_a)
         render_settings.data_b.line_width = 6.0
         render_settings.data_b.line_smooth = 6.0
-        render_settings.data_b.colors = [HISTORY_COLOR]
+        render_settings.data_b.colors = [render_settings.colors.history.to_tuple()]
+
+        palette = render_settings.colors
+        # Wire color_settings reference to data layer configs
+        render_settings.data_a.color_settings = palette
+        render_settings.data_b.color_settings = palette
 
         flows: dict[int, ls.FlowLayer] = {}
         mask_textures: dict[int, Texture] = {}
         for i in range(self.num_cams):
-            color: tuple[float, float, float, float] = TRACK_COLORS[i % len(TRACK_COLORS)]
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.data_hub)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.data_hub)
             cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.data_hub)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
 
-            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.data_hub,   cam_image.texture,  HISTORY_COLOR, color,  render_settings.tracker)
-            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.data_hub,   cam_image.texture,  color,                  render_settings.pose_comp)
+            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.data_hub,   cam_image.texture,  render_settings.tracker,    palette)
+            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.data_hub,   cam_image.texture,  render_settings.pose_comp,  palette)
 
-            centre_gmtry=   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,                                               render_settings.centre_geometry)
-            centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_gmtry,    cam_mask.texture,                           render_settings.centre_mask)
+            centre_gmtry=   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,                       render_settings.centre_geometry)
+            centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(     i, centre_gmtry,    cam_mask.texture,   render_settings.centre_mask)
             mask_textures[i] = centre_mask.texture
-            centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_gmtry,    cam_image.texture,  centre_mask.texture,    render_settings.centre_cam)
-            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_gmtry,    cam_frg.texture,    centre_mask.texture,    render_settings.centre_frg,    color[:3])
-            centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_gmtry,    color,                                      render_settings.centre_pose)
+            centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(      i, centre_gmtry,    cam_image.texture,  centre_mask.texture,    render_settings.centre_cam)
+            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(      i, centre_gmtry,    cam_frg.texture,    centre_mask.texture,    render_settings.centre_frg,    palette)
+            centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(     i, centre_gmtry,    palette,                                    render_settings.centre_pose)
 
-            motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,   centre_mask.texture, color)
-            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub,   mask_textures, centre_frg.texture, list(TRACK_COLORS), config=render_settings.ms_mask)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask, centre_mask.texture, list(TRACK_COLORS), config=render_settings.flow)
-            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS), config=render_settings.fluid)
+            motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,                       centre_mask.texture,    palette)
+            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub,   mask_textures,      centre_frg.texture,     render_settings.ms_mask,        palette)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask,           centre_mask.texture,    render_settings.flow)
+            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows,                                      render_settings.fluid,    palette)
 
             self.L[Layers.composite][i] = ls.CompositeLayer([fluid, ms_mask], render_settings.composite)
 
