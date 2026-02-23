@@ -11,6 +11,14 @@ from modules.settings import presets
 from modules.settings.registry import SettingsRegistry
 from modules.settings.setting import Setting
 
+# ---------------------------------------------------------------------------
+# Poll rate for setting → UI synchronisation.
+# All UI updates run on NiceGUI's event-loop timer, never on the thread that
+# writes the setting.  This avoids WebSocket flooding (bind fired per-write)
+# and thread-safety issues (GL thread calling NiceGUI API).
+# ---------------------------------------------------------------------------
+POLL_INTERVAL = 0.25  # seconds
+
 
 def generate_label(name):
     """Convert field/config name to a human-readable label.
@@ -30,39 +38,20 @@ def generate_label(name):
     return " ".join(result)
 
 
-def _build_field_control(settings, name, field, cleanup):
+def _build_field_control(settings, name, field, polls):
     """Create a NiceGUI control for a single Setting field.
 
     Returns the control's "size class":
         'full'  — needs a full row (slider, text input)
         'small' — compact inline control (switch, select, number)
 
-    *cleanup* collects teardown items so the caller can deregister them
-    when the browser client disconnects.  Each item is either:
-        (settings, field, callback)   — for bind/unbind
-        ('timer', timer_instance)     — for polling timers
+    *polls* collects ``(settings, name, [last_value], setter)`` tuples.
+    A timer created by the caller will poll these periodically to push
+    external changes into the UI — thread-safe by construction.
     """
     value = getattr(settings, name)
     label = generate_label(name)
     is_disabled = field.readonly
-
-    # -- Helper: for readonly fields, poll via ui.timer instead of bind ------
-    def _poll_readonly(element, setter):
-        """Create a timer that polls the setting value into *element*.
-
-        *setter* is called with the new value (e.g. ``lbl.set_text``).
-        Returns the timer so it can be cleaned up on disconnect.
-        """
-        last = [value]  # mutable cell to avoid unnecessary updates
-
-        def _tick():
-            cur = getattr(settings, name)
-            if cur != last[0]:
-                last[0] = cur
-                setter(cur)
-
-        t = ui.timer(0.5, _tick)
-        cleanup.append(('timer', t))
 
     # -- Enum → select -------------------------------------------------------
     if isinstance(field.type_, type) and issubclass(field.type_, Enum):
@@ -73,19 +62,12 @@ def _build_field_control(settings, name, field, cleanup):
             label=label,
         ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]")
 
-        if is_disabled:
-            _poll_readonly(sel, lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v))
-        else:
+        if not is_disabled:
             def on_select_change(e, f=field):
                 setattr(settings, name, f.type_[e.value])
-
             sel.on_value_change(on_select_change)
 
-            def update_select(v, sel=sel):
-                sel.set_value(v.name if isinstance(v, Enum) else v)
-
-            settings.bind(field, update_select)
-            cleanup.append((settings, field, update_select))
+        polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v)))
         return 'small'
 
     # -- bool → switch -------------------------------------------------------
@@ -94,19 +76,12 @@ def _build_field_control(settings, name, field, cleanup):
             "dense" + (" disable" if is_disabled else "")
         )
 
-        if is_disabled:
-            _poll_readonly(sw, lambda v, sw=sw: sw.set_value(v))
-        else:
+        if not is_disabled:
             def on_switch_change(e):
                 setattr(settings, name, e.value)
-
             sw.on_value_change(on_switch_change)
 
-            def update_switch(v, sw=sw):
-                sw.set_value(v)
-
-            settings.bind(field, update_switch)
-            cleanup.append((settings, field, update_switch))
+        polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
         return 'small'
 
     # -- int/float with min+max → slider -------------------------------------
@@ -119,19 +94,12 @@ def _build_field_control(settings, name, field, cleanup):
                 min=field.min, max=field.max, step=step, value=value
             ).props("dense label-always" + (" disable" if is_disabled else ""))
 
-        if is_disabled:
-            _poll_readonly(sl, lambda v, sl=sl: sl.set_value(v))
-        else:
+        if not is_disabled:
             def on_slider_change(e):
                 setattr(settings, name, field.type_(e.value))
-
             sl.on_value_change(on_slider_change)
 
-            def update_slider(v, sl=sl):
-                sl.set_value(v)
-
-            settings.bind(field, update_slider)
-            cleanup.append((settings, field, update_slider))
+        polls.append((settings, name, [value], lambda v, sl=sl: sl.set_value(v)))
         return 'full'
 
     # -- int/float without range → number input ------------------------------
@@ -143,20 +111,13 @@ def _build_field_control(settings, name, field, cleanup):
             format=f"%.0f" if field.type_ is int else f"%.2f",
         ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
-        if is_disabled:
-            _poll_readonly(num, lambda v, num=num: num.set_value(v))
-        else:
+        if not is_disabled:
             def on_num_change(e):
                 if e.value is not None:
                     setattr(settings, name, field.type_(e.value))
-
             num.on_value_change(on_num_change)
 
-            def update_num(v, num=num):
-                num.set_value(v)
-
-            settings.bind(field, update_num)
-            cleanup.append((settings, field, update_num))
+        polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
         return 'small'
 
     # -- str → text input ----------------------------------------------------
@@ -165,19 +126,12 @@ def _build_field_control(settings, name, field, cleanup):
             "dense outlined" + (" disable" if is_disabled else "")
         )
 
-        if is_disabled:
-            _poll_readonly(inp, lambda v, inp=inp: inp.set_value(v))
-        else:
+        if not is_disabled:
             def on_input_change(e):
                 setattr(settings, name, e.value)
-
             inp.on_value_change(on_input_change)
 
-            def update_input(v, inp=inp):
-                inp.set_value(v)
-
-            settings.bind(field, update_input)
-            cleanup.append((settings, field, update_input))
+        polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
         return 'full'
 
     # -- Fallback: read-only label -------------------------------------------
@@ -185,7 +139,7 @@ def _build_field_control(settings, name, field, cleanup):
         ui.label(label).classes("text-sm")
         lbl = ui.label(str(value)).classes("text-sm text-gray-500")
 
-    _poll_readonly(lbl, lambda v, lbl=lbl: lbl.set_text(str(v)))
+    polls.append((settings, name, [value], lambda v, lbl=lbl: lbl.set_text(str(v))))
     return 'small'
 
 
@@ -206,13 +160,35 @@ def _has_visible_content(settings):
     return False
 
 
-def _build_settings_card(name, settings, cleanup):
+def _make_poll_timer(polls, timers):
+    """Create a single ``ui.timer`` that polls all entries in *polls*.
+
+    Each entry is ``(settings, name, [last_value], setter)``.
+    The timer runs on NiceGUI's event loop so UI calls are thread-safe.
+    *timers* collects the timer for later cleanup reference.
+    """
+    if not polls:
+        return
+
+    def _tick():
+        for s, fname, last, setter in polls:
+            cur = getattr(s, fname)
+            if cur != last[0]:
+                last[0] = cur
+                setter(cur)
+
+    timers.append(ui.timer(POLL_INTERVAL, _tick))
+
+
+def _build_settings_card(name, settings, timers):
     """Build a collapsible card for one BaseSettings instance.
 
     Uses a 2-column grid for sliders and flows small controls (switches,
     selects, numbers) inline in a wrapping row for a compact layout.
     """
     with ui.expansion(generate_label(name), icon="settings").props("duration=0").classes("w-full"):
+        polls: list[tuple] = []
+
         # Separate fields into full-width (sliders) and small (inline) controls
         full_fields = []
         small_fields = []
@@ -246,13 +222,16 @@ def _build_settings_card(name, settings, cleanup):
         if small_fields:
             with ui.row().classes("w-full gap-4 flex-wrap items-end"):
                 for field_name in small_fields:
-                    _build_field_control(settings, field_name, settings.fields[field_name], cleanup)
+                    _build_field_control(settings, field_name, settings.fields[field_name], polls)
 
         # Full-width controls (sliders, text) in a 2-column grid
         if full_fields:
             with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-2"):
                 for field_name in full_fields:
-                    _build_field_control(settings, field_name, settings.fields[field_name], cleanup)
+                    _build_field_control(settings, field_name, settings.fields[field_name], polls)
+
+        # Create one poll timer for all fields in this card
+        _make_poll_timer(polls, timers)
 
         # Actions
         action_items = [
@@ -266,7 +245,7 @@ def _build_settings_card(name, settings, cleanup):
 
         # Children (recursive)
         for child_name, child in settings.children.items():
-            _build_settings_card(child_name, child, cleanup)
+            _build_settings_card(child_name, child, timers)
 
 
 def _build_preset_controls(registry):
@@ -400,8 +379,8 @@ def create_settings_panel(
         def index():
             create_settings_panel(registry, title="POSER", on_exit=stop)
     """
-    # Track all (settings, field_name, callback) for this client session
-    cleanup: list[tuple] = []
+    # Timers for this client session — NiceGUI auto-cleans on disconnect.
+    timers: list = []
 
     # -- Header row: title | preset controls | exit button -----------------
     with ui.row().classes("w-full items-center flex-nowrap gap-0"):
@@ -433,11 +412,13 @@ def create_settings_panel(
 
     # Render pinned fields and actions in a compact row above the tabs
     if pinned_fields or pinned_actions:
+        pinned_polls: list[tuple] = []
         with ui.row().classes("w-full gap-4 flex-wrap items-end"):
             for settings, field_name, field in pinned_fields:
-                _build_field_control(settings, field_name, field, cleanup)
+                _build_field_control(settings, field_name, field, pinned_polls)
             for settings, action_name, action in pinned_actions:
                 _build_action_button(settings, action_name, action)
+        _make_poll_timer(pinned_polls, timers)
 
     # Filter out groups where all settings have no visible content
     group_map = {
@@ -462,19 +443,4 @@ def create_settings_panel(
             with ui.tab_panel(tab_map[group]):
                 for config_name in config_names:
                     settings = registry.get(config_name)
-                    _build_settings_card(config_name, settings, cleanup)
-
-    # Deregister UI callbacks when the browser tab disconnects.
-    # Timers are managed by NiceGUI's client lifecycle automatically.
-    def _on_disconnect():
-        for item in cleanup:
-            if item[0] == 'timer':
-                continue
-            s, fld, cb = item
-            try:
-                s.unbind(fld, cb)
-            except (KeyError, ValueError):
-                pass
-        cleanup.clear()
-
-    app.on_disconnect(_on_disconnect)
+                    _build_settings_card(config_name, settings, timers)
