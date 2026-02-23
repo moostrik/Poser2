@@ -7,11 +7,12 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color, Texture
+from modules.gl.WindowManager import WindowSettings
 from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub, Stage
 from modules.gui.PyReallySimpleGui import Gui
-from modules.render.render_settings import RenderSettings, WindowSettings, DataLayer
+from modules.render.render_settings import RenderSettings, DataLayer
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -159,7 +160,6 @@ FINAL_LAYERS: list[Layers] = SHOW_COMP
 class RenderManager(RenderBase):
     def __init__(self, gui: Gui, data_hub: DataHub, render_settings: RenderSettings,
                  num_cams: int = 3, num_players: int = 3) -> None:
-        win = render_settings.window
         self.num_players: int = num_players
         self.num_cams: int =    num_cams
 
@@ -245,30 +245,12 @@ class RenderManager(RenderBase):
             SubdivisionRow(name='track',        columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
             SubdivisionRow(name='preview',      columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
         ]
-        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, win.width, win.height, False)
+        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, render_settings.window.width, render_settings.window.height, False)
 
         # window manager
-        self.secondary_order_list: list[int] = win.secondary_list
-        self.window_manager: WindowManager = WindowManager(
-            self, self.subdivision.width, self.subdivision.height,
-            win.title, win.fullscreen,
-            win.v_sync, win.fps,
-            win.x, win.y,
-            win.monitor, win.secondary_list
-        )
-
-        # Bind window settings → window manager (reactive runtime control)
-        wm = self.window_manager
-        win.bind(WindowSettings.v_sync,     lambda v: wm.set_v_sync(v))
-        win.bind(WindowSettings.fullscreen, lambda v: wm.set_main_fullscreen(v))
-        win.bind(WindowSettings.monitor,    lambda v: wm.set_monitor(v))
-        win.bind(WindowSettings.x,         lambda _: wm.set_position(win.x, win.y))
-        win.bind(WindowSettings.y,         lambda _: wm.set_position(win.x, win.y))
-        win.bind(WindowSettings.width,     lambda _: wm.set_size(win.width, win.height))
-        win.bind(WindowSettings.height,    lambda _: wm.set_size(win.width, win.height))
-
-        # FPS feedback: WindowManager pushes measured FPS into the readonly setting
-        wm.fps_callback = lambda fps: setattr(win, 'fps', fps)
+        render_settings.window.width = self.subdivision.width
+        render_settings.window.height = self.subdivision.height
+        self.window_manager: WindowManager = WindowManager(self, render_settings.window)
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -347,7 +329,7 @@ class RenderManager(RenderBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ADD)
 
-        camera_id: int = self.secondary_order_list.index(monitor_id)
+        camera_id: int = self.render_settings.window.secondary_list.index(monitor_id)
         for layer_type in self._draw_layers:
             self.L[layer_type][camera_id].draw()
 

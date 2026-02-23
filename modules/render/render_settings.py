@@ -17,6 +17,7 @@ from modules.render.layers.flow.FlowLayer import FlowLayerConfig
 from modules.render.layers.flow.FluidLayer import FluidLayerConfig
 
 from modules.settings import Setting, Child, BaseSettings
+from modules.gl.WindowManager import WindowSettings
 
 
 # ---------------------------------------------------------------------------
@@ -58,19 +59,6 @@ class DataLayerConfig(Protocol):
 # ---------------------------------------------------------------------------
 # Settings classes
 # ---------------------------------------------------------------------------
-
-class WindowSettings(BaseSettings):
-    """Window / init configuration — set once before RenderManager starts."""
-    title: Setting[str] =           Setting(str,  "Poser", init_only=True, visible=False)
-    fps: Setting[int] =             Setting(int,  60, readonly=True)
-    v_sync: Setting[bool] =         Setting(bool, True)
-    fullscreen: Setting[bool] =     Setting(bool, False)
-    monitor: Setting[int] =         Setting(int,  0)
-    secondary_list: Setting[list[int]] = Setting(list[int], [])
-    x: Setting[int] =               Setting(int,  0)
-    y: Setting[int] =               Setting(int,  80)
-    width: Setting[int] =           Setting(int,  1920)
-    height: Setting[int] =          Setting(int,  1000)
 
 
 class DataLayerSettings(BaseSettings):

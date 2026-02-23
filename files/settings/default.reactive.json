@@ -3,14 +3,18 @@
     "lut": "NONE",
     "lut_strength": 1.0,
     "window": {
-      "v_sync": true,
+      "v_sync": false,
       "fullscreen": false,
       "monitor": 0,
-      "x": 0,
+      "secondary_list": [
+        1,
+        2,
+        3
+      ],
+      "x": 20,
       "y": 80,
-      "width": 1920,
-      "height": 1000,
-      "secondary_list": [0, 1, 2]
+      "width": 1080,
+      "height": 1000
     },
     "data_layer": {
       "feature": "NONE",

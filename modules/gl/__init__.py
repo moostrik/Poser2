@@ -2,7 +2,7 @@
 from .RenderBase import RenderBase
 from .Shader import Shader
 from .ComputeShader import ComputeShader
-from .WindowManager import WindowManager
+from .WindowManager import WindowManager, WindowSettings
 from . import Style
 from . import shaders
 from .Utils import Blit, clear_color
