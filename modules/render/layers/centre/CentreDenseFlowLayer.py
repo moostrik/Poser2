@@ -8,10 +8,10 @@ from modules.render.shaders import DrawRoi, MaskApply
 from modules.gl import Fbo, Texture, Style
 
 
-class CentreDlowConfig(BaseSettings):
+class CentreDlowSettings(BaseSettings):
     """Configuration for CentreDenseFlowLayer optical flow visualization."""
-    mask_opacity:   Setting[float] = Setting(float, 1.0, min=0.0, max=1.0, description="Flow mask opacity")
-    use_mask:       Setting[bool]  = Setting(bool, True, description="Enable flow masking")
+    mask_opacity:   Setting[float] = Setting(1.0, min=0.0, max=1.0, description="Flow mask opacity")
+    use_mask:       Setting[bool]  = Setting(True, description="Enable flow masking")
 
 
 class CentreDenseFlowLayer(LayerBase):
@@ -21,13 +21,13 @@ class CentreDenseFlowLayer(LayerBase):
     Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, geometry: CentreGeometry, flow_texture: Texture, mask_texture: Texture | None = None, config: CentreDlowConfig | None = None) -> None:
+    def __init__(self, geometry: CentreGeometry, flow_texture: Texture, mask_texture: Texture | None = None, config: CentreDlowSettings | None = None) -> None:
         self._geometry: CentreGeometry = geometry
         self._flow_texture: Texture = flow_texture
         self._mask_texture: Texture | None = mask_texture
 
         # Configuration
-        self.config: CentreDlowConfig = config or CentreDlowConfig()
+        self.config: CentreDlowSettings = config or CentreDlowSettings()
 
         # FBOs
         self._flow_fbo: Fbo = Fbo()

@@ -12,22 +12,22 @@ from modules.gl import Style
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentreFrgConfig(BaseSettings):
+class CentreFrgSettings(BaseSettings):
     """Configuration for CentreFrgLayer foreground rendering."""
-    blend_factor:   Setting[float] = Setting(float, 0.2, min=0.0, max=1.0, description="Foreground temporal blending")
-    exposure:       Setting[float] = Setting(float, 1.2, min=0.1, max=3.0, description="Exposure multiplier")
-    gamma:          Setting[float] = Setting(float, 1.0, min=0.5, max=2.0, description="Gamma correction")
-    offset:         Setting[float] = Setting(float, 0.0, min=-0.5, max=0.5, description="Exposure offset")
-    contrast:       Setting[float] = Setting(float, 1.1, min=0.5, max=2.0, description="Contrast")
-    saturation:     Setting[float] = Setting(float, 2.0, min=0.5, max=2.0, description="Color saturation")
+    blend_factor:   Setting[float] = Setting(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
+    exposure:       Setting[float] = Setting(1.2, min=0.1, max=3.0, description="Exposure multiplier")
+    gamma:          Setting[float] = Setting(1.0, min=0.5, max=2.0, description="Gamma correction")
+    offset:         Setting[float] = Setting(0.0, min=-0.5, max=0.5, description="Exposure offset")
+    contrast:       Setting[float] = Setting(1.1, min=0.5, max=2.0, description="Contrast")
+    saturation:     Setting[float] = Setting(2.0, min=0.5, max=2.0, description="Color saturation")
     # Cel shade
-    levels:         Setting[int]   = Setting(int, 9, min=2, max=12, description="Number of color bands")
-    smoothness:     Setting[float] = Setting(float, 0.33, min=0.0, max=0.5, description="Gradient between bands")
+    levels:         Setting[int]   = Setting(9, min=2, max=12, description="Number of color bands")
+    smoothness:     Setting[float] = Setting(0.33, min=0.0, max=0.5, description="Gradient between bands")
     # Hue shift
-    colorize:       Setting[float] = Setting(float, 0.96, min=0.0, max=1.0, description="Hue shift toward track color (0.0 = off)")
+    colorize:       Setting[float] = Setting(0.96, min=0.0, max=1.0, description="Hue shift toward track color (0.0 = off)")
     # Post
-    sharpen:        Setting[float] = Setting(float, 0.0, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
-    use_mask:       Setting[bool]  = Setting(bool, True, description="Apply mask to foreground")
+    sharpen:        Setting[float] = Setting(0.0, min=0.0, max=2.0, description="Sharpen result (0.0 = off)")
+    use_mask:       Setting[bool]  = Setting(True, description="Apply mask to foreground")
 
 
 class CentreFrgLayer(LayerBase):
@@ -36,14 +36,14 @@ class CentreFrgLayer(LayerBase):
     Uses bbox_geometry for rendering. Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, geometry: CentreGeometry, frg_texture: Texture, mask_texture: Texture | None = None, config: CentreFrgConfig | None = None, track_color: tuple[float, float, float] = (1.0, 1.0, 1.0)) -> None:
+    def __init__(self, geometry: CentreGeometry, frg_texture: Texture, mask_texture: Texture | None = None, config: CentreFrgSettings | None = None, track_color: tuple[float, float, float] = (1.0, 1.0, 1.0)) -> None:
         self._geometry: CentreGeometry = geometry
         self._frg_texture: Texture = frg_texture
         self._mask_texture: Texture | None = mask_texture
         self._track_color: tuple[float, float, float] = track_color
 
         # Configuration
-        self.config: CentreFrgConfig = config or CentreFrgConfig()
+        self.config: CentreFrgSettings = config or CentreFrgSettings()
 
         # FBOs
         self._roi_fbo: Fbo = Fbo()

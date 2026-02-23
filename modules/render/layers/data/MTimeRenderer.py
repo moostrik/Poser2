@@ -10,13 +10,13 @@ from modules.render.layers.LayerBase import LayerBase
 from modules.gl import Text
 
 
-class MTimeRendererConfig(BaseSettings):
-    stage: Setting[Stage] = Setting(Stage, Stage.LERP, init_only=True, description="Pipeline stage for pose data")
+class MTimeRendererSettings(BaseSettings):
+    stage: Setting[Stage] = Setting(Stage.LERP, init_only=True, description="Pipeline stage for pose data")
 
 
 class MTimeRenderer(LayerBase):
-    def __init__(self, track_id: int, data: DataHub, config: MTimeRendererConfig | None = None) -> None:
-        self._config: MTimeRendererConfig = config or MTimeRendererConfig()
+    def __init__(self, track_id: int, data: DataHub, config: MTimeRendererSettings | None = None) -> None:
+        self._config: MTimeRendererSettings = config or MTimeRendererSettings()
         self._data: DataHub = data
         self._track_id: int = track_id
         self._motion_time: str | None = None

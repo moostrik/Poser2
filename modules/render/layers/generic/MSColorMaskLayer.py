@@ -24,17 +24,17 @@ from modules.render.shaders.generic.Tint import Tint
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class MSColorMaskLayerConfig(BaseSettings):
+class MSColorMaskLayerSettings(BaseSettings):
     """Configuration for MSColorMaskLayer."""
-    num_players:            Setting[int]   = Setting(int, 3, init_only=True)
-    blend_mode:             Setting[Style.BlendMode] = Setting(Style.BlendMode, Style.BlendMode.ALPHA)
-    similarity_threshold:   Setting[float] = Setting(float, 0.33, min=0.0, max=1.0)
-    motion_exponent:        Setting[float] = Setting(float, 1.5, min=0.0, max=5.0)
+    num_players:            Setting[int]   = Setting(3, init_only=True)
+    blend_mode:             Setting[Style.BlendMode] = Setting(Style.BlendMode.ALPHA)
+    similarity_threshold:   Setting[float] = Setting(0.33, min=0.0, max=1.0)
+    motion_exponent:        Setting[float] = Setting(1.5, min=0.0, max=5.0)
     # AddDodgeBlend parameters
-    add_curve:              Setting[float] = Setting(float, 2.0, min=0.0, max=5.0)
-    dodge_curve:            Setting[float] = Setting(float, 1.5, min=0.0, max=5.0)
+    add_curve:              Setting[float] = Setting(2.0, min=0.0, max=5.0)
+    dodge_curve:            Setting[float] = Setting(1.5, min=0.0, max=5.0)
     # MSColorMask parameters
-    layered:                Setting[float] = Setting(float, 1.0, min=0.0, max=1.0, description="0 = additive, 1 = own in front")
+    layered:                Setting[float] = Setting(1.0, min=0.0, max=1.0, description="0 = additive, 1 = own in front")
 
 
 class MSColorMaskLayer(LayerBase):
@@ -55,14 +55,14 @@ class MSColorMaskLayer(LayerBase):
         mask_textures: dict[int, Texture],
         frg_texture: Texture,
         colors: list[tuple[float, float, float, float]],
-        config: MSColorMaskLayerConfig | None = None
+        config: MSColorMaskLayerSettings | None = None
     ) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._mask_textures: dict[int, Texture] = mask_textures
         self._frg_texture: Texture = frg_texture
         self._colors: list[tuple[float, float, float, float]] = colors
-        self.config: MSColorMaskLayerConfig = config or MSColorMaskLayerConfig()
+        self.config: MSColorMaskLayerSettings = config or MSColorMaskLayerSettings()
 
         self._tint_fbos: list[Fbo] = [Fbo() for _ in range(self.config.num_players)]
         self._blend_fbo: SwapFbo = SwapFbo()

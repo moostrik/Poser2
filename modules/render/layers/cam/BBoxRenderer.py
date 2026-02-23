@@ -11,14 +11,14 @@ from modules.render.layers.LayerBase import LayerBase, Rect
 from modules.render.shaders import DrawRectangleOutline
 
 
-class BBoxRendererConfig(BaseSettings):
-    stage:      Setting[Stage] = Setting(Stage, Stage.LERP, description="Pipeline stage for pose data")
-    line_width: Setting[float] = Setting(float, 2.0, min=1.0, max=10.0, description="Bounding box line width in pixels")
+class BBoxRendererSettings(BaseSettings):
+    stage:      Setting[Stage] = Setting(Stage.LERP, description="Pipeline stage for pose data")
+    line_width: Setting[float] = Setting(2.0, min=1.0, max=10.0, description="Bounding box line width in pixels")
 
 
 class BBoxRenderer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, bbox_color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0), config: BBoxRendererConfig | None = None) -> None:
-        self._config: BBoxRendererConfig = config or BBoxRendererConfig()
+    def __init__(self, cam_id: int, data: DataHub, bbox_color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0), config: BBoxRendererSettings | None = None) -> None:
+        self._config: BBoxRendererSettings = config or BBoxRendererSettings()
         self._data: DataHub = data
         self._cam_id: int = cam_id
         self._cam_bbox_rects: list[Rect] = []

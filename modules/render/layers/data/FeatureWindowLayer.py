@@ -13,7 +13,7 @@ from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.nodes import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import WindowShader
-from modules.render.layers.data.DataLayerConfig import FEATURE_COLORS, DEFAULT_COLORS, DataLayerConfig
+from modules.render.layers.data.DataLayerSettings import FEATURE_COLORS, DEFAULT_COLORS, DataLayerSettings
 
 
 class FeatureWindowLayer(LayerBase):
@@ -24,10 +24,10 @@ class FeatureWindowLayer(LayerBase):
     via DataHub per-track windows.
     """
 
-    def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerConfig) -> None:
+    def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
-        self._config: DataLayerConfig = config
+        self._config: DataLayerSettings = config
         self.active: bool = False  # Instance-level active state
 
         self._fbo: Fbo = Fbo()

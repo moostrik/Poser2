@@ -49,13 +49,13 @@ class FluidDrawMode(IntEnum):
     OBSTACLE = auto()
 
 
-class FluidLayerConfig(BaseSettings):
+class FluidLayerSettings(BaseSettings):
     """Configuration for FluidLayer (fluid simulation)."""
-    fps = Setting(float, 110.0, min=1.0, max=240.0)
-    num_players = Setting(int, 3, min=1, max=8)
-    draw_mode = Setting(FluidDrawMode, FluidDrawMode.DENSITY)
-    blend_mode = Setting(Style.BlendMode, Style.BlendMode.ADD)
-    simulation_scale = Setting(float, 0.5, min=0.1, max=2.0)
+    fps = Setting(110.0, min=1.0, max=240.0)
+    num_players = Setting(3, min=1, max=8)
+    draw_mode = Setting(FluidDrawMode.DENSITY)
+    blend_mode = Setting(Style.BlendMode.ADD)
+    simulation_scale = Setting(0.5, min=0.1, max=2.0)
 
     visualisation = Child(VisualisationFieldConfig)
     fluid_flow = Child(FluidFlowConfig)
@@ -86,7 +86,7 @@ class FluidLayer(LayerBase):
         density_texture = fluid.density
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, flow_layers: dict[int, FlowLayer], colors: list[tuple[float, float, float, float]], config: FluidLayerConfig | None = None) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, flow_layers: dict[int, FlowLayer], colors: list[tuple[float, float, float, float]], config: FluidLayerSettings | None = None) -> None:
         """Initialize fluid layer.
 
         Args:
@@ -99,7 +99,7 @@ class FluidLayer(LayerBase):
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._flow_layers: dict[int, FlowLayer] = flow_layers
-        self.config: FluidLayerConfig = config or FluidLayerConfig()
+        self.config: FluidLayerSettings = config or FluidLayerSettings()
 
         self._delta_time: float = 1 / self.config.fps
 

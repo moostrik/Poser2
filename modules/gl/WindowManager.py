@@ -24,17 +24,17 @@ from modules.settings import Setting, BaseSettings
 
 class WindowSettings(BaseSettings):
     """Window / init configuration — set once before RenderManager starts."""
-    title: Setting[str] =           Setting(str,  "Poser", init_only=True, visible=False)
-    fps: Setting[int] =             Setting(int,  60, readonly=True, pinned=True)
-    min_fps: Setting[int] =         Setting(int,  60, readonly=True, pinned=True)
-    v_sync: Setting[bool] =         Setting(bool, True)
-    fullscreen: Setting[bool] =     Setting(bool, False)
-    monitor: Setting[int] =         Setting(int,  0)
-    secondary_list: Setting[list[int]] = Setting(list[int], [0])
-    x: Setting[int] =               Setting(int,  0)
-    y: Setting[int] =               Setting(int,  80)
-    width: Setting[int] =           Setting(int,  1920)
-    height: Setting[int] =          Setting(int,  1000)
+    title: Setting[str] =           Setting("Poser", init_only=True, visible=False)
+    fps: Setting[int] =             Setting(60, readonly=True, pinned=True)
+    min_fps: Setting[int] =         Setting(60, readonly=True, pinned=True)
+    v_sync: Setting[bool] =         Setting(True)
+    fullscreen: Setting[bool] =     Setting(False)
+    monitor: Setting[int] =         Setting(0)
+    secondary_list: Setting[list[int]] = Setting([0])
+    x: Setting[int] =               Setting(0)
+    y: Setting[int] =               Setting(80)
+    width: Setting[int] =           Setting(1920)
+    height: Setting[int] =          Setting(1000)
 
 
 class Button(Enum):

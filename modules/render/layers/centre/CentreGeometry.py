@@ -20,15 +20,15 @@ from modules.gl import Texture
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentreGeometryConfig(BaseSettings):
+class CentreGeometrySettings(BaseSettings):
     """Configuration for CentreGeometry anchor point positioning."""
-    stage:              Setting[Stage] = Setting(Stage, Stage.SMOOTH, description="Pose data pipeline stage")
-    cam_aspect:         Setting[float] = Setting(float, 1.7778, init_only=True, description="Camera aspect ratio (16/9 = 1.7778)")
-    target_top_x:       Setting[float] = Setting(float, 0.5, min=0.0, max=1.0, description="Top anchor X position (normalized)")
-    target_top_y:       Setting[float] = Setting(float, 0.33, min=0.0, max=1.0, description="Top anchor Y position (normalized)")
-    target_bottom_x:    Setting[float] = Setting(float, 0.5, min=0.0, max=1.0, description="Bottom anchor X position (normalized)")
-    target_bottom_y:    Setting[float] = Setting(float, 0.6, min=0.0, max=1.0, description="Bottom anchor Y position (normalized)")
-    dst_aspectratio:    Setting[float] = Setting(float, 0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
+    stage:              Setting[Stage] = Setting(Stage.SMOOTH, description="Pose data pipeline stage")
+    cam_aspect:         Setting[float] = Setting(1.7778, init_only=True, description="Camera aspect ratio (16/9 = 1.7778)")
+    target_top_x:       Setting[float] = Setting(0.5, min=0.0, max=1.0, description="Top anchor X position (normalized)")
+    target_top_y:       Setting[float] = Setting(0.33, min=0.0, max=1.0, description="Top anchor Y position (normalized)")
+    target_bottom_x:    Setting[float] = Setting(0.5, min=0.0, max=1.0, description="Bottom anchor X position (normalized)")
+    target_bottom_y:    Setting[float] = Setting(0.6, min=0.0, max=1.0, description="Bottom anchor Y position (normalized)")
+    dst_aspectratio:    Setting[float] = Setting(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
 
 
 @dataclass
@@ -56,13 +56,13 @@ class CentreGeometry(LayerBase):
     pose points to crop space.
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, config: CentreGeometryConfig | None = None) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, config: CentreGeometrySettings | None = None) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
 
         # Configuration
-        self.config: CentreGeometryConfig = config or CentreGeometryConfig()
+        self.config: CentreGeometrySettings = config or CentreGeometrySettings()
         self._stage: Stage = self.config.stage
         self._cam_aspect: float = self.config.cam_aspect
 

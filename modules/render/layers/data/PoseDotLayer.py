@@ -15,15 +15,15 @@ from modules.utils.PointsAndRects import Rect
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class PoseDotConfig(BaseSettings):
-    stage:      Setting[Stage] = Setting(Stage, Stage.LERP, init_only=True, description="Pipeline stage for pose data")
-    dot_size:   Setting[float] = Setting(float, 4.0, min=1.0, max=20.0, description="Dot size in pixels")
-    dot_smooth: Setting[float] = Setting(float, 2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")
+class PoseDotSettings(BaseSettings):
+    stage:      Setting[Stage] = Setting(Stage.LERP, init_only=True, description="Pipeline stage for pose data")
+    dot_size:   Setting[float] = Setting(4.0, min=1.0, max=20.0, description="Dot size in pixels")
+    dot_smooth: Setting[float] = Setting(2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")
 
 
 class PoseDotLayer(LayerBase):
-    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseDotConfig | None = None) -> None:
-        self._config: PoseDotConfig = config or PoseDotConfig()
+    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseDotSettings | None = None) -> None:
+        self._config: PoseDotSettings = config or PoseDotSettings()
         self._track_id: int = track_id
         self._data_hub: DataHub = data
         self._fbo: Fbo = Fbo()

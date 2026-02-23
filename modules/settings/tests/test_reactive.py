@@ -54,20 +54,20 @@ class RenderMode(Enum):
 # ---------------------------------------------------------------------------
 
 class CameraSettings(BaseSettings):
-    exposure = Setting(int, 1000, min=100, max=10000, step=100, description="Exposure time (µs)")
-    gain = Setting(float, 1.0, min=0.0, max=16.0, step=0.1)
-    overlay_color = Setting(Color, Color(1, 0, 0))
-    resolution = Setting(int, 1080, init_only=True)
-    fps = Setting(float, 0.0, readonly=True, visible=False)
-    mode = Setting(RenderMode, RenderMode.SOLID)
+    exposure = Setting(1000, min=100, max=10000, step=100, description="Exposure time (µs)")
+    gain = Setting(1.0, min=0.0, max=16.0, step=0.1)
+    overlay_color = Setting(Color(1, 0, 0))
+    resolution = Setting(1080, init_only=True)
+    fps = Setting(0.0, readonly=True, visible=False)
+    mode = Setting(RenderMode.SOLID)
 
 
 class MinimalSettings(BaseSettings):
-    value = Setting(int, 0)
+    value = Setting(0)
 
 
 class SettingsWithActions(BaseSettings):
-    exposure = Setting(int, 1000)
+    exposure = Setting(1000)
     reset = Action(description="Reset all values")
     hidden_action = Action(visible=False)
 
@@ -701,30 +701,30 @@ class TestRegistryGroups(unittest.TestCase):
 
 # ===== Child descriptor tests =============================================
 
-class InnerConfig(BaseSettings):
-    speed = Setting(float, 1.0, min=0.0, max=10.0)
-    scale = Setting(float, 0.5)
+class InnerSettings(BaseSettings):
+    speed = Setting(1.0, min=0.0, max=10.0)
+    scale = Setting(0.5)
 
 
-class OuterConfig(BaseSettings):
-    fps = Setting(float, 60.0, min=1.0, max=240.0)
-    inner = Child(InnerConfig)
+class OuterSettings(BaseSettings):
+    fps = Setting(60.0, min=1.0, max=240.0)
+    inner = Child(InnerSettings)
 
 
-class DoubleChildConfig(BaseSettings):
-    name = Setting(str, "default")
-    alpha = Child(InnerConfig)
-    beta = Child(InnerConfig)
+class DoubleChildSettings(BaseSettings):
+    name = Setting("default")
+    alpha = Child(InnerSettings)
+    beta = Child(InnerSettings)
 
 
-class MiddleConfig(BaseSettings):
-    weight = Setting(float, 0.5, min=0.0, max=1.0)
-    inner = Child(InnerConfig)
+class MiddleSettings(BaseSettings):
+    weight = Setting(0.5, min=0.0, max=1.0)
+    inner = Child(InnerSettings)
 
 
-class DeepConfig(BaseSettings):
-    label = Setting(str, "root")
-    middle = Child(MiddleConfig)
+class DeepSettings(BaseSettings):
+    label = Setting("root")
+    middle = Child(MiddleSettings)
 
 
 class TestChild(unittest.TestCase):
@@ -733,37 +733,37 @@ class TestChild(unittest.TestCase):
     # -- Basic access -------------------------------------------------------
 
     def test_child_access(self):
-        cfg = OuterConfig()
-        self.assertIsInstance(cfg.inner, InnerConfig)
+        cfg = OuterSettings()
+        self.assertIsInstance(cfg.inner, InnerSettings)
         self.assertEqual(cfg.inner.speed, 1.0)
         self.assertEqual(cfg.inner.scale, 0.5)
 
     def test_child_field_mutation(self):
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         cfg.inner.speed = 5.0
         self.assertEqual(cfg.inner.speed, 5.0)
 
     def test_child_not_replaceable(self):
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         with self.assertRaises(AttributeError):
-            cfg.inner = InnerConfig()
+            cfg.inner = InnerSettings()
 
     def test_each_instance_gets_own_child(self):
-        a = OuterConfig()
-        b = OuterConfig()
+        a = OuterSettings()
+        b = OuterSettings()
         a.inner.speed = 9.0
         self.assertEqual(b.inner.speed, 1.0)
 
     # -- Children property --------------------------------------------------
 
     def test_children_property(self):
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         children = cfg.children
         self.assertIn("inner", children)
-        self.assertIsInstance(children["inner"], InnerConfig)
+        self.assertIsInstance(children["inner"], InnerSettings)
 
     def test_children_property_returns_copy(self):
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         children = cfg.children
         children["fake"] = None
         self.assertNotIn("fake", cfg.children)
@@ -771,7 +771,7 @@ class TestChild(unittest.TestCase):
     # -- Multiple children --------------------------------------------------
 
     def test_multiple_children_independent(self):
-        cfg = DoubleChildConfig()
+        cfg = DoubleChildSettings()
         cfg.alpha.speed = 3.0
         cfg.beta.speed = 7.0
         self.assertEqual(cfg.alpha.speed, 3.0)
@@ -780,7 +780,7 @@ class TestChild(unittest.TestCase):
     # -- Serialization: to_dict ---------------------------------------------
 
     def test_to_dict_includes_children(self):
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         cfg.inner.speed = 2.5
         d = cfg.to_dict()
         self.assertIn("fps", d)
@@ -789,7 +789,7 @@ class TestChild(unittest.TestCase):
         self.assertEqual(d["inner"]["scale"], 0.5)
 
     def test_to_dict_nested_structure(self):
-        cfg = DoubleChildConfig()
+        cfg = DoubleChildSettings()
         cfg.alpha.speed = 1.0
         cfg.beta.speed = 2.0
         d = cfg.to_dict()
@@ -800,27 +800,27 @@ class TestChild(unittest.TestCase):
     # -- Serialization: update_from_dict ------------------------------------
 
     def test_update_from_dict_restores_children(self):
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         cfg.update_from_dict({"fps": 120.0, "inner": {"speed": 8.0, "scale": 0.25}})
         self.assertEqual(cfg.fps, 120.0)
         self.assertEqual(cfg.inner.speed, 8.0)
         self.assertEqual(cfg.inner.scale, 0.25)
 
     def test_update_from_dict_partial_child(self):
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         cfg.update_from_dict({"inner": {"speed": 4.0}})
         self.assertEqual(cfg.inner.speed, 4.0)
         self.assertEqual(cfg.inner.scale, 0.5)  # Unchanged
 
     def test_update_from_dict_ignores_unknown_child_keys(self):
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         cfg.update_from_dict({"inner": {"speed": 3.0, "nonexistent": 99}})
         self.assertEqual(cfg.inner.speed, 3.0)
 
     # -- Round-trip ---------------------------------------------------------
 
     def test_json_round_trip(self):
-        cfg1 = OuterConfig()
+        cfg1 = OuterSettings()
         cfg1.fps = 144.0
         cfg1.inner.speed = 3.5
         cfg1.inner.scale = 0.75
@@ -828,7 +828,7 @@ class TestChild(unittest.TestCase):
         serialized = json.dumps(cfg1.to_dict())
         data = json.loads(serialized)
 
-        cfg2 = OuterConfig()
+        cfg2 = OuterSettings()
         cfg2.update_from_dict(data)
         self.assertEqual(cfg2.fps, 144.0)
         self.assertEqual(cfg2.inner.speed, 3.5)
@@ -837,30 +837,30 @@ class TestChild(unittest.TestCase):
     # -- Callbacks on child fields ------------------------------------------
 
     def test_child_field_callbacks_still_fire(self):
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         received = []
-        cfg.inner.bind(InnerConfig.speed, lambda v: received.append(v))
+        cfg.inner.bind(InnerSettings.speed, lambda v: received.append(v))
         cfg.inner.speed = 7.0
         self.assertEqual(received, [7.0])
 
     # -- Repr ---------------------------------------------------------------
 
     def test_repr_shows_children(self):
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         r = repr(cfg)
-        self.assertIn("InnerConfig(...)", r)
+        self.assertIn("InnerSettings(...)", r)
         self.assertIn("fps=", r)
 
     # -- Class-level descriptor access --------------------------------------
 
     def test_class_level_access_returns_descriptor(self):
-        self.assertIsInstance(OuterConfig.inner, Child)
+        self.assertIsInstance(OuterSettings.inner, Child)
 
     # -- Registry with children ---------------------------------------------
 
     def test_registry_save_load_with_children(self):
         reg = SettingsRegistry()
-        cfg = OuterConfig()
+        cfg = OuterSettings()
         cfg.fps = 30.0
         cfg.inner.speed = 2.0
         reg.register("outer", cfg)
@@ -871,7 +871,7 @@ class TestChild(unittest.TestCase):
             presets.save(reg, path)
 
             reg2 = SettingsRegistry()
-            cfg2 = OuterConfig()
+            cfg2 = OuterSettings()
             reg2.register("outer", cfg2)
             presets.load(reg2, path)
 
@@ -883,23 +883,23 @@ class TestChild(unittest.TestCase):
     # -- Deep nesting (3 levels) --------------------------------------------
 
     def test_deep_access(self):
-        cfg = DeepConfig()
+        cfg = DeepSettings()
         self.assertEqual(cfg.label, "root")
-        self.assertIsInstance(cfg.middle, MiddleConfig)
+        self.assertIsInstance(cfg.middle, MiddleSettings)
         self.assertEqual(cfg.middle.weight, 0.5)
-        self.assertIsInstance(cfg.middle.inner, InnerConfig)
+        self.assertIsInstance(cfg.middle.inner, InnerSettings)
         self.assertEqual(cfg.middle.inner.speed, 1.0)
         self.assertEqual(cfg.middle.inner.scale, 0.5)
 
     def test_deep_mutation(self):
-        cfg = DeepConfig()
+        cfg = DeepSettings()
         cfg.middle.inner.speed = 9.9
         self.assertEqual(cfg.middle.inner.speed, 9.9)
         cfg.middle.weight = 0.1
         self.assertEqual(cfg.middle.weight, 0.1)
 
     def test_deep_to_dict(self):
-        cfg = DeepConfig()
+        cfg = DeepSettings()
         cfg.middle.inner.speed = 3.0
         cfg.middle.weight = 0.8
         d = cfg.to_dict()
@@ -911,7 +911,7 @@ class TestChild(unittest.TestCase):
         self.assertEqual(d["middle"]["inner"]["scale"], 0.5)
 
     def test_deep_update_from_dict(self):
-        cfg = DeepConfig()
+        cfg = DeepSettings()
         cfg.update_from_dict({
             "label": "updated",
             "middle": {
@@ -925,7 +925,7 @@ class TestChild(unittest.TestCase):
         self.assertEqual(cfg.middle.inner.scale, 0.1)
 
     def test_deep_update_from_dict_partial(self):
-        cfg = DeepConfig()
+        cfg = DeepSettings()
         cfg.update_from_dict({"middle": {"inner": {"speed": 5.5}}})
         self.assertEqual(cfg.middle.inner.speed, 5.5)
         self.assertEqual(cfg.middle.inner.scale, 0.5)  # unchanged
@@ -933,7 +933,7 @@ class TestChild(unittest.TestCase):
         self.assertEqual(cfg.label, "root")              # unchanged
 
     def test_deep_json_round_trip(self):
-        cfg1 = DeepConfig()
+        cfg1 = DeepSettings()
         cfg1.label = "trip"
         cfg1.middle.weight = 0.3
         cfg1.middle.inner.speed = 4.4
@@ -942,7 +942,7 @@ class TestChild(unittest.TestCase):
         serialized = json.dumps(cfg1.to_dict())
         data = json.loads(serialized)
 
-        cfg2 = DeepConfig()
+        cfg2 = DeepSettings()
         cfg2.update_from_dict(data)
         self.assertEqual(cfg2.label, "trip")
         self.assertEqual(cfg2.middle.weight, 0.3)
@@ -950,20 +950,20 @@ class TestChild(unittest.TestCase):
         self.assertEqual(cfg2.middle.inner.scale, 0.9)
 
     def test_deep_callback(self):
-        cfg = DeepConfig()
+        cfg = DeepSettings()
         received = []
-        cfg.middle.inner.bind(InnerConfig.speed, lambda v: received.append(v))
+        cfg.middle.inner.bind(InnerSettings.speed, lambda v: received.append(v))
         cfg.middle.inner.speed = 6.6
         self.assertEqual(received, [6.6])
 
     def test_deep_instances_independent(self):
-        a = DeepConfig()
-        b = DeepConfig()
+        a = DeepSettings()
+        b = DeepSettings()
         a.middle.inner.speed = 100.0
         self.assertEqual(b.middle.inner.speed, 1.0)
 
     def test_deep_children_property(self):
-        cfg = DeepConfig()
+        cfg = DeepSettings()
         self.assertIn("middle", cfg.children)
         self.assertIn("inner", cfg.middle.children)
 

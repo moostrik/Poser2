@@ -52,12 +52,12 @@ class FlowDrawMode(IntEnum):
     TEMP_BRIDGE_OUTPUT = auto()
 
 
-class FlowLayerConfig(BaseSettings):
+class FlowLayerSettings(BaseSettings):
     """Configuration for FlowLayer (optical flow + bridges)."""
-    fps = Setting(float, 60.0, min=1.0, max=240.0)
-    draw_mode = Setting(FlowDrawMode, FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
-    blend_mode = Setting(Style.BlendMode, Style.BlendMode.ADD)
-    simulation_scale = Setting(float, 0.5, min=0.1, max=2.0)
+    fps = Setting(60.0, min=1.0, max=240.0)
+    draw_mode = Setting(FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
+    blend_mode = Setting(Style.BlendMode.ADD)
+    simulation_scale = Setting(0.5, min=0.1, max=2.0)
 
     visualisation = Child(VisualisationFieldConfig)
     optical_flow = Child(OpticalFlowConfig)
@@ -66,8 +66,8 @@ class FlowLayerConfig(BaseSettings):
     temperature_bridge = Child(TemperatureBridgeConfig)
 
 
-# Keep FlowConfig as alias for backward compatibility
-FlowConfig = FlowLayerConfig
+# Keep FlowSettings as alias for backward compatibility
+FlowSettings = FlowLayerSettings
 
 class FlowLayer(LayerBase):
     """Flow processing layer with optical flow and bridges.
@@ -92,7 +92,7 @@ class FlowLayer(LayerBase):
         fluid.add_temperature(flow.temperature)
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, mask_source: MaskSourceLayer, mask: Texture, colors: list[tuple[float, float, float, float]], config: FlowLayerConfig | None = None) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, mask_source: MaskSourceLayer, mask: Texture, colors: list[tuple[float, float, float, float]], config: FlowLayerSettings | None = None) -> None:
         """Initialize flow layer.
 
         Args:
@@ -109,7 +109,7 @@ class FlowLayer(LayerBase):
         self._mask_source: MaskSourceLayer = mask_source
         self._mask: Texture = mask
         self._colors: list[tuple[float, float, float, float]] = colors
-        self.config: FlowLayerConfig = config or FlowLayerConfig()
+        self.config: FlowLayerSettings = config or FlowLayerSettings()
 
         self._delta_time: float = 1 / self.config.fps
 

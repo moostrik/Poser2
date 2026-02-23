@@ -13,22 +13,22 @@ from typing import Protocol
 from modules.DataHub import Stage
 from modules.pose.Frame import ScalarFrameField
 
-from modules.render.layers.generic.CompositeLayer import CompositeLayerConfig
-from modules.render.layers.generic.MSColorMaskLayer import MSColorMaskLayerConfig
-from modules.render.layers.flow.FlowLayer import FlowLayerConfig
-from modules.render.layers.flow.FluidLayer import FluidLayerConfig
+from modules.render.layers.generic.CompositeLayer import CompositeLayerSettings
+from modules.render.layers.generic.MSColorMaskLayer import MSColorMaskLayerSettings
+from modules.render.layers.flow.FlowLayer import FlowLayerSettings
+from modules.render.layers.flow.FluidLayer import FluidLayerSettings
 
-from modules.render.layers.centre.CentreGeometry import CentreGeometryConfig
-from modules.render.layers.centre.CentreMaskLayer import CentreMaskConfig
-from modules.render.layers.centre.CentreCamLayer import CentreCamConfig
-from modules.render.layers.centre.CentreFrgLayer import CentreFrgConfig
-from modules.render.layers.centre.CentrePoseLayer import CentrePoseConfig
+from modules.render.layers.centre.CentreGeometry import CentreGeometrySettings
+from modules.render.layers.centre.CentreMaskLayer import CentreMaskSettings
+from modules.render.layers.centre.CentreCamLayer import CentreCamSettings
+from modules.render.layers.centre.CentreFrgLayer import CentreFrgSettings
+from modules.render.layers.centre.CentrePoseLayer import CentrePoseSettings
 
-from modules.render.layers.cam.TrackerCompositor import TrackerCompConfig
-from modules.render.layers.cam.PoseCompositor import PoseCompConfig
+from modules.render.layers.cam.TrackerCompositor import TrackerCompSettings
+from modules.render.layers.cam.PoseCompositor import PoseCompSettings
 
-from modules.render.layers.data.DataLayerConfig import DataLayerConfig
-from modules.render.layers.data.MTimeRenderer import MTimeRendererConfig
+from modules.render.layers.data.DataLayerSettings import DataLayerSettings
+from modules.render.layers.data.MTimeRenderer import MTimeRendererSettings
 
 from modules.settings import Setting, Child, BaseSettings
 from modules.gl.WindowManager import WindowSettings
@@ -59,7 +59,7 @@ class LayerMode(IntEnum):
 
 class DataLayer(Protocol):
     """Protocol for data layer instances with active state and shared config."""
-    _config: DataLayerConfig
+    _config: DataLayerSettings
 
     def set_active(self, active: bool) -> None: ...
 
@@ -69,12 +69,12 @@ class DataLayer(Protocol):
 # ---------------------------------------------------------------------------
 
 
-class DataLayerSettings(BaseSettings):
+class DataLayerControl(BaseSettings):
     """Data layer control — feature selection, display mode, stages."""
-    feature: Setting[RenderFeature] =   Setting(RenderFeature, RenderFeature.angle_motion)
-    mode: Setting[LayerMode] =      Setting(LayerMode, LayerMode.WINDOW)
-    stage_a: Setting[Stage] =       Setting(Stage, Stage.SMOOTH)
-    stage_b: Setting[Stage] =       Setting(Stage, Stage.LERP)
+    feature: Setting[RenderFeature] =   Setting(RenderFeature.angle_motion)
+    mode: Setting[LayerMode] =      Setting(LayerMode.WINDOW)
+    stage_a: Setting[Stage] =       Setting(Stage.SMOOTH)
+    stage_b: Setting[Stage] =       Setting(Stage.LERP)
 
 
 class RenderSettings(BaseSettings):
@@ -84,31 +84,31 @@ class RenderSettings(BaseSettings):
     window: Child[WindowSettings] =     Child(WindowSettings)
 
     # Data layer control (foldable child)
-    data_layer: Child[DataLayerSettings] =  Child(DataLayerSettings)
+    data_layer: Child[DataLayerControl] =  Child(DataLayerControl)
 
     # Centre layers
-    centre_geometry: Child[CentreGeometryConfig] = Child(CentreGeometryConfig)
-    centre_mask:     Child[CentreMaskConfig]     = Child(CentreMaskConfig)
-    centre_cam:      Child[CentreCamConfig]       = Child(CentreCamConfig)
-    centre_frg:      Child[CentreFrgConfig]       = Child(CentreFrgConfig)
-    centre_pose:     Child[CentrePoseConfig]      = Child(CentrePoseConfig)
+    centre_geometry: Child[CentreGeometrySettings] = Child(CentreGeometrySettings)
+    centre_mask:     Child[CentreMaskSettings]     = Child(CentreMaskSettings)
+    centre_cam:      Child[CentreCamSettings]       = Child(CentreCamSettings)
+    centre_frg:      Child[CentreFrgSettings]       = Child(CentreFrgSettings)
+    centre_pose:     Child[CentrePoseSettings]      = Child(CentrePoseSettings)
 
     # Cam compositors
-    tracker:         Child[TrackerCompConfig] = Child(TrackerCompConfig)
-    pose_comp:       Child[PoseCompConfig]    = Child(PoseCompConfig)
+    tracker:         Child[TrackerCompSettings] = Child(TrackerCompSettings)
+    pose_comp:       Child[PoseCompSettings]    = Child(PoseCompSettings)
 
     # Data layers
-    data_a:          Child[DataLayerConfig]      = Child(DataLayerConfig)
-    data_b:          Child[DataLayerConfig]      = Child(DataLayerConfig)
-    data_time:       Child[MTimeRendererConfig]  = Child(MTimeRendererConfig)
+    data_a:          Child[DataLayerSettings]      = Child(DataLayerSettings)
+    data_b:          Child[DataLayerSettings]      = Child(DataLayerSettings)
+    data_time:       Child[MTimeRendererSettings]  = Child(MTimeRendererSettings)
 
     # Composite / mask
-    composite:       Child[CompositeLayerConfig]     = Child(CompositeLayerConfig)
-    ms_mask:         Child[MSColorMaskLayerConfig]   = Child(MSColorMaskLayerConfig)
+    composite:       Child[CompositeLayerSettings]     = Child(CompositeLayerSettings)
+    ms_mask:         Child[MSColorMaskLayerSettings]   = Child(MSColorMaskLayerSettings)
 
     # Flow / Fluid (child configs, shared across all cameras)
-    flow: Child[FlowLayerConfig] =          Child(FlowLayerConfig)
-    fluid: Child[FluidLayerConfig] =         Child(FluidLayerConfig)
+    flow: Child[FlowLayerSettings] =          Child(FlowLayerSettings)
+    fluid: Child[FluidLayerSettings] =         Child(FluidLayerSettings)
 
     # ------------------------------------------------------------------
     # Data-layer binding (replaces Config.bind / _propagate)
@@ -124,7 +124,7 @@ class RenderSettings(BaseSettings):
         ])
         # Wire _propagate to each relevant field on the data_layer child
         dl = self.data_layer
-        for field in (DataLayerSettings.feature, DataLayerSettings.mode, DataLayerSettings.stage_a, DataLayerSettings.stage_b):
+        for field in (DataLayerControl.feature, DataLayerControl.mode, DataLayerControl.stage_a, DataLayerControl.stage_b):
             dl.bind(field, lambda _v: self._propagate())
         self._propagate()
 

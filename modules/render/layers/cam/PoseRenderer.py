@@ -15,17 +15,17 @@ from modules.render.layers.data.colors import TRACK_COLORS
 from modules.render.shaders import PosePointLines
 
 
-class PoseRendererConfig(BaseSettings):
-    stage:      Setting[Stage] = Setting(Stage, Stage.LERP, description="Pipeline stage for pose data")
-    line_width: Setting[float] = Setting(float, 1.0, min=0.5, max=10.0, description="Pose line width")
-    line_smooth:Setting[float] = Setting(float, 0.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
-    use_scores: Setting[bool]  = Setting(bool, False, description="Use confidence scores for line opacity")
-    use_bbox:   Setting[bool]  = Setting(bool, True, description="Transform points to image space using bbox")
+class PoseRendererSettings(BaseSettings):
+    stage:      Setting[Stage] = Setting(Stage.LERP, description="Pipeline stage for pose data")
+    line_width: Setting[float] = Setting(1.0, min=0.5, max=10.0, description="Pose line width")
+    line_smooth:Setting[float] = Setting(0.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
+    use_scores: Setting[bool]  = Setting(False, description="Use confidence scores for line opacity")
+    use_bbox:   Setting[bool]  = Setting(True, description="Transform points to image space using bbox")
 
 
 class PoseRenderer(LayerBase):
-    def __init__(self, cam_id: int, data: DataHub, colors: list[tuple[float, float, float, float]] | None = None, config: PoseRendererConfig | None = None) -> None:
-        self._config: PoseRendererConfig = config or PoseRendererConfig()
+    def __init__(self, cam_id: int, data: DataHub, colors: list[tuple[float, float, float, float]] | None = None, config: PoseRendererSettings | None = None) -> None:
+        self._config: PoseRendererSettings = config or PoseRendererSettings()
         self._data: DataHub = data
         self._cam_id: int = cam_id
         self._colors: list[tuple[float, float, float, float]] | None = colors

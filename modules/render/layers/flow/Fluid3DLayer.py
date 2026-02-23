@@ -41,13 +41,13 @@ class Fluid3DDrawMode(IntEnum):
     DENSITY_RAW = auto()
 
 
-class Fluid3DLayerConfig(BaseSettings):
+class Fluid3DLayerSettings(BaseSettings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
-    fps = Setting(float, 30.0, min=1.0, max=240.0)
-    num_players = Setting(int, 3, min=1, max=8)
-    draw_mode = Setting(Fluid3DDrawMode, Fluid3DDrawMode.DENSITY)
-    blend_mode = Setting(Style.BlendMode, Style.BlendMode.ADD)
-    simulation_scale = Setting(float, 0.5, min=0.1, max=2.0)
+    fps = Setting(30.0, min=1.0, max=240.0)
+    num_players = Setting(3, min=1, max=8)
+    draw_mode = Setting(Fluid3DDrawMode.DENSITY)
+    blend_mode = Setting(Style.BlendMode.ADD)
+    simulation_scale = Setting(0.5, min=0.1, max=2.0)
 
     visualisation = Child(VisualisationFieldConfig)
     fluid_flow = Child(FluidFlow3DConfig)
@@ -82,7 +82,7 @@ class Fluid3DLayer(LayerBase):
     def __init__(self, cam_id: int, data_hub: DataHub,
                  flow_layers: dict[int, FlowLayer],
                  colors: list[tuple[float, float, float, float]],
-                 config: Fluid3DLayerConfig | None = None) -> None:
+                 config: Fluid3DLayerSettings | None = None) -> None:
         """Initialize 3D fluid layer.
 
         Args:
@@ -95,7 +95,7 @@ class Fluid3DLayer(LayerBase):
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._flow_layers: dict[int, FlowLayer] = flow_layers
-        self.config: Fluid3DLayerConfig = config or Fluid3DLayerConfig()
+        self.config: Fluid3DLayerSettings = config or Fluid3DLayerSettings()
 
         self._delta_time: float = 1 / self.config.fps
 

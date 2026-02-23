@@ -14,8 +14,8 @@ class BaseSettings:
     Override init_only fields via constructor kwargs::
 
         class CameraSettings(BaseSettings):
-            exposure = Setting(int, 1000, min=100, max=10000)
-            resolution = Setting(int, 1080, init_only=True)
+            exposure = Setting(1000, min=100, max=10000)
+            resolution = Setting(1080, init_only=True)
 
         settings = CameraSettings(resolution=720)
     """

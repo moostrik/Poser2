@@ -57,11 +57,11 @@ LutSelection = _discover_luts()
 # Configuration
 # ============================================================================
 
-class CompositeLayerConfig(BaseSettings):
+class CompositeLayerSettings(BaseSettings):
     """Configuration for CompositeLayer."""
-    blend_mode:     Setting[Style.BlendMode] = Setting(Style.BlendMode, Style.BlendMode.ALPHA)
-    lut:            Setting[LutSelection]    = Setting(LutSelection, LutSelection.NONE)  # type: ignore
-    lut_strength:   Setting[float]           = Setting(float, 1.0, min=0.0, max=1.0)
+    blend_mode:     Setting[Style.BlendMode] = Setting(Style.BlendMode.ALPHA)
+    lut:            Setting[LutSelection]    = Setting(LutSelection.NONE)  # type: ignore
+    lut_strength:   Setting[float]           = Setting(1.0, min=0.0, max=1.0)
 
 
 # ============================================================================
@@ -87,7 +87,7 @@ class CompositeLayer(LayerBase):
     def __init__(
         self,
         layers: list[LayerBase],
-        config: CompositeLayerConfig | None = None
+        config: CompositeLayerSettings | None = None
     ) -> None:
         """Initialize CompositeLayer.
 
@@ -96,7 +96,7 @@ class CompositeLayer(LayerBase):
             config: Layer configuration
         """
         self._layers: list[LayerBase] = layers
-        self.config: CompositeLayerConfig = config or CompositeLayerConfig()
+        self.config: CompositeLayerSettings = config or CompositeLayerSettings()
 
         # Composition FBO (before LUT)
         self._composite_fbo: Fbo = Fbo()

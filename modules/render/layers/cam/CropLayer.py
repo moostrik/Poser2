@@ -12,13 +12,13 @@ from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import DrawRoi
 
 
-class CropConfig(BaseSettings):
-    stage: Setting[Stage] = Setting(Stage, Stage.LERP, description="Pipeline stage for pose data")
+class CropSettings(BaseSettings):
+    stage: Setting[Stage] = Setting(Stage.LERP, description="Pipeline stage for pose data")
 
 
 class CropLayer(LayerBase):
-    def __init__(self, track_id: int, data_hub: DataHub, cam_texture: Texture, config: CropConfig | None = None) -> None:
-        self._config: CropConfig = config or CropConfig()
+    def __init__(self, track_id: int, data_hub: DataHub, cam_texture: Texture, config: CropSettings | None = None) -> None:
+        self._config: CropSettings = config or CropSettings()
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._fbo: Fbo = Fbo()

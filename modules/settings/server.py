@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 class ServerSettings(BaseSettings):
     """Configuration for the NiceGUI settings server."""
-    title: Setting[str] = Setting(str, "Settings", init_only=True, visible=False)
-    port: Setting[int] = Setting(int, 666, init_only=True, visible=False)
+    title: Setting[str] = Setting("Settings", init_only=True, visible=False)
+    port: Setting[int] = Setting(666, init_only=True, visible=False)
 
 
 class SettingsServer:

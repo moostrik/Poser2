@@ -15,13 +15,13 @@ class Child(Generic[C]):
 
     Declare as a class attribute alongside Setting descriptors::
 
-        class FluidLayerConfig(BaseSettings):
-            fps = Setting(float, 110.0)
-            fluid_flow = Child(FluidFlowConfig)
-            visualisation = Child(VisualisationFieldConfig)
+        class FluidLayerSettings(BaseSettings):
+            fps = Setting(110.0)
+            fluid_flow = Child(FluidFlowSettings)
+            visualisation = Child(VisualisationFieldSettings)
 
     Each instance gets its own fresh child (created during BaseSettings.__init__).
-    Access: ``config.fluid_flow.speed``.
+    Access: ``settings.fluid_flow.speed``.
     Children are not replaceable — mutate their fields instead.
     """
 

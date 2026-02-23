@@ -15,25 +15,25 @@ from modules.render.shaders import PosePointLines, DrawCircles
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentrePoseConfig(BaseSettings):
+class CentrePoseSettings(BaseSettings):
     """Configuration for CentrePoseLayer pose line rendering."""
-    line_width:     Setting[float] = Setting(float, 3.0, min=0.5, max=10.0, description="Pose line thickness")
-    line_smooth:    Setting[float] = Setting(float, 0.0, min=0.0, max=5.0, description="Line anti-aliasing radius")
-    use_scores:     Setting[bool]  = Setting(bool, False, description="Color lines by confidence scores")
-    draw_anchors:   Setting[bool]  = Setting(bool, False, description="Show anchor points as circles")
+    line_width:     Setting[float] = Setting(3.0, min=0.5, max=10.0, description="Pose line thickness")
+    line_smooth:    Setting[float] = Setting(0.0, min=0.0, max=5.0, description="Line anti-aliasing radius")
+    use_scores:     Setting[bool]  = Setting(False, description="Color lines by confidence scores")
+    draw_anchors:   Setting[bool]  = Setting(False, description="Show anchor points as circles")
 
 
 class CentrePoseLayer(LayerBase):
     """Renders pose keypoint lines in crop space."""
 
-    def __init__(self, geometry: CentreGeometry, color: tuple[float, float, float, float] | None = None, config: CentrePoseConfig | None = None) -> None:
+    def __init__(self, geometry: CentreGeometry, color: tuple[float, float, float, float] | None = None, config: CentrePoseSettings | None = None) -> None:
         self._geometry: CentreGeometry = geometry
         self._fbo: Fbo = Fbo()
         self._shader: PosePointLines = PosePointLines()
         self._circle_shader: DrawCircles = DrawCircles()
 
         # Configuration
-        self.config: CentrePoseConfig = config or CentrePoseConfig()
+        self.config: CentrePoseSettings = config or CentrePoseSettings()
         self.color: tuple[float, float, float, float] | None = color
 
         # HotReloadMethods(self.__class__, True, True)

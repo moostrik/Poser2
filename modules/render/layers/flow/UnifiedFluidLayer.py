@@ -59,14 +59,14 @@ class UnifiedFluidDrawMode(IntEnum):
     PRESSURE = auto()
 
 
-class UnifiedFluidLayerConfig(BaseSettings):
+class UnifiedFluidLayerSettings(BaseSettings):
     """Configuration for UnifiedFluidLayer."""
-    fps = Setting(float, 60.0, min=1.0, max=240.0)
-    num_players = Setting(int, 3, min=1, max=8)
-    gap_ratio = Setting(float, 0.5, min=0.0, max=2.0, description="Gap = ratio * slot width")
-    draw_mode = Setting(UnifiedFluidDrawMode, UnifiedFluidDrawMode.DENSITY)
-    blend_mode = Setting(Style.BlendMode, Style.BlendMode.ADD)
-    simulation_scale = Setting(float, 0.25, min=0.1, max=2.0)
+    fps = Setting(60.0, min=1.0, max=240.0)
+    num_players = Setting(3, min=1, max=8)
+    gap_ratio = Setting(0.5, min=0.0, max=2.0, description="Gap = ratio * slot width")
+    draw_mode = Setting(UnifiedFluidDrawMode.DENSITY)
+    blend_mode = Setting(Style.BlendMode.ADD)
+    simulation_scale = Setting(0.25, min=0.1, max=2.0)
 
     visualisation = Child(VisualisationFieldConfig)
     fluid_flow = Child(FluidFlowConfig)
@@ -75,10 +75,10 @@ class UnifiedFluidLayerConfig(BaseSettings):
 class UnifiedFluidLayer(LayerBase):
     """Unified fluid simulation for all players on a single wide grid."""
 
-    def __init__(self, data_hub: DataHub, flow_layers: dict[int, FlowLayer], colors: list[tuple[float, float, float, float]], config: UnifiedFluidLayerConfig | None = None) -> None:
+    def __init__(self, data_hub: DataHub, flow_layers: dict[int, FlowLayer], colors: list[tuple[float, float, float, float]], config: UnifiedFluidLayerSettings | None = None) -> None:
         self._data_hub: DataHub = data_hub
         self._flow_layers: dict[int, FlowLayer] = flow_layers
-        self.config: UnifiedFluidLayerConfig = config or UnifiedFluidLayerConfig()
+        self.config: UnifiedFluidLayerSettings = config or UnifiedFluidLayerSettings()
 
         self._num_slots: int = len(flow_layers)
         self._delta_time: float = 1 / self.config.fps

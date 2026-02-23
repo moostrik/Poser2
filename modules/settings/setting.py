@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import threading
 from enum import Enum
-from typing import Generic, TypeVar, overload, Any, get_origin, get_args
+from typing import Generic, TypeVar, overload, Any, cast, get_origin, get_args
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,12 @@ class Setting(Generic[T]):
 
     Declare as a class attribute on a BaseSettings subclass::
 
-        exposure = Setting(int, 1000, min=100, max=10000)
+        exposure = Setting(1000, min=100, max=10000)
+
+    The type is inferred from the default value.  Pass an explicit type as the
+    first argument only when inference is impossible (e.g. generic lists)::
+
+        tags = Setting(list[str], [])
 
     The descriptor handles get/set, type enforcement, init-only guards,
     callbacks, and JSON serialization.
@@ -28,8 +33,8 @@ class Setting(Generic[T]):
 
     def __init__(
         self,
-        type_: type[T],
-        default: T,
+        type_or_default,
+        default: T | None = None,
         *,
         min: T | None = None,
         max: T | None = None,
@@ -40,8 +45,22 @@ class Setting(Generic[T]):
         visible: bool = True,
         pinned: bool = False,
     ) -> None:
-        self.type_ = type_
-        self.default = default
+        if default is None:
+            # Single-arg form: Setting(value, ...)  — infer type from default
+            default = cast(T, type_or_default)
+            # bool check must come before int (bool is a subclass of int)
+            if isinstance(default, bool):
+                type_ = cast(type[T], bool)
+            elif isinstance(default, Enum):
+                type_ = cast(type[T], type(default))
+            else:
+                type_ = cast(type[T], type(default))
+        else:
+            # Two-arg form: Setting(type_, default, ...)
+            type_ = cast(type[T], type_or_default)
+
+        self.type_: type[T] = type_
+        self.default: T = default
         self.min = min
         self.max = max
         self.step = step

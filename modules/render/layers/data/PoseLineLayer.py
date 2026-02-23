@@ -13,19 +13,19 @@ from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import PosePointLines as shader
 
 
-class PoseLineConfig(BaseSettings):
-    stage:      Setting[Stage] = Setting(Stage, Stage.LERP, init_only=True, description="Pipeline stage for pose data")
-    line_width: Setting[float] = Setting(float, 4.0, min=0.5, max=20.0, description="Line width in pixels")
-    line_smooth:Setting[float] = Setting(float, 2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
-    use_scores: Setting[bool]  = Setting(bool, True, description="Use confidence scores for line opacity")
-    use_bbox:   Setting[bool]  = Setting(bool, False, description="Transform points to image space using bbox")
+class PoseLineSettings(BaseSettings):
+    stage:      Setting[Stage] = Setting(Stage.LERP, init_only=True, description="Pipeline stage for pose data")
+    line_width: Setting[float] = Setting(4.0, min=0.5, max=20.0, description="Line width in pixels")
+    line_smooth:Setting[float] = Setting(2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
+    use_scores: Setting[bool]  = Setting(True, description="Use confidence scores for line opacity")
+    use_bbox:   Setting[bool]  = Setting(False, description="Transform points to image space using bbox")
 
 
 
 class PoseLineLayer(LayerBase):
 
-    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseLineConfig | None = None) -> None:
-        self._config: PoseLineConfig = config or PoseLineConfig()
+    def __init__(self, track_id: int, data: DataHub, color: tuple[float, float, float, float] | None = None, config: PoseLineSettings | None = None) -> None:
+        self._config: PoseLineSettings = config or PoseLineSettings()
         self._track_id: int = track_id
         self._data_hub: DataHub = data
         self._fbo: Fbo = Fbo()
