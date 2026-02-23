@@ -23,7 +23,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.render.color_settings import ColorSettings
 
 
-class MSColorMaskLayerSettings(BaseSettings):
+class ColorMaskLayerSettings(BaseSettings):
     """Configuration for MSColorMaskLayer."""
     num_players:            Setting[int]   = Setting(3, init_only=True)
     blend_mode:             Setting[Style.BlendMode] = Setting(Style.BlendMode.ALPHA)
@@ -47,12 +47,12 @@ class MSColorMaskLayer(LayerBase):
     Each camera's contribution is colored exactly once.
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, frg_texture: Texture, mask_textures: dict[int, Texture], settings: MSColorMaskLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, frg_texture: Texture, mask_textures: dict[int, Texture], settings: ColorMaskLayerSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._mask_textures: dict[int, Texture] = mask_textures
         self._frg_texture: Texture = frg_texture
-        self.config: MSColorMaskLayerSettings = settings
+        self.config: ColorMaskLayerSettings = settings
         self._color_settings: ColorSettings = color_settings
 
         self._tint_fbos: list[Fbo] = [Fbo() for _ in range(self.config.num_players)]

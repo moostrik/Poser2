@@ -1,7 +1,10 @@
 # TODO
 # colors without alpha?
 # pulling only on read -> instead of readonly read / write bools?
-# better ordening of settings (now we have both render tab and render panel)
+# fix datalayer order / dark
+# setvieport more consistent
+# fx allocation sizes
+
 
 
 # Third-party imports
@@ -30,20 +33,15 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.cam_frg,
     Layers.cam_crop,
 
-    Layers.centre_math,
-    # Layers.centre_cam,
+    Layers.centre_geom,
     Layers.centre_mask,
     Layers.centre_frg,
     Layers.centre_pose,
 
-    # Layers.motion,
-    Layers.ms_mask,
+    Layers.color_mask,
     Layers.flow,
     Layers.fluid,
     Layers.composite,
-
-    # Layers.hdt_prep,
-    # Layers.hdt_blend,
 ]
 
 INTERFACE_LAYERS: list[Layers] = [
@@ -60,64 +58,6 @@ LARGE_LAYERS: list[Layers] = [
     Layers.composite,
 ]
 
-PREVIEW_CENTRE: list[Layers] = [
-    Layers.centre_frg,
-    Layers.centre_pose,
-    Layers.data_time,
-]
-
-SHOW_CAM: list[Layers] = [
-    Layers.poser
-]
-
-SHOW_POSE: list[Layers] = [
-    Layers.tracker,
-]
-
-SHOW_CENTRE: list[Layers] = [
-    # Layers.centre_cam,
-    # Layers.centre_frg,
-    Layers.centre_mask,
-    # Layers.hdt_prep,
-    Layers.centre_pose,
-]
-
-SHOW_MASK: list[Layers] = [
-    Layers.cam_mask,
-    # Layers.centre_mask,
-    # Layers.centre_motion,
-    Layers.centre_pose,
-    # Layers.cam_crop
-]
-
-SHOW_COMP: list[Layers] = [
-    # Layers.centre_frg,
-    # Layers.flow,
-    # Layers.centre_mask,
-    # Layers.motion,
-    # Layers.fluid,
-    # Layers.ms_mask,
-    # Layers.sim_blend,
-    # Layers.centre_pose,
-    # Layers.centre_motion,
-    # Layers.centre_frg,
-    # Layers.fluid,
-    Layers.composite,
-]
-
-SHOW_DATA: list[Layers] = [
-    # Layers.centre_motion,
-    Layers.data_B_W,
-    Layers.data_B_F,
-    Layers.data_A_W,
-    Layers.data_A_F,
-    # Layers.data_time,
-]
-
-
-PREVIEW_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
-FINAL_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
-
 
 class RenderManager(RenderBase):
     def __init__(self, data_hub: DataHub, settings: RenderSettings, num_cams: int = 3, num_players: int = 3) -> None:
@@ -131,8 +71,8 @@ class RenderManager(RenderBase):
         # layers
         self._update_layers: list[Layers] =     UPDATE_LAYERS
         self._interface_layers: list[Layers] =  INTERFACE_LAYERS
-        self._preview_layers: list[Layers] =    settings.preview_layers
-        self._draw_layers: list[Layers] =       settings.final_layers
+        self._preview_layers: list[Layers] =    settings.layers.preview
+        self._draw_layers: list[Layers] =       settings.layers.final
 
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
@@ -153,17 +93,16 @@ class RenderManager(RenderBase):
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
 
             cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.data_hub,   cam_image.texture,          settings.tracker,       settings.colors)
-            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.data_hub,   cam_image.texture,          settings.pose_comp,     settings.colors)
+            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.data_hub,   cam_image.texture,          settings.poser,     settings.colors)
 
-            centre_gmtry=   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,                               settings.centre_geometry)
+            centre_gmtry=   self.L[Layers.centre_geom][i] = ls.CentreGeometry(      i, self.data_hub,                               settings.centre_geometry)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(     i, centre_gmtry,    cam_mask.texture,           settings.centre_mask)
             cmt[i] = centre_mask.texture
             centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(      i, centre_gmtry,    cam_image.texture,  cmt[i], settings.centre_cam)
             centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(      i, centre_gmtry,    cam_frg.texture,    cmt[i], settings.centre_frg,    settings.colors)
             centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(     i, centre_gmtry,                                settings.centre_pose,   settings.colors)
 
-            motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,                       cmt[i],                         settings.colors)
-            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub,   centre_frg.texture, cmt,    settings.ms_mask,       settings.colors)
+            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.data_hub,   centre_frg.texture, cmt,    settings.color_masks,       settings.colors)
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask,           cmt[i], settings.flow)
             fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows,                      settings.fluid,         settings.colors)
 
@@ -202,7 +141,6 @@ class RenderManager(RenderBase):
 
     def allocate_window_renders(self) -> None:
         w, h = self.subdivision.get_allocation_size('similarity', 0)
-        # self.pose_sim_layer.allocate(w, h, GL_RGBA)
         for i in range(self.num_cams):
             w, h = self.subdivision.get_allocation_size('track', i)
             self.L[Layers.poser][i].allocate(w , h, GL_RGBA)
@@ -220,8 +158,8 @@ class RenderManager(RenderBase):
         self.data_hub.notify_update()
 
         self._update_layers = UPDATE_LAYERS
-        self._draw_layers = self.settings.final_layers
-        self._preview_layers = self.settings.preview_layers
+        self._draw_layers = self.settings.layers.final
+        self._preview_layers = self.settings.layers.preview
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)

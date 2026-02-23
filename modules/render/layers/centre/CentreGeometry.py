@@ -20,7 +20,7 @@ from modules.gl import Texture
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentreGeometrySettings(BaseSettings):
+class CentreGeomSettings(BaseSettings):
     """Configuration for CentreGeometry anchor point positioning."""
     stage:              Setting[Stage] = Setting(Stage.SMOOTH, description="Pose data pipeline stage")
     cam_aspect:         Setting[float] = Setting(1.7778, init_only=True, description="Camera aspect ratio (16/9 = 1.7778)")
@@ -56,13 +56,13 @@ class CentreGeometry(LayerBase):
     pose points to crop space.
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, config: CentreGeometrySettings | None = None) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, config: CentreGeomSettings | None = None) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
 
         # Configuration
-        self.config: CentreGeometrySettings = config or CentreGeometrySettings()
+        self.config: CentreGeomSettings = config or CentreGeomSettings()
         self._stage: Stage = self.config.stage
         self._cam_aspect: float = self.config.cam_aspect
 
