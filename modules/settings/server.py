@@ -46,13 +46,7 @@ class SettingsServer:
             ui.dark_mode(True)
             ui.add_head_html('<style>* { transition-duration: 0s !important; animation-duration: 0s !important; }</style>')
             with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-                with ui.row().classes("w-full items-center justify-between"):
-                    ui.label(title).classes("text-2xl font-bold")
-                    if on_exit:
-                        ui.button(icon="power_settings_new", on_click=on_exit).props(
-                            "dense flat color=negative"
-                        ).tooltip("Exit application")
-                create_settings_panel(registry)
+                create_settings_panel(registry, title=title, on_exit=on_exit)
 
         def _run():
             ui.run(

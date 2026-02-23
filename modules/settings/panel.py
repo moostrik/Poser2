@@ -39,12 +39,32 @@ def _build_field_control(settings, name, field, cleanup):
         'full'  — needs a full row (slider, text input)
         'small' — compact inline control (switch, select, number)
 
-    *cleanup* collects (settings, field, callback) tuples so the caller
-    can deregister them when the browser client disconnects.
+    *cleanup* collects teardown items so the caller can deregister them
+    when the browser client disconnects.  Each item is either:
+        (settings, field, callback)   — for bind/unbind
+        ('timer', timer_instance)     — for polling timers
     """
     value = getattr(settings, name)
     label = generate_label(name)
     is_disabled = field.readonly
+
+    # -- Helper: for readonly fields, poll via ui.timer instead of bind ------
+    def _poll_readonly(element, setter):
+        """Create a timer that polls the setting value into *element*.
+
+        *setter* is called with the new value (e.g. ``lbl.set_text``).
+        Returns the timer so it can be cleaned up on disconnect.
+        """
+        last = [value]  # mutable cell to avoid unnecessary updates
+
+        def _tick():
+            cur = getattr(settings, name)
+            if cur != last[0]:
+                last[0] = cur
+                setter(cur)
+
+        t = ui.timer(0.5, _tick)
+        cleanup.append(('timer', t))
 
     # -- Enum → select -------------------------------------------------------
     if isinstance(field.type_, type) and issubclass(field.type_, Enum):
@@ -55,16 +75,19 @@ def _build_field_control(settings, name, field, cleanup):
             label=label,
         ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]")
 
-        def on_select_change(e, f=field):
-            setattr(settings, name, f.type_[e.value])
+        if is_disabled:
+            _poll_readonly(sel, lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v))
+        else:
+            def on_select_change(e, f=field):
+                setattr(settings, name, f.type_[e.value])
 
-        sel.on_value_change(on_select_change)
+            sel.on_value_change(on_select_change)
 
-        def update_select(v, sel=sel):
-            sel.set_value(v.name if isinstance(v, Enum) else v)
+            def update_select(v, sel=sel):
+                sel.set_value(v.name if isinstance(v, Enum) else v)
 
-        settings.bind(field, update_select)
-        cleanup.append((settings, field, update_select))
+            settings.bind(field, update_select)
+            cleanup.append((settings, field, update_select))
         return 'small'
 
     # -- bool → switch -------------------------------------------------------
@@ -73,16 +96,19 @@ def _build_field_control(settings, name, field, cleanup):
             "dense" + (" disable" if is_disabled else "")
         )
 
-        def on_switch_change(e):
-            setattr(settings, name, e.value)
+        if is_disabled:
+            _poll_readonly(sw, lambda v, sw=sw: sw.set_value(v))
+        else:
+            def on_switch_change(e):
+                setattr(settings, name, e.value)
 
-        sw.on_value_change(on_switch_change)
+            sw.on_value_change(on_switch_change)
 
-        def update_switch(v, sw=sw):
-            sw.set_value(v)
+            def update_switch(v, sw=sw):
+                sw.set_value(v)
 
-        settings.bind(field, update_switch)
-        cleanup.append((settings, field, update_switch))
+            settings.bind(field, update_switch)
+            cleanup.append((settings, field, update_switch))
         return 'small'
 
     # -- int/float with min+max → slider -------------------------------------
@@ -95,16 +121,19 @@ def _build_field_control(settings, name, field, cleanup):
                 min=field.min, max=field.max, step=step, value=value
             ).props("dense label-always" + (" disable" if is_disabled else ""))
 
-        def on_slider_change(e):
-            setattr(settings, name, field.type_(e.value))
+        if is_disabled:
+            _poll_readonly(sl, lambda v, sl=sl: sl.set_value(v))
+        else:
+            def on_slider_change(e):
+                setattr(settings, name, field.type_(e.value))
 
-        sl.on_value_change(on_slider_change)
+            sl.on_value_change(on_slider_change)
 
-        def update_slider(v, sl=sl):
-            sl.set_value(v)
+            def update_slider(v, sl=sl):
+                sl.set_value(v)
 
-        settings.bind(field, update_slider)
-        cleanup.append((settings, field, update_slider))
+            settings.bind(field, update_slider)
+            cleanup.append((settings, field, update_slider))
         return 'full'
 
     # -- int/float without range → number input ------------------------------
@@ -116,17 +145,20 @@ def _build_field_control(settings, name, field, cleanup):
             format=f"%.0f" if field.type_ is int else f"%.2f",
         ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
-        def on_num_change(e):
-            if e.value is not None:
-                setattr(settings, name, field.type_(e.value))
+        if is_disabled:
+            _poll_readonly(num, lambda v, num=num: num.set_value(v))
+        else:
+            def on_num_change(e):
+                if e.value is not None:
+                    setattr(settings, name, field.type_(e.value))
 
-        num.on_value_change(on_num_change)
+            num.on_value_change(on_num_change)
 
-        def update_num(v, num=num):
-            num.set_value(v)
+            def update_num(v, num=num):
+                num.set_value(v)
 
-        settings.bind(field, update_num)
-        cleanup.append((settings, field, update_num))
+            settings.bind(field, update_num)
+            cleanup.append((settings, field, update_num))
         return 'small'
 
     # -- str → text input ----------------------------------------------------
@@ -135,16 +167,19 @@ def _build_field_control(settings, name, field, cleanup):
             "dense outlined" + (" disable" if is_disabled else "")
         )
 
-        def on_input_change(e):
-            setattr(settings, name, e.value)
+        if is_disabled:
+            _poll_readonly(inp, lambda v, inp=inp: inp.set_value(v))
+        else:
+            def on_input_change(e):
+                setattr(settings, name, e.value)
 
-        inp.on_value_change(on_input_change)
+            inp.on_value_change(on_input_change)
 
-        def update_input(v, inp=inp):
-            inp.set_value(v)
+            def update_input(v, inp=inp):
+                inp.set_value(v)
 
-        settings.bind(field, update_input)
-        cleanup.append((settings, field, update_input))
+            settings.bind(field, update_input)
+            cleanup.append((settings, field, update_input))
         return 'full'
 
     # -- Fallback: read-only label -------------------------------------------
@@ -152,11 +187,7 @@ def _build_field_control(settings, name, field, cleanup):
         ui.label(label).classes("text-sm")
         lbl = ui.label(str(value)).classes("text-sm text-gray-500")
 
-    def update_label(v, lbl=lbl):
-        lbl.set_text(str(v))
-
-    settings.bind(field, update_label)
-    cleanup.append((settings, field, update_label))
+    _poll_readonly(lbl, lambda v, lbl=lbl: lbl.set_text(str(v)))
     return 'small'
 
 
@@ -249,100 +280,113 @@ def _scan_presets():
     )
 
 
-def _build_save_load_toolbar(registry):
-    """Build a preset toolbar: dropdown, Save / Save As / Load / Delete buttons."""
+def _build_preset_controls(registry):
+    """Emit preset dropdown + action buttons (no wrapping row — caller provides layout)."""
     presets = _scan_presets()
 
-    with ui.row().classes("w-full items-center gap-2 flex-nowrap"):
-        dropdown = ui.select(
-            options=presets,
-            value=presets[0] if presets else None,
-            label="Preset",
-        ).props("dense outlined clearable").classes("min-w-[180px] flex-1")
+    dropdown = ui.select(
+        options=presets,
+        value=presets[0] if presets else None,
+        label="Preset",
+    ).props("dense outlined clearable").classes("min-w-[180px]")
 
-        def _refresh_dropdown():
-            updated = _scan_presets()
-            dropdown.set_options(updated)
+    def _refresh_dropdown():
+        updated = _scan_presets()
+        dropdown.set_options(updated)
 
-        def do_save():
-            preset_name = dropdown.value
-            if not preset_name:
-                ui.notify("Select a preset to overwrite, or use Save As", type="warning")
-                return
-            path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
-            registry.save(path)
-            ui.notify(f"Saved '{preset_name}'", type="positive")
+    def do_save():
+        preset_name = dropdown.value
+        if not preset_name:
+            ui.notify("Select a preset to overwrite, or use Save As", type="warning")
+            return
+        path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
+        registry.save(path)
+        ui.notify(f"Saved '{preset_name}'", type="positive")
 
-        async def do_save_as():
-            with ui.dialog() as dialog, ui.card().classes("min-w-[300px]"):
-                ui.label("Save As").classes("text-lg font-bold")
-                name_input = ui.input(label="Preset name", value=dropdown.value or "").props("dense outlined autofocus")
+    async def do_save_as():
+        with ui.dialog() as dialog, ui.card().classes("min-w-[300px]"):
+            ui.label("Save As").classes("text-lg font-bold")
+            name_input = ui.input(label="Preset name", value=dropdown.value or "").props("dense outlined autofocus")
 
-                with ui.row().classes("w-full justify-end gap-2"):
-                    ui.button("Cancel", on_click=dialog.close).props("flat")
+            with ui.row().classes("w-full justify-end gap-2"):
+                ui.button("Cancel", on_click=dialog.close).props("flat")
 
-                    def confirm():
-                        preset_name = (name_input.value or "").strip()
-                        if not preset_name:
-                            ui.notify("Enter a preset name", type="warning")
-                            return
-                        path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
-                        registry.save(path)
-                        _refresh_dropdown()
-                        dropdown.set_value(preset_name)
-                        ui.notify(f"Saved '{preset_name}'", type="positive")
-                        dialog.close()
+                def confirm():
+                    preset_name = (name_input.value or "").strip()
+                    if not preset_name:
+                        ui.notify("Enter a preset name", type="warning")
+                        return
+                    path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
+                    registry.save(path)
+                    _refresh_dropdown()
+                    dropdown.set_value(preset_name)
+                    ui.notify(f"Saved '{preset_name}'", type="positive")
+                    dialog.close()
 
-                    ui.button("Save", on_click=confirm).props("flat color=primary")
+                ui.button("Save", on_click=confirm).props("flat color=primary")
 
-                # Allow Enter key to confirm
-                name_input.on("keydown.enter", lambda _: confirm())
+            # Allow Enter key to confirm
+            name_input.on("keydown.enter", lambda _: confirm())
 
-            dialog.open()
+        dialog.open()
 
-        def do_load():
-            preset_name = dropdown.value
-            if not preset_name:
-                ui.notify("Select a preset to load", type="warning")
-                return
-            path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
-            if not path.exists():
-                ui.notify(f"Preset '{preset_name}' not found", type="negative")
-                return
-            registry.load(path)
-            ui.notify(f"Loaded '{preset_name}'", type="positive")
+    def do_load():
+        preset_name = dropdown.value
+        if not preset_name:
+            ui.notify("Select a preset to load", type="warning")
+            return
+        path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
+        if not path.exists():
+            ui.notify(f"Preset '{preset_name}' not found", type="negative")
+            return
+        registry.load(path)
+        ui.notify(f"Loaded '{preset_name}'", type="positive")
 
-        def do_delete():
-            preset_name = dropdown.value
-            if not preset_name:
-                ui.notify("Select a preset to delete", type="warning")
-                return
-            path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
-            if path.exists():
-                path.unlink()
-            _refresh_dropdown()
-            dropdown.set_value(None)
-            ui.notify(f"Deleted '{preset_name}'", type="info")
+    def do_delete():
+        preset_name = dropdown.value
+        if not preset_name:
+            ui.notify("Select a preset to delete", type="warning")
+            return
+        path = SETTINGS_DIR / f"{preset_name}{PRESET_SUFFIX}"
+        if path.exists():
+            path.unlink()
+        _refresh_dropdown()
+        dropdown.set_value(None)
+        ui.notify(f"Deleted '{preset_name}'", type="info")
 
-        ui.button(icon="save", on_click=do_save).props("dense flat").tooltip("Save (overwrite selected)")
-        ui.button(icon="save_as", on_click=do_save_as).props("dense flat").tooltip("Save as new preset")
-        ui.button(icon="file_open", on_click=do_load).props("dense flat").tooltip("Load preset")
-        ui.button(icon="delete", on_click=do_delete).props("dense flat color=negative").tooltip("Delete preset")
+    ui.button(icon="save", on_click=do_save).props("dense flat").tooltip("Save (overwrite selected)")
+    ui.button(icon="save_as", on_click=do_save_as).props("dense flat").tooltip("Save as new preset")
+    ui.button(icon="file_open", on_click=do_load).props("dense flat").tooltip("Load preset")
+    ui.button(icon="delete", on_click=do_delete).props("dense flat color=negative").tooltip("Delete preset")
 
 
-def create_settings_panel(registry):
+def create_settings_panel(
+    registry,
+    *,
+    title: str = "",
+    on_exit=None,
+):
     """Build a full tabbed settings panel from a SettingsRegistry.
 
     Call this inside a NiceGUI page context::
 
         @ui.page("/")
         def index():
-            create_settings_panel(registry)
+            create_settings_panel(registry, title="POSER", on_exit=stop)
     """
     # Track all (settings, field_name, callback) for this client session
     cleanup: list[tuple] = []
 
-    _build_save_load_toolbar(registry)
+    # -- Header row: title | preset controls | exit button -----------------
+    with ui.row().classes("w-full items-center flex-nowrap gap-0"):
+        if title:
+            ui.label(title).classes("text-2xl font-bold")
+        with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
+            _build_preset_controls(registry)
+        if on_exit:
+            ui.button(icon="power_settings_new", on_click=on_exit).props(
+                "dense flat color=negative"
+            ).tooltip("Exit application")
 
     # Collect pinned fields and actions from all registered modules (recursing into children)
     pinned_fields: list[tuple[BaseSettings, str, Setting]] = []
@@ -394,13 +438,20 @@ def create_settings_panel(registry):
                     settings = registry.get(config_name)
                     _build_settings_card(config_name, settings, cleanup)
 
-    # Deregister UI callbacks when the browser tab / client disconnects
+    # Deregister UI callbacks and stop timers when the browser tab disconnects
     def _on_disconnect():
-        for s, fld, cb in cleanup:
-            try:
-                s.unbind(fld, cb)
-            except (KeyError, ValueError):
-                pass
+        for item in cleanup:
+            if item[0] == 'timer':
+                try:
+                    item[1].deactivate()
+                except Exception:
+                    pass
+            else:
+                s, fld, cb = item
+                try:
+                    s.unbind(fld, cb)
+                except (KeyError, ValueError):
+                    pass
         cleanup.clear()
 
     app.on_disconnect(_on_disconnect)
