@@ -5,7 +5,6 @@ from enum import IntEnum, auto
 from modules.settings import Setting, BaseSettings
 from modules.DataHub import Stage
 from modules.pose.Frame import FrameField, ScalarFrameField
-from modules.render.layers.data.colors import DEFAULT_COLORS
 from modules.render.color_settings import ColorSettings
 
 
@@ -61,10 +60,12 @@ class DataLayerSettings(BaseSettings):
     def get_colors(self) -> list[tuple[float, float, float, float]]:
         """Resolve colors for the current feature field.
 
-        Priority: explicit _colors override → track colors from ColorSettings → DEFAULT_COLORS.
+        Priority: explicit _colors override → track colors from ColorSettings → default palette.
         """
         if self._colors is not None:
             return self._colors
-        if self._color_settings is not None and self.feature_field in _TRACK_COLOR_FIELDS:
-            return self._color_settings.track_color_tuples
-        return DEFAULT_COLORS
+        if self._color_settings is not None:
+            if self.feature_field in _TRACK_COLOR_FIELDS:
+                return self._color_settings.track_color_tuples
+            return self._color_settings.default_color_tuples
+        return [(1.0, 0.5, 0.0, 1.0), (0.0, 1.0, 1.0, 1.0)]  # hardcoded fallback (should not be reached)

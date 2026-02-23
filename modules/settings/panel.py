@@ -125,36 +125,19 @@ def _build_field_control(settings, name, field, polls):
     # -- Color → color picker ------------------------------------------------
     if field.type_ is Color:
         hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
-        with ui.row().classes("items-end gap-2"):
-            ci = ui.color_input(
-                label=label, value=hex_val
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-40")
-
-            alpha_num = ui.number(
-                label="A", value=round(value.a, 3) if isinstance(value, Color) else 1.0,
-                min=0.0, max=1.0, step=0.01, format="%.2f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-20")
+        ci = ui.color_input(
+            label=label, value=hex_val
+        ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-40")
 
         if not is_disabled:
-            def on_color_change(e, _alpha=alpha_num):
+            def on_color_change(e):
                 if e.value:
                     c = Color.from_hex(e.value)
-                    a_val = _alpha.value if _alpha.value is not None else 1.0
-                    setattr(settings, name, Color(c.r, c.g, c.b, float(a_val)))
+                    setattr(settings, name, Color(c.r, c.g, c.b, 1.0))
             ci.on_value_change(on_color_change)
 
-            def on_alpha_change(e, _ci=ci):
-                if e.value is not None:
-                    cur = getattr(settings, name)
-                    setattr(settings, name, Color(cur.r, cur.g, cur.b, float(e.value)))
-            alpha_num.on_value_change(on_alpha_change)
-
-        def _color_setter(v, _ci=ci, _a=alpha_num):
-            if isinstance(v, Color):
-                _ci.set_value(v.to_hex())
-                _a.set_value(round(v.a, 3))
-        polls.append((settings, name, [value], _color_setter))
-        return 'full'
+        polls.append((settings, name, [value], lambda v, _ci=ci: _ci.set_value(v.to_hex() if isinstance(v, Color) else '#000000')))
+        return 'small'
 
     # -- Point2f → x/y number row --------------------------------------------
     if field.type_ is Point2f:
@@ -419,7 +402,7 @@ def _build_settings_body(settings, timers):
             full_fields.append(field_name)
         elif field.type_ is str:
             full_fields.append(field_name)
-        elif field.type_ in (Color, Point2f, Rect):
+        elif field.type_ in (Point2f, Rect):
             full_fields.append(field_name)
         elif get_origin(field.type_) is list:
             full_fields.append(field_name)

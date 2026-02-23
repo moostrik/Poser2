@@ -11,10 +11,13 @@ from modules.utils import Color
 
 class ColorSettings(BaseSettings):
     """Per-player track colors (one color picker per player in the panel)."""
-    player_0: Setting[Color] = Setting(Color(1.0, 0.0, 0.0))  # Red
-    player_1: Setting[Color] = Setting(Color(0.0, 0.0, 1.0))  # Blue
-    player_2: Setting[Color] = Setting(Color(0.0, 1.0, 0.0))  # Green
-    history:  Setting[Color] = Setting(Color(0.5, 0.5, 0.5))   # Grey
+    player_0:    Setting[Color] = Setting(Color(1.0, 0.0, 0.0))  # Red
+    player_1:    Setting[Color] = Setting(Color(0.0, 0.0, 1.0))  # Blue
+    player_2:    Setting[Color] = Setting(Color(0.0, 1.0, 0.0))  # Green
+    pose_left:   Setting[Color] = Setting(Color(1.0, 0.5, 0.0))  # Orange
+    pose_right:  Setting[Color] = Setting(Color(0.0, 1.0, 1.0))  # Cyan
+    pose_center: Setting[Color] = Setting(Color(1.0, 1.0, 1.0))  # White
+    history:     Setting[Color] = Setting(Color(0.5, 0.5, 0.5))  # Grey
 
     @property
     def track_colors(self) -> list[Color]:
@@ -28,3 +31,8 @@ class ColorSettings(BaseSettings):
     def track_color_tuples(self) -> list[tuple[float, float, float, float]]:
         """Return all player colors as RGBA tuples (for GL layers)."""
         return [c.to_tuple() for c in self.track_colors]
+
+    @property
+    def default_color_tuples(self) -> list[tuple[float, float, float, float]]:
+        """Default data-layer palette (pose_left + pose_right) as RGBA tuples."""
+        return [self.pose_left.to_tuple(), self.pose_right.to_tuple()]
