@@ -131,7 +131,7 @@ class Setting(Generic[T]):
                     f"got {type(value).__name__}: {value!r}"
                 )
             if self._element_type is not None:
-                return [self._element_type(v) for v in value]
+                return [self._coerce_element(v) for v in value]
             return list(value)
         # Reject bool when int or float is expected (bool is a subclass of int)
         if self.type_ in (int, float) and isinstance(value, bool):
@@ -177,6 +177,24 @@ class Setting(Generic[T]):
             f"got {type(value).__name__}: {value!r}"
         )
 
+    def _coerce_element(self, v):
+        """Coerce a single list element to self._element_type."""
+        et = self._element_type
+        if isinstance(v, et):
+            return v
+        # Enum element: reconstruct from name (str) or value (int)
+        if isinstance(et, type) and issubclass(et, Enum):
+            if isinstance(v, str):
+                try:
+                    return et[v]
+                except KeyError:
+                    raise TypeError(f"Cannot construct {et.__name__} from name {v!r}")
+            try:
+                return et(v)
+            except (ValueError, KeyError):
+                raise TypeError(f"Cannot construct {et.__name__} from {v!r}")
+        return et(v)
+
     # -- Callbacks -----------------------------------------------------------
 
     def bind(self, obj, callback):
@@ -201,7 +219,7 @@ class Setting(Generic[T]):
         if isinstance(value, Enum):
             return value.name
         if isinstance(value, list):
-            return list(value)  # shallow copy, elements are primitives
+            return [v.name if isinstance(v, Enum) else v for v in value]
         return value
 
     def from_json_value(self, obj, raw):

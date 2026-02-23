@@ -2,6 +2,7 @@
 
 from enum import Enum
 from pathlib import Path
+from typing import get_origin, get_args
 
 from nicegui import app, ui
 
@@ -90,7 +91,7 @@ def _build_field_control(settings, name, field, polls):
         step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
 
         with ui.column().classes("w-full gap-0 pt-2 pb-1"):
-            ui.label(label).classes("text-xs text-gray-400")
+            ui.label(label).classes("text-xs text-caption")
             sl = ui.slider(
                 min=field.min, max=field.max, step=step, value=value
             ).props("dense label-always" + (" disable" if is_disabled else ""))
@@ -158,7 +159,7 @@ def _build_field_control(settings, name, field, polls):
     # -- Point2f → x/y number row --------------------------------------------
     if field.type_ is Point2f:
         with ui.row().classes("items-end gap-2"):
-            ui.label(label).classes("text-xs text-gray-400 self-center")
+            ui.label(label).classes("text-xs text-caption self-center")
             x_num = ui.number(
                 label="X", value=value.x if isinstance(value, Point2f) else 0.0,
                 step=0.01, format="%.3f",
@@ -191,7 +192,7 @@ def _build_field_control(settings, name, field, polls):
     # -- Rect → x/y/w/h number row -------------------------------------------
     if field.type_ is Rect:
         with ui.row().classes("items-end gap-2"):
-            ui.label(label).classes("text-xs text-gray-400 self-center")
+            ui.label(label).classes("text-xs text-caption self-center")
             rx = ui.number(
                 label="X", value=value.x if isinstance(value, Rect) else 0.0,
                 step=0.01, format="%.3f",
@@ -257,10 +258,101 @@ def _build_field_control(settings, name, field, polls):
         polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
         return 'full'
 
+    # -- list[Enum] → sortable checklist ------------------------------------
+    if get_origin(field.type_) is list:
+        elem_type = get_args(field.type_)[0] if get_args(field.type_) else None
+        if elem_type is not None and isinstance(elem_type, type) and issubclass(elem_type, Enum):
+            all_members = list(elem_type)
+            active_set = set(value)
+
+            with ui.column().classes("w-full gap-1 pt-2 pb-1"):
+                ui.label(label).classes("text-xs text-caption")
+
+                # Container for the sortable items
+                container = ui.column().classes("w-full gap-0 border rounded p-1")
+
+                # State: ordered list of ALL members; active ones are checked
+                # Order: active items first (in their list order), then inactive
+                ordered = list(value) + [m for m in all_members if m not in active_set]
+                state = {"order": ordered, "active": set(value)}
+
+                def _rebuild(cont, st, _settings=settings, _name=name, _elem=elem_type):
+                    """Rebuild the sortable checklist UI from state."""
+                    cont.clear()
+                    with cont:
+                        for idx, member in enumerate(st["order"]):
+                            is_active = member in st["active"]
+                            with ui.row().classes(
+                                "w-full items-center gap-2 px-2 py-0.5 rounded cursor-move"
+                                + ("" if is_active else " opacity-50")
+                            ).style(
+                                "background: color-mix(in srgb, var(--q-primary) 15%, transparent);"
+                                if is_active else ""
+                            ):
+                                # Checkbox
+                                cb = ui.checkbox(
+                                    value=is_active,
+                                ).props("dense").classes("my-0")
+
+                                # Label
+                                ui.label(generate_label(member.name)).classes(
+                                    "text-sm flex-1"
+                                )
+
+                                # Move up/down buttons
+                                up_btn = ui.button(
+                                    icon="arrow_upward",
+                                    on_click=lambda _, i=idx: _move(cont, st, i, -1),
+                                ).props("dense flat size=xs").classes("my-0")
+                                down_btn = ui.button(
+                                    icon="arrow_downward",
+                                    on_click=lambda _, i=idx: _move(cont, st, i, 1),
+                                ).props("dense flat size=xs").classes("my-0")
+
+                                if idx == 0:
+                                    up_btn.props("disable")
+                                if idx == len(st["order"]) - 1:
+                                    down_btn.props("disable")
+
+                                # Wire checkbox
+                                def _on_check(e, m=member):
+                                    if e.value:
+                                        st["active"].add(m)
+                                    else:
+                                        st["active"].discard(m)
+                                    _apply(cont, st)
+                                cb.on_value_change(_on_check)
+
+                def _move(cont, st, idx, direction):
+                    """Swap item at idx with its neighbor in the given direction."""
+                    new_idx = idx + direction
+                    if 0 <= new_idx < len(st["order"]):
+                        st["order"][idx], st["order"][new_idx] = st["order"][new_idx], st["order"][idx]
+                        _apply(cont, st)
+
+                def _apply(cont, st):
+                    """Push current state to the Setting and rebuild UI."""
+                    new_list = [m for m in st["order"] if m in st["active"]]
+                    setattr(settings, name, new_list)
+                    _rebuild(cont, st)
+
+                _rebuild(container, state)
+
+            def _list_setter(v, _cont=container, _st=state, _elem=elem_type):
+                """Poll setter: update widget when setting changes externally."""
+                active_set = set(v)
+                _st["active"] = active_set
+                # Re-order: active items first in their list order, then inactive
+                _st["order"] = list(v) + [m for m in list(_elem) if m not in active_set]
+                _rebuild(_cont, _st)
+
+            polls.append((settings, name, [list(value)], _list_setter))
+            return 'full'
+
     # -- Fallback: read-only label -------------------------------------------
     with ui.row().classes("items-center gap-2"):
         ui.label(label).classes("text-sm")
-        lbl = ui.label(str(value)).classes("text-sm text-gray-500")
+        lbl = ui.label(str(value)).classes("text-sm text-secondary")
 
     polls.append((settings, name, [value], lambda v, lbl=lbl: lbl.set_text(str(v))))
     return 'small'
@@ -303,74 +395,81 @@ def _make_poll_timer(polls, timers):
     timers.append(ui.timer(POLL_INTERVAL, _tick))
 
 
-def _build_settings_card(name, settings, timers):
-    """Build a collapsible card for one BaseSettings instance.
+def _build_settings_body(settings, timers):
+    """Emit the controls for a single BaseSettings instance (no wrapper).
 
     Uses a 2-column grid for sliders and flows small controls (switches,
     selects, numbers) inline in a wrapping row for a compact layout.
     """
+    polls: list[tuple] = []
+
+    # Separate fields into full-width (sliders) and small (inline) controls
+    full_fields = []
+    small_fields = []
+    init_only_fields = []
+
+    for field_name, field in settings.fields.items():
+        if not field.visible:
+            continue
+        if field.init_only:
+            init_only_fields.append(field_name)
+            continue
+        # Classify by type
+        if field.type_ in (int, float) and field.min is not None and field.max is not None:
+            full_fields.append(field_name)
+        elif field.type_ is str:
+            full_fields.append(field_name)
+        elif field.type_ in (Color, Point2f, Rect):
+            full_fields.append(field_name)
+        elif get_origin(field.type_) is list:
+            full_fields.append(field_name)
+        else:
+            small_fields.append(field_name)
+
+    # Init-only fields as compact read-only labels
+    if init_only_fields:
+        with ui.row().classes("w-full gap-4 flex-wrap"):
+            for field_name in init_only_fields:
+                with ui.row().classes("items-center gap-1"):
+                    ui.label(generate_label(field_name)).classes("text-xs text-caption")
+                    ui.label(str(getattr(settings, field_name))).classes(
+                        "text-sm text-secondary italic"
+                    )
+
+    # Small controls (switches, selects, numbers) in a wrapping row
+    if small_fields:
+        with ui.row().classes("w-full gap-4 flex-wrap items-end"):
+            for field_name in small_fields:
+                _build_field_control(settings, field_name, settings.fields[field_name], polls)
+
+    # Full-width controls (sliders, text) in a 2-column grid
+    if full_fields:
+        with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-2"):
+            for field_name in full_fields:
+                _build_field_control(settings, field_name, settings.fields[field_name], polls)
+
+    # Create one poll timer for all fields in this card
+    _make_poll_timer(polls, timers)
+
+    # Actions
+    action_items = [
+        (n, a) for n, a in settings.actions.items() if a.visible
+    ]
+    if action_items:
+        ui.separator()
+        with ui.row().classes("gap-2"):
+            for action_name, action in action_items:
+                _build_action_button(settings, action_name, action)
+
+    # Children (recursive)
+    for child_name, child in settings.children.items():
+        _build_settings_card(child_name, child, timers)
+
+
+def _build_settings_card(name, settings, timers):
+    """Build a collapsible card for one BaseSettings instance."""
     with ui.expansion(generate_label(name), icon="settings").props("duration=0").classes("w-full"):
-        polls: list[tuple] = []
-
-        # Separate fields into full-width (sliders) and small (inline) controls
-        full_fields = []
-        small_fields = []
-        init_only_fields = []
-
-        for field_name, field in settings.fields.items():
-            if not field.visible:
-                continue
-            if field.init_only:
-                init_only_fields.append(field_name)
-                continue
-            # Classify by type
-            if field.type_ in (int, float) and field.min is not None and field.max is not None:
-                full_fields.append(field_name)
-            elif field.type_ is str:
-                full_fields.append(field_name)
-            elif field.type_ in (Color, Point2f, Rect):
-                full_fields.append(field_name)
-            else:
-                small_fields.append(field_name)
-
-        # Init-only fields as compact read-only labels
-        if init_only_fields:
-            with ui.row().classes("w-full gap-4 flex-wrap"):
-                for field_name in init_only_fields:
-                    with ui.row().classes("items-center gap-1"):
-                        ui.label(generate_label(field_name)).classes("text-xs text-gray-400")
-                        ui.label(str(getattr(settings, field_name))).classes(
-                            "text-sm text-gray-500 italic"
-                        )
-
-        # Small controls (switches, selects, numbers) in a wrapping row
-        if small_fields:
-            with ui.row().classes("w-full gap-4 flex-wrap items-end"):
-                for field_name in small_fields:
-                    _build_field_control(settings, field_name, settings.fields[field_name], polls)
-
-        # Full-width controls (sliders, text) in a 2-column grid
-        if full_fields:
-            with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-2"):
-                for field_name in full_fields:
-                    _build_field_control(settings, field_name, settings.fields[field_name], polls)
-
-        # Create one poll timer for all fields in this card
-        _make_poll_timer(polls, timers)
-
-        # Actions
-        action_items = [
-            (n, a) for n, a in settings.actions.items() if a.visible
-        ]
-        if action_items:
-            ui.separator()
-            with ui.row().classes("gap-2"):
-                for action_name, action in action_items:
-                    _build_action_button(settings, action_name, action)
-
-        # Children (recursive)
-        for child_name, child in settings.children.items():
-            _build_settings_card(child_name, child, timers)
+        _build_settings_body(settings, timers)
 
 
 def _build_preset_controls(registry):
@@ -495,7 +594,7 @@ def create_settings_panel(
     *,
     title: str = "",
     on_exit=None,
-):
+) -> None:
     """Build a full tabbed settings panel from a SettingsRegistry.
 
     Call this inside a NiceGUI page context::
@@ -504,6 +603,10 @@ def create_settings_panel(
         def index():
             create_settings_panel(registry, title="POSER", on_exit=stop)
     """
+
+    # Force dark mode for consistent styling
+    ui.dark_mode(True)
+
     # Timers for this client session — NiceGUI auto-cleans on disconnect.
     timers: list = []
 
@@ -566,6 +669,11 @@ def create_settings_panel(
     with ui.tab_panels(tabs, value=tab_map[group_names[0]]).classes("w-full"):
         for group, config_names in group_map.items():
             with ui.tab_panel(tab_map[group]):
-                for config_name in config_names:
-                    settings = registry.get(config_name)
-                    _build_settings_card(config_name, settings, timers)
+                if len(config_names) == 1:
+                    # Single config in group — render directly, no
+                    # redundant expansion with the same name as the tab.
+                    _build_settings_body(registry.get(config_names[0]), timers)
+                else:
+                    for config_name in config_names:
+                        settings = registry.get(config_name)
+                        _build_settings_card(config_name, settings, timers)

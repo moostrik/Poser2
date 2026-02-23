@@ -1,5 +1,5 @@
 # Standard library imports
-from enum import Enum
+from enum import Enum, IntEnum
 from threading import Thread, Lock, current_thread
 from time import sleep, time_ns
 import traceback
@@ -22,6 +22,14 @@ from modules.gl.Utils import FpsCounter
 from modules.settings import Setting, BaseSettings
 
 
+class MonitorId(IntEnum):
+    """Logical monitor slots. IntEnum so it's a plain int everywhere."""
+    M0 = 0
+    M1 = 1
+    M2 = 2
+    M3 = 3
+
+
 class WindowSettings(BaseSettings):
     """Window / init configuration — set once before RenderManager starts."""
     title: Setting[str] =           Setting("Poser", init_only=True, visible=False)
@@ -30,11 +38,11 @@ class WindowSettings(BaseSettings):
     v_sync: Setting[bool] =         Setting(True)
     fullscreen: Setting[bool] =     Setting(False)
     monitor: Setting[int] =         Setting(0)
-    secondary_list: Setting[list[int]] = Setting([0])
     x: Setting[int] =               Setting(0)
     y: Setting[int] =               Setting(80)
     width: Setting[int] =           Setting(1920)
     height: Setting[int] =          Setting(1000)
+    secondary_list: Setting[list[MonitorId]] = Setting(list[MonitorId], [MonitorId.M0])
 
 
 class Button(Enum):

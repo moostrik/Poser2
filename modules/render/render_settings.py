@@ -23,9 +23,10 @@ from modules.render.layers.cam.PoseCompositor import PoseCompSettings
 
 from modules.render.layers.data.DataLayerSettings import DataLayerSettings
 
-from modules.settings import Child, BaseSettings
+from modules.settings import Child, BaseSettings, Setting
 from modules.gl.WindowManager import WindowSettings
 from modules.render.color_settings import ColorSettings
+from modules.render.layer_ids import Layers
 
 
 class RenderSettings(BaseSettings):
@@ -33,6 +34,10 @@ class RenderSettings(BaseSettings):
 
     window: Child[WindowSettings] =     Child(WindowSettings)
     colors: Child[ColorSettings] =      Child(ColorSettings)
+
+    # Layer draw lists (order matters — first in list is drawn first / behind)
+    preview_layers: Setting[list[Layers]] = Setting(list[Layers], [Layers.composite], description="Layers drawn in the preview viewports")
+    final_layers:   Setting[list[Layers]] = Setting(list[Layers], [Layers.composite], description="Layers drawn on the output monitors")
 
     # Centre layers
     centre_geometry: Child[CentreGeometrySettings] =    Child(CentreGeometrySettings)

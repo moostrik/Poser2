@@ -1,60 +1,27 @@
-# Standard library imports
-from enum import IntEnum, auto
+# TODO
+# colors without alpha?
+# pulling only on read -> instead of readonly read / write bools?
+# better ordening of settings (now we have both render tab and render panel)
+
 
 # Third-party imports
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 # Local application imports
 from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color, Texture
-from modules.render.color_settings import ColorSettings
+from modules.gl.WindowManager import MonitorId
+from modules.render.layer_ids import Layers
 from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub
-from modules.gui.PyReallySimpleGui import Gui
 from modules.render.render_settings import RenderSettings
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
-from modules.render.CompositionSubdivider import make_subdivision, SubdivisionRow, Subdivision
+from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
 from modules.render import layers as ls
 
 from modules.utils.HotReloadMethods import HotReloadMethods
-
-
-class Layers(IntEnum):
-    # source layers
-    cam_image =     0
-    cam_mask =      auto()
-    cam_frg=        auto()
-    cam_crop =      auto()
-
-    # composite layers
-    tracker =       auto()
-    poser =         auto()
-
-    # centre layers
-    centre_math=    auto()
-    centre_cam =    auto()
-    centre_mask =   auto()
-    centre_frg =    auto()
-    centre_pose =   auto()
-
-    # Data layers (configurable slots A and B, all pre-allocated)
-    data_B_W =      auto()
-    data_B_F =      auto()
-    data_A_W =      auto()
-    data_A_F =      auto()
-    data_time =     auto()
-
-    # composition layers
-    motion =        auto()
-    flow =          auto()
-    fluid =         auto()
-    ms_mask =       auto()
-    composite =     auto()
-
-    # hdt_prep =      auto()
-    # hdt_blend =     auto()
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -151,6 +118,7 @@ SHOW_DATA: list[Layers] = [
 PREVIEW_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
 FINAL_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
 
+
 class RenderManager(RenderBase):
     def __init__(self, data_hub: DataHub, settings: RenderSettings, num_cams: int = 3, num_players: int = 3) -> None:
         self.num_players: int = num_players
@@ -163,8 +131,8 @@ class RenderManager(RenderBase):
         # layers
         self._update_layers: list[Layers] =     UPDATE_LAYERS
         self._interface_layers: list[Layers] =  INTERFACE_LAYERS
-        self._preview_layers: list[Layers] =    PREVIEW_LAYERS
-        self._draw_layers: list[Layers] =       FINAL_LAYERS
+        self._preview_layers: list[Layers] =    settings.preview_layers
+        self._draw_layers: list[Layers] =       settings.final_layers
 
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
@@ -252,8 +220,8 @@ class RenderManager(RenderBase):
         self.data_hub.notify_update()
 
         self._update_layers = UPDATE_LAYERS
-        self._draw_layers = FINAL_LAYERS
-        self._preview_layers = PREVIEW_LAYERS
+        self._draw_layers = self.settings.final_layers
+        self._preview_layers = self.settings.preview_layers
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
@@ -288,12 +256,20 @@ class RenderManager(RenderBase):
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         clear_color()
 
+        try:
+            camera_id: int = self.settings.window.secondary_list.index(MonitorId(monitor_id))
+        except ValueError:
+            return
+
+        if camera_id >= self.num_cams:
+            return
+
         Style.reset_state()
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ADD)
 
-        camera_id: int = self.settings.window.secondary_list.index(monitor_id)
         for layer_type in self._draw_layers:
-            self.L[layer_type][camera_id].draw()
+            if camera_id in self.L[layer_type]:
+                self.L[layer_type][camera_id].draw()
 
         Style.pop_style()
