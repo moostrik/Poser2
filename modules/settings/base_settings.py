@@ -69,6 +69,11 @@ class BaseSettings:
             raise AttributeError(
                 f"Cannot replace child '{name}' — mutate its fields instead"
             )
+        # Allow @property setters defined on the class
+        for cls in type(self).__mro__:
+            if name in cls.__dict__ and isinstance(cls.__dict__[name], property):
+                cls.__dict__[name].fset(self, value)
+                return
         if name not in self._fields:
             raise AttributeError(
                 f"'{type(self).__name__}' has no setting '{name}'"

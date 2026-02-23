@@ -1,8 +1,7 @@
 # Standard library imports
-from dataclasses import dataclass
 
 # Local application imports
-from modules.ConfigBase import ConfigBase, config_field
+from modules.settings import Setting, BaseSettings
 from modules.DataHub import Stage
 from modules.pose.Frame import FrameField, ScalarFrameField
 from modules.render.layers.data.colors import DEFAULT_COLORS, TRACK_COLORS
@@ -21,17 +20,26 @@ FEATURE_COLORS: dict[ScalarFrameField, list[tuple[float, float, float, float]]] 
 }
 
 
-@dataclass
-class DataLayerConfig(ConfigBase):
+class DataLayerConfig(BaseSettings):
     """Unified configuration for data visualization layers. Active state is per-layer instance."""
-    feature_field: ScalarFrameField =   config_field(ScalarFrameField.angle_motion)
-    stage: Stage =                      config_field(Stage.SMOOTH)
+    feature_field:  Setting[ScalarFrameField] = Setting(ScalarFrameField, ScalarFrameField.angle_motion)
+    stage:          Setting[Stage]            = Setting(Stage, Stage.SMOOTH)
 
-    line_width: float =         config_field(3.0)
-    line_smooth: float =        config_field(1.0)
+    line_width:     Setting[float] = Setting(float, 3.0)
+    line_smooth:    Setting[float] = Setting(float, 1.0)
 
-    use_scores: bool =          config_field(False)
-    render_labels: bool =       config_field(True)
+    use_scores:     Setting[bool]  = Setting(bool, False)
+    render_labels:  Setting[bool]  = Setting(bool, True)
 
-    # Not a config_field - stays outside ConfigBase watch system
-    colors: list[tuple[float, float, float, float]] | None = None
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Not a Setting — stays outside the descriptor system
+        self._colors: list[tuple[float, float, float, float]] | None = None
+
+    @property
+    def colors(self) -> list[tuple[float, float, float, float]] | None:
+        return self._colors
+
+    @colors.setter
+    def colors(self, value: list[tuple[float, float, float, float]] | None) -> None:
+        self._colors = value

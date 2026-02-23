@@ -7,10 +7,9 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color, Texture
-from modules.gl.WindowManager import WindowSettings
 from modules.render.layers import LayerBase
 
-from modules.DataHub import DataHub, Stage
+from modules.DataHub import DataHub
 from modules.gui.PyReallySimpleGui import Gui
 from modules.render.render_settings import RenderSettings, DataLayer
 from modules.utils.PointsAndRects import Rect, Point2f
@@ -174,27 +173,13 @@ class RenderManager(RenderBase):
 
         self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
 
-        # configs
-        self.tracker_comp_config =  ls.TrackerCompConfig(   stage=Stage.LERP, pose_line_width=2.0, bbox_line_width=2)
-        self.pose_comp_config =     ls.PoseCompConfig(      stage=Stage.LERP, line_width=2.0, line_smooth=0.0, use_gpu_crop=True)
-
-        self.centre_gmtr_config=    ls.CentreGeometryConfig(stage=Stage.SMOOTH, cam_aspect=16/9, target_top_x=0.5, target_top_y=0.33, target_bottom_x=0.5, target_bottom_y=0.6, dst_aspectratio=9/16)
-        self.centre_mask_config =   ls.CentreMaskConfig(    blend_factor=0.2, blur_steps=0, blur_radius=1.0, dilation_steps=0)
-        self.centre_cam_config =    ls.CentreCamConfig(     blend_factor=0.2, mask_opacity=1.0, use_mask=True)
-        self.centre_frg_config =    ls.CentreFrgConfig(     blend_factor=0.2,  exposure=1.2, gamma=1.0, offset=0.0, contrast=1.1, saturation=2.0, levels=9, smoothness=0.33, sharpen=0.0, colorize=0.96, use_mask=True)
-        self.centre_pose_config =   ls.CentrePoseConfig(    line_width=3.0, line_smooth=0.0, use_scores=False, draw_anchors=False)
-
-        self.data_A_config =        ls.DataLayerConfig(     stage=Stage.SMOOTH,  line_width=3.0, line_smooth=1.0, use_scores=False, render_labels=True, colors=None)
-        self.data_B_config =        ls.DataLayerConfig(     stage=Stage.LERP,    line_width=6.0, line_smooth=6.0, use_scores=False, render_labels=True, colors=[HISTORY_COLOR])
-        self.data_time_config =     ls.MTimeRendererConfig( stage=Stage.LERP)
-        self.composite_config =     ls.CompositeLayerConfig()
-
-        # Reactive render settings (feature, mode, stages, LUT, flow, fluid)
+        # Reactive render settings (feature, mode, stages, LUT, flow, fluid, all configs)
         self.render_settings = render_settings
 
-        # Propagate LUT changes to composite config
-        self.render_settings.bind(RenderSettings.lut, lambda v: setattr(self.composite_config, 'lut', v))
-        self.render_settings.bind(RenderSettings.lut_strength, lambda v: setattr(self.composite_config, 'lut_strength', v))
+        # Set data_b overrides (class defaults match data_a)
+        render_settings.data_b.line_width = 6.0
+        render_settings.data_b.line_smooth = 6.0
+        render_settings.data_b.colors = [HISTORY_COLOR]
 
         flows: dict[int, ls.FlowLayer] = {}
         mask_textures: dict[int, Texture] = {}
@@ -205,30 +190,30 @@ class RenderManager(RenderBase):
             cam_frg =       self.L[Layers.cam_frg][i]=      ls.FrgSourceLayer(      i, self.data_hub)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.data_hub)
 
-            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.data_hub,   cam_image.texture,  HISTORY_COLOR, color,  self.tracker_comp_config)
-            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.data_hub,   cam_image.texture,  color,                  self.pose_comp_config)
+            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.data_hub,   cam_image.texture,  HISTORY_COLOR, color,  render_settings.tracker)
+            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.data_hub,   cam_image.texture,  color,                  render_settings.pose_comp)
 
-            centre_gmtry=   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,                                               self.centre_gmtr_config)
-            centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_gmtry,    cam_mask.texture,                           self.centre_mask_config)
+            centre_gmtry=   self.L[Layers.centre_math][i] = ls.CentreGeometry(      i, self.data_hub,                                               render_settings.centre_geometry)
+            centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(        centre_gmtry,    cam_mask.texture,                           render_settings.centre_mask)
             mask_textures[i] = centre_mask.texture
-            centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_gmtry,    cam_image.texture,  centre_mask.texture,    self.centre_cam_config)
-            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_gmtry,    cam_frg.texture,    centre_mask.texture,    self.centre_frg_config,    color[:3])
-            centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_gmtry,    color,                                      self.centre_pose_config)
+            centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(         centre_gmtry,    cam_image.texture,  centre_mask.texture,    render_settings.centre_cam)
+            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(         centre_gmtry,    cam_frg.texture,    centre_mask.texture,    render_settings.centre_frg,    color[:3])
+            centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(        centre_gmtry,    color,                                      render_settings.centre_pose)
 
             motion =        self.L[Layers.motion][i] =      ls.MotionLayer(         i, self.data_hub,   centre_mask.texture, color)
-            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub,   mask_textures, centre_frg.texture, list(TRACK_COLORS))
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask, centre_mask.texture, list(TRACK_COLORS), config=self.render_settings.flow)
-            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS), config=self.render_settings.fluid)
+            ms_mask =       self.L[Layers.ms_mask][i] =     ls.MSColorMaskLayer(    i, self.data_hub,   mask_textures, centre_frg.texture, list(TRACK_COLORS), config=render_settings.ms_mask)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask, centre_mask.texture, list(TRACK_COLORS), config=render_settings.flow)
+            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows, list(TRACK_COLORS), config=render_settings.fluid)
 
-            self.L[Layers.composite][i] = ls.CompositeLayer([fluid, ms_mask], self.composite_config)
+            self.L[Layers.composite][i] = ls.CompositeLayer([fluid, ms_mask], render_settings.composite)
 
-            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, self.data_A_config)
-            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, self.data_A_config)
-            self.L[Layers.data_A_AV][i] = ls.AngleVelLayer(     i, self.data_hub, self.data_A_config)
-            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, self.data_B_config)
-            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, self.data_B_config)
-            self.L[Layers.data_B_AV][i] = ls.AngleVelLayer(     i, self.data_hub, self.data_B_config)
-            self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub, self.data_time_config)
+            self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, render_settings.data_a)
+            self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, render_settings.data_a)
+            self.L[Layers.data_A_AV][i] = ls.AngleVelLayer(     i, self.data_hub, render_settings.data_a)
+            self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, render_settings.data_b)
+            self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, render_settings.data_b)
+            self.L[Layers.data_B_AV][i] = ls.AngleVelLayer(     i, self.data_hub, render_settings.data_b)
+            self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub, render_settings.data_time)
 
         # Bind data layers to render_settings — propagates active state and shared properties
         self.render_settings.bind_data_layers(
