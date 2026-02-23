@@ -47,7 +47,7 @@ class MSColorMaskLayer(LayerBase):
     Each camera's contribution is colored exactly once.
     """
 
-    def __init__(self, cam_id: int, data_hub: DataHub, mask_textures: dict[int, Texture], frg_texture: Texture, settings: MSColorMaskLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, data_hub: DataHub, frg_texture: Texture, mask_textures: dict[int, Texture], settings: MSColorMaskLayerSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
         self._data_hub: DataHub = data_hub
         self._mask_textures: dict[int, Texture] = mask_textures

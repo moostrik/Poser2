@@ -27,7 +27,7 @@ class CentrePoseSettings(BaseSettings):
 class CentrePoseLayer(LayerBase):
     """Renders pose keypoint lines in crop space."""
 
-    def __init__(self, cam_id: int, geometry: CentreGeometry, color_settings: ColorSettings, config: CentrePoseSettings | None = None) -> None:
+    def __init__(self, cam_id: int, geometry: CentreGeometry, settings: CentrePoseSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
         self._geometry: CentreGeometry = geometry
         self._fbo: Fbo = Fbo()
@@ -35,7 +35,7 @@ class CentrePoseLayer(LayerBase):
         self._circle_shader: DrawCircles = DrawCircles()
 
         # Configuration
-        self.config: CentrePoseSettings = config or CentrePoseSettings()
+        self.settings: CentrePoseSettings = settings or CentrePoseSettings()
         self._color_settings: ColorSettings = color_settings
 
         # HotReloadMethods(self.__class__, True, True)
@@ -64,8 +64,8 @@ class CentrePoseLayer(LayerBase):
         if transformed_points is None:
             return
 
-        line_width: float = 1.0 / self._fbo.height * self.config.line_width
-        line_smooth: float = 1.0 / self._fbo.height * self.config.line_smooth
+        line_width: float = 1.0 / self._fbo.height * self.settings.line_width
+        line_smooth: float = 1.0 / self._fbo.height * self.settings.line_smooth
         anchor_size: float = line_width * 4.0
         anchor_smooth: float = line_smooth
         anchor_color: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
@@ -81,7 +81,7 @@ class CentrePoseLayer(LayerBase):
         self._fbo.begin()
         clear_color()
         color = self._color_settings.track_colors[self._cam_id % len(self._color_settings.track_colors)].to_tuple()
-        self._shader.use(transformed_points, line_width, line_smooth, color, self.config.use_scores)
-        if self.config.draw_anchors:
+        self._shader.use(transformed_points, line_width, line_smooth, color, self.settings.use_scores)
+        if self.settings.draw_anchors:
             self._circle_shader.use(positions, anchor_size, anchor_smooth, anchor_color, aspect_ratio)
         self._fbo.end()
