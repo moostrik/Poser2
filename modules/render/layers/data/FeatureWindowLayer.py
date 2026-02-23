@@ -13,7 +13,7 @@ from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.pose.nodes import FeatureWindow
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import WindowShader
-from modules.render.layers.data.DataLayerSettings import DataLayerSettings
+from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode
 
 
 class FeatureWindowLayer(LayerBase):
@@ -23,12 +23,13 @@ class FeatureWindowLayer(LayerBase):
     with time flowing left-to-right. Sources data from various window trackers
     via DataHub per-track windows.
     """
+    LAYER_MODE: LayerMode = LayerMode.WINDOW
 
     def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._config: DataLayerSettings = config
-        self.active: bool = False  # Instance-level active state
+        self._was_active: bool = False
 
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
@@ -45,16 +46,9 @@ class FeatureWindowLayer(LayerBase):
         self._shader: WindowShader = WindowShader()
         self._text_renderer: Text = Text()
 
-    def set_active(self, active: bool) -> None:
-        """Set active state and trigger cleanup on deactivation."""
-        if self.active != active:
-            self.active = active
-            if not active:
-                self.clear()
-
-    def _on_active_change(self, active: bool) -> None:
-        if not active:
-            self.clear()
+    @property
+    def _is_active(self) -> bool:
+        return self._config.mode == self.LAYER_MODE
 
     @property
     def texture(self) -> Texture:
@@ -83,7 +77,7 @@ class FeatureWindowLayer(LayerBase):
         self._labels = []
 
     def draw(self) -> None:
-        if not self.active:
+        if not self._is_active:
             return
         if self._fbo.allocated:
             Blit.use(self._fbo.texture)
@@ -92,7 +86,11 @@ class FeatureWindowLayer(LayerBase):
 
     def update(self) -> None:
         """Update visualization from DataHub FeatureWindow."""
-        if not self.active:
+        active = self._is_active
+        if self._was_active and not active:
+            self.clear()
+        self._was_active = active
+        if not active:
             return
         # ScalarFrameField.value matches FrameField.value for dict key lookup
         window: FeatureWindow | None = self._data_hub.get_feature_window(

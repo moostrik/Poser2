@@ -1,6 +1,5 @@
 # Standard library imports
 from enum import IntEnum, auto
-from typing import cast
 
 # Third-party imports
 from OpenGL.GL import * # type: ignore
@@ -12,7 +11,7 @@ from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub
 from modules.gui.PyReallySimpleGui import Gui
-from modules.render.render_settings import RenderSettings, DataLayer
+from modules.render.render_settings import RenderSettings
 from modules.utils.PointsAndRects import Rect, Point2f
 
 # Render Imports
@@ -150,7 +149,7 @@ SHOW_DATA: list[Layers] = [
 
 
 PREVIEW_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
-FINAL_LAYERS: list[Layers] = SHOW_COMP
+FINAL_LAYERS: list[Layers] = SHOW_COMP + SHOW_DATA
 
 class RenderManager(RenderBase):
     def __init__(self, data_hub: DataHub, settings: RenderSettings, num_cams: int = 3, num_players: int = 3) -> None:
@@ -206,15 +205,7 @@ class RenderManager(RenderBase):
             self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data_a)
             self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.data_hub, settings.data_b)
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.data_hub, settings.data_b)
-            self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub, settings.data_time)
-
-        # Bind data layers to render_settings — propagates active state and shared properties
-        self.settings.bind_data_layers(
-            {i: cast(DataLayer, self.L[Layers.data_A_W][i]) for i in range(self.num_cams)},
-            {i: cast(DataLayer, self.L[Layers.data_A_F][i]) for i in range(self.num_cams)},
-            {i: cast(DataLayer, self.L[Layers.data_B_W][i]) for i in range(self.num_cams)},
-            {i: cast(DataLayer, self.L[Layers.data_B_F][i]) for i in range(self.num_cams)},
-        )
+            self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.data_hub)
 
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [

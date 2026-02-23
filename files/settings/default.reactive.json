@@ -17,12 +17,6 @@
       "width": 1080,
       "height": 1000
     },
-    "data_layer": {
-      "feature": "NONE",
-      "mode": "WINDOW",
-      "stage_a": "SMOOTH",
-      "stage_b": "LERP"
-    },
     "flow": {
       "fps": 60.0,
       "draw_mode": "DENSITY_BRIDGE_INPUT_COLOR",

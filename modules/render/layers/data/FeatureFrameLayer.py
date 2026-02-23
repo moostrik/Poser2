@@ -12,7 +12,7 @@ from modules.pose.features import PoseFeatureType
 from modules.pose.Frame import Frame, FrameField, ScalarFrameField
 from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import FeatureShader
-from modules.render.layers.data.DataLayerSettings import DataLayerSettings
+from modules.render.layers.data.DataLayerSettings import DataLayerSettings, LayerMode
 
 
 class FeatureFrameLayer(LayerBase):
@@ -21,12 +21,13 @@ class FeatureFrameLayer(LayerBase):
     Displays feature values as horizontal lines with color cycling through
     a configurable color list. Transparent background.
     """
+    LAYER_MODE: LayerMode = LayerMode.FRAME
 
     def __init__(self, track_id: int, data_hub: DataHub, config: DataLayerSettings) -> None:
         self._track_id: int = track_id
         self._data_hub: DataHub = data_hub
         self._config: DataLayerSettings = config
-        self.active: bool = False  # Instance-level active state
+        self._was_active: bool = False
 
         self._fbo: Fbo = Fbo()
         self._label_fbo: Fbo = Fbo()
@@ -38,16 +39,9 @@ class FeatureFrameLayer(LayerBase):
         self._shader: FeatureShader = FeatureShader()
         self._text_renderer: Text = Text()
 
-    def set_active(self, active: bool) -> None:
-        """Set active state and trigger cleanup on deactivation."""
-        if self.active != active:
-            self.active = active
-            if not active:
-                self.clear()
-
-    def _on_active_change(self, active: bool) -> None:
-        if not active:
-            self.clear()
+    @property
+    def _is_active(self) -> bool:
+        return self._config.mode == self.LAYER_MODE
 
     @property
     def texture(self) -> Texture:
@@ -71,7 +65,7 @@ class FeatureFrameLayer(LayerBase):
         self._labels = []
 
     def draw(self) -> None:
-        if not self.active:
+        if not self._is_active:
             return
         if self._fbo.allocated:
             Blit.use(self._fbo.texture)
@@ -80,7 +74,11 @@ class FeatureFrameLayer(LayerBase):
 
     def update(self) -> None:
         """Update visualization from DataHub Frame."""
-        if not self.active:
+        active = self._is_active
+        if self._was_active and not active:
+            self.clear()
+        self._was_active = active
+        if not active:
             return
         pose: Frame | None = self._data_hub.get_pose(self._config.stage, self._track_id)
         self._data_cache.update(pose)

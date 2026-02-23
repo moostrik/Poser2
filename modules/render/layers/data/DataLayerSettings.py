@@ -1,9 +1,19 @@
+# Standard library imports
+from enum import IntEnum, auto
+
 # Local application imports
 from modules.settings import Setting, BaseSettings
 from modules.DataHub import Stage
 from modules.pose.Frame import FrameField, ScalarFrameField
 from modules.render.layers.data.colors import DEFAULT_COLORS
 from modules.render.color_settings import ColorSettings
+
+
+class LayerMode(IntEnum):
+    """Display mode for a data layer slot. NONE disables rendering."""
+    NONE =      0
+    FRAME =     auto()
+    WINDOW =    auto()
 
 
 # Fields that use track colors (the rest use DEFAULT_COLORS)
@@ -15,7 +25,8 @@ _TRACK_COLOR_FIELDS: set[ScalarFrameField] = {
 
 
 class DataLayerSettings(BaseSettings):
-    """Unified configuration for data visualization layers. Active state is per-layer instance."""
+    """Unified configuration for data visualization layers."""
+    mode:           Setting[LayerMode]        = Setting(LayerMode.WINDOW)
     feature_field:  Setting[ScalarFrameField] = Setting(ScalarFrameField.angle_motion)
     stage:          Setting[Stage]            = Setting(Stage.SMOOTH)
 

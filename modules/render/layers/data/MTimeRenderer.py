@@ -11,7 +11,7 @@ from modules.gl import Text
 
 
 class MTimeRendererSettings(BaseSettings):
-    stage: Setting[Stage] = Setting(Stage.LERP, init_only=True, description="Pipeline stage for pose data")
+    stage: Setting[Stage] = Setting(Stage.LERP, description="Pipeline stage for pose data")
 
 
 class MTimeRenderer(LayerBase):
