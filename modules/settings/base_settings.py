@@ -1,9 +1,13 @@
 """BaseSettings — collection of Setting descriptors with attribute access, callbacks, and serialization."""
 
+import copy
+import logging
 import threading
 import typing
 
 from modules.settings.setting import Setting, Widget
+
+logger = logging.getLogger(__name__)
 
 
 class BaseSettings:
@@ -40,7 +44,7 @@ class BaseSettings:
                 if isinstance(attr_value, Setting) and attr_name not in self._fields:
                     self._fields[attr_name] = attr_value
                     default = attr_value.default
-                    self._values[attr_name] = list(default) if isinstance(default, list) else default
+                    self._values[attr_name] = copy.deepcopy(default) if isinstance(default, list) else default
                     self._callbacks[attr_name] = []
                     self._locks[attr_name] = threading.Lock()
 
@@ -64,6 +68,10 @@ class BaseSettings:
                     try:
                         resolved = eval(ann, ns)
                     except Exception:
+                        logger.warning(
+                            "Could not resolve annotation %r on %s.%s — skipping auto-child",
+                            ann, cls.__name__, attr_name, exc_info=True,
+                        )
                         continue
                 if isinstance(resolved, type) and issubclass(resolved, BaseSettings) and resolved is not BaseSettings:
                     self._children[attr_name] = resolved()
@@ -173,14 +181,19 @@ class BaseSettings:
     # -- Serialization -------------------------------------------------------
 
     def to_dict(self):
-        """Serialize mutable fields to a dict (excludes readonly and init_only).
+        """Serialize mutable fields to a dict.
+
+        Excludes ``readonly`` fields and ``Widget.button`` fields.
+        ``init_only`` fields **are** included (they are editable in JSON but
+        cannot be changed at runtime after construction).
 
         Children are serialized as nested dicts.
         """
         result = {}
         for name, field in self._fields.items():
-            if not field.readonly:
-                result[name] = field.to_json_value(self)
+            if field.readonly or field.widget == Widget.button:
+                continue
+            result[name] = field.to_json_value(self)
         for name, child in self._children.items():
             result[name] = child.to_dict()
         return result
@@ -193,11 +206,30 @@ class BaseSettings:
         for name, raw in data.items():
             if name in self._children and isinstance(raw, dict):
                 self._children[name].update_from_dict(raw)
+            elif name in self._children:
+                logger.warning(
+                    "%s.update_from_dict: expected dict for child '%s', got %s — skipping",
+                    type(self).__name__, name, type(raw).__name__,
+                )
             elif name in self._fields:
                 field = self._fields[name]
                 if field.init_only and self._initialized:
                     continue
                 field.from_json_value(self, raw)
+
+    # -- Equality ------------------------------------------------------------
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return NotImplemented
+        if self._values != other._values:
+            return False
+        for name, child in self._children.items():
+            if child != other._children.get(name):
+                return False
+        return True
+
+    __hash__ = None  # mutable — unhashable
 
     # -- Repr ----------------------------------------------------------------
 

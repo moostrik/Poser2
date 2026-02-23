@@ -36,6 +36,14 @@ class Setting(Generic[T]):
 
     Custom types used as Setting values should implement ``__eq__`` so that
     change detection (skip callback when value unchanged) works correctly.
+
+    .. note:: In-place mutation limitation
+
+        Modifying a mutable value in place (e.g. ``settings.tags.append(x)``)
+        will **not** trigger callbacks because the descriptor ``__set__`` is
+        never invoked.  To fire callbacks, re-assign the whole value::
+
+            settings.tags = settings.tags + [x]
     """
 
     def __init__(
@@ -46,7 +54,7 @@ class Setting(Generic[T]):
         min: T | None = None,
         max: T | None = None,
         step: T | None = None,
-        description: str = "",
+        description: str = "",  # noqa: E501  — min/max/step are GUI presentation hints only; they are NOT enforced by the descriptor.
         readonly: bool = False,
         init_only: bool = False,
         visible: bool = True,
@@ -210,14 +218,15 @@ class Setting(Generic[T]):
         """Invoke all registered callbacks (for Widget.button actions).
 
         Unlike set(), fire() does not change the value — it just triggers
-        every callback with no arguments.
+        every callback with ``True`` so that all callbacks share the same
+        ``callback(value)`` signature regardless of field type.
         """
         lock = obj._locks[self.name]
         with lock:
             callbacks = list(obj._callbacks[self.name])
         for cb in callbacks:
             try:
-                cb()
+                cb(True)
             except Exception:
                 logger.warning(
                     "Action callback %r for '%s' raised an exception",

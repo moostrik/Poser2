@@ -282,7 +282,7 @@ class TestSerialization(unittest.TestCase):
         s2 = CameraSettings()
         s2.update_from_dict(data)
         self.assertEqual(s2.exposure, 4000)
-        # init_only fields are not serialized / restored
+        # init_only fields are serialized but not restored after init
         self.assertEqual(s2.resolution, 1080)  # stays at default
         self.assertEqual(s2.overlay_color, Color(0.1, 0.2, 0.3))
         self.assertEqual(s2.mode, RenderMode.TEXTURED)
@@ -565,15 +565,15 @@ class TestAction(unittest.TestCase):
     def test_action_fires_callbacks(self):
         s = SettingsWithActions()
         results = []
-        s.bind(SettingsWithActions.reset, lambda: results.append("fired"))
+        s.bind(SettingsWithActions.reset, lambda _: results.append("fired"))
         SettingsWithActions.reset.fire(s)
         self.assertEqual(results, ["fired"])
 
     def test_action_multiple_callbacks(self):
         s = SettingsWithActions()
         a, b = [], []
-        s.bind(SettingsWithActions.reset, lambda: a.append(1))
-        s.bind(SettingsWithActions.reset, lambda: b.append(2))
+        s.bind(SettingsWithActions.reset, lambda _: a.append(1))
+        s.bind(SettingsWithActions.reset, lambda _: b.append(2))
         SettingsWithActions.reset.fire(s)
         self.assertEqual(a, [1])
         self.assertEqual(b, [2])
@@ -591,12 +591,12 @@ class TestAction(unittest.TestCase):
     def test_bind_action_unknown_raises(self):
         s = SettingsWithActions()
         with self.assertRaises(KeyError):
-            s.bind(MinimalSettings.value, lambda: None)
+            s.bind(MinimalSettings.value, lambda _: None)
 
     def test_unbind_action(self):
         s = SettingsWithActions()
         results = []
-        cb = lambda: results.append(1)
+        cb = lambda _: results.append(1)
         s.bind(SettingsWithActions.reset, cb)
         s.unbind(SettingsWithActions.reset, cb)
         SettingsWithActions.reset.fire(s)
@@ -625,8 +625,8 @@ class TestAction(unittest.TestCase):
     def test_action_broken_callback_doesnt_crash(self):
         s = SettingsWithActions()
         results = []
-        s.bind(SettingsWithActions.reset, lambda: 1 / 0)  # will raise
-        s.bind(SettingsWithActions.reset, lambda: results.append("ok"))
+        s.bind(SettingsWithActions.reset, lambda _: 1 / 0)  # will raise
+        s.bind(SettingsWithActions.reset, lambda _: results.append("ok"))
         SettingsWithActions.reset.fire(s)  # should not raise
         self.assertEqual(results, ["ok"])
 
@@ -1456,6 +1456,83 @@ class TestRectSettingIntegration(unittest.TestCase):
         s2 = _RectSettings()
         s2.update_from_dict(data)
         self.assertEqual(s2.region, Rect(10, 20, 320, 240))
+
+
+# ── Hardening tests ────────────────────────────────────────────────────────
+
+class TestBindAllWithButtons(unittest.TestCase):
+    """bind_all must work when Widget.button fields are present (#1)."""
+
+    def test_bind_all_fires_for_buttons(self):
+        s = SettingsWithActions()
+        results = []
+        s.bind_all(lambda v: results.append(v))
+        SettingsWithActions.reset.fire(s)
+        self.assertIn(True, results)
+
+    def test_bind_all_fires_for_normal_fields(self):
+        s = SettingsWithActions()
+        results = []
+        s.bind_all(lambda v: results.append(v))
+        s.exposure = 5000
+        self.assertIn(5000, results)
+
+
+class TestToDictExclusions(unittest.TestCase):
+    """to_dict must exclude readonly AND Widget.button fields (#5)."""
+
+    def test_button_excluded(self):
+        s = SettingsWithActions()
+        d = s.to_dict()
+        self.assertNotIn("reset", d)
+        self.assertNotIn("hidden_action", d)
+
+    def test_normal_field_included(self):
+        s = SettingsWithActions()
+        d = s.to_dict()
+        self.assertIn("exposure", d)
+
+
+class TestBaseSettingsEquality(unittest.TestCase):
+    """__eq__ on BaseSettings (#9)."""
+
+    def test_equal_defaults(self):
+        self.assertEqual(CameraSettings(), CameraSettings())
+
+    def test_different_values(self):
+        a = CameraSettings()
+        b = CameraSettings()
+        a.exposure = 9999
+        self.assertNotEqual(a, b)
+
+    def test_different_types(self):
+        self.assertNotEqual(CameraSettings(), MinimalSettings())
+
+    def test_unhashable(self):
+        with self.assertRaises(TypeError):
+            hash(CameraSettings())
+
+
+class TestDeepCopyDefaults(unittest.TestCase):
+    """List defaults must be deep-copied between instances (#10)."""
+
+    def test_list_not_shared(self):
+        class TagSettings(BaseSettings):
+            tags = Setting(list[str], ["a", "b"])
+
+        s1 = TagSettings()
+        s2 = TagSettings()
+        s1.tags = s1.tags + ["c"]
+        self.assertEqual(s2.tags, ["a", "b"])
+
+    def test_nested_list_not_shared(self):
+        class NestedList(BaseSettings):
+            items = Setting(list[str], ["x"])
+
+        a = NestedList()
+        b = NestedList()
+        # Directly mutate the internal default (simulates shallow-copy bug)
+        self.assertIsNot(a._values["items"], b._values["items"])
 
 
 if __name__ == "__main__":
