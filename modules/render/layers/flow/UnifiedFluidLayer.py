@@ -20,7 +20,7 @@ from modules.render.layers.LayerBase import LayerBase
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 
-from modules.settings import Setting, Child, BaseSettings
+from modules.settings import Setting, BaseSettings
 from modules.flow import Visualizer, VisualisationFieldConfig
 from modules.flow.fluid import FluidFlow, FluidFlowConfig
 from modules.render.shaders import DensityColorize
@@ -68,8 +68,8 @@ class UnifiedFluidLayerSettings(BaseSettings):
     blend_mode = Setting(Style.BlendMode.ADD)
     simulation_scale = Setting(0.25, min=0.1, max=2.0)
 
-    visualisation = Child(VisualisationFieldConfig)
-    fluid_flow = Child(FluidFlowConfig)
+    visualisation: VisualisationFieldConfig
+    fluid_flow: FluidFlowConfig
 
 
 class UnifiedFluidLayer(LayerBase):

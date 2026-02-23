@@ -20,7 +20,7 @@ from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame, MotionGate, Similarity
 
-from modules.settings import Setting, Child, BaseSettings
+from modules.settings import Setting, BaseSettings
 from modules.flow import Visualizer, VisualisationFieldConfig
 from modules.flow.fluid3d import FluidFlow3D, FluidFlow3DConfig
 from modules.render.shaders import DensityColorize
@@ -49,8 +49,8 @@ class Fluid3DLayerSettings(BaseSettings):
     blend_mode = Setting(Style.BlendMode.ADD)
     simulation_scale = Setting(0.5, min=0.1, max=2.0)
 
-    visualisation = Child(VisualisationFieldConfig)
-    fluid_flow = Child(FluidFlow3DConfig)
+    visualisation: VisualisationFieldConfig
+    fluid_flow: FluidFlow3DConfig
 
 
 class Fluid3DLayer(LayerBase):

@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import logging
 import threading
-from enum import Enum
+from enum import Enum, auto
 from typing import Generic, TypeVar, overload, Any, cast, get_origin, get_args
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+
+
+class Widget(Enum):
+    """GUI hint for how a Setting should be rendered in the panel."""
+    default = auto()
+    toggle = auto()
+    button = auto()
 
 
 class Setting(Generic[T]):
@@ -44,6 +51,7 @@ class Setting(Generic[T]):
         init_only: bool = False,
         visible: bool = True,
         pinned: bool = False,
+        widget: Widget = Widget.default,
     ) -> None:
         if default is None:
             # Single-arg form: Setting(value, ...)  — infer type from default
@@ -69,6 +77,7 @@ class Setting(Generic[T]):
         self.init_only = init_only
         self.visible = visible
         self.pinned = pinned
+        self.widget = widget
         # Generic list support: list[int], list[str], etc.
         self._origin = get_origin(type_)          # list | None
         self._element_type = get_args(type_)[0] if get_args(type_) else None  # int | str | …
@@ -179,7 +188,7 @@ class Setting(Generic[T]):
 
     def _coerce_element(self, v):
         """Coerce a single list element to self._element_type."""
-        et = self._element_type
+        et: type = self._element_type  # type: ignore[assignment]
         if isinstance(v, et):
             return v
         # Enum element: reconstruct from name (str) or value (int)
@@ -196,6 +205,24 @@ class Setting(Generic[T]):
         return et(v)
 
     # -- Callbacks -----------------------------------------------------------
+
+    def fire(self, obj):
+        """Invoke all registered callbacks (for Widget.button actions).
+
+        Unlike set(), fire() does not change the value — it just triggers
+        every callback with no arguments.
+        """
+        lock = obj._locks[self.name]
+        with lock:
+            callbacks = list(obj._callbacks[self.name])
+        for cb in callbacks:
+            try:
+                cb()
+            except Exception:
+                logger.warning(
+                    "Action callback %r for '%s' raised an exception",
+                    cb, self.name, exc_info=True,
+                )
 
     def bind(self, obj, callback):
         with obj._locks[self.name]:
@@ -240,10 +267,14 @@ class Setting(Generic[T]):
 
     def __repr__(self):
         parts = [self._type_name, f"default={self.default!r}"]
+        if self.description:
+            parts.append(f"description={self.description!r}")
         if self.readonly:
             parts.append("readonly=True")
         if self.init_only:
             parts.append("init_only=True")
         if not self.visible:
             parts.append("visible=False")
+        if self.widget != Widget.default:
+            parts.append(f"widget={self.widget!r}")
         return f"Setting({', '.join(parts)})"

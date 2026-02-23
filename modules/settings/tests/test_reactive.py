@@ -8,9 +8,7 @@ import threading
 import unittest
 from enum import Enum
 
-from modules.settings.setting import Setting
-from modules.settings.action import Action
-from modules.settings.child import Child
+from modules.settings.setting import Setting, Widget
 from modules.settings.base_settings import BaseSettings
 from modules.settings.registry import SettingsRegistry
 from modules.settings import presets
@@ -46,8 +44,8 @@ class MinimalSettings(BaseSettings):
 
 class SettingsWithActions(BaseSettings):
     exposure = Setting(1000)
-    reset = Action(description="Reset all values")
-    hidden_action = Action(visible=False)
+    reset = Setting(False, widget=Widget.button, description="Reset all values")
+    hidden_action = Setting(False, widget=Widget.button, visible=False)
 
 
 # ---------------------------------------------------------------------------
@@ -562,13 +560,13 @@ class TestRegistryExtras(unittest.TestCase):
 
 
 class TestAction(unittest.TestCase):
-    """Tests for the Action descriptor."""
+    """Tests for Widget.button Settings (replacing the old Action descriptor)."""
 
     def test_action_fires_callbacks(self):
         s = SettingsWithActions()
         results = []
         s.bind(SettingsWithActions.reset, lambda: results.append("fired"))
-        s._actions["reset"].fire(s)
+        SettingsWithActions.reset.fire(s)
         self.assertEqual(results, ["fired"])
 
     def test_action_multiple_callbacks(self):
@@ -576,18 +574,19 @@ class TestAction(unittest.TestCase):
         a, b = [], []
         s.bind(SettingsWithActions.reset, lambda: a.append(1))
         s.bind(SettingsWithActions.reset, lambda: b.append(2))
-        s._actions["reset"].fire(s)
+        SettingsWithActions.reset.fire(s)
         self.assertEqual(a, [1])
         self.assertEqual(b, [2])
 
     def test_action_no_callbacks_ok(self):
         s = SettingsWithActions()
-        s._actions["reset"].fire(s)  # should not raise
+        SettingsWithActions.reset.fire(s)  # should not raise
 
-    def test_action_not_assignable(self):
+    def test_action_is_assignable(self):
+        """Widget.button fields are normal Settings — assignment is allowed."""
         s = SettingsWithActions()
-        with self.assertRaises(AttributeError):
-            s.reset = True
+        s.reset = True  # should not raise
+        self.assertEqual(s.reset, True)
 
     def test_bind_action_unknown_raises(self):
         s = SettingsWithActions()
@@ -600,7 +599,7 @@ class TestAction(unittest.TestCase):
         cb = lambda: results.append(1)
         s.bind(SettingsWithActions.reset, cb)
         s.unbind(SettingsWithActions.reset, cb)
-        s._actions["reset"].fire(s)
+        SettingsWithActions.reset.fire(s)
         self.assertEqual(results, [])
 
     def test_actions_property(self):
@@ -617,19 +616,18 @@ class TestAction(unittest.TestCase):
         self.assertNotIn("fake", s.actions)
 
     def test_action_repr(self):
-        s = SettingsWithActions()
-        r = repr(s._actions["reset"])
+        r = repr(SettingsWithActions.reset)
         self.assertIn("Reset all values", r)
 
     def test_action_class_access_returns_descriptor(self):
-        self.assertIsInstance(SettingsWithActions.reset, Action)
+        self.assertIsInstance(SettingsWithActions.reset, Setting)
 
     def test_action_broken_callback_doesnt_crash(self):
         s = SettingsWithActions()
         results = []
         s.bind(SettingsWithActions.reset, lambda: 1 / 0)  # will raise
         s.bind(SettingsWithActions.reset, lambda: results.append("ok"))
-        s._actions["reset"].fire(s)  # should not raise
+        SettingsWithActions.reset.fire(s)  # should not raise
         self.assertEqual(results, ["ok"])
 
 
@@ -686,23 +684,23 @@ class InnerSettings(BaseSettings):
 
 class OuterSettings(BaseSettings):
     fps = Setting(60.0, min=1.0, max=240.0)
-    inner = Child(InnerSettings)
+    inner: InnerSettings
 
 
 class DoubleChildSettings(BaseSettings):
     name = Setting("default")
-    alpha = Child(InnerSettings)
-    beta = Child(InnerSettings)
+    alpha: InnerSettings
+    beta: InnerSettings
 
 
 class MiddleSettings(BaseSettings):
     weight = Setting(0.5, min=0.0, max=1.0)
-    inner = Child(InnerSettings)
+    inner: InnerSettings
 
 
 class DeepSettings(BaseSettings):
     label = Setting("root")
-    middle = Child(MiddleSettings)
+    middle: MiddleSettings
 
 
 class TestChild(unittest.TestCase):
@@ -829,10 +827,11 @@ class TestChild(unittest.TestCase):
         self.assertIn("InnerSettings(...)", r)
         self.assertIn("fps=", r)
 
-    # -- Class-level descriptor access --------------------------------------
+    # -- Class-level annotation access (no descriptor on the class) -----------
 
-    def test_class_level_access_returns_descriptor(self):
-        self.assertIsInstance(OuterSettings.inner, Child)
+    def test_class_level_annotation_exists(self):
+        ann = OuterSettings.__annotations__
+        self.assertIn("inner", ann)
 
     # -- Registry with children ---------------------------------------------
 

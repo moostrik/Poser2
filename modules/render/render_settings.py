@@ -23,7 +23,7 @@ from modules.render.layers.cam.PoseCompositor import PoseCompSettings
 
 from modules.render.layers.data.DataLayerSettings import DataLayerSettings
 
-from modules.settings import Child, BaseSettings
+from modules.settings import BaseSettings
 from modules.gl.WindowManager import WindowSettings
 from modules.render.color_settings import ColorSettings
 from modules.render.layer_ids import LayerSettings
@@ -33,35 +33,35 @@ class RenderSettings(BaseSettings):
     """Mutable render-pipeline settings (registered in SettingsRegistry)."""
 
     # Layer Selection
-    layers:          Child[LayerSettings] =         Child(LayerSettings)
+    layers:          LayerSettings
 
     # Data layers
-    data_a:          Child[DataLayerSettings] =     Child(DataLayerSettings)
-    data_b:          Child[DataLayerSettings] =     Child(DataLayerSettings)
+    data_a:          DataLayerSettings
+    data_b:          DataLayerSettings
 
     # Cam compositors
-    tracker:        Child[TrackerCompSettings] =    Child(TrackerCompSettings)
-    poser:          Child[PoseCompSettings] =       Child(PoseCompSettings)
+    tracker:         TrackerCompSettings
+    poser:           PoseCompSettings
 
     # Centre layers
-    centre_geometry:Child[CentreGeomSettings] =     Child(CentreGeomSettings)
-    centre_mask:    Child[CentreMaskSettings] =     Child(CentreMaskSettings)
-    centre_cam:     Child[CentreCamSettings] =      Child(CentreCamSettings)
-    centre_frg:     Child[CentreFrgSettings] =      Child(CentreFrgSettings)
-    centre_pose:    Child[CentrePoseSettings] =     Child(CentrePoseSettings)
+    centre_geometry: CentreGeomSettings
+    centre_mask:     CentreMaskSettings
+    centre_cam:      CentreCamSettings
+    centre_frg:      CentreFrgSettings
+    centre_pose:     CentrePoseSettings
 
     # Mask
-    color_masks:    Child[ColorMaskLayerSettings] =  Child(ColorMaskLayerSettings)
+    color_masks:     ColorMaskLayerSettings
 
     # Flow / Fluid
-    flow:           Child[FlowLayerSettings] =      Child(FlowLayerSettings)
-    fluid:          Child[FluidLayerSettings] =     Child(FluidLayerSettings)
+    flow:            FlowLayerSettings
+    fluid:           FluidLayerSettings
 
     # Lut
-    composite:      Child[CompositeLayerSettings] = Child(CompositeLayerSettings)
+    composite:       CompositeLayerSettings
 
     # colors
-    colors:         Child[ColorSettings] =          Child(ColorSettings)
+    colors:          ColorSettings
 
     # Window
-    window:         Child[WindowSettings] =         Child(WindowSettings)
+    window:          WindowSettings

@@ -6,11 +6,10 @@ from typing import get_origin, get_args
 
 from nicegui import app, ui
 
-from modules.settings.action import Action
 from modules.settings.base_settings import BaseSettings
 from modules.settings import presets
 from modules.settings.registry import SettingsRegistry
-from modules.settings.setting import Setting
+from modules.settings.setting import Setting, Widget
 from modules.utils import Color, Point2f, Rect
 
 # ---------------------------------------------------------------------------
@@ -70,6 +69,20 @@ def _build_field_control(settings, name, field, polls):
             sel.on_value_change(on_select_change)
 
         polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v)))
+        return 'small'
+
+    # -- bool + Widget.toggle → toggle button --------------------------------
+    if field.type_ is bool and field.widget == Widget.toggle:
+        tg = ui.toggle({True: label, False: label}, value=value).props(
+            "dense" + (" disable" if is_disabled else "")
+        )
+
+        if not is_disabled:
+            def on_toggle_change(e):
+                setattr(settings, name, e.value)
+            tg.on_value_change(on_toggle_change)
+
+        polls.append((settings, name, [value], lambda v, tg=tg: tg.set_value(v)))
         return 'small'
 
     # -- bool → switch -------------------------------------------------------
@@ -341,17 +354,17 @@ def _build_field_control(settings, name, field, polls):
     return 'small'
 
 
-def _build_action_button(settings, name, action):
-    """Create a NiceGUI button for an Action."""
+def _build_action_button(settings, name, field):
+    """Create a NiceGUI button for a Widget.button Setting."""
     label = generate_label(name)
-    ui.button(label, on_click=lambda: action.fire(settings)).props("dense")
+    ui.button(label, on_click=lambda: field.fire(settings)).props("dense")
 
 
 def _has_visible_content(settings):
     """Return True if settings has any visible fields, actions, or children."""
     if any(f.visible for f in settings.fields.values()):
         return True
-    if any(a.visible for a in settings.actions.values()):
+    if settings.actions:
         return True
     if settings.children:
         return True
@@ -394,6 +407,8 @@ def _build_settings_body(settings, timers):
     for field_name, field in settings.fields.items():
         if not field.visible:
             continue
+        if field.widget == Widget.button:
+            continue  # rendered in the actions section
         if field.init_only:
             init_only_fields.append(field_name)
             continue
@@ -434,15 +449,15 @@ def _build_settings_body(settings, timers):
     # Create one poll timer for all fields in this card
     _make_poll_timer(polls, timers)
 
-    # Actions
+    # Actions (Widget.button fields)
     action_items = [
-        (n, a) for n, a in settings.actions.items() if a.visible
+        (n, f) for n, f in settings.actions.items() if f.visible
     ]
     if action_items:
         ui.separator()
         with ui.row().classes("gap-2"):
-            for action_name, action in action_items:
-                _build_action_button(settings, action_name, action)
+            for action_name, action_field in action_items:
+                _build_action_button(settings, action_name, action_field)
 
     # Children (recursive)
     for child_name, child in settings.children.items():
@@ -606,15 +621,15 @@ def create_settings_panel(
 
     # Collect pinned fields and actions from all registered modules (recursing into children)
     pinned_fields: list[tuple[BaseSettings, str, Setting]] = []
-    pinned_actions: list[tuple[BaseSettings, str, Action]] = []
+    pinned_actions: list[tuple[BaseSettings, str, Setting]] = []
 
     def _collect_pinned(settings: BaseSettings) -> None:
         for field_name, field in settings.fields.items():
             if field.pinned and field.visible:
                 pinned_fields.append((settings, field_name, field))
-        for action_name, action in settings.actions.items():
-            if action.pinned and action.visible:
-                pinned_actions.append((settings, action_name, action))
+        for action_name, action_field in settings.actions.items():
+            if action_field.pinned and action_field.visible:
+                pinned_actions.append((settings, action_name, action_field))
         for child in settings.children.values():
             _collect_pinned(child)
 
@@ -627,8 +642,8 @@ def create_settings_panel(
         with ui.row().classes("w-full gap-4 flex-wrap items-end"):
             for settings, field_name, field in pinned_fields:
                 _build_field_control(settings, field_name, field, pinned_polls)
-            for settings, action_name, action in pinned_actions:
-                _build_action_button(settings, action_name, action)
+            for settings, action_name, action_field in pinned_actions:
+                _build_action_button(settings, action_name, action_field)
         _make_poll_timer(pinned_polls, timers)
 
     # Filter out groups where all settings have no visible content

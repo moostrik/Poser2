@@ -14,7 +14,7 @@ from modules.pose.Frame import Frame
 
 from modules.render.layers.source.MaskSourceLayer import MaskSourceLayer
 
-from modules.settings import Setting, Child, BaseSettings
+from modules.settings import Setting, BaseSettings
 from modules.flow import (
     OpticalFlow, OpticalFlowConfig,
     VelocitySmoothTrail, SmoothTrailConfig,
@@ -59,11 +59,11 @@ class FlowLayerSettings(BaseSettings):
     blend_mode = Setting(Style.BlendMode.ADD)
     simulation_scale = Setting(0.5, min=0.1, max=2.0)
 
-    visualisation = Child(VisualisationFieldConfig)
-    optical_flow = Child(OpticalFlowConfig)
-    velocity_trail = Child(SmoothTrailConfig)
-    density_bridge = Child(DensityBridgeConfig)
-    temperature_bridge = Child(TemperatureBridgeConfig)
+    visualisation: VisualisationFieldConfig
+    optical_flow: OpticalFlowConfig
+    velocity_trail: SmoothTrailConfig
+    density_bridge: DensityBridgeConfig
+    temperature_bridge: TemperatureBridgeConfig
 
 
 # Keep FlowSettings as alias for backward compatibility

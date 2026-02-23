@@ -1,10 +1,9 @@
 """BaseSettings — collection of Setting descriptors with attribute access, callbacks, and serialization."""
 
 import threading
+import typing
 
-from modules.settings.setting import Setting
-from modules.settings.action import Action
-from modules.settings.child import Child
+from modules.settings.setting import Setting, Widget
 
 
 class BaseSettings:
@@ -18,6 +17,13 @@ class BaseSettings:
             resolution = Setting(1080, init_only=True)
 
         settings = CameraSettings(resolution=720)
+
+    Child settings are detected automatically from type annotations whose
+    type is a BaseSettings subclass::
+
+        class RenderSettings(BaseSettings):
+            flow: FlowSettings          # auto-instantiated child
+            fps = Setting(60.0)
     """
 
     def __init__(self, **kwargs):
@@ -26,10 +32,9 @@ class BaseSettings:
         object.__setattr__(self, "_values", {})
         object.__setattr__(self, "_callbacks", {})
         object.__setattr__(self, "_locks", {})
-        object.__setattr__(self, "_actions", {})
         object.__setattr__(self, "_children", {})
 
-        # Collect Setting, Action, and Child descriptors from the class hierarchy
+        # Collect Setting descriptors from the class hierarchy
         for cls in type(self).__mro__:
             for attr_name, attr_value in vars(cls).items():
                 if isinstance(attr_value, Setting) and attr_name not in self._fields:
@@ -38,12 +43,30 @@ class BaseSettings:
                     self._values[attr_name] = list(default) if isinstance(default, list) else default
                     self._callbacks[attr_name] = []
                     self._locks[attr_name] = threading.Lock()
-                elif isinstance(attr_value, Action) and attr_name not in self._actions:
-                    self._actions[attr_name] = attr_value
-                    self._callbacks[attr_name] = []
-                    self._locks[attr_name] = threading.Lock()
-                elif isinstance(attr_value, Child) and attr_name not in self._children:
-                    self._children[attr_name] = attr_value.settings_type()
+
+        # Auto-detect children from annotations: any annotated type that is a
+        # BaseSettings subclass (and not already a Setting descriptor) becomes
+        # a child, auto-instantiated with defaults.
+        for cls in type(self).__mro__:
+            annotations = vars(cls).get("__annotations__", {})
+            for attr_name, ann in annotations.items():
+                if attr_name in self._fields or attr_name in self._children:
+                    continue
+                # Resolve string annotations if needed
+                resolved = ann
+                if isinstance(ann, str):
+                    ns = {**vars(typing), **{c.__name__: c for c in type(self).__mro__ if hasattr(c, '__name__')}}
+                    # Also pull the module globals where the class was defined
+                    import sys
+                    mod = sys.modules.get(cls.__module__, None)
+                    if mod:
+                        ns.update(vars(mod))
+                    try:
+                        resolved = eval(ann, ns)
+                    except Exception:
+                        continue
+                if isinstance(resolved, type) and issubclass(resolved, BaseSettings) and resolved is not BaseSettings:
+                    self._children[attr_name] = resolved()
 
         # Apply kwargs (init_only fields are still writable here)
         for name, value in kwargs.items():
@@ -61,10 +84,6 @@ class BaseSettings:
         if name.startswith("_"):
             object.__setattr__(self, name, value)
             return
-        if name in self._actions:
-            raise AttributeError(
-                f"Action '{name}' is not assignable — call fire() instead"
-            )
         if name in self._children:
             raise AttributeError(
                 f"Cannot replace child '{name}' — mutate its fields instead"
@@ -81,8 +100,14 @@ class BaseSettings:
         self._fields[name].set(self, value)
 
     def __getattr__(self, name):
+        # Children: return child instance
+        try:
+            children = object.__getattribute__(self, "_children")
+            if name in children:
+                return children[name]
+        except AttributeError:
+            pass
         # Fallback — normally the descriptor __get__ handles known fields.
-        # This catches edge cases (e.g. dynamic lookup via getattr()).
         fields = object.__getattribute__(self, "_fields")
         if name in fields:
             return object.__getattribute__(self, "_values")[name]
@@ -107,8 +132,8 @@ class BaseSettings:
 
     @property
     def actions(self):
-        """Read-only view of all Action descriptors, keyed by name."""
-        return dict(self._actions)
+        """Read-only view of all Widget.button Settings, keyed by name."""
+        return {n: f for n, f in self._fields.items() if f.widget == Widget.button}
 
     @property
     def children(self):
@@ -117,22 +142,22 @@ class BaseSettings:
 
     # -- Callback registration -----------------------------------------------
 
-    def bind(self, field: 'Setting | Action', callback) -> None:
-        """Register a callback for a Setting or Action descriptor.
+    def bind(self, field: 'Setting', callback) -> None:
+        """Register a callback for a Setting descriptor.
 
         Usage::
 
             settings.bind(MySettings.exposure, on_exposure_changed)
             settings.bind(MySettings.reset, on_reset_fired)
         """
-        if field.name not in self._fields and field.name not in self._actions:
+        if field.name not in self._fields:
             raise KeyError(
-                f"'{type(self).__name__}' has no setting or action '{field.name}'"
+                f"'{type(self).__name__}' has no setting '{field.name}'"
             )
         field.bind(self, callback)
 
-    def unbind(self, field: 'Setting | Action', callback) -> None:
-        """Remove a previously registered callback for a Setting or Action."""
+    def unbind(self, field: 'Setting', callback) -> None:
+        """Remove a previously registered callback for a Setting."""
         field.unbind(self, callback)
 
     def bind_all(self, callback) -> None:
