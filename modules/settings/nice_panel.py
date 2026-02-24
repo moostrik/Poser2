@@ -182,10 +182,14 @@ def _build_slider(settings, name, field, polls):
 
 
 
+    # Number of decimal places to round to, derived from step size.
+    _decimals = max(0, -int(__import__('math').floor(__import__('math').log10(step)))) if step > 0 and field.type_ is not int else 0
+
     if not is_disabled:
         def nudge(delta):
             cur = sl.value
-            new = max(field.min, min(field.max, field.type_(cur + delta)))
+            new = round(cur + delta, _decimals) if _decimals else field.type_(cur + delta)
+            new = max(field.min, min(field.max, new))
             sl.set_value(new)
             setattr(settings, name, new)
 
@@ -704,70 +708,69 @@ def _make_poll_timer(polls, timers):
 def _build_settings_body(settings, timers, *, depth=0, expansions=None):
     """Emit the controls for a single Settings instance (no wrapper).
 
-    Uses a 2-column grid for sliders and flows small controls (switches,
-    selects, numbers) inline in a wrapping row for a compact layout.
+    Renders fields in **declaration order**, grouping consecutive runs
+    of same-size controls into appropriate containers:
+      - ``init``   → compact read-only label
+      - ``button`` → action button row
+      - ``small``  → wrapping inline row (switches, selects, numbers)
+      - ``full``   → 2-column grid (sliders, text inputs, lists)
 
     *depth* tracks nesting level (0 = top, 1+ = child of child).
     *expansions* collects ``ui.expansion`` elements for expand/collapse-all.
     """
     polls: list[tuple] = []
 
-    # Separate fields into full-width (sliders) and small (inline) controls
-    full_fields = []
-    small_fields = []
-    init_only_fields = []
-
-    # -- Full / small classification via Widget.resolve() --------------------
     _FULL_WIDGETS = {Widget.slider, Widget.input, Widget.textarea, Widget.checklist, Widget.order}
 
+    # Classify each field into a kind while preserving declaration order.
+    ordered: list[tuple[str, str, Field]] = []  # (kind, name, field)
     for field_name, field in settings.fields.items():
         if not field.visible:
             continue
         if field.widget == Widget.button:
-            continue  # rendered in the actions section
-        if field.access is Access.INIT:
-            init_only_fields.append(field_name)
-            continue
-        resolved = Widget.resolve(field)
-        if resolved in _FULL_WIDGETS or field.type_ in (Point2f, Rect):
-            full_fields.append(field_name)
+            ordered.append(("button", field_name, field))
+        elif field.access is Access.INIT:
+            ordered.append(("init", field_name, field))
         else:
-            small_fields.append(field_name)
+            resolved = Widget.resolve(field)
+            if resolved in _FULL_WIDGETS or field.type_ in (Point2f, Rect):
+                ordered.append(("full", field_name, field))
+            else:
+                ordered.append(("small", field_name, field))
 
-    # Init-only fields as compact read-only labels
-    if init_only_fields:
-        with ui.row().classes("w-full gap-4 flex-wrap"):
-            for field_name in init_only_fields:
-                with ui.row().classes("items-center gap-1"):
-                    ui.label(generate_label(field_name)).classes("text-xs text-caption")
-                    ui.label(str(getattr(settings, field_name))).classes(
-                        "text-sm text-secondary italic"
-                    )
+    # Emit consecutive runs of the same kind in one container.
+    i = 0
+    while i < len(ordered):
+        kind = ordered[i][0]
+        # Collect the run of consecutive same-kind fields.
+        run: list[tuple[str, str, Field]] = []
+        while i < len(ordered) and ordered[i][0] == kind:
+            run.append(ordered[i])
+            i += 1
 
-    # Small controls (switches, selects, numbers) in a wrapping row
-    if small_fields:
-        with ui.row().classes("w-full gap-4 flex-wrap items-end"):
-            for field_name in small_fields:
-                _build_field_control(settings, field_name, settings.fields[field_name], polls)
-
-    # Full-width controls (sliders, text) in a 2-column grid
-    if full_fields:
-        with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-2 poser-grid"):
-            for field_name in full_fields:
-                _build_field_control(settings, field_name, settings.fields[field_name], polls)
+        if kind == "init":
+            with ui.row().classes("w-full gap-4 flex-wrap"):
+                for _, field_name, field in run:
+                    with ui.row().classes("items-center gap-1"):
+                        ui.label(generate_label(field_name)).classes("text-xs text-caption")
+                        ui.label(str(getattr(settings, field_name))).classes(
+                            "text-sm text-secondary italic"
+                        )
+        elif kind == "button":
+            with ui.row().classes("gap-2"):
+                for _, action_name, action_field in run:
+                    _build_action_button(settings, action_name, action_field)
+        elif kind == "small":
+            with ui.row().classes("w-full gap-4 flex-wrap items-end"):
+                for _, field_name, field in run:
+                    _build_field_control(settings, field_name, field, polls)
+        elif kind == "full":
+            with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-2 poser-grid"):
+                for _, field_name, field in run:
+                    _build_field_control(settings, field_name, field, polls)
 
     # Create one poll timer for all fields in this card
     _make_poll_timer(polls, timers)
-
-    # Actions (Widget.button fields)
-    action_items = [
-        (n, f) for n, f in settings.actions.items() if f.visible
-    ]
-    if action_items:
-        ui.separator()
-        with ui.row().classes("gap-2"):
-            for action_name, action_field in action_items:
-                _build_action_button(settings, action_name, action_field)
 
     # Children (recursive)
     for child_name, child in settings.children.items():
