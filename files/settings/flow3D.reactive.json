@@ -1,0 +1,230 @@
+{
+  "render": {
+    "layer": {
+      "select": {
+        "preview": [
+          "composite"
+        ],
+        "final": [
+          "composite"
+        ]
+      },
+      "lut": {
+        "blend_mode": "ALPHA",
+        "lut": "NONE",
+        "lut_strength": 1.0
+      }
+    },
+    "data": {
+      "a": {
+        "mode": "WINDOW",
+        "feature_field": "angle_motion",
+        "stage": "SMOOTH",
+        "line_width": 3.0,
+        "line_smooth": 1.0,
+        "use_scores": false,
+        "render_labels": true
+      },
+      "b": {
+        "mode": "WINDOW",
+        "feature_field": "angle_motion",
+        "stage": "SMOOTH",
+        "line_width": 6.0,
+        "line_smooth": 6.0,
+        "use_scores": false,
+        "render_labels": true
+      }
+    },
+    "preview": {
+      "tracker": {
+        "stage": "LERP",
+        "pose_line_width": 2.0,
+        "bbox_line_width": 2
+      },
+      "poser": {
+        "stage": "LERP",
+        "line_width": 2.0,
+        "line_smooth": 0.0,
+        "use_gpu_crop": true
+      }
+    },
+    "centre": {
+      "geometry": {
+        "stage": "SMOOTH",
+        "cam_aspect": 1.7778,
+        "target_top_x": 0.5,
+        "target_top_y": 0.33,
+        "target_bottom_x": 0.5,
+        "target_bottom_y": 0.6,
+        "dst_aspectratio": 0.5625
+      },
+      "mask": {
+        "blend_factor": 0.2,
+        "dilation_steps": 0,
+        "blur_steps": 0,
+        "blur_radius": 1.0
+      },
+      "cam": {
+        "blend_factor": 0.2,
+        "mask_opacity": 1.0,
+        "use_mask": true
+      },
+      "frg": {
+        "blend_factor": 0.2,
+        "exposure": 1.2,
+        "gamma": 1.0,
+        "offset": 0.0,
+        "contrast": 1.1,
+        "saturation": 2.0,
+        "levels": 9,
+        "smoothness": 0.33,
+        "colorize": 0.96,
+        "sharpen": 0.0,
+        "use_mask": true
+      },
+      "pose": {
+        "line_width": 3.0,
+        "line_smooth": 0.0,
+        "use_scores": false,
+        "draw_anchors": false
+      },
+      "color": {
+        "num_players": 3,
+        "blend_mode": "ALPHA",
+        "similarity_threshold": 0.33,
+        "motion_exponent": 1.5,
+        "add_curve": 2.0,
+        "dodge_curve": 1.5,
+        "layered": 1.0
+      }
+    },
+    "flow": {
+      "fps": 60.0,
+      "draw_mode": "DENSITY_BRIDGE_INPUT_COLOR",
+      "blend_mode": "ADD",
+      "simulation_scale": 0.5,
+      "visualisation": {
+        "toggle_scalar": false,
+        "scale": 1.0,
+        "spacing": 20.0,
+        "element_length": 40.0,
+        "element_width": 1.0
+      },
+      "optical_flow": {
+        "offset": 3,
+        "threshold": 0.0,
+        "strength_x": 3.3,
+        "strength_y": 3.3,
+        "boost": 0.0
+      },
+      "velocity_trail": {
+        "scale": 1.0,
+        "trail_weight": 0.9,
+        "blur_radius": 8.0,
+        "blur_steps": 4
+      },
+      "density_bridge": {
+        "saturation": 1.2,
+        "brightness": 1.0
+      },
+      "temperature_bridge": {
+        "scale": 0.5
+      }
+    },
+    "fluid": {
+      "fps": 110.0,
+      "num_players": 3,
+      "draw_mode": "DENSITY",
+      "blend_mode": "ADD",
+      "simulation_scale": 0.5,
+      "visualisation": {
+        "toggle_scalar": false,
+        "scale": 1.0,
+        "spacing": 20.0,
+        "element_length": 40.0,
+        "element_width": 1.0
+      },
+      "fluid_flow": {
+        "speed": 1.0,
+        "vel_self_advection": 0.01,
+        "den_speed_offset": 0.0,
+        "vel_lifetime": 30.0,
+        "vel_vorticity": 30.0,
+        "vel_vorticity_radius": 10.0,
+        "vel_viscosity": 50.0,
+        "vel_viscosity_iter": 40,
+        "prs_speed": 0.0,
+        "prs_lifetime": 8.0,
+        "prs_iterations": 40,
+        "den_lifetime": 18.0,
+        "tmp_lifetime": 3.0,
+        "tmp_buoyancy": 0.0,
+        "tmp_weight": -10.0,
+        "tmp_ambient": 0.2
+      }
+    },
+    "colors": {
+      "player_0": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_1": {
+        "r": 0.0,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_2": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "pose_left": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "pose_right": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_center": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "history": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      }
+    },
+    "window": {
+      "title": "Poser",
+      "v_sync": false,
+      "fullscreen": false,
+      "monitor": 0,
+      "x": 20,
+      "y": 80,
+      "width": 1080,
+      "height": 1000,
+      "secondary_list": [
+        "M1",
+        "M2",
+        "M3"
+      ]
+    }
+  },
+  "server": {
+    "title": "POSER",
+    "port": 666
+  }
+}
