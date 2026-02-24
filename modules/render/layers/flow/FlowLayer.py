@@ -59,10 +59,10 @@ class FlowLayerSettings(BaseSettings):
     blend_mode = Setting(Style.BlendMode.ADD)
     simulation_scale = Setting(0.5, min=0.1, max=2.0)
 
-    visualisation: VisualisationFieldConfig
-    optical_flow: OpticalFlowConfig
-    velocity_trail: SmoothTrailConfig
-    density_bridge: DensityBridgeConfig
+    visualisation:      VisualisationFieldConfig
+    optical_flow:       OpticalFlowConfig
+    velocity_trail:     SmoothTrailConfig
+    density_bridge:     DensityBridgeConfig
     temperature_bridge: TemperatureBridgeConfig
 
 

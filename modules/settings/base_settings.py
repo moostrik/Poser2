@@ -2,6 +2,7 @@
 
 import copy
 import logging
+import sys
 import threading
 import typing
 
@@ -23,8 +24,7 @@ class BaseSettings:
 
         settings = CameraSettings(resolution=720)
 
-    Child settings are detected automatically from type annotations whose
-    type is a BaseSettings subclass::
+    Child settings are declared via type annotations::
 
         class RenderSettings(BaseSettings):
             flow: FlowSettings          # auto-instantiated child
@@ -39,43 +39,48 @@ class BaseSettings:
         object.__setattr__(self, "_locks", {})
         object.__setattr__(self, "_children", {})
 
-        # Collect Setting descriptors from the class hierarchy
+        # Collect Setting descriptors and child BaseSettings from the class hierarchy
         for cls in type(self).__mro__:
             for attr_name, attr_value in vars(cls).items():
+                if attr_name.startswith("_"):
+                    continue
                 if isinstance(attr_value, Setting) and attr_name not in self._fields:
                     self._fields[attr_name] = attr_value
                     default = attr_value.default
                     self._values[attr_name] = copy.deepcopy(default) if isinstance(default, list) else default
                     self._callbacks[attr_name] = []
                     self._locks[attr_name] = threading.Lock()
+                elif (
+                    isinstance(attr_value, type)
+                    and issubclass(attr_value, BaseSettings)
+                    and attr_value is not BaseSettings
+                    and attr_name not in self._fields
+                    and attr_name not in self._children
+                ):
+                    child = attr_value()
+                    self._children[attr_name] = child
+                    object.__setattr__(self, attr_name, child)
 
-        # Auto-detect children from annotations: any annotated type that is a
-        # BaseSettings subclass (and not already a Setting descriptor) becomes
-        # a child, auto-instantiated with defaults.
+        # Also detect children from type annotations
         for cls in type(self).__mro__:
             annotations = vars(cls).get("__annotations__", {})
             for attr_name, ann in annotations.items():
                 if attr_name in self._fields or attr_name in self._children:
                     continue
-                # Resolve string annotations if needed
                 resolved = ann
                 if isinstance(ann, str):
-                    ns = {**vars(typing), **{c.__name__: c for c in type(self).__mro__ if hasattr(c, '__name__')}}
-                    # Also pull the module globals where the class was defined
-                    import sys
+                    ns = {**vars(typing)}
                     mod = sys.modules.get(cls.__module__, None)
                     if mod:
                         ns.update(vars(mod))
                     try:
                         resolved = eval(ann, ns)
                     except Exception:
-                        logger.warning(
-                            "Could not resolve annotation %r on %s.%s — skipping auto-child",
-                            ann, cls.__name__, attr_name, exc_info=True,
-                        )
                         continue
                 if isinstance(resolved, type) and issubclass(resolved, BaseSettings) and resolved is not BaseSettings:
-                    self._children[attr_name] = resolved()
+                    child = resolved()
+                    self._children[attr_name] = child
+                    object.__setattr__(self, attr_name, child)
 
         # Apply kwargs (init_only fields are still writable here)
         for name, value in kwargs.items():
@@ -109,13 +114,7 @@ class BaseSettings:
         self._fields[name].set(self, value)
 
     def __getattr__(self, name):
-        # Children: return child instance
-        try:
-            children = object.__getattribute__(self, "_children")
-            if name in children:
-                return children[name]
-        except AttributeError:
-            pass
+        # Children are stored as instance attributes — they don't reach here.
         # Fallback — normally the descriptor __get__ handles known fields.
         fields = object.__getattribute__(self, "_fields")
         if name in fields:

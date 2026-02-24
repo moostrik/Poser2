@@ -1,5 +1,4 @@
 # TODO
-# colors without alpha?
 # pulling only on read -> instead of readonly read / write bools?
 # fix datalayer order / dark
 # setvieport more consistent

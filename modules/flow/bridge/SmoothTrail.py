@@ -14,10 +14,10 @@ from .shaders import Trail, GaussianBlur
 
 class SmoothTrailConfig(BaseSettings):
     """Configuration for trail smoothing."""
-    scale = Setting(float, 1.0, min=-10.0, max=10.0, description="Converts optical flow to simulation velocity")
-    trail_weight = Setting(float, 0.9, min=0.0, max=0.99, description="Temporal smoothing (0=no trail, 0.99=long trail)")
-    blur_radius = Setting(float, 8.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
-    blur_steps = Setting(int, 4, min=0, max=8, description="Number of Gaussian blur passes")
+    scale = Setting(1.0, min=-10.0, max=10.0, description="Converts optical flow to simulation velocity")
+    trail_weight = Setting(0.9, min=0.0, max=0.99, description="Temporal smoothing (0=no trail, 0.99=long trail)")
+    blur_radius = Setting(8.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
+    blur_steps = Setting(4, min=0, max=8, description="Number of Gaussian blur passes")
 
 
 class SmoothTrail(FlowBase):

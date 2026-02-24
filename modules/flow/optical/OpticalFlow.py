@@ -16,11 +16,11 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class OpticalFlowConfig(BaseSettings):
-    offset = Setting(int, 3, min=1, max=10, description="Gradient sample offset in pixels")
-    threshold = Setting(float, 0.0, min=0.0, max=0.2, description="Motion detection threshold")
-    strength_x = Setting(float, 3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
-    strength_y = Setting(float, 3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
-    boost = Setting(float, 0.0, min=-0.5, max=0.9, description="Power boost for small motions")
+    offset = Setting(3, min=1, max=10, description="Gradient sample offset in pixels")
+    threshold = Setting(0.0, min=0.0, max=0.2, description="Motion detection threshold")
+    strength_x = Setting(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
+    strength_y = Setting(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
+    boost = Setting(0.0, min=-0.5, max=0.9, description="Power boost for small motions")
 
 
 class OpticalFlow(FlowBase):

@@ -758,7 +758,7 @@ class TestChild(unittest.TestCase):
         self.assertIn("InnerSettings(...)", r)
         self.assertIn("fps=", r)
 
-    # -- Class-level annotation access (no descriptor on the class) -----------
+    # -- Class-level attribute access (child type on the class) ----------------
 
     def test_class_level_annotation_exists(self):
         ann = OuterSettings.__annotations__

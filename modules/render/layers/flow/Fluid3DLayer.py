@@ -50,7 +50,7 @@ class Fluid3DLayerSettings(BaseSettings):
     simulation_scale = Setting(0.5, min=0.1, max=2.0)
 
     visualisation: VisualisationFieldConfig
-    fluid_flow: FluidFlow3DConfig
+    fluid_flow:    FluidFlow3DConfig
 
 
 class Fluid3DLayer(LayerBase):

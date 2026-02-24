@@ -23,7 +23,7 @@ from .shaders.TemperatureBridge import TemperatureBridge as TemperatureBridgeSha
 
 class TemperatureBridgeConfig(BaseSettings):
     """Configuration for temperature bridge."""
-    scale = Setting(float, 0.5, min=-1.0, max=2.0, description="Temperature output multiplier")
+    scale = Setting(0.5, min=-1.0, max=2.0, description="Temperature output multiplier")
 
 
 class TemperatureBridge(FlowBase):

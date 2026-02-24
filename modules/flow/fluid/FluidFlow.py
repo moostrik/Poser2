@@ -45,30 +45,30 @@ class FluidFlowConfig(BaseSettings):
     """
 
     # ---- Transport speed ----
-    speed = Setting(float, 1.0, min=0.0, max=5.0, description="Base fluid transport rate")
-    vel_self_advection = Setting(float, 0.01, min=0.0, max=0.2, description="How much velocity advects itself. Keep low for stability.")
-    den_speed_offset = Setting(float, 0.0, min=-5.0, max=5.0, description="Added to base speed for density only. 0 = physically coupled.")
+    speed = Setting(1.0, min=0.0, max=5.0, description="Base fluid transport rate")
+    vel_self_advection = Setting(0.01, min=0.0, max=0.2, description="How much velocity advects itself. Keep low for stability.")
+    den_speed_offset = Setting(0.0, min=-5.0, max=5.0, description="Added to base speed for density only. 0 = physically coupled.")
 
     # ---- Velocity parameters ----
-    vel_lifetime = Setting(float, 30.0, min=0.01, max=60.0, description="Seconds until velocity fades to ~1%")
-    vel_vorticity = Setting(float, 30.0, min=0.0, max=60.0, description="Vortex confinement strength (adds turbulence)")
-    vel_vorticity_radius = Setting(float, 10.0, min=1.0, max=30.0, description="Curl sampling radius in texels")
-    vel_viscosity = Setting(float, 50.0, min=0.0, max=100.0, description="Fluid thickness/resistance to flow")
-    vel_viscosity_iter = Setting(int, 40, min=1, max=60, description="Solver iterations for viscosity")
+    vel_lifetime = Setting(30.0, min=0.01, max=60.0, description="Seconds until velocity fades to ~1%")
+    vel_vorticity = Setting(30.0, min=0.0, max=60.0, description="Vortex confinement strength (adds turbulence)")
+    vel_vorticity_radius = Setting(10.0, min=1.0, max=30.0, description="Curl sampling radius in texels")
+    vel_viscosity = Setting(50.0, min=0.0, max=100.0, description="Fluid thickness/resistance to flow")
+    vel_viscosity_iter = Setting(40, min=1, max=60, description="Solver iterations for viscosity")
 
     # ---- Pressure parameters ----
-    prs_speed = Setting(float, 0.0, min=0.0, max=2.0, description="Pressure advection speed")
-    prs_lifetime = Setting(float, 8.0, min=0.01, max=60.0, description="Seconds until pressure fades to ~1%")
-    prs_iterations = Setting(int, 40, min=1, max=60, description="Solver iterations for pressure")
+    prs_speed = Setting(0.0, min=0.0, max=2.0, description="Pressure advection speed")
+    prs_lifetime = Setting(8.0, min=0.01, max=60.0, description="Seconds until pressure fades to ~1%")
+    prs_iterations = Setting(40, min=1, max=60, description="Solver iterations for pressure")
 
     # ---- Density parameters ----
-    den_lifetime = Setting(float, 30.0, min=0.01, max=60.0, description="Seconds until density fades to ~1%")
+    den_lifetime = Setting(30.0, min=0.01, max=60.0, description="Seconds until density fades to ~1%")
 
     # ---- Temperature parameters ----
-    tmp_lifetime = Setting(float, 3.0, min=0.01, max=60.0, description="Seconds until temperature fades to ~1%")
-    tmp_buoyancy = Setting(float, 0.0, min=0.0, max=10.0, description="Thermal buoyancy coefficient: hot air rises")
-    tmp_weight = Setting(float, -10.0, min=-20.0, max=2.0, description="Ratio of gravity/settling vs thermal lift")
-    tmp_ambient = Setting(float, 0.2, min=0.0, max=1.0, description="Reference temperature (buoyancy = 0 at this temp)")
+    tmp_lifetime = Setting(3.0, min=0.01, max=60.0, description="Seconds until temperature fades to ~1%")
+    tmp_buoyancy = Setting(0.0, min=0.0, max=10.0, description="Thermal buoyancy coefficient: hot air rises")
+    tmp_weight = Setting(-10.0, min=-20.0, max=2.0, description="Ratio of gravity/settling vs thermal lift")
+    tmp_ambient = Setting(0.2, min=0.0, max=1.0, description="Reference temperature (buoyancy = 0 at this temp)")
 
 
 class FluidFlow(FlowBase):
