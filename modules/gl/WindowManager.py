@@ -33,8 +33,8 @@ class MonitorId(IntEnum):
 class WindowSettings(BaseSettings):
     """Window / init configuration — set once before RenderManager starts."""
     title: Setting[str] =           Setting("Poser", init_only=True, visible=False)
-    fps: Setting[int] =             Setting(60, readonly=True, pinned=True)
-    min_fps: Setting[int] =         Setting(60, readonly=True, pinned=True)
+    fps: Setting[int] =             Setting(60, readonly=True, pinned=True, description="Average Camera FPS")
+    min_fps: Setting[int] =         Setting(60, readonly=True, pinned=True, description="Minimum Camera FPS")
     v_sync: Setting[bool] =         Setting(True)
     fullscreen: Setting[bool] =     Setting(False)
     monitor: Setting[int] =         Setting(0)

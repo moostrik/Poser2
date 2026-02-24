@@ -51,13 +51,23 @@ def _build_field_control(settings, name, field, polls):
     *polls* collects ``(settings, name, [last_value], setter)`` tuples.
     A timer created by the caller will poll these periodically to push
     external changes into the UI — thread-safe by construction.
+
+    If the field has a non-empty ``description``, the control is wrapped
+    in a container with a hover tooltip showing that description.
     """
+    desc = field.description
     resolved = Widget.resolve(field)
     builder = _BUILDERS.get(resolved)
-    if builder is not None:
-        return builder(settings, name, field, polls)
-    # Fallback for types without a registered builder (Point2f, Rect, etc.)
-    return _build_fallback(settings, name, field, polls)
+    if desc:
+        with ui.element('div'):
+            ui.tooltip(desc).props('anchor="top middle" self="bottom middle" delay=800')
+            if builder is not None:
+                return builder(settings, name, field, polls)
+            return _build_fallback(settings, name, field, polls)
+    else:
+        if builder is not None:
+            return builder(settings, name, field, polls)
+        return _build_fallback(settings, name, field, polls)
 
 
 # ---------------------------------------------------------------------------
