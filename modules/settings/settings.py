@@ -213,6 +213,8 @@ class Settings:
         is ``False`` (before ``initialize()`` has been called).
 
         Nested dicts matching child names are forwarded to the child.
+        Bad values are logged and skipped — one broken field does not
+        prevent the remaining fields from loading.
         """
         for name, raw in data.items():
             if name in self._children and isinstance(raw, dict):
@@ -226,7 +228,18 @@ class Settings:
                 field = self._fields[name]
                 if field.access is Access.INIT and self._initialized:
                     continue
-                field.from_json_value(self, raw)
+                try:
+                    field.from_json_value(self, raw)
+                except (TypeError, ValueError) as exc:
+                    logger.warning(
+                        "%s.update_from_dict: skipping '%s' — %s",
+                        type(self).__name__, name, exc,
+                    )
+            else:
+                logger.warning(
+                    "%s.update_from_dict: ignoring unknown key '%s'",
+                    type(self).__name__, name,
+                )
 
     # -- Equality ------------------------------------------------------------
 

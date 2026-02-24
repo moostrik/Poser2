@@ -41,12 +41,26 @@ def set_startup(name: str) -> None:
 
 
 def save(root: Settings, filepath) -> None:
-    """Serialize all settings to a JSON file."""
+    """Serialize all settings to a JSON file (atomic write)."""
+    import os
+    import tempfile
+
     data = root.to_dict()
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    # Write to a temp file in the same directory, then atomically replace.
+    fd, tmp = tempfile.mkstemp(dir=filepath.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp, filepath)
+    except BaseException:
+        # Clean up the temp file on any failure
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def startup_path() -> Path:

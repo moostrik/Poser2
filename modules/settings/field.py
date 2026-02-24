@@ -229,8 +229,17 @@ class Field(Generic[T]):
     def _coerce_element(self, v):
         """Coerce a single list element to self._element_type."""
         et: type = self._element_type  # type: ignore[assignment]
+        # Reject bool when int or float is expected (bool is a subclass of int)
+        if et in (int, float) and isinstance(v, bool):
+            raise TypeError(
+                f"Field '{self.name}' list element expects {et.__name__}, "
+                f"got bool: {v!r}"
+            )
         if isinstance(v, et):
             return v
+        # Promote int → float for float lists
+        if et is float and isinstance(v, int):
+            return float(v)
         # Enum element: reconstruct from name (str) or value (int)
         if isinstance(et, type) and issubclass(et, Enum):
             if isinstance(v, str):

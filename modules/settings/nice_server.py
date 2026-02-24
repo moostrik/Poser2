@@ -78,9 +78,12 @@ class NiceServer:
 
     def stop(self) -> None:
         """Shut down the NiceGUI settings server."""
+        thread = self._thread
         try:
             nicegui_app.shutdown()
             logger.info("Settings server stopped")
         except Exception:
             logger.warning("Settings server shutdown failed", exc_info=True)
+        if thread is not None:
+            thread.join(timeout=3)
         self._thread = None

@@ -307,7 +307,25 @@ class TestSerialization(unittest.TestCase):
 
     def test_update_from_dict_ignores_unknown_keys(self):
         s = CameraSettings()
-        s.update_from_dict({"unknown_key": 42})  # should not raise
+        with self.assertLogs("modules.settings.settings", level="WARNING") as cm:
+            s.update_from_dict({"unknown_key": 42})
+        self.assertTrue(any("unknown key 'unknown_key'" in m for m in cm.output))
+
+    def test_update_from_dict_skips_bad_value_continues(self):
+        """M1: one bad value should not prevent the rest from loading."""
+        s = CameraSettings()
+        s.update_from_dict({
+            "exposure": "not_a_number",   # bad — should be skipped
+            "gain": 8.0,                  # good — should still apply
+        })
+        self.assertEqual(s.exposure, 1000)   # unchanged (bad value skipped)
+        self.assertEqual(s.gain, 8.0)        # applied despite earlier bad value
+
+    def test_update_from_dict_bad_value_logs_warning(self):
+        s = CameraSettings()
+        with self.assertLogs("modules.settings.settings", level="WARNING") as cm:
+            s.update_from_dict({"exposure": "not_a_number"})
+        self.assertTrue(any("exposure" in m for m in cm.output))
 
 
 class TestRepr(unittest.TestCase):
@@ -431,6 +449,26 @@ class TestPresetSaveLoad(unittest.TestCase):
         root = self._make_root()
         self.assertIn("camera", root.children)
         self.assertIsInstance(root.camera, CameraSettings)
+
+    def test_save_is_atomic(self):
+        """M5: save writes to a temp file then atomically replaces."""
+        root = self._make_root()
+        root.camera.exposure = 4242
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "settings.json")
+            # Save twice — second write should not corrupt the first
+            presets.save(root, path)
+            root.camera.exposure = 9999
+            presets.save(root, path)
+
+            with open(path, "r") as f:
+                raw = json.load(f)
+            self.assertEqual(raw["camera"]["exposure"], 9999)
+
+            # No leftover .tmp files
+            tmp_files = [f for f in os.listdir(tmpdir) if f.endswith(".tmp")]
+            self.assertEqual(tmp_files, [])
 
 
 class TestSettingMetadata(unittest.TestCase):
@@ -985,6 +1023,19 @@ class TestListSetting(unittest.TestCase):
     def test_empty_list_default_rejected(self):
         with self.assertRaises(ValueError):
             Field([])
+
+    def test_reject_bool_in_int_list(self):
+        """M2: bool should not pass as int in list elements."""
+        s = ListSettings()
+        with self.assertRaises(TypeError):
+            s.ids = [True, 2, 3]
+
+    def test_reject_bool_in_float_list(self):
+        class FloatListSettings(Settings):
+            vals = Field([1.0, 2.0])
+        s = FloatListSettings()
+        with self.assertRaises(TypeError):
+            s.vals = [False, 2.0]
 
 
 # ---------------------------------------------------------------------------

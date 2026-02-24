@@ -168,7 +168,7 @@ def _build_number(settings, name, field, polls):
     num = ui.number(
         label=label,
         value=value,
-        step=field.step or (1 if field.type_ is int else 0.01),
+        step=field.step if field.step is not None else (1 if field.type_ is int else 0.01),
         format="%.0f" if field.type_ is int else "%.2f",
     ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
