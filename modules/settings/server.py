@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class ServerSettings(BaseSettings):
     """Configuration for the NiceGUI settings server."""
-    title: Setting[str] = Setting("POSER", access=Setting.INIT, visible=False)
+    title: Setting[str] = Setting("Settings", access=Setting.INIT, visible=False)
     port: Setting[int] = Setting(666, access=Setting.INIT, visible=False)
 
 
@@ -47,6 +47,7 @@ class SettingsServer:
                 create_settings_panel(root, title=title, port=port, on_exit=on_exit)
 
         def _run():
+            nicegui_app.config.show_welcome_message = False
             ui.run(
                 port=port,
                 title=title,
@@ -60,17 +61,20 @@ class SettingsServer:
         self._thread = threading.Thread(target=_run, daemon=True, name="settings-ui")
         self._thread.start()
 
-        # Log connection URLs instead of opening a browser window
+        # Log connection URLs (skip loopback and link-local addresses)
+        BLUE = "\033[94m"
+        RESET = "\033[0m"
         import socket
         try:
             hostname = socket.gethostname()
             _, _, ips = socket.gethostbyname_ex(hostname)
             for ip in ips:
-                if not ip.startswith("127."):
-                    logger.info(f"Settings UI: http://{ip}:{port}")
+                if ip.startswith("127.") or ip.startswith("169.254."):
+                    continue
+                print(f"Settings UI: {BLUE}http://{ip}:{port}{RESET}", flush=True)
         except Exception:
             pass
-        logger.info(f"Settings UI: http://localhost:{port}")
+        print(f"Settings UI: {BLUE}http://localhost:{port}{RESET}", flush=True)
 
     def stop(self) -> None:
         """Shut down the NiceGUI settings server."""

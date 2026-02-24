@@ -90,8 +90,6 @@ class BaseSettings:
                 )
             self._fields[name].set(self, value)
 
-        object.__setattr__(self, "_initialized", True)
-
     # -- Attribute access guard ----------------------------------------------
 
     def __setattr__(self, name, value):
@@ -198,8 +196,21 @@ class BaseSettings:
             result[name] = child.to_dict()
         return result
 
+    def initialize(self):
+        """Lock INIT fields.  Call once after the startup preset is loaded.
+
+        After this call, ``Access.INIT`` fields can no longer be written
+        programmatically or via ``update_from_dict``.
+        """
+        object.__setattr__(self, '_initialized', True)
+        for child in self._children.values():
+            child.initialize()
+
     def update_from_dict(self, data):
-        """Restore fields from a dict. Skips Access.INIT fields after init.
+        """Restore fields from a dict.
+
+        ``Access.INIT`` fields are included only while ``_initialized``
+        is ``False`` (before ``initialize()`` has been called).
 
         Nested dicts matching child names are forwarded to the child.
         """

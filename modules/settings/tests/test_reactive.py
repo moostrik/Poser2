@@ -147,24 +147,36 @@ class TestInitAccess(unittest.TestCase):
         s = CameraSettings(resolution=720)
         self.assertEqual(s.resolution, 720)
 
-    def test_init_raises_after_init(self):
+    def test_init_raises_after_initialize(self):
         s = CameraSettings()
+        s.initialize()
         with self.assertRaises(AttributeError):
             s.resolution = 480
 
-    def test_init_loadable_via_set_before_init(self):
+    def test_init_writable_before_initialize(self):
         s = CameraSettings()
-        # Simulate pre-init state: can set INIT fields
-        object.__setattr__(s, "_initialized", False)
         s.resolution = 480
-        object.__setattr__(s, "_initialized", True)
         self.assertEqual(s.resolution, 480)
 
-    def test_init_skipped_by_update_from_dict(self):
+    def test_init_skipped_by_update_from_dict_after_initialize(self):
         s = CameraSettings(resolution=720)
+        # Before initialize: INIT fields are applied
         s.update_from_dict({"resolution": 480})
-        # INIT field should NOT be overwritten after init
-        self.assertEqual(s.resolution, 720)
+        self.assertEqual(s.resolution, 480)
+        # Lock INIT fields
+        s.initialize()
+        # After initialize: INIT fields are skipped
+        s.update_from_dict({"resolution": 1080})
+        self.assertEqual(s.resolution, 480)
+
+    def test_initialize_recurses_to_children(self):
+        from modules.settings.tests.test_reactive import OuterSettings
+        s = OuterSettings()
+        self.assertFalse(s._initialized)
+        self.assertFalse(s.inner._initialized)
+        s.initialize()
+        self.assertTrue(s._initialized)
+        self.assertTrue(s.inner._initialized)
 
 
 class TestCallbacks(unittest.TestCase):

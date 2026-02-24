@@ -6,11 +6,10 @@ from datetime import datetime
 import os
 
 # Local application imports
-from modules.render.RenderManager import RenderManager
-from modules.render.render_settings import RenderSettings
+from modules.settings import BaseSettings, presets, SettingsServer, ServerSettings
 from modules.Settings import Settings
+from modules.render import RenderManager, RenderSettings
 from modules.DataHub import DataHub, Stage
-from modules.pose.Frame import FrameField
 from modules.gui import Gui
 from modules.gui.ConfigGuiGenerator import ConfigGuiGenerator
 from modules.inout import OscSound, ArtNetLed
@@ -18,9 +17,13 @@ from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBan
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
 from modules.utils import Timer, TimerConfig
-from modules.settings import BaseSettings
-from modules.settings import presets
-from modules.settings.server import SettingsServer, ServerSettings
+
+
+# M SETTINGS (root BaseSettings — children auto-detected)
+class MainSettings(BaseSettings):
+    render: RenderSettings
+    server: ServerSettings
+
 
 class Main():
     def __init__(self, settings: Settings) -> None:
@@ -28,6 +31,11 @@ class Main():
         self.settings: Settings = settings
         self.gui = Gui(settings.gui)
         num_players: int = settings.num_players
+
+        self.new_settings = MainSettings()
+        if not presets.load(self.new_settings, presets.startup_path()):
+            presets.save(self.new_settings, presets.startup_path())  # create default preset if loading failed
+        self.new_settings.initialize()
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -72,21 +80,12 @@ class Main():
         self.timer = Timer(self.timer_config)
         self.timer_gui = ConfigGuiGenerator(self.timer_config, self.gui, "Timer")
 
-        # APP SETTINGS (root BaseSettings — children auto-detected)
-        class AppSettings(BaseSettings):
-            render: RenderSettings
-            server: ServerSettings
-
-        self.app_settings = AppSettings()
-        self.render_settings = self.app_settings.render
-
+        self.render_settings = self.new_settings.render
         self.render = RenderManager(self.data_hub, self.render_settings, num_cams=len(self.cameras), num_players=settings.num_players)
 
-        # Load startup preset (after all subsystems initialised)
-        presets.load_startup(self.app_settings)
 
         # Start settings server
-        self.settings_server = SettingsServer(self.app_settings, self.app_settings.server, on_exit=self.stop)
+        self.settings_server = SettingsServer(self.new_settings, self.new_settings.server, on_exit=self.stop)
         self.settings_server.start()
 
         # POSE CONFIGURATION

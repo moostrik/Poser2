@@ -49,7 +49,16 @@ def save(root: BaseSettings, filepath) -> None:
         json.dump(data, f, indent=2)
 
 
-def load(root: BaseSettings, filepath) -> None:
+def startup_path() -> Path:
+    """Return the file path for the startup preset.
+
+    If the file does not exist yet, a default preset is **not** created
+    here — the caller decides what to do.
+    """
+    return path(get_startup())
+
+
+def load(root: BaseSettings, filepath) -> bool:
     """Restore settings from a JSON file.
 
     Skips unknown fields and init_only fields.  Silently handles
@@ -57,20 +66,15 @@ def load(root: BaseSettings, filepath) -> None:
     """
     filepath = Path(filepath)
     if not filepath.exists():
-        return
+        logger.warning(f"Preset file not found: {filepath}")
+        return False
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
-        return
+        logger.warning(f"Failed to load preset: {filepath}")
+        return False
     root.update_from_dict(data)
+    logger.info(f"Loaded preset: {filepath}")
+    return True
 
-
-def load_startup(root: BaseSettings) -> None:
-    """Load the startup preset.  Falls back to saving defaults if missing."""
-    name = get_startup()
-    p = path(name)
-    if p.exists():
-        load(root, p)
-    else:
-        save(root, path("default"))

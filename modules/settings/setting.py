@@ -145,6 +145,10 @@ class Setting(Generic[T]):
             raise AttributeError(
                 f"Setting '{self.name}' can only be set during initialization"
             )
+        self._apply(obj, value)
+
+    def _apply(self, obj, value):
+        """Write *value* unconditionally (coerce, store, fire callbacks)."""
         value = self._coerce(value)
         lock = obj._locks[self.name]
         callbacks_to_fire = []
@@ -287,12 +291,12 @@ class Setting(Generic[T]):
         return value
 
     def from_json_value(self, obj, raw):
-        """Restore value from JSON via set().
+        """Restore value from JSON, bypassing the INIT guard.
 
-        Will raise AttributeError on init_only fields after initialization.
-        Callers (e.g. update_from_dict) are responsible for skipping those.
+        Callers (``update_from_dict``) decide whether INIT fields should
+        be written; this method just applies the value unconditionally.
         """
-        self.set(obj, raw)
+        self._apply(obj, raw)
 
     # -- Repr ----------------------------------------------------------------
 
