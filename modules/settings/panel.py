@@ -1,15 +1,18 @@
 """NiceGUI settings panel — auto-generates a tabbed UI from a SettingsRegistry."""
 
+from __future__ import annotations
+
 from enum import Enum
 from pathlib import Path
-from typing import get_origin, get_args
+from typing import Callable, get_origin, get_args
 
 from nicegui import app, ui
 
 from modules.settings.base_settings import BaseSettings
 from modules.settings import presets
 from modules.settings.registry import SettingsRegistry
-from modules.settings.setting import Setting, Widget
+from modules.settings.setting import Setting
+from modules.settings.widget import Widget
 from modules.utils import Color, Point2f, Rect
 
 # ---------------------------------------------------------------------------
@@ -50,107 +53,433 @@ def _build_field_control(settings, name, field, polls):
     A timer created by the caller will poll these periodically to push
     external changes into the UI — thread-safe by construction.
     """
+    resolved = Widget.resolve(field)
+    builder = _BUILDERS.get(resolved)
+    if builder is not None:
+        return builder(settings, name, field, polls)
+    # Fallback for types without a registered builder (Point2f, Rect, etc.)
+    return _build_fallback(settings, name, field, polls)
+
+
+# ---------------------------------------------------------------------------
+# Builder registry — maps Widget constants to NiceGUI builder functions.
+# Each builder receives (settings, name, field, polls) and returns 'full'
+# or 'small'.  Use @widget_builder(Widget.xxx) to register.
+# ---------------------------------------------------------------------------
+
+_BUILDERS: dict[Widget, Callable] = {}
+
+
+def widget_builder(widget: Widget):
+    """Decorator: register a panel builder for a Widget constant."""
+    def decorator(fn: Callable) -> Callable:
+        _BUILDERS[widget] = fn
+        return fn
+    return decorator
+
+
+# -- bool builders -----------------------------------------------------------
+
+@widget_builder(Widget.switch)
+def _build_switch(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     is_disabled = field.readonly
 
-    # -- Enum → select -------------------------------------------------------
-    if isinstance(field.type_, type) and issubclass(field.type_, Enum):
-        options = {m.name: m.name for m in field.type_}
-        sel = ui.select(
-            options=options,
-            value=value.name,
-            label=label,
-        ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]")
+    sw = ui.switch(label, value=value).props(
+        "dense" + (" disable" if is_disabled else "")
+    )
 
-        if not is_disabled:
-            def on_select_change(e, f=field):
-                setattr(settings, name, f.type_[e.value])
-            sel.on_value_change(on_select_change)
+    if not is_disabled:
+        def on_switch_change(e):
+            setattr(settings, name, e.value)
+        sw.on_value_change(on_switch_change)
 
-        polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v)))
-        return 'small'
+    polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
+    return 'small'
 
-    # -- bool + Widget.toggle → toggle button --------------------------------
-    if field.type_ is bool and field.widget == Widget.toggle:
-        tg = ui.toggle({True: label, False: label}, value=value).props(
-            "dense" + (" disable" if is_disabled else "")
-        )
 
-        if not is_disabled:
-            def on_toggle_change(e):
-                setattr(settings, name, e.value)
-            tg.on_value_change(on_toggle_change)
+@widget_builder(Widget.toggle)
+def _build_toggle(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
 
-        polls.append((settings, name, [value], lambda v, tg=tg: tg.set_value(v)))
-        return 'small'
+    tg = ui.toggle({True: label, False: label}, value=value).props(
+        "dense" + (" disable" if is_disabled else "")
+    )
 
-    # -- bool → switch -------------------------------------------------------
-    if field.type_ is bool:
-        sw = ui.switch(label, value=value).props(
-            "dense" + (" disable" if is_disabled else "")
-        )
+    if not is_disabled:
+        def on_toggle_change(e):
+            setattr(settings, name, e.value)
+        tg.on_value_change(on_toggle_change)
 
-        if not is_disabled:
-            def on_switch_change(e):
-                setattr(settings, name, e.value)
-            sw.on_value_change(on_switch_change)
+    polls.append((settings, name, [value], lambda v, tg=tg: tg.set_value(v)))
+    return 'small'
 
-        polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
-        return 'small'
 
-    # -- int/float with min+max → slider -------------------------------------
-    if field.type_ in (int, float) and field.min is not None and field.max is not None:
-        step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
+# -- numeric builders --------------------------------------------------------
 
-        with ui.column().classes("w-full gap-0 pt-2 pb-1"):
-            ui.label(label).classes("text-xs text-caption")
-            sl = ui.slider(
-                min=field.min, max=field.max, step=step, value=value
-            ).props("dense label-always" + (" disable" if is_disabled else ""))
+@widget_builder(Widget.slider)
+def _build_slider(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
+    step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
 
-        if not is_disabled:
-            def on_slider_change(e):
+    with ui.column().classes("w-full gap-0 pt-2 pb-1"):
+        ui.label(label).classes("text-xs text-caption")
+        sl = ui.slider(
+            min=field.min, max=field.max, step=step, value=value
+        ).props("dense label-always" + (" disable" if is_disabled else ""))
+
+    if not is_disabled:
+        def on_slider_change(e):
+            setattr(settings, name, field.type_(e.value))
+        sl.on_value_change(on_slider_change)
+
+    polls.append((settings, name, [value], lambda v, sl=sl: sl.set_value(v)))
+    return 'full'
+
+
+@widget_builder(Widget.number)
+def _build_number(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
+
+    num = ui.number(
+        label=label,
+        value=value,
+        step=field.step or (1 if field.type_ is int else 0.01),
+        format="%.0f" if field.type_ is int else "%.2f",
+    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+
+    if not is_disabled:
+        def on_num_change(e):
+            if e.value is not None:
                 setattr(settings, name, field.type_(e.value))
-            sl.on_value_change(on_slider_change)
+        num.on_value_change(on_num_change)
 
-        polls.append((settings, name, [value], lambda v, sl=sl: sl.set_value(v)))
-        return 'full'
+    polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
+    return 'small'
 
-    # -- int/float without range → number input ------------------------------
-    if field.type_ in (int, float):
-        num = ui.number(
-            label=label,
-            value=value,
-            step=field.step or (1 if field.type_ is int else 0.01),
-            format=f"%.0f" if field.type_ is int else f"%.2f",
-        ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
 
-        if not is_disabled:
-            def on_num_change(e):
-                if e.value is not None:
-                    setattr(settings, name, field.type_(e.value))
-            num.on_value_change(on_num_change)
+@widget_builder(Widget.knob)
+def _build_knob(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
+    step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
+    min_val = field.min if field.min is not None else 0
+    max_val = field.max if field.max is not None else 100
 
-        polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
-        return 'small'
+    with ui.column().classes("items-center gap-0"):
+        kn = ui.knob(
+            value=value, min=min_val, max=max_val, step=step,
+            show_value=True, size="lg",
+        ).props(
+            "thickness=0.2" + (" disable" if is_disabled else "")
+        )
+        ui.label(label).classes("text-xs text-caption")
 
-    # -- Color → color picker ------------------------------------------------
-    if field.type_ is Color:
-        hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
+    if not is_disabled:
+        def on_knob_change(e):
+            setattr(settings, name, field.type_(e.value))
+        kn.on_value_change(on_knob_change)
+
+    polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(v)))
+    return 'small'
+
+
+# -- enum builders -----------------------------------------------------------
+
+@widget_builder(Widget.select)
+def _build_select(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
+
+    options = {m.name: m.name for m in field.type_}
+    sel = ui.select(
+        options=options,
+        value=value.name,
+        label=label,
+    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("min-w-[120px]")
+
+    if not is_disabled:
+        def on_select_change(e, f=field):
+            setattr(settings, name, f.type_[e.value])
+        sel.on_value_change(on_select_change)
+
+    polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v)))
+    return 'small'
+
+
+@widget_builder(Widget.radio)
+def _build_radio(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
+
+    options = {m: generate_label(m.name) for m in field.type_}
+    with ui.column().classes("gap-0 pt-1 pb-1"):
+        ui.label(label).classes("text-xs text-caption")
+        rg = ui.toggle(options=options, value=value).props(
+            "dense" + (" disable" if is_disabled else "")
+        )
+
+    if not is_disabled:
+        def on_radio_change(e):
+            setattr(settings, name, e.value)
+        rg.on_value_change(on_radio_change)
+
+    polls.append((settings, name, [value], lambda v, rg=rg: rg.set_value(v)))
+    return 'small'
+
+
+# -- string builders ---------------------------------------------------------
+
+@widget_builder(Widget.input)
+def _build_input(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
+
+    inp = ui.input(label=label, value=value).props(
+        "dense outlined" + (" disable" if is_disabled else "")
+    )
+
+    if not is_disabled:
+        def on_input_change(e):
+            setattr(settings, name, e.value)
+        inp.on_value_change(on_input_change)
+
+    polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
+    return 'full'
+
+
+@widget_builder(Widget.ip)
+def _build_ip(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
+
+    inp = ui.input(
+        label=label, value=value,
+        validation={"Invalid IP": lambda v: all(
+            p.isdigit() and 0 <= int(p) <= 255 for p in v.split(".")
+        ) if v.count(".") == 3 else False},
+    ).props(
+        'dense outlined mask="###.###.###.###"' + (" disable" if is_disabled else "")
+    ).classes("w-40")
+
+    if not is_disabled:
+        def on_ip_change(e):
+            setattr(settings, name, e.value)
+        inp.on_value_change(on_ip_change)
+
+    polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
+    return 'small'
+
+
+@widget_builder(Widget.textarea)
+def _build_textarea(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
+
+    ta = ui.textarea(label=label, value=value).props(
+        "dense outlined" + (" disable" if is_disabled else "")
+    )
+
+    if not is_disabled:
+        def on_ta_change(e):
+            setattr(settings, name, e.value)
+        ta.on_value_change(on_ta_change)
+
+    polls.append((settings, name, [value], lambda v, ta=ta: ta.set_value(v)))
+    return 'full'
+
+
+# -- color builders ----------------------------------------------------------
+
+@widget_builder(Widget.color)
+def _build_color(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
+
+    hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
+    ci = ui.color_input(
+        label=label, value=hex_val
+    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-40")
+
+    if not is_disabled:
+        def on_color_change(e):
+            if e.value:
+                c = Color.from_hex(e.value)
+                setattr(settings, name, Color(c.r, c.g, c.b, 1.0))
+        ci.on_value_change(on_color_change)
+
+    polls.append((settings, name, [value], lambda v, _ci=ci: _ci.set_value(v.to_hex() if isinstance(v, Color) else '#000000')))
+    return 'small'
+
+
+@widget_builder(Widget.color_alpha)
+def _build_color_alpha(settings, name, field, polls):
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
+
+    hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
+    alpha = value.a if isinstance(value, Color) else 1.0
+
+    with ui.row().classes("items-end gap-2"):
         ci = ui.color_input(
             label=label, value=hex_val
-        ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-40")
+        ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-32")
 
-        if not is_disabled:
-            def on_color_change(e):
-                if e.value:
-                    c = Color.from_hex(e.value)
-                    setattr(settings, name, Color(c.r, c.g, c.b, 1.0))
-            ci.on_value_change(on_color_change)
+        alpha_num = ui.number(
+            label="A", value=alpha,
+            min=0.0, max=1.0, step=0.01,
+            format="%.2f",
+        ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-20")
 
-        polls.append((settings, name, [value], lambda v, _ci=ci: _ci.set_value(v.to_hex() if isinstance(v, Color) else '#000000')))
-        return 'small'
+    if not is_disabled:
+        def on_color_change(e):
+            if e.value:
+                c = Color.from_hex(e.value)
+                cur_alpha = alpha_num.value or 1.0
+                setattr(settings, name, Color(c.r, c.g, c.b, float(cur_alpha)))
+        ci.on_value_change(on_color_change)
+
+        def on_alpha_change(e):
+            if e.value is not None:
+                cur = getattr(settings, name)
+                setattr(settings, name, Color(cur.r, cur.g, cur.b, float(e.value)))
+        alpha_num.on_value_change(on_alpha_change)
+
+    def _color_alpha_setter(v, _ci=ci, _an=alpha_num):
+        if isinstance(v, Color):
+            _ci.set_value(v.to_hex())
+            _an.set_value(v.a)
+
+    polls.append((settings, name, [value], _color_alpha_setter))
+    return 'small'
+
+
+# -- list builders -----------------------------------------------------------
+
+def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool):
+    """Shared implementation for checklist (with checkboxes) and order (without)."""
+    value = getattr(settings, name)
+    label = generate_label(name)
+
+    elem_type = get_args(field.type_)[0] if get_args(field.type_) else None
+    if elem_type is None or not (isinstance(elem_type, type) and issubclass(elem_type, Enum)):
+        # Fallback for non-enum lists
+        return _build_fallback(settings, name, field, polls)
+
+    all_members = list(elem_type)
+    active_set = set(value)
+
+    with ui.column().classes("w-full gap-1 pt-2 pb-1"):
+        ui.label(label).classes("text-xs text-caption")
+        container = ui.column().classes("w-full gap-0 border rounded p-1")
+
+        if with_checkboxes:
+            ordered = list(value) + [m for m in all_members if m not in active_set]
+        else:
+            # Order-only: all members always active, ordered as in value
+            ordered = list(value)
+        state = {"order": ordered, "active": set(value) if with_checkboxes else set(all_members)}
+
+        def _rebuild(cont, st, _settings=settings, _name=name, _elem=elem_type, _cb=with_checkboxes):
+            cont.clear()
+            with cont:
+                for idx, member in enumerate(st["order"]):
+                    is_active = member in st["active"]
+                    with ui.row().classes(
+                        "w-full items-center gap-2 px-2 py-0.5 rounded cursor-move"
+                        + ("" if is_active else " opacity-50")
+                    ).style(
+                        "background: color-mix(in srgb, var(--q-primary) 15%, transparent);"
+                        if is_active else ""
+                    ):
+                        if _cb:
+                            cb_widget = ui.checkbox(
+                                value=is_active,
+                            ).props("dense").classes("my-0")
+
+                        ui.label(generate_label(member.name)).classes("text-sm flex-1")
+
+                        up_btn = ui.button(
+                            icon="arrow_upward",
+                            on_click=lambda _, i=idx: _move(cont, st, i, -1),
+                        ).props("dense flat size=xs").classes("my-0")
+                        down_btn = ui.button(
+                            icon="arrow_downward",
+                            on_click=lambda _, i=idx: _move(cont, st, i, 1),
+                        ).props("dense flat size=xs").classes("my-0")
+
+                        if idx == 0:
+                            up_btn.props("disable")
+                        if idx == len(st["order"]) - 1:
+                            down_btn.props("disable")
+
+                        if _cb:
+                            def _on_check(e, m=member):
+                                if e.value:
+                                    st["active"].add(m)
+                                else:
+                                    st["active"].discard(m)
+                                _apply(cont, st)
+                            cb_widget.on_value_change(_on_check)
+
+        def _move(cont, st, idx, direction):
+            new_idx = idx + direction
+            if 0 <= new_idx < len(st["order"]):
+                st["order"][idx], st["order"][new_idx] = st["order"][new_idx], st["order"][idx]
+                _apply(cont, st)
+
+        def _apply(cont, st):
+            new_list = [m for m in st["order"] if m in st["active"]]
+            setattr(settings, name, new_list)
+            _rebuild(cont, st)
+
+        _rebuild(container, state)
+
+    def _list_setter(v, _cont=container, _st=state, _elem=elem_type, _cb=with_checkboxes):
+        active_set_inner = set(v)
+        _st["active"] = active_set_inner
+        if _cb:
+            _st["order"] = list(v) + [m for m in list(_elem) if m not in active_set_inner]
+        else:
+            _st["order"] = list(v)
+        _rebuild(_cont, _st)
+
+    polls.append((settings, name, [list(value)], _list_setter))
+    return 'full'
+
+
+@widget_builder(Widget.checklist)
+def _build_checklist(settings, name, field, polls):
+    return _build_sortable_list(settings, name, field, polls, with_checkboxes=True)
+
+
+@widget_builder(Widget.order)
+def _build_order(settings, name, field, polls):
+    return _build_sortable_list(settings, name, field, polls, with_checkboxes=False)
+
+
+# -- Fallback for unregistered types (Point2f, Rect, unknown) ----------------
+
+def _build_fallback(settings, name, field, polls):
+    """Build a control for types without a registered Widget builder."""
+    value = getattr(settings, name)
+    label = generate_label(name)
+    is_disabled = field.readonly
 
     # -- Point2f → x/y number row --------------------------------------------
     if field.type_ is Point2f:
@@ -240,112 +569,7 @@ def _build_field_control(settings, name, field, polls):
         polls.append((settings, name, [value], _rect_setter))
         return 'full'
 
-    # -- str → text input ----------------------------------------------------
-    if field.type_ is str:
-        inp = ui.input(label=label, value=value).props(
-            "dense outlined" + (" disable" if is_disabled else "")
-        )
-
-        if not is_disabled:
-            def on_input_change(e):
-                setattr(settings, name, e.value)
-            inp.on_value_change(on_input_change)
-
-        polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
-        return 'full'
-
-    # -- list[Enum] → sortable checklist ------------------------------------
-    if get_origin(field.type_) is list:
-        elem_type = get_args(field.type_)[0] if get_args(field.type_) else None
-        if elem_type is not None and isinstance(elem_type, type) and issubclass(elem_type, Enum):
-            all_members = list(elem_type)
-            active_set = set(value)
-
-            with ui.column().classes("w-full gap-1 pt-2 pb-1"):
-                ui.label(label).classes("text-xs text-caption")
-
-                # Container for the sortable items
-                container = ui.column().classes("w-full gap-0 border rounded p-1")
-
-                # State: ordered list of ALL members; active ones are checked
-                # Order: active items first (in their list order), then inactive
-                ordered = list(value) + [m for m in all_members if m not in active_set]
-                state = {"order": ordered, "active": set(value)}
-
-                def _rebuild(cont, st, _settings=settings, _name=name, _elem=elem_type):
-                    """Rebuild the sortable checklist UI from state."""
-                    cont.clear()
-                    with cont:
-                        for idx, member in enumerate(st["order"]):
-                            is_active = member in st["active"]
-                            with ui.row().classes(
-                                "w-full items-center gap-2 px-2 py-0.5 rounded cursor-move"
-                                + ("" if is_active else " opacity-50")
-                            ).style(
-                                "background: color-mix(in srgb, var(--q-primary) 15%, transparent);"
-                                if is_active else ""
-                            ):
-                                # Checkbox
-                                cb = ui.checkbox(
-                                    value=is_active,
-                                ).props("dense").classes("my-0")
-
-                                # Label
-                                ui.label(generate_label(member.name)).classes(
-                                    "text-sm flex-1"
-                                )
-
-                                # Move up/down buttons
-                                up_btn = ui.button(
-                                    icon="arrow_upward",
-                                    on_click=lambda _, i=idx: _move(cont, st, i, -1),
-                                ).props("dense flat size=xs").classes("my-0")
-                                down_btn = ui.button(
-                                    icon="arrow_downward",
-                                    on_click=lambda _, i=idx: _move(cont, st, i, 1),
-                                ).props("dense flat size=xs").classes("my-0")
-
-                                if idx == 0:
-                                    up_btn.props("disable")
-                                if idx == len(st["order"]) - 1:
-                                    down_btn.props("disable")
-
-                                # Wire checkbox
-                                def _on_check(e, m=member):
-                                    if e.value:
-                                        st["active"].add(m)
-                                    else:
-                                        st["active"].discard(m)
-                                    _apply(cont, st)
-                                cb.on_value_change(_on_check)
-
-                def _move(cont, st, idx, direction):
-                    """Swap item at idx with its neighbor in the given direction."""
-                    new_idx = idx + direction
-                    if 0 <= new_idx < len(st["order"]):
-                        st["order"][idx], st["order"][new_idx] = st["order"][new_idx], st["order"][idx]
-                        _apply(cont, st)
-
-                def _apply(cont, st):
-                    """Push current state to the Setting and rebuild UI."""
-                    new_list = [m for m in st["order"] if m in st["active"]]
-                    setattr(settings, name, new_list)
-                    _rebuild(cont, st)
-
-                _rebuild(container, state)
-
-            def _list_setter(v, _cont=container, _st=state, _elem=elem_type):
-                """Poll setter: update widget when setting changes externally."""
-                active_set = set(v)
-                _st["active"] = active_set
-                # Re-order: active items first in their list order, then inactive
-                _st["order"] = list(v) + [m for m in list(_elem) if m not in active_set]
-                _rebuild(_cont, _st)
-
-            polls.append((settings, name, [list(value)], _list_setter))
-            return 'full'
-
-    # -- Fallback: read-only label -------------------------------------------
+    # -- Generic fallback: read-only label -----------------------------------
     with ui.row().classes("items-center gap-2"):
         ui.label(label).classes("text-sm")
         lbl = ui.label(str(value)).classes("text-sm text-secondary")
@@ -404,6 +628,9 @@ def _build_settings_body(settings, timers):
     small_fields = []
     init_only_fields = []
 
+    # -- Full / small classification via Widget.resolve() --------------------
+    _FULL_WIDGETS = {Widget.slider, Widget.input, Widget.textarea, Widget.checklist, Widget.order}
+
     for field_name, field in settings.fields.items():
         if not field.visible:
             continue
@@ -412,14 +639,8 @@ def _build_settings_body(settings, timers):
         if field.init_only:
             init_only_fields.append(field_name)
             continue
-        # Classify by type
-        if field.type_ in (int, float) and field.min is not None and field.max is not None:
-            full_fields.append(field_name)
-        elif field.type_ is str:
-            full_fields.append(field_name)
-        elif field.type_ in (Point2f, Rect):
-            full_fields.append(field_name)
-        elif get_origin(field.type_) is list:
+        resolved = Widget.resolve(field)
+        if resolved in _FULL_WIDGETS or field.type_ in (Point2f, Rect):
             full_fields.append(field_name)
         else:
             small_fields.append(field_name)

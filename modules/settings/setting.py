@@ -4,19 +4,14 @@ from __future__ import annotations
 
 import logging
 import threading
-from enum import Enum, auto
+from enum import Enum
 from typing import Generic, TypeVar, overload, Any, cast, get_origin, get_args
+
+from modules.settings.widget import Widget
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
-
-
-class Widget(Enum):
-    """GUI hint for how a Setting should be rendered in the panel."""
-    default = auto()
-    toggle = auto()
-    button = auto()
 
 
 class Setting(Generic[T]):
@@ -86,6 +81,12 @@ class Setting(Generic[T]):
         self.visible = visible
         self.pinned = pinned
         self.widget = widget
+        # Validate widget ↔ type compatibility
+        if widget is not Widget.default and not widget.accepts(type_):
+            raise TypeError(
+                f"Widget.{widget.name} is not compatible with type "
+                f"{getattr(type_, '__name__', repr(type_))}"
+            )
         # Generic list support: list[int], list[str], etc.
         self._origin = get_origin(type_)          # list | None
         self._element_type = get_args(type_)[0] if get_args(type_) else None  # int | str | …

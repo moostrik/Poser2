@@ -8,7 +8,8 @@ import threading
 import unittest
 from enum import Enum
 
-from modules.settings.setting import Setting, Widget
+from modules.settings.setting import Setting
+from modules.settings.widget import Widget
 from modules.settings.base_settings import BaseSettings
 from modules.settings.registry import SettingsRegistry
 from modules.settings import presets
@@ -1533,6 +1534,169 @@ class TestDeepCopyDefaults(unittest.TestCase):
         b = NestedList()
         # Directly mutate the internal default (simulates shallow-copy bug)
         self.assertIsNot(a._values["items"], b._values["items"])
+
+
+# ── Widget class tests ─────────────────────────────────────────────────────
+
+class TestWidgetClass(unittest.TestCase):
+    """Tests for the Widget class (replaces the old Widget Enum)."""
+
+    def test_eq_same(self):
+        self.assertEqual(Widget.button, Widget.button)
+
+    def test_eq_different(self):
+        self.assertNotEqual(Widget.button, Widget.toggle)
+
+    def test_eq_non_widget(self):
+        self.assertNotEqual(Widget.button, "button")
+
+    def test_hash_consistent(self):
+        self.assertEqual(hash(Widget.button), hash(Widget.button))
+        self.assertNotEqual(hash(Widget.button), hash(Widget.toggle))
+
+    def test_hash_usable_as_dict_key(self):
+        d = {Widget.button: "b", Widget.toggle: "t"}
+        self.assertEqual(d[Widget.button], "b")
+
+    def test_repr(self):
+        self.assertEqual(repr(Widget.button), "Widget.button")
+        self.assertEqual(repr(Widget.default), "Widget.default")
+
+    def test_name_property(self):
+        self.assertEqual(Widget.slider.name, "slider")
+
+    def test_types_property(self):
+        self.assertEqual(Widget.switch.types, (bool,))
+        self.assertEqual(Widget.slider.types, (int, float))
+        self.assertIsNone(Widget.default.types)
+
+
+class TestWidgetAccepts(unittest.TestCase):
+    """Widget.accepts() validates type compatibility."""
+
+    def test_default_accepts_anything(self):
+        self.assertTrue(Widget.default.accepts(bool))
+        self.assertTrue(Widget.default.accepts(int))
+        self.assertTrue(Widget.default.accepts(str))
+
+    def test_switch_accepts_bool(self):
+        self.assertTrue(Widget.switch.accepts(bool))
+
+    def test_switch_rejects_int(self):
+        self.assertFalse(Widget.switch.accepts(int))
+
+    def test_slider_accepts_int(self):
+        self.assertTrue(Widget.slider.accepts(int))
+
+    def test_slider_accepts_float(self):
+        self.assertTrue(Widget.slider.accepts(float))
+
+    def test_slider_rejects_str(self):
+        self.assertFalse(Widget.slider.accepts(str))
+
+    def test_select_accepts_enum(self):
+        self.assertTrue(Widget.select.accepts(RenderMode))
+
+    def test_select_rejects_str(self):
+        self.assertFalse(Widget.select.accepts(str))
+
+    def test_checklist_accepts_list(self):
+        import typing
+        self.assertTrue(Widget.checklist.accepts(list[RenderMode]))
+
+    def test_checklist_rejects_enum(self):
+        self.assertFalse(Widget.checklist.accepts(RenderMode))
+
+    def test_ip_accepts_str(self):
+        self.assertTrue(Widget.ip.accepts(str))
+
+    def test_ip_rejects_int(self):
+        self.assertFalse(Widget.ip.accepts(int))
+
+    def test_color_accepts_color(self):
+        self.assertTrue(Widget.color.accepts(Color))
+
+    def test_color_rejects_str(self):
+        self.assertFalse(Widget.color.accepts(str))
+
+    def test_color_alpha_accepts_color(self):
+        self.assertTrue(Widget.color_alpha.accepts(Color))
+
+
+class TestWidgetResolve(unittest.TestCase):
+    """Widget.resolve() maps Widget.default to a concrete widget."""
+
+    def test_bool_resolves_to_switch(self):
+        field = Setting(True)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.switch)
+
+    def test_int_with_range_resolves_to_slider(self):
+        field = Setting(50, min=0, max=100)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.slider)
+
+    def test_int_without_range_resolves_to_number(self):
+        field = Setting(50)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.number)
+
+    def test_float_with_range_resolves_to_slider(self):
+        field = Setting(0.5, min=0.0, max=1.0)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.slider)
+
+    def test_enum_resolves_to_select(self):
+        field = Setting(RenderMode.SOLID)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.select)
+
+    def test_str_resolves_to_input(self):
+        field = Setting("hello")
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.input)
+
+    def test_color_resolves_to_color(self):
+        field = Setting(Color(1, 0, 0))
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.color)
+
+    def test_list_resolves_to_checklist(self):
+        field = Setting(list[RenderMode], [RenderMode.SOLID])
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.checklist)
+
+    def test_explicit_widget_returned_unchanged(self):
+        field = Setting(True, widget=Widget.toggle)
+        field.__set_name__(None, "test")
+        self.assertEqual(Widget.resolve(field), Widget.toggle)
+
+
+class TestWidgetValidation(unittest.TestCase):
+    """Setting.__init__ rejects incompatible widget+type combinations."""
+
+    def test_incompatible_widget_raises(self):
+        with self.assertRaises(TypeError):
+            Setting(1.0, widget=Widget.ip)
+
+    def test_incompatible_bool_on_slider(self):
+        with self.assertRaises(TypeError):
+            Setting(True, widget=Widget.slider)
+
+    def test_compatible_passes(self):
+        # Should not raise
+        Setting("0.0.0.0", widget=Widget.ip)
+        Setting(True, widget=Widget.toggle)
+        Setting(True, widget=Widget.button)
+        Setting(50, widget=Widget.slider, min=0, max=100)
+        Setting(RenderMode.SOLID, widget=Widget.radio)
+        Setting(Color(1, 0, 0), widget=Widget.color_alpha)
+
+    def test_default_never_raises(self):
+        # Widget.default is always compatible
+        Setting(1.0, widget=Widget.default)
+        Setting("text", widget=Widget.default)
+        Setting(True, widget=Widget.default)
 
 
 if __name__ == "__main__":

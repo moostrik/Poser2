@@ -5,7 +5,8 @@ import logging
 import threading
 import typing
 
-from modules.settings.setting import Setting, Widget
+from modules.settings.setting import Setting
+from modules.settings.widget import Widget
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +230,7 @@ class BaseSettings:
                 return False
         return True
 
-    __hash__ = None  # mutable — unhashable
+    __hash__: None = None  # mutable — unhashable
 
     # -- Repr ----------------------------------------------------------------
 
