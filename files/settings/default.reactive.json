@@ -1,142 +1,102 @@
 {
   "render": {
-    "preview_layers": [
-      "centre_frg",
-      "centre_pose",
-      "data_B_W",
-      "data_B_F",
-      "data_A_W",
-      "data_A_F"
-    ],
-    "final_layers": [
-      "composite",
-      "data_A_W",
-      "data_A_F",
-      "data_B_W",
-      "data_B_F"
-    ],
-    "window": {
-      "title": "Poser",
-      "v_sync": false,
-      "fullscreen": false,
-      "monitor": 0,
-      "x": 20,
-      "y": 80,
-      "width": 1080,
-      "height": 1000,
-      "secondary_list": [
-        "M1",
-        "M2",
-        "M3"
-      ]
-    },
-    "colors": {
-      "player_0": {
-        "r": 1.0,
-        "g": 0.0,
-        "b": 0.0,
-        "a": 1.0
+    "layer": {
+      "select": {
+        "preview": [
+          "composite"
+        ],
+        "final": [
+          "composite"
+        ]
       },
-      "player_1": {
-        "r": 0.0,
-        "g": 0.0,
-        "b": 1.0,
-        "a": 1.0
-      },
-      "player_2": {
-        "r": 0.0,
-        "g": 1.0,
-        "b": 0.0,
-        "a": 1.0
-      },
-      "history": {
-        "r": 0.5,
-        "g": 0.5,
-        "b": 0.5,
-        "a": 1.0
+      "lut": {
+        "blend_mode": "ALPHA",
+        "lut": "NONE",
+        "lut_strength": 1.0
       }
     },
-    "centre_geometry": {
-      "stage": "SMOOTH",
-      "cam_aspect": 1.7778,
-      "target_top_x": 0.5,
-      "target_top_y": 0.33,
-      "target_bottom_x": 0.5,
-      "target_bottom_y": 0.6,
-      "dst_aspectratio": 0.5625
+    "data": {
+      "a": {
+        "mode": "WINDOW",
+        "feature_field": "angle_motion",
+        "stage": "SMOOTH",
+        "line_width": 3.0,
+        "line_smooth": 1.0,
+        "use_scores": false,
+        "render_labels": true
+      },
+      "b": {
+        "mode": "WINDOW",
+        "feature_field": "angle_motion",
+        "stage": "SMOOTH",
+        "line_width": 6.0,
+        "line_smooth": 6.0,
+        "use_scores": false,
+        "render_labels": true
+      }
     },
-    "centre_mask": {
-      "blend_factor": 0.2,
-      "dilation_steps": 0,
-      "blur_steps": 0,
-      "blur_radius": 1.0
+    "preview": {
+      "tracker": {
+        "stage": "LERP",
+        "pose_line_width": 2.0,
+        "bbox_line_width": 2
+      },
+      "poser": {
+        "stage": "LERP",
+        "line_width": 2.0,
+        "line_smooth": 0.0,
+        "use_gpu_crop": true
+      }
     },
-    "centre_cam": {
-      "blend_factor": 0.2,
-      "mask_opacity": 1.0,
-      "use_mask": true
-    },
-    "centre_frg": {
-      "blend_factor": 0.2,
-      "exposure": 1.2,
-      "gamma": 1.0,
-      "offset": 0.0,
-      "contrast": 1.1,
-      "saturation": 2.0,
-      "levels": 9,
-      "smoothness": 0.33,
-      "colorize": 0.96,
-      "sharpen": 0.0,
-      "use_mask": true
-    },
-    "centre_pose": {
-      "line_width": 3.0,
-      "line_smooth": 0.0,
-      "use_scores": false,
-      "draw_anchors": false
-    },
-    "tracker": {
-      "stage": "LERP",
-      "pose_line_width": 2.0,
-      "bbox_line_width": 2
-    },
-    "pose_comp": {
-      "stage": "LERP",
-      "line_width": 2.0,
-      "line_smooth": 0.0,
-      "use_gpu_crop": true
-    },
-    "data_a": {
-      "mode": "NONE",
-      "feature_field": "angle_motion",
-      "stage": "SMOOTH",
-      "line_width": 3.0,
-      "line_smooth": 1.0,
-      "use_scores": false,
-      "render_labels": true
-    },
-    "data_b": {
-      "mode": "NONE",
-      "feature_field": "angle_motion",
-      "stage": "SMOOTH",
-      "line_width": 6.0,
-      "line_smooth": 6.0,
-      "use_scores": false,
-      "render_labels": true
-    },
-    "composite": {
-      "blend_mode": "ALPHA",
-      "lut": "NONE",
-      "lut_strength": 1.0
-    },
-    "ms_mask": {
-      "num_players": 3,
-      "blend_mode": "ALPHA",
-      "similarity_threshold": 0.33,
-      "motion_exponent": 1.5,
-      "add_curve": 2.0,
-      "dodge_curve": 1.5,
-      "layered": 1.0
+    "centre": {
+      "geometry": {
+        "stage": "SMOOTH",
+        "cam_aspect": 1.7778,
+        "target_top_x": 0.5,
+        "target_top_y": 0.33,
+        "target_bottom_x": 0.5,
+        "target_bottom_y": 0.6,
+        "dst_aspectratio": 0.5625
+      },
+      "mask": {
+        "blend_factor": 0.2,
+        "dilation_steps": 0,
+        "blur_steps": 0,
+        "blur_radius": 1.0
+      },
+      "cam": {
+        "blend_factor": 0.2,
+        "mask_opacity": 1.0,
+        "use_mask": true
+      },
+      "frg": {
+        "blend_factor": 0.2,
+        "exposure": 1.2,
+        "gamma": 1.0,
+        "offset": 0.0,
+        "contrast": 1.1,
+        "saturation": 2.0,
+        "levels": 9,
+        "smoothness": 0.33,
+        "colorize": 0.96,
+        "sharpen": 0.0,
+        "use_mask": true
+      },
+      "pose": {
+        "line_width": 3.0,
+        "line_smooth": 0.0,
+        "use_scores": false,
+        "draw_anchors": false
+      },
+      "color": {
+        "num_players": 3,
+        "blend_mode": "ALPHA",
+        "similarity_threshold": 0.33,
+        "motion_exponent": 1.5,
+        "add_curve": 2.0,
+        "dodge_curve": 1.5,
+        "layered": 1.0
+      }
     },
     "flow": {
       "fps": 60.0,
@@ -202,10 +162,69 @@
         "tmp_weight": -10.0,
         "tmp_ambient": 0.2
       }
+    },
+    "colors": {
+      "player_0": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_1": {
+        "r": 0.0,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_2": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "pose_left": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "pose_right": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_center": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "history": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      }
+    },
+    "window": {
+      "title": "Poser",
+      "v_sync": false,
+      "fullscreen": false,
+      "monitor": 0,
+      "x": 20,
+      "y": 80,
+      "width": 1080,
+      "height": 1000,
+      "secondary_list": [
+        "M1",
+        "M2",
+        "M3"
+      ]
     }
   },
   "server": {
-    "title": "POSER",
+    "title": "Settings",
     "port": 666
   }
 }
