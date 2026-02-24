@@ -26,7 +26,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, SwapFbo, Fbo
 from modules.gl.Texture3D import Texture3D, SwapTexture3D
 from modules.gl.ComputeShader import ComputeShader
-from modules.settings import Field, Settings
+from modules.settings import Field, Settings, Widget
 from .shaders import (
     Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
@@ -49,6 +49,9 @@ class FluidFlow3DConfig(Settings):
     Same speed/lifetime/vorticity/buoyancy model as FluidFlowConfig,
     with additional depth-specific parameters.
     """
+
+    # ---- Actions ----
+    reset_sim = Field(False, widget=Widget.button, description="Reset all simulation fields to zero")
 
     # ---- Depth parameters ----
     depth_layers = Field(16, min=4, max=64, description="Number of depth layers in the 3D volume")
@@ -124,6 +127,7 @@ class FluidFlow3D:
         self._depth: int = 0
         self._aspect: float = 1.0
         self._allocated: bool = False
+        self._reset_pending: bool = False
 
         # ---- Volumetric fields (SwapTexture3D for ping-pong) ----
         # Velocity: CLAMP_TO_BORDER(0) = no-slip walls
@@ -174,61 +178,8 @@ class FluidFlow3D:
         self._composite_shader: Composite3D = Composite3D()
         self._add_shader: Add3D = Add3D()
 
-    # ========== Properties ==========
-
-    @property
-    def allocated(self) -> bool:
-        return self._allocated
-
-    @property
-    def velocity_volume(self) -> Texture3D:
-        """RGBA16F velocity volume (u,v,w in xyz)."""
-        return self._velocity.texture
-
-    @property
-    def density_volume(self) -> Texture3D:
-        """RGBA16F density volume."""
-        return self._density.texture
-
-    @property
-    def temperature_volume(self) -> Texture3D:
-        """R16F temperature volume."""
-        return self._temperature.texture
-
-    @property
-    def pressure_volume(self) -> Texture3D:
-        """R16F pressure volume."""
-        return self._pressure.texture
-
-    @property
-    def obstacle_volume(self) -> Texture3D:
-        """R8 obstacle mask volume."""
-        return self._obstacle
-
-    @property
-    def divergence_volume(self) -> Texture3D:
-        """R16F divergence volume (intermediate)."""
-        return self._divergence_vol
-
-    @property
-    def curl_volume(self) -> Texture3D:
-        """RGBA16F curl/vorticity vector volume (intermediate)."""
-        return self._curl_vol
-
-    @property
-    def density(self) -> Texture:
-        """2D composited density output for downstream render layers."""
-        return self._output_texture
-
-    @property
-    def velocity(self) -> Texture3D:
-        """Alias for velocity_volume (primary field access)."""
-        return self._velocity.texture
-
-    @property
-    def depth(self) -> int:
-        """Number of depth layers."""
-        return self._depth
+        # Bind settings actions
+        self.config.bind(FluidFlow3DConfig.reset_sim, lambda _: self._request_reset())
 
     # ========== Allocation ==========
 
@@ -252,35 +203,35 @@ class FluidFlow3D:
 
         sim_w = self._width
         sim_h = self._height
-        d = self._depth
+        depth: int = self._depth
 
         # Allocate volumetric fields (at incoming simulation resolution)
-        self._velocity.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._velocity.allocate(sim_w, sim_h, depth, GL_RGBA16F)
         self._velocity.clear_all()
 
-        self._density.allocate(self._density_width, self._density_height, d, GL_RGBA16F)
+        self._density.allocate(self._density_width, self._density_height, depth, GL_RGBA16F)
         self._density.clear_all()
 
-        self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
+        self._temperature.allocate(sim_w, sim_h, depth, GL_R16F)
         self._temperature.clear_all()
 
-        self._pressure.allocate(sim_w, sim_h, d, GL_R16F)
+        self._pressure.allocate(sim_w, sim_h, depth, GL_R16F)
         self._pressure.clear_all()
 
-        self._obstacle.allocate(sim_w, sim_h, d, GL_R8)
+        self._obstacle.allocate(sim_w, sim_h, depth, GL_R8)
         self._obstacle.clear()
 
         # Intermediate volumes
-        self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
+        self._divergence_vol.allocate(sim_w, sim_h, depth, GL_R16F)
         self._divergence_vol.clear()
 
-        self._curl_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._curl_vol.allocate(sim_w, sim_h, depth, GL_RGBA16F)
         self._curl_vol.clear()
 
-        self._vorticity_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._vorticity_force_vol.allocate(sim_w, sim_h, depth, GL_RGBA16F)
         self._vorticity_force_vol.clear()
 
-        self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._buoyancy_force_vol.allocate(sim_w, sim_h, depth, GL_RGBA16F)
         self._buoyancy_force_vol.clear()
 
         # 2D composited output
@@ -332,163 +283,7 @@ class FluidFlow3D:
 
         self._allocated = False
 
-    def reset(self) -> None:
-        """Reset all simulation fields to zero."""
-        if not self._allocated:
-            return
-        self._velocity.clear_all()
-        self._density.clear_all()
-        self._temperature.clear_all()
-        self._pressure.clear_all()
-        self._divergence_vol.clear()
-        self._curl_vol.clear()
-
-    # ========== Input Methods (2D -> 3D injection) ==========
-
-    def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D velocity texture into 3D velocity volume.
-
-        Uses gaussian depth spread centered at config.injection_layer.
-        """
-        if not self._allocated:
-            return
-        self._inject_shader.use(
-            texture, self._velocity.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
-            strength, mode=0,
-            internal_format=GL_RGBA16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    def set_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Set (replace) 3D velocity volume from 2D texture.
-
-        Gaussian depth spread, replace mode.
-        """
-        if not self._allocated:
-            return
-        self._velocity.clear_all()
-        self._inject_shader.use(
-            texture, self._velocity.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
-            strength, mode=1,
-            internal_format=GL_RGBA16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    def add_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D density texture into 3D density volume."""
-        if not self._allocated:
-            return
-        self._inject_shader.use(
-            texture, self._density.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
-            strength, mode=0,
-            internal_format=GL_RGBA16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    def set_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Set (replace) 3D density volume from 2D texture."""
-        if not self._allocated:
-            return
-        self._density.clear_all()
-        self._inject_shader.use(
-            texture, self._density.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
-            strength, mode=1,
-            internal_format=GL_RGBA16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    def add_density_channel(self, texture: Texture, channel: int,
-                            strength: float = 1.0) -> None:
-        """Inject single-channel 2D texture into one RGBA channel of the 3D density volume.
-
-        Uses gaussian depth spread centered at config.injection_layer.
-
-        Args:
-            texture: 2D source texture (reads .r component)
-            channel: Target RGBA channel (0=R, 1=G, 2=B, 3=A)
-            strength: Injection strength multiplier
-        """
-        if not self._allocated:
-            return
-        self._inject_channel_shader.use(
-            texture, self._density.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
-            channel, strength, mode=0,
-            internal_format=GL_RGBA16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    def clamp_density(self, min_value: float = 0.0, max_value: float = 1.0) -> None:
-        """Clamp 3D density volume voxels to [min_value, max_value].
-
-        Args:
-            min_value: Minimum clamp value (applied to all channels)
-            max_value: Maximum clamp value (applied to all channels)
-        """
-        if not self._allocated:
-            return
-        self._clamp_shader.use(
-            self._density.texture, min_value, max_value,
-            internal_format=GL_RGBA16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D temperature texture into 3D temperature volume."""
-        if not self._allocated:
-            return
-        self._inject_shader.use(
-            texture, self._temperature.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
-            strength, mode=0,
-            internal_format=GL_R16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    def set_temperature(self, texture: Texture, strength: float = 1.0) -> None:
-        """Set 3D temperature volume from 2D texture."""
-        if not self._allocated:
-            return
-        self._temperature.clear_all()
-        self._inject_shader.use(
-            texture, self._temperature.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
-            strength, mode=1,
-            internal_format=GL_R16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    def add_pressure(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D pressure texture into 3D pressure volume."""
-        if not self._allocated:
-            return
-        self._inject_shader.use(
-            texture, self._pressure.texture,
-            self.config.injection_layer,
-            self.config.injection_spread,
-            strength, mode=0,
-            internal_format=GL_R16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
     # ========== Internal helpers ==========
-
-    def _add_force_to_velocity(self, force: Texture3D, strength: float = 1.0) -> None:
-        """Add 3D force volume to velocity in-place (no swap needed)."""
-        self._add_shader.use(self._velocity.texture, force, strength)
-        glMemoryBarrier(_BARRIER_IMAGE)
-
     @staticmethod
     def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
         """Calculate frame-rate independent decay multiplier.
@@ -507,6 +302,11 @@ class FluidFlow3D:
         """
         if not self._allocated:
             return
+
+        # Handle deferred reset from UI thread
+        if self._reset_pending:
+            self._reset_pending = False
+            self.reset()
 
         self._aspect = self._width / self._height if self._height > 0 else 1.0
         depth_scale: float = self.config.depth_scale
@@ -686,3 +486,220 @@ class FluidFlow3D:
             self.config.composite_mode
         )
         glMemoryBarrier(_BARRIER_IMAGE)
+
+
+    def _request_reset(self) -> None:
+        """Thread-safe reset request — deferred to next update() on the GL thread."""
+        self._reset_pending = True
+
+    def reset(self) -> None:
+        """Reset all simulation fields to zero."""
+        if not self._allocated:
+            return
+        self._velocity.clear_all()
+        self._density.clear_all()
+        self._temperature.clear_all()
+        self._pressure.clear_all()
+        self._divergence_vol.clear()
+        self._curl_vol.clear()
+
+    # ========== Input Methods (2D -> 3D injection) ==========
+
+    def _add_force_to_velocity(self, force: Texture3D, strength: float = 1.0) -> None:
+        """Add 3D force volume to velocity in-place (no swap needed)."""
+        self._add_shader.use(self._velocity.texture, force, strength)
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
+        """Inject 2D velocity texture into 3D velocity volume.
+
+        Uses gaussian depth spread centered at config.injection_layer.
+        """
+        if not self._allocated:
+            return
+        self._inject_shader.use(
+            texture, self._velocity.texture,
+            self.config.injection_layer,
+            self.config.injection_spread,
+            strength, mode=0,
+            internal_format=GL_RGBA16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def set_velocity(self, texture: Texture, strength: float = 1.0) -> None:
+        """Set (replace) 3D velocity volume from 2D texture.
+
+        Gaussian depth spread, replace mode.
+        """
+        if not self._allocated:
+            return
+        self._velocity.clear_all()
+        self._inject_shader.use(
+            texture, self._velocity.texture,
+            self.config.injection_layer,
+            self.config.injection_spread,
+            strength, mode=1,
+            internal_format=GL_RGBA16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def add_density(self, texture: Texture, strength: float = 1.0) -> None:
+        """Inject 2D density texture into 3D density volume."""
+        if not self._allocated:
+            return
+        self._inject_shader.use(
+            texture, self._density.texture,
+            self.config.injection_layer,
+            self.config.injection_spread,
+            strength, mode=0,
+            internal_format=GL_RGBA16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def set_density(self, texture: Texture, strength: float = 1.0) -> None:
+        """Set (replace) 3D density volume from 2D texture."""
+        if not self._allocated:
+            return
+        self._density.clear_all()
+        self._inject_shader.use(
+            texture, self._density.texture,
+            self.config.injection_layer,
+            self.config.injection_spread,
+            strength, mode=1,
+            internal_format=GL_RGBA16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def add_density_channel(self, texture: Texture, channel: int,
+                            strength: float = 1.0) -> None:
+        """Inject single-channel 2D texture into one RGBA channel of the 3D density volume.
+
+        Uses gaussian depth spread centered at config.injection_layer.
+
+        Args:
+            texture: 2D source texture (reads .r component)
+            channel: Target RGBA channel (0=R, 1=G, 2=B, 3=A)
+            strength: Injection strength multiplier
+        """
+        if not self._allocated:
+            return
+        self._inject_channel_shader.use(
+            texture, self._density.texture,
+            self.config.injection_layer,
+            self.config.injection_spread,
+            channel, strength, mode=0,
+            internal_format=GL_RGBA16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def clamp_density(self, min_value: float = 0.0, max_value: float = 1.0) -> None:
+        """Clamp 3D density volume voxels to [min_value, max_value].
+
+        Args:
+            min_value: Minimum clamp value (applied to all channels)
+            max_value: Maximum clamp value (applied to all channels)
+        """
+        if not self._allocated:
+            return
+        self._clamp_shader.use(
+            self._density.texture, min_value, max_value,
+            internal_format=GL_RGBA16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
+        """Inject 2D temperature texture into 3D temperature volume."""
+        if not self._allocated:
+            return
+        self._inject_shader.use(
+            texture, self._temperature.texture,
+            self.config.injection_layer,
+            self.config.injection_spread,
+            strength, mode=0,
+            internal_format=GL_R16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def set_temperature(self, texture: Texture, strength: float = 1.0) -> None:
+        """Set 3D temperature volume from 2D texture."""
+        if not self._allocated:
+            return
+        self._temperature.clear_all()
+        self._inject_shader.use(
+            texture, self._temperature.texture,
+            self.config.injection_layer,
+            self.config.injection_spread,
+            strength, mode=1,
+            internal_format=GL_R16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def add_pressure(self, texture: Texture, strength: float = 1.0) -> None:
+        """Inject 2D pressure texture into 3D pressure volume."""
+        if not self._allocated:
+            return
+        self._inject_shader.use(
+            texture, self._pressure.texture,
+            self.config.injection_layer,
+            self.config.injection_spread,
+            strength, mode=0,
+            internal_format=GL_R16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+
+    # ========== Properties ==========
+
+    @property
+    def allocated(self) -> bool:
+        return self._allocated
+
+    @property
+    def velocity_volume(self) -> Texture3D:
+        """RGBA16F velocity volume (u,v,w in xyz)."""
+        return self._velocity.texture
+
+    @property
+    def density_volume(self) -> Texture3D:
+        """RGBA16F density volume."""
+        return self._density.texture
+
+    @property
+    def temperature_volume(self) -> Texture3D:
+        """R16F temperature volume."""
+        return self._temperature.texture
+
+    @property
+    def pressure_volume(self) -> Texture3D:
+        """R16F pressure volume."""
+        return self._pressure.texture
+
+    @property
+    def obstacle_volume(self) -> Texture3D:
+        """R8 obstacle mask volume."""
+        return self._obstacle
+
+    @property
+    def divergence_volume(self) -> Texture3D:
+        """R16F divergence volume (intermediate)."""
+        return self._divergence_vol
+
+    @property
+    def curl_volume(self) -> Texture3D:
+        """RGBA16F curl/vorticity vector volume (intermediate)."""
+        return self._curl_vol
+
+    @property
+    def density(self) -> Texture:
+        """2D composited density output for downstream render layers."""
+        return self._output_texture
+
+    @property
+    def velocity(self) -> Texture3D:
+        """Alias for velocity_volume (primary field access)."""
+        return self._velocity.texture
+
+    @property
+    def depth(self) -> int:
+        """Number of depth layers."""
+        return self._depth

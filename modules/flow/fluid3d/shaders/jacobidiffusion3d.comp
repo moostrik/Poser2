@@ -4,8 +4,12 @@
  * JacobiDiffusion3D - Multi-iteration viscosity diffusion for 3D velocity.
  *
  * 6-neighbor 3D Jacobi diffusion:
- *   v^(k+1) = β * (αx*(vL + vR) + αy*(vB + vT) + αz*(vF + vK) + γ*vC)
+ *   v^(k+1) = β * (αx*(vL + vR) + αy*(vB + vT) + αz*(vF + vK) + γ*v_old)
  *   γ = 1/(ν·Δt), β = 1/(2αx + 2αy + 2αz + γ)
+ *
+ * The source term γ*v_old uses the ORIGINAL velocity (from before the
+ * solve), not the evolving iterate. This correctly solves the implicit
+ * diffusion equation (I - νΔt∇²)v_new = v_old.
  *
  * Shared memory tiling for XY (18x18), Z from global memory.
  * Velocity is vec4 (xyz = u,v,w).
@@ -56,6 +60,7 @@ void main() {
 
     // Initial shared memory load
     vec4 myVelocity = validPixel ? loadVelocity(gid) : vec4(0.0);
+    vec4 v_old = myVelocity;  // preserve original for source term
     s_velocity[sid.y][sid.x] = myVelocity;
 
     // Halo loads
@@ -102,11 +107,12 @@ void main() {
             vF = obsFront ? vC : vF;
             vK = obsBack  ? vC : vK;
 
-            // Jacobi diffusion: v^(k+1) = β * (αx*(vL+vR) + αy*(vB+vT) + αz*(vK+vF) + γ*vC)
+            // Jacobi diffusion: v^(k+1) = β * (αx*(vL+vR) + αy*(vB+vT) + αz*(vK+vF) + γ*v_old)
+            // v_old is the ORIGINAL velocity, not the evolving iterate
             newVelocity = uBeta * (uAlpha.x * (vL + vR)
                                  + uAlpha.y * (vB + vT)
                                  + uAlpha.z * (vK + vF)
-                                 + uGamma * vC);
+                                 + uGamma * v_old);
         } else if (obstacle) {
             newVelocity = vec4(0.0);
         }

@@ -23,7 +23,7 @@ void main() {
 
     // Check if current pixel is inside obstacle
     float oC = texture(uObstacle, st).r;
-    if (oC >= 0.99) {
+    if (oC > 0.5) {
         fragColor = vec4(0.0);
         return;
     }

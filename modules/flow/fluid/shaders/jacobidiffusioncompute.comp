@@ -8,7 +8,11 @@
  * to read neighbors from fast shared memory instead of global texture memory.
  *
  * Solves diffusion equation for velocity viscosity:
- * x^(k+1) = β * (αx*(xL + xR) + αy*(xB + xT) + γ*xC)
+ * x^(k+1) = β * (αx*(xL + xR) + αy*(xB + xT) + γ*x_old)
+ *
+ * The source term γ*x_old uses the ORIGINAL velocity (from before the
+ * solve), not the evolving iterate. This correctly solves the implicit
+ * diffusion equation (I - νΔt∇²)v_new = v_old.
  *
  * where γ = 1/(ν·Δt) and β = 1/(2*αx + 2*αy + γ)
  */
@@ -49,7 +53,7 @@ vec4 sampleObstacleOffset(ivec2 coord) {
 // Helper to check if coord is obstacle
 bool isObstacle(ivec2 coord) {
     vec2 uv = (vec2(coord) + 0.5) / vec2(uSize);
-    return texture(uObstacle, uv).r >= 0.99;
+    return texture(uObstacle, uv).r > 0.5;
 }
 
 void main() {
@@ -77,6 +81,7 @@ void main() {
     // ===== Initial shared memory load =====
     // Each thread loads its center pixel
     vec2 myVelocity = validPixel ? loadVelocity(gid) : vec2(0.0);
+    vec2 v_old = myVelocity;  // preserve original for source term
     s_velocity[sid.y][sid.x] = myVelocity;
 
     // Load halo pixels (threads on edges load extra pixels)
@@ -135,8 +140,9 @@ void main() {
             vL = mix(vL, vC, obsOffset.w);
 
             // Jacobi iteration for diffusion:
-            // x^(k+1) = β * (αx*(xL + xR) + αy*(xB + xT) + γ*xC)
-            newVelocity = uBeta * (uAlpha.x * (vL + vR) + uAlpha.y * (vB + vT) + uGamma * vC);
+            // x^(k+1) = β * (αx*(xL + xR) + αy*(xB + xT) + γ*v_old)
+            // v_old is the ORIGINAL velocity, not the evolving iterate
+            newVelocity = uBeta * (uAlpha.x * (vL + vR) + uAlpha.y * (vB + vT) + uGamma * v_old);
         } else if (obstacle) {
             newVelocity = vec2(0.0);
         }

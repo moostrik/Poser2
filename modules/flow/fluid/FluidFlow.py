@@ -12,7 +12,7 @@ Ported from ofxFlowTools ftFluidFlow.h/cpp
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo, Fbo
-from modules.settings import Field, Settings
+from modules.settings import Field, Settings, Widget
 from .. import FlowBase, FlowUtil
 from .shaders import (
     Advect, Divergence, Gradient, JacobiPressure, JacobiPressureCompute,
@@ -43,6 +43,9 @@ class FluidFlowConfig(Settings):
         Exponential frame-rate-independent decay: multiplier = 0.01^(dt/lifetime).
         lifetime=3.0 means the field retains ~1% after 3 seconds.
     """
+
+    # ---- Actions ----
+    reset_sim = Field(False, widget=Widget.button, description="Reset all simulation fields to zero")
 
     # ---- Transport speed ----
     speed = Field(1.0, min=0.0, max=5.0, description="Base fluid transport rate")
@@ -128,6 +131,7 @@ class FluidFlow(FlowBase):
         self._simulation_height: int = 0
         self._density_width: int = 0
         self._density_height: int = 0
+        self._reset_pending: bool = False
 
         # Shaders
         self._advect_shader: Advect = Advect()
@@ -146,6 +150,9 @@ class FluidFlow(FlowBase):
         self._buoyancy_shader: Buoyancy = Buoyancy()
         self._obstacle_offset_shader: ObstacleOffset = ObstacleOffset()
         self._add_boolean_shader: AddBoolean = AddBoolean()
+
+        # Bind settings actions
+        self.config.bind(FluidFlowConfig.reset_sim, lambda _: self._request_reset())
 
         # hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -285,6 +292,10 @@ class FluidFlow(FlowBase):
         self._obstacle_offset_shader.deallocate()
         self._add_boolean_shader.deallocate()
 
+    def _request_reset(self) -> None:
+        """Thread-safe reset request — deferred to next update() on the GL thread."""
+        self._reset_pending = True
+
     def reset(self) -> None:
         """Reset all simulation fields to zero."""
         super().reset()
@@ -393,6 +404,11 @@ class FluidFlow(FlowBase):
         """
         if not self._allocated:
             return
+
+        # Handle deferred reset from UI thread
+        if self._reset_pending:
+            self._reset_pending = False
+            self.reset()
 
         # self._aspect = 1.0
         self._aspect = self._width / self._height if self._height > 0 else 1.0
