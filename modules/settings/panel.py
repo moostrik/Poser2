@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import socket
 from enum import Enum
 from pathlib import Path
 from typing import Callable, get_origin, get_args
@@ -856,10 +857,21 @@ def _build_preset_controls(root):
     ui.button(icon="delete", on_click=do_delete).props("dense flat color=negative").tooltip("Delete preset")
 
 
+def _get_local_ips() -> list[str]:
+    """Return all non-loopback IPv4 addresses for this machine."""
+    try:
+        hostname = socket.gethostname()
+        _, _, ips = socket.gethostbyname_ex(hostname)
+        return [ip for ip in ips if not ip.startswith("127.")]
+    except Exception:
+        return []
+
+
 def create_settings_panel(
     root,
     *,
     title: str = "",
+    port: int | None = None,
     on_exit=None,
 ) -> None:
     """Build a full tabbed settings panel from a root BaseSettings.
@@ -868,7 +880,7 @@ def create_settings_panel(
 
         @ui.page("/")
         def index():
-            create_settings_panel(app_settings, title="POSER", on_exit=stop)
+            create_settings_panel(app_settings, title="POSER", port=8080, on_exit=stop)
     """
 
     # Force dark mode for consistent styling
@@ -881,6 +893,21 @@ def create_settings_panel(
     with ui.row().classes("w-full items-center flex-nowrap gap-0"):
         if title:
             ui.label(title).classes("text-2xl font-bold")
+        if port is not None:
+            def _show_ip_info():
+                ips = _get_local_ips()
+                with ui.dialog() as dlg, ui.card().classes("min-w-[240px] gap-1"):
+                    ui.label("Connect").classes("text-base font-bold")
+                    ui.separator()
+                    for ip in ips:
+                        url = f"http://{ip}:{port}"
+                        ui.link(url, url, new_tab=True).classes("text-sm")
+                    url_local = f"http://localhost:{port}"
+                    ui.link(url_local, url_local, new_tab=True).classes("text-sm")
+                    ui.separator()
+                    ui.button("Close", on_click=dlg.close).props("flat dense")
+                dlg.open()
+            ui.button(icon="info", on_click=_show_ip_info).props("dense flat").tooltip("Show connection info")
         with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
             _build_preset_controls(root)
         if on_exit:

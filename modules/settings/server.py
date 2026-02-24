@@ -45,7 +45,7 @@ class SettingsServer:
             ui.dark_mode(True)
             ui.add_head_html('<style>* { transition-duration: 0s !important; animation-duration: 0s !important; }</style>')
             with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-                create_settings_panel(root, title=title, on_exit=on_exit)
+                create_settings_panel(root, title=title, port=port, on_exit=on_exit)
 
         def _run():
             ui.run(
