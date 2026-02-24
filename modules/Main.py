@@ -154,7 +154,7 @@ class Main():
         # WINDOW TRACKERS
         self.window_tracker_R =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * settings.camera.fps)))
         self.window_tracker_S =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * settings.camera.fps)))
-        self.window_tracker_I =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * self.render_settings.window.fps)))
+        self.window_tracker_I =     trackers.AllWindowTracker(num_players, trackers.WindowNodeConfig(window_size=int(6.0 * self.render_settings.window.avg_fps)))
 
         self.bbox_filters =      trackers.FilterTracker(
             settings.num_players,

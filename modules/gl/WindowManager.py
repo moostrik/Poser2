@@ -66,7 +66,7 @@ class WindowManager():
         self._actual_height: int = settings.height
         self.windowed_fullscreen: bool = False
         self.frame_interval: None | int = None
-        print(f"WindowManager initialized with width={settings.width}, height={settings.height}, fullscreen={settings.fullscreen}, v_sync={settings.v_sync}, fps={settings.fps}, frame_interval={self.frame_interval}ns")
+        print(f"WindowManager initialized with width={settings.width}, height={settings.height}, fullscreen={settings.fullscreen}, v_sync={settings.v_sync}, fps={settings.avg_fps}, frame_interval={self.frame_interval}ns")
         self.fps = FpsCounter()
         self.mouse_x: float = 0.0
         self.mouse_y: float = 0.0
@@ -99,7 +99,7 @@ class WindowManager():
 
         # FPS feedback: push measured FPS into the readonly settings
         def _push_fps(fps: int) -> None:
-            s.fps = fps
+            s.avg_fps = fps
             s.min_fps = self.fps.get_min_fps()
         self.fps_callback = _push_fps
 
