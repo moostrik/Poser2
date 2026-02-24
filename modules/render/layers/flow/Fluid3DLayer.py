@@ -43,11 +43,9 @@ class Fluid3DDrawMode(IntEnum):
 
 class Fluid3DLayerSettings(Settings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
-    fps: Field[float] =                     Field(30.0, min=1.0, max=240.0)
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
     draw_mode: Field[Fluid3DDrawMode] =     Field(Fluid3DDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
-    simulation_scale: Field[float] =        Field(0.5, min=0.1, max=2.0)
 
     fluid_flow:    FluidFlow3DConfig
     visualisation: VisualisationFieldConfig
@@ -95,11 +93,7 @@ class Fluid3DLayer(LayerBase):
         self.config: Fluid3DLayerSettings = settings or Fluid3DLayerSettings()
         self._color_settings: ColorSettings = color_settings
 
-        self._delta_time: float = 1 / self.config.fps
-
-        self._fluid_flow: FluidFlow3D = FluidFlow3D(
-            self.config.simulation_scale, self.config.fluid_flow
-        )
+        self._fluid_flow: FluidFlow3D = FluidFlow3D(self.config.fluid_flow)
         self._visualizer: Visualizer = Visualizer(self.config.visualisation)
 
         # Colorization resources
@@ -130,14 +124,11 @@ class Fluid3DLayer(LayerBase):
             height: Processing height
             internal_format: Ignored (formats determined by FluidFlow3D)
         """
-        sim_width = int(width * self.config.simulation_scale)
-        sim_height = int(height * self.config.simulation_scale)
+        self._fluid_flow.allocate(width, height)
+        self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
 
-        self._fluid_flow.allocate(sim_width, sim_height, width, height)
-        self._visualizer.allocate(sim_width, sim_height)
-
-        # Colorization FBO at simulation resolution
-        self._colorized_fbo.allocate(sim_width, sim_height, GL_RGBA16F)
+        # Colorization FBO at density (full output) resolution
+        self._colorized_fbo.allocate(width, height, GL_RGBA16F)
         self._density_colorize_shader.allocate()
 
     def deallocate(self) -> None:
@@ -155,9 +146,6 @@ class Fluid3DLayer(LayerBase):
 
     def update(self) -> None:
         """Update 3D fluid simulation with inputs from all flow layers."""
-
-        # print (f"Updating FluidLayer3D (cam {self._cam_id}) with delta_time {self._delta_time:.4f}s")
-
         # Get motion data from pose
         pose: Frame | None = self._data_hub.get_pose(Stage.LERP, self._cam_id)
         similarities: np.ndarray = (
@@ -171,7 +159,7 @@ class Fluid3DLayer(LayerBase):
         motion: float = pose.angle_motion.value if pose is not None else 0.0
         m_s = similarities
 
-        self.config.fluid_flow.den_lifetime = 18.0 - (pow(motion, 2.0) * 14.0)
+        # self.config.fluid_flow.den_lifetime = 18.0 - (pow(motion, 2.0) * 14.0)
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -181,11 +169,11 @@ class Fluid3DLayer(LayerBase):
         den_strength: float
         for cam_id, flow_layer in self._flow_layers.items():
             if cam_id == self._cam_id:
-                vel_strength = self._delta_time * motion
-                den_strength = motion * 0.02
+                vel_strength = motion
+                den_strength = motion
             else:
-                vel_strength = self._delta_time * (m_s[cam_id])
-                den_strength = 0.02 * (m_s[cam_id])
+                vel_strength = m_s[cam_id]
+                den_strength = m_s[cam_id]
 
             # Add velocity from each flow layer
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
@@ -195,13 +183,19 @@ class Fluid3DLayer(LayerBase):
             self._fluid_flow.add_density_channel(
                 flow_layer.magnitude, channel, den_strength
             )
-            self._fluid_flow.clamp_density(0.0, 1.2)
 
             # Add temperature from each flow layer
-            self._fluid_flow.add_temperature(flow_layer.temperature, 0.0)
+            self._fluid_flow.add_temperature(flow_layer.temperature, 1.0)
 
-        # Update 3D fluid simulation
-        self._fluid_flow.update(self._delta_time)
+        # Snapshot sim dims before update for resize detection
+        prev_sw, prev_sh = self._fluid_flow.sim_width, self._fluid_flow.sim_height
+
+        # Update 3D fluid simulation (handles its own reallocation internally)
+        self._fluid_flow.update()
+
+        # Resize visualizer if sim dims changed
+        if self._fluid_flow.sim_width != prev_sw or self._fluid_flow.sim_height != prev_sh:
+            self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
 
         # Colorize density channels with track colors
         self._colorize_density()

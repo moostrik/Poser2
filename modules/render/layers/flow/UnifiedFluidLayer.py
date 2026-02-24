@@ -61,12 +61,10 @@ class UnifiedFluidDrawMode(IntEnum):
 
 class UnifiedFluidLayerSettings(Settings):
     """Configuration for UnifiedFluidLayer."""
-    fps = Field(60.0, min=1.0, max=240.0)
     num_players = Field(3, min=1, max=8)
     gap_ratio = Field(0.5, min=0.0, max=2.0, description="Gap = ratio * slot width")
     draw_mode = Field(UnifiedFluidDrawMode.DENSITY)
     blend_mode = Field(Style.BlendMode.ADD)
-    simulation_scale = Field(0.25, min=0.1, max=2.0)
 
     visualisation: VisualisationFieldConfig
     fluid_flow:    FluidFlowConfig
@@ -81,7 +79,6 @@ class UnifiedFluidLayer(LayerBase):
         self.config: UnifiedFluidLayerSettings = config or UnifiedFluidLayerSettings()
 
         self._num_slots: int = len(flow_layers)
-        self._delta_time: float = 1 / self.config.fps
 
         # Grid layout calculation:
         # total_width = num_slots + (num_slots - 1) * gap_ratio
@@ -89,7 +86,7 @@ class UnifiedFluidLayer(LayerBase):
         self._total_width_ratio: float = self._num_slots + (self._num_slots - 1) * self.config.gap_ratio
 
         # Fluid simulation
-        self._fluid_flow: FluidFlow = FluidFlow(self.config.simulation_scale, self.config.fluid_flow)
+        self._fluid_flow: FluidFlow = FluidFlow(self.config.fluid_flow)
         self._visualizer: Visualizer = Visualizer(self.config.visualisation)
 
         # Colorization
@@ -167,14 +164,7 @@ class UnifiedFluidLayer(LayerBase):
             height: Slot height
             internal_format: Ignored
         """
-        self._slot_width = int(width * self.config.simulation_scale)
-        self._slot_height = int(height * self.config.simulation_scale)
-
-        # Unified grid = slots + gaps
-        self._sim_width = int(self._slot_width * self._total_width_ratio)
-        self._sim_height = self._slot_height
-
-        # Density at higher resolution
+        # Density at higher resolution (unified grid = slots + gaps)
         self._density_width = int(width * self._total_width_ratio)
         self._density_height = height
 
@@ -182,8 +172,15 @@ class UnifiedFluidLayer(LayerBase):
         self._unified_width = self._density_width
         self._unified_height = self._density_height
 
-        # Allocate fluid simulation
-        self._fluid_flow.allocate(self._sim_width, self._sim_height, self._density_width, self._density_height)
+        # Allocate fluid simulation (FluidFlow computes sim dims internally)
+        self._fluid_flow.allocate(self._density_width, self._density_height)
+
+        # Slot dims at simulation resolution (for positioning)
+        self._slot_width = self._fluid_flow.sim_width // max(1, int(self._total_width_ratio))
+        self._slot_height = self._fluid_flow.sim_height
+        self._sim_width = self._fluid_flow.sim_width
+        self._sim_height = self._fluid_flow.sim_height
+
         self._visualizer.allocate(self._sim_width, self._sim_height)
 
         # Colorization FBO
@@ -264,11 +261,8 @@ class UnifiedFluidLayer(LayerBase):
                     strength=den_strength
                 )
 
-        # Clamp density
-        self._fluid_flow.clamp_density(0.0, 1.1)
-
         # Run simulation
-        self._fluid_flow.update(self._delta_time)
+        self._fluid_flow.update()
 
         # Colorize density
         self._colorize_density()

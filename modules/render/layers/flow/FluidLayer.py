@@ -52,8 +52,6 @@ class FluidDrawMode(IntEnum):
 class FluidLayerSettings(Settings):
     """Configuration for FluidLayer (fluid simulation)."""
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
-    simulation_scale: Field[float] =        Field(0.5, min=0.1, max=2.0, access=Field.INIT)
-    fps: Field[float] =                     Field(110.0, min=1.0, max=240.0)
     draw_mode: Field[FluidDrawMode] =       Field(FluidDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
@@ -102,9 +100,7 @@ class FluidLayer(LayerBase):
         self.settings: FluidLayerSettings = settings
         self._color_settings: ColorSettings = color_settings
 
-        self._delta_time: float = 1 / self.settings.fps
-
-        self._fluid_flow: FluidFlow = FluidFlow(self.settings.simulation_scale, self.settings.fluid_flow)
+        self._fluid_flow: FluidFlow = FluidFlow(self.settings.fluid_flow)
         self._visualizer: Visualizer = Visualizer(self.settings.visualisation)
 
         # Colorization resources (rendering concern, not simulation)
@@ -170,15 +166,11 @@ class FluidLayer(LayerBase):
             height: Processing height
             internal_format: Ignored (formats determined by FluidFlow)
         """
-        # Fluid simulation: low-res simulation, high-res density output
-        sim_width = int(width * self.settings.simulation_scale)
-        sim_height = int(height * self.settings.simulation_scale)
+        self._fluid_flow.allocate(width, height)
+        self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
 
-        self._fluid_flow.allocate(sim_width, sim_height, width, height)
-        self._visualizer.allocate(sim_width, sim_height)
-
-        # Allocate colorization FBO at simulation resolution
-        self._colorized_fbo.allocate(sim_width, sim_height, GL_RGBA16F)
+        # Colorization FBO at density (full output) resolution
+        self._colorized_fbo.allocate(width, height, GL_RGBA16F)
         self._density_colorize_shader.allocate()
 
     def deallocate(self) -> None:
@@ -201,10 +193,9 @@ class FluidLayer(LayerBase):
         similarities: np.ndarray = pose.similarity.values if pose is not None else np.full((self.settings.num_players,), 0.0)
         motion_gates: np.ndarray = pose.motion_gate.values if pose is not None else np.full((self.settings.num_players,), 0.0)
         motion: float = pose.angle_motion.value if pose is not None else 0.0
-        m_s = similarities # * motion_gates  # Modulate similarity by motion gate
+        m_s = similarities
 
         self.settings.fluid_flow.den_lifetime = 18.0 - (pow(motion, 2.0) * 14.0)  # More motion = faster decay
-        # self.config.fluid_flow.den_speed_offset = motion
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -214,30 +205,31 @@ class FluidLayer(LayerBase):
         den_strength: float
         for cam_id, flow_layer in self._flow_layers.items():
             if cam_id == self._cam_id:
-                vel_strength = self._delta_time * motion
-                den_strength = motion * 0.02
-                # if motion > 0:
-                #     m = 0.95
-                #     print (m, m - pow(m, 8))
-                #     pass
+                vel_strength = motion
+                den_strength = motion
             else:
-                vel_strength = self._delta_time * (m_s[cam_id]) # m_s[cam_id]  # Cross-camera influence modulated by similarity and motion gate
-                den_strength = 0.02 * (m_s[cam_id])   # Cross-camera influence modulated by similarity, motion gate, and motion value
+                vel_strength = m_s[cam_id]
+                den_strength = m_s[cam_id]
 
             # Add velocity from each flow layer
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
 
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
-            channel: int = cam_id % 4  # Map camera to RGBA channel
+            channel: int = cam_id % 4
             self._fluid_flow.add_density_channel(flow_layer.magnitude, channel, den_strength)
-            self._fluid_flow.clamp_density(0.0, 1.2)
-
 
             # Add temperature from each flow layer
-            self._fluid_flow.add_temperature(flow_layer.temperature, 0.0)
+            self._fluid_flow.add_temperature(flow_layer.temperature, 1.0)
 
-        # Update fluid simulation
-        self._fluid_flow.update(self._delta_time)
+        # Snapshot sim dims before update for resize detection
+        prev_sw, prev_sh = self._fluid_flow.sim_width, self._fluid_flow.sim_height
+
+        # Update fluid simulation (handles its own reallocation internally)
+        self._fluid_flow.update()
+
+        # Resize visualizer if sim dims changed
+        if self._fluid_flow.sim_width != prev_sw or self._fluid_flow.sim_height != prev_sh:
+            self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
 
         # Colorize density channels with track colors
         self._colorize_density()

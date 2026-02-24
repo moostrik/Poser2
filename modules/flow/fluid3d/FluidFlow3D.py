@@ -53,6 +53,17 @@ class FluidFlow3DConfig(Settings):
     # ---- Actions ----
     reset_sim = Field(False, widget=Widget.button, description="Reset all simulation fields to zero")
 
+    # ---- Global ----
+    simulation_scale = Field(0.5, min=0.1, max=2.0, description="Resolution scale for simulation buffers")
+    avg_fps = Field(60, min=1, max=240, access=Field.READ, description="Current average FPS (bound from WindowManager)")
+
+    # ---- Input strengths ----
+    vel_input_strength = Field(1.0, min=0.0, max=10.0, description="Multiplier applied to all velocity inputs")
+    den_input_strength = Field(0.01, min=0.0, max=1.0, description="Multiplier applied to all density inputs")
+    tmp_input_strength = Field(0.0, min=0.0, max=1.0, description="Multiplier applied to all temperature inputs")
+    vel_clamp_max = Field(5.0, min=0.1, max=50.0, description="Maximum velocity magnitude after clamping")
+    den_clamp_max = Field(1.2, min=0.1, max=5.0, description="Maximum density value after clamping")
+
     # ---- Depth parameters ----
     depth_layers = Field(16, min=4, max=64, description="Number of depth layers in the 3D volume")
     depth_scale = Field(1.0, min=0.5, max=5.0, description="Manual multiplier on auto-computed Z grid spacing (width/depth_layers)")
@@ -115,11 +126,14 @@ class FluidFlow3D:
         _output_texture:  Texture RGBA16F    (composited from 3D density)
     """
 
-    def __init__(self, sim_scale: float = 0.25,
-                 config: FluidFlow3DConfig | None = None) -> None:
+    @staticmethod
+    def _align16(v: int) -> int:
+        """Round up to the nearest multiple of 16."""
+        return (v + 15) & ~15
+
+    def __init__(self, config: FluidFlow3DConfig | None = None) -> None:
         self.config: FluidFlow3DConfig = config or FluidFlow3DConfig()
 
-        self._simulation_scale: float = sim_scale
         self._width: int = 0
         self._height: int = 0
         self._density_width: int = 0
@@ -183,25 +197,24 @@ class FluidFlow3D:
         # Bind settings actions
         self.config.bind(FluidFlow3DConfig.reset_sim, lambda _: self._request_reset())
         self.config.bind(FluidFlow3DConfig.depth_layers, lambda _: self._request_reallocate())
+        self.config.bind(FluidFlow3DConfig.simulation_scale, lambda _: self._request_reallocate())
 
     # ========== Allocation ==========
 
-    def allocate(self, width: int, height: int,
-                 output_width: int | None = None,
-                 output_height: int | None = None) -> None:
+    def allocate(self, width: int, height: int) -> None:
         """Allocate all 3D volumes and shaders.
 
         Args:
-            width: Simulation resolution (XY)
-            height: Simulation resolution (XY)
-            output_width: Composited 2D output width (defaults to width)
-            output_height: Composited 2D output height (defaults to height)
+            width: Full output resolution width (XY)
+            height: Full output resolution height (XY)
         """
-        self._width = width
-        self._height = height
-        self._density_width = output_width if output_width is not None else width
-        self._density_height = output_height if output_height is not None else height
-        self._aspect = width / height if height > 0 else 1.0
+        self._density_width = width
+        self._density_height = height
+
+        sim_scale = self.config.simulation_scale
+        self._width = self._align16(int(width * sim_scale))
+        self._height = self._align16(int(height * sim_scale))
+        self._aspect = self._width / self._height if self._height > 0 else 1.0
         self._depth = self.config.depth_layers
         self._auto_depth_scale = self._width / max(1, self._depth)
 
@@ -314,21 +327,23 @@ class FluidFlow3D:
 
     # ========== Update Pipeline ==========
 
-    def update(self, delta_time: float = 1.0) -> None:
-        """Run one frame of the 3D fluid simulation pipeline.
-
-        Args:
-            delta_time: Time step (typically 1/fps or 1.0 for per-frame)
-        """
+    def update(self) -> None:
+        """Run one frame of the 3D fluid simulation pipeline."""
         if not self._allocated:
             return
         self._reload_shaders()
 
-        # Handle deferred reallocation from UI thread (depth_layers changed)
+        # Handle deferred reallocation from UI thread (depth_layers or simulation_scale changed)
         if self._reallocate_pending:
             self._reallocate_pending = False
             new_depth = self.config.depth_layers
-            if new_depth != self._depth:
+            sim_scale = self.config.simulation_scale
+            new_w = self._align16(int(self._density_width * sim_scale))
+            new_h = self._align16(int(self._density_height * sim_scale))
+            if new_depth != self._depth or new_w != self._width or new_h != self._height:
+                self._width = new_w
+                self._height = new_h
+                self._aspect = self._width / self._height if self._height > 0 else 1.0
                 self._reallocate_volumes(new_depth)
 
         # Handle deferred reset from UI thread
@@ -336,9 +351,15 @@ class FluidFlow3D:
             self._reset_pending = False
             self.reset()
 
+        # Clamp inputs before simulation
+        self.clamp_density()
+        self._clamp_velocity()
+
+        delta_time: float = 1.0 / max(1, self.config.avg_fps)
+
         self._aspect = self._width / self._height if self._height > 0 else 1.0
         depth_scale: float = self._auto_depth_scale * self.config.depth_scale
-        grid_scale: float = self._simulation_scale
+        grid_scale: float = self.config.simulation_scale
 
         # ===== STEP 1: ADVECT DENSITY =====
         advect_den_step = delta_time * (self.config.speed + self.config.den_speed_offset)
@@ -374,7 +395,7 @@ class FluidFlow3D:
 
         # ===== STEP 3: VELOCITY DIFFUSE (viscosity) =====
         if self.config.vel_viscosity > 0.0:
-            viscosity_dt = self.config.vel_viscosity * (self._simulation_scale ** 2) * delta_time
+            viscosity_dt = self.config.vel_viscosity * (self.config.simulation_scale ** 2) * delta_time
 
             result = self._jacobi_diffusion_shader.solve(
                 self._velocity.texture,
@@ -392,7 +413,7 @@ class FluidFlow3D:
 
         # ===== STEP 4: VORTICITY CONFINEMENT =====
         if self.config.vel_vorticity > 0.0 and self.config.vel_vorticity_radius > 0.0:
-            vorticity_radius = self.config.vel_vorticity_radius * self._simulation_scale
+            vorticity_radius = self.config.vel_vorticity_radius * self.config.simulation_scale
             vorticity_force = self.config.vel_vorticity * delta_time
 
             # 4a. Compute 3D curl (vorticity vector)
@@ -439,8 +460,8 @@ class FluidFlow3D:
 
             # 6. Compute and apply buoyancy force
             # F = sigma*(T - T_ambient) - kappa*density
-            sigma = delta_time * self._simulation_scale * self.config.tmp_buoyancy
-            kappa = delta_time * self._simulation_scale * self.config.tmp_weight
+            sigma = delta_time * self.config.simulation_scale * self.config.tmp_buoyancy
+            kappa = delta_time * self.config.simulation_scale * self.config.tmp_weight
 
             self._buoyancy_shader.use(
                 self._temperature.texture,
@@ -585,14 +606,16 @@ class FluidFlow3D:
         """Inject 2D velocity texture into 3D velocity volume.
 
         Uses gaussian depth spread centered at config.injection_layer.
+        Applies config vel_input_strength and delta_time.
         """
         if not self._allocated:
             return
+        effective = strength * self.config.vel_input_strength * (1.0 / max(1, self.config.avg_fps))
         self._inject_shader.use(
             texture, self._velocity.texture,
             self.config.injection_layer,
             self.config.injection_spread,
-            strength, mode=0,
+            effective, mode=0,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
@@ -615,14 +638,16 @@ class FluidFlow3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D density texture into 3D density volume."""
+        """Inject 2D density texture into 3D density volume. Applies config den_input_strength and delta_time."""
         if not self._allocated:
             return
+        dt = 1.0 / max(1, self.config.avg_fps)
+        effective = strength * self.config.den_input_strength * dt
         self._inject_shader.use(
             texture, self._density.texture,
             self.config.injection_layer,
             self.config.injection_spread,
-            strength, mode=0,
+            effective, mode=0,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
@@ -646,6 +671,7 @@ class FluidFlow3D:
         """Inject single-channel 2D texture into one RGBA channel of the 3D density volume.
 
         Uses gaussian depth spread centered at config.injection_layer.
+        Applies config den_input_strength.
 
         Args:
             texture: 2D source texture (reads .r component)
@@ -654,39 +680,48 @@ class FluidFlow3D:
         """
         if not self._allocated:
             return
+        dt = 1.0 / max(1, self.config.avg_fps)
+        effective = strength * self.config.den_input_strength * dt
         self._inject_channel_shader.use(
             texture, self._density.texture,
             self.config.injection_layer,
             self.config.injection_spread,
-            channel, strength, mode=0,
+            channel, effective, mode=0,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
-    def clamp_density(self, min_value: float = 0.0, max_value: float = 1.0) -> None:
-        """Clamp 3D density volume voxels to [min_value, max_value].
-
-        Args:
-            min_value: Minimum clamp value (applied to all channels)
-            max_value: Maximum clamp value (applied to all channels)
-        """
+    def clamp_density(self) -> None:
+        """Clamp 3D density volume voxels to [0, config.den_clamp_max]."""
         if not self._allocated:
             return
         self._clamp_shader.use(
-            self._density.texture, min_value, max_value,
+            self._density.texture, 0.0, self.config.den_clamp_max,
+            internal_format=GL_RGBA16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+    def _clamp_velocity(self) -> None:
+        """Clamp 3D velocity volume voxels to [-vel_clamp_max, vel_clamp_max]."""
+        if not self._allocated:
+            return
+        self._clamp_shader.use(
+            self._velocity.texture, -self.config.vel_clamp_max, self.config.vel_clamp_max,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D temperature texture into 3D temperature volume."""
+        """Inject 2D temperature texture into 3D temperature volume. Applies config tmp_input_strength and delta_time."""
         if not self._allocated:
             return
+        dt = 1.0 / max(1, self.config.avg_fps)
+        effective = strength * self.config.tmp_input_strength * dt
         self._inject_shader.use(
             texture, self._temperature.texture,
             self.config.injection_layer,
             self.config.injection_spread,
-            strength, mode=0,
+            effective, mode=0,
             internal_format=GL_R16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
@@ -774,3 +809,13 @@ class FluidFlow3D:
     def depth(self) -> int:
         """Number of depth layers."""
         return self._depth
+
+    @property
+    def sim_width(self) -> int:
+        """Current simulation resolution width (aligned to 16)."""
+        return self._width
+
+    @property
+    def sim_height(self) -> int:
+        """Current simulation resolution height (aligned to 16)."""
+        return self._height

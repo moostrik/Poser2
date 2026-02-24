@@ -10,7 +10,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 # Local application imports
 from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color, Texture
-from modules.gl.WindowManager import MonitorId
+from modules.gl.WindowManager import MonitorId, WindowSettings
 from modules.render.layer_settings import Layers
 from modules.render.layers import LayerBase
 
@@ -121,6 +121,12 @@ class RenderManager(RenderBase):
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
         self.window_manager: WindowManager = WindowManager(self, settings.window)
+
+        # Propagate window fps to fluid simulation configs
+        def _propagate_fps(fps: int) -> None:
+            settings.fluid.fluid_flow.avg_fps = fps
+            settings.fluid3D.fluid_flow.avg_fps = fps
+        settings.window.bind(WindowSettings.avg_fps, _propagate_fps)
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
