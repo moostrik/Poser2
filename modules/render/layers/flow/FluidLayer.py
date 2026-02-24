@@ -51,14 +51,14 @@ class FluidDrawMode(IntEnum):
 
 class FluidLayerSettings(Settings):
     """Configuration for FluidLayer (fluid simulation)."""
-    fps = Field(110.0, min=1.0, max=240.0)
-    num_players = Field(3, min=1, max=8)
-    draw_mode = Field(FluidDrawMode.DENSITY)
-    blend_mode = Field(Style.BlendMode.ADD)
-    simulation_scale = Field(0.5, min=0.1, max=2.0)
+    fps: Field[float] =                     Field(110.0, min=1.0, max=240.0)
+    num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
+    draw_mode: Field[FluidDrawMode] =       Field(FluidDrawMode.DENSITY)
+    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
+    simulation_scale: Field[float] =        Field(0.5, min=0.1, max=2.0)
 
-    visualisation: VisualisationFieldConfig
     fluid_flow:    FluidFlowConfig
+    visualisation: VisualisationFieldConfig
 
 
 class FluidLayer(LayerBase):
