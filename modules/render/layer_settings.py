@@ -35,6 +35,7 @@ class Layers(IntEnum):
     color_mask =    auto()
     flow =          auto()
     fluid =         auto()
+    fluid3D =       auto()
     composite =     auto()
 
 

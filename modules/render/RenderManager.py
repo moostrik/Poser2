@@ -103,6 +103,7 @@ class RenderManager(RenderBase):
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.data_hub,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.data_hub,   cam_mask,           cmt[i], settings.flow)
             fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.data_hub,   flows,                      settings.fluid,             settings.colors)
+            fluid3D =  self.L[Layers.fluid3D][i] =          ls.Fluid3DLayer(        i, self.data_hub,   flows,                      settings.fluid3D,           settings.colors)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.lut)
 

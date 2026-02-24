@@ -35,5 +35,6 @@ class RenderSettings(Settings):
     centre:  CentreGroup
     flow:    layers.FlowLayerSettings
     fluid:   layers.FluidLayerSettings
+    fluid3D: layers.Fluid3DLayerSettings
     colors:  ColorSettings
     window:  WindowSettings
