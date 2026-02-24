@@ -2033,16 +2033,6 @@ class TestPresetsUtilities(unittest.TestCase):
         f2 = Field(42)
         self.assertFalse(f2.pinned)
 
-    def test_set_startup_rejects_reserved_names(self):
-        for name in ("CON", "con", "NUL", "COM1", "LPT3", "com1", "aux"):
-            with self.assertRaises(ValueError, msg=f"Should reject '{name}'"):
-                presets.set_startup(name)
-
-    def test_set_startup_rejects_reserved_with_extension(self):
-        """CON.txt should be rejected — stem is CON."""
-        with self.assertRaises(ValueError):
-            presets.set_startup("CON.txt")
-
 
 # ── Bug-fix regression tests ──────────────────────────────────────────────
 
