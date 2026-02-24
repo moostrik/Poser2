@@ -34,11 +34,23 @@ def get_startup() -> str:
         return "default"
 
 
+# Windows reserved device names (case-insensitive)
+_RESERVED_NAMES = frozenset({
+    "CON", "PRN", "AUX", "NUL",
+    *(f"COM{i}" for i in range(1, 10)),
+    *(f"LPT{i}" for i in range(1, 10)),
+})
+
+
 def set_startup(name: str) -> None:
     """Persist *name* as the preset to load on next startup."""
     # Reject names that could escape the settings directory
     if not name or "/" in name or "\\" in name or name.startswith("."):
         raise ValueError(f"Invalid preset name: {name!r}")
+    # Reject Windows reserved device names (e.g. CON, NUL, COM1)
+    stem = name.split(".")[0].upper()
+    if stem in _RESERVED_NAMES:
+        raise ValueError(f"Invalid preset name (reserved): {name!r}")
     SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
     (SETTINGS_DIR / "_startup_preset.txt").write_text(name)
 

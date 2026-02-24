@@ -2033,6 +2033,91 @@ class TestPresetsUtilities(unittest.TestCase):
         f2 = Field(42)
         self.assertFalse(f2.pinned)
 
+    def test_set_startup_rejects_reserved_names(self):
+        for name in ("CON", "con", "NUL", "COM1", "LPT3", "com1", "aux"):
+            with self.assertRaises(ValueError, msg=f"Should reject '{name}'"):
+                presets.set_startup(name)
+
+    def test_set_startup_rejects_reserved_with_extension(self):
+        """CON.txt should be rejected — stem is CON."""
+        with self.assertRaises(ValueError):
+            presets.set_startup("CON.txt")
+
+
+# ── Bug-fix regression tests ──────────────────────────────────────────────
+
+class TestToJsonValueListElements(unittest.TestCase):
+    """Bug 1: to_json_value should serialize list elements with to_dict()."""
+
+    def test_list_of_colors_serialized(self):
+        class ColorListSettings(Settings):
+            colors = Field([Color(1, 0, 0)])
+
+        s = ColorListSettings()
+        s.colors = [Color(1, 0, 0), Color(0, 1, 0)]
+        d = s.to_dict()
+        self.assertEqual(d["colors"], [
+            {"r": 1, "g": 0, "b": 0, "a": 1.0},
+            {"r": 0, "g": 1, "b": 0, "a": 1.0},
+        ])
+
+    def test_list_of_enums_still_works(self):
+        s = EnumListSettings()
+        s.modes = [RenderMode.WIREFRAME, RenderMode.SOLID]
+        d = s.to_dict()
+        self.assertEqual(d["modes"], ["WIREFRAME", "SOLID"])
+
+    def test_list_of_ints_still_works(self):
+        s = ListSettings()
+        s.ids = [4, 5, 6]
+        d = s.to_dict()
+        self.assertEqual(d["ids"], [4, 5, 6])
+
+
+class TestLossyFloatToIntRejection(unittest.TestCase):
+    """Bug 2: non-integer floats must be rejected in int list coercion."""
+
+    def test_integer_floats_accepted(self):
+        """1.0, 2.0, 3.0 are lossless → still accepted."""
+        s = ListSettings()
+        s.ids = [1.0, 2.0, 3.0]  # type: ignore
+        self.assertEqual(s.ids, [1, 2, 3])
+
+    def test_non_integer_float_rejected(self):
+        """1.5 is lossy → must raise TypeError."""
+        s = ListSettings()
+        with self.assertRaises(TypeError):
+            s.ids = [1, 2.5, 3]  # type: ignore
+
+    def test_negative_non_integer_rejected(self):
+        s = ListSettings()
+        with self.assertRaises(TypeError):
+            s.ids = [-0.7]  # type: ignore
+
+
+class TestListCopyOnRead(unittest.TestCase):
+    """Bug 4: __get__ returns a shallow copy so in-place mutation can't corrupt state."""
+
+    def test_append_does_not_mutate_internal(self):
+        s = ListSettings()
+        got = s.ids
+        got.append(999)
+        self.assertEqual(s.ids, [1, 2, 3])  # internal unchanged
+
+    def test_clear_does_not_mutate_internal(self):
+        s = ListSettings()
+        got = s.ids
+        got.clear()
+        self.assertEqual(s.ids, [1, 2, 3])
+
+    def test_consecutive_reads_are_equal(self):
+        s = ListSettings()
+        self.assertEqual(s.ids, s.ids)
+
+    def test_read_is_not_same_object(self):
+        s = ListSettings()
+        self.assertIsNot(s.ids, s.ids)
+
 
 if __name__ == "__main__":
     unittest.main()

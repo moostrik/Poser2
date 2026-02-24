@@ -131,7 +131,12 @@ class Field(Generic[T]):
     def __get__(self, obj: Any | None, objtype: type | None = None) -> Field[T] | T:
         if obj is None:
             return self  # class-level access returns the descriptor itself
-        return obj._values[self.name]
+        value = obj._values[self.name]
+        # Return a shallow copy of lists to prevent silent in-place mutation
+        # (in-place changes would bypass __set__ and not fire callbacks).
+        if isinstance(value, list):
+            return cast(T, list(value))
+        return value
 
     def __set__(self, obj: Any, value: T) -> None:
         self.set(obj, value)
@@ -239,6 +244,15 @@ class Field(Generic[T]):
         # Promote int → float for float lists
         if et is float and isinstance(v, int):
             return float(v)
+        # Promote float → int only when lossless (e.g. 3.0 → 3, but reject 3.7)
+        if et is int and isinstance(v, float):
+            iv = int(v)
+            if v != iv:
+                raise TypeError(
+                    f"Field '{self.name}' list element expects int, "
+                    f"got non-integer float: {v!r}"
+                )
+            return iv
         # Enum element: reconstruct from name (str) or value (int)
         if isinstance(et, type) and issubclass(et, Enum):
             if isinstance(v, str):
@@ -295,7 +309,12 @@ class Field(Generic[T]):
         if isinstance(value, Enum):
             return value.name
         if isinstance(value, list):
-            return [v.name if isinstance(v, Enum) else v for v in value]
+            return [
+                v.name if isinstance(v, Enum)
+                else v.to_dict() if hasattr(v, 'to_dict')
+                else v
+                for v in value
+            ]
         return value
 
     def from_json_value(self, obj, raw):
