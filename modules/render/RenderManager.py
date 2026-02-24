@@ -11,7 +11,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 # Local application imports
 from modules.gl import RenderBase, WindowManager, Shader, Style, clear_color, Texture
 from modules.gl.WindowManager import MonitorId
-from modules.render.layer_ids import Layers
+from modules.render.layer_settings import Layers
 from modules.render.layers import LayerBase
 
 from modules.DataHub import DataHub

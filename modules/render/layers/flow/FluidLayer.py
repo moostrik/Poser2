@@ -11,7 +11,7 @@ import numpy as np
 from modules.gl import Texture, Style, Fbo
 from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.DataHub import DataHub, Stage
-from modules.pose.Frame import Frame, MotionGate, Similarity
+from modules.pose.Frame import Frame
 
 from modules.settings import Field, Settings
 from modules.flow import Visualizer, VisualisationFieldConfig

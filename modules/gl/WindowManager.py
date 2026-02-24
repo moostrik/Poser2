@@ -19,7 +19,7 @@ import ctypes
 # Local application imports
 from modules.gl.RenderBase import RenderBase
 from modules.gl.Utils import FpsCounter
-from modules.settings import Field, Settings
+from modules.settings import Field, Settings, Widget
 
 
 class MonitorId(IntEnum):
@@ -42,7 +42,7 @@ class WindowSettings(Settings):
     y: Field[int] =               Field(80)
     width: Field[int] =           Field(1920)
     height: Field[int] =          Field(1000)
-    secondary_list: Field[list[MonitorId]] = Field([MonitorId.M0])
+    secondary_list: Field[list[MonitorId]] = Field([MonitorId.M0], widget=Widget.order)
 
 
 class Button(Enum):

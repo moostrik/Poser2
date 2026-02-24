@@ -1,58 +1,39 @@
 """RenderSettings - reactive settings for the render pipeline."""
 
-from modules.render.layers.generic.CompositeLayer import CompositeLayerSettings
-from modules.render.layers.generic.MSColorMaskLayer import ColorMaskLayerSettings
-from modules.render.layers.flow.FlowLayer import FlowLayerSettings
-from modules.render.layers.flow.FluidLayer import FluidLayerSettings
-
-from modules.render.layers.centre.CentreGeometry import CentreGeomSettings
-from modules.render.layers.centre.CentreMaskLayer import CentreMaskSettings
-from modules.render.layers.centre.CentreCamLayer import CentreCamSettings
-from modules.render.layers.centre.CentreFrgLayer import CentreFrgSettings
-from modules.render.layers.centre.CentrePoseLayer import CentrePoseSettings
-
-from modules.render.layers.cam.TrackerCompositor import TrackerCompSettings
-from modules.render.layers.cam.PoseCompositor import PoseCompSettings
-
-from modules.render.layers.data.DataLayerSettings import DataLayerSettings
-
+from .color_settings import ColorSettings
+from .layer_settings import LayerSettings
+from . import layers
 from modules.settings import Settings
 from modules.gl.WindowManager import WindowSettings
-from modules.render.color_settings import ColorSettings
-from modules.render.layer_ids import LayerSettings
 
 
 class LayerGroup(Settings):
-    select: LayerSettings
-    lut:    CompositeLayerSettings
-
+    select:   LayerSettings
+    lut:      layers.CompositeLayerSettings
 
 class DataGroup(Settings):
-    a: DataLayerSettings
-    b: DataLayerSettings
-
+    a:        layers.DataLayerSettings
+    b:        layers.DataLayerSettings
 
 class PreviewGroup(Settings):
-    tracker: TrackerCompSettings
-    poser:   PoseCompSettings
-
+    tracker:  layers.TrackerCompSettings
+    poser:    layers.PoseCompSettings
 
 class CentreGroup(Settings):
-    geometry: CentreGeomSettings
-    mask:     CentreMaskSettings
-    cam:      CentreCamSettings
-    frg:      CentreFrgSettings
-    pose:     CentrePoseSettings
-    color:    ColorMaskLayerSettings
+    geometry: layers.CentreGeomSettings
+    mask:     layers.CentreMaskSettings
+    cam:      layers.CentreCamSettings
+    frg:      layers.CentreFrgSettings
+    pose:     layers.CentrePoseSettings
+    color:    layers.ColorMaskLayerSettings
 
 
 class RenderSettings(Settings):
-    """Mutable render-pipeline settings."""
     layer:   LayerGroup
     data:    DataGroup
     preview: PreviewGroup
     centre:  CentreGroup
-    flow:    FlowLayerSettings
-    fluid:   FluidLayerSettings
+    flow:    layers.FlowLayerSettings
+    fluid:   layers.FluidLayerSettings
     colors:  ColorSettings
     window:  WindowSettings

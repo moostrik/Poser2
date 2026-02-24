@@ -102,7 +102,7 @@
       "fps": 60.0,
       "draw_mode": "DENSITY_BRIDGE_INPUT_COLOR",
       "blend_mode": "ADD",
-      "simulation_scale": 0.5,
+      "simulation_scale": 0.25,
       "visualisation": {
         "toggle_scalar": false,
         "scale": 1.0,
@@ -136,31 +136,36 @@
       "num_players": 3,
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
-      "simulation_scale": 0.5,
+      "simulation_scale": 0.25,
+      "fluid_flow": {
+        "depth_layers": 16,
+        "depth_scale": 1.0,
+        "composite_mode": 1,
+        "injection_layer": 0.1,
+        "injection_spread": 0.15,
+        "speed": 1.0,
+        "vel_self_advection": 0.01,
+        "den_speed_offset": 0.0,
+        "vel_lifetime": 9.9,
+        "vel_vorticity": 5.0,
+        "vel_vorticity_radius": 3.0,
+        "vel_viscosity": 15.0,
+        "vel_viscosity_iter": 40,
+        "prs_speed": 0.0,
+        "prs_lifetime": 8.0,
+        "prs_iterations": 40,
+        "den_lifetime": 7.0,
+        "tmp_lifetime": 3.0,
+        "tmp_buoyancy": 0.0,
+        "tmp_weight": -10.0,
+        "tmp_ambient": 0.2
+      },
       "visualisation": {
         "toggle_scalar": false,
         "scale": 1.0,
         "spacing": 20.0,
         "element_length": 40.0,
         "element_width": 1.0
-      },
-      "fluid_flow": {
-        "speed": 1.0,
-        "vel_self_advection": 0.01,
-        "den_speed_offset": 0.0,
-        "vel_lifetime": 30.0,
-        "vel_vorticity": 30.0,
-        "vel_vorticity_radius": 10.0,
-        "vel_viscosity": 50.0,
-        "vel_viscosity_iter": 40,
-        "prs_speed": 0.0,
-        "prs_lifetime": 8.0,
-        "prs_iterations": 40,
-        "den_lifetime": 18.0,
-        "tmp_lifetime": 3.0,
-        "tmp_buoyancy": 0.0,
-        "tmp_weight": -10.0,
-        "tmp_ambient": 0.2
       }
     },
     "colors": {
@@ -217,9 +222,7 @@
       "width": 1080,
       "height": 1000,
       "secondary_list": [
-        "M1",
-        "M2",
-        "M3"
+        "M1"
       ]
     }
   },

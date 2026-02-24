@@ -14,7 +14,7 @@ from .centre.CentreFrgLayer import          CentreFrgLayer, CentreFrgSettings
 from .centre.CentrePoseLayer import         CentrePoseLayer, CentrePoseSettings
 from .centre.CentreDenseFlowLayer import    CentreDenseFlowLayer, CentreDlowSettings
 
-from .data.DataLayerSettings import           DataLayerSettings, ScalarFrameField, LayerMode
+from .data.DataLayerSettings import         DataLayerSettings, ScalarFrameField, LayerMode
 from .data.FeatureFrameLayer import         FeatureFrameLayer
 from .data.FeatureWindowLayer import        FeatureWindowLayer
 from .data.MTimeRenderer import             MTimeRenderer, MTimeRendererSettings
@@ -27,7 +27,7 @@ from .generic.MSColorMaskLayer import       MSColorMaskLayer, ColorMaskLayerSett
 from .generic.CompositeLayer import         CompositeLayer, CompositeLayerSettings, LutSelection
 from .flow.FlowLayer import                 FlowLayer, FlowLayerSettings, FlowSettings, FlowDrawMode
 from .flow.FluidLayer import                FluidLayer, FluidLayerSettings, FluidDrawMode
-from .flow.Fluid3DLayer import              Fluid3DLayer, Fluid3DLayerSettings, Fluid3DDrawMode
+from .flow.FluidLayer3D import              FluidLayer3D, FluidLayer3DSettings, Fluid3DDrawMode
 
 from .generic.HDTPrepare import             HDTPrepare
 from .generic.HDTBlend import               HDTBlend
