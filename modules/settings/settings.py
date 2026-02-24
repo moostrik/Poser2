@@ -6,13 +6,13 @@ import sys
 import threading
 import typing
 
-from modules.settings.setting import Setting, Access
+from modules.settings.field import Field, Access
 from modules.settings.widget import Widget
 
 logger = logging.getLogger(__name__)
 
 
-class BaseSettings:
+class Settings:
     """Collection of Setting descriptors with attribute access, callbacks, and serialization.
 
     Subclass and declare Setting descriptors as class attributes.
@@ -44,7 +44,7 @@ class BaseSettings:
             for attr_name, attr_value in vars(cls).items():
                 if attr_name.startswith("_"):
                     continue
-                if isinstance(attr_value, Setting) and attr_name not in self._fields:
+                if isinstance(attr_value, Field) and attr_name not in self._fields:
                     self._fields[attr_name] = attr_value
                     default = attr_value.default
                     self._values[attr_name] = copy.deepcopy(default) if isinstance(default, list) else default
@@ -52,8 +52,8 @@ class BaseSettings:
                     self._locks[attr_name] = threading.Lock()
                 elif (
                     isinstance(attr_value, type)
-                    and issubclass(attr_value, BaseSettings)
-                    and attr_value is not BaseSettings
+                    and issubclass(attr_value, Settings)
+                    and attr_value is not Settings
                     and attr_name not in self._fields
                     and attr_name not in self._children
                 ):
@@ -77,7 +77,7 @@ class BaseSettings:
                         resolved = eval(ann, ns)
                     except Exception:
                         continue
-                if isinstance(resolved, type) and issubclass(resolved, BaseSettings) and resolved is not BaseSettings:
+                if isinstance(resolved, type) and issubclass(resolved, Settings) and resolved is not Settings:
                     child = resolved()
                     self._children[attr_name] = child
                     object.__setattr__(self, attr_name, child)
@@ -148,7 +148,7 @@ class BaseSettings:
 
     # -- Callback registration -----------------------------------------------
 
-    def bind(self, field: 'Setting', callback) -> None:
+    def bind(self, field: 'Field', callback) -> None:
         """Register a callback for a Setting descriptor.
 
         Usage::
@@ -162,7 +162,7 @@ class BaseSettings:
             )
         field.bind(self, callback)
 
-    def unbind(self, field: 'Setting', callback) -> None:
+    def unbind(self, field: 'Field', callback) -> None:
         """Remove a previously registered callback for a Setting."""
         field.unbind(self, callback)
 

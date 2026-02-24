@@ -2,7 +2,7 @@
 
 from enum import IntEnum, auto
 
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 
 
 class Layers(IntEnum):
@@ -38,7 +38,7 @@ class Layers(IntEnum):
     composite =     auto()
 
 
-class LayerSettings(BaseSettings):
+class LayerSettings(Settings):
     """Which layers to draw in preview and final output (order matters)."""
-    preview: Setting[list[Layers]] = Setting([Layers.composite], description="Layers drawn in the preview viewports")
-    final:   Setting[list[Layers]] = Setting([Layers.composite], description="Layers drawn on the output monitors")
+    preview: Field[list[Layers]] = Field([Layers.composite], description="Layers drawn in the preview viewports")
+    final:   Field[list[Layers]] = Field([Layers.composite], description="Layers drawn on the output monitors")

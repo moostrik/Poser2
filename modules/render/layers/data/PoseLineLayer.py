@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from modules.DataHub import DataHub, Stage
 from modules.gl import Fbo, Texture, Blit, clear_color
 from modules.pose.Frame import Frame
@@ -14,13 +14,13 @@ from modules.render.shaders import PosePointLines as shader
 from modules.utils import Color
 
 
-class PoseLineSettings(BaseSettings):
-    stage:      Setting[Stage] = Setting(Stage.LERP, access=Setting.INIT, description="Pipeline stage for pose data")
-    line_width: Setting[float] = Setting(4.0, min=0.5, max=20.0, description="Line width in pixels")
-    line_smooth:Setting[float] = Setting(2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
-    use_scores: Setting[bool]  = Setting(True, description="Use confidence scores for line opacity")
-    use_bbox:   Setting[bool]  = Setting(False, description="Transform points to image space using bbox")
-    color:      Setting[Color] = Setting(Color(1.0, 1.0, 1.0), description="Line color")
+class PoseLineSettings(Settings):
+    stage:      Field[Stage] = Field(Stage.LERP, access=Field.INIT, description="Pipeline stage for pose data")
+    line_width: Field[float] = Field(4.0, min=0.5, max=20.0, description="Line width in pixels")
+    line_smooth:Field[float] = Field(2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
+    use_scores: Field[bool]  = Field(True, description="Use confidence scores for line opacity")
+    use_bbox:   Field[bool]  = Field(False, description="Transform points to image space using bbox")
+    color:      Field[Color] = Field(Color(1.0, 1.0, 1.0), description="Line color")
 
 
 class PoseLineLayer(LayerBase):

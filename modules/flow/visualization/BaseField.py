@@ -9,16 +9,16 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Fbo, Texture, Blit
 from modules.utils.PointsAndRects import Rect
 
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 
 
-class VisualisationFieldConfig(BaseSettings):
+class VisualisationFieldConfig(Settings):
     """Base configuration for field visualizations."""
-    toggle_scalar = Setting(False, description="Toggle between direction map and arrow field")
-    scale = Setting(1.0, min=0.0, max=10.0, description="Visualization scale multiplier")
-    spacing = Setting(20.0, min=4.0, max=64.0, description="Distance between elements (pixels)")
-    element_length = Setting(40.0, description="Arrow element length")
-    element_width = Setting(1.0, min=0.5, max=2.5, description="Element line width")
+    toggle_scalar = Field(False, description="Toggle between direction map and arrow field")
+    scale = Field(1.0, min=0.0, max=10.0, description="Visualization scale multiplier")
+    spacing = Field(20.0, min=4.0, max=64.0, description="Distance between elements (pixels)")
+    element_length = Field(40.0, description="Arrow element length")
+    element_width = Field(1.0, min=0.5, max=2.5, description="Element line width")
 
 
 class FieldBase(ABC):

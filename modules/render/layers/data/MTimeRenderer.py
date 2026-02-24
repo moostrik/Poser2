@@ -3,15 +3,15 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 from modules.render.layers.LayerBase import LayerBase
 from modules.gl import Text
 
 
-class MTimeRendererSettings(BaseSettings):
-    stage: Setting[Stage] = Setting(Stage.LERP, description="Pipeline stage for pose data")
+class MTimeRendererSettings(Settings):
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
 
 class MTimeRenderer(LayerBase):

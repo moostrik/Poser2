@@ -2,12 +2,10 @@
 from math import ceil
 from typing import Optional
 from functools import partial
-from datetime import datetime
-import os
 
 # Local application imports
-from modules.settings import BaseSettings, presets, SettingsServer, ServerSettings
-from modules.Settings import Settings
+from modules.settings import Settings as NewSettings , presets, NiceServer, NiceSettings
+from modules.Settings import Settings as OldSettings
 from modules.render import RenderManager, RenderSettings
 from modules.DataHub import DataHub, Stage
 from modules.gui import Gui
@@ -20,15 +18,15 @@ from modules.utils import Timer, TimerConfig
 
 
 # M SETTINGS (root BaseSettings — children auto-detected)
-class MainSettings(BaseSettings):
+class MainSettings(NewSettings):
     render: RenderSettings
-    server: ServerSettings
+    server: NiceSettings
 
 
 class Main():
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: OldSettings) -> None:
 
-        self.settings: Settings = settings
+        self.old_settings: OldSettings = settings
         self.gui = Gui(settings.gui)
         num_players: int = settings.num_players
 
@@ -85,7 +83,7 @@ class Main():
 
 
         # Start settings server
-        self.settings_server = SettingsServer(self.new_settings, self.new_settings.server, on_exit=self.stop)
+        self.settings_server = NiceServer(self.new_settings, self.new_settings.server, on_exit=self.stop)
         self.settings_server.start()
 
         # POSE CONFIGURATION

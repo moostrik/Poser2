@@ -20,7 +20,7 @@ from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame, MotionGate, Similarity
 
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from modules.flow import Visualizer, VisualisationFieldConfig
 from modules.flow.fluid3d import FluidFlow3D, FluidFlow3DConfig
 from modules.render.shaders import DensityColorize
@@ -41,13 +41,13 @@ class Fluid3DDrawMode(IntEnum):
     DENSITY_RAW = auto()
 
 
-class Fluid3DLayerSettings(BaseSettings):
+class Fluid3DLayerSettings(Settings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
-    fps = Setting(30.0, min=1.0, max=240.0)
-    num_players = Setting(3, min=1, max=8)
-    draw_mode = Setting(Fluid3DDrawMode.DENSITY)
-    blend_mode = Setting(Style.BlendMode.ADD)
-    simulation_scale = Setting(0.5, min=0.1, max=2.0)
+    fps = Field(30.0, min=1.0, max=240.0)
+    num_players = Field(3, min=1, max=8)
+    draw_mode = Field(Fluid3DDrawMode.DENSITY)
+    blend_mode = Field(Style.BlendMode.ADD)
+    simulation_scale = Field(0.5, min=0.1, max=2.0)
 
     visualisation: VisualisationFieldConfig
     fluid_flow:    FluidFlow3DConfig

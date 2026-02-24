@@ -2,7 +2,7 @@
 from enum import IntEnum, auto
 
 # Local application imports
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from modules.DataHub import Stage
 from modules.pose.Frame import FrameField, ScalarFrameField
 from modules.render.color_settings import ColorSettings
@@ -23,17 +23,17 @@ _TRACK_COLOR_FIELDS: set[ScalarFrameField] = {
 }
 
 
-class DataLayerSettings(BaseSettings):
+class DataLayerSettings(Settings):
     """Unified configuration for data visualization layers."""
-    mode:           Setting[LayerMode]        = Setting(LayerMode.WINDOW)
-    feature_field:  Setting[ScalarFrameField] = Setting(ScalarFrameField.angle_motion)
-    stage:          Setting[Stage]            = Setting(Stage.SMOOTH)
+    mode:           Field[LayerMode]        = Field(LayerMode.WINDOW)
+    feature_field:  Field[ScalarFrameField] = Field(ScalarFrameField.angle_motion)
+    stage:          Field[Stage]            = Field(Stage.SMOOTH)
 
-    line_width:     Setting[float] = Setting(3.0)
-    line_smooth:    Setting[float] = Setting(1.0)
+    line_width:     Field[float] = Field(3.0)
+    line_smooth:    Field[float] = Field(1.0)
 
-    use_scores:     Setting[bool]  = Setting(False)
-    render_labels:  Setting[bool]  = Setting(True)
+    use_scores:     Field[bool]  = Field(False)
+    render_labels:  Field[bool]  = Field(True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

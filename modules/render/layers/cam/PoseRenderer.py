@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D
@@ -13,12 +13,12 @@ from modules.render.shaders import PosePointLines
 from modules.render.color_settings import ColorSettings
 
 
-class PoseRendererSettings(BaseSettings):
-    stage:      Setting[Stage] = Setting(Stage.LERP, description="Pipeline stage for pose data")
-    line_width: Setting[float] = Setting(1.0, min=0.5, max=10.0, description="Pose line width")
-    line_smooth:Setting[float] = Setting(0.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
-    use_scores: Setting[bool]  = Setting(False, description="Use confidence scores for line opacity")
-    use_bbox:   Setting[bool]  = Setting(True, description="Transform points to image space using bbox")
+class PoseRendererSettings(Settings):
+    stage:      Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
+    line_width: Field[float] = Field(1.0, min=0.5, max=10.0, description="Pose line width")
+    line_smooth:Field[float] = Field(0.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
+    use_scores: Field[bool]  = Field(False, description="Use confidence scores for line opacity")
+    use_bbox:   Field[bool]  = Field(True, description="Transform points to image space using bbox")
 
 
 class PoseRenderer(LayerBase):

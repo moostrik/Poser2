@@ -8,19 +8,19 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl.Fbo import Fbo
 from modules.gl import Texture, Blit
 
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from .. import FlowBase, FlowUtil
 from .shaders import Luminance, MergeRGB, OpticalFlow as OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
 
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class OpticalFlowConfig(BaseSettings):
-    offset = Setting(3, min=1, max=10, description="Gradient sample offset in pixels")
-    threshold = Setting(0.0, min=0.0, max=0.2, description="Motion detection threshold")
-    strength_x = Setting(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
-    strength_y = Setting(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
-    boost = Setting(0.0, min=-0.5, max=0.9, description="Power boost for small motions")
+class OpticalFlowConfig(Settings):
+    offset = Field(3, min=1, max=10, description="Gradient sample offset in pixels")
+    threshold = Field(0.0, min=0.0, max=0.2, description="Motion detection threshold")
+    strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
+    strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
+    boost = Field(0.0, min=-0.5, max=0.9, description="Power boost for small motions")
 
 
 class OpticalFlow(FlowBase):

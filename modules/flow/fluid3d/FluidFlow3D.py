@@ -26,7 +26,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, SwapFbo, Fbo
 from modules.gl.Texture3D import Texture3D, SwapTexture3D
 from modules.gl.ComputeShader import ComputeShader
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from .shaders import (
     Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
@@ -43,7 +43,7 @@ _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 # Configuration
 # ---------------------------------------------------------------------------
 
-class FluidFlow3DConfig(BaseSettings):
+class FluidFlow3DConfig(Settings):
     """Configuration for 3D fluid simulation.
 
     Same speed/lifetime/vorticity/buoyancy model as FluidFlowConfig,
@@ -51,37 +51,37 @@ class FluidFlow3DConfig(BaseSettings):
     """
 
     # ---- Depth parameters ----
-    depth_layers = Setting(16, min=4, max=64, description="Number of depth layers in the 3D volume")
-    depth_scale = Setting(1.0, min=0.1, max=4.0, description="Z grid spacing relative to XY")
-    composite_mode = Setting(1, min=0, max=2, description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
-    injection_layer = Setting(0.5, min=0.0, max=1.0, description="Normalized depth for 2D->3D injection center")
-    injection_spread = Setting(0.15, min=0.01, max=0.5, description="Gaussian sigma for depth spread during injection")
+    depth_layers = Field(16, min=4, max=64, description="Number of depth layers in the 3D volume")
+    depth_scale = Field(1.0, min=0.1, max=4.0, description="Z grid spacing relative to XY")
+    composite_mode = Field(1, min=0, max=2, description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
+    injection_layer = Field(0.5, min=0.0, max=1.0, description="Normalized depth for 2D->3D injection center")
+    injection_spread = Field(0.15, min=0.01, max=0.5, description="Gaussian sigma for depth spread during injection")
 
     # ---- Transport speed ----
-    speed = Setting(1.0, min=0.0, max=5.0, description="Base fluid transport rate")
-    vel_self_advection = Setting(0.01, min=0.0, max=0.2, description="How much velocity advects itself")
-    den_speed_offset = Setting(0.0, min=-5.0, max=5.0, description="Added to base speed for density only")
+    speed = Field(1.0, min=0.0, max=5.0, description="Base fluid transport rate")
+    vel_self_advection = Field(0.01, min=0.0, max=0.2, description="How much velocity advects itself")
+    den_speed_offset = Field(0.0, min=-5.0, max=5.0, description="Added to base speed for density only")
 
     # ---- Velocity parameters ----
-    vel_lifetime = Setting(10.0, min=0.01, max=60.0, description="Seconds until velocity fades to ~1%")
-    vel_vorticity = Setting(5.0, min=0.0, max=60.0, description="Vortex confinement strength")
-    vel_vorticity_radius = Setting(3.0, min=1.0, max=30.0, description="Curl sampling radius in texels")
-    vel_viscosity = Setting(15.0, min=0.0, max=100.0, description="Fluid thickness/resistance to flow")
-    vel_viscosity_iter = Setting(40, min=1, max=60, description="Solver iterations for viscosity")
+    vel_lifetime = Field(10.0, min=0.01, max=60.0, description="Seconds until velocity fades to ~1%")
+    vel_vorticity = Field(5.0, min=0.0, max=60.0, description="Vortex confinement strength")
+    vel_vorticity_radius = Field(3.0, min=1.0, max=30.0, description="Curl sampling radius in texels")
+    vel_viscosity = Field(15.0, min=0.0, max=100.0, description="Fluid thickness/resistance to flow")
+    vel_viscosity_iter = Field(40, min=1, max=60, description="Solver iterations for viscosity")
 
     # ---- Pressure parameters ----
-    prs_speed = Setting(0.0, min=0.0, max=2.0, description="Pressure advection speed")
-    prs_lifetime = Setting(8.0, min=0.01, max=60.0, description="Seconds until pressure fades to ~1%")
-    prs_iterations = Setting(40, min=1, max=60, description="Solver iterations for pressure")
+    prs_speed = Field(0.0, min=0.0, max=2.0, description="Pressure advection speed")
+    prs_lifetime = Field(8.0, min=0.01, max=60.0, description="Seconds until pressure fades to ~1%")
+    prs_iterations = Field(40, min=1, max=60, description="Solver iterations for pressure")
 
     # ---- Density parameters ----
-    den_lifetime = Setting(30.0, min=0.01, max=60.0, description="Seconds until density fades to ~1%")
+    den_lifetime = Field(30.0, min=0.01, max=60.0, description="Seconds until density fades to ~1%")
 
     # ---- Temperature parameters ----
-    tmp_lifetime = Setting(3.0, min=0.01, max=60.0, description="Seconds until temperature fades to ~1%")
-    tmp_buoyancy = Setting(0.0, min=0.0, max=10.0, description="Thermal buoyancy coefficient: hot air rises")
-    tmp_weight = Setting(-10.0, min=-20.0, max=2.0, description="Ratio of gravity/settling vs thermal lift")
-    tmp_ambient = Setting(0.2, min=0.0, max=1.0, description="Reference temperature (buoyancy = 0 at this temp)")
+    tmp_lifetime = Field(3.0, min=0.01, max=60.0, description="Seconds until temperature fades to ~1%")
+    tmp_buoyancy = Field(0.0, min=0.0, max=10.0, description="Thermal buoyancy coefficient: hot air rises")
+    tmp_weight = Field(-10.0, min=-20.0, max=2.0, description="Ratio of gravity/settling vs thermal lift")
+    tmp_ambient = Field(0.2, min=0.0, max=1.0, description="Reference temperature (buoyancy = 0 at this temp)")
 
 
 # ---------------------------------------------------------------------------

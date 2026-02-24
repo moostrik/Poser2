@@ -8,9 +8,9 @@ import threading
 import unittest
 from enum import Enum
 
-from modules.settings.setting import Setting
+from modules.settings.field import Field
 from modules.settings.widget import Widget
-from modules.settings.base_settings import BaseSettings
+from modules.settings.settings import Settings
 from modules.settings import presets
 from modules.utils import Color, Point2f, Rect
 
@@ -29,23 +29,23 @@ class RenderMode(Enum):
 # Test settings classes
 # ---------------------------------------------------------------------------
 
-class CameraSettings(BaseSettings):
-    exposure = Setting(1000, min=100, max=10000, step=100, description="Exposure time (µs)")
-    gain = Setting(1.0, min=0.0, max=16.0, step=0.1)
-    overlay_color = Setting(Color(1, 0, 0))
-    resolution = Setting(1080, access=Setting.INIT)
-    fps = Setting(0.0, access=Setting.READ, visible=False)
-    mode = Setting(RenderMode.SOLID)
+class CameraSettings(Settings):
+    exposure = Field(1000, min=100, max=10000, step=100, description="Exposure time (µs)")
+    gain = Field(1.0, min=0.0, max=16.0, step=0.1)
+    overlay_color = Field(Color(1, 0, 0))
+    resolution = Field(1080, access=Field.INIT)
+    fps = Field(0.0, access=Field.READ, visible=False)
+    mode = Field(RenderMode.SOLID)
 
 
-class MinimalSettings(BaseSettings):
-    value = Setting(0)
+class MinimalSettings(Settings):
+    value = Field(0)
 
 
-class SettingsWithActions(BaseSettings):
-    exposure = Setting(1000)
-    reset = Setting(False, widget=Widget.button, description="Reset all values")
-    hidden_action = Setting(False, widget=Widget.button, visible=False)
+class SettingsWithActions(Settings):
+    exposure = Field(1000)
+    reset = Field(False, widget=Widget.button, description="Reset all values")
+    hidden_action = Field(False, widget=Widget.button, visible=False)
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ class TestSettingDescriptor(unittest.TestCase):
             CameraSettings(nonexistent=42)
 
     def test_class_access_returns_descriptor(self):
-        self.assertIsInstance(CameraSettings.exposure, Setting)
+        self.assertIsInstance(CameraSettings.exposure, Field)
 
 
 class TestTypeCoercion(unittest.TestCase):
@@ -382,7 +382,7 @@ class TestPresetSaveLoad(unittest.TestCase):
     """Tests for preset save/load using a root BaseSettings."""
 
     def _make_root(self):
-        class Root(BaseSettings):
+        class Root(Settings):
             camera: CameraSettings
         return Root()
 
@@ -527,7 +527,7 @@ class TestPresetExtras(unittest.TestCase):
     """Tests for preset edge cases (missing/corrupt files)."""
 
     def _make_root(self):
-        class Root(BaseSettings):
+        class Root(Settings):
             cam: CameraSettings
         return Root()
 
@@ -607,7 +607,7 @@ class TestAction(unittest.TestCase):
         self.assertIn("Reset all values", r)
 
     def test_action_class_access_returns_descriptor(self):
-        self.assertIsInstance(SettingsWithActions.reset, Setting)
+        self.assertIsInstance(SettingsWithActions.reset, Field)
 
     def test_action_broken_callback_doesnt_crash(self):
         s = SettingsWithActions()
@@ -620,29 +620,29 @@ class TestAction(unittest.TestCase):
 
 # ===== Child descriptor tests =============================================
 
-class InnerSettings(BaseSettings):
-    speed = Setting(1.0, min=0.0, max=10.0)
-    scale = Setting(0.5)
+class InnerSettings(Settings):
+    speed = Field(1.0, min=0.0, max=10.0)
+    scale = Field(0.5)
 
 
-class OuterSettings(BaseSettings):
-    fps = Setting(60.0, min=1.0, max=240.0)
+class OuterSettings(Settings):
+    fps = Field(60.0, min=1.0, max=240.0)
     inner: InnerSettings
 
 
-class DoubleChildSettings(BaseSettings):
-    name = Setting("default")
+class DoubleChildSettings(Settings):
+    name = Field("default")
     alpha: InnerSettings
     beta: InnerSettings
 
 
-class MiddleSettings(BaseSettings):
-    weight = Setting(0.5, min=0.0, max=1.0)
+class MiddleSettings(Settings):
+    weight = Field(0.5, min=0.0, max=1.0)
     inner: InnerSettings
 
 
-class DeepSettings(BaseSettings):
-    label = Setting("root")
+class DeepSettings(Settings):
+    label = Field("root")
     middle: MiddleSettings
 
 
@@ -779,7 +779,7 @@ class TestChild(unittest.TestCase):
     # -- Preset save/load with children -------------------------------------
 
     def test_save_load_with_children(self):
-        class Root(BaseSettings):
+        class Root(Settings):
             outer: OuterSettings
         root = Root()
         root.outer.fps = 30.0
@@ -888,9 +888,9 @@ class TestChild(unittest.TestCase):
 
 # ── List Setting ───────────────────────────────────────────────────────────
 
-class ListSettings(BaseSettings):
-    tags = Setting(["default"])
-    ids = Setting([1, 2, 3])
+class ListSettings(Settings):
+    tags = Field(["default"])
+    ids = Field([1, 2, 3])
 
 
 class TestListSetting(unittest.TestCase):
@@ -985,7 +985,7 @@ class TestListSetting(unittest.TestCase):
 
     def test_empty_list_default_rejected(self):
         with self.assertRaises(ValueError):
-            Setting([])
+            Field([])
 
 
 # ---------------------------------------------------------------------------
@@ -1248,16 +1248,16 @@ class TestRectSerialization(unittest.TestCase):
 # Setting integration with Color, Point2f, Rect
 # ---------------------------------------------------------------------------
 
-class _ColorSettings(BaseSettings):
-    color = Setting(Color(1.0, 0.0, 0.0))
+class _ColorSettings(Settings):
+    color = Field(Color(1.0, 0.0, 0.0))
 
 
-class _PointSettings(BaseSettings):
-    pos = Setting(Point2f(0.0, 0.0))
+class _PointSettings(Settings):
+    pos = Field(Point2f(0.0, 0.0))
 
 
-class _RectSettings(BaseSettings):
-    region = Setting(Rect(0.0, 0.0, 1.0, 1.0))
+class _RectSettings(Settings):
+    region = Field(Rect(0.0, 0.0, 1.0, 1.0))
 
 
 class TestColorSettingIntegration(unittest.TestCase):
@@ -1462,8 +1462,8 @@ class TestDeepCopyDefaults(unittest.TestCase):
     """List defaults must be deep-copied between instances (#10)."""
 
     def test_list_not_shared(self):
-        class TagSettings(BaseSettings):
-            tags = Setting(["a", "b"])
+        class TagSettings(Settings):
+            tags = Field(["a", "b"])
 
         s1 = TagSettings()
         s2 = TagSettings()
@@ -1471,8 +1471,8 @@ class TestDeepCopyDefaults(unittest.TestCase):
         self.assertEqual(s2.tags, ["a", "b"])
 
     def test_nested_list_not_shared(self):
-        class NestedList(BaseSettings):
-            items = Setting(["x"])
+        class NestedList(Settings):
+            items = Field(["x"])
 
         a = NestedList()
         b = NestedList()
@@ -1571,47 +1571,47 @@ class TestWidgetResolve(unittest.TestCase):
     """Widget.resolve() maps Widget.default to a concrete widget."""
 
     def test_bool_resolves_to_switch(self):
-        field = Setting(True)
+        field = Field(True)
         field.__set_name__(None, "test")
         self.assertEqual(Widget.resolve(field), Widget.switch)
 
     def test_int_with_range_resolves_to_slider(self):
-        field = Setting(50, min=0, max=100)
+        field = Field(50, min=0, max=100)
         field.__set_name__(None, "test")
         self.assertEqual(Widget.resolve(field), Widget.slider)
 
     def test_int_without_range_resolves_to_number(self):
-        field = Setting(50)
+        field = Field(50)
         field.__set_name__(None, "test")
         self.assertEqual(Widget.resolve(field), Widget.number)
 
     def test_float_with_range_resolves_to_slider(self):
-        field = Setting(0.5, min=0.0, max=1.0)
+        field = Field(0.5, min=0.0, max=1.0)
         field.__set_name__(None, "test")
         self.assertEqual(Widget.resolve(field), Widget.slider)
 
     def test_enum_resolves_to_select(self):
-        field = Setting(RenderMode.SOLID)
+        field = Field(RenderMode.SOLID)
         field.__set_name__(None, "test")
         self.assertEqual(Widget.resolve(field), Widget.select)
 
     def test_str_resolves_to_input(self):
-        field = Setting("hello")
+        field = Field("hello")
         field.__set_name__(None, "test")
         self.assertEqual(Widget.resolve(field), Widget.input)
 
     def test_color_resolves_to_color(self):
-        field = Setting(Color(1, 0, 0))
+        field = Field(Color(1, 0, 0))
         field.__set_name__(None, "test")
         self.assertEqual(Widget.resolve(field), Widget.color)
 
     def test_list_resolves_to_checklist(self):
-        field = Setting([RenderMode.SOLID])
+        field = Field([RenderMode.SOLID])
         field.__set_name__(None, "test")
         self.assertEqual(Widget.resolve(field), Widget.checklist)
 
     def test_explicit_widget_returned_unchanged(self):
-        field = Setting(True, widget=Widget.toggle)
+        field = Field(True, widget=Widget.toggle)
         field.__set_name__(None, "test")
         self.assertEqual(Widget.resolve(field), Widget.toggle)
 
@@ -1621,26 +1621,26 @@ class TestWidgetValidation(unittest.TestCase):
 
     def test_incompatible_widget_raises(self):
         with self.assertRaises(TypeError):
-            Setting(1.0, widget=Widget.ip)
+            Field(1.0, widget=Widget.ip)
 
     def test_incompatible_bool_on_slider(self):
         with self.assertRaises(TypeError):
-            Setting(True, widget=Widget.slider)
+            Field(True, widget=Widget.slider)
 
     def test_compatible_passes(self):
         # Should not raise
-        Setting("0.0.0.0", widget=Widget.ip)
-        Setting(True, widget=Widget.toggle)
-        Setting(True, widget=Widget.button)
-        Setting(50, widget=Widget.slider, min=0, max=100)
-        Setting(RenderMode.SOLID, widget=Widget.radio)
-        Setting(Color(1, 0, 0), widget=Widget.color_alpha)
+        Field("0.0.0.0", widget=Widget.ip)
+        Field(True, widget=Widget.toggle)
+        Field(True, widget=Widget.button)
+        Field(50, widget=Widget.slider, min=0, max=100)
+        Field(RenderMode.SOLID, widget=Widget.radio)
+        Field(Color(1, 0, 0), widget=Widget.color_alpha)
 
     def test_default_never_raises(self):
         # Widget.default is always compatible
-        Setting(1.0, widget=Widget.default)
-        Setting("text", widget=Widget.default)
-        Setting(True, widget=Widget.default)
+        Field(1.0, widget=Widget.default)
+        Field("text", widget=Widget.default)
+        Field(True, widget=Widget.default)
 
 
 if __name__ == "__main__":

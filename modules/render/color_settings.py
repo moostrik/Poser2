@@ -5,19 +5,19 @@ render_settings.py (which imports layer Settings classes) and the
 layer modules (which need ColorSettings at runtime).
 """
 
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from modules.utils import Color
 
 
-class ColorSettings(BaseSettings):
+class ColorSettings(Settings):
     """Per-player track colors (one color picker per player in the panel)."""
-    player_0:    Setting[Color] = Setting(Color(1.0, 0.0, 0.0))  # Red
-    player_1:    Setting[Color] = Setting(Color(0.0, 0.0, 1.0))  # Blue
-    player_2:    Setting[Color] = Setting(Color(0.0, 1.0, 0.0))  # Green
-    pose_left:   Setting[Color] = Setting(Color(1.0, 0.5, 0.0))  # Orange
-    pose_right:  Setting[Color] = Setting(Color(0.0, 1.0, 1.0))  # Cyan
-    pose_center: Setting[Color] = Setting(Color(1.0, 1.0, 1.0))  # White
-    history:     Setting[Color] = Setting(Color(0.5, 0.5, 0.5))  # Grey
+    player_0:    Field[Color] = Field(Color(1.0, 0.0, 0.0))  # Red
+    player_1:    Field[Color] = Field(Color(0.0, 0.0, 1.0))  # Blue
+    player_2:    Field[Color] = Field(Color(0.0, 1.0, 0.0))  # Green
+    pose_left:   Field[Color] = Field(Color(1.0, 0.5, 0.0))  # Orange
+    pose_right:  Field[Color] = Field(Color(0.0, 1.0, 1.0))  # Cyan
+    pose_center: Field[Color] = Field(Color(1.0, 1.0, 1.0))  # White
+    history:     Field[Color] = Field(Color(0.5, 0.5, 0.5))  # Grey
 
     @property
     def track_colors(self) -> list[Color]:

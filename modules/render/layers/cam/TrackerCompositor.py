@@ -1,7 +1,7 @@
 """ Draws the full camera image, depth tracklets, pose lines, and bounding boxes."""
 
 # Local application imports
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from modules.gl import Fbo, Texture, Blit
 from modules.DataHub import DataHub, Stage
 from modules.render.layers.LayerBase import LayerBase, Rect
@@ -12,10 +12,10 @@ from modules.render.layers.cam.PoseRenderer import PoseRenderer, PoseRendererSet
 from modules.render.color_settings import ColorSettings
 
 
-class TrackerCompSettings(BaseSettings):
-    stage:          Setting[Stage] = Setting(Stage.LERP, description="Pipeline stage for pose data")
-    pose_line_width:Setting[float] = Setting(2.0, min=0.5, max=10.0, description="Pose line width")
-    bbox_line_width:Setting[int]   = Setting(2, min=1, max=10, description="Bounding box line width in pixels")
+class TrackerCompSettings(Settings):
+    stage:          Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
+    pose_line_width:Field[float] = Field(2.0, min=0.5, max=10.0, description="Pose line width")
+    bbox_line_width:Field[int]   = Field(2, min=1, max=10, description="Bounding box line width in pixels")
 
 
 class TrackerCompositor(LayerBase):

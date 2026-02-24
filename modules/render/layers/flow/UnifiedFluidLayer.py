@@ -20,7 +20,7 @@ from modules.render.layers.LayerBase import LayerBase
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
 
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from modules.flow import Visualizer, VisualisationFieldConfig
 from modules.flow.fluid import FluidFlow, FluidFlowConfig
 from modules.render.shaders import DensityColorize
@@ -59,14 +59,14 @@ class UnifiedFluidDrawMode(IntEnum):
     PRESSURE = auto()
 
 
-class UnifiedFluidLayerSettings(BaseSettings):
+class UnifiedFluidLayerSettings(Settings):
     """Configuration for UnifiedFluidLayer."""
-    fps = Setting(60.0, min=1.0, max=240.0)
-    num_players = Setting(3, min=1, max=8)
-    gap_ratio = Setting(0.5, min=0.0, max=2.0, description="Gap = ratio * slot width")
-    draw_mode = Setting(UnifiedFluidDrawMode.DENSITY)
-    blend_mode = Setting(Style.BlendMode.ADD)
-    simulation_scale = Setting(0.25, min=0.1, max=2.0)
+    fps = Field(60.0, min=1.0, max=240.0)
+    num_players = Field(3, min=1, max=8)
+    gap_ratio = Field(0.5, min=0.0, max=2.0, description="Gap = ratio * slot width")
+    draw_mode = Field(UnifiedFluidDrawMode.DENSITY)
+    blend_mode = Field(Style.BlendMode.ADD)
+    simulation_scale = Field(0.25, min=0.1, max=2.0)
 
     visualisation: VisualisationFieldConfig
     fluid_flow:    FluidFlowConfig

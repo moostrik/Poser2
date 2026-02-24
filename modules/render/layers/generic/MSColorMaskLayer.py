@@ -12,7 +12,7 @@ from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.render.layers.LayerBase import LayerBase, Blit
 from modules.DataHub import DataHub, Stage
 from modules.pose.Frame import Frame
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 
 from modules.render.shaders.hdt.MSColorMask import MSColorMask
 from modules.render.shaders.hdt.AddDodgeBlend import AddDodgeBlend
@@ -23,17 +23,17 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 from modules.render.color_settings import ColorSettings
 
 
-class ColorMaskLayerSettings(BaseSettings):
+class ColorMaskLayerSettings(Settings):
     """Configuration for MSColorMaskLayer."""
-    num_players:            Setting[int]   = Setting(3, access=Setting.INIT)
-    blend_mode:             Setting[Style.BlendMode] = Setting(Style.BlendMode.ALPHA)
-    similarity_threshold:   Setting[float] = Setting(0.33, min=0.0, max=1.0)
-    motion_exponent:        Setting[float] = Setting(1.5, min=0.0, max=5.0)
+    num_players:            Field[int]   = Field(3, access=Field.INIT)
+    blend_mode:             Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
+    similarity_threshold:   Field[float] = Field(0.33, min=0.0, max=1.0)
+    motion_exponent:        Field[float] = Field(1.5, min=0.0, max=5.0)
     # AddDodgeBlend parameters
-    add_curve:              Setting[float] = Setting(2.0, min=0.0, max=5.0)
-    dodge_curve:            Setting[float] = Setting(1.5, min=0.0, max=5.0)
+    add_curve:              Field[float] = Field(2.0, min=0.0, max=5.0)
+    dodge_curve:            Field[float] = Field(1.5, min=0.0, max=5.0)
     # MSColorMask parameters
-    layered:                Setting[float] = Setting(1.0, min=0.0, max=1.0, description="0 = additive, 1 = own in front")
+    layered:                Field[float] = Field(1.0, min=0.0, max=1.0, description="0 = additive, 1 = own in front")
 
 
 class MSColorMaskLayer(LayerBase):

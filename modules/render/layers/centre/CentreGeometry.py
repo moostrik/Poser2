@@ -10,7 +10,7 @@ from OpenGL.GL import * # type: ignore
 
 # Local application imports
 from modules.DataHub import DataHub, DataHubType, Stage
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from modules.pose.Frame import Frame
 from modules.pose.features.Points2D import Points2D, PointLandmark
 from modules.render.layers.LayerBase import LayerBase, DataCache
@@ -20,15 +20,15 @@ from modules.gl import Texture
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
-class CentreGeomSettings(BaseSettings):
+class CentreGeomSettings(Settings):
     """Configuration for CentreGeometry anchor point positioning."""
-    stage:              Setting[Stage] = Setting(Stage.SMOOTH, description="Pose data pipeline stage")
-    cam_aspect:         Setting[float] = Setting(1.7778, access=Setting.INIT, description="Camera aspect ratio (16/9 = 1.7778)")
-    target_top_x:       Setting[float] = Setting(0.5, min=0.0, max=1.0, description="Top anchor X position (normalized)")
-    target_top_y:       Setting[float] = Setting(0.33, min=0.0, max=1.0, description="Top anchor Y position (normalized)")
-    target_bottom_x:    Setting[float] = Setting(0.5, min=0.0, max=1.0, description="Bottom anchor X position (normalized)")
-    target_bottom_y:    Setting[float] = Setting(0.6, min=0.0, max=1.0, description="Bottom anchor Y position (normalized)")
-    dst_aspectratio:    Setting[float] = Setting(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
+    stage:              Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
+    cam_aspect:         Field[float] = Field(1.7778, access=Field.INIT, description="Camera aspect ratio (16/9 = 1.7778)")
+    target_top_x:       Field[float] = Field(0.5, min=0.0, max=1.0, description="Top anchor X position (normalized)")
+    target_top_y:       Field[float] = Field(0.33, min=0.0, max=1.0, description="Top anchor Y position (normalized)")
+    target_bottom_x:    Field[float] = Field(0.5, min=0.0, max=1.0, description="Bottom anchor X position (normalized)")
+    target_bottom_y:    Field[float] = Field(0.6, min=0.0, max=1.0, description="Bottom anchor Y position (normalized)")
+    dst_aspectratio:    Field[float] = Field(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
 
 
 @dataclass

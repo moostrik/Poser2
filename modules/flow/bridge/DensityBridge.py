@@ -7,16 +7,16 @@ Ported from ofxFlowTools ftDensityBridgeFlow.h
 from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from .. import FlowBase, FlowUtil
 from .shaders.DensityBridgeShader import DensityBridgeShader
 from ..shaders.HSV import HSV
 
 
-class DensityBridgeConfig(BaseSettings):
+class DensityBridgeConfig(Settings):
     """Configuration for density bridge."""
-    saturation = Setting(1.2, min=0.0, max=5.0, description="Color saturation boost")
-    brightness = Setting(1.0, min=0.0, max=2.0, description="Brightness/value adjustment")
+    saturation = Field(1.2, min=0.0, max=5.0, description="Color saturation boost")
+    brightness = Field(1.0, min=0.0, max=2.0, description="Brightness/value adjustment")
 
 
 class DensityBridge(FlowBase):

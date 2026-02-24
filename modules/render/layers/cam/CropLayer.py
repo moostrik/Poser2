@@ -4,7 +4,7 @@
 from OpenGL.GL import * # type: ignore
 
 # Local application imports
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 from modules.DataHub import DataHub, Stage
 from modules.gl import Fbo, Texture, clear_color
 from modules.pose.Frame import Frame
@@ -12,8 +12,8 @@ from modules.render.layers.LayerBase import LayerBase, DataCache, Rect
 from modules.render.shaders import DrawRoi
 
 
-class CropSettings(BaseSettings):
-    stage: Setting[Stage] = Setting(Stage.LERP, description="Pipeline stage for pose data")
+class CropSettings(Settings):
+    stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
 
 class CropLayer(LayerBase):

@@ -16,28 +16,28 @@ from modules.render.layers.cam.PoseCompositor import PoseCompSettings
 
 from modules.render.layers.data.DataLayerSettings import DataLayerSettings
 
-from modules.settings import BaseSettings
+from modules.settings import Settings
 from modules.gl.WindowManager import WindowSettings
 from modules.render.color_settings import ColorSettings
 from modules.render.layer_ids import LayerSettings
 
 
-class LayerGroup(BaseSettings):
+class LayerGroup(Settings):
     select: LayerSettings
     lut:    CompositeLayerSettings
 
 
-class DataGroup(BaseSettings):
+class DataGroup(Settings):
     a: DataLayerSettings
     b: DataLayerSettings
 
 
-class PreviewGroup(BaseSettings):
+class PreviewGroup(Settings):
     tracker: TrackerCompSettings
     poser:   PoseCompSettings
 
 
-class CentreGroup(BaseSettings):
+class CentreGroup(Settings):
     geometry: CentreGeomSettings
     mask:     CentreMaskSettings
     cam:      CentreCamSettings
@@ -46,7 +46,7 @@ class CentreGroup(BaseSettings):
     color:    ColorMaskLayerSettings
 
 
-class RenderSettings(BaseSettings):
+class RenderSettings(Settings):
     """Mutable render-pipeline settings."""
     layer:   LayerGroup
     data:    DataGroup

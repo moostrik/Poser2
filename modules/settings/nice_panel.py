@@ -9,9 +9,9 @@ from typing import Callable, get_origin, get_args
 
 from nicegui import app, ui
 
-from modules.settings.base_settings import BaseSettings
+from modules.settings.settings import Settings
 from modules.settings import presets
-from modules.settings.setting import Setting, Access
+from modules.settings.field import Field, Access
 from modules.settings.widget import Widget, WidgetSize
 from modules.utils import Color, Point2f, Rect
 
@@ -943,10 +943,10 @@ def create_settings_panel(
             ).tooltip("Exit application")
 
     # Collect pinned fields and actions from all registered modules (recursing into children)
-    pinned_fields: list[tuple[BaseSettings, str, Setting]] = []
-    pinned_actions: list[tuple[BaseSettings, str, Setting]] = []
+    pinned_fields: list[tuple[Settings, str, Field]] = []
+    pinned_actions: list[tuple[Settings, str, Field]] = []
 
-    def _collect_pinned(settings: BaseSettings) -> None:
+    def _collect_pinned(settings: Settings) -> None:
         for field_name, field in settings.fields.items():
             if field.pinned and field.visible:
                 pinned_fields.append((settings, field_name, field))
@@ -971,7 +971,7 @@ def create_settings_panel(
     # -- Build tabs: one per visible child of the root ---------------------
     # Each child BaseSettings with visible content becomes a tab.
     # The root's own fields (if any) go in a tab named after the root.
-    tab_entries: list[tuple[str, BaseSettings]] = []  # (name, settings)
+    tab_entries: list[tuple[str, Settings]] = []  # (name, settings)
 
     # Root's own visible fields → a tab for the root itself
     root_has_fields = any(

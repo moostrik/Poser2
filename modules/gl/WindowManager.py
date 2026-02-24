@@ -19,7 +19,7 @@ import ctypes
 # Local application imports
 from modules.gl.RenderBase import RenderBase
 from modules.gl.Utils import FpsCounter
-from modules.settings import Setting, BaseSettings
+from modules.settings import Field, Settings
 
 
 class MonitorId(IntEnum):
@@ -30,19 +30,19 @@ class MonitorId(IntEnum):
     M3 = 3
 
 
-class WindowSettings(BaseSettings):
+class WindowSettings(Settings):
     """Window / init configuration — set once before RenderManager starts."""
-    title: Setting[str] =           Setting("Poser", access=Setting.INIT, visible=False)
-    avg_fps: Setting[int] =             Setting(60, access=Setting.READ, pinned=True, description="Average Camera FPS")
-    min_fps: Setting[int] =         Setting(60, access=Setting.READ, pinned=True, description="Minimum Camera FPS")
-    v_sync: Setting[bool] =         Setting(True)
-    fullscreen: Setting[bool] =     Setting(False)
-    monitor: Setting[int] =         Setting(0)
-    x: Setting[int] =               Setting(0)
-    y: Setting[int] =               Setting(80)
-    width: Setting[int] =           Setting(1920)
-    height: Setting[int] =          Setting(1000)
-    secondary_list: Setting[list[MonitorId]] = Setting([MonitorId.M0])
+    title: Field[str] =           Field("Poser", access=Field.INIT, visible=False)
+    avg_fps: Field[int] =             Field(60, access=Field.READ, pinned=True, description="Average Camera FPS")
+    min_fps: Field[int] =         Field(60, access=Field.READ, pinned=True, description="Minimum Camera FPS")
+    v_sync: Field[bool] =         Field(True)
+    fullscreen: Field[bool] =     Field(False)
+    monitor: Field[int] =         Field(0)
+    x: Field[int] =               Field(0)
+    y: Field[int] =               Field(80)
+    width: Field[int] =           Field(1920)
+    height: Field[int] =          Field(1000)
+    secondary_list: Field[list[MonitorId]] = Field([MonitorId.M0])
 
 
 class Button(Enum):

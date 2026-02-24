@@ -32,7 +32,7 @@ class Access(Enum):
     INIT = "init"
 
 
-class Setting(Generic[T]):
+class Field(Generic[T]):
     """Descriptor-based setting field with type coercion, callbacks, and thread safety.
 
     Declare as a class attribute on a BaseSettings subclass::
@@ -126,10 +126,10 @@ class Setting(Generic[T]):
     # -- Descriptor protocol -------------------------------------------------
 
     @overload
-    def __get__(self, obj: None, objtype: type) -> Setting[T]: ...
+    def __get__(self, obj: None, objtype: type) -> Field[T]: ...
     @overload
     def __get__(self, obj: Any, objtype: type) -> T: ...
-    def __get__(self, obj: Any | None, objtype: type | None = None) -> Setting[T] | T:
+    def __get__(self, obj: Any | None, objtype: type | None = None) -> Field[T] | T:
         if obj is None:
             return self  # class-level access returns the descriptor itself
         return obj._values[self.name]

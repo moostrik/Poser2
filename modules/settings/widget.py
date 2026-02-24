@@ -16,7 +16,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, ClassVar, get_origin
 
 if TYPE_CHECKING:
-    from modules.settings.setting import Setting
+    from modules.settings.field import Field
 
 
 class WidgetSize(Enum):
@@ -113,7 +113,7 @@ class Widget:
         return False
 
     @classmethod
-    def resolve(cls, field: Setting) -> Widget:
+    def resolve(cls, field: Field) -> Widget:
         """Map ``Widget.default`` to a concrete widget based on field metadata.
 
         If the field already has a non-default widget, return it unchanged.
