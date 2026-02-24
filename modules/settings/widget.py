@@ -1,12 +1,12 @@
-"""Widget — GUI presentation hints for Setting fields.
+"""Widget — GUI presentation hints for Field descriptors.
 
-Each Widget constant declares which Setting value types it is compatible with.
+Each Widget constant declares which Field value types it is compatible with.
 The panel uses ``Widget.resolve()`` to map ``Widget.default`` to a concrete
 widget based on the field's type and parameters.
 
 Adding a new widget:
     1. Add a ``ClassVar[Widget]`` annotation + assignment below.
-    2. Register a builder in ``panel.py`` with ``@widget_builder(Widget.xxx)``.
+    2. Register a builder in ``nice_panel.py`` with ``@widget_builder(Widget.xxx)``.
     3. Optionally add it to ``_DEFAULTS`` if it should be the auto-pick for a type.
 """
 

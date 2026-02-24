@@ -1,4 +1,4 @@
-"""Setting descriptor with type coercion, callbacks, and thread safety."""
+"""Field descriptor with type coercion, callbacks, and thread safety."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ T = TypeVar("T")
 
 
 class Access(Enum):
-    """Controls who may read/write a Setting and whether the UI polls it.
+    """Controls who may read/write a Field and whether the UI polls it.
 
     ========== ============ ======== ==========================================
     Member     UI editable  Polled   Use case
@@ -35,22 +35,22 @@ class Access(Enum):
 class Field(Generic[T]):
     """Descriptor-based setting field with type coercion, callbacks, and thread safety.
 
-    Declare as a class attribute on a BaseSettings subclass::
+    Declare as a class attribute on a Settings subclass::
 
-        exposure = Setting(1000, min=100, max=10000)
+        exposure = Field(1000, min=100, max=10000)
 
     The type is always inferred from the default value.  For list settings,
     the element type is inferred from the first element::
 
-        tags = Setting(["default"])
-        modes = Setting([RenderMode.SOLID])
+        tags = Field(["default"])
+        modes = Field([RenderMode.SOLID])
 
     List defaults must contain at least one element for type inference.
 
     The descriptor handles get/set, type enforcement, init-only guards,
     callbacks, and JSON serialization.
 
-    Custom types used as Setting values should implement ``__eq__`` so that
+    Custom types used as Field values should implement ``__eq__`` so that
     change detection (skip callback when value unchanged) works correctly.
 
     .. note:: In-place mutation limitation
@@ -62,7 +62,7 @@ class Field(Generic[T]):
             settings.tags = settings.tags + [x]
     """
 
-    # Convenience aliases so callers write Setting.READ instead of Access.READ
+    # Convenience aliases so callers write Field.READ instead of Access.READ
     READ = Access.READ
     WRITE = Access.WRITE
     READWRITE = Access.READWRITE
@@ -143,7 +143,7 @@ class Field(Generic[T]):
         """Set value. Only enforces Access.INIT after initialization."""
         if self.access is Access.INIT and obj._initialized:
             raise AttributeError(
-                f"Setting '{self.name}' can only be set during initialization"
+                f"Field '{self.name}' can only be set during initialization"
             )
         self._apply(obj, value)
 
@@ -176,7 +176,7 @@ class Field(Generic[T]):
         if self._origin is list:
             if not isinstance(value, list):
                 raise TypeError(
-                    f"Setting '{self.name}' expects list, "
+                    f"Field '{self.name}' expects list, "
                     f"got {type(value).__name__}: {value!r}"
                 )
             if self._element_type is not None:
@@ -185,7 +185,7 @@ class Field(Generic[T]):
         # Reject bool when int or float is expected (bool is a subclass of int)
         if self.type_ in (int, float) and isinstance(value, bool):
             raise TypeError(
-                f"Setting '{self.name}' expects {self._type_name}, got bool: {value!r}"
+                f"Field '{self.name}' expects {self._type_name}, got bool: {value!r}"
             )
         if isinstance(value, self.type_):
             return value
@@ -222,7 +222,7 @@ class Field(Generic[T]):
                     f"Cannot construct {self._type_name} from dict: {value!r}"
                 )
         raise TypeError(
-            f"Setting '{self.name}' expects {self._type_name}, "
+            f"Field '{self.name}' expects {self._type_name}, "
             f"got {type(value).__name__}: {value!r}"
         )
 
@@ -311,9 +311,9 @@ class Field(Generic[T]):
         if self.description:
             parts.append(f"description={self.description!r}")
         if self.access is not Access.WRITE:
-            parts.append(f"access=Setting.{self.access.name}")
+            parts.append(f"access=Field.{self.access.name}")
         if not self.visible:
             parts.append("visible=False")
         if self.widget != Widget.default:
             parts.append(f"widget={self.widget!r}")
-        return f"Setting({', '.join(parts)})"
+        return f"Field({', '.join(parts)})"

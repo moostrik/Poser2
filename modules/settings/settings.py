@@ -1,4 +1,4 @@
-"""BaseSettings — collection of Setting descriptors with attribute access, callbacks, and serialization."""
+"""Settings — collection of Field descriptors with attribute access, callbacks, and serialization."""
 
 import copy
 import logging
@@ -13,22 +13,22 @@ logger = logging.getLogger(__name__)
 
 
 class Settings:
-    """Collection of Setting descriptors with attribute access, callbacks, and serialization.
+    """Collection of Field descriptors with attribute access, callbacks, and serialization.
 
-    Subclass and declare Setting descriptors as class attributes.
+    Subclass and declare Field descriptors as class attributes.
     Override init_only fields via constructor kwargs::
 
-        class CameraSettings(BaseSettings):
-            exposure = Setting(1000, min=100, max=10000)
-            resolution = Setting(1080, access=Setting.INIT)
+        class CameraSettings(Settings):
+            exposure = Field(1000, min=100, max=10000)
+            resolution = Field(1080, access=Field.INIT)
 
         settings = CameraSettings(resolution=720)
 
     Child settings are declared via type annotations::
 
-        class RenderSettings(BaseSettings):
+        class RenderSettings(Settings):
             flow: FlowSettings          # auto-instantiated child
-            fps = Setting(60.0)
+            fps = Field(60.0)
     """
 
     def __init__(self, **kwargs):
@@ -39,7 +39,7 @@ class Settings:
         object.__setattr__(self, "_locks", {})
         object.__setattr__(self, "_children", {})
 
-        # Collect Setting descriptors and child BaseSettings from the class hierarchy
+        # Collect Field descriptors and child Settings from the class hierarchy
         for cls in type(self).__mro__:
             for attr_name, attr_value in vars(cls).items():
                 if attr_name.startswith("_"):

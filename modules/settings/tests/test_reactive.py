@@ -1,6 +1,5 @@
 """Tests for the reactive settings system."""
 
-import colorsys
 import json
 import os
 import tempfile
@@ -53,7 +52,7 @@ class SettingsWithActions(Settings):
 # ---------------------------------------------------------------------------
 
 class TestSettingDescriptor(unittest.TestCase):
-    """Tests for the Setting descriptor itself."""
+    """Tests for the Field descriptor itself."""
 
     def test_default_value(self):
         s = CameraSettings()
@@ -379,7 +378,7 @@ class TestThreadSafety(unittest.TestCase):
 
 
 class TestPresetSaveLoad(unittest.TestCase):
-    """Tests for preset save/load using a root BaseSettings."""
+    """Tests for preset save/load using a root Settings."""
 
     def _make_root(self):
         class Root(Settings):
@@ -894,7 +893,7 @@ class ListSettings(Settings):
 
 
 class TestListSetting(unittest.TestCase):
-    """Tests for list[T] support in Setting."""
+    """Tests for list[T] support in Field."""
 
     def test_default_value(self):
         s = ListSettings()
@@ -1438,8 +1437,8 @@ class TestToDictExclusions(unittest.TestCase):
         self.assertIn("exposure", d)
 
 
-class TestBaseSettingsEquality(unittest.TestCase):
-    """__eq__ on BaseSettings (#9)."""
+class TestSettingsEquality(unittest.TestCase):
+    """__eq__ on Settings (#9)."""
 
     def test_equal_defaults(self):
         self.assertEqual(CameraSettings(), CameraSettings())

@@ -1,13 +1,12 @@
-"""NiceGUI settings panel — auto-generates a tabbed UI from a BaseSettings root."""
+"""NiceGUI settings panel — auto-generates a tabbed UI from a Settings root."""
 
 from __future__ import annotations
 
 import socket
 from enum import Enum
-from pathlib import Path
 from typing import Callable, get_origin, get_args
 
-from nicegui import app, ui
+from nicegui import ui
 
 from modules.settings.settings import Settings
 from modules.settings import presets
@@ -659,7 +658,7 @@ def _make_poll_timer(polls, timers):
 
 
 def _build_settings_body(settings, timers, *, depth=0, expansions=None):
-    """Emit the controls for a single BaseSettings instance (no wrapper).
+    """Emit the controls for a single Settings instance (no wrapper).
 
     Uses a 2-column grid for sliders and flows small controls (switches,
     selects, numbers) inline in a wrapping row for a compact layout.
@@ -732,7 +731,7 @@ def _build_settings_body(settings, timers, *, depth=0, expansions=None):
 
 
 def _build_settings_card(name, settings, timers, *, depth=0, expansions=None):
-    """Build a card for one BaseSettings instance.
+    """Build a card for one Settings instance.
 
     At *depth* 0 the card is a collapsible ``ui.expansion``.
     At *depth* >= 1 it renders flat with a section divider + bold label.
@@ -886,7 +885,7 @@ def create_settings_panel(
     port: int | None = None,
     on_exit=None,
 ) -> None:
-    """Build a full tabbed settings panel from a root BaseSettings.
+    """Build a full tabbed settings panel from a root Settings.
 
     Call this inside a NiceGUI page context::
 
@@ -969,7 +968,7 @@ def create_settings_panel(
         _make_poll_timer(pinned_polls, timers)
 
     # -- Build tabs: one per visible child of the root ---------------------
-    # Each child BaseSettings with visible content becomes a tab.
+    # Each child Settings with visible content becomes a tab.
     # The root's own fields (if any) go in a tab named after the root.
     tab_entries: list[tuple[str, Settings]] = []  # (name, settings)
 
