@@ -77,13 +77,13 @@ class Main():
 
         # RENDER
         self.render_settings = RenderSettings()
-        self.registry.register("render", self.render_settings, group="render")
+        self.registry.register("render", self.render_settings)
 
         self.render = RenderManager(self.data_hub, self.render_settings, num_cams=len(self.cameras), num_players=settings.num_players)
 
         # SETTINGS SERVER (register settings before preset load, start after)
         self.server_settings = ServerSettings(title="POSER", port=666)
-        self.registry.register("server", self.server_settings, group="server")
+        self.registry.register("server", self.server_settings)
 
         # Load startup preset (after all subsystems have registered)
         presets.load_startup(self.registry)

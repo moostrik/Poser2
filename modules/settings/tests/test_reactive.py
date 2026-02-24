@@ -632,47 +632,45 @@ class TestAction(unittest.TestCase):
         self.assertEqual(results, ["ok"])
 
 
-class TestRegistryGroups(unittest.TestCase):
-    """Tests for registry group support."""
+class TestRegistryModules(unittest.TestCase):
+    """Tests for the simplified registry (no groups)."""
 
-    def test_default_group(self):
+    def test_register_and_get(self):
+        reg = SettingsRegistry()
+        s = CameraSettings()
+        reg.register("cam", s)
+        self.assertIs(reg.get("cam"), s)
+
+    def test_modules_returns_copy(self):
         reg = SettingsRegistry()
         reg.register("cam", CameraSettings())
-        self.assertEqual(reg.groups(), {"default": ["cam"]})
-
-    def test_custom_group(self):
-        reg = SettingsRegistry()
-        reg.register("cam", CameraSettings(), group="camera")
-        reg.register("timer", MinimalSettings(), group="general")
-        groups = reg.groups()
-        self.assertEqual(groups["camera"], ["cam"])
-        self.assertEqual(groups["general"], ["timer"])
-
-    def test_multiple_in_same_group(self):
-        reg = SettingsRegistry()
-        reg.register("a", MinimalSettings(), group="pose")
-        reg.register("b", MinimalSettings(), group="pose")
-        self.assertEqual(reg.groups()["pose"], ["a", "b"])
-
-    def test_groups_returns_copy(self):
-        reg = SettingsRegistry()
-        reg.register("cam", CameraSettings(), group="camera")
-        g = reg.groups()
-        g["camera"].append("fake")
-        self.assertEqual(reg.groups()["camera"], ["cam"])
+        m = reg.modules()
+        m["fake"] = MinimalSettings()
+        self.assertNotIn("fake", reg.modules())
 
     def test_register_preserves_order(self):
         reg = SettingsRegistry()
-        reg.register("c", MinimalSettings(), group="g")
-        reg.register("a", MinimalSettings(), group="g")
-        reg.register("b", MinimalSettings(), group="g")
-        self.assertEqual(reg.groups()["g"], ["c", "a", "b"])
+        reg.register("c", MinimalSettings())
+        reg.register("a", MinimalSettings())
+        reg.register("b", MinimalSettings())
+        self.assertEqual(list(reg.modules().keys()), ["c", "a", "b"])
 
-    def test_repr_shows_groups(self):
+    def test_contains(self):
         reg = SettingsRegistry()
-        reg.register("cam", CameraSettings(), group="camera")
+        reg.register("cam", CameraSettings())
+        self.assertIn("cam", reg)
+        self.assertNotIn("missing", reg)
+
+    def test_getitem(self):
+        reg = SettingsRegistry()
+        s = CameraSettings()
+        reg.register("cam", s)
+        self.assertIs(reg["cam"], s)
+
+    def test_repr(self):
+        reg = SettingsRegistry()
+        reg.register("cam", CameraSettings())
         r = repr(reg)
-        self.assertIn("camera", r)
         self.assertIn("cam", r)
 
 

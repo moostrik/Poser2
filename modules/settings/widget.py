@@ -18,6 +18,12 @@ from typing import TYPE_CHECKING, ClassVar, get_origin
 if TYPE_CHECKING:
     from modules.settings.setting import Setting
 
+
+class WidgetSize(Enum):
+    """Layout size returned by panel builders."""
+    full = "full"    # needs a full row (slider, text input, checklist)
+    small = "small"  # compact inline control (switch, select, number)
+
 # Lazy import to avoid circular dependency at module level.
 # Color is only needed at runtime inside accepts() / resolve().
 _Color = None

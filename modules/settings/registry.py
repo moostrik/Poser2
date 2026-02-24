@@ -8,30 +8,26 @@ logger = logging.getLogger(__name__)
 
 
 class SettingsRegistry:
-    """Stores multiple BaseSettings instances organised by group.
+    """Stores multiple BaseSettings instances by name (insertion-ordered).
 
     This is a pure data container — all file I/O lives in ``presets``.
+    The panel derives tabs from each root's children.
     """
 
     def __init__(self):
-        self._modules = {}
-        self._groups = {}
+        self._modules: dict[str, BaseSettings] = {}
 
-    def register(self, name, settings, group="default"):
-        """Register a settings module under a group."""
+    def register(self, name: str, settings: BaseSettings) -> None:
+        """Register a settings module."""
         self._modules[name] = settings
-        if group not in self._groups:
-            self._groups[group] = []
-        if name not in self._groups[group]:
-            self._groups[group].append(name)
 
-    def get(self, name):
+    def get(self, name: str) -> BaseSettings:
         """Retrieve a registered settings module."""
         return self._modules[name]
 
-    def groups(self):
-        """Return a copy of {group: [config_names]} mapping."""
-        return {g: list(names) for g, names in self._groups.items()}
+    def modules(self) -> dict[str, BaseSettings]:
+        """Return insertion-ordered ``{name: settings}`` (shallow copy)."""
+        return dict(self._modules)
 
     def to_dict(self) -> dict:
         """Serialize every module to a plain dict."""
@@ -59,4 +55,4 @@ class SettingsRegistry:
         return self._modules[name]
 
     def __repr__(self):
-        return f"SettingsRegistry(groups={dict(self._groups)})"
+        return f"SettingsRegistry(modules={list(self._modules)})"

@@ -12,7 +12,7 @@ from modules.settings.base_settings import BaseSettings
 from modules.settings import presets
 from modules.settings.registry import SettingsRegistry
 from modules.settings.setting import Setting
-from modules.settings.widget import Widget
+from modules.settings.widget import Widget, WidgetSize
 from modules.utils import Color, Point2f, Rect
 
 # ---------------------------------------------------------------------------
@@ -45,9 +45,9 @@ def generate_label(name):
 def _build_field_control(settings, name, field, polls):
     """Create a NiceGUI control for a single Setting field.
 
-    Returns the control's "size class":
-        'full'  — needs a full row (slider, text input)
-        'small' — compact inline control (switch, select, number)
+    Returns a ``WidgetSize`` indicating the layout class:
+        WidgetSize.full  — needs a full row (slider, text input)
+        WidgetSize.small — compact inline control (switch, select, number)
 
     *polls* collects ``(settings, name, [last_value], setter)`` tuples.
     A timer created by the caller will poll these periodically to push
@@ -63,8 +63,8 @@ def _build_field_control(settings, name, field, polls):
 
 # ---------------------------------------------------------------------------
 # Builder registry — maps Widget constants to NiceGUI builder functions.
-# Each builder receives (settings, name, field, polls) and returns 'full'
-# or 'small'.  Use @widget_builder(Widget.xxx) to register.
+# Each builder receives (settings, name, field, polls) and returns a WidgetSize.
+# Use @widget_builder(Widget.xxx) to register.
 # ---------------------------------------------------------------------------
 
 _BUILDERS: dict[Widget, Callable] = {}
@@ -96,7 +96,7 @@ def _build_switch(settings, name, field, polls):
         sw.on_value_change(on_switch_change)
 
     polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
-    return 'small'
+    return WidgetSize.small
 
 
 @widget_builder(Widget.toggle)
@@ -115,7 +115,7 @@ def _build_toggle(settings, name, field, polls):
         tg.on_value_change(on_toggle_change)
 
     polls.append((settings, name, [value], lambda v, tg=tg: tg.set_value(v)))
-    return 'small'
+    return WidgetSize.small
 
 
 # -- numeric builders --------------------------------------------------------
@@ -139,7 +139,7 @@ def _build_slider(settings, name, field, polls):
         sl.on_value_change(on_slider_change)
 
     polls.append((settings, name, [value], lambda v, sl=sl: sl.set_value(v)))
-    return 'full'
+    return WidgetSize.full
 
 
 @widget_builder(Widget.number)
@@ -162,7 +162,7 @@ def _build_number(settings, name, field, polls):
         num.on_value_change(on_num_change)
 
     polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
-    return 'small'
+    return WidgetSize.small
 
 
 @widget_builder(Widget.knob)
@@ -189,7 +189,7 @@ def _build_knob(settings, name, field, polls):
         kn.on_value_change(on_knob_change)
 
     polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(v)))
-    return 'small'
+    return WidgetSize.small
 
 
 # -- enum builders -----------------------------------------------------------
@@ -213,7 +213,7 @@ def _build_select(settings, name, field, polls):
         sel.on_value_change(on_select_change)
 
     polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v)))
-    return 'small'
+    return WidgetSize.small
 
 
 @widget_builder(Widget.radio)
@@ -235,7 +235,7 @@ def _build_radio(settings, name, field, polls):
         rg.on_value_change(on_radio_change)
 
     polls.append((settings, name, [value], lambda v, rg=rg: rg.set_value(v)))
-    return 'small'
+    return WidgetSize.small
 
 
 # -- string builders ---------------------------------------------------------
@@ -256,7 +256,7 @@ def _build_input(settings, name, field, polls):
         inp.on_value_change(on_input_change)
 
     polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
-    return 'full'
+    return WidgetSize.full
 
 
 @widget_builder(Widget.ip)
@@ -280,7 +280,7 @@ def _build_ip(settings, name, field, polls):
         inp.on_value_change(on_ip_change)
 
     polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
-    return 'small'
+    return WidgetSize.small
 
 
 @widget_builder(Widget.textarea)
@@ -299,7 +299,7 @@ def _build_textarea(settings, name, field, polls):
         ta.on_value_change(on_ta_change)
 
     polls.append((settings, name, [value], lambda v, ta=ta: ta.set_value(v)))
-    return 'full'
+    return WidgetSize.full
 
 
 # -- color builders ----------------------------------------------------------
@@ -323,7 +323,7 @@ def _build_color(settings, name, field, polls):
         ci.on_value_change(on_color_change)
 
     polls.append((settings, name, [value], lambda v, _ci=ci: _ci.set_value(v.to_hex() if isinstance(v, Color) else '#000000')))
-    return 'small'
+    return WidgetSize.small
 
 
 @widget_builder(Widget.color_alpha)
@@ -366,7 +366,7 @@ def _build_color_alpha(settings, name, field, polls):
             _an.set_value(v.a)
 
     polls.append((settings, name, [value], _color_alpha_setter))
-    return 'small'
+    return WidgetSize.small
 
 
 # -- list builders -----------------------------------------------------------
@@ -460,7 +460,7 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
         _rebuild(_cont, _st)
 
     polls.append((settings, name, [list(value)], _list_setter))
-    return 'full'
+    return WidgetSize.full
 
 
 @widget_builder(Widget.checklist)
@@ -512,7 +512,7 @@ def _build_fallback(settings, name, field, polls):
                 _x.set_value(v.x)
                 _y.set_value(v.y)
         polls.append((settings, name, [value], _point_setter))
-        return 'full'
+        return WidgetSize.full
 
     # -- Rect → x/y/w/h number row -------------------------------------------
     if field.type_ is Rect:
@@ -567,7 +567,7 @@ def _build_fallback(settings, name, field, polls):
                 _rw.set_value(v.width)
                 _rh.set_value(v.height)
         polls.append((settings, name, [value], _rect_setter))
-        return 'full'
+        return WidgetSize.full
 
     # -- Generic fallback: read-only label -----------------------------------
     with ui.row().classes("items-center gap-2"):
@@ -575,7 +575,7 @@ def _build_fallback(settings, name, field, polls):
         lbl = ui.label(str(value)).classes("text-sm text-secondary")
 
     polls.append((settings, name, [value], lambda v, lbl=lbl: lbl.set_text(str(v))))
-    return 'small'
+    return WidgetSize.small
 
 
 def _build_action_button(settings, name, field):
@@ -615,11 +615,14 @@ def _make_poll_timer(polls, timers):
     timers.append(ui.timer(POLL_INTERVAL, _tick))
 
 
-def _build_settings_body(settings, timers):
+def _build_settings_body(settings, timers, *, depth=0, expansions=None):
     """Emit the controls for a single BaseSettings instance (no wrapper).
 
     Uses a 2-column grid for sliders and flows small controls (switches,
     selects, numbers) inline in a wrapping row for a compact layout.
+
+    *depth* tracks nesting level (0 = top, 1+ = child of child).
+    *expansions* collects ``ui.expansion`` elements for expand/collapse-all.
     """
     polls: list[tuple] = []
 
@@ -682,13 +685,28 @@ def _build_settings_body(settings, timers):
 
     # Children (recursive)
     for child_name, child in settings.children.items():
-        _build_settings_card(child_name, child, timers)
+        _build_settings_card(child_name, child, timers, depth=depth, expansions=expansions)
 
 
-def _build_settings_card(name, settings, timers):
-    """Build a collapsible card for one BaseSettings instance."""
-    with ui.expansion(generate_label(name), icon="settings").props("duration=0").classes("w-full"):
-        _build_settings_body(settings, timers)
+def _build_settings_card(name, settings, timers, *, depth=0, expansions=None):
+    """Build a card for one BaseSettings instance.
+
+    At *depth* 0 the card is a collapsible ``ui.expansion``.
+    At *depth* >= 1 it renders flat with a section divider + bold label.
+    """
+    if depth >= 1:
+        # Flat rendering — no nested expansion
+        ui.separator().classes("mt-2")
+        ui.label(generate_label(name)).classes("text-sm font-bold text-primary")
+        _build_settings_body(settings, timers, depth=depth + 1, expansions=expansions)
+    else:
+        exp = ui.expansion(
+            generate_label(name), icon="settings",
+        ).props("duration=0").classes("w-full")
+        if expansions is not None:
+            expansions.append(exp)
+        with exp:
+            _build_settings_body(settings, timers, depth=depth + 1, expansions=expansions)
 
 
 def _build_preset_controls(registry):
@@ -854,8 +872,8 @@ def create_settings_panel(
         for child in settings.children.values():
             _collect_pinned(child)
 
-    for module_name in registry._modules:
-        _collect_pinned(registry.get(module_name))
+    for root in registry.modules().values():
+        _collect_pinned(root)
 
     # Render pinned fields and actions in a compact row above the tabs
     if pinned_fields or pinned_actions:
@@ -867,32 +885,46 @@ def create_settings_panel(
                 _build_action_button(settings, action_name, action_field)
         _make_poll_timer(pinned_polls, timers)
 
-    # Filter out groups where all settings have no visible content
-    group_map = {
-        g: [n for n in names if _has_visible_content(registry.get(n))]
-        for g, names in registry.groups().items()
-    }
-    group_map = {g: names for g, names in group_map.items() if names}
+    # -- Build tabs: one per registered root module ---------------------------
+    # Each root BaseSettings with visible content becomes a tab.
+    # Its own fields render at the top; its children render as collapsible
+    # sections (depth 0) inside the tab.
+    tab_entries: list[tuple[str, BaseSettings]] = []  # (name, root)
+    for module_name, root in registry.modules().items():
+        if _has_visible_content(root):
+            tab_entries.append((module_name, root))
 
-    if not group_map:
+    if not tab_entries:
         ui.label("No settings registered.")
         return
 
-    group_names = list(group_map.keys())
-
     with ui.tabs().classes("w-full") as tabs:
         tab_map = {}
-        for group in group_names:
-            tab_map[group] = ui.tab(generate_label(group))
+        for label, _ in tab_entries:
+            tab_map[label] = ui.tab(generate_label(label))
 
-    with ui.tab_panels(tabs, value=tab_map[group_names[0]]).classes("w-full"):
-        for group, config_names in group_map.items():
-            with ui.tab_panel(tab_map[group]):
-                if len(config_names) == 1:
-                    # Single config in group — render directly, no
-                    # redundant expansion with the same name as the tab.
-                    _build_settings_body(registry.get(config_names[0]), timers)
-                else:
-                    for config_name in config_names:
-                        settings = registry.get(config_name)
-                        _build_settings_card(config_name, settings, timers)
+    with ui.tab_panels(tabs, value=tab_map[tab_entries[0][0]]).classes("w-full"):
+        for label, root_settings in tab_entries:
+            with ui.tab_panel(tab_map[label]):
+                expansions: list = []
+                _build_settings_body(
+                    root_settings, timers,
+                    depth=0, expansions=expansions,
+                )
+
+                # Expand / Collapse-all toggle (only if there are expansions)
+                if expansions:
+                    _expanded = {"all": False}
+                    def _toggle_all(exps=expansions, state=_expanded):
+                        state["all"] = not state["all"]
+                        for e in exps:
+                            if state["all"]:
+                                e.open()
+                            else:
+                                e.close()
+                    with ui.row().classes("w-full justify-end mt-1"):
+                        ui.button(
+                            "Expand / Collapse All",
+                            icon="unfold_more",
+                            on_click=_toggle_all,
+                        ).props("dense flat size=sm")
