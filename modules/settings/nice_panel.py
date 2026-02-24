@@ -907,6 +907,44 @@ def create_settings_panel(
     }
     ''')
 
+    # -- Shutdown overlay (client-side JS) ---------------------------------
+    # Defines showShutdownScreen() and auto-shows it when the WebSocket
+    # disconnects (external quit, Ctrl-C, stop() from code, etc.).
+    _title_esc = title.replace('\\', '\\\\').replace("'", "\\'") if title else ''
+    _title_markup = (
+        f'<div style="font-size:1.5rem;font-weight:bold;color:#3f3f46;'
+        f'margin-bottom:1rem">{_title_esc}</div>'
+        if title else ''
+    )
+    ui.add_head_html(f'''<script>(function() {{
+      window.showShutdownScreen = function() {{
+        if (document.getElementById("shutdown-overlay")) return;
+        var d = document.createElement("div");
+        d.id = "shutdown-overlay";
+        d.style.cssText = "position:fixed;inset:0;background:black;z-index:99999;"
+          + "display:flex;align-items:center;justify-content:center;pointer-events:none;";
+        d.innerHTML = '<div style="text-align:center">'
+          + '{_title_markup}'
+          + '<span class="material-icons" style="font-size:80px;color:#3f3f46">'
+          + 'power_settings_new</span></div>';
+        document.body.appendChild(d);
+      }};
+      var _t = null;
+      var _i = setInterval(function() {{
+        if (window.socket) {{
+          window.socket.on("disconnect", function() {{
+            _t = setTimeout(window.showShutdownScreen, 1500);
+          }});
+          window.socket.on("connect", function() {{
+            if (_t) {{ clearTimeout(_t); _t = null; }}
+            var el = document.getElementById("shutdown-overlay");
+            if (el) el.remove();
+          }});
+          clearInterval(_i);
+        }}
+      }}, 100);
+    }})();</script>''')
+
     # -- Header row: title | preset controls | exit button -----------------
     with ui.row().classes("w-full items-center flex-wrap gap-1"):
         if title:
@@ -926,16 +964,7 @@ def create_settings_panel(
             _build_preset_controls(root)
         if on_exit:
             async def _do_exit():
-                # Blackout the page before exiting
-                overlay = ui.element('div').classes(
-                    'fixed inset-0 bg-black z-[9999] flex items-center justify-center'
-                ).style('pointer-events:none')
-                with overlay:
-                    with ui.column().classes('items-center gap-4'):
-                        if title:
-                            ui.label(title).classes('text-2xl font-bold text-zinc-700')
-                        ui.icon('power_settings_new', size='80px').classes('text-zinc-700')
-                await ui.run_javascript('void(0)')  # flush to browser
+                await ui.run_javascript('showShutdownScreen()')
                 on_exit()
             ui.button(icon="power_settings_new", on_click=_do_exit).props(
                 "dense flat color=negative"

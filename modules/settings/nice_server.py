@@ -47,13 +47,13 @@ class NiceServer:
                 create_settings_panel(root, title=title, port=port, on_exit=on_exit)
 
         def _run():
-            nicegui_app.config.show_welcome_message = False
             ui.run(
                 port=port,
                 title=title,
                 reload=False,
                 show=False,
                 dark=True,
+                show_welcome_message=False,
                 uvicorn_logging_level="warning",
                 log_config=None,
             )
@@ -78,6 +78,6 @@ class NiceServer:
             logger.info("Settings server stopped")
         except Exception:
             logger.warning("Settings server shutdown failed", exc_info=True)
-        if thread is not None:
+        if thread is not None and thread is not threading.current_thread():
             thread.join(timeout=3)
         self._thread = None

@@ -86,7 +86,7 @@ class ComputeShader(Shader):
                 Shader._watch_directory(self.shader_dir)
 
         # Compile compute shader
-        self.allocated = self._compile_compute_shader(verbose=True)
+        self.allocated = self._compile_compute_shader(verbose=False)
 
     def _compile_compute_shader(self, verbose: bool = False) -> bool:
         """Load and compile compute shader. Returns True if successful."""

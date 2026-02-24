@@ -114,31 +114,5 @@
       "color": 1.0,
       "bar": 1.0
     }
-  ],
-
-  "render": {
-    "title": "Poser",
-    "monitor": 1,
-    "width": 1920,
-    "height": 1000,
-    "x": 0,
-    "y": 1700,
-    "fullscreen": false,
-    "fps": 60.0,
-    "v_sync": false,
-    "secondary_list": [
-      1,
-      2,
-      3
-    ],
-    "num_cams": 3,
-    "num_players": 3,
-    "cams_a_row": 3,
-    "num_R": 3,
-    "stream_capacity": 600,
-    "feature": "angle_motion",
-    "mode": "WINDOW",
-    "stage_a": "SMOOTH",
-    "stage_b": "LERP"
-  }
+  ]
 }
