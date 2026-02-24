@@ -136,20 +136,64 @@ def _build_toggle(settings, name, field, polls):
 
 # -- numeric builders --------------------------------------------------------
 
+# Cycling accent colors for slider controls.
+_SLIDER_COLORS = ["blue", "purple", "amber-8"]
+_slider_color_index = [0]
+
+def _next_slider_color() -> str:
+    """Return the next color in the blue → purple → yellow cycle."""
+    c = _SLIDER_COLORS[_slider_color_index[0] % len(_SLIDER_COLORS)]
+    _slider_color_index[0] += 1
+    return c
+
+
 @widget_builder(Widget.slider)
 def _build_slider(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
     is_disabled = field.access is Access.READ
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
+    big_step = step * 10
+    color = _next_slider_color()
 
     with ui.column().classes("w-full gap-0 pt-2 pb-1"):
-        ui.label(label).classes("text-xs text-caption")
+        with ui.row().classes("w-full items-center justify-between gap-0"):
+            ui.label(label).classes("text-xs text-caption")
+            if not is_disabled:
+                with ui.row().classes("gap-0 items-center"):
+                    btn_big_down = ui.button(
+                        icon="keyboard_double_arrow_left", on_click=lambda: None,
+                    ).props(f"flat dense round size=xs color={color}")
+                    btn_down = ui.button(
+                        icon="chevron_left", on_click=lambda: None,
+                    ).props(f"flat dense round size=xs color={color}")
+                    btn_up = ui.button(
+                        icon="chevron_right", on_click=lambda: None,
+                    ).props(f"flat dense round size=xs color={color}")
+                    btn_big_up = ui.button(
+                        icon="keyboard_double_arrow_right", on_click=lambda: None,
+                    ).props(f"flat dense round size=xs color={color}")
         sl = ui.slider(
             min=field.min, max=field.max, step=step, value=value
-        ).props("dense label-always" + (" disable" if is_disabled else ""))
+        ).props(
+            f"dense label-always color={color}"
+            + (" disable" if is_disabled else "")
+        )
+
+
 
     if not is_disabled:
+        def nudge(delta):
+            cur = sl.value
+            new = max(field.min, min(field.max, field.type_(cur + delta)))
+            sl.set_value(new)
+            setattr(settings, name, new)
+
+        btn_big_down.on_click(lambda: nudge(-big_step))
+        btn_down.on_click(lambda: nudge(-step))
+        btn_up.on_click(lambda: nudge(step))
+        btn_big_up.on_click(lambda: nudge(big_step))
+
         def on_slider_change(e):
             setattr(settings, name, field.type_(e.value))
         sl.on_value_change(on_slider_change)
@@ -905,6 +949,7 @@ def create_settings_panel(
     @media (max-width: 639px) {
         .poser-grid { grid-template-columns: 1fr !important; }
     }
+    .q-slider__pin { opacity: 0.65 !important; }
     ''')
 
     # -- Shutdown overlay (client-side JS) ---------------------------------
@@ -946,82 +991,84 @@ def create_settings_panel(
     }})();</script>''')
 
     # -- Header row: title | preset controls | exit button -----------------
-    with ui.row().classes("w-full items-center flex-wrap gap-1"):
-        if title:
-            ui.label(title).classes("text-2xl font-bold")
-        if port is not None:
-            with ui.button(icon="info").props("dense flat").tooltip("Show connection info"):
-                with ui.menu().props('anchor="bottom middle" self="top middle"'):
-                    with ui.card().classes("gap-1").props("flat"):
-                        ui.label("Connect").classes("text-base font-bold")
-                        ui.separator()
-                        for _ip in _get_local_ips():
-                            _url = f"http://{_ip}:{port}"
-                            ui.link(_url, _url, new_tab=True).classes("text-sm")
-                        _url_local = f"http://localhost:{port}"
-                        ui.link(_url_local, _url_local, new_tab=True).classes("text-sm")
-        with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
-            _build_preset_controls(root)
-        if on_exit:
-            async def _do_exit():
-                await ui.run_javascript('showShutdownScreen()')
-                on_exit()
-            ui.button(icon="power_settings_new", on_click=_do_exit).props(
-                "dense flat color=negative"
-            ).tooltip("Exit application")
-
-    # Collect pinned fields and actions from all registered modules (recursing into children)
-    pinned_fields: list[tuple[Settings, str, Field]] = []
-    pinned_actions: list[tuple[Settings, str, Field]] = []
-
-    def _collect_pinned(settings: Settings) -> None:
-        for field_name, field in settings.fields.items():
-            if field.pinned and field.visible:
-                pinned_fields.append((settings, field_name, field))
-        for action_name, action_field in settings.actions.items():
-            if action_field.pinned and action_field.visible:
-                pinned_actions.append((settings, action_name, action_field))
-        for child in settings.children.values():
-            _collect_pinned(child)
-
-    _collect_pinned(root)
-
-    # Render pinned fields and actions in a compact row above the tabs
-    if pinned_fields or pinned_actions:
-        pinned_polls: list[tuple] = []
-        with ui.row().classes("w-full gap-4 flex-wrap items-end"):
-            for settings, field_name, field in pinned_fields:
-                _build_field_control(settings, field_name, field, pinned_polls)
-            for settings, action_name, action_field in pinned_actions:
-                _build_action_button(settings, action_name, action_field)
-        _make_poll_timer(pinned_polls, timers)
-
-    # -- Build tabs: one per visible child of the root ---------------------
-    # Each child Settings with visible content becomes a tab.
-    # The root's own fields (if any) go in a tab named after the root.
+    # Collect tab entries early so we can build tabs inside the sticky header.
     tab_entries: list[tuple[str, Settings]] = []  # (name, settings)
-
-    # Root's own visible fields → a tab for the root itself
     root_has_fields = any(
         f.visible and f.widget != Widget.button
         for f in root.fields.values()
     ) or any(f.visible for f in root.actions.values())
     if root_has_fields:
         tab_entries.append((type(root).__name__, root))
-
-    # Each child → its own tab
     for child_name, child in root.children.items():
         if _has_visible_content(child):
             tab_entries.append((child_name, child))
 
-    if not tab_entries:
-        ui.label("No settings registered.")
-        return
+    with ui.column().classes("w-full sticky top-0 z-50 gap-0 bg-dark text-white").style(
+        "background: #1d1d1d"
+    ):
+        with ui.row().classes("w-full items-center flex-wrap gap-1"):
+            if title:
+                ui.label(title).classes("text-2xl font-bold")
+            if port is not None:
+                with ui.button(icon="info").props("dense flat").tooltip("Show connection info"):
+                    with ui.menu().props('anchor="bottom middle" self="top middle"'):
+                        with ui.card().classes("gap-1").props("flat"):
+                            ui.label("Connect").classes("text-base font-bold")
+                            ui.separator()
+                            for _ip in _get_local_ips():
+                                _url = f"http://{_ip}:{port}"
+                                ui.link(_url, _url, new_tab=True).classes("text-sm")
+                            _url_local = f"http://localhost:{port}"
+                            ui.link(_url_local, _url_local, new_tab=True).classes("text-sm")
+            with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
+                _build_preset_controls(root)
+            if on_exit:
+                async def _do_exit():
+                    await ui.run_javascript('showShutdownScreen()')
+                    on_exit()
+                ui.button(icon="power_settings_new", on_click=_do_exit).props(
+                    "dense flat color=negative"
+                ).tooltip("Exit application")
 
-    with ui.tabs().classes("w-full") as tabs:
-        tab_map = {}
-        for label, _ in tab_entries:
-            tab_map[label] = ui.tab(generate_label(label))
+        # Collect pinned fields and actions from all registered modules
+        pinned_fields: list[tuple[Settings, str, Field]] = []
+        pinned_actions: list[tuple[Settings, str, Field]] = []
+
+        def _collect_pinned(settings: Settings) -> None:
+            for field_name, field in settings.fields.items():
+                if field.pinned and field.visible:
+                    pinned_fields.append((settings, field_name, field))
+            for action_name, action_field in settings.actions.items():
+                if action_field.pinned and action_field.visible:
+                    pinned_actions.append((settings, action_name, action_field))
+            for child in settings.children.values():
+                _collect_pinned(child)
+
+        _collect_pinned(root)
+
+        # Render pinned fields and actions in a compact row above the tabs
+        if pinned_fields or pinned_actions:
+            pinned_polls: list[tuple] = []
+            with ui.row().classes("w-full gap-4 flex-wrap items-end"):
+                for settings, field_name, field in pinned_fields:
+                    _build_field_control(settings, field_name, field, pinned_polls)
+                for settings, action_name, action_field in pinned_actions:
+                    _build_action_button(settings, action_name, action_field)
+            _make_poll_timer(pinned_polls, timers)
+
+        # Tabs inside the sticky header
+        if not tab_entries:
+            ui.label("No settings registered.")
+
+        if tab_entries:
+            with ui.tabs().classes("w-full") as tabs:
+                tab_map = {}
+                for label, _ in tab_entries:
+                    tab_map[label] = ui.tab(generate_label(label))
+    # -- end of sticky header --
+
+    if not tab_entries:
+        return
 
     with ui.tab_panels(tabs, value=tab_map[tab_entries[0][0]]).classes("w-full"):
         for label, root_settings in tab_entries:

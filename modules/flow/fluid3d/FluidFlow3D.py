@@ -55,7 +55,7 @@ class FluidFlow3DConfig(Settings):
 
     # ---- Depth parameters ----
     depth_layers = Field(16, min=4, max=64, description="Number of depth layers in the 3D volume")
-    depth_scale = Field(1.0, min=0.1, max=4.0, description="Z grid spacing relative to XY")
+    depth_scale = Field(1.0, min=0.5, max=5.0, description="Manual multiplier on auto-computed Z grid spacing (width/depth_layers)")
     composite_mode = Field(1, min=0, max=2, description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
     injection_layer = Field(0.5, min=0.0, max=1.0, description="Normalized depth for 2D->3D injection center")
     injection_spread = Field(0.15, min=0.01, max=0.5, description="Gaussian sigma for depth spread during injection")
@@ -126,8 +126,10 @@ class FluidFlow3D:
         self._density_height: int = 0
         self._depth: int = 0
         self._aspect: float = 1.0
+        self._auto_depth_scale: float = 1.0
         self._allocated: bool = False
         self._reset_pending: bool = False
+        self._reallocate_pending: bool = False
 
         # ---- Volumetric fields (SwapTexture3D for ping-pong) ----
         # Velocity: CLAMP_TO_BORDER(0) = no-slip walls
@@ -180,6 +182,7 @@ class FluidFlow3D:
 
         # Bind settings actions
         self.config.bind(FluidFlow3DConfig.reset_sim, lambda _: self._request_reset())
+        self.config.bind(FluidFlow3DConfig.depth_layers, lambda _: self._request_reallocate())
 
     # ========== Allocation ==========
 
@@ -200,6 +203,7 @@ class FluidFlow3D:
         self._density_height = output_height if output_height is not None else height
         self._aspect = width / height if height > 0 else 1.0
         self._depth = self.config.depth_layers
+        self._auto_depth_scale = self._width / max(1, self._depth)
 
         sim_w = self._width
         sim_h = self._height
@@ -283,6 +287,22 @@ class FluidFlow3D:
 
         self._allocated = False
 
+    def _reload_shaders(self) -> None:
+        """Hot-reload all shaders."""
+        self._advect_shader.reload()
+        self._divergence_shader.reload()
+        self._gradient_shader.reload()
+        self._jacobi_pressure_shader.reload()
+        self._jacobi_diffusion_shader.reload()
+        self._vorticity_curl_shader.reload()
+        self._vorticity_force_shader.reload()
+        self._buoyancy_shader.reload()
+        self._inject_shader.reload()
+        self._inject_channel_shader.reload()
+        self._clamp_shader.reload()
+        self._composite_shader.reload()
+        self._add_shader.reload()
+
     # ========== Internal helpers ==========
     @staticmethod
     def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
@@ -302,6 +322,14 @@ class FluidFlow3D:
         """
         if not self._allocated:
             return
+        self._reload_shaders()
+
+        # Handle deferred reallocation from UI thread (depth_layers changed)
+        if self._reallocate_pending:
+            self._reallocate_pending = False
+            new_depth = self.config.depth_layers
+            if new_depth != self._depth:
+                self._reallocate_volumes(new_depth)
 
         # Handle deferred reset from UI thread
         if self._reset_pending:
@@ -309,7 +337,7 @@ class FluidFlow3D:
             self.reset()
 
         self._aspect = self._width / self._height if self._height > 0 else 1.0
-        depth_scale: float = self.config.depth_scale
+        depth_scale: float = self._auto_depth_scale * self.config.depth_scale
         grid_scale: float = self._simulation_scale
 
         # ===== STEP 1: ADVECT DENSITY =====
@@ -491,6 +519,49 @@ class FluidFlow3D:
     def _request_reset(self) -> None:
         """Thread-safe reset request — deferred to next update() on the GL thread."""
         self._reset_pending = True
+
+    def _request_reallocate(self) -> None:
+        """Thread-safe reallocation request — deferred to next update() on the GL thread."""
+        self._reallocate_pending = True
+
+    def _reallocate_volumes(self, new_depth: int) -> None:
+        """Reallocate all 3D volumes with a new depth. Must run on the GL thread.
+
+        Shaders are not reallocated (they have no depth-dependent state).
+        """
+        self._depth = new_depth
+        self._auto_depth_scale = self._width / max(1, self._depth)
+        d = self._depth
+        sim_w = self._width
+        sim_h = self._height
+
+        # Reallocate volumetric fields
+        self._velocity.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._velocity.clear_all()
+
+        self._density.allocate(self._density_width, self._density_height, d, GL_RGBA16F)
+        self._density.clear_all()
+
+        self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
+        self._temperature.clear_all()
+
+        self._pressure.allocate(sim_w, sim_h, d, GL_R16F)
+        self._pressure.clear_all()
+
+        self._obstacle.allocate(sim_w, sim_h, d, GL_R8)
+        self._obstacle.clear()
+
+        self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
+        self._divergence_vol.clear()
+
+        self._curl_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._curl_vol.clear()
+
+        self._vorticity_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._vorticity_force_vol.clear()
+
+        self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._buoyancy_force_vol.clear()
 
     def reset(self) -> None:
         """Reset all simulation fields to zero."""

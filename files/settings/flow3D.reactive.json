@@ -2,7 +2,9 @@
   "render": {
     "layer": {
       "select": {
-        "preview": [],
+        "preview": [
+          "fluid3D"
+        ],
         "final": [
           "fluid3D"
         ]
@@ -140,14 +142,14 @@
         "vel_self_advection": 0.01,
         "den_speed_offset": 0.0,
         "vel_lifetime": 30.0,
-        "vel_vorticity": 14.9,
-        "vel_vorticity_radius": 4.94,
-        "vel_viscosity": 10.93,
+        "vel_vorticity": 5.17,
+        "vel_vorticity_radius": 2.82,
+        "vel_viscosity": 6.62,
         "vel_viscosity_iter": 40,
         "prs_speed": 0.0,
         "prs_lifetime": 8.0,
         "prs_iterations": 40,
-        "den_lifetime": 17.89252289404155,
+        "den_lifetime": 4.928412919115271,
         "tmp_lifetime": 3.0,
         "tmp_buoyancy": 0.0,
         "tmp_weight": -10.0,
@@ -168,23 +170,23 @@
       "blend_mode": "ADD",
       "simulation_scale": 0.25,
       "fluid_flow": {
-        "depth_layers": 4,
+        "depth_layers": 20,
         "depth_scale": 1.0,
         "composite_mode": 1,
         "injection_layer": 0.1,
         "injection_spread": 0.15,
-        "speed": 0.5,
-        "vel_self_advection": 0.13,
+        "speed": 0.93,
+        "vel_self_advection": 0.02,
         "den_speed_offset": 0.0,
-        "vel_lifetime": 9.9,
-        "vel_vorticity": 21.03,
-        "vel_vorticity_radius": 3.0,
-        "vel_viscosity": 7.59,
+        "vel_lifetime": 60.0,
+        "vel_vorticity": 0.49,
+        "vel_vorticity_radius": 1.0,
+        "vel_viscosity": 12.95,
         "vel_viscosity_iter": 40,
         "prs_speed": 0.0,
         "prs_lifetime": 8.0,
         "prs_iterations": 40,
-        "den_lifetime": 17.89252289404155,
+        "den_lifetime": 4.928412919115271,
         "tmp_lifetime": 3.0,
         "tmp_buoyancy": 0.0,
         "tmp_weight": -10.0,
