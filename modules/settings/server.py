@@ -2,7 +2,6 @@
 
 import logging
 import threading
-import webbrowser
 from typing import Callable, Optional
 
 from nicegui import ui, app as nicegui_app
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class ServerSettings(BaseSettings):
     """Configuration for the NiceGUI settings server."""
-    title: Setting[str] = Setting("Settings", access=Setting.INIT, visible=False)
+    title: Setting[str] = Setting("POSER", access=Setting.INIT, visible=False)
     port: Setting[int] = Setting(666, access=Setting.INIT, visible=False)
 
 
@@ -60,9 +59,18 @@ class SettingsServer:
 
         self._thread = threading.Thread(target=_run, daemon=True, name="settings-ui")
         self._thread.start()
-        logger.info(f"Settings UI started on http://localhost:{port}")
 
-        webbrowser.open(f"http://localhost:{port}")
+        # Log connection URLs instead of opening a browser window
+        import socket
+        try:
+            hostname = socket.gethostname()
+            _, _, ips = socket.gethostbyname_ex(hostname)
+            for ip in ips:
+                if not ip.startswith("127."):
+                    logger.info(f"Settings UI: http://{ip}:{port}")
+        except Exception:
+            pass
+        logger.info(f"Settings UI: http://localhost:{port}")
 
     def stop(self) -> None:
         """Shut down the NiceGUI settings server."""

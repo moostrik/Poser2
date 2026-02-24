@@ -632,18 +632,30 @@ def _make_poll_timer(polls, timers):
     Each entry is ``(settings, name, [last_value], setter)``.
     The timer runs on NiceGUI's event loop so UI calls are thread-safe.
     *timers* collects the timer for later cleanup reference.
+    Cancels itself if the client has been deleted (parent slot gone).
     """
     if not polls:
         return
 
-    def _tick():
-        for s, fname, last, setter in polls:
-            cur = getattr(s, fname)
-            if cur != last[0]:
-                last[0] = cur
-                setter(cur)
+    t_holder: list = [None]
 
-    timers.append(ui.timer(POLL_INTERVAL, _tick))
+    def _tick():
+        try:
+            for s, fname, last, setter in polls:
+                cur = getattr(s, fname)
+                if cur != last[0]:
+                    last[0] = cur
+                    setter(cur)
+        except RuntimeError:
+            # Parent slot deleted — client is gone, cancel to stop recurring errors
+            if t_holder[0] is not None:
+                t_holder[0].cancel()
+        except Exception:
+            pass  # Transient error (e.g. WebSocket drop) — skip this tick, retry next
+
+    t = ui.timer(POLL_INTERVAL, _tick)
+    t_holder[0] = t
+    timers.append(t)
 
 
 def _build_settings_body(settings, timers, *, depth=0, expansions=None):
@@ -697,7 +709,7 @@ def _build_settings_body(settings, timers, *, depth=0, expansions=None):
 
     # Full-width controls (sliders, text) in a 2-column grid
     if full_fields:
-        with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-2"):
+        with ui.grid(columns=2).classes("w-full gap-x-4 gap-y-2 poser-grid"):
             for field_name in full_fields:
                 _build_field_control(settings, field_name, settings.fields[field_name], polls)
 
@@ -886,32 +898,47 @@ def create_settings_panel(
     # Force dark mode for consistent styling
     ui.dark_mode(True)
 
-    # Timers for this client session — NiceGUI auto-cleans on disconnect.
+    # Timers for this client session — self-cancel if parent slot is deleted.
     timers: list = []
 
+    # -- Responsive CSS via @media (works on all browsers) -----------------
+    ui.add_css('''
+    @media (max-width: 639px) {
+        .poser-grid { grid-template-columns: 1fr !important; }
+    }
+    ''')
+
     # -- Header row: title | preset controls | exit button -----------------
-    with ui.row().classes("w-full items-center flex-nowrap gap-0"):
+    with ui.row().classes("w-full items-center flex-wrap gap-1"):
         if title:
             ui.label(title).classes("text-2xl font-bold")
         if port is not None:
-            def _show_ip_info():
-                ips = _get_local_ips()
-                with ui.dialog() as dlg, ui.card().classes("min-w-[240px] gap-1"):
-                    ui.label("Connect").classes("text-base font-bold")
-                    ui.separator()
-                    for ip in ips:
-                        url = f"http://{ip}:{port}"
-                        ui.link(url, url, new_tab=True).classes("text-sm")
-                    url_local = f"http://localhost:{port}"
-                    ui.link(url_local, url_local, new_tab=True).classes("text-sm")
-                    ui.separator()
-                    ui.button("Close", on_click=dlg.close).props("flat dense")
-                dlg.open()
-            ui.button(icon="info", on_click=_show_ip_info).props("dense flat").tooltip("Show connection info")
+            with ui.button(icon="info").props("dense flat").tooltip("Show connection info"):
+                with ui.menu().props('anchor="bottom middle" self="top middle"'):
+                    with ui.card().classes("gap-1").props("flat"):
+                        ui.label("Connect").classes("text-base font-bold")
+                        ui.separator()
+                        for _ip in _get_local_ips():
+                            _url = f"http://{_ip}:{port}"
+                            ui.link(_url, _url, new_tab=True).classes("text-sm")
+                        _url_local = f"http://localhost:{port}"
+                        ui.link(_url_local, _url_local, new_tab=True).classes("text-sm")
         with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
             _build_preset_controls(root)
         if on_exit:
-            ui.button(icon="power_settings_new", on_click=on_exit).props(
+            async def _do_exit():
+                # Blackout the page before exiting
+                overlay = ui.element('div').classes(
+                    'fixed inset-0 bg-black z-[9999] flex items-center justify-center'
+                ).style('pointer-events:none')
+                with overlay:
+                    with ui.column().classes('items-center gap-4'):
+                        if title:
+                            ui.label(title).classes('text-2xl font-bold text-zinc-700')
+                        ui.icon('power_settings_new', size='80px').classes('text-zinc-700')
+                await ui.run_javascript('void(0)')  # flush to browser
+                on_exit()
+            ui.button(icon="power_settings_new", on_click=_do_exit).props(
                 "dense flat color=negative"
             ).tooltip("Exit application")
 
@@ -972,6 +999,10 @@ def create_settings_panel(
         for label, root_settings in tab_entries:
             with ui.tab_panel(tab_map[label]):
                 expansions: list = []
+
+                # Expand / Collapse-all placeholder — filled after body build
+                toggle_row = ui.row().classes("w-full justify-end mb-1")
+
                 _build_settings_body(
                     root_settings, timers,
                     depth=0, expansions=expansions,
@@ -987,9 +1018,11 @@ def create_settings_panel(
                                 e.open()
                             else:
                                 e.close()
-                    with ui.row().classes("w-full justify-end mt-1"):
+                    with toggle_row:
                         ui.button(
                             "Expand / Collapse All",
                             icon="unfold_more",
                             on_click=_toggle_all,
                         ).props("dense flat size=sm")
+                else:
+                    toggle_row.delete()
