@@ -169,7 +169,6 @@ class TestInitAccess(unittest.TestCase):
         self.assertEqual(s.resolution, 480)
 
     def test_initialize_recurses_to_children(self):
-        from modules.settings.tests.test_reactive import OuterSettings
         s = OuterSettings()
         self.assertFalse(s._initialized)
         self.assertFalse(s.inner._initialized)
@@ -1691,6 +1690,348 @@ class TestWidgetValidation(unittest.TestCase):
         Field(1.0, widget=Widget.default)
         Field("text", widget=Widget.default)
         Field(True, widget=Widget.default)
+
+
+# ── Enum list support ──────────────────────────────────────────────────────
+
+class EnumListSettings(Settings):
+    modes = Field([RenderMode.SOLID])
+
+
+class TestEnumListRoundTrip(unittest.TestCase):
+    """Enum list serialization and coercion (was completely untested)."""
+
+    def test_default_value(self):
+        s = EnumListSettings()
+        self.assertEqual(s.modes, [RenderMode.SOLID])
+
+    def test_set_enum_list(self):
+        s = EnumListSettings()
+        s.modes = [RenderMode.WIREFRAME, RenderMode.TEXTURED]
+        self.assertEqual(s.modes, [RenderMode.WIREFRAME, RenderMode.TEXTURED])
+
+    def test_to_dict_serializes_names(self):
+        s = EnumListSettings()
+        s.modes = [RenderMode.WIREFRAME, RenderMode.SOLID]
+        d = s.to_dict()
+        self.assertEqual(d["modes"], ["WIREFRAME", "SOLID"])
+
+    def test_update_from_dict_restores_enums(self):
+        s = EnumListSettings()
+        s.update_from_dict({"modes": ["TEXTURED", "WIREFRAME"]})
+        self.assertEqual(s.modes, [RenderMode.TEXTURED, RenderMode.WIREFRAME])
+
+    def test_json_round_trip(self):
+        s1 = EnumListSettings()
+        s1.modes = [RenderMode.TEXTURED]
+        data = json.loads(json.dumps(s1.to_dict()))
+        s2 = EnumListSettings()
+        s2.update_from_dict(data)
+        self.assertEqual(s2.modes, [RenderMode.TEXTURED])
+
+    def test_bad_enum_name_in_list_raises(self):
+        s = EnumListSettings()
+        with self.assertRaises(TypeError):
+            s.modes = ["NONEXISTENT"] # type: ignore
+
+
+# ── Enum coercion edge cases ──────────────────────────────────────────────
+
+class TestEnumCoercion(unittest.TestCase):
+    """Enum construction from name vs value, plus error paths."""
+
+    def test_enum_from_name(self):
+        s = CameraSettings()
+        s.mode = "WIREFRAME"  # type: ignore
+        self.assertEqual(s.mode, RenderMode.WIREFRAME)
+
+    def test_enum_from_value(self):
+        """For non-string-valued enums, coercion by value works."""
+        class Priority(Enum):
+            LOW = 1
+            HIGH = 2
+        class PrioSettings(Settings):
+            level = Field(Priority.LOW)
+        s = PrioSettings()
+        s.level = 2  # type: ignore
+        self.assertEqual(s.level, Priority.HIGH)
+
+    def test_bad_enum_name_raises(self):
+        s = CameraSettings()
+        with self.assertRaises(TypeError):
+            s.mode = "NONEXISTENT" # type: ignore
+
+    def test_bad_enum_value_raises(self):
+        s = CameraSettings()
+        with self.assertRaises(TypeError):
+            s.mode = 999  # type: ignore
+
+
+# ── Callback edge cases ───────────────────────────────────────────────────
+
+class TestCallbackEdgeCases(unittest.TestCase):
+    """Bind idempotency, unbind no-op, broken callback in _apply."""
+
+    def test_bind_duplicate_prevention(self):
+        s = CameraSettings()
+        calls = []
+        cb = lambda v: calls.append(v)
+        s.bind(CameraSettings.exposure, cb)
+        s.bind(CameraSettings.exposure, cb)  # duplicate — should be ignored
+        s.exposure = 5000
+        self.assertEqual(calls, [5000])  # exactly one call
+
+    def test_unbind_silent_noop(self):
+        s = CameraSettings()
+        cb = lambda v: None
+        # Never bound — should not raise
+        s.unbind(CameraSettings.exposure, cb)
+
+    def test_broken_callback_doesnt_crash_apply(self):
+        """A callback that raises during field set should not crash."""
+        s = CameraSettings()
+        results = []
+        s.bind(CameraSettings.exposure, lambda v: (_ for _ in ()).throw(RuntimeError("boom")))
+        s.bind(CameraSettings.exposure, lambda v: results.append(v))
+        s.exposure = 9999  # should not raise
+        # The second callback should still have fired
+        self.assertEqual(results, [9999])
+
+    def test_unbind_all(self):
+        s = CameraSettings()
+        calls = []
+        cb = lambda v: calls.append(v)
+        s.bind_all(cb)
+        s.exposure = 2000
+        self.assertTrue(len(calls) > 0)
+        calls.clear()
+        s.unbind_all(cb)
+        s.exposure = 3000
+        self.assertEqual(calls, [])
+
+
+# ── update_from_dict edge cases ───────────────────────────────────────────
+
+class TestUpdateFromDictEdgeCases(unittest.TestCase):
+    """Non-dict child value, equality with children."""
+
+    def test_non_dict_child_logs_warning(self):
+        s = OuterSettings()
+        with self.assertLogs("modules.settings.settings", level="WARNING") as cm:
+            s.update_from_dict({"inner": 42})
+        self.assertTrue(any("expected dict for child 'inner'" in m for m in cm.output))
+        # inner should be unchanged
+        self.assertEqual(s.inner.speed, 1.0)
+
+
+# ── Equality with children ────────────────────────────────────────────────
+
+class TestEqualityWithChildren(unittest.TestCase):
+    """__eq__ should compare child state too."""
+
+    def test_equal_children(self):
+        a = OuterSettings()
+        b = OuterSettings()
+        self.assertEqual(a, b)
+
+    def test_different_child_values(self):
+        a = OuterSettings()
+        b = OuterSettings()
+        a.inner.speed = 9.9
+        self.assertNotEqual(a, b)
+
+
+# ── @property setter routing ──────────────────────────────────────────────
+
+class SettingsWithProperty(Settings):
+    raw_val = Field(0)
+
+    @property
+    def doubled(self):
+        return self.raw_val * 2
+
+    @doubled.setter
+    def doubled(self, value):
+        self.raw_val = value // 2
+
+
+class TestPropertySetter(unittest.TestCase):
+    """__setattr__ should route to @property setters."""
+
+    def test_property_getter(self):
+        s = SettingsWithProperty()
+        self.assertEqual(s.doubled, 0)
+
+    def test_property_setter(self):
+        s = SettingsWithProperty()
+        s.doubled = 20
+        self.assertEqual(s.raw_val, 10)
+        self.assertEqual(s.doubled, 20)
+
+
+# ── Field inheritance via MRO ─────────────────────────────────────────────
+
+class ExtendedCamera(CameraSettings):
+    zoom = Field(1.0, min=1.0, max=10.0)
+
+
+class TestFieldInheritance(unittest.TestCase):
+    """Fields should be inherited from parent Settings classes."""
+
+    def test_parent_fields_accessible(self):
+        s = ExtendedCamera()
+        self.assertEqual(s.exposure, 1000)
+        self.assertEqual(s.zoom, 1.0)
+
+    def test_parent_fields_in_fields_dict(self):
+        s = ExtendedCamera()
+        self.assertIn("exposure", s.fields)
+        self.assertIn("zoom", s.fields)
+
+    def test_serialization_includes_both(self):
+        s = ExtendedCamera()
+        s.exposure = 2000
+        s.zoom = 5.0
+        d = s.to_dict()
+        self.assertEqual(d["exposure"], 2000)
+        self.assertEqual(d["zoom"], 5.0)
+
+
+# ── None value rejection ──────────────────────────────────────────────────
+
+class TestNoneRejection(unittest.TestCase):
+    """None should be rejected for any typed field."""
+
+    def test_none_int(self):
+        s = CameraSettings()
+        with self.assertRaises(TypeError):
+            s.exposure = None # type: ignore
+
+    def test_none_float(self):
+        s = CameraSettings()
+        with self.assertRaises(TypeError):
+            s.gain = None # type: ignore
+
+    def test_none_custom_type(self):
+        s = CameraSettings()
+        with self.assertRaises(TypeError):
+            s.overlay_color = None # type: ignore
+
+
+# ── Field repr branches ──────────────────────────────────────────────────
+
+class TestFieldReprBranches(unittest.TestCase):
+    """Cover all repr branches."""
+
+    def test_repr_with_init_access(self):
+        f = Field(42, access=Field.INIT)
+        r = repr(f)
+        self.assertIn("access=Field.INIT", r)
+
+    def test_repr_with_invisible(self):
+        f = Field(0, visible=False)
+        r = repr(f)
+        self.assertIn("visible=False", r)
+
+    def test_repr_basic(self):
+        f = Field(1.0)
+        r = repr(f)
+        self.assertIn("float", r)
+        self.assertIn("1.0", r)
+        self.assertTrue(r.startswith("Field("))
+
+
+# ── load() return value ──────────────────────────────────────────────────
+
+class TestLoadReturnValue(unittest.TestCase):
+    """load() should return True on success, False on failure."""
+
+    def _make_root(self):
+        class Root(Settings):
+            camera: CameraSettings
+        return Root()
+
+    def test_load_success_returns_true(self):
+        root = self._make_root()
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "test.json")
+            presets.save(root, p)
+            self.assertTrue(presets.load(root, p))
+
+    def test_load_missing_returns_false(self):
+        root = self._make_root()
+        self.assertFalse(presets.load(root, "/nonexistent/path.json"))
+
+    def test_load_corrupt_returns_false(self):
+        root = self._make_root()
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "bad.json")
+            with open(p, "w") as f:
+                f.write("{corrupted json!!")
+            self.assertFalse(presets.load(root, p))
+
+
+# ── presets utility functions ─────────────────────────────────────────────
+
+class TestPresetsUtilities(unittest.TestCase):
+    """Tests for path(), scan(), get_startup(), set_startup()."""
+
+    def test_path_returns_expected(self):
+        p = presets.path("mypreset")
+        self.assertEqual(p.name, "mypreset.reactive.json")
+
+    def test_set_startup_get_startup_round_trip(self):
+        with tempfile.TemporaryDirectory() as d:
+            from pathlib import Path
+            orig_dir = presets.SETTINGS_DIR
+            presets.SETTINGS_DIR = Path(d)
+            try:
+                presets.set_startup("custom")
+                self.assertEqual(presets.get_startup(), "custom")
+            finally:
+                presets.SETTINGS_DIR = orig_dir
+
+    def test_get_startup_default_fallback(self):
+        with tempfile.TemporaryDirectory() as d:
+            from pathlib import Path
+            orig_dir = presets.SETTINGS_DIR
+            presets.SETTINGS_DIR = Path(d)
+            try:
+                # No _startup_preset.txt → should return "default"
+                self.assertEqual(presets.get_startup(), "default")
+            finally:
+                presets.SETTINGS_DIR = orig_dir
+
+    def test_scan_returns_sorted_names(self):
+        with tempfile.TemporaryDirectory() as d:
+            from pathlib import Path
+            orig_dir = presets.SETTINGS_DIR
+            presets.SETTINGS_DIR = Path(d)
+            try:
+                (Path(d) / "beta.reactive.json").write_text("{}")
+                (Path(d) / "alpha.reactive.json").write_text("{}")
+                result = presets.scan()
+                self.assertEqual(result, ["alpha", "beta"])
+            finally:
+                presets.SETTINGS_DIR = orig_dir
+
+    def test_set_startup_rejects_path_traversal(self):
+        with self.assertRaises(ValueError):
+            presets.set_startup("../etc/passwd")
+
+    def test_set_startup_rejects_empty(self):
+        with self.assertRaises(ValueError):
+            presets.set_startup("")
+
+    def test_set_startup_rejects_dotfile(self):
+        with self.assertRaises(ValueError):
+            presets.set_startup(".hidden")
+
+    def test_pinned_attribute(self):
+        f = Field(42, pinned=True)
+        self.assertTrue(f.pinned)
+        f2 = Field(42)
+        self.assertFalse(f2.pinned)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ from nicegui import ui, app as nicegui_app
 
 from modules.settings.settings import Settings
 from modules.settings.field import Field
-from modules.settings.nice_panel import create_settings_panel
+from modules.settings.nice_panel import create_settings_panel, _get_local_ips
 
 logger = logging.getLogger(__name__)
 
@@ -62,18 +62,12 @@ class NiceServer:
         self._thread.start()
 
         # Log connection URLs (skip loopback and link-local addresses)
-        BLUE = "\033[94m"
-        RESET = "\033[0m"
-        import socket
-        try:
-            hostname = socket.gethostname()
-            _, _, ips = socket.gethostbyname_ex(hostname)
-            for ip in ips:
-                if ip.startswith("127.") or ip.startswith("169.254."):
-                    continue
-                print(f"Settings UI: {BLUE}http://{ip}:{port}{RESET}", flush=True)
-        except Exception:
-            pass
+        import sys
+        use_ansi = hasattr(sys.stderr, "isatty") and sys.stderr.isatty()
+        BLUE = "\033[94m" if use_ansi else ""
+        RESET = "\033[0m" if use_ansi else ""
+        for ip in _get_local_ips():
+            print(f"Settings UI: {BLUE}http://{ip}:{port}{RESET}", flush=True)
         print(f"Settings UI: {BLUE}http://localhost:{port}{RESET}", flush=True)
 
     def stop(self) -> None:

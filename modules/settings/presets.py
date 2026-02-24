@@ -36,6 +36,9 @@ def get_startup() -> str:
 
 def set_startup(name: str) -> None:
     """Persist *name* as the preset to load on next startup."""
+    # Reject names that could escape the settings directory
+    if not name or "/" in name or "\\" in name or name.startswith("."):
+        raise ValueError(f"Invalid preset name: {name!r}")
     SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
     (SETTINGS_DIR / "_startup_preset.txt").write_text(name)
 
@@ -80,15 +83,15 @@ def load(root: Settings, filepath) -> bool:
     """
     filepath = Path(filepath)
     if not filepath.exists():
-        logger.warning(f"Preset file not found: {filepath}")
+        logger.warning("Preset file not found: %s", filepath)
         return False
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
-        logger.warning(f"Failed to load preset: {filepath}")
+        logger.warning("Failed to load preset: %s", filepath)
         return False
     root.update_from_dict(data)
-    logger.info(f"Loaded preset: {filepath}")
+    logger.info("Loaded preset: %s", filepath)
     return True
 
