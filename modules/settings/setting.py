@@ -14,6 +14,24 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
+class Access(Enum):
+    """Controls who may read/write a Setting and whether the UI polls it.
+
+    ========== ============ ======== ==========================================
+    Member     UI editable  Polled   Use case
+    ========== ============ ======== ==========================================
+    READ       no           yes      Code writes, UI displays (e.g. FPS)
+    WRITE      yes          no       UI is the only writer (most fields)
+    READWRITE  yes          yes      Both code and UI write (e.g. window size)
+    INIT       static label no       Set once at construction, then immutable
+    ========== ============ ======== ==========================================
+    """
+    READ = "read"
+    WRITE = "write"
+    READWRITE = "readwrite"
+    INIT = "init"
+
+
 class Setting(Generic[T]):
     """Descriptor-based setting field with type coercion, callbacks, and thread safety.
 
@@ -44,6 +62,12 @@ class Setting(Generic[T]):
             settings.tags = settings.tags + [x]
     """
 
+    # Convenience aliases so callers write Setting.READ instead of Access.READ
+    READ = Access.READ
+    WRITE = Access.WRITE
+    READWRITE = Access.READWRITE
+    INIT = Access.INIT
+
     def __init__(
         self,
         default: T,
@@ -52,8 +76,7 @@ class Setting(Generic[T]):
         max: T | None = None,
         step: T | None = None,
         description: str = "",  # noqa: E501  — min/max/step are GUI presentation hints only; they are NOT enforced by the descriptor.
-        readonly: bool = False,
-        init_only: bool = False,
+        access: Access = Access.WRITE,
         visible: bool = True,
         pinned: bool = False,
         widget: Widget = Widget.default,
@@ -81,8 +104,7 @@ class Setting(Generic[T]):
         self.max = max
         self.step = step
         self.description = description
-        self.readonly = readonly
-        self.init_only = init_only
+        self.access = access
         self.visible = visible
         self.pinned = pinned
         self.widget = widget
@@ -115,11 +137,11 @@ class Setting(Generic[T]):
     def __set__(self, obj: Any, value: T) -> None:
         self.set(obj, value)
 
-    # -- Public set (respects init_only) ------------------------------------
+    # -- Public set (respects Access.INIT) ----------------------------------
 
     def set(self, obj, value):
-        """Set value. Only enforces init_only after initialization."""
-        if self.init_only and obj._initialized:
+        """Set value. Only enforces Access.INIT after initialization."""
+        if self.access is Access.INIT and obj._initialized:
             raise AttributeError(
                 f"Setting '{self.name}' can only be set during initialization"
             )
@@ -284,10 +306,8 @@ class Setting(Generic[T]):
         parts = [self._type_name, f"default={self.default!r}"]
         if self.description:
             parts.append(f"description={self.description!r}")
-        if self.readonly:
-            parts.append("readonly=True")
-        if self.init_only:
-            parts.append("init_only=True")
+        if self.access is not Access.WRITE:
+            parts.append(f"access=Setting.{self.access.name}")
         if not self.visible:
             parts.append("visible=False")
         if self.widget != Widget.default:

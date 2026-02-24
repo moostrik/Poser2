@@ -10,7 +10,7 @@ from nicegui import app, ui
 
 from modules.settings.base_settings import BaseSettings
 from modules.settings import presets
-from modules.settings.setting import Setting
+from modules.settings.setting import Setting, Access
 from modules.settings.widget import Widget, WidgetSize
 from modules.utils import Color, Point2f, Rect
 
@@ -60,7 +60,7 @@ def _build_field_control(settings, name, field, polls):
     builder = _BUILDERS.get(resolved)
     if desc:
         with ui.element('div'):
-            ui.tooltip(desc).props('anchor="top middle" self="bottom middle" delay=800')
+            ui.tooltip(desc).props('anchor="bottom middle" self="bottom middle" delay=800')
             if builder is not None:
                 return builder(settings, name, field, polls)
             return _build_fallback(settings, name, field, polls)
@@ -93,7 +93,7 @@ def widget_builder(widget: Widget):
 def _build_switch(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     sw = ui.switch(label, value=value).props(
         "dense" + (" disable" if is_disabled else "")
@@ -104,7 +104,8 @@ def _build_switch(settings, name, field, polls):
             setattr(settings, name, e.value)
         sw.on_value_change(on_switch_change)
 
-    polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
     return WidgetSize.small
 
 
@@ -112,7 +113,7 @@ def _build_switch(settings, name, field, polls):
 def _build_toggle(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     tg = ui.toggle({True: label, False: label}, value=value).props(
         "dense" + (" disable" if is_disabled else "")
@@ -123,7 +124,8 @@ def _build_toggle(settings, name, field, polls):
             setattr(settings, name, e.value)
         tg.on_value_change(on_toggle_change)
 
-    polls.append((settings, name, [value], lambda v, tg=tg: tg.set_value(v)))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, tg=tg: tg.set_value(v)))
     return WidgetSize.small
 
 
@@ -133,7 +135,7 @@ def _build_toggle(settings, name, field, polls):
 def _build_slider(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
 
     with ui.column().classes("w-full gap-0 pt-2 pb-1"):
@@ -147,7 +149,8 @@ def _build_slider(settings, name, field, polls):
             setattr(settings, name, field.type_(e.value))
         sl.on_value_change(on_slider_change)
 
-    polls.append((settings, name, [value], lambda v, sl=sl: sl.set_value(v)))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, sl=sl: sl.set_value(v)))
     return WidgetSize.full
 
 
@@ -155,7 +158,7 @@ def _build_slider(settings, name, field, polls):
 def _build_number(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     num = ui.number(
         label=label,
@@ -170,7 +173,8 @@ def _build_number(settings, name, field, polls):
                 setattr(settings, name, field.type_(e.value))
         num.on_value_change(on_num_change)
 
-    polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, num=num: num.set_value(v)))
     return WidgetSize.small
 
 
@@ -178,7 +182,7 @@ def _build_number(settings, name, field, polls):
 def _build_knob(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     min_val = field.min if field.min is not None else 0
     max_val = field.max if field.max is not None else 100
@@ -197,7 +201,8 @@ def _build_knob(settings, name, field, polls):
             setattr(settings, name, field.type_(e.value))
         kn.on_value_change(on_knob_change)
 
-    polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(v)))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(v)))
     return WidgetSize.small
 
 
@@ -207,7 +212,7 @@ def _build_knob(settings, name, field, polls):
 def _build_select(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     options = {m.name: m.name for m in field.type_}
     sel = ui.select(
@@ -221,7 +226,8 @@ def _build_select(settings, name, field, polls):
             setattr(settings, name, f.type_[e.value])
         sel.on_value_change(on_select_change)
 
-    polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v)))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v.name if isinstance(v, Enum) else v)))
     return WidgetSize.small
 
 
@@ -229,7 +235,7 @@ def _build_select(settings, name, field, polls):
 def _build_radio(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     options = {m: generate_label(m.name) for m in field.type_}
     with ui.column().classes("gap-0 pt-1 pb-1"):
@@ -243,7 +249,8 @@ def _build_radio(settings, name, field, polls):
             setattr(settings, name, e.value)
         rg.on_value_change(on_radio_change)
 
-    polls.append((settings, name, [value], lambda v, rg=rg: rg.set_value(v)))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, rg=rg: rg.set_value(v)))
     return WidgetSize.small
 
 
@@ -253,7 +260,7 @@ def _build_radio(settings, name, field, polls):
 def _build_input(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     inp = ui.input(label=label, value=value).props(
         "dense outlined" + (" disable" if is_disabled else "")
@@ -264,7 +271,8 @@ def _build_input(settings, name, field, polls):
             setattr(settings, name, e.value)
         inp.on_value_change(on_input_change)
 
-    polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
     return WidgetSize.full
 
 
@@ -272,7 +280,7 @@ def _build_input(settings, name, field, polls):
 def _build_ip(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     inp = ui.input(
         label=label, value=value,
@@ -288,7 +296,8 @@ def _build_ip(settings, name, field, polls):
             setattr(settings, name, e.value)
         inp.on_value_change(on_ip_change)
 
-    polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, inp=inp: inp.set_value(v)))
     return WidgetSize.small
 
 
@@ -296,7 +305,7 @@ def _build_ip(settings, name, field, polls):
 def _build_textarea(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     ta = ui.textarea(label=label, value=value).props(
         "dense outlined" + (" disable" if is_disabled else "")
@@ -307,7 +316,8 @@ def _build_textarea(settings, name, field, polls):
             setattr(settings, name, e.value)
         ta.on_value_change(on_ta_change)
 
-    polls.append((settings, name, [value], lambda v, ta=ta: ta.set_value(v)))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, ta=ta: ta.set_value(v)))
     return WidgetSize.full
 
 
@@ -317,7 +327,7 @@ def _build_textarea(settings, name, field, polls):
 def _build_color(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
     ci = ui.color_input(
@@ -331,7 +341,8 @@ def _build_color(settings, name, field, polls):
                 setattr(settings, name, Color(c.r, c.g, c.b, 1.0))
         ci.on_value_change(on_color_change)
 
-    polls.append((settings, name, [value], lambda v, _ci=ci: _ci.set_value(v.to_hex() if isinstance(v, Color) else '#000000')))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, _ci=ci: _ci.set_value(v.to_hex() if isinstance(v, Color) else '#000000')))
     return WidgetSize.small
 
 
@@ -339,7 +350,7 @@ def _build_color(settings, name, field, polls):
 def _build_color_alpha(settings, name, field, polls):
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
     alpha = value.a if isinstance(value, Color) else 1.0
@@ -374,7 +385,8 @@ def _build_color_alpha(settings, name, field, polls):
             _ci.set_value(v.to_hex())
             _an.set_value(v.a)
 
-    polls.append((settings, name, [value], _color_alpha_setter))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], _color_alpha_setter))
     return WidgetSize.small
 
 
@@ -468,7 +480,8 @@ def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool)
             _st["order"] = list(v)
         _rebuild(_cont, _st)
 
-    polls.append((settings, name, [list(value)], _list_setter))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [list(value)], _list_setter))
     return WidgetSize.full
 
 
@@ -488,7 +501,7 @@ def _build_fallback(settings, name, field, polls):
     """Build a control for types without a registered Widget builder."""
     value = getattr(settings, name)
     label = generate_label(name)
-    is_disabled = field.readonly
+    is_disabled = field.access is Access.READ
 
     # -- Point2f → x/y number row --------------------------------------------
     if field.type_ is Point2f:
@@ -520,7 +533,8 @@ def _build_fallback(settings, name, field, polls):
             if isinstance(v, Point2f):
                 _x.set_value(v.x)
                 _y.set_value(v.y)
-        polls.append((settings, name, [value], _point_setter))
+        if field.access is not Access.WRITE:
+            polls.append((settings, name, [value], _point_setter))
         return WidgetSize.full
 
     # -- Rect → x/y/w/h number row -------------------------------------------
@@ -575,7 +589,8 @@ def _build_fallback(settings, name, field, polls):
                 _ry.set_value(v.y)
                 _rw.set_value(v.width)
                 _rh.set_value(v.height)
-        polls.append((settings, name, [value], _rect_setter))
+        if field.access is not Access.WRITE:
+            polls.append((settings, name, [value], _rect_setter))
         return WidgetSize.full
 
     # -- Generic fallback: read-only label -----------------------------------
@@ -583,7 +598,8 @@ def _build_fallback(settings, name, field, polls):
         ui.label(label).classes("text-sm")
         lbl = ui.label(str(value)).classes("text-sm text-secondary")
 
-    polls.append((settings, name, [value], lambda v, lbl=lbl: lbl.set_text(str(v))))
+    if field.access is not Access.WRITE:
+        polls.append((settings, name, [value], lambda v, lbl=lbl: lbl.set_text(str(v))))
     return WidgetSize.small
 
 
@@ -648,7 +664,7 @@ def _build_settings_body(settings, timers, *, depth=0, expansions=None):
             continue
         if field.widget == Widget.button:
             continue  # rendered in the actions section
-        if field.init_only:
+        if field.access is Access.INIT:
             init_only_fields.append(field_name)
             continue
         resolved = Widget.resolve(field)

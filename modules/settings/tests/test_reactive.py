@@ -33,8 +33,8 @@ class CameraSettings(BaseSettings):
     exposure = Setting(1000, min=100, max=10000, step=100, description="Exposure time (µs)")
     gain = Setting(1.0, min=0.0, max=16.0, step=0.1)
     overlay_color = Setting(Color(1, 0, 0))
-    resolution = Setting(1080, init_only=True)
-    fps = Setting(0.0, readonly=True, visible=False)
+    resolution = Setting(1080, access=Setting.INIT)
+    fps = Setting(0.0, access=Setting.READ, visible=False)
     mode = Setting(RenderMode.SOLID)
 
 
@@ -119,20 +119,20 @@ class TestTypeCoercion(unittest.TestCase):
         self.assertEqual(s.mode, RenderMode.TEXTURED)
 
 
-class TestReadOnly(unittest.TestCase):
-    """Tests for readonly fields (readonly is a GUI hint, not enforced)."""
+class TestReadAccess(unittest.TestCase):
+    """Tests for Setting.READ fields (GUI hint, not enforced by descriptor)."""
 
-    def test_readonly_allows_set(self):
+    def test_read_allows_set(self):
         s = CameraSettings()
         s.fps = 30.0
         self.assertEqual(s.fps, 30.0)
 
-    def test_readonly_set_works(self):
+    def test_read_set_works(self):
         s = CameraSettings()
         s.fps = 29.97
         self.assertEqual(s.fps, 29.97)
 
-    def test_readonly_callback_fires_on_set(self):
+    def test_read_callback_fires_on_set(self):
         s = CameraSettings()
         results = []
         s.bind(CameraSettings.fps, lambda v: results.append(v))
@@ -140,30 +140,30 @@ class TestReadOnly(unittest.TestCase):
         self.assertEqual(results, [60.0])
 
 
-class TestInitOnly(unittest.TestCase):
-    """Tests for init_only fields."""
+class TestInitAccess(unittest.TestCase):
+    """Tests for Setting.INIT fields."""
 
-    def test_init_only_set_during_construction(self):
+    def test_init_set_during_construction(self):
         s = CameraSettings(resolution=720)
         self.assertEqual(s.resolution, 720)
 
-    def test_init_only_raises_after_init(self):
+    def test_init_raises_after_init(self):
         s = CameraSettings()
         with self.assertRaises(AttributeError):
             s.resolution = 480
 
-    def test_init_only_loadable_via_set_before_init(self):
+    def test_init_loadable_via_set_before_init(self):
         s = CameraSettings()
-        # Simulate pre-init state: can set init_only fields
+        # Simulate pre-init state: can set INIT fields
         object.__setattr__(s, "_initialized", False)
         s.resolution = 480
         object.__setattr__(s, "_initialized", True)
         self.assertEqual(s.resolution, 480)
 
-    def test_init_only_skipped_by_update_from_dict(self):
+    def test_init_skipped_by_update_from_dict(self):
         s = CameraSettings(resolution=720)
         s.update_from_dict({"resolution": 480})
-        # init_only field should NOT be overwritten after init
+        # INIT field should NOT be overwritten after init
         self.assertEqual(s.resolution, 720)
 
 
@@ -246,7 +246,7 @@ class TestInstanceIsolation(unittest.TestCase):
 class TestSerialization(unittest.TestCase):
     """Tests for to_dict / update_from_dict."""
 
-    def test_to_dict_excludes_readonly(self):
+    def test_to_dict_excludes_read_access(self):
         s = CameraSettings()
         d = s.to_dict()
         self.assertNotIn("fps", d)
@@ -255,7 +255,7 @@ class TestSerialization(unittest.TestCase):
         s = CameraSettings()
         d = s.to_dict()
         self.assertIn("exposure", d)
-        # init_only fields are included in serialization (editable in JSON)
+        # INIT fields are included in serialization (editable in JSON)
         self.assertIn("resolution", d)
 
     def test_to_dict_values(self):

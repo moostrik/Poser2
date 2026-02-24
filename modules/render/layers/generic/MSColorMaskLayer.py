@@ -25,7 +25,7 @@ from modules.render.color_settings import ColorSettings
 
 class ColorMaskLayerSettings(BaseSettings):
     """Configuration for MSColorMaskLayer."""
-    num_players:            Setting[int]   = Setting(3, init_only=True)
+    num_players:            Setting[int]   = Setting(3, access=Setting.INIT)
     blend_mode:             Setting[Style.BlendMode] = Setting(Style.BlendMode.ALPHA)
     similarity_threshold:   Setting[float] = Setting(0.33, min=0.0, max=1.0)
     motion_exponent:        Setting[float] = Setting(1.5, min=0.0, max=5.0)

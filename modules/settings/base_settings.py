@@ -6,7 +6,7 @@ import sys
 import threading
 import typing
 
-from modules.settings.setting import Setting
+from modules.settings.setting import Setting, Access
 from modules.settings.widget import Widget
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class BaseSettings:
 
         class CameraSettings(BaseSettings):
             exposure = Setting(1000, min=100, max=10000)
-            resolution = Setting(1080, init_only=True)
+            resolution = Setting(1080, access=Setting.INIT)
 
         settings = CameraSettings(resolution=720)
 
@@ -183,15 +183,15 @@ class BaseSettings:
     def to_dict(self):
         """Serialize mutable fields to a dict.
 
-        Excludes ``readonly`` fields and ``Widget.button`` fields.
-        ``init_only`` fields **are** included (they are editable in JSON but
+        Excludes ``Access.READ`` fields and ``Widget.button`` fields.
+        ``Access.INIT`` fields **are** included (they are editable in JSON but
         cannot be changed at runtime after construction).
 
         Children are serialized as nested dicts.
         """
         result = {}
         for name, field in self._fields.items():
-            if field.readonly or field.widget == Widget.button:
+            if field.access is Access.READ or field.widget == Widget.button:
                 continue
             result[name] = field.to_json_value(self)
         for name, child in self._children.items():
@@ -199,7 +199,7 @@ class BaseSettings:
         return result
 
     def update_from_dict(self, data):
-        """Restore fields from a dict. Skips init_only fields after init.
+        """Restore fields from a dict. Skips Access.INIT fields after init.
 
         Nested dicts matching child names are forwarded to the child.
         """
@@ -213,7 +213,7 @@ class BaseSettings:
                 )
             elif name in self._fields:
                 field = self._fields[name]
-                if field.init_only and self._initialized:
+                if field.access is Access.INIT and self._initialized:
                     continue
                 field.from_json_value(self, raw)
 

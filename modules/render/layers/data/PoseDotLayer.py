@@ -16,7 +16,7 @@ from modules.utils.HotReloadMethods import HotReloadMethods
 
 
 class PoseDotSettings(BaseSettings):
-    stage:      Setting[Stage] = Setting(Stage.LERP, init_only=True, description="Pipeline stage for pose data")
+    stage:      Setting[Stage] = Setting(Stage.LERP, access=Setting.INIT, description="Pipeline stage for pose data")
     dot_size:   Setting[float] = Setting(4.0, min=1.0, max=20.0, description="Dot size in pixels")
     dot_smooth: Setting[float] = Setting(2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")
 
