@@ -63,7 +63,7 @@ class NiceServer:
 
         # Log connection URLs (skip loopback and link-local addresses)
         import sys
-        use_ansi = hasattr(sys.stderr, "isatty") and sys.stderr.isatty()
+        use_ansi = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
         BLUE = "\033[94m" if use_ansi else ""
         RESET = "\033[0m" if use_ansi else ""
         for ip in _get_local_ips():

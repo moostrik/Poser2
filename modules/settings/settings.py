@@ -133,23 +133,23 @@ class Settings:
 
     @property
     def fields(self):
-        """Read-only view of all Setting descriptors, keyed by name."""
+        """Read-only view of all Field descriptors, keyed by name."""
         return dict(self._fields)
 
     @property
     def actions(self):
-        """Read-only view of all Widget.button Settings, keyed by name."""
+        """Read-only view of all Widget.button fields, keyed by name."""
         return {n: f for n, f in self._fields.items() if f.widget == Widget.button}
 
     @property
     def children(self):
-        """Read-only view of all Child instances, keyed by name."""
+        """Read-only view of all child instances, keyed by name."""
         return dict(self._children)
 
     # -- Callback registration -----------------------------------------------
 
     def bind(self, field: 'Field', callback) -> None:
-        """Register a callback for a Setting descriptor.
+        """Register a callback for a field.
 
         Usage::
 
@@ -163,16 +163,16 @@ class Settings:
         field.bind(self, callback)
 
     def unbind(self, field: 'Field', callback) -> None:
-        """Remove a previously registered callback for a Setting."""
+        """Remove a previously registered callback for a field."""
         field.unbind(self, callback)
 
     def bind_all(self, callback) -> None:
-        """Register *callback* on every Setting field in this instance."""
+        """Register *callback* on every field in this instance."""
         for field in self._fields.values():
             field.bind(self, callback)
 
     def unbind_all(self, callback) -> None:
-        """Remove *callback* from every Setting field in this instance."""
+        """Remove *callback* from every field in this instance."""
         for field in self._fields.values():
             field.unbind(self, callback)
 

@@ -873,7 +873,7 @@ def _get_local_ips() -> list[str]:
     try:
         hostname = socket.gethostname()
         _, _, ips = socket.gethostbyname_ex(hostname)
-        return [ip for ip in ips if not ip.startswith("127.")]
+        return [ip for ip in ips if not ip.startswith("127.") and not ip.startswith("169.254.")]
     except Exception:
         return []
 
