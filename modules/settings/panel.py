@@ -59,11 +59,16 @@ def _build_field_control(settings, name, field, polls):
     resolved = Widget.resolve(field)
     builder = _BUILDERS.get(resolved)
     if desc:
-        with ui.element('div'):
-            ui.tooltip(desc).props('anchor="bottom middle" self="bottom middle" delay=800')
+        with ui.element('div').classes('relative'):
             if builder is not None:
-                return builder(settings, name, field, polls)
-            return _build_fallback(settings, name, field, polls)
+                result = builder(settings, name, field, polls)
+            else:
+                result = _build_fallback(settings, name, field, polls)
+            with ui.icon('info_outline').classes(
+                'text-grey-6 cursor-help absolute'
+            ).style('font-size: 14px; bottom: -18px; right: -2px'):
+                ui.tooltip(desc).props('anchor="bottom left" self="top right" :offset="[2, -14]" delay=500')
+            return result
     else:
         if builder is not None:
             return builder(settings, name, field, polls)

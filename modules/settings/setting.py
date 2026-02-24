@@ -71,11 +71,11 @@ class Setting(Generic[T]):
     def __init__(
         self,
         default: T,
-        *,
-        min: T | None = None,
-        max: T | None = None,
+        *, # the keyword-only parameters below are GUI presentation hints only.
+        min: T | None = None,   # min/max/step are not enforced by the descriptor
+        max: T | None = None,   # they are just hints for the UI to show sliders, etc.
         step: T | None = None,
-        description: str = "",  # noqa: E501  — min/max/step are GUI presentation hints only; they are NOT enforced by the descriptor.
+        description: str = "",
         access: Access = Access.WRITE,
         visible: bool = True,
         pinned: bool = False,
