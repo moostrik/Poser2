@@ -42,7 +42,7 @@ class WindowSettings(BaseSettings):
     y: Setting[int] =               Setting(80)
     width: Setting[int] =           Setting(1920)
     height: Setting[int] =          Setting(1000)
-    secondary_list: Setting[list[MonitorId]] = Setting(list[MonitorId], [MonitorId.M0])
+    secondary_list: Setting[list[MonitorId]] = Setting([MonitorId.M0])
 
 
 class Button(Enum):

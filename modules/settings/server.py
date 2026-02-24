@@ -10,7 +10,6 @@ from nicegui import ui, app as nicegui_app
 from modules.settings.base_settings import BaseSettings
 from modules.settings.setting import Setting
 from modules.settings.panel import create_settings_panel
-from modules.settings.registry import SettingsRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +23,8 @@ class ServerSettings(BaseSettings):
 class SettingsServer:
     """NiceGUI settings server that runs on a background thread."""
 
-    def __init__(self, registry: SettingsRegistry, settings: ServerSettings, on_exit: Optional[Callable[[], None]] = None):
-        self.registry = registry
+    def __init__(self, root: BaseSettings, settings: ServerSettings, on_exit: Optional[Callable[[], None]] = None):
+        self.root = root
         self.settings = settings
         self.on_exit = on_exit
         self._thread: Optional[threading.Thread] = None
@@ -36,7 +35,7 @@ class SettingsServer:
             logger.warning("Settings server already running")
             return
 
-        registry = self.registry
+        root = self.root
         title = self.settings.title
         port = self.settings.port
         on_exit = self.on_exit
@@ -46,7 +45,7 @@ class SettingsServer:
             ui.dark_mode(True)
             ui.add_head_html('<style>* { transition-duration: 0s !important; animation-duration: 0s !important; }</style>')
             with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-                create_settings_panel(registry, title=title, on_exit=on_exit)
+                create_settings_panel(root, title=title, on_exit=on_exit)
 
         def _run():
             ui.run(

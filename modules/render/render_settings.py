@@ -1,8 +1,9 @@
 """RenderSettings — reactive settings for the render pipeline.
 
 Manages mutable runtime state (feature selection, data layer mode, stages,
-LUT, flow/fluid configs) via the BaseSettings descriptor system. Registered
-in the SettingsRegistry for NiceGUI panel and JSON preset persistence.
+LUT, flow/fluid configs) via the BaseSettings descriptor system.  Declared
+as a child of the app-level root settings for NiceGUI panel and JSON preset
+persistence.
 
 Window/init fields (title, width, fps, …) are init_only Settings.
 """

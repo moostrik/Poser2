@@ -21,10 +21,13 @@ class Setting(Generic[T]):
 
         exposure = Setting(1000, min=100, max=10000)
 
-    The type is inferred from the default value.  Pass an explicit type as the
-    first argument only when inference is impossible (e.g. generic lists)::
+    The type is always inferred from the default value.  For list settings,
+    the element type is inferred from the first element::
 
-        tags = Setting(list[str], [])
+        tags = Setting(["default"])
+        modes = Setting([RenderMode.SOLID])
+
+    List defaults must contain at least one element for type inference.
 
     The descriptor handles get/set, type enforcement, init-only guards,
     callbacks, and JSON serialization.
@@ -43,8 +46,7 @@ class Setting(Generic[T]):
 
     def __init__(
         self,
-        type_or_default,
-        default: T | None = None,
+        default: T,
         *,
         min: T | None = None,
         max: T | None = None,
@@ -56,19 +58,22 @@ class Setting(Generic[T]):
         pinned: bool = False,
         widget: Widget = Widget.default,
     ) -> None:
-        if default is None:
-            # Single-arg form: Setting(value, ...)  — infer type from default
-            default = cast(T, type_or_default)
+        # Infer type from default value
+        if isinstance(default, list):
+            if not default:
+                raise ValueError(
+                    "List defaults must contain at least one element "
+                    "so the element type can be inferred."
+                )
+            elem_type = type(default[0])
+            type_ = cast(type[T], list[elem_type])
+        elif isinstance(default, bool):
             # bool check must come before int (bool is a subclass of int)
-            if isinstance(default, bool):
-                type_ = cast(type[T], bool)
-            elif isinstance(default, Enum):
-                type_ = cast(type[T], type(default))
-            else:
-                type_ = cast(type[T], type(default))
+            type_ = cast(type[T], bool)
+        elif isinstance(default, Enum):
+            type_ = cast(type[T], type(default))
         else:
-            # Two-arg form: Setting(type_, default, ...)
-            type_ = cast(type[T], type_or_default)
+            type_ = cast(type[T], type(default))
 
         self.type_: type[T] = type_
         self.default: T = default

@@ -18,7 +18,7 @@ from modules.cam import DepthCam, DepthSimulator, Recorder, Player, FrameSyncBan
 from modules.tracker import TrackerType, PanoramicTracker, OnePerCamTracker
 from modules.pose import batch, guis, nodes, trackers
 from modules.utils import Timer, TimerConfig
-from modules.settings import SettingsRegistry
+from modules.settings import BaseSettings
 from modules.settings import presets
 from modules.settings.server import SettingsServer, ServerSettings
 
@@ -72,24 +72,21 @@ class Main():
         self.timer = Timer(self.timer_config)
         self.timer_gui = ConfigGuiGenerator(self.timer_config, self.gui, "Timer")
 
-        # SETTINGS REGISTRY
-        self.registry = SettingsRegistry()
+        # APP SETTINGS (root BaseSettings — children auto-detected)
+        class AppSettings(BaseSettings):
+            render: RenderSettings
+            server: ServerSettings
 
-        # RENDER
-        self.render_settings = RenderSettings()
-        self.registry.register("render", self.render_settings)
+        self.app_settings = AppSettings()
+        self.render_settings = self.app_settings.render
 
         self.render = RenderManager(self.data_hub, self.render_settings, num_cams=len(self.cameras), num_players=settings.num_players)
 
-        # SETTINGS SERVER (register settings before preset load, start after)
-        self.server_settings = ServerSettings(title="POSER", port=666)
-        self.registry.register("server", self.server_settings)
-
-        # Load startup preset (after all subsystems have registered)
-        presets.load_startup(self.registry)
+        # Load startup preset (after all subsystems initialised)
+        presets.load_startup(self.app_settings)
 
         # Start settings server
-        self.settings_server = SettingsServer(self.registry, self.server_settings, on_exit=self.stop)
+        self.settings_server = SettingsServer(self.app_settings, self.app_settings.server, on_exit=self.stop)
         self.settings_server.start()
 
         # POSE CONFIGURATION

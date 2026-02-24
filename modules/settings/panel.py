@@ -1,4 +1,4 @@
-"""NiceGUI settings panel — auto-generates a tabbed UI from a SettingsRegistry."""
+"""NiceGUI settings panel — auto-generates a tabbed UI from a BaseSettings root."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from nicegui import app, ui
 
 from modules.settings.base_settings import BaseSettings
 from modules.settings import presets
-from modules.settings.registry import SettingsRegistry
 from modules.settings.setting import Setting
 from modules.settings.widget import Widget, WidgetSize
 from modules.utils import Color, Point2f, Rect
@@ -709,7 +708,7 @@ def _build_settings_card(name, settings, timers, *, depth=0, expansions=None):
             _build_settings_body(settings, timers, depth=depth + 1, expansions=expansions)
 
 
-def _build_preset_controls(registry):
+def _build_preset_controls(root):
     """Emit preset dropdown + action buttons (no wrapping row — caller provides layout)."""
     preset_list = presets.scan()
     startup = presets.get_startup()
@@ -757,7 +756,7 @@ def _build_preset_controls(registry):
             return
         p = presets.path(name)
         if p.exists():
-            presets.load(registry, p)
+            presets.load(root, p)
             ui.notify(f"Loaded '{name}'", type="positive")
 
     dropdown.on_value_change(_on_preset_change)
@@ -768,7 +767,7 @@ def _build_preset_controls(registry):
         if not preset_name:
             ui.notify("Select a preset to overwrite, or use Save As", type="warning")
             return
-        presets.save(registry, presets.path(preset_name))
+        presets.save(root, presets.path(preset_name))
         ui.notify(f"Saved '{preset_name}'", type="positive")
 
     async def do_save_as():
@@ -784,7 +783,7 @@ def _build_preset_controls(registry):
                     if not preset_name:
                         ui.notify("Enter a preset name", type="warning")
                         return
-                    presets.save(registry, presets.path(preset_name))
+                    presets.save(root, presets.path(preset_name))
                     _refresh_dropdown()
                     dropdown.set_value(preset_name)
                     ui.notify(f"Saved '{preset_name}'", type="positive")
@@ -827,18 +826,18 @@ def _build_preset_controls(registry):
 
 
 def create_settings_panel(
-    registry,
+    root,
     *,
     title: str = "",
     on_exit=None,
 ) -> None:
-    """Build a full tabbed settings panel from a SettingsRegistry.
+    """Build a full tabbed settings panel from a root BaseSettings.
 
     Call this inside a NiceGUI page context::
 
         @ui.page("/")
         def index():
-            create_settings_panel(registry, title="POSER", on_exit=stop)
+            create_settings_panel(app_settings, title="POSER", on_exit=stop)
     """
 
     # Force dark mode for consistent styling
@@ -852,7 +851,7 @@ def create_settings_panel(
         if title:
             ui.label(title).classes("text-2xl font-bold")
         with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
-            _build_preset_controls(registry)
+            _build_preset_controls(root)
         if on_exit:
             ui.button(icon="power_settings_new", on_click=on_exit).props(
                 "dense flat color=negative"
@@ -872,8 +871,7 @@ def create_settings_panel(
         for child in settings.children.values():
             _collect_pinned(child)
 
-    for root in registry.modules().values():
-        _collect_pinned(root)
+    _collect_pinned(root)
 
     # Render pinned fields and actions in a compact row above the tabs
     if pinned_fields or pinned_actions:
@@ -885,14 +883,23 @@ def create_settings_panel(
                 _build_action_button(settings, action_name, action_field)
         _make_poll_timer(pinned_polls, timers)
 
-    # -- Build tabs: one per registered root module ---------------------------
-    # Each root BaseSettings with visible content becomes a tab.
-    # Its own fields render at the top; its children render as collapsible
-    # sections (depth 0) inside the tab.
-    tab_entries: list[tuple[str, BaseSettings]] = []  # (name, root)
-    for module_name, root in registry.modules().items():
-        if _has_visible_content(root):
-            tab_entries.append((module_name, root))
+    # -- Build tabs: one per visible child of the root ---------------------
+    # Each child BaseSettings with visible content becomes a tab.
+    # The root's own fields (if any) go in a tab named after the root.
+    tab_entries: list[tuple[str, BaseSettings]] = []  # (name, settings)
+
+    # Root's own visible fields → a tab for the root itself
+    root_has_fields = any(
+        f.visible and f.widget != Widget.button
+        for f in root.fields.values()
+    ) or any(f.visible for f in root.actions.values())
+    if root_has_fields:
+        tab_entries.append((type(root).__name__, root))
+
+    # Each child → its own tab
+    for child_name, child in root.children.items():
+        if _has_visible_content(child):
+            tab_entries.append((child_name, child))
 
     if not tab_entries:
         ui.label("No settings registered.")

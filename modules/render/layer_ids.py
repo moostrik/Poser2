@@ -40,5 +40,5 @@ class Layers(IntEnum):
 
 class LayerSettings(BaseSettings):
     """Which layers to draw in preview and final output (order matters)."""
-    preview: Setting[list[Layers]] = Setting(list[Layers], [Layers.composite], description="Layers drawn in the preview viewports")
-    final:   Setting[list[Layers]] = Setting(list[Layers], [Layers.composite], description="Layers drawn on the output monitors")
+    preview: Setting[list[Layers]] = Setting([Layers.composite], description="Layers drawn in the preview viewports")
+    final:   Setting[list[Layers]] = Setting([Layers.composite], description="Layers drawn on the output monitors")

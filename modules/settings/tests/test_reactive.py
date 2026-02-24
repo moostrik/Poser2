@@ -11,7 +11,6 @@ from enum import Enum
 from modules.settings.setting import Setting
 from modules.settings.widget import Widget
 from modules.settings.base_settings import BaseSettings
-from modules.settings.registry import SettingsRegistry
 from modules.settings import presets
 from modules.utils import Color, Point2f, Rect
 
@@ -367,29 +366,22 @@ class TestThreadSafety(unittest.TestCase):
         self.assertGreater(counter["n"], 0)
 
 
-class TestSettingsRegistry(unittest.TestCase):
-    """Tests for SettingsRegistry."""
+class TestPresetSaveLoad(unittest.TestCase):
+    """Tests for preset save/load using a root BaseSettings."""
 
-    def test_register_and_get(self):
-        reg = SettingsRegistry()
-        s = CameraSettings()
-        reg.register("camera", s)
-        self.assertIs(reg.get("camera"), s)
-
-    def test_get_unknown_raises(self):
-        reg = SettingsRegistry()
-        with self.assertRaises(KeyError):
-            reg.get("nope")
+    def _make_root(self):
+        class Root(BaseSettings):
+            camera: CameraSettings
+        return Root()
 
     def test_save_and_load(self):
-        s1 = CameraSettings(exposure=3000)
-        s1.mode = RenderMode.WIREFRAME
-        reg = SettingsRegistry()
-        reg.register("camera", s1)
+        root = self._make_root()
+        root.camera.exposure = 3000
+        root.camera.mode = RenderMode.WIREFRAME
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "settings.json")
-            presets.save(reg, path)
+            presets.save(root, path)
 
             # Verify JSON file content
             with open(path, "r") as f:
@@ -397,41 +389,37 @@ class TestSettingsRegistry(unittest.TestCase):
             self.assertIn("camera", raw)
             self.assertEqual(raw["camera"]["exposure"], 3000)
 
-            # Load into fresh settings
-            s2 = CameraSettings()
-            reg2 = SettingsRegistry()
-            reg2.register("camera", s2)
-            presets.load(reg2, path)
+            # Load into fresh root
+            root2 = self._make_root()
+            presets.load(root2, path)
 
-            self.assertEqual(s2.exposure, 3000)
+            self.assertEqual(root2.camera.exposure, 3000)
             # init_only fields stay at default
-            self.assertEqual(s2.resolution, 1080)
-            self.assertEqual(s2.mode, RenderMode.WIREFRAME)
+            self.assertEqual(root2.camera.resolution, 1080)
+            self.assertEqual(root2.camera.mode, RenderMode.WIREFRAME)
 
     def test_load_fires_callbacks(self):
-        s = CameraSettings()
-        reg = SettingsRegistry()
-        reg.register("camera", s)
+        root = self._make_root()
         results = []
-        s.bind(CameraSettings.exposure, lambda v: results.append(v))
+        root.camera.bind(CameraSettings.exposure, lambda v: results.append(v))
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "settings.json")
             # Save with different value
-            s.exposure = 5000
-            presets.save(reg, path)
+            root.camera.exposure = 5000
+            presets.save(root, path)
             results.clear()
 
             # Reset and load
-            s.exposure = 1000
+            root.camera.exposure = 1000
             results.clear()
-            presets.load(reg, path)
+            presets.load(root, path)
             self.assertEqual(results, [5000])
 
-    def test_repr(self):
-        reg = SettingsRegistry()
-        reg.register("cam", CameraSettings())
-        self.assertIn("cam", repr(reg))
+    def test_children_accessible(self):
+        root = self._make_root()
+        self.assertIn("camera", root.children)
+        self.assertIsInstance(root.camera, CameraSettings)
 
 
 class TestSettingMetadata(unittest.TestCase):
@@ -523,39 +511,25 @@ class TestFieldsProperty(unittest.TestCase):
         self.assertNotIn("fake", s.fields)
 
 
-class TestRegistryExtras(unittest.TestCase):
-    """Tests for __contains__ and __getitem__ on SettingsRegistry."""
+class TestPresetExtras(unittest.TestCase):
+    """Tests for preset edge cases (missing/corrupt files)."""
 
-    def test_contains(self):
-        reg = SettingsRegistry()
-        reg.register("cam", CameraSettings())
-        self.assertIn("cam", reg) # type: ignore
-        self.assertNotIn("nope", reg) # type: ignore
-
-    def test_getitem(self):
-        reg = SettingsRegistry()
-        s = CameraSettings()
-        reg.register("cam", s)
-        self.assertIs(reg["cam"], s)
-
-    def test_getitem_unknown_raises(self):
-        reg = SettingsRegistry()
-        with self.assertRaises(KeyError):
-            _ = reg["nope"]
+    def _make_root(self):
+        class Root(BaseSettings):
+            cam: CameraSettings
+        return Root()
 
     def test_load_missing_file_no_error(self):
-        reg = SettingsRegistry()
-        reg.register("cam", CameraSettings())
-        presets.load(reg, "nonexistent_path_12345.json")  # should not raise
+        root = self._make_root()
+        presets.load(root, "nonexistent_path_12345.json")  # should not raise
 
     def test_load_corrupt_file_no_error(self):
-        reg = SettingsRegistry()
-        reg.register("cam", CameraSettings())
+        root = self._make_root()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             f.write("{corrupt json!!!")
             path = f.name
         try:
-            presets.load(reg, path)  # should not raise
+            presets.load(root, path)  # should not raise
         finally:
             os.unlink(path)
 
@@ -630,48 +604,6 @@ class TestAction(unittest.TestCase):
         s.bind(SettingsWithActions.reset, lambda _: results.append("ok"))
         SettingsWithActions.reset.fire(s)  # should not raise
         self.assertEqual(results, ["ok"])
-
-
-class TestRegistryModules(unittest.TestCase):
-    """Tests for the simplified registry (no groups)."""
-
-    def test_register_and_get(self):
-        reg = SettingsRegistry()
-        s = CameraSettings()
-        reg.register("cam", s)
-        self.assertIs(reg.get("cam"), s)
-
-    def test_modules_returns_copy(self):
-        reg = SettingsRegistry()
-        reg.register("cam", CameraSettings())
-        m = reg.modules()
-        m["fake"] = MinimalSettings()
-        self.assertNotIn("fake", reg.modules())
-
-    def test_register_preserves_order(self):
-        reg = SettingsRegistry()
-        reg.register("c", MinimalSettings())
-        reg.register("a", MinimalSettings())
-        reg.register("b", MinimalSettings())
-        self.assertEqual(list(reg.modules().keys()), ["c", "a", "b"])
-
-    def test_contains(self):
-        reg = SettingsRegistry()
-        reg.register("cam", CameraSettings())
-        self.assertIn("cam", reg)
-        self.assertNotIn("missing", reg)
-
-    def test_getitem(self):
-        reg = SettingsRegistry()
-        s = CameraSettings()
-        reg.register("cam", s)
-        self.assertIs(reg["cam"], s)
-
-    def test_repr(self):
-        reg = SettingsRegistry()
-        reg.register("cam", CameraSettings())
-        r = repr(reg)
-        self.assertIn("cam", r)
 
 
 # ===== Child descriptor tests =============================================
@@ -832,27 +764,25 @@ class TestChild(unittest.TestCase):
         ann = OuterSettings.__annotations__
         self.assertIn("inner", ann)
 
-    # -- Registry with children ---------------------------------------------
+    # -- Preset save/load with children -------------------------------------
 
-    def test_registry_save_load_with_children(self):
-        reg = SettingsRegistry()
-        cfg = OuterSettings()
-        cfg.fps = 30.0
-        cfg.inner.speed = 2.0
-        reg.register("outer", cfg)
+    def test_save_load_with_children(self):
+        class Root(BaseSettings):
+            outer: OuterSettings
+        root = Root()
+        root.outer.fps = 30.0
+        root.outer.inner.speed = 2.0
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             path = f.name
         try:
-            presets.save(reg, path)
+            presets.save(root, path)
 
-            reg2 = SettingsRegistry()
-            cfg2 = OuterSettings()
-            reg2.register("outer", cfg2)
-            presets.load(reg2, path)
+            root2 = Root()
+            presets.load(root2, path)
 
-            self.assertEqual(cfg2.fps, 30.0)
-            self.assertEqual(cfg2.inner.speed, 2.0)
+            self.assertEqual(root2.outer.fps, 30.0)
+            self.assertEqual(root2.outer.inner.speed, 2.0)
         finally:
             os.unlink(path)
 
@@ -947,8 +877,8 @@ class TestChild(unittest.TestCase):
 # ── List Setting ───────────────────────────────────────────────────────────
 
 class ListSettings(BaseSettings):
-    tags = Setting(list[str], [])
-    ids = Setting(list[int], [1, 2, 3])
+    tags = Setting(["default"])
+    ids = Setting([1, 2, 3])
 
 
 class TestListSetting(unittest.TestCase):
@@ -956,7 +886,7 @@ class TestListSetting(unittest.TestCase):
 
     def test_default_value(self):
         s = ListSettings()
-        self.assertEqual(s.tags, [])
+        self.assertEqual(s.tags, ["default"])
         self.assertEqual(s.ids, [1, 2, 3])
 
     def test_defaults_are_independent(self):
@@ -968,7 +898,7 @@ class TestListSetting(unittest.TestCase):
         # Actually, defaults share the same list object until first set.
         # We verify via set:
         a.tags = ["a"]
-        self.assertEqual(b.tags, [])
+        self.assertEqual(b.tags, ["default"])
 
     def test_set_list(self):
         s = ListSettings()
@@ -1040,6 +970,10 @@ class TestListSetting(unittest.TestCase):
         s = ListSettings()
         s.ids = []
         self.assertEqual(s.ids, [])
+
+    def test_empty_list_default_rejected(self):
+        with self.assertRaises(ValueError):
+            Setting([])
 
 
 # ---------------------------------------------------------------------------
@@ -1517,7 +1451,7 @@ class TestDeepCopyDefaults(unittest.TestCase):
 
     def test_list_not_shared(self):
         class TagSettings(BaseSettings):
-            tags = Setting(list[str], ["a", "b"])
+            tags = Setting(["a", "b"])
 
         s1 = TagSettings()
         s2 = TagSettings()
@@ -1526,7 +1460,7 @@ class TestDeepCopyDefaults(unittest.TestCase):
 
     def test_nested_list_not_shared(self):
         class NestedList(BaseSettings):
-            items = Setting(list[str], ["x"])
+            items = Setting(["x"])
 
         a = NestedList()
         b = NestedList()
@@ -1660,7 +1594,7 @@ class TestWidgetResolve(unittest.TestCase):
         self.assertEqual(Widget.resolve(field), Widget.color)
 
     def test_list_resolves_to_checklist(self):
-        field = Setting(list[RenderMode], [RenderMode.SOLID])
+        field = Setting([RenderMode.SOLID])
         field.__set_name__(None, "test")
         self.assertEqual(Widget.resolve(field), Widget.checklist)
 
