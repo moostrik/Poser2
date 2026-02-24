@@ -1,19 +1,19 @@
 """Widget — GUI presentation hints for Field descriptors.
 
-Each Widget constant declares which Field value types it is compatible with.
+Each Widget member declares which Field value types it is compatible with.
 The panel uses ``Widget.resolve()`` to map ``Widget.default`` to a concrete
 widget based on the field's type and parameters.
 
 Adding a new widget:
-    1. Add a ``ClassVar[Widget]`` annotation + assignment below.
+    1. Add member to the ``Widget`` enum below.
     2. Register a builder in ``nice_panel.py`` with ``@widget_builder(Widget.xxx)``.
-    3. Optionally add it to ``_DEFAULTS`` if it should be the auto-pick for a type.
+    3. Optionally add it to ``resolve()`` if it should be the auto-pick for a type.
 """
 
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar, get_origin
+from typing import TYPE_CHECKING, get_origin
 
 if TYPE_CHECKING:
     from modules.settings.field import Field
@@ -36,72 +36,80 @@ def _get_color():
     return _Color
 
 
-class Widget:
+class Widget(Enum):
     """GUI hint for how a Setting should be rendered in the panel.
 
-    Each constant carries a ``types`` tuple declaring compatible Setting
-    value types.  ``None`` means *any type* (used only by ``Widget.default``).
+    Each member carries a ``types`` tuple declaring compatible Setting
+    value types, or ``None`` meaning *any type* (used by ``default``,
+    ``color``, ``color_alpha``).
 
     The ``resolve(field)`` class method maps ``Widget.default`` to a concrete
     widget based on the field's ``type_``, ``min``, and ``max``.
     """
 
-    # -- ClassVar annotations for Pylance autocompletion ---------------------
+    # Use __new__ to give each member a unique auto-incrementing int value
+    # so that members with the same compatible types (e.g. switch/toggle/button)
+    # remain distinct instead of collapsing into aliases.
+    # Enum unpacks tuple values as positional args, so we accept *args.
+    def __new__(cls, *args):
+        obj = object.__new__(cls)
+        obj._value_ = len(cls.__members__) + 1
+        return obj
+
+    def __init__(self, *args) -> None:
+        # args == (None,) for 'default = None'; (bool,) for 'switch = (bool,)';
+        # (int, float) for 'slider = (int, float)'; etc.
+        if len(args) == 1 and args[0] is None:
+            self._types = None
+        else:
+            self._types = args
+
+    # -- Members (argument = compatible types, or None) ----------------------
     # bool widgets
-    default:      ClassVar[Widget]
-    switch:       ClassVar[Widget]
-    toggle:       ClassVar[Widget]
-    button:       ClassVar[Widget]
+    default     = None
+    switch      = (bool,)
+    toggle      = (bool,)
+    button      = (bool,)
     # numeric widgets
-    slider:       ClassVar[Widget]
-    number:       ClassVar[Widget]
-    knob:         ClassVar[Widget]
+    slider      = (int, float)
+    number      = (int, float)
+    knob        = (int, float)
     # enum widgets
-    select:       ClassVar[Widget]
-    radio:        ClassVar[Widget]
+    select      = (Enum,)
+    radio       = (Enum,)
     # string widgets
-    input:        ClassVar[Widget]
-    ip:           ClassVar[Widget]
-    textarea:     ClassVar[Widget]
-    # color widgets
-    color:        ClassVar[Widget]
-    color_alpha:  ClassVar[Widget]
+    input       = (str,)
+    ip          = (str,)
+    textarea    = (str,)
+    # color widgets (accepts() uses lazy Color import)
+    color       = None
+    color_alpha = None
     # list widgets
-    checklist:    ClassVar[Widget]
-    order:        ClassVar[Widget]
-
-    # -- Instance -----------------------------------------------------------
-
-    __slots__ = ("_name", "_types")
-
-    def __init__(self, name: str, types: tuple[type, ...] | None = None) -> None:
-        self._name = name
-        self._types = types
+    checklist   = (list,)
+    order       = (list,)
 
     # -- Public API ----------------------------------------------------------
 
     @property
-    def name(self) -> str:
-        return self._name
-
-    @property
     def types(self) -> tuple[type, ...] | None:
+        """Compatible field types, or ``None`` for *any type*."""
         return self._types
 
     def accepts(self, field_type: type) -> bool:
         """Return True if this widget is compatible with *field_type*."""
-        if self._types is None:
+        types = self._types
+        if types is None:
             # Widget.default accepts anything; color/color_alpha need special handling
-            if self._name in ("color", "color_alpha"):
+            if self.name in ("color", "color_alpha"):
                 return field_type is _get_color()
             return True  # Widget.default accepts anything
         origin = get_origin(field_type)
         if origin is not None:
             field_type = origin  # list[Enum] → list
         # bool is a subclass of int — reject it for numeric widgets
-        if field_type is bool and self._types and bool not in self._types:
+        if field_type is bool and types and bool not in types:
             return False
-        for t in self._types:
+        for t in types:
             if t is Enum:
                 # Accept any Enum subclass
                 if isinstance(field_type, type) and issubclass(field_type, Enum):
@@ -155,35 +163,6 @@ class Widget:
 
     # -- Dunder --------------------------------------------------------------
 
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, Widget):
-            return self._name == other._name
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        return hash(self._name)
-
     def __repr__(self) -> str:
-        return f"Widget.{self._name}"
+        return f"Widget.{self.name}"
 
-
-# -- Singleton constants -----------------------------------------------------
-# Each is created once; equality/hash is by name.
-
-Widget.default     = Widget("default",     None)
-Widget.switch      = Widget("switch",      (bool,))
-Widget.toggle      = Widget("toggle",      (bool,))
-Widget.button      = Widget("button",      (bool,))
-Widget.slider      = Widget("slider",      (int, float))
-Widget.number      = Widget("number",      (int, float))
-Widget.knob        = Widget("knob",        (int, float))
-Widget.select      = Widget("select",      (Enum,))
-Widget.radio       = Widget("radio",       (Enum,))
-Widget.input       = Widget("input",       (str,))
-Widget.ip          = Widget("ip",          (str,))
-Widget.textarea    = Widget("textarea",    (str,))
-# Color types use a lazy getter so we don't import at module level
-Widget.color       = Widget("color",       None)  # accepts() overridden by resolve()
-Widget.color_alpha = Widget("color_alpha", None)  # accepts() overridden by resolve()
-Widget.checklist   = Widget("checklist",   (list,))
-Widget.order       = Widget("order",       (list,))

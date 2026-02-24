@@ -1532,7 +1532,7 @@ class TestDeepCopyDefaults(unittest.TestCase):
 # ── Widget class tests ─────────────────────────────────────────────────────
 
 class TestWidgetClass(unittest.TestCase):
-    """Tests for the Widget class (replaces the old Widget Enum)."""
+    """Tests for the Widget Enum."""
 
     def test_eq_same(self):
         self.assertEqual(Widget.button, Widget.button)
@@ -1562,6 +1562,38 @@ class TestWidgetClass(unittest.TestCase):
         self.assertEqual(Widget.switch.types, (bool,))
         self.assertEqual(Widget.slider.types, (int, float))
         self.assertIsNone(Widget.default.types)
+
+    def test_is_enum(self):
+        self.assertIsInstance(Widget.button, Widget)
+        self.assertIsInstance(Widget.default, Widget)
+
+    def test_identity(self):
+        self.assertIs(Widget.button, Widget.button)
+        self.assertIsNot(Widget.button, Widget.toggle)
+
+    def test_same_types_still_distinct(self):
+        """Members with identical compatible types must remain separate."""
+        self.assertIsNot(Widget.switch, Widget.toggle)
+        self.assertIsNot(Widget.switch, Widget.button)
+        self.assertIsNot(Widget.slider, Widget.number)
+        self.assertIsNot(Widget.select, Widget.radio)
+        self.assertIsNot(Widget.checklist, Widget.order)
+        self.assertIsNot(Widget.default, Widget.color)
+
+    def test_iteration(self):
+        members = list(Widget)
+        self.assertIn(Widget.button, members)
+        self.assertEqual(len(members), 16)
+
+    def test_match_statement(self):
+        """Widget members work in match/case."""
+        w = Widget.slider
+        match w:
+            case Widget.slider:
+                result = "slider"
+            case _:
+                result = "other"
+        self.assertEqual(result, "slider")
 
 
 class TestWidgetAccepts(unittest.TestCase):
