@@ -24,9 +24,11 @@ Boundary conditions via per-field wrap modes (no explicit border obstacles):
 """
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Texture, Texture3D, SwapTexture3D
+from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D
 from modules.settings import Field, Settings, Widget
 from ..fluid.fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
+from ..fluid.shaders import AddBoolean
+from ..FlowUtil import FlowUtil
 from .shaders import (
     Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
@@ -142,10 +144,13 @@ class FluidFlow3D:
         self._simulation_obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
         # Density-resolution obstacle (for density advection when simulation_scale < 1)
         self._density_obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
+        # 2D obstacle source (authoritative, never affected by depth/sim_scale changes)
+        self._obstacle_source: SwapFbo = SwapFbo(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
 
         # ---- Intermediate volumes (single buffer, no ping-pong) ----
         self._divergence_vol: Texture3D = Texture3D()
-        self._curl_vol: Texture3D = Texture3D()
+        # Curl is sampled at neighbor offsets by VorticityForce3D — border must return zero
+        self._curl_vol: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._vorticity_force_vol: Texture3D = Texture3D()
         self._buoyancy_force_vol: Texture3D = Texture3D()
 
@@ -169,6 +174,7 @@ class FluidFlow3D:
         self._add_shader: Add3D = Add3D()
         self._blit_shader: Blit3D = Blit3D()
         self._inject_binary_shader: InjectBinary3D = InjectBinary3D()
+        self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
         self.config.bind(FluidFlow3DConfig.reset_sim, lambda _: self._request_reset())
@@ -193,6 +199,9 @@ class FluidFlow3D:
         self._allocate_simulation_fields()
         self._allocate_density_fields()
 
+        # 2D obstacle source (full output resolution, depth-independent)
+        self._obstacle_source.allocate(self._density_width, self._density_height, GL_R8)
+
         # 2D composited output
         self._output_texture.allocate(self._density_width, self._density_height, GL_RGBA16F)
 
@@ -213,6 +222,7 @@ class FluidFlow3D:
         self._add_shader.allocate()
         self._blit_shader.allocate()
         self._inject_binary_shader.allocate()
+        self._add_boolean_shader.allocate()
 
         self._allocated = True
 
@@ -227,11 +237,13 @@ class FluidFlow3D:
         self._simulation_height = self._align16(int(self._density_height * sim_scale))
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
         self._depth = self.config.depth.layers
+        self._depth_aspect = (self._simulation_width / max(1, self._depth)) * self.config.depth.scale
 
     def _allocate_density_fields(self) -> None:
         """(Re)allocate density-resolution volumes (full output resolution × depth)."""
         self._density.allocate(self._density_width, self._density_height, self._depth, GL_RGBA16F)
         self._density_obstacle.allocate(self._density_width, self._density_height, self._depth, GL_R8)
+        self._regenerate_obstacle_volumes()
 
     def _allocate_simulation_fields(self) -> None:
         """(Re)allocate simulation-resolution 3D volumes."""
@@ -244,8 +256,7 @@ class FluidFlow3D:
         self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
         self._pressure.allocate(sim_w, sim_h, d, GL_R16F)
         self._simulation_obstacle.allocate(sim_w, sim_h, d, GL_R8)
-        self._blit_shader.use(self._density_obstacle, self._simulation_obstacle, GL_R8)
-        glMemoryBarrier(_BARRIER_IMAGE)
+        self._regenerate_obstacle_volumes()
 
         # Intermediate volumes
         self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
@@ -261,6 +272,7 @@ class FluidFlow3D:
         self._pressure.deallocate()
         self._density_obstacle.deallocate()
         self._simulation_obstacle.deallocate()
+        self._obstacle_source.deallocate()
         self._divergence_vol.deallocate()
         self._curl_vol.deallocate()
         self._vorticity_force_vol.deallocate()
@@ -283,6 +295,7 @@ class FluidFlow3D:
         self._add_shader.deallocate()
         self._blit_shader.deallocate()
         self._inject_binary_shader.deallocate()
+        self._add_boolean_shader.deallocate()
 
         self._allocated = False
 
@@ -326,7 +339,6 @@ class FluidFlow3D:
 
         # Per-frame state
         self._dt = 1.0 / max(1, self.config.fps)
-        self._depth_aspect = (self._simulation_width / max(1, self._depth)) * self.config.depth.scale
 
         # Dampen velocity (clean input for all steps)
         vel: VelocityConfig = self.config.velocity
@@ -347,7 +359,6 @@ class FluidFlow3D:
         self._dampen(self._density, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
 
         self._composite_output()
-
 
     # ========== Pipeline Steps ==========
 
@@ -768,33 +779,55 @@ class FluidFlow3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     # ----- Obstacles -----
+    def _regenerate_obstacle_volumes(self) -> None:
+        """Project 2D obstacle source into both 3D obstacle volumes."""
+        if not self._has_obstacles:
+            return
+        self._inject_binary_shader.use(self._obstacle_source.texture, self._simulation_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source.texture, self._density_obstacle, mode=1)
+        glMemoryBarrier(_BARRIER_IMAGE)
+
     def set_obstacle(self, texture: Texture) -> None:
         """Replace obstacle volume with a 2D mask projected through all layers.
 
-        Updates both sim-resolution and density-resolution obstacle volumes.
+        Stores the 2D mask as the authoritative source, then projects into
+        both sim-resolution and density-resolution 3D obstacle volumes.
 
         Args:
             texture: 2D obstacle mask (any channel > 0.5 = obstacle)
         """
         if not self._allocated:
             return
-        self._inject_binary_shader.use(texture, self._simulation_obstacle, mode=1)
-        self._inject_binary_shader.use(texture, self._density_obstacle, mode=1)
+        # Replace 2D source (clear → OR with texture = texture)
+        FlowUtil.zero(self._obstacle_source)
+        self._obstacle_source.swap()
+        self._obstacle_source.begin()
+        self._add_boolean_shader.use(self._obstacle_source.back_texture, texture)
+        self._obstacle_source.end()
+        # Project to 3D volumes
+        self._inject_binary_shader.use(self._obstacle_source.texture, self._simulation_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source.texture, self._density_obstacle, mode=1)
         glMemoryBarrier(_BARRIER_IMAGE)
         self._has_obstacles = True
 
     def add_obstacle(self, texture: Texture) -> None:
         """Add to obstacle volume (boolean OR with existing obstacles).
 
-        Updates both sim-resolution and density-resolution obstacle volumes.
+        Updates the 2D source and both 3D obstacle volumes.
 
         Args:
             texture: 2D obstacle mask to add (any channel > 0.5 = obstacle)
         """
         if not self._allocated:
             return
-        self._inject_binary_shader.use(texture, self._simulation_obstacle, mode=0)
-        self._inject_binary_shader.use(texture, self._density_obstacle, mode=0)
+        # OR into 2D source
+        self._obstacle_source.swap()
+        self._obstacle_source.begin()
+        self._add_boolean_shader.use(self._obstacle_source.back_texture, texture)
+        self._obstacle_source.end()
+        # Regenerate 3D volumes from updated source
+        self._inject_binary_shader.use(self._obstacle_source.texture, self._simulation_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source.texture, self._density_obstacle, mode=1)
         glMemoryBarrier(_BARRIER_IMAGE)
         self._has_obstacles = True
 
@@ -802,6 +835,7 @@ class FluidFlow3D:
         """Clear all obstacles."""
         if not self._allocated:
             return
+        FlowUtil.zero(self._obstacle_source)
         self._simulation_obstacle.clear()
         self._density_obstacle.clear()
         glMemoryBarrier(_BARRIER_IMAGE)

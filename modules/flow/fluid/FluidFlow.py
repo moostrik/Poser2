@@ -137,7 +137,8 @@ class FluidFlow:
 
         # Intermediate result FBOs (single buffer, no ping-pong)
         self._divergence_fbo: Fbo = Fbo()
-        self._vorticity_curl_fbo: Fbo = Fbo()
+        # Curl is sampled at neighbor offsets by VorticityForce — border must return zero
+        self._vorticity_curl_fbo: Fbo = Fbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._vorticity_force_fbo: Fbo = Fbo()
         self._buoyancy_fbo: Fbo = Fbo()
 
