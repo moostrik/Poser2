@@ -120,6 +120,7 @@ class FluidFlow3D:
         self._auto_depth_scale: float = 1.0
 
         self._dt: float = 1.0 / 60.0
+        self._reference_dt: float = 1.0 / 60.0  # iteration scaling baseline (60fps)
 
         self._grid_scale: float = 0.5
         self._depth_scale: float = 1.0
@@ -454,6 +455,7 @@ class FluidFlow3D:
             return
 
         viscosity_dt = self.config.velocity.viscosity * (self.config.simulation_scale ** 2) * self._dt
+        iterations = self._scale_iterations(self.config.velocity.viscosity_iter)
 
         result = self._jacobi_diffusion_shader.solve(
             self._velocity.texture,
@@ -461,7 +463,7 @@ class FluidFlow3D:
             self._simulation_obstacle,
             self._grid_scale, self._aspect, self._depth_scale,
             viscosity_dt,
-            total_iterations=self.config.velocity.viscosity_iter,
+            total_iterations=iterations,
             iterations_per_dispatch=5,
             has_obstacles=self._has_obstacles
         )
@@ -575,13 +577,15 @@ class FluidFlow3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # 8b. Solve Poisson equation for pressure
+        iterations = self._scale_iterations(self.config.pressure.iterations)
+
         result = self._jacobi_pressure_shader.solve(
             self._pressure.texture,
             self._pressure.back_texture,
             self._divergence_vol,
             self._simulation_obstacle,
             self._grid_scale, self._aspect, self._depth_scale,
-            total_iterations=self.config.pressure.iterations,
+            total_iterations=iterations,
             iterations_per_dispatch=5,
             has_obstacles=self._has_obstacles
         )
@@ -681,6 +685,15 @@ class FluidFlow3D:
         self._reallocate_pending = True
 
     # ========== Internal helpers ==========
+
+    def _scale_iterations(self, base_iterations: int) -> int:
+        """Scale solver iterations proportionally to dt.
+
+        GUI iteration count represents quality at 60fps. At other frame rates,
+        iterations scale to approximate consistent solver convergence.
+        """
+        ratio = self._dt / self._reference_dt
+        return max(1, int(base_iterations * ratio + 0.5))
 
     @staticmethod
     def _align16(v: int) -> int:

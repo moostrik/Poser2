@@ -103,6 +103,7 @@ class FluidFlow:
         self._density_width: int = 0
         self._density_height: int = 0
         self._dt: float = 1.0 / 60.0
+        self._reference_dt: float = 1.0 / 60.0  # iteration scaling baseline (60fps)
         self._has_obstacles: bool = False
         self._allocated: bool = False
         self._reset_pending: bool = False
@@ -415,6 +416,7 @@ class FluidFlow:
             return
 
         viscosity_dt = self.config.velocity.viscosity * (self.config.simulation_scale ** 2) * self._dt
+        iterations = self._scale_iterations(self.config.velocity.viscosity_iter)
 
         if self._use_compute_diffusion:
             result = self._jacobi_diffusion_compute.solve(
@@ -424,14 +426,14 @@ class FluidFlow:
                 self.config.simulation_scale,
                 self._aspect,
                 viscosity_dt,
-                total_iterations=self.config.velocity.viscosity_iter,
+                total_iterations=iterations,
                 iterations_per_dispatch=5,
                 has_obstacles=self._has_obstacles
             )
             if result != self._velocity_fbo.texture:
                 self._velocity_fbo.swap()
         else:
-            for _ in range(self.config.velocity.viscosity_iter):
+            for _ in range(iterations):
                 self._velocity_fbo.swap()
                 self._velocity_fbo.begin()
                 self._jacobi_diffusion_shader.use(
@@ -556,6 +558,8 @@ class FluidFlow:
         self._divergence_fbo.end()
 
         # 8b. Solve Poisson equation for pressure
+        iterations = self._scale_iterations(self.config.pressure.iterations)
+
         if self._use_compute_pressure:
             result = self._jacobi_pressure_compute.solve(
                 self._pressure_fbo.texture,
@@ -564,14 +568,14 @@ class FluidFlow:
                 self._simulation_obstacle_fbo.texture,
                 self.config.simulation_scale,
                 self._aspect,
-                total_iterations=self.config.pressure.iterations,
+                total_iterations=iterations,
                 iterations_per_dispatch=5,
                 has_obstacles=self._has_obstacles
             )
             if result != self._pressure_fbo.texture:
                 self._pressure_fbo.swap()
         else:
-            for _ in range(self.config.pressure.iterations):
+            for _ in range(iterations):
                 self._pressure_fbo.swap()
                 self._pressure_fbo.begin()
                 self._jacobi_pressure_shader.use(
@@ -659,6 +663,15 @@ class FluidFlow:
         self._reallocate_pending = True
 
     # ========== Internal helpers ==========
+
+    def _scale_iterations(self, base_iterations: int) -> int:
+        """Scale solver iterations proportionally to dt.
+
+        GUI iteration count represents quality at 60fps. At other frame rates,
+        iterations scale to approximate consistent solver convergence.
+        """
+        ratio = self._dt / self._reference_dt
+        return max(1, int(base_iterations * ratio + 0.5))
 
     @staticmethod
     def _align16(v: int) -> int:
