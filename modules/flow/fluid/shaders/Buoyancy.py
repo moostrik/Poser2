@@ -12,13 +12,14 @@ class Buoyancy(Shader):
         super().__init__()
 
     def use(self, velocity: Texture, temperature: Texture, density: Texture,
-            sigma: float, kappa: float, ambient_temperature: float) -> None:
+            obstacle: Texture, sigma: float, kappa: float, ambient_temperature: float) -> None:
         """Compute buoyancy force: F = σ(T - T_ambient) - κρ
 
         Args:
             velocity: Current velocity field (RG32F) - passed for consistency but not used
             temperature: Temperature field (R32F)
             density: Density field (RGBA32F)
+            obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
             sigma: Thermal buoyancy coefficient σ (already includes dt * scale)
             kappa: Density weight coefficient κ (already includes dt * scale)
             ambient_temperature: Reference temperature
@@ -38,6 +39,10 @@ class Buoyancy(Shader):
         glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, density.tex_id)
         glUniform1i(self.get_uniform_loc("uDensity"), 2)
+
+        glActiveTexture(GL_TEXTURE3)
+        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        glUniform1i(self.get_uniform_loc("uObstacle"), 3)
 
         # Set uniforms
         glUniform1f(self.get_uniform_loc("uSigma"), sigma)

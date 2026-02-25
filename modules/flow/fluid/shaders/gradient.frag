@@ -43,6 +43,13 @@ void main() {
     // Compute and subtract gradient (aspect-corrected)
     vec2 grad = vec2(uHalfRdxInv.x * (pR - pL), uHalfRdxInv.y * (pT - pB));
     vec2 vOld = texture(uVelocity, st).xy;
+    vec2 vNew = vOld - grad;
 
-    fragColor = vOld - grad;
+    // No-penetration: zero velocity component pointing into obstacle neighbors
+    if (oR > 0.5) vNew.x = min(vNew.x, 0.0);
+    if (oL > 0.5) vNew.x = max(vNew.x, 0.0);
+    if (oT > 0.5) vNew.y = min(vNew.y, 0.0);
+    if (oB > 0.5) vNew.y = max(vNew.y, 0.0);
+
+    fragColor = vNew;
 }

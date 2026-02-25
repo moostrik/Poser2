@@ -40,11 +40,11 @@ void main() {
     float oR = textureOffset(uObstacle, st, ivec2(1, 0)).r;
     float oL = textureOffset(uObstacle, st, ivec2(-1, 0)).r;
 
-    // Neumann boundary conditions: zero gradient at obstacles
-    xT = mix(xT, xC, oT);
-    xB = mix(xB, xC, oB);
-    xR = mix(xR, xC, oR);
-    xL = mix(xL, xC, oL);
+    // No-slip boundary conditions: use zero velocity at obstacle walls
+    xT = mix(xT, vec4(0.0), oT);
+    xB = mix(xB, vec4(0.0), oB);
+    xR = mix(xR, vec4(0.0), oR);
+    xL = mix(xL, vec4(0.0), oL);
 
     // Jacobi iteration for anisotropic diffusion:
     // (alpha_x*(xL + xR) + alpha_y*(xB + xT) + gamma*xC) * beta

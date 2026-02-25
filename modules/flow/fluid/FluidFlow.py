@@ -182,6 +182,76 @@ class FluidFlow(FlowBase):
         self._buoyancy_shader.allocate()
         self._add_boolean_shader.allocate()
 
+        # DEBUG: inject test obstacle shapes
+        self._debug_inject_obstacle_shapes()
+
+    def _debug_inject_obstacle_shapes(self) -> None:
+        """Draw circle, triangle, cross, and line into the obstacle buffer for visual verification."""
+        import numpy as np
+
+        w, h = self._width, self._height
+        mask = np.zeros((h, w), dtype=np.uint8)
+
+        # Coordinate grids (row=y, col=x)
+        yy, xx = np.ogrid[0:h, 0:w]
+
+        # ---- Circle (top-left quadrant) ----
+        cx, cy, r = w // 4, h * 3 // 4, min(w, h) // 8
+        dist_sq = (xx - cx) ** 2 + (yy - cy) ** 2
+        mask[dist_sq <= r * r] = 255
+
+        # ---- Triangle (top-right quadrant) ----
+        tx, ty = w * 3 // 4, h * 3 // 4  # center
+        s = min(w, h) // 7  # half-size
+        # Equilateral triangle pointing up: 3 edge tests
+        # Vertices: top (tx, ty+s), bottom-left (tx-s, ty-s*0.6), bottom-right (tx+s, ty-s*0.6)
+        top_y = ty + s
+        bot_y = ty - int(s * 0.6)
+        # Left edge: top -> bottom-left
+        # Right edge: top -> bottom-right
+        # Bottom edge: bottom-left -> bottom-right
+        for y_px in range(max(0, bot_y), min(h, top_y + 1)):
+            for x_px in range(max(0, tx - s), min(w, tx + s + 1)):
+                # Barycentric test
+                t_frac = (y_px - bot_y) / max(1, top_y - bot_y)
+                half_w = s * (1.0 - t_frac)
+                if abs(x_px - tx) <= half_w:
+                    mask[y_px, x_px] = 255
+
+        # ---- Cross (bottom-left quadrant) ----
+        cx2, cy2 = w // 4, h // 4
+        arm = min(w, h) // 8
+        thick = max(2, min(w, h) // 40)
+        # Horizontal bar
+        mask[max(0, cy2 - thick):min(h, cy2 + thick + 1),
+             max(0, cx2 - arm):min(w, cx2 + arm + 1)] = 255
+        # Vertical bar
+        mask[max(0, cy2 - arm):min(h, cy2 + arm + 1),
+             max(0, cx2 - thick):min(w, cx2 + thick + 1)] = 255
+
+        # ---- Diagonal line (bottom-right quadrant) ----
+        lx, ly = w * 3 // 4, h // 4  # center
+        length = min(w, h) // 6
+        thick_l = max(2, min(w, h) // 50)
+        for t in np.linspace(-1, 1, length * 4):
+            px = int(lx + t * length * 0.5)
+            py = int(ly + t * length * 0.3)
+            for dx in range(-thick_l, thick_l + 1):
+                for dy in range(-thick_l, thick_l + 1):
+                    nx, ny = px + dx, py + dy
+                    if 0 <= nx < w and 0 <= ny < h:
+                        mask[ny, nx] = 255
+
+        # Upload to a temporary texture and inject
+        temp = Texture()
+        temp.allocate(w, h, GL_R8)
+        glBindTexture(GL_TEXTURE_2D, temp.tex_id)
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RED, GL_UNSIGNED_BYTE, mask)
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+        self.set_obstacle(temp)
+        temp.deallocate()
+
     def _allocate_fbos(self) -> None:
         """(Re)allocate all simulation FBOs at current dimensions.
 
@@ -390,6 +460,7 @@ class FluidFlow(FlowBase):
         self._vorticity_force_fbo.begin()
         self._vorticity_force_shader.use(
             self._vorticity_curl_fbo.texture,
+            self._obstacle_fbo.texture,
             self.config.simulation_scale,
             self._aspect,
             vorticity_force
@@ -430,6 +501,7 @@ class FluidFlow(FlowBase):
             self._input_fbo.texture,
             self._temperature_fbo.texture,
             self._output_fbo.texture,
+            self._obstacle_fbo.texture,
             sigma,
             kappa,
             self.config.temperature.ambient

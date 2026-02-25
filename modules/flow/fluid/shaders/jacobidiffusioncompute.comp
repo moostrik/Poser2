@@ -139,10 +139,11 @@ void main() {
             float oR = s_obstacle[sid.y][sid.x + 1];
             float oL = s_obstacle[sid.y][sid.x - 1];
 
-            vT = mix(vT, vC, oT);
-            vB = mix(vB, vC, oB);
-            vR = mix(vR, vC, oR);
-            vL = mix(vL, vC, oL);
+            // No-slip boundary conditions: use zero velocity at obstacle walls
+            vT = mix(vT, vec2(0.0), oT);
+            vB = mix(vB, vec2(0.0), oB);
+            vR = mix(vR, vec2(0.0), oR);
+            vL = mix(vL, vec2(0.0), oL);
 
             // Jacobi iteration for diffusion:
             // x^(k+1) = β * (αx*(xL + xR) + αy*(xB + xT) + γ*v_old)
