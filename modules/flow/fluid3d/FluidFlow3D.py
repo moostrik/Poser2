@@ -223,72 +223,8 @@ class FluidFlow3D:
         self._allocated = True
 
         # DEBUG: inject test obstacle shapes
-        # self._debug_inject_obstacle_shapes()
-
-    @staticmethod
-    def _debug_inject_obstacle_shapes() -> None:
-        """Draw circle, triangle, cross, and line into the obstacle volume for visual verification.
-
-        Reuses the same 2D mask pattern as FluidFlow._debug_inject_obstacle_shapes,
-        projected through all depth layers via set_obstacle() → InjectBinary3D.
-        """
-        import numpy as np
-
-        w, h = self._width, self._height
-        mask = np.zeros((h, w), dtype=np.uint8)
-
-        # Coordinate grids (row=y, col=x)
-        yy, xx = np.ogrid[0:h, 0:w]
-
-        # ---- Circle (top-left quadrant) ----
-        cx, cy, r = w // 4, h * 3 // 4, min(w, h) // 8
-        dist_sq = (xx - cx) ** 2 + (yy - cy) ** 2
-        mask[dist_sq <= r * r] = 255
-
-        # ---- Triangle (top-right quadrant) ----
-        tx, ty = w * 3 // 4, h * 3 // 4  # center
-        s = min(w, h) // 7  # half-size
-        top_y = ty + s
-        bot_y = ty - int(s * 0.6)
-        for y_px in range(max(0, bot_y), min(h, top_y + 1)):
-            for x_px in range(max(0, tx - s), min(w, tx + s + 1)):
-                t_frac = (y_px - bot_y) / max(1, top_y - bot_y)
-                half_w = s * (1.0 - t_frac)
-                if abs(x_px - tx) <= half_w:
-                    mask[y_px, x_px] = 255
-
-        # ---- Cross (bottom-left quadrant) ----
-        cx2, cy2 = w // 4, h // 4
-        arm = min(w, h) // 8
-        thick = max(2, min(w, h) // 40)
-        mask[max(0, cy2 - thick):min(h, cy2 + thick + 1),
-             max(0, cx2 - arm):min(w, cx2 + arm + 1)] = 255
-        mask[max(0, cy2 - arm):min(h, cy2 + arm + 1),
-             max(0, cx2 - thick):min(w, cx2 + thick + 1)] = 255
-
-        # ---- Diagonal line (bottom-right quadrant) ----
-        lx, ly = w * 3 // 4, h // 4
-        length = min(w, h) // 6
-        thick_l = max(2, min(w, h) // 50)
-        for t in np.linspace(-1, 1, length * 4):
-            px = int(lx + t * length * 0.5)
-            py = int(ly + t * length * 0.3)
-            for dx in range(-thick_l, thick_l + 1):
-                for dy in range(-thick_l, thick_l + 1):
-                    nx, ny = px + dx, py + dy
-                    if 0 <= nx < w and 0 <= ny < h:
-                        mask[ny, nx] = 255
-
-        # Upload to a temporary 2D texture and inject through all layers
-        from modules.gl import Texture
-        temp = Texture()
-        temp.allocate(w, h, GL_R8)
-        glBindTexture(GL_TEXTURE_2D, temp.tex_id)
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RED, GL_UNSIGNED_BYTE, mask)
-        glBindTexture(GL_TEXTURE_2D, 0)
-
-        self.set_obstacle(temp)
-        temp.deallocate()
+        from ..fluid.debug_utils import upload_debug_obstacle
+        upload_debug_obstacle(self, self._width, self._height)
 
     def _allocate_volumes(self) -> None:
         """(Re)allocate all 3D volumetric fields at current dimensions.
