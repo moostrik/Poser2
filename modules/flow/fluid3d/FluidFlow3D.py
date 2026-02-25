@@ -138,7 +138,9 @@ class FluidFlow3D:
         # Pressure: CLAMP_TO_EDGE = zero-gradient walls (Neumann)
         self._pressure: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_EDGE)
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
-        self._obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
+        self._simulation_obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
+        # Density-resolution obstacle (for density advection when simulation_scale < 1)
+        self._density_obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
         self._has_obstacles: bool = False
 
         # ---- Intermediate volumes (single buffer, no ping-pong) ----
@@ -217,7 +219,7 @@ class FluidFlow3D:
         self._allocated = True
 
         # DEBUG: inject test obstacle shapes
-        self._debug_inject_obstacle_shapes()
+        # self._debug_inject_obstacle_shapes()
 
     def _debug_inject_obstacle_shapes(self) -> None:
         """Draw circle, triangle, cross, and line into the obstacle volume for visual verification.
@@ -308,8 +310,10 @@ class FluidFlow3D:
         self._pressure.allocate(sim_w, sim_h, d, GL_R16F)
         self._pressure.clear_all()
 
-        self._obstacle.allocate(sim_w, sim_h, d, GL_R8)
-        self._obstacle.clear()
+        self._simulation_obstacle.allocate(sim_w, sim_h, d, GL_R8)
+        self._simulation_obstacle.clear()
+        self._density_obstacle.allocate(self._density_width, self._density_height, d, GL_R8)
+        self._density_obstacle.clear()
         self._has_obstacles = False
 
         # Intermediate volumes
@@ -331,7 +335,8 @@ class FluidFlow3D:
         self._density.deallocate()
         self._temperature.deallocate()
         self._pressure.deallocate()
-        self._obstacle.deallocate()
+        self._density_obstacle.deallocate()
+        self._simulation_obstacle.deallocate()
         self._divergence_vol.deallocate()
         self._curl_vol.deallocate()
         self._vorticity_force_vol.deallocate()
@@ -435,7 +440,7 @@ class FluidFlow3D:
             self._velocity.back_texture,
             self._velocity.texture,
             self._velocity.back_texture,
-            self._obstacle,
+            self._simulation_obstacle,
             self._aspect, self._depth_scale,
             advect_step, dissipation,
             internal_format=GL_RGBA16F,
@@ -453,7 +458,7 @@ class FluidFlow3D:
         result = self._jacobi_diffusion_shader.solve(
             self._velocity.texture,
             self._velocity.back_texture,
-            self._obstacle,
+            self._simulation_obstacle,
             self._grid_scale, self._aspect, self._depth_scale,
             viscosity_dt,
             total_iterations=self.config.velocity.viscosity_iter,
@@ -475,7 +480,7 @@ class FluidFlow3D:
         # 4a. Compute 3D curl
         self._vorticity_curl_shader.use(
             self._velocity.texture,
-            self._obstacle,
+            self._simulation_obstacle,
             self._curl_vol,
             self._grid_scale, self._aspect, self._depth_scale,
             vorticity_radius,
@@ -486,7 +491,7 @@ class FluidFlow3D:
         # 4b. Compute confinement force
         self._vorticity_force_shader.use(
             self._curl_vol,
-            self._obstacle,
+            self._simulation_obstacle,
             self._vorticity_force_vol,
             self._grid_scale, self._aspect, self._depth_scale,
             vorticity_force,
@@ -512,7 +517,7 @@ class FluidFlow3D:
             self._temperature.back_texture,
             self._temperature.texture,
             self._velocity.texture,
-            self._obstacle,
+            self._simulation_obstacle,
             self._aspect, self._depth_scale,
             advect_step, dissipation,
             internal_format=GL_R16F,
@@ -527,7 +532,7 @@ class FluidFlow3D:
         self._buoyancy_shader.use(
             self._temperature.texture,
             self._density.texture,
-            self._obstacle,
+            self._simulation_obstacle,
             self._buoyancy_force_vol,
             sigma, kappa, self.config.temperature.ambient,
             has_obstacles=self._has_obstacles
@@ -549,7 +554,7 @@ class FluidFlow3D:
             self._pressure.back_texture,
             self._pressure.texture,
             self._velocity.texture,
-            self._obstacle,
+            self._simulation_obstacle,
             self._aspect, self._depth_scale,
             advect_step, dissipation,
             internal_format=GL_R16F,
@@ -562,7 +567,7 @@ class FluidFlow3D:
         # 8a. Compute divergence
         self._divergence_shader.use(
             self._velocity.texture,
-            self._obstacle,
+            self._simulation_obstacle,
             self._divergence_vol,
             self._grid_scale, self._aspect, self._depth_scale,
             has_obstacles=self._has_obstacles
@@ -574,7 +579,7 @@ class FluidFlow3D:
             self._pressure.texture,
             self._pressure.back_texture,
             self._divergence_vol,
-            self._obstacle,
+            self._simulation_obstacle,
             self._grid_scale, self._aspect, self._depth_scale,
             total_iterations=self.config.pressure.iterations,
             iterations_per_dispatch=5,
@@ -589,7 +594,7 @@ class FluidFlow3D:
         self._gradient_shader.use(
             self._velocity.back_texture,
             self._pressure.texture,
-            self._obstacle,
+            self._simulation_obstacle,
             self._velocity.texture,
             self._grid_scale, self._aspect, self._depth_scale,
             has_obstacles=self._has_obstacles
@@ -606,7 +611,7 @@ class FluidFlow3D:
             self._density.back_texture,
             self._density.texture,
             self._velocity.texture,
-            self._obstacle,
+            self._density_obstacle,
             self._aspect, self._depth_scale,
             advect_step, dissipation,
             internal_format=GL_RGBA16F,
@@ -827,26 +832,41 @@ class FluidFlow3D:
     def set_obstacle(self, texture: Texture) -> None:
         """Replace obstacle volume with a 2D mask projected through all layers.
 
+        Updates both sim-resolution and density-resolution obstacle volumes.
+
         Args:
             texture: 2D obstacle mask (any channel > 0.5 = obstacle)
         """
         if not self._allocated:
             return
-        self._inject_binary_shader.use(texture, self._obstacle, mode=1)
+        self._inject_binary_shader.use(texture, self._simulation_obstacle, mode=1)
+        self._inject_binary_shader.use(texture, self._density_obstacle, mode=1)
         glMemoryBarrier(_BARRIER_IMAGE)
         self._has_obstacles = True
 
     def add_obstacle(self, texture: Texture) -> None:
         """Add to obstacle volume (boolean OR with existing obstacles).
 
+        Updates both sim-resolution and density-resolution obstacle volumes.
+
         Args:
             texture: 2D obstacle mask to add (any channel > 0.5 = obstacle)
         """
         if not self._allocated:
             return
-        self._inject_binary_shader.use(texture, self._obstacle, mode=0)
+        self._inject_binary_shader.use(texture, self._simulation_obstacle, mode=0)
+        self._inject_binary_shader.use(texture, self._density_obstacle, mode=0)
         glMemoryBarrier(_BARRIER_IMAGE)
         self._has_obstacles = True
+
+    def clear_obstacles(self) -> None:
+        """Clear all obstacles."""
+        if not self._allocated:
+            return
+        self._simulation_obstacle.clear()
+        self._density_obstacle.clear()
+        glMemoryBarrier(_BARRIER_IMAGE)
+        self._has_obstacles = False
 
     # ========== Properties ==========
 
@@ -876,8 +896,13 @@ class FluidFlow3D:
 
     @property
     def obstacle_volume(self) -> Texture3D:
-        """R8 obstacle mask volume."""
-        return self._obstacle
+        """R8 obstacle mask volume (sim resolution)."""
+        return self._simulation_obstacle
+
+    @property
+    def density_obstacle_volume(self) -> Texture3D:
+        """R8 obstacle mask volume (density resolution)."""
+        return self._density_obstacle
 
     @property
     def divergence_volume(self) -> Texture3D:
