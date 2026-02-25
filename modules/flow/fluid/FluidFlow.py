@@ -174,13 +174,7 @@ class FluidFlow:
         """
         self._density_width = width
         self._density_height = height
-
-        sim_scale = self.config.simulation_scale
-        self._simulation_width = self._align16(int(width * sim_scale))
-        self._simulation_height = self._align16(int(height * sim_scale))
-
-        # Compute aspect ratio for isotropic simulation
-        self._aspect: float = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
+        self._update_simulation_dimensions()
 
         self._allocate_simulation_fields()
 
@@ -206,6 +200,13 @@ class FluidFlow:
         # DEBUG: inject test obstacle shapes
         from .debug_utils import upload_debug_obstacle
         upload_debug_obstacle(self, self._simulation_width, self._simulation_height)
+
+    def _update_simulation_dimensions(self) -> None:
+        """Recompute simulation dimensions from current config."""
+        sim_scale = self.config.simulation_scale
+        self._simulation_width = self._align16(int(self._density_width * sim_scale))
+        self._simulation_height = self._align16(int(self._density_height * sim_scale))
+        self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
 
     def _allocate_simulation_fields(self) -> None:
         """(Re)allocate simulation-resolution FBOs."""
@@ -565,13 +566,9 @@ class FluidFlow:
         """Process reset and reallocation requests queued from the UI thread."""
         if self._reallocate_pending:
             self._reallocate_pending = False
-            sim_scale = self.config.simulation_scale
-            new_w = self._align16(int(self._density_width * sim_scale))
-            new_h = self._align16(int(self._density_height * sim_scale))
-            if new_w != self._simulation_width or new_h != self._simulation_height:
-                self._simulation_width = new_w
-                self._simulation_height = new_h
-                self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
+            old_w, old_h = self._simulation_width, self._simulation_height
+            self._update_simulation_dimensions()
+            if self._simulation_width != old_w or self._simulation_height != old_h:
                 self._allocate_simulation_fields()
 
         if self._reset_pending:

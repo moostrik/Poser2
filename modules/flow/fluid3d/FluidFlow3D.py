@@ -188,18 +188,10 @@ class FluidFlow3D:
         """
         self._density_width = width
         self._density_height = height
-
-        sim_scale = self.config.simulation_scale
-        self._simulation_width = self._align16(int(width * sim_scale))
-        self._simulation_height = self._align16(int(height * sim_scale))
-        self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
-        self._depth = self.config.depth.layers
+        self._update_simulation_dimensions()
 
         self._allocate_simulation_fields()
-
-        # Density fields (full output resolution × depth)
-        self._density.allocate(self._density_width, self._density_height, self._depth, GL_RGBA16F)
-        self._density_obstacle.allocate(self._density_width, self._density_height, self._depth, GL_R8)
+        self._allocate_density_fields()
 
         # 2D composited output
         self._output_texture.allocate(self._density_width, self._density_height, GL_RGBA16F)
@@ -227,6 +219,19 @@ class FluidFlow3D:
         # DEBUG: inject test obstacle shapes
         from ..fluid.debug_utils import upload_debug_obstacle
         upload_debug_obstacle(self, self._simulation_width, self._simulation_height)
+
+    def _update_simulation_dimensions(self) -> None:
+        """Recompute simulation dimensions from current config."""
+        sim_scale = self.config.simulation_scale
+        self._simulation_width = self._align16(int(self._density_width * sim_scale))
+        self._simulation_height = self._align16(int(self._density_height * sim_scale))
+        self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
+        self._depth = self.config.depth.layers
+
+    def _allocate_density_fields(self) -> None:
+        """(Re)allocate density-resolution volumes (full output resolution × depth)."""
+        self._density.allocate(self._density_width, self._density_height, self._depth, GL_RGBA16F)
+        self._density_obstacle.allocate(self._density_width, self._density_height, self._depth, GL_R8)
 
     def _allocate_simulation_fields(self) -> None:
         """(Re)allocate simulation-resolution 3D volumes."""
@@ -584,22 +589,14 @@ class FluidFlow3D:
         """Process reset and reallocation requests queued from the UI thread."""
         if self._reallocate_pending:
             self._reallocate_pending = False
-            new_depth = self.config.depth.layers
-            sim_scale = self.config.simulation_scale
-            new_w = self._align16(int(self._density_width * sim_scale))
-            new_h = self._align16(int(self._density_height * sim_scale))
-            depth_changed = new_depth != self._depth
-            sim_changed = new_w != self._simulation_width or new_h != self._simulation_height
+            old_w, old_h, old_d = self._simulation_width, self._simulation_height, self._depth
+            self._update_simulation_dimensions()
+            sim_changed = self._simulation_width != old_w or self._simulation_height != old_h
+            depth_changed = self._depth != old_d
             if sim_changed or depth_changed:
-                self._simulation_width = new_w
-                self._simulation_height = new_h
-                self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
-                self._depth = new_depth
                 self._allocate_simulation_fields()
                 if depth_changed:
-                    # Density is at full resolution but shares depth dimension
-                    self._density.allocate(self._density_width, self._density_height, self._depth, GL_RGBA16F)
-                    self._density_obstacle.allocate(self._density_width, self._density_height, self._depth, GL_R8)
+                    self._allocate_density_fields()
 
         if self._reset_pending:
             self._reset_pending = False
