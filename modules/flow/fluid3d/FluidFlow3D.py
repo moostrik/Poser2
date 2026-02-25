@@ -53,7 +53,9 @@ class DepthConfig(Settings):
     """3D depth/volume-specific parameters."""
     layers: Field[int]              = Field(4,    min=1,    max=64,     description="Number of depth layers in the 3D volume")
     scale: Field[float]             = Field(1.0,  min=0.5,  max=5.0,    description="Manual multiplier on auto-computed Z grid spacing (width/depth_layers)")
-    composite_mode: Field[int]      = Field(1,    min=0,    max=2,      description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
+    composite_mode: Field[int]      = Field(3,    min=0,    max=3,      description="3D->2D compositing: 0=alpha, 1=additive, 2=max, 3=emission-absorption")
+    ray_steps: Field[int]           = Field(32,   min=1,    max=128,    description="Number of ray-march steps for volumetric composite (mode 3). More steps = smoother inter-layer interpolation")
+    absorption: Field[float]        = Field(4.0,  min=0.01,  max=50.0,   description="Beer's law absorption coefficient (higher = more opaque per unit density)")
     injection_layer: Field[float]   = Field(1.0,  min=0.0,  max=1.0,    description="Normalized depth for 2D->3D injection center")
     injection_spread: Field[float]  = Field(0.001, min=0.001, max=0.5,   description="Gaussian sigma for depth spread during injection")
 
@@ -598,7 +600,9 @@ class FluidFlow3D:
         self._composite_shader.use(
             self._density.texture,
             self._output_texture,
-            self.config.depth.composite_mode
+            self.config.depth.composite_mode,
+            absorption=self.config.depth.absorption,
+            ray_steps=self.config.depth.ray_steps
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -676,7 +680,7 @@ class FluidFlow3D:
     def add_velocity_z(self, texture: Texture, strength: float = 1.0) -> None:
         """Inject 2D texture as Z-velocity (W channel) into 3D velocity volume.
 
-        Negative strength pushes fluid from back layer toward front (camera).
+        Positive strength pushes fluid from back layer toward front (camera).
         Uses motion magnitude as the per-pixel Z-velocity source.
         """
         if not self._allocated:

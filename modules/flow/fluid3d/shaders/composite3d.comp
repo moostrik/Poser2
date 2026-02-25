@@ -21,9 +21,11 @@ layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F
 layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
 
 // Parameters
-uniform int   uMode;       // 0=alpha, 1=additive, 2=max
-uniform int   uDepth;      // Number of depth layers
-uniform ivec2 uOutputSize; // 2D output dimensions
+uniform int   uMode;        // 0=alpha, 1=additive, 2=max, 3=emission-absorption
+uniform int   uDepth;       // Number of depth layers
+uniform ivec2 uOutputSize;  // 2D output dimensions
+uniform float uAbsorption;  // Beer's law absorption coefficient (mode 3)
+uniform int   uRaySteps;    // Number of ray-march steps (mode 3), oversamples volume
 
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -63,6 +65,30 @@ void main() {
         for (int z = 0; z < uDepth; z++) {
             float z_norm = (float(z) + 0.5) / float(uDepth);
             result = max(result, texture(uDensity, vec3(uv, z_norm)));
+        }
+    }
+    else if (uMode == 3) {
+        // Volumetric additive with Z-blur: at each layer center, gather a
+        // gaussian-weighted kernel along Z to create genuinely smooth
+        // transitions between discrete layers. uAbsorption controls the
+        // blur sigma (in normalized Z units). Larger = softer/more diffuse.
+        float sigma = max(uAbsorption, 0.001);
+        int taps = 9;  // blur kernel size (odd)
+        int half_taps = taps / 2;
+        float inv_depth = 1.0 / float(uDepth);
+
+        for (int z = 0; z < uDepth; z++) {
+            float z_center = (float(z) + 0.5) * inv_depth;
+
+            // Gaussian blur kernel along Z (unnormalized — preserves brightness)
+            vec4 blurred = vec4(0.0);
+            for (int t = -half_taps; t <= half_taps; t++) {
+                float z_sample = z_center + float(t) * sigma / float(half_taps);
+                z_sample = clamp(z_sample, 0.0, 1.0);
+                float w = exp(-0.5 * pow(float(t) / float(half_taps), 2.0));
+                blurred += texture(uDensity, vec3(uv, z_sample)) * w;
+            }
+            result += blurred;
         }
     }
 

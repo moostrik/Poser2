@@ -221,7 +221,7 @@ class Fluid3DLayer(LayerBase):
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
         textures = {
-            Fluid3DDrawMode.DENSITY: self._colorized_fbo.texture,
+            Fluid3DDrawMode.DENSITY: self._fluid_flow.density,
             Fluid3DDrawMode.DENSITY_RAW: self._fluid_flow.density,
         }
         return textures.get(self.config.draw_mode, self._fluid_flow.density)
