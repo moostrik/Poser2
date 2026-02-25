@@ -367,11 +367,12 @@ class FluidFlow:
 
         # Simulation steps
         self._advect_velocity()
-        self._diffuse_velocity()
-        self._apply_vorticity()
-        self._advect_temperature_and_buoyancy()
+        self._apply_viscosity()
+        self._confine_vorticity()
+        self._advect_temperature()
+        self._apply_buoyancy()
         self._advect_pressure()
-        self._project_pressure()
+        self._enforce_incompressibility()
         self._advect_density()
 
         # Dampen inputs before simulation
@@ -393,7 +394,7 @@ class FluidFlow:
         FlowUtil.add(self._velocity_fbo, texture, strength)
 
     def _advect_velocity(self) -> None:
-        """Step 2: Self-advect & dissipate velocity field."""
+        """Self-advect & dissipate velocity field."""
         advect_step = self._dt * self.config.velocity.self_advection
         dissipation = self._calculate_dissipation(self._dt, self.config.velocity.fade_time)
 
@@ -410,8 +411,8 @@ class FluidFlow:
         )
         self._velocity_fbo.end()
 
-    def _diffuse_velocity(self) -> None:
-        """Step 3: Viscosity diffusion (Jacobi solver)."""
+    def _apply_viscosity(self) -> None:
+        """Diffuse velocity via Jacobi viscosity solver."""
         if self.config.velocity.viscosity <= 0.0:
             return
 
@@ -446,8 +447,8 @@ class FluidFlow:
                 )
                 self._velocity_fbo.end()
 
-    def _apply_vorticity(self) -> None:
-        """Step 4: Vorticity confinement (curl → force → add to velocity)."""
+    def _confine_vorticity(self) -> None:
+        """Vorticity confinement (curl → force → add to velocity)."""
         if self.config.velocity.vorticity <= 0.0 or self.config.velocity.vorticity_radius <= 0.0:
             return
 
@@ -481,13 +482,12 @@ class FluidFlow:
         # 4c. Add force to velocity
         self._add_force_to_velocity(self._vorticity_force_fbo.texture)
 
-    def _advect_temperature_and_buoyancy(self) -> None:
-        """Steps 5–6: Advect temperature & apply buoyancy force to velocity."""
+    def _advect_temperature(self) -> None:
+        """Advect & dissipate the temperature scalar field."""
         if self.config.temperature.buoyancy == 0.0:
             FlowUtil.zero(self._temperature_fbo)
             return
 
-        # 5. Advect temperature
         advect_step = self._dt * self.config.speed
         dissipation = self._calculate_dissipation(self._dt, self.config.temperature.fade_time)
 
@@ -504,7 +504,11 @@ class FluidFlow:
         )
         self._temperature_fbo.end()
 
-        # 6. Buoyancy: F = σ(T - T_ambient) - κρ
+    def _apply_buoyancy(self) -> None:
+        """Apply buoyancy force to velocity: F = σ(T − T_ambient) − κρ."""
+        if self.config.temperature.buoyancy == 0.0:
+            return
+
         sigma = self._dt * self.config.simulation_scale * self.config.temperature.buoyancy
         kappa = self._dt * self.config.simulation_scale * self.config.temperature.weight
 
@@ -524,7 +528,7 @@ class FluidFlow:
         self._add_force_to_velocity(self._buoyancy_fbo.texture)
 
     def _advect_pressure(self) -> None:
-        """Step 7: Advect & dissipate pressure (optional, non-physical)."""
+        """Advect & dissipate pressure (optional, non-physical)."""
         if self.config.pressure.speed <= 0.0:
             return
 
@@ -544,8 +548,8 @@ class FluidFlow:
         )
         self._pressure_fbo.end()
 
-    def _project_pressure(self) -> None:
-        """Step 8: Pressure projection (divergence → Jacobi solve → gradient subtraction)."""
+    def _enforce_incompressibility(self) -> None:
+        """Pressure projection (divergence → Jacobi solve → gradient subtraction)."""
         # 8a. Compute divergence
         self._divergence_fbo.begin()
         self._divergence_shader.use(
@@ -602,7 +606,7 @@ class FluidFlow:
         self._velocity_fbo.end()
 
     def _advect_density(self) -> None:
-        """Step 1: Advect & dissipate density field."""
+        """Advect & dissipate density field."""
         advect_step = self._dt * (self.config.speed + self.config.density.speed_offset)
         dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
 

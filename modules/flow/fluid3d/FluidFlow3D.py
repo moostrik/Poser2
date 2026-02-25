@@ -5,14 +5,15 @@ filtering between depth layers. Produces a composited 2D output for
 downstream rendering compatibility.
 
 Pipeline:
-    1. Advect density (3D semi-Lagrangian)
-    2. Advect velocity (3D self-advection)
-    3. Diffuse velocity (3D Jacobi viscosity solver)
-    4. Vorticity confinement (3D curl + confinement force)
-    5. Temperature advection + buoyancy force
-    6. Pressure advection (optional, non-physical)
-    7. Pressure projection (divergence -> Jacobi solve -> gradient subtraction)
-    8. Composite 3D density -> 2D output
+    1. Advect velocity (3D self-advection)
+    2. Apply viscosity (3D Jacobi diffusion solver)
+    3. Confine vorticity (3D curl + confinement force)
+    4. Advect pressure (optional, non-physical)
+    5. Enforce incompressibility (divergence -> Jacobi solve -> gradient subtraction)
+    6. Advect temperature
+    7. Apply buoyancy force
+    8. Advect density (3D semi-Lagrangian)
+    9. Composite 3D density -> 2D output
 
 Boundary conditions via per-field wrap modes (no explicit border obstacles):
     Velocity/density:  GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
@@ -409,11 +410,12 @@ class FluidFlow3D:
 
         # Simulation steps
         self._advect_velocity()
-        self._diffuse_velocity()
-        self._apply_vorticity()
+        self._apply_viscosity()
+        self._confine_vorticity()
         self._advect_pressure()
-        self._project_pressure()
-        self._advect_temperature_and_buoyancy()
+        self._enforce_incompressibility()
+        self._advect_temperature()
+        self._apply_buoyancy()
         self._advect_density()
         self._composite_output()
 
@@ -432,7 +434,7 @@ class FluidFlow3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def _advect_velocity(self) -> None:
-        """Step 2: Self-advect & dissipate velocity field."""
+        """Self-advect & dissipate velocity field."""
         advect_step = self._dt * self.config.velocity.self_advection
         dissipation = self._calculate_dissipation(self._dt, self.config.velocity.fade_time)
 
@@ -449,8 +451,8 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-    def _diffuse_velocity(self) -> None:
-        """Step 3: Viscosity diffusion (Jacobi solver)."""
+    def _apply_viscosity(self) -> None:
+        """Diffuse velocity via Jacobi viscosity solver."""
         if self.config.velocity.viscosity <= 0.0:
             return
 
@@ -471,8 +473,8 @@ class FluidFlow3D:
             self._velocity.swap()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-    def _apply_vorticity(self) -> None:
-        """Step 4: Vorticity confinement (curl → force → add to velocity)."""
+    def _confine_vorticity(self) -> None:
+        """Vorticity confinement (curl → force → add to velocity)."""
         if self.config.velocity.vorticity <= 0.0 or self.config.velocity.vorticity_radius <= 0.0:
             return
 
@@ -504,13 +506,12 @@ class FluidFlow3D:
         # 4c. Add force to velocity
         self._add_force_to_velocity(self._vorticity_force_vol)
 
-    def _advect_temperature_and_buoyancy(self) -> None:
-        """Steps 5–6: Advect temperature & apply buoyancy force to velocity."""
+    def _advect_temperature(self) -> None:
+        """Advect & dissipate the temperature scalar field."""
         if self.config.temperature.buoyancy == 0.0:
             self._temperature.clear_all()
             return
 
-        # 5. Advect temperature
         advect_step = self._dt * self.config.speed
         dissipation = self._calculate_dissipation(self._dt, self.config.temperature.fade_time)
 
@@ -527,7 +528,11 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # 6. Buoyancy: F = sigma*(T - T_ambient) - kappa*density
+    def _apply_buoyancy(self) -> None:
+        """Apply buoyancy force to velocity: F = σ(T − T_ambient) − κρ."""
+        if self.config.temperature.buoyancy == 0.0:
+            return
+
         sigma = self._dt * self.config.simulation_scale * self.config.temperature.buoyancy
         kappa = self._dt * self.config.simulation_scale * self.config.temperature.weight
 
@@ -544,7 +549,7 @@ class FluidFlow3D:
         self._add_force_to_velocity(self._buoyancy_force_vol)
 
     def _advect_pressure(self) -> None:
-        """Step 7: Advect & dissipate pressure (optional, non-physical)."""
+        """Advect & dissipate pressure (optional, non-physical)."""
         if self.config.pressure.speed <= 0.0:
             return
 
@@ -564,8 +569,8 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-    def _project_pressure(self) -> None:
-        """Step 8: Pressure projection (divergence → Jacobi solve → gradient subtraction)."""
+    def _enforce_incompressibility(self) -> None:
+        """Pressure projection (divergence → Jacobi solve → gradient subtraction)."""
         # 8a. Compute divergence
         self._divergence_shader.use(
             self._velocity.texture,
@@ -606,7 +611,7 @@ class FluidFlow3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _advect_density(self) -> None:
-        """Step 1: Advect & dissipate density field."""
+        """Advect & dissipate density field."""
         advect_step = self._dt * (self.config.speed + self.config.density.speed_offset)
         dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
 
@@ -647,7 +652,7 @@ class FluidFlow3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def _composite_output(self) -> None:
-        """Step 9: Composite 3D density → 2D output texture."""
+        """Composite 3D density → 2D output texture."""
         self._composite_shader.use(
             self._density.texture,
             self._output_texture,
