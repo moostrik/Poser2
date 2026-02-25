@@ -119,6 +119,7 @@ class FluidFlow(FlowBase):
         self._height: int = 0
         self._density_width: int = 0
         self._density_height: int = 0
+        self._dt: float = 1.0 / 60.0
         self._reset_pending: bool = False
         self._reallocate_pending: bool = False
 
@@ -424,16 +425,40 @@ class FluidFlow(FlowBase):
     # ========== Update Pipeline ==========
 
     def update(self) -> None:
-        """Update fluid simulation (8-step pipeline)."""
+        """Run one frame of the 2D fluid simulation pipeline."""
         if not self._allocated:
             return
 
-        # Handle deferred reset from UI thread
+        self._handle_deferred_actions()
+        self._reload_shaders()
+
+        # Per-frame state
+        self._dt = 1.0 / max(1, self.config.avg_fps)
+        self._aspect = self._width / self._height if self._height > 0 else 1.0
+
+        # Dampen inputs before simulation
+        vel = self.config.velocity
+        den = self.config.density
+        self._dampen(self._input_fbo,  vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
+        self._dampen(self._output_fbo, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
+
+        # Simulation steps
+        self._advect_density()
+        self._advect_velocity()
+        self._diffuse_velocity()
+        self._apply_vorticity()
+        self._advect_temperature_and_buoyancy()
+        self._advect_pressure()
+        self._project_pressure()
+
+    # ========== Deferred Actions ==========
+
+    def _handle_deferred_actions(self) -> None:
+        """Process reset and reallocation requests queued from the UI thread."""
         if self._reset_pending:
             self._reset_pending = False
             self.reset()
 
-        # Handle deferred reallocation from UI thread (simulation_scale changed)
         if self._reallocate_pending:
             self._reallocate_pending = False
             sim_scale = self.config.simulation_scale
@@ -442,19 +467,27 @@ class FluidFlow(FlowBase):
             if new_w != self._width or new_h != self._height:
                 self.allocate(self._density_width, self._density_height)
 
-        # Dampen inputs before simulation
-        delta_time: float = 1.0 / max(1, self.config.avg_fps)
-        vel = self.config.velocity
-        den = self.config.density
-        self._dampen(self._input_fbo,  vel.dampen_threshold, vel.dampen_time, delta_time, include_alpha=False)
-        self._dampen(self._output_fbo, den.dampen_threshold, den.dampen_time, delta_time, include_alpha=True)
+    def _reload_shaders(self) -> None:
+        """Hot-reload all shaders (checks file timestamps internally)."""
+        self._advect_shader.reload()
+        self._divergence_shader.reload()
+        self._gradient_shader.reload()
+        self._jacobi_pressure_shader.reload()
+        self._jacobi_pressure_compute.reload()
+        self._jacobi_diffusion_shader.reload()
+        self._jacobi_diffusion_compute.reload()
+        self._vorticity_curl_shader.reload()
+        self._vorticity_force_shader.reload()
+        self._buoyancy_shader.reload()
+        self._obstacle_offset_shader.reload()
+        self._add_boolean_shader.reload()
 
-        self._aspect = self._width / self._height if self._height > 0 else 1.0
+    # ========== Pipeline Steps ==========
 
-        # ===== STEP 1: DENSITY ADVECT & DISSIPATE =====
-        # Density uses base speed + artistic offset (0 offset = physically coupled)
-        advect_den_step: float = delta_time * (self.config.speed + self.config.density.speed_offset)
-        dissipate_den: float = FluidFlow._calculate_dissipation(delta_time, self.config.density.fade_time)
+    def _advect_density(self) -> None:
+        """Step 1: Advect & dissipate density field."""
+        advect_step = self._dt * (self.config.speed + self.config.density.speed_offset)
+        dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
 
         self._output_fbo.swap()
         self._output_fbo.begin()
@@ -463,15 +496,15 @@ class FluidFlow(FlowBase):
             self._input_fbo.texture,        # Velocity
             self._obstacle_fbo.texture,     # Obstacles
             self._aspect,
-            advect_den_step,
-            dissipate_den
+            advect_step,
+            dissipation
         )
         self._output_fbo.end()
 
-        # ===== STEP 2: VELOCITY ADVECT & DISSIPATE =====
-        # Velocity self-advection uses separate low damper for numerical stability
-        advect_vel_step: float = delta_time * self.config.velocity.self_advection
-        dissipate_vel: float = FluidFlow._calculate_dissipation(delta_time, self.config.velocity.fade_time)
+    def _advect_velocity(self) -> None:
+        """Step 2: Self-advect & dissipate velocity field."""
+        advect_step = self._dt * self.config.velocity.self_advection
+        dissipation = self._calculate_dissipation(self._dt, self.config.velocity.fade_time)
 
         self._input_fbo.swap()
         self._input_fbo.begin()
@@ -480,141 +513,139 @@ class FluidFlow(FlowBase):
             self._input_fbo.back_texture,   # Velocity
             self._obstacle_fbo.texture,     # Obstacles
             self._aspect,
-            advect_vel_step,
-            dissipate_vel
+            advect_step,
+            dissipation
         )
         self._input_fbo.end()
 
-        # ===== STEP 3: VELOCITY DIFFUSE (viscosity) =====
-        if self.config.velocity.viscosity > 0.0:
-            # Scale viscosity by simulation_scale² for resolution independence
-            viscosity_dt: float = self.config.velocity.viscosity * (self.config.simulation_scale ** 2) * delta_time
+    def _diffuse_velocity(self) -> None:
+        """Step 3: Viscosity diffusion (Jacobi solver)."""
+        if self.config.velocity.viscosity <= 0.0:
+            return
 
-            if self._use_compute_diffusion:
-                # Compute shader: multi-iteration with automatic ping-pong
-                result = self._jacobi_diffusion_compute.solve(
-                    self._input_fbo.texture,
+        viscosity_dt = self.config.velocity.viscosity * (self.config.simulation_scale ** 2) * self._dt
+
+        if self._use_compute_diffusion:
+            result = self._jacobi_diffusion_compute.solve(
+                self._input_fbo.texture,
+                self._input_fbo.back_texture,
+                self._obstacle_fbo.texture,
+                self._obstacle_offset_fbo.texture,
+                self.config.simulation_scale,
+                self._aspect,
+                viscosity_dt,
+                total_iterations=self.config.velocity.viscosity_iter,
+                iterations_per_dispatch=5
+            )
+            if result != self._input_fbo.texture:
+                self._input_fbo.swap()
+        else:
+            for _ in range(self.config.velocity.viscosity_iter):
+                self._input_fbo.swap()
+                self._input_fbo.begin()
+                self._jacobi_diffusion_shader.use(
                     self._input_fbo.back_texture,
                     self._obstacle_fbo.texture,
                     self._obstacle_offset_fbo.texture,
                     self.config.simulation_scale,
                     self._aspect,
-                    viscosity_dt,
-                    total_iterations=self.config.velocity.viscosity_iter,
-                    iterations_per_dispatch=5
+                    viscosity_dt
                 )
-                # Ensure the correct buffer is active after solve
-                if result != self._input_fbo.texture:
-                    self._input_fbo.swap()
-            else:
-                # Fragment shader fallback: one iteration per FBO swap
-                for _ in range(self.config.velocity.viscosity_iter):
-                    self._input_fbo.swap()
-                    self._input_fbo.begin()
-                    self._jacobi_diffusion_shader.use(
-                        self._input_fbo.back_texture,
-                        self._obstacle_fbo.texture,
-                        self._obstacle_offset_fbo.texture,
-                        self.config.simulation_scale,
-                        self._aspect,
-                        viscosity_dt
-                    )
-                    self._input_fbo.end()
+                self._input_fbo.end()
 
-        # ===== STEP 4: VELOCITY VORTICITY CONFINEMENT =====
-        if self.config.velocity.vorticity > 0.0 and self.config.velocity.vorticity_radius > 0.0:
-            self._vorticity_curl_shader.reload()
-            self._vorticity_force_shader.reload()
+    def _apply_vorticity(self) -> None:
+        """Step 4: Vorticity confinement (curl → force → add to velocity)."""
+        if self.config.velocity.vorticity <= 0.0 or self.config.velocity.vorticity_radius <= 0.0:
+            return
 
-            vorticity_radius: float = self.config.velocity.vorticity_radius * self.config.simulation_scale
-            vorticity_force: float = (self.config.velocity.vorticity * delta_time)
+        vorticity_radius = self.config.velocity.vorticity_radius * self.config.simulation_scale
+        vorticity_force = self.config.velocity.vorticity * self._dt
 
-            # 4a. Compute vorticity curl
-            self._vorticity_curl_fbo.begin()
-            self._vorticity_curl_shader.use(
-                self._input_fbo.texture,
-                self._obstacle_fbo.texture,
-                self.config.simulation_scale,
-                self._aspect,
-                vorticity_radius
-            )
-            self._vorticity_curl_fbo.end()
+        # 4a. Compute vorticity curl
+        self._vorticity_curl_fbo.begin()
+        self._vorticity_curl_shader.use(
+            self._input_fbo.texture,
+            self._obstacle_fbo.texture,
+            self.config.simulation_scale,
+            self._aspect,
+            vorticity_radius
+        )
+        self._vorticity_curl_fbo.end()
 
-            # 4b. Compute confinement force
-            self._vorticity_force_fbo.begin()
-            self._vorticity_force_shader.use(
-                self._vorticity_curl_fbo.texture,
-                self.config.simulation_scale,
-                self._aspect,
-                vorticity_force
-            )
-            self._vorticity_force_fbo.end()
+        # 4b. Compute confinement force
+        self._vorticity_force_fbo.begin()
+        self._vorticity_force_shader.use(
+            self._vorticity_curl_fbo.texture,
+            self.config.simulation_scale,
+            self._aspect,
+            vorticity_force
+        )
+        self._vorticity_force_fbo.end()
 
-            # 4c. Add force to velocity (direct — no input_strength*dt)
-            self._add_force_to_velocity(self._vorticity_force_fbo.texture)
+        # 4c. Add force to velocity
+        self._add_force_to_velocity(self._vorticity_force_fbo.texture)
 
-        # ===== STEP 5 & 6: TEMPERATURE ADVECT & BUOYANCY =====
-        # Only compute temperature if buoyancy is enabled
+    def _advect_temperature_and_buoyancy(self) -> None:
+        """Steps 5–6: Advect temperature & apply buoyancy force to velocity."""
         if self.config.temperature.buoyancy == 0.0:
             FlowUtil.zero(self._temperature_fbo)
-        else:
-            # 5a. Advect temperature (coupled to base flow speed)
-            advect_tmp_step: float = delta_time * self.config.speed
-            dissipate_tmp: float = FluidFlow._calculate_dissipation(delta_time, self.config.temperature.fade_time)
+            return
 
-            self._temperature_fbo.swap()
-            self._temperature_fbo.begin()
-            self._advect_shader.use(
-                self._temperature_fbo.back_texture,  # Source temperature
-                self._input_fbo.texture,            # Velocity
-                self._obstacle_fbo.texture,         # Obstacles
-                self._aspect,
-                advect_tmp_step,
-                dissipate_tmp
-            )
-            self._temperature_fbo.end()
+        # 5. Advect temperature
+        advect_step = self._dt * self.config.speed
+        dissipation = self._calculate_dissipation(self._dt, self.config.temperature.fade_time)
 
-            # 6. Compute and apply buoyancy force
-            # F = σ(T - T_ambient) - κρ  where κ = weight_ratio * σ
-            # Both terms scaled by delta_time * simulation_scale for resolution independence
-            sigma: float = delta_time * self.config.simulation_scale * self.config.temperature.buoyancy
-            kappa: float = delta_time * self.config.simulation_scale * self.config.temperature.weight  # Weight as ratio of thermal effect
+        self._temperature_fbo.swap()
+        self._temperature_fbo.begin()
+        self._advect_shader.use(
+            self._temperature_fbo.back_texture,
+            self._input_fbo.texture,
+            self._obstacle_fbo.texture,
+            self._aspect,
+            advect_step,
+            dissipation
+        )
+        self._temperature_fbo.end()
 
-            self._buoyancy_fbo.begin()
-            self._buoyancy_shader.use(
-                self._input_fbo.texture,
-                self._temperature_fbo.texture,
-                self._output_fbo.texture,
-                sigma,
-                kappa,
-                self.config.temperature.ambient
-            )
-            self._buoyancy_fbo.end()
+        # 6. Buoyancy: F = σ(T - T_ambient) - κρ
+        sigma = self._dt * self.config.simulation_scale * self.config.temperature.buoyancy
+        kappa = self._dt * self.config.simulation_scale * self.config.temperature.weight
 
-            # Add buoyancy force to velocity (direct — no input_strength*dt)
-            self._add_force_to_velocity(self._buoyancy_fbo.texture)
-            # Reset temperature when buoyancy disabled to prevent stale data
+        self._buoyancy_fbo.begin()
+        self._buoyancy_shader.use(
+            self._input_fbo.texture,
+            self._temperature_fbo.texture,
+            self._output_fbo.texture,
+            sigma,
+            kappa,
+            self.config.temperature.ambient
+        )
+        self._buoyancy_fbo.end()
 
-        # ===== STEP 7: PRESSURE ADVECT & DISSIPATE =====
-        # # Only advect pressure for artistic effects (non-physical)
-        # When prs_speed = 0, pressure is purely from projection (physical)
-        if self.config.pressure.speed > 0.0:
-            advect_prs_step: float = delta_time * self.config.pressure.speed
-            dissipate_prs: float = FluidFlow._calculate_dissipation(delta_time, self.config.pressure.fade_time)
+        self._add_force_to_velocity(self._buoyancy_fbo.texture)
 
-            self._pressure_fbo.swap()
-            self._pressure_fbo.begin()
-            self._advect_shader.use(
-                self._pressure_fbo.back_texture,  # Source pressure
-                self._input_fbo.texture,          # Velocity
-                self._obstacle_fbo.texture,       # Obstacles
-                self._aspect,
-                advect_prs_step,
-                dissipate_prs
-            )
-            self._pressure_fbo.end()
+    def _advect_pressure(self) -> None:
+        """Step 7: Advect & dissipate pressure (optional, non-physical)."""
+        if self.config.pressure.speed <= 0.0:
+            return
 
-        # ===== STEP 8: PRESSURE PROJECTION (Make divergence-free) =====
+        advect_step = self._dt * self.config.pressure.speed
+        dissipation = self._calculate_dissipation(self._dt, self.config.pressure.fade_time)
+
+        self._pressure_fbo.swap()
+        self._pressure_fbo.begin()
+        self._advect_shader.use(
+            self._pressure_fbo.back_texture,
+            self._input_fbo.texture,
+            self._obstacle_fbo.texture,
+            self._aspect,
+            advect_step,
+            dissipation
+        )
+        self._pressure_fbo.end()
+
+    def _project_pressure(self) -> None:
+        """Step 8: Pressure projection (divergence → Jacobi solve → gradient subtraction)."""
         # 8a. Compute divergence
         self._divergence_fbo.begin()
         self._divergence_shader.use(
@@ -626,11 +657,8 @@ class FluidFlow(FlowBase):
         )
         self._divergence_fbo.end()
 
-        self._use_compute_pressure = True
-
-        # 8b. Solve Poisson equation for pressure (Jacobi iterations)
+        # 8b. Solve Poisson equation for pressure
         if self._use_compute_pressure:
-            # Compute shader: multi-iteration with automatic ping-pong
             result = self._jacobi_pressure_compute.solve(
                 self._pressure_fbo.texture,
                 self._pressure_fbo.back_texture,
@@ -642,11 +670,9 @@ class FluidFlow(FlowBase):
                 total_iterations=self.config.pressure.iterations,
                 iterations_per_dispatch=5
             )
-            # Ensure the correct buffer is active after solve
             if result != self._pressure_fbo.texture:
                 self._pressure_fbo.swap()
         else:
-            # Fragment shader fallback: one iteration per FBO swap
             for _ in range(self.config.pressure.iterations):
                 self._pressure_fbo.swap()
                 self._pressure_fbo.begin()

@@ -118,6 +118,9 @@ class FluidFlow3D:
         self._density_height: int = 0
         self._depth: int = 0
         self._aspect: float = 1.0
+        self._dt: float = 1.0 / 60.0
+        self._depth_scale: float = 1.0
+        self._grid_scale: float = 0.5
         self._auto_depth_scale: float = 1.0
         self._allocated: bool = False
         self._reset_pending: bool = False
@@ -313,9 +316,36 @@ class FluidFlow3D:
         """Run one frame of the 3D fluid simulation pipeline."""
         if not self._allocated:
             return
-        self._reload_shaders()
 
-        # Handle deferred reallocation from UI thread (depth_layers or simulation_scale changed)
+        self._reload_shaders()
+        self._handle_deferred_actions()
+
+        # Per-frame state
+        self._dt = 1.0 / max(1, self.config.avg_fps)
+        self._aspect = self._width / self._height if self._height > 0 else 1.0
+        self._depth_scale = self._auto_depth_scale * self.config.depth.scale
+        self._grid_scale = self.config.simulation_scale
+
+        # Dampen inputs before simulation
+        vel = self.config.velocity
+        den = self.config.density
+        self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
+        self._dampen(self._density,  den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
+
+        # Simulation steps
+        self._advect_density()
+        self._advect_velocity()
+        self._diffuse_velocity()
+        self._apply_vorticity()
+        self._advect_temperature_and_buoyancy()
+        self._advect_pressure()
+        self._project_pressure()
+        self._composite_output()
+
+    # ========== Deferred Actions ==========
+
+    def _handle_deferred_actions(self) -> None:
+        """Process reset and reallocation requests queued from the UI thread."""
         if self._reallocate_pending:
             self._reallocate_pending = False
             new_depth = self.config.depth.layers
@@ -328,174 +358,173 @@ class FluidFlow3D:
                 self._aspect = self._width / self._height if self._height > 0 else 1.0
                 self._reallocate_volumes(new_depth)
 
-        # Handle deferred reset from UI thread
         if self._reset_pending:
             self._reset_pending = False
             self.reset()
 
-        # Dampen inputs before simulation
-        delta_time: float = 1.0 / max(1, self.config.avg_fps)
-        vel = self.config.velocity
-        den = self.config.density
-        self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, delta_time, include_alpha=False)
-        self._dampen(self._density,  den.dampen_threshold, den.dampen_time, delta_time, include_alpha=True)
+    # ========== Pipeline Steps ==========
 
-        self._aspect = self._width / self._height if self._height > 0 else 1.0
-        depth_scale: float = self._auto_depth_scale * self.config.depth.scale
-        grid_scale: float = self.config.simulation_scale
-
-        # ===== STEP 1: ADVECT DENSITY =====
-        advect_den_step = delta_time * (self.config.speed + self.config.density.speed_offset)
-        dissipate_den = self._calculate_dissipation(delta_time, self.config.density.fade_time)
+    def _advect_density(self) -> None:
+        """Step 1: Advect & dissipate density field."""
+        advect_step = self._dt * (self.config.speed + self.config.density.speed_offset)
+        dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
 
         self._density.swap()
         self._advect_shader.advect(
-            self._density.back_texture,   # read from previous
-            self._density.texture,        # write to current
-            self._velocity.texture,       # advected by velocity
+            self._density.back_texture,
+            self._density.texture,
+            self._velocity.texture,
             self._obstacle,
-            self._aspect, depth_scale,
-            advect_den_step, dissipate_den,
+            self._aspect, self._depth_scale,
+            advect_step, dissipation,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # ===== STEP 2: ADVECT VELOCITY (self-advection) =====
-        advect_vel_step = delta_time * self.config.velocity.self_advection
-        dissipate_vel = self._calculate_dissipation(delta_time, self.config.velocity.fade_time)
+    def _advect_velocity(self) -> None:
+        """Step 2: Self-advect & dissipate velocity field."""
+        advect_step = self._dt * self.config.velocity.self_advection
+        dissipation = self._calculate_dissipation(self._dt, self.config.velocity.fade_time)
 
         self._velocity.swap()
         self._advect_shader.advect(
-            self._velocity.back_texture,  # source velocity (self-advection)
-            self._velocity.texture,       # write result
-            self._velocity.back_texture,  # advected by same velocity field
+            self._velocity.back_texture,
+            self._velocity.texture,
+            self._velocity.back_texture,
             self._obstacle,
-            self._aspect, depth_scale,
-            advect_vel_step, dissipate_vel,
+            self._aspect, self._depth_scale,
+            advect_step, dissipation,
             internal_format=GL_RGBA16F
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # ===== STEP 3: VELOCITY DIFFUSE (viscosity) =====
-        if self.config.velocity.viscosity > 0.0:
-            viscosity_dt = self.config.velocity.viscosity * (self.config.simulation_scale ** 2) * delta_time
+    def _diffuse_velocity(self) -> None:
+        """Step 3: Viscosity diffusion (Jacobi solver)."""
+        if self.config.velocity.viscosity <= 0.0:
+            return
 
-            result = self._jacobi_diffusion_shader.solve(
-                self._velocity.texture,
-                self._velocity.back_texture,
-                self._obstacle,
-                grid_scale, self._aspect, depth_scale,
-                viscosity_dt,
-                total_iterations=self.config.velocity.viscosity_iter,
-                iterations_per_dispatch=5
-            )
-            # Ensure correct buffer is active after solve
-            if result != self._velocity.texture:
-                self._velocity.swap()
-            glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        viscosity_dt = self.config.velocity.viscosity * (self.config.simulation_scale ** 2) * self._dt
 
-        # ===== STEP 4: VORTICITY CONFINEMENT =====
-        if self.config.velocity.vorticity > 0.0 and self.config.velocity.vorticity_radius > 0.0:
-            vorticity_radius = self.config.velocity.vorticity_radius * self.config.simulation_scale
-            vorticity_force = self.config.velocity.vorticity * delta_time
+        result = self._jacobi_diffusion_shader.solve(
+            self._velocity.texture,
+            self._velocity.back_texture,
+            self._obstacle,
+            self._grid_scale, self._aspect, self._depth_scale,
+            viscosity_dt,
+            total_iterations=self.config.velocity.viscosity_iter,
+            iterations_per_dispatch=5
+        )
+        if result != self._velocity.texture:
+            self._velocity.swap()
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-            # 4a. Compute 3D curl (vorticity vector)
-            self._vorticity_curl_shader.use(
-                self._velocity.texture,
-                self._obstacle,
-                self._curl_vol,
-                grid_scale, self._aspect, depth_scale,
-                vorticity_radius
-            )
-            glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+    def _apply_vorticity(self) -> None:
+        """Step 4: Vorticity confinement (curl → force → add to velocity)."""
+        if self.config.velocity.vorticity <= 0.0 or self.config.velocity.vorticity_radius <= 0.0:
+            return
 
-            # 4b. Compute confinement force
-            self._vorticity_force_shader.use(
-                self._curl_vol,
-                self._vorticity_force_vol,
-                grid_scale, self._aspect, depth_scale,
-                vorticity_force
-            )
-            glMemoryBarrier(_BARRIER_IMAGE)
+        vorticity_radius = self.config.velocity.vorticity_radius * self.config.simulation_scale
+        vorticity_force = self.config.velocity.vorticity * self._dt
 
-            # 4c. Add force to velocity in-place
-            self._add_force_to_velocity(self._vorticity_force_vol)
+        # 4a. Compute 3D curl
+        self._vorticity_curl_shader.use(
+            self._velocity.texture,
+            self._obstacle,
+            self._curl_vol,
+            self._grid_scale, self._aspect, self._depth_scale,
+            vorticity_radius
+        )
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # ===== STEP 5 & 6: TEMPERATURE ADVECT & BUOYANCY =====
+        # 4b. Compute confinement force
+        self._vorticity_force_shader.use(
+            self._curl_vol,
+            self._vorticity_force_vol,
+            self._grid_scale, self._aspect, self._depth_scale,
+            vorticity_force
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
+        # 4c. Add force to velocity
+        self._add_force_to_velocity(self._vorticity_force_vol)
+
+    def _advect_temperature_and_buoyancy(self) -> None:
+        """Steps 5–6: Advect temperature & apply buoyancy force to velocity."""
         if self.config.temperature.buoyancy == 0.0:
             self._temperature.clear_all()
-        else:
-            # 5a. Advect temperature
-            advect_tmp_step = delta_time * self.config.speed
-            dissipate_tmp = self._calculate_dissipation(delta_time, self.config.temperature.fade_time)
+            return
 
-            self._temperature.swap()
-            self._advect_shader.advect(
-                self._temperature.back_texture,
-                self._temperature.texture,
-                self._velocity.texture,
-                self._obstacle,
-                self._aspect, depth_scale,
-                advect_tmp_step, dissipate_tmp,
-                internal_format=GL_R16F
-            )
-            glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        # 5. Advect temperature
+        advect_step = self._dt * self.config.speed
+        dissipation = self._calculate_dissipation(self._dt, self.config.temperature.fade_time)
 
-            # 6. Compute and apply buoyancy force
-            # F = sigma*(T - T_ambient) - kappa*density
-            sigma = delta_time * self.config.simulation_scale * self.config.temperature.buoyancy
-            kappa = delta_time * self.config.simulation_scale * self.config.temperature.weight
+        self._temperature.swap()
+        self._advect_shader.advect(
+            self._temperature.back_texture,
+            self._temperature.texture,
+            self._velocity.texture,
+            self._obstacle,
+            self._aspect, self._depth_scale,
+            advect_step, dissipation,
+            internal_format=GL_R16F
+        )
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-            self._buoyancy_shader.use(
-                self._temperature.texture,
-                self._density.texture,
-                self._buoyancy_force_vol,
-                sigma, kappa, self.config.temperature.ambient
-            )
-            glMemoryBarrier(_BARRIER_IMAGE)
+        # 6. Buoyancy: F = sigma*(T - T_ambient) - kappa*density
+        sigma = self._dt * self.config.simulation_scale * self.config.temperature.buoyancy
+        kappa = self._dt * self.config.simulation_scale * self.config.temperature.weight
 
-            # Add buoyancy force to velocity
-            self._add_force_to_velocity(self._buoyancy_force_vol)
+        self._buoyancy_shader.use(
+            self._temperature.texture,
+            self._density.texture,
+            self._buoyancy_force_vol,
+            sigma, kappa, self.config.temperature.ambient
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
 
-        # ===== STEP 7: PRESSURE ADVECT (optional, non-physical) =====
-        if self.config.pressure.speed > 0.0:
-            advect_prs_step = delta_time * self.config.pressure.speed
-            dissipate_prs = self._calculate_dissipation(delta_time, self.config.pressure.fade_time)
+        self._add_force_to_velocity(self._buoyancy_force_vol)
 
-            self._pressure.swap()
-            self._advect_shader.advect(
-                self._pressure.back_texture,
-                self._pressure.texture,
-                self._velocity.texture,
-                self._obstacle,
-                self._aspect, depth_scale,
-                advect_prs_step, dissipate_prs,
-                internal_format=GL_R16F
-            )
-            glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+    def _advect_pressure(self) -> None:
+        """Step 7: Advect & dissipate pressure (optional, non-physical)."""
+        if self.config.pressure.speed <= 0.0:
+            return
 
-        # ===== STEP 8: PRESSURE PROJECTION (make divergence-free) =====
+        advect_step = self._dt * self.config.pressure.speed
+        dissipation = self._calculate_dissipation(self._dt, self.config.pressure.fade_time)
 
+        self._pressure.swap()
+        self._advect_shader.advect(
+            self._pressure.back_texture,
+            self._pressure.texture,
+            self._velocity.texture,
+            self._obstacle,
+            self._aspect, self._depth_scale,
+            advect_step, dissipation,
+            internal_format=GL_R16F
+        )
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+
+    def _project_pressure(self) -> None:
+        """Step 8: Pressure projection (divergence → Jacobi solve → gradient subtraction)."""
         # 8a. Compute divergence
         self._divergence_shader.use(
             self._velocity.texture,
             self._obstacle,
             self._divergence_vol,
-            grid_scale, self._aspect, depth_scale
+            self._grid_scale, self._aspect, self._depth_scale
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # 8b. Solve Poisson equation for pressure (Jacobi iterations)
+        # 8b. Solve Poisson equation for pressure
         result = self._jacobi_pressure_shader.solve(
             self._pressure.texture,
             self._pressure.back_texture,
             self._divergence_vol,
             self._obstacle,
-            grid_scale, self._aspect, depth_scale,
+            self._grid_scale, self._aspect, self._depth_scale,
             total_iterations=self.config.pressure.iterations,
             iterations_per_dispatch=5
         )
-        # Ensure correct buffer is active
         if result != self._pressure.texture:
             self._pressure.swap()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -503,15 +532,16 @@ class FluidFlow3D:
         # 8c. Subtract pressure gradient from velocity
         self._velocity.swap()
         self._gradient_shader.use(
-            self._velocity.back_texture,    # read old velocity
-            self._pressure.texture,          # read pressure
+            self._velocity.back_texture,
+            self._pressure.texture,
             self._obstacle,
-            self._velocity.texture,          # write corrected velocity
-            grid_scale, self._aspect, depth_scale
+            self._velocity.texture,
+            self._grid_scale, self._aspect, self._depth_scale
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # ===== STEP 9: COMPOSITE 3D -> 2D =====
+    def _composite_output(self) -> None:
+        """Step 9: Composite 3D density → 2D output texture."""
         self._composite_shader.use(
             self._density.texture,
             self._output_texture,
@@ -519,6 +549,7 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
+    # ========== Deferred Requests ==========
 
     def _request_reset(self) -> None:
         """Thread-safe reset request — deferred to next update() on the GL thread."""
