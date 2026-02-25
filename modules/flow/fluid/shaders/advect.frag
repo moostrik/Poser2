@@ -22,10 +22,12 @@ uniform float uDissipation;    // Energy loss multiplier per frame
 void main() {
     vec2 st = texCoord;
 
+    // Obstacle check — write current source value (not black) so bilinear
+    // sampling across the boundary extrapolates smoothly instead of bleeding zeros.
     if (uHasObstacles) {
         float obstacle = texture(uObstacle, st).x;
         if (obstacle > 0.5) {
-            fragColor = vec4(0.0);
+            fragColor = texture(uSource, st);
             return;
         }
     }
@@ -33,8 +35,12 @@ void main() {
     // Backward trace along velocity (aspect-corrected)
     vec2 velocity = texture(uVelocity, st).xy;
     vec2 st_back = st - uTimestep * uRdx * velocity;
-    // No clamp — GL_CLAMP_TO_BORDER returns 0 for out-of-bounds samples,
-    // providing natural boundary decay without explicit obstacle checks.
+
+    // If backtrace lands inside an obstacle, fall back to current position
+    // (no advection) to prevent sampling from zeroed obstacle interior.
+    if (uHasObstacles && texture(uObstacle, st_back).x > 0.5) {
+        st_back = st;
+    }
 
     // Sample and dissipate
     fragColor = uDissipation * texture(uSource, st_back);

@@ -36,11 +36,12 @@ void main() {
     // Normalized 3D texture coordinates (center of voxel)
     vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
 
-    // Obstacle check
+    // Obstacle check — write current source value (not black) so trilinear
+    // sampling across the boundary extrapolates smoothly instead of bleeding zeros.
     if (uHasObstacles) {
         float obstacle = texture(uObstacle, st).r;
         if (obstacle > 0.5) {
-            imageStore(uResult, gid, vec4(0.0));
+            imageStore(uResult, gid, texture(uSource, st));
             return;
         }
     }
@@ -48,7 +49,12 @@ void main() {
     // Backward trace along 3D velocity
     vec3 velocity = texture(uVelocity, st).xyz;
     vec3 st_back = st - uTimestep * uRdx * velocity;
-    // No clamp needed — wrap mode (CLAMP_TO_BORDER) handles out-of-bounds
+
+    // If backtrace lands inside an obstacle, fall back to current position
+    // (no advection) to prevent sampling from zeroed obstacle interior.
+    if (uHasObstacles && texture(uObstacle, st_back).r > 0.5) {
+        st_back = st;
+    }
 
     // Sample source with trilinear interpolation and apply dissipation
     vec4 result = uDissipation * texture(uSource, st_back);

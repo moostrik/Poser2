@@ -54,8 +54,8 @@ class DepthConfig(Settings):
     layers: Field[int]              = Field(4,    min=1,    max=64,     description="Number of depth layers in the 3D volume")
     scale: Field[float]             = Field(1.0,  min=0.5,  max=5.0,    description="Manual multiplier on auto-computed Z grid spacing (width/depth_layers)")
     composite_mode: Field[int]      = Field(1,    min=0,    max=2,      description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
-    injection_layer: Field[float]   = Field(0.1,  min=0.0,  max=1.0,    description="Normalized depth for 2D->3D injection center")
-    injection_spread: Field[float]  = Field(0.15, min=0.01, max=0.5,    description="Gaussian sigma for depth spread during injection")
+    injection_layer: Field[float]   = Field(1.0,  min=0.0,  max=1.0,    description="Normalized depth for 2D->3D injection center")
+    injection_spread: Field[float]  = Field(0.001, min=0.001, max=0.5,   description="Gaussian sigma for depth spread during injection")
 
 class FluidFlow3DConfig(Settings):
     """Configuration for 3D fluid simulation.
@@ -227,8 +227,8 @@ class FluidFlow3D:
         self._allocated = True
 
         # DEBUG: inject test obstacle shapes
-        from ..fluid.debug_utils import upload_debug_obstacle
-        upload_debug_obstacle(self, self._simulation_width, self._simulation_height)
+        # from ..fluid.debug_utils import upload_debug_obstacle
+        # upload_debug_obstacle(self, self._simulation_width, self._simulation_height)
 
     def _update_simulation_dimensions(self) -> None:
         """Recompute simulation dimensions from current config."""
@@ -263,6 +263,14 @@ class FluidFlow3D:
         self._curl_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._vorticity_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+
+    def _regenerate_obstacle_volumes(self) -> None:
+        """Project 2D obstacle source into both 3D obstacle volumes."""
+        if not self._has_obstacles:
+            return
+        self._inject_binary_shader.use(self._obstacle_source.texture, self._simulation_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source.texture, self._density_obstacle, mode=1)
+        glMemoryBarrier(_BARRIER_IMAGE)
 
     def deallocate(self) -> None:
         """Release all GPU resources."""
@@ -665,6 +673,26 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
+    def add_velocity_z(self, texture: Texture, strength: float = 1.0) -> None:
+        """Inject 2D texture as Z-velocity (W channel) into 3D velocity volume.
+
+        Negative strength pushes fluid from back layer toward front (camera).
+        Uses motion magnitude as the per-pixel Z-velocity source.
+        """
+        if not self._allocated:
+            return
+        dt = 1.0 / max(1, self.config.fps)
+        # Negate: negative W at back layer pulls fluid toward front (camera)
+        effective = strength * self.config.velocity.input_strength * dt
+        self._inject_channel_shader.use(
+            texture, self._velocity.texture,
+            self.config.depth.injection_layer,
+            self.config.depth.injection_spread,
+            2, effective, mode=0,  # channel 2 = B component = W (Z-velocity)
+            internal_format=GL_RGBA16F
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
     def set_velocity(self, texture: Texture, strength: float = 1.0) -> None:
         """Set (replace) 3D velocity volume from 2D texture.
 
@@ -776,15 +804,6 @@ class FluidFlow3D:
             strength, mode=0,
             internal_format=GL_R16F
         )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    # ----- Obstacles -----
-    def _regenerate_obstacle_volumes(self) -> None:
-        """Project 2D obstacle source into both 3D obstacle volumes."""
-        if not self._has_obstacles:
-            return
-        self._inject_binary_shader.use(self._obstacle_source.texture, self._simulation_obstacle, mode=1)
-        self._inject_binary_shader.use(self._obstacle_source.texture, self._density_obstacle, mode=1)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def set_obstacle(self, texture: Texture) -> None:
