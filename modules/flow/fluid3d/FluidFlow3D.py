@@ -116,13 +116,11 @@ class FluidFlow3D:
         self._density_height: int = 0
         self._depth: int = 0
         self._aspect: float = 1.0
-        self._auto_depth_scale: float = 1.0
 
         self._reference_dt: float = 1.0 / 60.0  # iteration scaling baseline (60fps)
         self._dt: float = self._reference_dt
 
-        self._grid_scale: float = 0.5
-        self._depth_scale: float = 1.0
+        self._depth_aspect: float = 1.0
 
         self._has_obstacles: bool = False
 
@@ -232,7 +230,6 @@ class FluidFlow3D:
 
     def _allocate_simulation_fields(self) -> None:
         """(Re)allocate simulation-resolution 3D volumes."""
-        self._auto_depth_scale = self._simulation_width / max(1, self._depth)
         d = self._depth
         sim_w = self._simulation_width
         sim_h = self._simulation_height
@@ -324,11 +321,10 @@ class FluidFlow3D:
 
         # Per-frame state
         self._dt = 1.0 / max(1, self.config.fps)
-        self._depth_scale = self._auto_depth_scale * self.config.depth.scale
-        self._grid_scale = self.config.simulation_scale
+        self._depth_aspect = (self._simulation_width / max(1, self._depth)) * self.config.depth.scale
 
         # Dampen velocity (clean input for all steps)
-        vel = self.config.velocity
+        vel: VelocityConfig = self.config.velocity
         self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
 
         # Simulation steps
@@ -342,7 +338,7 @@ class FluidFlow3D:
         self._advect_density()
 
         # Dampen density (clean output)
-        den = self.config.density
+        den: DensityConfig = self.config.density
         self._dampen(self._density, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
 
         self._composite_output()
@@ -366,7 +362,7 @@ class FluidFlow3D:
             self._velocity.texture,
             self._velocity.back_texture,
             self._simulation_obstacle,
-            self._aspect, self._depth_scale,
+            self._aspect, self._depth_aspect,
             advect_step, dissipation,
             internal_format=GL_RGBA16F,
             has_obstacles=self._has_obstacles
@@ -385,7 +381,7 @@ class FluidFlow3D:
             self._velocity.texture,
             self._velocity.back_texture,
             self._simulation_obstacle,
-            self._grid_scale, self._aspect, self._depth_scale,
+            self.config.simulation_scale, self._aspect, self._depth_aspect,
             viscosity_dt,
             total_iterations=iterations,
             iterations_per_dispatch=5,
@@ -408,7 +404,7 @@ class FluidFlow3D:
             self._velocity.texture,
             self._simulation_obstacle,
             self._curl_vol,
-            self._grid_scale, self._aspect, self._depth_scale,
+            self.config.simulation_scale, self._aspect, self._depth_aspect,
             vorticity_radius,
             has_obstacles=self._has_obstacles
         )
@@ -419,7 +415,7 @@ class FluidFlow3D:
             self._curl_vol,
             self._simulation_obstacle,
             self._vorticity_force_vol,
-            self._grid_scale, self._aspect, self._depth_scale,
+            self.config.simulation_scale, self._aspect, self._depth_aspect,
             vorticity_force,
             has_obstacles=self._has_obstacles
         )
@@ -443,7 +439,7 @@ class FluidFlow3D:
             self._temperature.texture,
             self._velocity.texture,
             self._simulation_obstacle,
-            self._aspect, self._depth_scale,
+            self._aspect, self._depth_aspect,
             advect_step, dissipation,
             internal_format=GL_R16F,
             has_obstacles=self._has_obstacles
@@ -484,7 +480,7 @@ class FluidFlow3D:
             self._pressure.texture,
             self._velocity.texture,
             self._simulation_obstacle,
-            self._aspect, self._depth_scale,
+            self._aspect, self._depth_aspect,
             advect_step, dissipation,
             internal_format=GL_R16F,
             has_obstacles=self._has_obstacles
@@ -498,7 +494,7 @@ class FluidFlow3D:
             self._velocity.texture,
             self._simulation_obstacle,
             self._divergence_vol,
-            self._grid_scale, self._aspect, self._depth_scale,
+            self.config.simulation_scale, self._aspect, self._depth_aspect,
             has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -511,7 +507,7 @@ class FluidFlow3D:
             self._pressure.back_texture,
             self._divergence_vol,
             self._simulation_obstacle,
-            self._grid_scale, self._aspect, self._depth_scale,
+            self.config.simulation_scale, self._aspect, self._depth_aspect,
             total_iterations=iterations,
             iterations_per_dispatch=5,
             has_obstacles=self._has_obstacles
@@ -527,7 +523,7 @@ class FluidFlow3D:
             self._pressure.texture,
             self._simulation_obstacle,
             self._velocity.texture,
-            self._grid_scale, self._aspect, self._depth_scale,
+            self.config.simulation_scale, self._aspect, self._depth_aspect,
             has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -543,7 +539,7 @@ class FluidFlow3D:
             self._density.texture,
             self._velocity.texture,
             self._density_obstacle,
-            self._aspect, self._depth_scale,
+            self._aspect, self._depth_aspect,
             advect_step, dissipation,
             internal_format=GL_RGBA16F,
             has_obstacles=self._has_obstacles

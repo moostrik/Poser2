@@ -289,7 +289,7 @@ class FluidFlow:
         self._dt = 1.0 / max(1, self.config.fps)
 
         # Dampen velocity (clean input for all steps)
-        vel = self.config.velocity
+        vel: VelocityConfig = self.config.velocity
         self._dampen(self._velocity_fbo, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
 
         # Simulation steps
@@ -303,7 +303,7 @@ class FluidFlow:
         self._advect_density()
 
         # Dampen density (clean output)
-        den = self.config.density
+        den: DensityConfig = self.config.density
         self._dampen(self._density_fbo, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
 
 
