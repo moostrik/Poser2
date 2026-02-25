@@ -109,6 +109,7 @@ class FluidFlow:
         self._simulation_height: int = 0
         self._density_width: int = 0
         self._density_height: int = 0
+        self._aspect: float = 1.0
 
         self._reference_dt: float = 1.0 / 60.0  # iteration scaling baseline (60fps)
         self._dt: float = self._reference_dt
@@ -177,10 +178,7 @@ class FluidFlow:
         self._update_simulation_dimensions()
 
         self._allocate_simulation_fields()
-
-        # Density fields (full output resolution, only allocated once)
-        self._density_fbo.allocate(self._density_width, self._density_height, GL_RGBA16F)
-        self._density_obstacle_fbo.allocate(self._density_width, self._density_height, GL_R8)
+        self._allocate_density_fields()
 
         # Allocate shaders
         self._advect_shader.allocate()
@@ -207,6 +205,11 @@ class FluidFlow:
         self._simulation_width = self._align16(int(self._density_width * sim_scale))
         self._simulation_height = self._align16(int(self._density_height * sim_scale))
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
+
+    def _allocate_density_fields(self) -> None:
+        """(Re)allocate density-resolution FBOs (full output resolution)."""
+        self._density_fbo.allocate(self._density_width, self._density_height, GL_RGBA16F)
+        self._density_obstacle_fbo.allocate(self._density_width, self._density_height, GL_R8)
 
     def _allocate_simulation_fields(self) -> None:
         """(Re)allocate simulation-resolution FBOs."""
@@ -610,93 +613,133 @@ class FluidFlow:
     # ========== Input Methods ==========
     def set_velocity(self, texture: Texture, strength: float = 1.0) -> None:
         """Set velocity field."""
+        if not self._allocated:
+            return
         FlowUtil.set(self._velocity_fbo, texture, strength)
 
     def set_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Set velocity in a specific region."""
+        if not self._allocated:
+            return
         FlowUtil.set_region(self._velocity_fbo, texture, x, y, w, h, strength)
 
     def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
         """Add to velocity field. Applies config velocity.input_strength and delta_time."""
+        if not self._allocated:
+            return
         dt = 1.0 / max(1, self.config.fps)
         effective = strength * self.config.velocity.input_strength * dt
         FlowUtil.add(self._velocity_fbo, texture, effective)
 
     def add_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Add velocity to a specific region."""
+        if not self._allocated:
+            return
         FlowUtil.add_region(self._velocity_fbo, texture, x, y, w, h, strength)
 
     # ----- Density -----
-    def set_density(self, texture: Texture) -> None:
+    def set_density(self, texture: Texture, strength: float = 1.0) -> None:
         """Set density field."""
-        FlowUtil.blit(self._density_fbo, texture)
+        if not self._allocated:
+            return
+        FlowUtil.set(self._density_fbo, texture, strength)
 
     def set_density_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Set density in a specific region."""
+        if not self._allocated:
+            return
         FlowUtil.set_region(self._density_fbo, texture, x, y, w, h, strength)
 
     def set_density_channel(self, texture: Texture, channel: int) -> None:
         """Set single-channel texture to one of the density channels."""
+        if not self._allocated:
+            return
         FlowUtil.set_channel(self._density_fbo, texture, channel)
 
     def set_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Set density channel in a specific region."""
+        if not self._allocated:
+            return
         FlowUtil.set_channel_region(self._density_fbo, texture, channel, x, y, w, h, strength)
 
     def add_density(self, texture: Texture, strength: float = 1.0) -> None:
         """Add to density field. Applies config density.input_strength and delta_time."""
+        if not self._allocated:
+            return
         dt = 1.0 / max(1, self.config.fps)
         effective = strength * self.config.density.input_strength * dt
         FlowUtil.add(self._density_fbo, texture, effective)
 
     def add_density_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Add density to a specific region."""
+        if not self._allocated:
+            return
         FlowUtil.add_region(self._density_fbo, texture, x, y, w, h, strength)
 
     def add_density_channel(self, texture: Texture, channel: int, strength: float = 1.0) -> None:
         """Add single-channel texture to one of the density channels. Applies config density.input_strength and delta_time."""
+        if not self._allocated:
+            return
         dt = 1.0 / max(1, self.config.fps)
         effective = strength * self.config.density.input_strength * dt
         FlowUtil.add_channel(self._density_fbo, texture, channel, effective)
 
     def add_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Add density to a specific channel at a specific region."""
+        if not self._allocated:
+            return
         FlowUtil.add_channel_region(self._density_fbo, texture, channel, x, y, w, h, strength)
 
     # ----- Temperature -----
-    def set_temperature(self, texture: Texture) -> None:
+    def set_temperature(self, texture: Texture, strength: float = 1.0) -> None:
         """Set temperature field."""
-        FlowUtil.blit(self._temperature_fbo, texture)
+        if not self._allocated:
+            return
+        FlowUtil.set(self._temperature_fbo, texture, strength)
 
     def set_temperature_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Set temperature in a specific region."""
+        if not self._allocated:
+            return
         FlowUtil.set_region(self._temperature_fbo, texture, x, y, w, h, strength)
 
     def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
         """Add to temperature field. Applies config temperature.input_strength and delta_time."""
+        if not self._allocated:
+            return
         dt = 1.0 / max(1, self.config.fps)
         effective = strength * self.config.temperature.input_strength * dt
         FlowUtil.add(self._temperature_fbo, texture, effective)
 
     def add_temperature_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Add temperature to a specific region."""
+        if not self._allocated:
+            return
         FlowUtil.add_region(self._temperature_fbo, texture, x, y, w, h, strength)
 
     # ----- Pressure -----
-    def set_pressure(self, texture: Texture) -> None:
+    def set_pressure(self, texture: Texture, strength: float = 1.0) -> None:
         """Set pressure field."""
-        FlowUtil.blit(self._pressure_fbo, texture)
+        if not self._allocated:
+            return
+        FlowUtil.set(self._pressure_fbo, texture, strength)
 
     def set_pressure_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Set pressure in a specific region."""
+        if not self._allocated:
+            return
         FlowUtil.set_region(self._pressure_fbo, texture, x, y, w, h, strength)
 
     def add_pressure(self, texture: Texture, strength: float = 1.0) -> None:
         """Add to pressure field."""
+        if not self._allocated:
+            return
         FlowUtil.add(self._pressure_fbo, texture, strength)
 
     def add_pressure_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Add pressure to a specific region."""
+        if not self._allocated:
+            return
         FlowUtil.add_region(self._pressure_fbo, texture, x, y, w, h, strength)
 
     # ----- Obstacles -----
@@ -708,6 +751,8 @@ class FluidFlow:
         Args:
             texture: Obstacle mask (any channel > 0 = obstacle)
         """
+        if not self._allocated:
+            return
         FlowUtil.zero(self._simulation_obstacle_fbo)
         self._simulation_obstacle_fbo.swap()
         self._simulation_obstacle_fbo.begin()
@@ -730,6 +775,8 @@ class FluidFlow:
         Args:
             texture: Obstacle mask to add
         """
+        if not self._allocated:
+            return
         self._simulation_obstacle_fbo.swap()
         self._simulation_obstacle_fbo.begin()
         self._add_boolean_shader.use(self._simulation_obstacle_fbo.back_texture, texture)
@@ -744,6 +791,8 @@ class FluidFlow:
 
     def clear_obstacles(self) -> None:
         """Clear all obstacles."""
+        if not self._allocated:
+            return
         FlowUtil.zero(self._simulation_obstacle_fbo)
         FlowUtil.zero(self._density_obstacle_fbo)
         self._has_obstacles = False
