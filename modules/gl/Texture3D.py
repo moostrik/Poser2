@@ -102,6 +102,7 @@ class Texture3D:
 
         glBindTexture(GL_TEXTURE_3D, 0)
         self.allocated = True
+        self.clear()
 
     def deallocate(self) -> None:
         """Release texture resources."""

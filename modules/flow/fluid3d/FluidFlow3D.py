@@ -201,9 +201,7 @@ class FluidFlow3D:
 
         # Density fields (full output resolution × depth)
         self._density.allocate(self._density_width, self._density_height, self._depth, GL_RGBA16F)
-        self._density.clear_all()
         self._density_obstacle.allocate(self._density_width, self._density_height, self._depth, GL_R8)
-        self._density_obstacle.clear()
 
         # 2D composited output
         self._output_texture.allocate(self._density_width, self._density_height, GL_RGBA16F)
@@ -233,12 +231,7 @@ class FluidFlow3D:
         upload_debug_obstacle(self, self._simulation_width, self._simulation_height)
 
     def _allocate_simulation_fields(self) -> None:
-        """(Re)allocate simulation-resolution 3D volumes.
-
-        Texture3D.allocate() leaves contents undefined, so explicit clears
-        are required.  Density fields are NOT included -- they live at full
-        output resolution and are allocated separately in allocate().
-        """
+        """(Re)allocate simulation-resolution 3D volumes."""
         self._auto_depth_scale = self._simulation_width / max(1, self._depth)
         d = self._depth
         sim_w = self._simulation_width
@@ -246,30 +239,17 @@ class FluidFlow3D:
 
         # Primary simulation fields
         self._velocity.allocate(sim_w, sim_h, d, GL_RGBA16F)
-        self._velocity.clear_all()
-
         self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
-        self._temperature.clear_all()
-
         self._pressure.allocate(sim_w, sim_h, d, GL_R16F)
-        self._pressure.clear_all()
-
         self._simulation_obstacle.allocate(sim_w, sim_h, d, GL_R8)
         self._blit_shader.use(self._density_obstacle, self._simulation_obstacle, GL_R8)
         glMemoryBarrier(_BARRIER_IMAGE)
 
         # Intermediate volumes
         self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
-        self._divergence_vol.clear()
-
         self._curl_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
-        self._curl_vol.clear()
-
         self._vorticity_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
-        self._vorticity_force_vol.clear()
-
         self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
-        self._buoyancy_force_vol.clear()
 
     def deallocate(self) -> None:
         """Release all GPU resources."""
@@ -333,8 +313,6 @@ class FluidFlow3D:
         self._density.clear_all()
         self._temperature.clear_all()
         self._pressure.clear_all()
-        self._divergence_vol.clear()
-        self._curl_vol.clear()
 
     def update(self) -> None:
         """Run one frame of the 3D fluid simulation pipeline."""
@@ -346,7 +324,6 @@ class FluidFlow3D:
 
         # Per-frame state
         self._dt = 1.0 / max(1, self.config.fps)
-        self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
         self._depth_scale = self._auto_depth_scale * self.config.depth.scale
         self._grid_scale = self.config.simulation_scale
 
@@ -626,9 +603,7 @@ class FluidFlow3D:
                 if depth_changed:
                     # Density is at full resolution but shares depth dimension
                     self._density.allocate(self._density_width, self._density_height, self._depth, GL_RGBA16F)
-                    self._density.clear_all()
                     self._density_obstacle.allocate(self._density_width, self._density_height, self._depth, GL_R8)
-                    self._density_obstacle.clear()
 
         if self._reset_pending:
             self._reset_pending = False

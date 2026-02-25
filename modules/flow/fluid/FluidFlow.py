@@ -22,7 +22,7 @@ Boundary conditions via per-field wrap modes:
 """
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Texture, SwapFbo, Fbo, Blit
+from modules.gl import Texture, SwapFbo, Fbo
 from modules.settings import Field, Settings, Widget
 from .. import FlowUtil
 from .fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
@@ -208,12 +208,7 @@ class FluidFlow:
         upload_debug_obstacle(self, self._simulation_width, self._simulation_height)
 
     def _allocate_simulation_fields(self) -> None:
-        """(Re)allocate simulation-resolution FBOs.
-
-        Fbo.allocate() clears each buffer to zero, so no explicit clear needed.
-        Density fields are NOT included -- they live at full output resolution
-        and are allocated separately in allocate().
-        """
+        """(Re)allocate simulation-resolution FBOs."""
         sim_w = self._simulation_width
         sim_h = self._simulation_height
 
@@ -281,7 +276,6 @@ class FluidFlow:
         self._density_fbo.clear_all()
         self._temperature_fbo.clear_all()
         self._pressure_fbo.clear_all()
-        self._divergence_fbo.clear()
 
     def update(self) -> None:
         """Run one frame of the 2D fluid simulation pipeline."""
@@ -293,7 +287,6 @@ class FluidFlow:
 
         # Per-frame state
         self._dt = 1.0 / max(1, self.config.fps)
-        self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
 
         # Dampen velocity (clean input for all steps)
         vel = self.config.velocity
