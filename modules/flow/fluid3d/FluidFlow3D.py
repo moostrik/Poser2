@@ -23,9 +23,8 @@ from __future__ import annotations
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Texture, SwapFbo, Fbo
+from modules.gl import Texture
 from modules.gl.Texture3D import Texture3D, SwapTexture3D
-from modules.gl.ComputeShader import ComputeShader
 from modules.settings import Field, Settings, Widget
 from ..fluid.fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
 from .shaders import (
@@ -40,6 +39,9 @@ _BARRIER_FETCH_AND_IMAGE: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADE
 _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
 
+from modules.utils.HotReloadMethods import HotReloadMethods
+
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -51,7 +53,6 @@ class DepthConfig(Settings):
     composite_mode: Field[int]      = Field(1,    min=0,    max=2,      description="3D->2D compositing: 0=alpha, 1=additive, 2=max")
     injection_layer: Field[float]   = Field(0.1,  min=0.0,  max=1.0,    description="Normalized depth for 2D->3D injection center")
     injection_spread: Field[float]  = Field(0.15, min=0.01, max=0.5,    description="Gaussian sigma for depth spread during injection")
-
 
 class FluidFlow3DConfig(Settings):
     """Configuration for 3D fluid simulation.
@@ -65,8 +66,8 @@ class FluidFlow3DConfig(Settings):
 
     # ---- Global ----
     simulation_scale: Field[float]  = Field(0.5,    min=0.1,    max=2.0,    description="Resolution scale for simulation buffers")
-    avg_fps: Field[int]             = Field(60,     min=1,      max=240,    description="Current average FPS (bound from WindowManager)", access=Field.READ)
-    speed: Field[float]             = Field(0.93,   min=0.0,    max=5.0,    description="Base fluid transport rate")
+    fps: Field[int]                 = Field(60,     min=1,      max=240,    description="Current average FPS for dt calculation (bound from WindowManager)", access=Field.READ)
+    speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
 
     # ---- Field groups ----
     depth:       DepthConfig
@@ -104,11 +105,6 @@ class FluidFlow3D:
         _output_texture:  Texture RGBA16F    (composited from 3D density)
     """
 
-    @staticmethod
-    def _align16(v: int) -> int:
-        """Round up to the nearest multiple of 16."""
-        return (v + 15) & ~15
-
     def __init__(self, config: FluidFlow3DConfig | None = None) -> None:
         self.config: FluidFlow3DConfig = config or FluidFlow3DConfig()
 
@@ -116,40 +112,31 @@ class FluidFlow3D:
         self._height: int = 0
         self._density_width: int = 0
         self._density_height: int = 0
+
         self._depth: int = 0
         self._aspect: float = 1.0
-        self._dt: float = 1.0 / 60.0
-        self._depth_scale: float = 1.0
-        self._grid_scale: float = 0.5
         self._auto_depth_scale: float = 1.0
+
+        self._dt: float = 1.0 / 60.0
+
+        self._grid_scale: float = 0.5
+        self._depth_scale: float = 1.0
+
         self._allocated: bool = False
         self._reset_pending: bool = False
         self._reallocate_pending: bool = False
 
         # ---- Volumetric fields (SwapTexture3D for ping-pong) ----
         # Velocity: CLAMP_TO_BORDER(0) = no-slip walls
-        self._velocity: SwapTexture3D = SwapTexture3D(
-            wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0)
-        )
+        self._velocity: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         # Density: CLAMP_TO_BORDER(0) = nothing leaks out
-        self._density: SwapTexture3D = SwapTexture3D(
-            wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0)
-        )
+        self._density: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         # Temperature: CLAMP_TO_EDGE = insulated walls (Neumann)
-        self._temperature: SwapTexture3D = SwapTexture3D(
-            wrap=GL_CLAMP_TO_EDGE
-        )
+        self._temperature: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_EDGE)
         # Pressure: CLAMP_TO_EDGE = zero-gradient walls (Neumann)
-        self._pressure: SwapTexture3D = SwapTexture3D(
-            wrap=GL_CLAMP_TO_EDGE
-        )
-
+        self._pressure: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_EDGE)
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
-        self._obstacle: Texture3D = Texture3D(
-            interpolation=GL_NEAREST,
-            wrap=GL_CLAMP_TO_BORDER,
-            border_color=(1.0, 0.0, 0.0, 0.0)
-        )
+        self._obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
 
         # ---- Intermediate volumes (single buffer, no ping-pong) ----
         self._divergence_vol: Texture3D = Texture3D()
@@ -181,6 +168,8 @@ class FluidFlow3D:
         self.config.depth.bind(DepthConfig.layers, lambda _: self._request_reallocate())
         self.config.bind(FluidFlow3DConfig.simulation_scale, lambda _: self._request_reallocate())
 
+        self._hot_reload = HotReloadMethods(self.__class__, True, True)
+
     # ========== Allocation ==========
 
     def allocate(self, width: int, height: int) -> None:
@@ -198,40 +187,8 @@ class FluidFlow3D:
         self._height = self._align16(int(height * sim_scale))
         self._aspect = self._width / self._height if self._height > 0 else 1.0
         self._depth = self.config.depth.layers
-        self._auto_depth_scale = self._width / max(1, self._depth)
 
-        sim_w = self._width
-        sim_h = self._height
-        depth: int = self._depth
-
-        # Allocate volumetric fields (at incoming simulation resolution)
-        self._velocity.allocate(sim_w, sim_h, depth, GL_RGBA16F)
-        self._velocity.clear_all()
-
-        self._density.allocate(self._density_width, self._density_height, depth, GL_RGBA16F)
-        self._density.clear_all()
-
-        self._temperature.allocate(sim_w, sim_h, depth, GL_R16F)
-        self._temperature.clear_all()
-
-        self._pressure.allocate(sim_w, sim_h, depth, GL_R16F)
-        self._pressure.clear_all()
-
-        self._obstacle.allocate(sim_w, sim_h, depth, GL_R8)
-        self._obstacle.clear()
-
-        # Intermediate volumes
-        self._divergence_vol.allocate(sim_w, sim_h, depth, GL_R16F)
-        self._divergence_vol.clear()
-
-        self._curl_vol.allocate(sim_w, sim_h, depth, GL_RGBA16F)
-        self._curl_vol.clear()
-
-        self._vorticity_force_vol.allocate(sim_w, sim_h, depth, GL_RGBA16F)
-        self._vorticity_force_vol.clear()
-
-        self._buoyancy_force_vol.allocate(sim_w, sim_h, depth, GL_RGBA16F)
-        self._buoyancy_force_vol.clear()
+        self._allocate_volumes()
 
         # 2D composited output
         self._output_texture.allocate(self._density_width, self._density_height, GL_RGBA16F)
@@ -253,6 +210,47 @@ class FluidFlow3D:
         self._add_shader.allocate()
 
         self._allocated = True
+
+    def _allocate_volumes(self) -> None:
+        """(Re)allocate all 3D volumetric fields at current dimensions.
+
+        Uses self._width, self._height, self._depth (and self._density_width/
+        self._density_height for the density field).  Shaders are not touched
+        because they carry no resolution-dependent state.
+        """
+        self._auto_depth_scale = self._width / max(1, self._depth)
+        d = self._depth
+        sim_w = self._width
+        sim_h = self._height
+
+        # Primary simulation fields
+        self._velocity.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._velocity.clear_all()
+
+        self._density.allocate(self._density_width, self._density_height, d, GL_RGBA16F)
+        self._density.clear_all()
+
+        self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
+        self._temperature.clear_all()
+
+        self._pressure.allocate(sim_w, sim_h, d, GL_R16F)
+        self._pressure.clear_all()
+
+        self._obstacle.allocate(sim_w, sim_h, d, GL_R8)
+        self._obstacle.clear()
+
+        # Intermediate volumes
+        self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
+        self._divergence_vol.clear()
+
+        self._curl_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._curl_vol.clear()
+
+        self._vorticity_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._vorticity_force_vol.clear()
+
+        self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._buoyancy_force_vol.clear()
 
     def deallocate(self) -> None:
         """Release all GPU resources."""
@@ -301,14 +299,16 @@ class FluidFlow3D:
         self._composite_shader.reload()
         self._add_shader.reload()
 
-    # ========== Internal helpers ==========
-    @staticmethod
-    def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
-        """Calculate frame-rate independent decay multiplier.
-
-        Returns pow(0.01, dt / decay_time) -- field reaches 1% after decay_time seconds.
-        """
-        return pow(0.01, delta_time / max(0.001, decay_time))
+    def reset(self) -> None:
+        """Reset all simulation fields to zero."""
+        if not self._allocated:
+            return
+        self._velocity.clear_all()
+        self._density.clear_all()
+        self._temperature.clear_all()
+        self._pressure.clear_all()
+        self._divergence_vol.clear()
+        self._curl_vol.clear()
 
     # ========== Update Pipeline ==========
 
@@ -321,7 +321,7 @@ class FluidFlow3D:
         self._handle_deferred_actions()
 
         # Per-frame state
-        self._dt = 1.0 / max(1, self.config.avg_fps)
+        self._dt = 1.0 / max(1, self.config.fps)
         self._aspect = self._width / self._height if self._height > 0 else 1.0
         self._depth_scale = self._auto_depth_scale * self.config.depth.scale
         self._grid_scale = self.config.simulation_scale
@@ -341,26 +341,6 @@ class FluidFlow3D:
         self._advect_pressure()
         self._project_pressure()
         self._composite_output()
-
-    # ========== Deferred Actions ==========
-
-    def _handle_deferred_actions(self) -> None:
-        """Process reset and reallocation requests queued from the UI thread."""
-        if self._reallocate_pending:
-            self._reallocate_pending = False
-            new_depth = self.config.depth.layers
-            sim_scale = self.config.simulation_scale
-            new_w = self._align16(int(self._density_width * sim_scale))
-            new_h = self._align16(int(self._density_height * sim_scale))
-            if new_depth != self._depth or new_w != self._width or new_h != self._height:
-                self._width = new_w
-                self._height = new_h
-                self._aspect = self._width / self._height if self._height > 0 else 1.0
-                self._reallocate_volumes(new_depth)
-
-        if self._reset_pending:
-            self._reset_pending = False
-            self.reset()
 
     # ========== Pipeline Steps ==========
 
@@ -549,7 +529,41 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
-    # ========== Deferred Requests ==========
+    # ========== Internal helpers ==========
+
+    @staticmethod
+    def _align16(v: int) -> int:
+        """Round up to the nearest multiple of 16."""
+        return (v + 15) & ~15
+
+    @staticmethod
+    def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
+        """Calculate frame-rate independent decay multiplier.
+
+        Returns pow(0.01, dt / decay_time) -- field reaches 1% after decay_time seconds.
+        """
+        return pow(0.01, delta_time / max(0.001, decay_time))
+
+    # ========== Deferred ==========
+
+    def _handle_deferred_actions(self) -> None:
+        """Process reset and reallocation requests queued from the UI thread."""
+        if self._reallocate_pending:
+            self._reallocate_pending = False
+            new_depth = self.config.depth.layers
+            sim_scale = self.config.simulation_scale
+            new_w = self._align16(int(self._density_width * sim_scale))
+            new_h = self._align16(int(self._density_height * sim_scale))
+            if new_depth != self._depth or new_w != self._width or new_h != self._height:
+                self._width = new_w
+                self._height = new_h
+                self._aspect = self._width / self._height if self._height > 0 else 1.0
+                self._depth = new_depth
+                self._allocate_volumes()
+
+        if self._reset_pending:
+            self._reset_pending = False
+            self.reset()
 
     def _request_reset(self) -> None:
         """Thread-safe reset request — deferred to next update() on the GL thread."""
@@ -558,56 +572,6 @@ class FluidFlow3D:
     def _request_reallocate(self) -> None:
         """Thread-safe reallocation request — deferred to next update() on the GL thread."""
         self._reallocate_pending = True
-
-    def _reallocate_volumes(self, new_depth: int) -> None:
-        """Reallocate all 3D volumes with a new depth. Must run on the GL thread.
-
-        Shaders are not reallocated (they have no depth-dependent state).
-        """
-        self._depth = new_depth
-        self._auto_depth_scale = self._width / max(1, self._depth)
-        d = self._depth
-        sim_w = self._width
-        sim_h = self._height
-
-        # Reallocate volumetric fields
-        self._velocity.allocate(sim_w, sim_h, d, GL_RGBA16F)
-        self._velocity.clear_all()
-
-        self._density.allocate(self._density_width, self._density_height, d, GL_RGBA16F)
-        self._density.clear_all()
-
-        self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
-        self._temperature.clear_all()
-
-        self._pressure.allocate(sim_w, sim_h, d, GL_R16F)
-        self._pressure.clear_all()
-
-        self._obstacle.allocate(sim_w, sim_h, d, GL_R8)
-        self._obstacle.clear()
-
-        self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
-        self._divergence_vol.clear()
-
-        self._curl_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
-        self._curl_vol.clear()
-
-        self._vorticity_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
-        self._vorticity_force_vol.clear()
-
-        self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
-        self._buoyancy_force_vol.clear()
-
-    def reset(self) -> None:
-        """Reset all simulation fields to zero."""
-        if not self._allocated:
-            return
-        self._velocity.clear_all()
-        self._density.clear_all()
-        self._temperature.clear_all()
-        self._pressure.clear_all()
-        self._divergence_vol.clear()
-        self._curl_vol.clear()
 
     # ========== Input Methods (2D -> 3D injection) ==========
 
@@ -624,7 +588,7 @@ class FluidFlow3D:
         """
         if not self._allocated:
             return
-        effective = strength * self.config.velocity.input_strength * (1.0 / max(1, self.config.avg_fps))
+        effective = strength * self.config.velocity.input_strength * (1.0 / max(1, self.config.fps))
         self._inject_shader.use(
             texture, self._velocity.texture,
             self.config.depth.injection_layer,
@@ -655,7 +619,7 @@ class FluidFlow3D:
         """Inject 2D density texture into 3D density volume. Applies config density.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.config.avg_fps)
+        dt = 1.0 / max(1, self.config.fps)
         effective = strength * self.config.density.input_strength * dt
         self._inject_shader.use(
             texture, self._density.texture,
@@ -694,7 +658,7 @@ class FluidFlow3D:
         """
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.config.avg_fps)
+        dt = 1.0 / max(1, self.config.fps)
         effective = strength * self.config.density.input_strength * dt
         self._inject_channel_shader.use(
             texture, self._density.texture,
@@ -732,7 +696,7 @@ class FluidFlow3D:
         """Inject 2D temperature texture into 3D temperature volume. Applies config temperature.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.config.avg_fps)
+        dt = 1.0 / max(1, self.config.fps)
         effective = strength * self.config.temperature.input_strength * dt
         self._inject_shader.use(
             texture, self._temperature.texture,
@@ -769,7 +733,6 @@ class FluidFlow3D:
             internal_format=GL_R16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
-
 
     # ========== Properties ==========
 

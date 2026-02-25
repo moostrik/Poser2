@@ -24,6 +24,10 @@ from .shaders import (
 from modules.utils.HotReloadMethods import HotReloadMethods
 
 
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
 class FluidFlowConfig(Settings):
     """Configuration for fluid simulation.
 
@@ -50,7 +54,7 @@ class FluidFlowConfig(Settings):
 
     # ---- Global ----
     simulation_scale = Field(0.5, min=0.1, max=2.0, description="Resolution scale for simulation buffers")
-    avg_fps = Field(60, min=1, max=240, access=Field.READ, description="Current average FPS (bound from WindowManager)")
+    fps = Field(60, min=1, max=240, access=Field.READ, description="Current average FPS for dt calculation (bound from WindowManager)")
     speed = Field(0.5, min=0.0, max=5.0, description="Base fluid transport rate")
 
     # ---- Field groups ----
@@ -59,6 +63,10 @@ class FluidFlowConfig(Settings):
     temperature: TemperatureConfig
     pressure:    PressureConfig
 
+
+# ---------------------------------------------------------------------------
+# 2D Fluid Simulation
+# ---------------------------------------------------------------------------
 
 class FluidFlow(FlowBase):
     """2D Navier-Stokes fluid simulation.
@@ -80,11 +88,6 @@ class FluidFlow(FlowBase):
         5. Compute divergence and solve for pressure
         6. Subtract pressure gradient (make divergence-free)
     """
-
-    @staticmethod
-    def _align16(v: int) -> int:
-        """Round up to the nearest multiple of 16."""
-        return (v + 15) & ~15
 
     def __init__(self, config: FluidFlowConfig | None = None) -> None:
         super().__init__()
@@ -145,57 +148,7 @@ class FluidFlow(FlowBase):
         self.config.bind(FluidFlowConfig.reset_sim, lambda _: self._request_reset())
         self.config.bind(FluidFlowConfig.simulation_scale, lambda _: self._request_reallocate())
 
-    # ========== Properties (Domain-specific API) ==========
-
-    @property
-    def velocity(self) -> Texture:
-        """RG32F velocity field."""
-        return self._input
-
-    @property
-    def density(self) -> Texture:
-        """RGBA32F density/color field."""
-        return self._output
-
-    @property
-    def temperature(self) -> Texture:
-        """R32F temperature field."""
-        return self._temperature_fbo.texture
-
-    @property
-    def pressure(self) -> Texture:
-        """R32F pressure field."""
-        return self._pressure_fbo.texture
-
-    @property
-    def divergence(self) -> Texture:
-        """R32F divergence field (intermediate result)."""
-        return self._divergence_fbo.texture
-
-    @property
-    def vorticity_curl(self) -> Texture:
-        """R32F vorticity curl field."""
-        return self._vorticity_curl_fbo.texture
-
-    @property
-    def buoyancy(self) -> Texture:
-        """RG32F buoyancy force field."""
-        return self._buoyancy_fbo.texture
-
-    @property
-    def obstacle(self) -> Texture:
-        """R8 obstacle mask."""
-        return self._obstacle_fbo.texture
-
-    @property
-    def sim_width(self) -> int:
-        """Current simulation resolution width (aligned to 16)."""
-        return self._width
-
-    @property
-    def sim_height(self) -> int:
-        """Current simulation resolution height (aligned to 16)."""
-        return self._height
+        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     # ========== Allocation ==========
 
@@ -216,34 +169,7 @@ class FluidFlow(FlowBase):
         # Compute aspect ratio for isotropic simulation
         self._aspect: float = self._width / self._height if self._height > 0 else 1.0
 
-        # Allocate base FBOs (velocity RG32F, density RGBA32F)
-        super().allocate(self._width, self._height, self._density_width, self._density_height)
-
-        # Allocate simulation fields
-        self._temperature_fbo.allocate(self._width, self._height, GL_R16F)
-        FlowUtil.zero(self._temperature_fbo)
-
-        self._pressure_fbo.allocate(self._width, self._height, GL_R16F)
-        FlowUtil.zero(self._pressure_fbo)
-
-        self._obstacle_fbo.allocate(self._width, self._height, GL_R8)
-        FlowUtil.zero(self._obstacle_fbo)
-
-        # Allocate intermediate FBOs
-        self._divergence_fbo.allocate(self._width, self._height, GL_R16F)
-        FlowUtil.zero(self._divergence_fbo)
-
-        self._vorticity_curl_fbo.allocate(self._width, self._height, GL_R16F)
-        FlowUtil.zero(self._vorticity_curl_fbo)
-
-        self._vorticity_force_fbo.allocate(self._width, self._height, GL_RG16F)
-        FlowUtil.zero(self._vorticity_force_fbo)
-
-        self._buoyancy_fbo.allocate(self._width, self._height, GL_RG16F)
-        FlowUtil.zero(self._buoyancy_fbo)
-
-        self._obstacle_offset_fbo.allocate(self._width, self._height, GL_RGBA8)
-        FlowUtil.zero(self._obstacle_offset_fbo)
+        self._allocate_fbos()
 
         # Allocate shaders
         self._advect_shader.allocate()
@@ -261,6 +187,42 @@ class FluidFlow(FlowBase):
 
         # Initialize obstacle offset (border handled by GL_CLAMP_TO_BORDER)
         self._init_obstacle()
+
+    def _allocate_fbos(self) -> None:
+        """(Re)allocate all simulation FBOs at current dimensions.
+
+        Uses self._width, self._height (and self._density_width/
+        self._density_height for the density/output FBOs via FlowBase).
+        Shaders are not touched because they carry no resolution-dependent state.
+        """
+        # Base FBOs (velocity RG32F, density RGBA32F)
+        super().allocate(self._width, self._height, self._density_width, self._density_height)
+
+        # Simulation fields
+        self._temperature_fbo.allocate(self._width, self._height, GL_R16F)
+        FlowUtil.zero(self._temperature_fbo)
+
+        self._pressure_fbo.allocate(self._width, self._height, GL_R16F)
+        FlowUtil.zero(self._pressure_fbo)
+
+        self._obstacle_fbo.allocate(self._width, self._height, GL_R8)
+        FlowUtil.zero(self._obstacle_fbo)
+
+        # Intermediate FBOs
+        self._divergence_fbo.allocate(self._width, self._height, GL_R16F)
+        FlowUtil.zero(self._divergence_fbo)
+
+        self._vorticity_curl_fbo.allocate(self._width, self._height, GL_R16F)
+        FlowUtil.zero(self._vorticity_curl_fbo)
+
+        self._vorticity_force_fbo.allocate(self._width, self._height, GL_RG16F)
+        FlowUtil.zero(self._vorticity_force_fbo)
+
+        self._buoyancy_fbo.allocate(self._width, self._height, GL_RG16F)
+        FlowUtil.zero(self._buoyancy_fbo)
+
+        self._obstacle_offset_fbo.allocate(self._width, self._height, GL_RGBA8)
+        FlowUtil.zero(self._obstacle_offset_fbo)
 
     def deallocate(self) -> None:
         """Release all FBO resources."""
@@ -287,13 +249,20 @@ class FluidFlow(FlowBase):
         self._obstacle_offset_shader.deallocate()
         self._add_boolean_shader.deallocate()
 
-    def _request_reset(self) -> None:
-        """Thread-safe reset request — deferred to next update() on the GL thread."""
-        self._reset_pending = True
-
-    def _request_reallocate(self) -> None:
-        """Thread-safe reallocation request — deferred to next update() on the GL thread."""
-        self._reallocate_pending = True
+    def _reload_shaders(self) -> None:
+        """Hot-reload all shaders (checks file timestamps internally)."""
+        self._advect_shader.reload()
+        self._divergence_shader.reload()
+        self._gradient_shader.reload()
+        self._jacobi_pressure_shader.reload()
+        self._jacobi_pressure_compute.reload()
+        self._jacobi_diffusion_shader.reload()
+        self._jacobi_diffusion_compute.reload()
+        self._vorticity_curl_shader.reload()
+        self._vorticity_force_shader.reload()
+        self._buoyancy_shader.reload()
+        self._obstacle_offset_shader.reload()
+        self._add_boolean_shader.reload()
 
     def reset(self) -> None:
         """Reset all simulation fields to zero."""
@@ -302,125 +271,6 @@ class FluidFlow(FlowBase):
         FlowUtil.zero(self._pressure_fbo)
         FlowUtil.zero(self._divergence_fbo)
         # Don't reset obstacles (preserve border)
-
-    # ========== Input Methods ==========
-
-    # ----- Velocity -----
-    def set_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Set velocity field."""
-        FlowUtil.set(self._input_fbo, texture, strength)
-
-    def set_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Set velocity in a specific region."""
-        FlowUtil.set_region(self._input_fbo, texture, x, y, w, h, strength)
-
-    def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to velocity field. Applies config velocity.input_strength and delta_time."""
-        dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.velocity.input_strength * dt
-        FlowUtil.add(self._input_fbo, texture, effective)
-
-    def _add_force_to_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add internal force to velocity (no input_strength or dt scaling).
-
-        Use for simulation-internal forces (vorticity confinement, buoyancy)
-        that already carry their own dt scaling. Matches FluidFlow3D's
-        _add_force_to_velocity for 2D/3D parity.
-        """
-        FlowUtil.add(self._input_fbo, texture, strength)
-
-    def add_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Add velocity to a specific region."""
-        FlowUtil.add_region(self._input_fbo, texture, x, y, w, h, strength)
-
-    # ----- Density -----
-    def set_density(self, texture: Texture) -> None:
-        """Set density field."""
-        FlowUtil.blit(self._output_fbo, texture)
-
-    def set_density_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Set density in a specific region."""
-        FlowUtil.set_region(self._output_fbo, texture, x, y, w, h, strength)
-
-    def set_density_channel(self, texture: Texture, channel: int) -> None:
-        """Set single-channel texture to one of the density channels."""
-        FlowUtil.set_channel(self._output_fbo, texture, channel)
-
-    def set_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Set density channel in a specific region."""
-        FlowUtil.set_channel_region(self._output_fbo, texture, channel, x, y, w, h, strength)
-
-    def add_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to density field. Applies config density.input_strength and delta_time."""
-        dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.density.input_strength * dt
-        FlowUtil.add(self._output_fbo, texture, effective)
-
-    def add_density_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Add density to a specific region."""
-        FlowUtil.add_region(self._output_fbo, texture, x, y, w, h, strength)
-
-    def add_density_channel(self, texture: Texture, channel: int, strength: float = 1.0) -> None:
-        """Add single-channel texture to one of the density channels. Applies config density.input_strength and delta_time."""
-        dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.density.input_strength * dt
-        FlowUtil.add_channel(self._output_fbo, texture, channel, effective)
-
-    def add_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Add density to a specific channel at a specific region."""
-        FlowUtil.add_channel_region(self._output_fbo, texture, channel, x, y, w, h, strength)
-
-    def _dampen(self, fbo: SwapFbo, threshold: float, dampen_time: float,
-               delta_time: float, include_alpha: bool) -> None:
-        """Exponential drag on magnitude excess above threshold.
-
-        Args:
-            fbo: Field to dampen (ping-pong swap handled by FlowUtil)
-            threshold: Magnitude below which values are untouched
-            dampen_time: Seconds for excess to decay to ~1%. 0=off
-            delta_time: Frame delta time for frame-rate independence
-            include_alpha: True for density (RGBA magnitude), False for velocity (RGB)
-        """
-        if dampen_time <= 0.0:
-            return
-        factor = pow(0.01, delta_time / dampen_time)
-        FlowUtil.dampen(fbo, threshold, factor, include_alpha)
-
-    # ----- Temperature -----
-    def set_temperature(self, texture: Texture) -> None:
-        """Set temperature field."""
-        FlowUtil.blit(self._temperature_fbo, texture)
-
-    def set_temperature_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Set temperature in a specific region."""
-        FlowUtil.set_region(self._temperature_fbo, texture, x, y, w, h, strength)
-
-    def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to temperature field. Applies config temperature.input_strength and delta_time."""
-        dt = 1.0 / max(1, self.config.avg_fps)
-        effective = strength * self.config.temperature.input_strength * dt
-        FlowUtil.add(self._temperature_fbo, texture, effective)
-
-    def add_temperature_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Add temperature to a specific region."""
-        FlowUtil.add_region(self._temperature_fbo, texture, x, y, w, h, strength)
-
-    # ----- Pressure -----
-    def set_pressure(self, texture: Texture) -> None:
-        """Set pressure field."""
-        FlowUtil.blit(self._pressure_fbo, texture)
-
-    def set_pressure_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Set pressure in a specific region."""
-        FlowUtil.set_region(self._pressure_fbo, texture, x, y, w, h, strength)
-
-    def add_pressure(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to pressure field."""
-        FlowUtil.add(self._pressure_fbo, texture, strength)
-
-    def add_pressure_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Add pressure to a specific region."""
-        FlowUtil.add_region(self._pressure_fbo, texture, x, y, w, h, strength)
 
     # ========== Update Pipeline ==========
 
@@ -433,7 +283,7 @@ class FluidFlow(FlowBase):
         self._reload_shaders()
 
         # Per-frame state
-        self._dt = 1.0 / max(1, self.config.avg_fps)
+        self._dt = 1.0 / max(1, self.config.fps)
         self._aspect = self._width / self._height if self._height > 0 else 1.0
 
         # Dampen inputs before simulation
@@ -451,7 +301,7 @@ class FluidFlow(FlowBase):
         self._advect_pressure()
         self._project_pressure()
 
-    # ========== Deferred Actions ==========
+    # ========== Deferred ==========
 
     def _handle_deferred_actions(self) -> None:
         """Process reset and reallocation requests queued from the UI thread."""
@@ -465,22 +315,19 @@ class FluidFlow(FlowBase):
             new_w = self._align16(int(self._density_width * sim_scale))
             new_h = self._align16(int(self._density_height * sim_scale))
             if new_w != self._width or new_h != self._height:
-                self.allocate(self._density_width, self._density_height)
+                self._width = new_w
+                self._height = new_h
+                self._aspect = self._width / self._height if self._height > 0 else 1.0
+                self._allocate_fbos()
+                self._init_obstacle()
 
-    def _reload_shaders(self) -> None:
-        """Hot-reload all shaders (checks file timestamps internally)."""
-        self._advect_shader.reload()
-        self._divergence_shader.reload()
-        self._gradient_shader.reload()
-        self._jacobi_pressure_shader.reload()
-        self._jacobi_pressure_compute.reload()
-        self._jacobi_diffusion_shader.reload()
-        self._jacobi_diffusion_compute.reload()
-        self._vorticity_curl_shader.reload()
-        self._vorticity_force_shader.reload()
-        self._buoyancy_shader.reload()
-        self._obstacle_offset_shader.reload()
-        self._add_boolean_shader.reload()
+    def _request_reset(self) -> None:
+        """Thread-safe reset request — deferred to next update() on the GL thread."""
+        self._reset_pending = True
+
+    def _request_reallocate(self) -> None:
+        """Thread-safe reallocation request — deferred to next update() on the GL thread."""
+        self._reallocate_pending = True
 
     # ========== Pipeline Steps ==========
 
@@ -699,6 +546,26 @@ class FluidFlow(FlowBase):
         )
         self._input_fbo.end()
 
+    # ========== Internal helpers ==========
+
+    @staticmethod
+    def _align16(v: int) -> int:
+        """Round up to the nearest multiple of 16."""
+        return (v + 15) & ~15
+
+    @staticmethod
+    def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
+        """Calculate frame-rate independent decay multiplier.
+
+        Args:
+            delta_time: Frame delta time (1/fps)
+            decay_time: Time in seconds to reach 1% of original value
+
+        Returns:
+            Multiplier to apply to field this frame (e.g., 0.99 = 1% loss)
+        """
+        return pow(0.01, delta_time / max(0.001, decay_time))
+
     # ========== Obstacle Initialization ==========
 
     def _init_obstacle(self) -> None:
@@ -758,15 +625,173 @@ class FluidFlow(FlowBase):
         self._obstacle_offset_shader.use(self._obstacle_fbo.texture)
         self._obstacle_offset_fbo.end()
 
-    @staticmethod
-    def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
-        """Calculate frame-rate independent decay multiplier.
+    # ========== Input Methods ==========
+
+    # ----- Velocity -----
+    def set_velocity(self, texture: Texture, strength: float = 1.0) -> None:
+        """Set velocity field."""
+        FlowUtil.set(self._input_fbo, texture, strength)
+
+    def set_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Set velocity in a specific region."""
+        FlowUtil.set_region(self._input_fbo, texture, x, y, w, h, strength)
+
+    def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
+        """Add to velocity field. Applies config velocity.input_strength and delta_time."""
+        dt = 1.0 / max(1, self.config.fps)
+        effective = strength * self.config.velocity.input_strength * dt
+        FlowUtil.add(self._input_fbo, texture, effective)
+
+    def _add_force_to_velocity(self, texture: Texture, strength: float = 1.0) -> None:
+        """Add internal force to velocity (no input_strength or dt scaling).
+
+        Use for simulation-internal forces (vorticity confinement, buoyancy)
+        that already carry their own dt scaling. Matches FluidFlow3D's
+        _add_force_to_velocity for 2D/3D parity.
+        """
+        FlowUtil.add(self._input_fbo, texture, strength)
+
+    def add_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Add velocity to a specific region."""
+        FlowUtil.add_region(self._input_fbo, texture, x, y, w, h, strength)
+
+    # ----- Density -----
+    def set_density(self, texture: Texture) -> None:
+        """Set density field."""
+        FlowUtil.blit(self._output_fbo, texture)
+
+    def set_density_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Set density in a specific region."""
+        FlowUtil.set_region(self._output_fbo, texture, x, y, w, h, strength)
+
+    def set_density_channel(self, texture: Texture, channel: int) -> None:
+        """Set single-channel texture to one of the density channels."""
+        FlowUtil.set_channel(self._output_fbo, texture, channel)
+
+    def set_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Set density channel in a specific region."""
+        FlowUtil.set_channel_region(self._output_fbo, texture, channel, x, y, w, h, strength)
+
+    def add_density(self, texture: Texture, strength: float = 1.0) -> None:
+        """Add to density field. Applies config density.input_strength and delta_time."""
+        dt = 1.0 / max(1, self.config.fps)
+        effective = strength * self.config.density.input_strength * dt
+        FlowUtil.add(self._output_fbo, texture, effective)
+
+    def add_density_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Add density to a specific region."""
+        FlowUtil.add_region(self._output_fbo, texture, x, y, w, h, strength)
+
+    def add_density_channel(self, texture: Texture, channel: int, strength: float = 1.0) -> None:
+        """Add single-channel texture to one of the density channels. Applies config density.input_strength and delta_time."""
+        dt = 1.0 / max(1, self.config.fps)
+        effective = strength * self.config.density.input_strength * dt
+        FlowUtil.add_channel(self._output_fbo, texture, channel, effective)
+
+    def add_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Add density to a specific channel at a specific region."""
+        FlowUtil.add_channel_region(self._output_fbo, texture, channel, x, y, w, h, strength)
+
+    def _dampen(self, fbo: SwapFbo, threshold: float, dampen_time: float,
+               delta_time: float, include_alpha: bool) -> None:
+        """Exponential drag on magnitude excess above threshold.
 
         Args:
-            delta_time: Frame delta time (1/fps)
-            decay_time: Time in seconds to reach 1% of original value
-
-        Returns:
-            Multiplier to apply to field this frame (e.g., 0.99 = 1% loss)
+            fbo: Field to dampen (ping-pong swap handled by FlowUtil)
+            threshold: Magnitude below which values are untouched
+            dampen_time: Seconds for excess to decay to ~1%. 0=off
+            delta_time: Frame delta time for frame-rate independence
+            include_alpha: True for density (RGBA magnitude), False for velocity (RGB)
         """
-        return pow(0.01, delta_time / max(0.001, decay_time))
+        if dampen_time <= 0.0:
+            return
+        factor = pow(0.01, delta_time / dampen_time)
+        FlowUtil.dampen(fbo, threshold, factor, include_alpha)
+
+    # ----- Temperature -----
+    def set_temperature(self, texture: Texture) -> None:
+        """Set temperature field."""
+        FlowUtil.blit(self._temperature_fbo, texture)
+
+    def set_temperature_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Set temperature in a specific region."""
+        FlowUtil.set_region(self._temperature_fbo, texture, x, y, w, h, strength)
+
+    def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
+        """Add to temperature field. Applies config temperature.input_strength and delta_time."""
+        dt = 1.0 / max(1, self.config.fps)
+        effective = strength * self.config.temperature.input_strength * dt
+        FlowUtil.add(self._temperature_fbo, texture, effective)
+
+    def add_temperature_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Add temperature to a specific region."""
+        FlowUtil.add_region(self._temperature_fbo, texture, x, y, w, h, strength)
+
+    # ----- Pressure -----
+    def set_pressure(self, texture: Texture) -> None:
+        """Set pressure field."""
+        FlowUtil.blit(self._pressure_fbo, texture)
+
+    def set_pressure_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Set pressure in a specific region."""
+        FlowUtil.set_region(self._pressure_fbo, texture, x, y, w, h, strength)
+
+    def add_pressure(self, texture: Texture, strength: float = 1.0) -> None:
+        """Add to pressure field."""
+        FlowUtil.add(self._pressure_fbo, texture, strength)
+
+    def add_pressure_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
+        """Add pressure to a specific region."""
+        FlowUtil.add_region(self._pressure_fbo, texture, x, y, w, h, strength)
+
+    # ========== Properties ==========
+
+    @property
+    def velocity(self) -> Texture:
+        """RG32F velocity field."""
+        return self._input
+
+    @property
+    def density(self) -> Texture:
+        """RGBA32F density/color field."""
+        return self._output
+
+    @property
+    def temperature(self) -> Texture:
+        """R32F temperature field."""
+        return self._temperature_fbo.texture
+
+    @property
+    def pressure(self) -> Texture:
+        """R32F pressure field."""
+        return self._pressure_fbo.texture
+
+    @property
+    def divergence(self) -> Texture:
+        """R32F divergence field (intermediate result)."""
+        return self._divergence_fbo.texture
+
+    @property
+    def vorticity_curl(self) -> Texture:
+        """R32F vorticity curl field."""
+        return self._vorticity_curl_fbo.texture
+
+    @property
+    def buoyancy(self) -> Texture:
+        """RG32F buoyancy force field."""
+        return self._buoyancy_fbo.texture
+
+    @property
+    def obstacle(self) -> Texture:
+        """R8 obstacle mask."""
+        return self._obstacle_fbo.texture
+
+    @property
+    def sim_width(self) -> int:
+        """Current simulation resolution width (aligned to 16)."""
+        return self._width
+
+    @property
+    def sim_height(self) -> int:
+        """Current simulation resolution height (aligned to 16)."""
+        return self._height

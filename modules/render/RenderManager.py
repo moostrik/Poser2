@@ -124,8 +124,8 @@ class RenderManager(RenderBase):
 
         # Propagate window fps to fluid simulation configs
         def _propagate_fps(fps: int) -> None:
-            settings.fluid.fluid_flow.avg_fps = fps
-            settings.fluid3D.fluid_flow.avg_fps = fps
+            settings.fluid.fluid_flow.fps = fps
+            settings.fluid3D.fluid_flow.fps = fps
         settings.window.bind(WindowSettings.avg_fps, _propagate_fps)
 
         # hot reloader
