@@ -299,6 +299,8 @@ class FluidFlow3D:
         self._composite_shader.reload()
         self._add_shader.reload()
 
+    # ========== Update Pipeline ==========
+
     def reset(self) -> None:
         """Reset all simulation fields to zero."""
         if not self._allocated:
@@ -309,8 +311,6 @@ class FluidFlow3D:
         self._pressure.clear_all()
         self._divergence_vol.clear()
         self._curl_vol.clear()
-
-    # ========== Update Pipeline ==========
 
     def update(self) -> None:
         """Run one frame of the 3D fluid simulation pipeline."""
@@ -343,6 +343,11 @@ class FluidFlow3D:
         self._composite_output()
 
     # ========== Pipeline Steps ==========
+
+    def _add_force_to_velocity(self, force: Texture3D, strength: float = 1.0) -> None:
+        """Add 3D force volume to velocity in-place (no swap needed)."""
+        self._add_shader.use(self._velocity.texture, force, strength)
+        glMemoryBarrier(_BARRIER_IMAGE)
 
     def _advect_density(self) -> None:
         """Step 1: Advect & dissipate density field."""
@@ -520,6 +525,29 @@ class FluidFlow3D:
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
+    def _dampen(self, volume: SwapTexture3D, threshold: float, dampen_time: float,
+               delta_time: float, include_alpha: bool,
+               internal_format: int = GL_RGBA16F) -> None:
+        """Exponential drag on magnitude excess above threshold.
+
+        Args:
+            volume: Volumetric field to dampen (in-place via compute shader)
+            threshold: Magnitude below which values are untouched
+            dampen_time: Seconds for excess to decay to ~1%. 0=off
+            delta_time: Frame delta time for frame-rate independence
+            include_alpha: True for density (RGBA magnitude), False for velocity (RGB)
+            internal_format: Image format for volume binding
+        """
+        if dampen_time <= 0.0:
+            return
+        factor = pow(0.01, delta_time / dampen_time)
+        self._dampen_shader.use(
+            volume.texture, threshold, factor,
+            include_alpha=include_alpha,
+            internal_format=internal_format
+        )
+        glMemoryBarrier(_BARRIER_IMAGE)
+
     def _composite_output(self) -> None:
         """Step 9: Composite 3D density → 2D output texture."""
         self._composite_shader.use(
@@ -528,21 +556,6 @@ class FluidFlow3D:
             self.config.depth.composite_mode
         )
         glMemoryBarrier(_BARRIER_IMAGE)
-
-    # ========== Internal helpers ==========
-
-    @staticmethod
-    def _align16(v: int) -> int:
-        """Round up to the nearest multiple of 16."""
-        return (v + 15) & ~15
-
-    @staticmethod
-    def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
-        """Calculate frame-rate independent decay multiplier.
-
-        Returns pow(0.01, dt / decay_time) -- field reaches 1% after decay_time seconds.
-        """
-        return pow(0.01, delta_time / max(0.001, decay_time))
 
     # ========== Deferred ==========
 
@@ -573,12 +586,22 @@ class FluidFlow3D:
         """Thread-safe reallocation request — deferred to next update() on the GL thread."""
         self._reallocate_pending = True
 
-    # ========== Input Methods (2D -> 3D injection) ==========
+    # ========== Internal helpers ==========
 
-    def _add_force_to_velocity(self, force: Texture3D, strength: float = 1.0) -> None:
-        """Add 3D force volume to velocity in-place (no swap needed)."""
-        self._add_shader.use(self._velocity.texture, force, strength)
-        glMemoryBarrier(_BARRIER_IMAGE)
+    @staticmethod
+    def _align16(v: int) -> int:
+        """Round up to the nearest multiple of 16."""
+        return (v + 15) & ~15
+
+    @staticmethod
+    def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
+        """Calculate frame-rate independent decay multiplier.
+
+        Returns pow(0.01, dt / decay_time) -- field reaches 1% after decay_time seconds.
+        """
+        return pow(0.01, delta_time / max(0.001, decay_time))
+
+    # ========== Input Methods (2D -> 3D injection) ==========
 
     def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
         """Inject 2D velocity texture into 3D velocity volume.
@@ -666,29 +689,6 @@ class FluidFlow3D:
             self.config.depth.injection_spread,
             channel, effective, mode=0,
             internal_format=GL_RGBA16F
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-    def _dampen(self, volume: SwapTexture3D, threshold: float, dampen_time: float,
-               delta_time: float, include_alpha: bool,
-               internal_format: int = GL_RGBA16F) -> None:
-        """Exponential drag on magnitude excess above threshold.
-
-        Args:
-            volume: Volumetric field to dampen (in-place via compute shader)
-            threshold: Magnitude below which values are untouched
-            dampen_time: Seconds for excess to decay to ~1%. 0=off
-            delta_time: Frame delta time for frame-rate independence
-            include_alpha: True for density (RGBA magnitude), False for velocity (RGB)
-            internal_format: Image format for volume binding
-        """
-        if dampen_time <= 0.0:
-            return
-        factor = pow(0.01, delta_time / dampen_time)
-        self._dampen_shader.use(
-            volume.texture, threshold, factor,
-            include_alpha=include_alpha,
-            internal_format=internal_format
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 

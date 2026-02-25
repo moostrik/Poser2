@@ -264,6 +264,8 @@ class FluidFlow(FlowBase):
         self._obstacle_offset_shader.reload()
         self._add_boolean_shader.reload()
 
+    # ========== Update Pipeline ==========
+
     def reset(self) -> None:
         """Reset all simulation fields to zero."""
         super().reset()
@@ -271,8 +273,6 @@ class FluidFlow(FlowBase):
         FlowUtil.zero(self._pressure_fbo)
         FlowUtil.zero(self._divergence_fbo)
         # Don't reset obstacles (preserve border)
-
-    # ========== Update Pipeline ==========
 
     def update(self) -> None:
         """Run one frame of the 2D fluid simulation pipeline."""
@@ -301,35 +301,16 @@ class FluidFlow(FlowBase):
         self._advect_pressure()
         self._project_pressure()
 
-    # ========== Deferred ==========
-
-    def _handle_deferred_actions(self) -> None:
-        """Process reset and reallocation requests queued from the UI thread."""
-        if self._reset_pending:
-            self._reset_pending = False
-            self.reset()
-
-        if self._reallocate_pending:
-            self._reallocate_pending = False
-            sim_scale = self.config.simulation_scale
-            new_w = self._align16(int(self._density_width * sim_scale))
-            new_h = self._align16(int(self._density_height * sim_scale))
-            if new_w != self._width or new_h != self._height:
-                self._width = new_w
-                self._height = new_h
-                self._aspect = self._width / self._height if self._height > 0 else 1.0
-                self._allocate_fbos()
-                self._init_obstacle()
-
-    def _request_reset(self) -> None:
-        """Thread-safe reset request — deferred to next update() on the GL thread."""
-        self._reset_pending = True
-
-    def _request_reallocate(self) -> None:
-        """Thread-safe reallocation request — deferred to next update() on the GL thread."""
-        self._reallocate_pending = True
-
     # ========== Pipeline Steps ==========
+
+    def _add_force_to_velocity(self, texture: Texture, strength: float = 1.0) -> None:
+        """Add internal force to velocity (no input_strength or dt scaling).
+
+        Use for simulation-internal forces (vorticity confinement, buoyancy)
+        that already carry their own dt scaling. Matches FluidFlow3D's
+        _add_force_to_velocity for 2D/3D parity.
+        """
+        FlowUtil.add(self._input_fbo, texture, strength)
 
     def _advect_density(self) -> None:
         """Step 1: Advect & dissipate density field."""
@@ -546,6 +527,50 @@ class FluidFlow(FlowBase):
         )
         self._input_fbo.end()
 
+    def _dampen(self, fbo: SwapFbo, threshold: float, dampen_time: float,
+               delta_time: float, include_alpha: bool) -> None:
+        """Exponential drag on magnitude excess above threshold.
+
+        Args:
+            fbo: Field to dampen (ping-pong swap handled by FlowUtil)
+            threshold: Magnitude below which values are untouched
+            dampen_time: Seconds for excess to decay to ~1%. 0=off
+            delta_time: Frame delta time for frame-rate independence
+            include_alpha: True for density (RGBA magnitude), False for velocity (RGB)
+        """
+        if dampen_time <= 0.0:
+            return
+        factor = pow(0.01, delta_time / dampen_time)
+        FlowUtil.dampen(fbo, threshold, factor, include_alpha)
+
+    # ========== Deferred ==========
+
+    def _handle_deferred_actions(self) -> None:
+        """Process reset and reallocation requests queued from the UI thread."""
+        if self._reset_pending:
+            self._reset_pending = False
+            self.reset()
+
+        if self._reallocate_pending:
+            self._reallocate_pending = False
+            sim_scale = self.config.simulation_scale
+            new_w = self._align16(int(self._density_width * sim_scale))
+            new_h = self._align16(int(self._density_height * sim_scale))
+            if new_w != self._width or new_h != self._height:
+                self._width = new_w
+                self._height = new_h
+                self._aspect = self._width / self._height if self._height > 0 else 1.0
+                self._allocate_fbos()
+                self._init_obstacle()
+
+    def _request_reset(self) -> None:
+        """Thread-safe reset request — deferred to next update() on the GL thread."""
+        self._reset_pending = True
+
+    def _request_reallocate(self) -> None:
+        """Thread-safe reallocation request — deferred to next update() on the GL thread."""
+        self._reallocate_pending = True
+
     # ========== Internal helpers ==========
 
     @staticmethod
@@ -642,15 +667,6 @@ class FluidFlow(FlowBase):
         effective = strength * self.config.velocity.input_strength * dt
         FlowUtil.add(self._input_fbo, texture, effective)
 
-    def _add_force_to_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add internal force to velocity (no input_strength or dt scaling).
-
-        Use for simulation-internal forces (vorticity confinement, buoyancy)
-        that already carry their own dt scaling. Matches FluidFlow3D's
-        _add_force_to_velocity for 2D/3D parity.
-        """
-        FlowUtil.add(self._input_fbo, texture, strength)
-
     def add_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Add velocity to a specific region."""
         FlowUtil.add_region(self._input_fbo, texture, x, y, w, h, strength)
@@ -691,22 +707,6 @@ class FluidFlow(FlowBase):
     def add_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Add density to a specific channel at a specific region."""
         FlowUtil.add_channel_region(self._output_fbo, texture, channel, x, y, w, h, strength)
-
-    def _dampen(self, fbo: SwapFbo, threshold: float, dampen_time: float,
-               delta_time: float, include_alpha: bool) -> None:
-        """Exponential drag on magnitude excess above threshold.
-
-        Args:
-            fbo: Field to dampen (ping-pong swap handled by FlowUtil)
-            threshold: Magnitude below which values are untouched
-            dampen_time: Seconds for excess to decay to ~1%. 0=off
-            delta_time: Frame delta time for frame-rate independence
-            include_alpha: True for density (RGBA magnitude), False for velocity (RGB)
-        """
-        if dampen_time <= 0.0:
-            return
-        factor = pow(0.01, delta_time / dampen_time)
-        FlowUtil.dampen(fbo, threshold, factor, include_alpha)
 
     # ----- Temperature -----
     def set_temperature(self, texture: Texture) -> None:
