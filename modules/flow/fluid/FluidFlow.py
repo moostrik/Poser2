@@ -1,17 +1,28 @@
-"""Fluid Flow - 2D Navier-Stokes fluid simulation.
+"""FluidFlow - 2D Navier-Stokes fluid simulation.
 
-Implements velocity, density, temperature, and pressure fields with:
-- Semi-Lagrangian advection
-- Pressure projection (incompressibility)
-- Viscosity diffusion
-- Vorticity confinement
-- Buoyancy forces
+All-fragment pipeline operating on GL_TEXTURE_2D FBOs with ping-pong
+buffers for iterative solvers.
 
-Ported from ofxFlowTools ftFluidFlow.h/cpp
+Pipeline:
+    1. Dampen velocity (magnitude clamping)
+    2. Advect velocity (self-advection)
+    3. Apply viscosity (Jacobi diffusion solver)
+    4. Confine vorticity (curl + confinement force)
+    5. Advect temperature
+    6. Apply buoyancy force
+    7. Advect pressure (optional, non-physical)
+    8. Enforce incompressibility (divergence -> Jacobi solve -> gradient subtraction)
+    9. Advect density (semi-Lagrangian)
+   10. Dampen density (magnitude clamping)
+
+Boundary conditions via per-field wrap modes:
+    Velocity/density:  GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
+    Pressure/temp:     GL_CLAMP_TO_EDGE              -> zero-gradient / Neumann
+    Obstacle:          GL_CLAMP_TO_BORDER(1,1,1,1)   -> OOB = obstacle
 """
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Texture, SwapFbo, Fbo
+from modules.gl import Texture, SwapFbo, Fbo, Blit
 from modules.settings import Field, Settings, Widget
 from .. import FlowUtil
 from .fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, PressureConfig
@@ -50,12 +61,12 @@ class FluidFlowConfig(Settings):
     """
 
     # ---- Actions ----
-    reset_sim = Field(False, widget=Widget.button, description="Reset all simulation fields to zero")
+    reset_sim: Field[bool]          = Field(False, widget=Widget.button, description="Reset all simulation fields to zero")
 
     # ---- Global ----
-    simulation_scale = Field(0.5, min=0.1, max=2.0, description="Resolution scale for simulation buffers")
-    fps = Field(60, min=1, max=240, access=Field.READ, description="Current average FPS for dt calculation (bound from WindowManager)")
-    speed = Field(0.5, min=0.0, max=5.0, description="Base fluid transport rate")
+    simulation_scale: Field[float]  = Field(0.5, min=0.1, max=2.0, description="Resolution scale for simulation buffers")
+    fps: Field[int]                 = Field(60, min=1, max=240, access=Field.READ, description="Current average FPS for dt calculation (bound from WindowManager)")
+    speed: Field[float]             = Field(0.5, min=0.0, max=5.0, description="Base fluid transport rate")
 
     # ---- Field groups ----
     velocity:    VelocityConfig
@@ -71,6 +82,10 @@ class FluidFlowConfig(Settings):
 class FluidFlow:
     """2D Navier-Stokes fluid simulation.
 
+    Does NOT inherit FlowBase -- manages its own SwapFbo ping-pong
+    buffers directly.  Provides a compatible public API with the 3D
+    FluidFlow3D where applicable.
+
     Fields:
         velocity:             SwapFbo RG16F    (u, v)
         density:              SwapFbo RGBA16F   (r, g, b, a)
@@ -84,41 +99,37 @@ class FluidFlow:
         vorticity_curl:   Fbo R16F
         vorticity_force:  Fbo RG16F
         buoyancy:         Fbo RG16F
-
-    Update pipeline:
-        1. Advect density, velocity, temperature, pressure
-        2. Apply viscosity (if enabled)
-        3. Apply vorticity confinement (if enabled)
-        4. Apply buoyancy (if enabled)
-        5. Compute divergence and solve for pressure
-        6. Subtract pressure gradient (make divergence-free)
     """
 
     def __init__(self, config: FluidFlowConfig | None = None) -> None:
         self.config: FluidFlowConfig = config or FluidFlowConfig()
 
         # ---- Simulation dimensions and state ---
-        self._width: int = 0
-        self._height: int = 0
+        self._simulation_width: int = 0
+        self._simulation_height: int = 0
         self._density_width: int = 0
         self._density_height: int = 0
-        self._dt: float = 1.0 / 60.0
+
         self._reference_dt: float = 1.0 / 60.0  # iteration scaling baseline (60fps)
+        self._dt: float = self._reference_dt
+
         self._has_obstacles: bool = False
+
         self._allocated: bool = False
+
         self._reset_pending: bool = False
         self._reallocate_pending: bool = False
 
         # ---- Simulation fields (SwapFbo for ping-pong) ----
-        # Velocity: CLAMP_TO_BORDER(0) = no-slip (velocity->0 at walls)
+        # Velocity: CLAMP_TO_BORDER(0) = no-slip walls
         self._velocity_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
-        # Density:  CLAMP_TO_BORDER(0) = nothing leaks out
+        # Density: CLAMP_TO_BORDER(0) = nothing leaks out
         self._density_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
-
-        # Additional simulation fields (SwapFbo for ping-pong)
-        self._temperature_fbo: SwapFbo = SwapFbo()  # CLAMP_TO_EDGE = insulated walls (Neumann)
-        self._pressure_fbo: SwapFbo = SwapFbo()      # CLAMP_TO_EDGE = zero-gradient walls (Neumann)
-        # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds reads as obstacle
+        # Temperature: CLAMP_TO_EDGE = insulated walls (Neumann)
+        self._temperature_fbo: SwapFbo = SwapFbo()
+        # Pressure: CLAMP_TO_EDGE = zero-gradient walls (Neumann)
+        self._pressure_fbo: SwapFbo = SwapFbo()
+        # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._simulation_obstacle_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 1.0, 1.0, 1.0))
         # Full-resolution obstacle for density advection (same wrap)
         self._density_obstacle_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 1.0, 1.0, 1.0))
@@ -128,7 +139,6 @@ class FluidFlow:
         self._vorticity_curl_fbo: Fbo = Fbo()
         self._vorticity_force_fbo: Fbo = Fbo()
         self._buoyancy_fbo: Fbo = Fbo()
-
 
         # Shaders
         self._advect_shader: Advect = Advect()
@@ -156,7 +166,7 @@ class FluidFlow:
     # ========== Allocation ==========
 
     def allocate(self, width: int, height: int) -> None:
-        """Allocate fluid simulation FBOs.
+        """Allocate all FBOs and shaders.
 
         Args:
             width: Full output resolution width
@@ -166,13 +176,17 @@ class FluidFlow:
         self._density_height = height
 
         sim_scale = self.config.simulation_scale
-        self._width = self._align16(int(width * sim_scale))
-        self._height = self._align16(int(height * sim_scale))
+        self._simulation_width = self._align16(int(width * sim_scale))
+        self._simulation_height = self._align16(int(height * sim_scale))
 
         # Compute aspect ratio for isotropic simulation
-        self._aspect: float = self._width / self._height if self._height > 0 else 1.0
+        self._aspect: float = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
 
-        self._allocate_fbos()
+        self._allocate_simulation_fields()
+
+        # Density fields (full output resolution, only allocated once)
+        self._density_fbo.allocate(self._density_width, self._density_height, GL_RGBA16F)
+        self._density_obstacle_fbo.allocate(self._density_width, self._density_height, GL_R8)
 
         # Allocate shaders
         self._advect_shader.allocate()
@@ -187,56 +201,37 @@ class FluidFlow:
         self._buoyancy_shader.allocate()
         self._add_boolean_shader.allocate()
 
-        # DEBUG: inject test obstacle shapes
-        from .debug_utils import upload_debug_obstacle
-        upload_debug_obstacle(self, self._width, self._height)
-
-    def _allocate_fbos(self) -> None:
-        """(Re)allocate all simulation FBOs at current dimensions.
-
-        Uses self._width, self._height (and self._density_width/
-        self._density_height for the density FBO).  Shaders are not
-        touched because they carry no resolution-dependent state.
-        """
-        # Primary simulation fields
-        self._velocity_fbo.allocate(self._width, self._height, GL_RG16F)
-        FlowUtil.zero(self._velocity_fbo)
-
-        self._density_fbo.allocate(self._density_width, self._density_height, GL_RGBA16F)
-        FlowUtil.zero(self._density_fbo)
-
         self._allocated = True
 
-        # Simulation fields
-        self._temperature_fbo.allocate(self._width, self._height, GL_R16F)
-        FlowUtil.zero(self._temperature_fbo)
+        # DEBUG: inject test obstacle shapes
+        from .debug_utils import upload_debug_obstacle
+        upload_debug_obstacle(self, self._simulation_width, self._simulation_height)
 
-        self._pressure_fbo.allocate(self._width, self._height, GL_R16F)
-        FlowUtil.zero(self._pressure_fbo)
+    def _allocate_simulation_fields(self) -> None:
+        """(Re)allocate simulation-resolution FBOs.
 
-        self._simulation_obstacle_fbo.allocate(self._width, self._height, GL_R8)
-        FlowUtil.zero(self._simulation_obstacle_fbo)
+        Fbo.allocate() clears each buffer to zero, so no explicit clear needed.
+        Density fields are NOT included -- they live at full output resolution
+        and are allocated separately in allocate().
+        """
+        sim_w = self._simulation_width
+        sim_h = self._simulation_height
 
-        self._density_obstacle_fbo.allocate(self._density_width, self._density_height, GL_R8)
-        FlowUtil.zero(self._density_obstacle_fbo)
-
-        self._has_obstacles = False
+        # Primary simulation fields
+        self._velocity_fbo.allocate(sim_w, sim_h, GL_RG16F)
+        self._temperature_fbo.allocate(sim_w, sim_h, GL_R16F)
+        self._pressure_fbo.allocate(sim_w, sim_h, GL_R16F)
+        self._simulation_obstacle_fbo.allocate(sim_w, sim_h, GL_R8)
+        FlowUtil.blit(self._simulation_obstacle_fbo, self._density_obstacle_fbo.texture)
 
         # Intermediate FBOs
-        self._divergence_fbo.allocate(self._width, self._height, GL_R16F)
-        FlowUtil.zero(self._divergence_fbo)
-
-        self._vorticity_curl_fbo.allocate(self._width, self._height, GL_R16F)
-        FlowUtil.zero(self._vorticity_curl_fbo)
-
-        self._vorticity_force_fbo.allocate(self._width, self._height, GL_RG16F)
-        FlowUtil.zero(self._vorticity_force_fbo)
-
-        self._buoyancy_fbo.allocate(self._width, self._height, GL_RG16F)
-        FlowUtil.zero(self._buoyancy_fbo)
+        self._divergence_fbo.allocate(sim_w, sim_h, GL_R16F)
+        self._vorticity_curl_fbo.allocate(sim_w, sim_h, GL_R16F)
+        self._vorticity_force_fbo.allocate(sim_w, sim_h, GL_RG16F)
+        self._buoyancy_fbo.allocate(sim_w, sim_h, GL_RG16F)
 
     def deallocate(self) -> None:
-        """Release all FBO resources."""
+        """Release all GPU resources."""
         self._velocity_fbo.deallocate()
         self._density_fbo.deallocate()
         self._temperature_fbo.deallocate()
@@ -263,7 +258,7 @@ class FluidFlow:
         self._allocated = False
 
     def _reload_shaders(self) -> None:
-        """Hot-reload all shaders (checks file timestamps internally)."""
+        """Hot-reload all shaders."""
         self._advect_shader.reload()
         self._divergence_shader.reload()
         self._gradient_shader.reload()
@@ -280,24 +275,25 @@ class FluidFlow:
 
     def reset(self) -> None:
         """Reset all simulation fields to zero."""
-        FlowUtil.zero(self._velocity_fbo)
-        FlowUtil.zero(self._density_fbo)
-        FlowUtil.zero(self._temperature_fbo)
-        FlowUtil.zero(self._pressure_fbo)
-        FlowUtil.zero(self._divergence_fbo)
-        # Don't reset obstacles (preserve border)
+        if not self._allocated:
+            return
+        self._velocity_fbo.clear_all()
+        self._density_fbo.clear_all()
+        self._temperature_fbo.clear_all()
+        self._pressure_fbo.clear_all()
+        self._divergence_fbo.clear()
 
     def update(self) -> None:
         """Run one frame of the 2D fluid simulation pipeline."""
         if not self._allocated:
             return
 
-        self._handle_deferred_actions()
         self._reload_shaders()
+        self._handle_deferred_actions()
 
         # Per-frame state
         self._dt = 1.0 / max(1, self.config.fps)
-        self._aspect = self._width / self._height if self._height > 0 else 1.0
+        self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
 
         # Dampen velocity (clean input for all steps)
         vel = self.config.velocity
@@ -320,14 +316,9 @@ class FluidFlow:
 
     # ========== Pipeline Steps ==========
 
-    def _add_force_to_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add internal force to velocity (no input_strength or dt scaling).
-
-        Use for simulation-internal forces (vorticity confinement, buoyancy)
-        that already carry their own dt scaling. Matches FluidFlow3D's
-        _add_force_to_velocity for 2D/3D parity.
-        """
-        FlowUtil.add(self._velocity_fbo, texture, strength)
+    def _add_force_to_velocity(self, force: Texture, strength: float = 1.0) -> None:
+        """Add force to velocity in-place (no input_strength or dt scaling)."""
+        FlowUtil.add(self._velocity_fbo, force, strength)
 
     def _advect_velocity(self) -> None:
         """Self-advect & dissipate velocity field."""
@@ -391,7 +382,7 @@ class FluidFlow:
         vorticity_radius = self.config.velocity.vorticity_radius * self.config.simulation_scale
         vorticity_force = self.config.velocity.vorticity * self._dt
 
-        # 4a. Compute vorticity curl
+        # a. Compute curl
         self._vorticity_curl_fbo.begin()
         self._vorticity_curl_shader.use(
             self._velocity_fbo.texture,
@@ -403,7 +394,7 @@ class FluidFlow:
         )
         self._vorticity_curl_fbo.end()
 
-        # 4b. Compute confinement force
+        # b. Compute confinement force
         self._vorticity_force_fbo.begin()
         self._vorticity_force_shader.use(
             self._vorticity_curl_fbo.texture,
@@ -415,13 +406,13 @@ class FluidFlow:
         )
         self._vorticity_force_fbo.end()
 
-        # 4c. Add force to velocity
+        # c. Add force to velocity
         self._add_force_to_velocity(self._vorticity_force_fbo.texture)
 
     def _advect_temperature(self) -> None:
         """Advect & dissipate the temperature scalar field."""
         if self.config.temperature.buoyancy == 0.0:
-            FlowUtil.zero(self._temperature_fbo)
+            self._temperature_fbo.clear_all()
             return
 
         advect_step = self._dt * self.config.speed
@@ -486,7 +477,7 @@ class FluidFlow:
 
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction)."""
-        # 8a. Compute divergence
+        # a. Compute divergence
         self._divergence_fbo.begin()
         self._divergence_shader.use(
             self._velocity_fbo.texture,
@@ -497,7 +488,7 @@ class FluidFlow:
         )
         self._divergence_fbo.end()
 
-        # 8b. Solve Poisson equation for pressure
+        # b. Solve Poisson equation for pressure
         iterations = self._scale_iterations(self.config.pressure.iterations)
 
         if self._use_compute_pressure:
@@ -528,7 +519,7 @@ class FluidFlow:
                 )
                 self._pressure_fbo.end()
 
-        # 8c. Subtract pressure gradient from velocity
+        # c. Subtract pressure gradient from velocity
         self._velocity_fbo.swap()
         self._velocity_fbo.begin()
         self._gradient_shader.use(
@@ -579,20 +570,20 @@ class FluidFlow:
 
     def _handle_deferred_actions(self) -> None:
         """Process reset and reallocation requests queued from the UI thread."""
-        if self._reset_pending:
-            self._reset_pending = False
-            self.reset()
-
         if self._reallocate_pending:
             self._reallocate_pending = False
             sim_scale = self.config.simulation_scale
             new_w = self._align16(int(self._density_width * sim_scale))
             new_h = self._align16(int(self._density_height * sim_scale))
-            if new_w != self._width or new_h != self._height:
-                self._width = new_w
-                self._height = new_h
-                self._aspect = self._width / self._height if self._height > 0 else 1.0
-                self._allocate_fbos()
+            if new_w != self._simulation_width or new_h != self._simulation_height:
+                self._simulation_width = new_w
+                self._simulation_height = new_h
+                self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
+                self._allocate_simulation_fields()
+
+        if self._reset_pending:
+            self._reset_pending = False
+            self.reset()
 
     def _request_reset(self) -> None:
         """Thread-safe reset request — deferred to next update() on the GL thread."""
@@ -622,20 +613,11 @@ class FluidFlow:
     def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
         """Calculate frame-rate independent decay multiplier.
 
-        Args:
-            delta_time: Frame delta time (1/fps)
-            decay_time: Time in seconds to reach 1% of original value
-
-        Returns:
-            Multiplier to apply to field this frame (e.g., 0.99 = 1% loss)
+        Returns pow(0.01, dt / decay_time) -- field reaches 1% after decay_time seconds.
         """
         return pow(0.01, delta_time / max(0.001, decay_time))
 
-    # ========== Obstacles ==========
-
     # ========== Input Methods ==========
-
-    # ----- Velocity -----
     def set_velocity(self, texture: Texture, strength: float = 1.0) -> None:
         """Set velocity field."""
         FlowUtil.set(self._velocity_fbo, texture, strength)
@@ -727,7 +709,7 @@ class FluidFlow:
         """Add pressure to a specific region."""
         FlowUtil.add_region(self._pressure_fbo, texture, x, y, w, h, strength)
 
-    # ---- Obstacles -----
+    # ----- Obstacles -----
     def set_obstacle(self, texture: Texture) -> None:
         """Replace obstacle mask with texture (boolean OR with empty field).
 
@@ -780,7 +762,6 @@ class FluidFlow:
 
     @property
     def allocated(self) -> bool:
-        """Check if buffers are allocated."""
         return self._allocated
 
     @property
@@ -795,27 +776,27 @@ class FluidFlow:
 
     @property
     def temperature(self) -> Texture:
-        """R32F temperature field."""
+        """R16F temperature field."""
         return self._temperature_fbo.texture
 
     @property
     def pressure(self) -> Texture:
-        """R32F pressure field."""
+        """R16F pressure field."""
         return self._pressure_fbo.texture
 
     @property
     def divergence(self) -> Texture:
-        """R32F divergence field (intermediate result)."""
+        """R16F divergence field (intermediate)."""
         return self._divergence_fbo.texture
 
     @property
     def vorticity_curl(self) -> Texture:
-        """R32F vorticity curl field."""
+        """R16F vorticity curl field."""
         return self._vorticity_curl_fbo.texture
 
     @property
     def buoyancy(self) -> Texture:
-        """RG32F buoyancy force field."""
+        """RG16F buoyancy force field."""
         return self._buoyancy_fbo.texture
 
     @property
@@ -826,9 +807,9 @@ class FluidFlow:
     @property
     def sim_width(self) -> int:
         """Current simulation resolution width (aligned to 16)."""
-        return self._width
+        return self._simulation_width
 
     @property
     def sim_height(self) -> int:
         """Current simulation resolution height (aligned to 16)."""
-        return self._height
+        return self._simulation_height

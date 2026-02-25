@@ -1,0 +1,30 @@
+#version 460 core
+
+/*
+ * Blit3D - Copy/resample one 3D volume into another.
+ *
+ * Source is bound as a sampler3D, so OpenGL handles filtering
+ * (GL_NEAREST for binary masks, GL_LINEAR for continuous fields).
+ * Dispatched at the destination resolution.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Source volume (read via sampler — filtering set by texture params)
+layout(binding = 0) uniform sampler3D uSource;
+
+// Destination volume (write-only image)
+layout(r8, binding = 0) uniform writeonly image3D uDst;
+
+uniform ivec3 uDstSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uDstSize))) return;
+
+    // Normalized coordinates — centers texels in both source and destination
+    vec3 uvw = (vec3(gid) + 0.5) / vec3(uDstSize);
+
+    vec4 val = texture(uSource, uvw);
+    imageStore(uDst, gid, val);
+}
