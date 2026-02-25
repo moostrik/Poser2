@@ -365,6 +365,10 @@ class FluidFlow:
         self._dt = 1.0 / max(1, self.config.fps)
         self._aspect = self._width / self._height if self._height > 0 else 1.0
 
+        # Dampen velocity (clean input for all steps)
+        vel = self.config.velocity
+        self._dampen(self._velocity_fbo, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
+
         # Simulation steps
         self._advect_velocity()
         self._apply_viscosity()
@@ -375,11 +379,9 @@ class FluidFlow:
         self._enforce_incompressibility()
         self._advect_density()
 
-        # Dampen inputs before simulation
-        vel = self.config.velocity
+        # Dampen density (clean output)
         den = self.config.density
-        self._dampen(self._velocity_fbo, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
-        self._dampen(self._density_fbo,   den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
+        self._dampen(self._density_fbo, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
 
 
     # ========== Pipeline Steps ==========

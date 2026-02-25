@@ -5,15 +5,17 @@ filtering between depth layers. Produces a composited 2D output for
 downstream rendering compatibility.
 
 Pipeline:
-    1. Advect velocity (3D self-advection)
-    2. Apply viscosity (3D Jacobi diffusion solver)
-    3. Confine vorticity (3D curl + confinement force)
-    4. Advect pressure (optional, non-physical)
-    5. Enforce incompressibility (divergence -> Jacobi solve -> gradient subtraction)
-    6. Advect temperature
-    7. Apply buoyancy force
-    8. Advect density (3D semi-Lagrangian)
-    9. Composite 3D density -> 2D output
+    1. Dampen velocity (magnitude clamping)
+    2. Advect velocity (3D self-advection)
+    3. Apply viscosity (3D Jacobi diffusion solver)
+    4. Confine vorticity (3D curl + confinement force)
+    5. Advect temperature
+    6. Apply buoyancy force
+    7. Advect pressure (optional, non-physical)
+    8. Enforce incompressibility (divergence -> Jacobi solve -> gradient subtraction)
+    9. Advect density (3D semi-Lagrangian)
+   10. Dampen density (magnitude clamping)
+   11. Composite 3D density -> 2D output
 
 Boundary conditions via per-field wrap modes (no explicit border obstacles):
     Velocity/density:  GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
@@ -223,7 +225,8 @@ class FluidFlow3D:
         # DEBUG: inject test obstacle shapes
         # self._debug_inject_obstacle_shapes()
 
-    def _debug_inject_obstacle_shapes(self) -> None:
+    @staticmethod
+    def _debug_inject_obstacle_shapes() -> None:
         """Draw circle, triangle, cross, and line into the obstacle volume for visual verification.
 
         Reuses the same 2D mask pattern as FluidFlow._debug_inject_obstacle_shapes,
@@ -408,22 +411,25 @@ class FluidFlow3D:
         self._depth_scale = self._auto_depth_scale * self.config.depth.scale
         self._grid_scale = self.config.simulation_scale
 
+        # Dampen velocity (clean input for all steps)
+        vel = self.config.velocity
+        self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
+
         # Simulation steps
         self._advect_velocity()
         self._apply_viscosity()
         self._confine_vorticity()
-        self._advect_pressure()
-        self._enforce_incompressibility()
         self._advect_temperature()
         self._apply_buoyancy()
+        self._advect_pressure()
+        self._enforce_incompressibility()
         self._advect_density()
-        self._composite_output()
 
-        # Dampen inputs before simulation
-        vel = self.config.velocity
+        # Dampen density (clean output)
         den = self.config.density
-        self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
-        self._dampen(self._density,  den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
+        self._dampen(self._density, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
+
+        self._composite_output()
 
 
     # ========== Pipeline Steps ==========
