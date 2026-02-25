@@ -18,6 +18,13 @@ uniform float uRadius;  // Sampling radius in texels
 
 void main() {
     vec2 st = texCoord;
+
+    // Early exit for obstacle pixels
+    if (texture(uObstacle, st).r > 0.5) {
+        fragColor = 0.0;
+        return;
+    }
+
     vec2 texelSize = 1.0 / textureSize(uVelocity, 0);
 
     // Sample at radius distance instead of 1 texel

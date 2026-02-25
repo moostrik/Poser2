@@ -11,11 +11,12 @@ class VorticityForce(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, curl: Texture, grid_scale: float, aspect: float, timestep: float) -> None:
+    def use(self, curl: Texture, obstacle: Texture, grid_scale: float, aspect: float, timestep: float) -> None:
         """Compute vorticity confinement force.
 
         Args:
             curl: Curl magnitude field (R32F)
+            obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
             grid_scale: Grid spacing (typically simulation_scale)
             aspect: Aspect ratio (width/height) for isotropic derivatives
             timestep: Vorticity timestep (controls turbulence strength)
@@ -26,10 +27,14 @@ class VorticityForce(Shader):
         # Bind shader program
         glUseProgram(self.shader_program)
 
-        # Bind texture
+        # Bind textures
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, curl.tex_id)
         glUniform1i(self.get_uniform_loc("uCurl"), 0)
+
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
+        glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
         # Set uniforms
         glUniform2f(self.get_uniform_loc("uHalfRdxInv"), half_rdx_x, half_rdx_y)

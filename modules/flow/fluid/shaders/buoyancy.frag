@@ -12,6 +12,7 @@ out vec2 fragColor;
 uniform sampler2D uVelocity;    // Current velocity field (RG32F) - not used but passed for consistency
 uniform sampler2D uTemperature; // Temperature field (R32F)
 uniform sampler2D uDensity;     // Density field (RGBA32F)
+uniform sampler2D uObstacle;    // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 
 // Parameters
 // F = sigma * (T - T_ambient) - kappa * density  (GPU Gems / Fedkiw et al.)
@@ -23,6 +24,12 @@ uniform float uAmbientTemperature; // Reference temperature
 
 void main() {
     vec2 st = texCoord;
+
+    // Early exit for obstacle pixels
+    if (texture(uObstacle, st).r > 0.5) {
+        fragColor = vec2(0.0);
+        return;
+    }
 
     // Sample temperature
     float temperature = texture(uTemperature, st).r;

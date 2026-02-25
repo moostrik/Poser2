@@ -10,6 +10,7 @@ out vec2 fragColor;
 
 // Input textures
 uniform sampler2D uCurl; // Curl magnitude field (R32F)
+uniform sampler2D uObstacle; // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 
 // Parameters
 uniform vec2 uHalfRdxInv;  // (0.5/gridScale_x, 0.5/gridScale_y) for aspect correction
@@ -17,6 +18,12 @@ uniform float uTimestep; // Vorticity confinement timestep
 
 void main() {
     vec2 st = texCoord;
+
+    // Early exit for obstacle pixels
+    if (texture(uObstacle, st).r > 0.5) {
+        fragColor = vec2(0.0);
+        return;
+    }
 
     // Sample curl neighbors (take absolute value)
     float cT = abs(textureOffset(uCurl, st, ivec2(0, 1)).r);
