@@ -12,6 +12,7 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler3D uTemperature;  // Temperature (R16F)
 layout(binding = 1) uniform sampler3D uDensity;       // Density (RGBA16F)
+layout(binding = 2) uniform sampler3D uObstacle;      // Obstacle mask (R8)
 
 layout(rgba16f, binding = 0) writeonly uniform image3D uForce;
 
@@ -19,12 +20,22 @@ uniform float uSigma;               // Thermal buoyancy (includes dt * scale)
 uniform float uKappa;               // Density weight (includes dt * scale)
 uniform float uAmbientTemperature;  // Reference temperature
 uniform ivec3 uSize;
+uniform bool  uHasObstacles;        // Skip obstacle logic when no obstacles present
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
     if (any(greaterThanEqual(gid, uSize))) return;
 
     vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+
+    // Obstacle check
+    if (uHasObstacles) {
+        float obstacle = texture(uObstacle, st).r;
+        if (obstacle > 0.5) {
+            imageStore(uForce, gid, vec4(0.0));
+            return;
+        }
+    }
 
     float temperature = texture(uTemperature, st).r;
     float dtemp = temperature - uAmbientTemperature;

@@ -20,7 +20,7 @@ class VorticityCurl3D(ComputeShader):
     def use(self, velocity: Texture3D, obstacle: Texture3D,
             curl_out: Texture3D,
             grid_scale: float, aspect: float, depth_scale: float,
-            radius: float) -> None:
+            radius: float, has_obstacles: bool = True) -> None:
         """Compute 3D velocity curl.
 
         Args:
@@ -31,6 +31,7 @@ class VorticityCurl3D(ComputeShader):
             aspect: Width/height ratio
             depth_scale: Z grid spacing relative to XY
             radius: Curl sampling radius in texels
+            has_obstacles: Whether obstacle logic is active
         """
         if not self.allocated or not self.shader_program:
             return
@@ -53,5 +54,6 @@ class VorticityCurl3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uRadius"), radius)
         glUniform3i(self.get_uniform_loc("uSize"),
                     curl_out.width, curl_out.height, curl_out.depth)
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         self.dispatch(curl_out.width, curl_out.height, curl_out.depth)

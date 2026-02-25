@@ -23,7 +23,8 @@ class Advect3D(ComputeShader):
         super().__init__()
 
     def use(self, source: Texture3D, velocity: Texture3D, obstacle: Texture3D,
-            aspect: float, depth_scale: float, timestep: float, dissipation: float) -> None:
+            aspect: float, depth_scale: float, timestep: float, dissipation: float,
+            has_obstacles: bool = True) -> None:
         """Apply 3D advection.
 
         Args:
@@ -34,6 +35,7 @@ class Advect3D(ComputeShader):
             depth_scale: Z grid spacing relative to XY (controls volume thickness)
             timestep: dt * speed — advection distance per frame
             dissipation: Exponential decay multiplier
+            has_obstacles: Whether obstacle logic is active
         """
         if not self.allocated or not self.shader_program:
             return
@@ -55,13 +57,15 @@ class Advect3D(ComputeShader):
         glUniform3f(self.get_uniform_loc("uRdx"), 1.0, rdx_y, rdx_z)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform3i(self.get_uniform_loc("uSize"), source.width, source.height, source.depth)
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         self.dispatch(source.width, source.height, source.depth)
 
     def advect(self, source_read: Texture3D, result_write: Texture3D,
                velocity: Texture3D, obstacle: Texture3D,
                aspect: float, depth_scale: float, timestep: float, dissipation: float,
-               internal_format: int = GL_RGBA16F) -> None:
+               internal_format: int = GL_RGBA16F,
+               has_obstacles: bool = True) -> None:
         """Advect from source_read into result_write (separate read/write buffers).
 
         Use this for ping-pong: read from back buffer, write to front buffer.
@@ -76,6 +80,7 @@ class Advect3D(ComputeShader):
             timestep: dt * speed
             dissipation: Decay multiplier
             internal_format: Image format for output (default RGBA16F)
+            has_obstacles: Whether obstacle logic is active
         """
         if not self.allocated or not self.shader_program:
             return
@@ -98,5 +103,6 @@ class Advect3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform3i(self.get_uniform_loc("uSize"),
                     result_write.width, result_write.height, result_write.depth)
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         self.dispatch(result_write.width, result_write.height, result_write.depth)

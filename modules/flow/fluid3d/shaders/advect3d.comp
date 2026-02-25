@@ -25,6 +25,7 @@ uniform float uTimestep;      // dt * speed
 uniform vec3  uRdx;           // (1.0, 1.0/aspect, 1.0/depth_scale) — aspect-corrected inverse grid
 uniform float uDissipation;   // Exponential decay multiplier
 uniform ivec3 uSize;          // Volume dimensions (width, height, depth)
+uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
@@ -36,10 +37,12 @@ void main() {
     vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
 
     // Obstacle check
-    float obstacle = texture(uObstacle, st).r;
-    if (obstacle > 0.5) {
-        imageStore(uResult, gid, vec4(0.0));
-        return;
+    if (uHasObstacles) {
+        float obstacle = texture(uObstacle, st).r;
+        if (obstacle > 0.5) {
+            imageStore(uResult, gid, vec4(0.0));
+            return;
+        }
     }
 
     // Backward trace along 3D velocity

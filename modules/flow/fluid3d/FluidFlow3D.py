@@ -31,7 +31,8 @@ from .shaders import (
     Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
-    Inject3D, InjectChannel3D, Clamp3D, Dampen3D, Composite3D, Add3D
+    Inject3D, InjectChannel3D, Clamp3D, Dampen3D, Composite3D, Add3D,
+    InjectBinary3D
 )
 
 # Combined memory barrier bits (cast to int for Pylance compatibility)
@@ -108,6 +109,7 @@ class FluidFlow3D:
     def __init__(self, config: FluidFlow3DConfig | None = None) -> None:
         self.config: FluidFlow3DConfig = config or FluidFlow3DConfig()
 
+        # ---- Simulation dimensions and state ---
         self._width: int = 0
         self._height: int = 0
         self._density_width: int = 0
@@ -137,6 +139,7 @@ class FluidFlow3D:
         self._pressure: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_EDGE)
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
+        self._has_obstacles: bool = False
 
         # ---- Intermediate volumes (single buffer, no ping-pong) ----
         self._divergence_vol: Texture3D = Texture3D()
@@ -162,6 +165,7 @@ class FluidFlow3D:
         self._dampen_shader: Dampen3D = Dampen3D()
         self._composite_shader: Composite3D = Composite3D()
         self._add_shader: Add3D = Add3D()
+        self._inject_binary_shader: InjectBinary3D = InjectBinary3D()
 
         # Bind settings actions
         self.config.bind(FluidFlow3DConfig.reset_sim, lambda _: self._request_reset())
@@ -208,8 +212,76 @@ class FluidFlow3D:
         self._dampen_shader.allocate()
         self._composite_shader.allocate()
         self._add_shader.allocate()
+        self._inject_binary_shader.allocate()
 
         self._allocated = True
+
+        # DEBUG: inject test obstacle shapes
+        self._debug_inject_obstacle_shapes()
+
+    def _debug_inject_obstacle_shapes(self) -> None:
+        """Draw circle, triangle, cross, and line into the obstacle volume for visual verification.
+
+        Reuses the same 2D mask pattern as FluidFlow._debug_inject_obstacle_shapes,
+        projected through all depth layers via set_obstacle() → InjectBinary3D.
+        """
+        import numpy as np
+
+        w, h = self._width, self._height
+        mask = np.zeros((h, w), dtype=np.uint8)
+
+        # Coordinate grids (row=y, col=x)
+        yy, xx = np.ogrid[0:h, 0:w]
+
+        # ---- Circle (top-left quadrant) ----
+        cx, cy, r = w // 4, h * 3 // 4, min(w, h) // 8
+        dist_sq = (xx - cx) ** 2 + (yy - cy) ** 2
+        mask[dist_sq <= r * r] = 255
+
+        # ---- Triangle (top-right quadrant) ----
+        tx, ty = w * 3 // 4, h * 3 // 4  # center
+        s = min(w, h) // 7  # half-size
+        top_y = ty + s
+        bot_y = ty - int(s * 0.6)
+        for y_px in range(max(0, bot_y), min(h, top_y + 1)):
+            for x_px in range(max(0, tx - s), min(w, tx + s + 1)):
+                t_frac = (y_px - bot_y) / max(1, top_y - bot_y)
+                half_w = s * (1.0 - t_frac)
+                if abs(x_px - tx) <= half_w:
+                    mask[y_px, x_px] = 255
+
+        # ---- Cross (bottom-left quadrant) ----
+        cx2, cy2 = w // 4, h // 4
+        arm = min(w, h) // 8
+        thick = max(2, min(w, h) // 40)
+        mask[max(0, cy2 - thick):min(h, cy2 + thick + 1),
+             max(0, cx2 - arm):min(w, cx2 + arm + 1)] = 255
+        mask[max(0, cy2 - arm):min(h, cy2 + arm + 1),
+             max(0, cx2 - thick):min(w, cx2 + thick + 1)] = 255
+
+        # ---- Diagonal line (bottom-right quadrant) ----
+        lx, ly = w * 3 // 4, h // 4
+        length = min(w, h) // 6
+        thick_l = max(2, min(w, h) // 50)
+        for t in np.linspace(-1, 1, length * 4):
+            px = int(lx + t * length * 0.5)
+            py = int(ly + t * length * 0.3)
+            for dx in range(-thick_l, thick_l + 1):
+                for dy in range(-thick_l, thick_l + 1):
+                    nx, ny = px + dx, py + dy
+                    if 0 <= nx < w and 0 <= ny < h:
+                        mask[ny, nx] = 255
+
+        # Upload to a temporary 2D texture and inject through all layers
+        from modules.gl import Texture
+        temp = Texture()
+        temp.allocate(w, h, GL_R8)
+        glBindTexture(GL_TEXTURE_2D, temp.tex_id)
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RED, GL_UNSIGNED_BYTE, mask)
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+        self.set_obstacle(temp)
+        temp.deallocate()
 
     def _allocate_volumes(self) -> None:
         """(Re)allocate all 3D volumetric fields at current dimensions.
@@ -238,6 +310,7 @@ class FluidFlow3D:
 
         self._obstacle.allocate(sim_w, sim_h, d, GL_R8)
         self._obstacle.clear()
+        self._has_obstacles = False
 
         # Intermediate volumes
         self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
@@ -279,6 +352,7 @@ class FluidFlow3D:
         self._dampen_shader.deallocate()
         self._composite_shader.deallocate()
         self._add_shader.deallocate()
+        self._inject_binary_shader.deallocate()
 
         self._allocated = False
 
@@ -298,6 +372,7 @@ class FluidFlow3D:
         self._dampen_shader.reload()
         self._composite_shader.reload()
         self._add_shader.reload()
+        self._inject_binary_shader.reload()
 
     # ========== Update Pipeline ==========
 
@@ -326,21 +401,22 @@ class FluidFlow3D:
         self._depth_scale = self._auto_depth_scale * self.config.depth.scale
         self._grid_scale = self.config.simulation_scale
 
+        # Simulation steps
+        self._advect_velocity()
+        self._diffuse_velocity()
+        self._apply_vorticity()
+        self._advect_pressure()
+        self._project_pressure()
+        self._advect_temperature_and_buoyancy()
+        self._advect_density()
+        self._composite_output()
+
         # Dampen inputs before simulation
         vel = self.config.velocity
         den = self.config.density
         self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
         self._dampen(self._density,  den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
 
-        # Simulation steps
-        self._advect_density()
-        self._advect_velocity()
-        self._diffuse_velocity()
-        self._apply_vorticity()
-        self._advect_temperature_and_buoyancy()
-        self._advect_pressure()
-        self._project_pressure()
-        self._composite_output()
 
     # ========== Pipeline Steps ==========
 
@@ -348,23 +424,6 @@ class FluidFlow3D:
         """Add 3D force volume to velocity in-place (no swap needed)."""
         self._add_shader.use(self._velocity.texture, force, strength)
         glMemoryBarrier(_BARRIER_IMAGE)
-
-    def _advect_density(self) -> None:
-        """Step 1: Advect & dissipate density field."""
-        advect_step = self._dt * (self.config.speed + self.config.density.speed_offset)
-        dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
-
-        self._density.swap()
-        self._advect_shader.advect(
-            self._density.back_texture,
-            self._density.texture,
-            self._velocity.texture,
-            self._obstacle,
-            self._aspect, self._depth_scale,
-            advect_step, dissipation,
-            internal_format=GL_RGBA16F
-        )
-        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _advect_velocity(self) -> None:
         """Step 2: Self-advect & dissipate velocity field."""
@@ -379,7 +438,8 @@ class FluidFlow3D:
             self._obstacle,
             self._aspect, self._depth_scale,
             advect_step, dissipation,
-            internal_format=GL_RGBA16F
+            internal_format=GL_RGBA16F,
+            has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -397,7 +457,8 @@ class FluidFlow3D:
             self._grid_scale, self._aspect, self._depth_scale,
             viscosity_dt,
             total_iterations=self.config.velocity.viscosity_iter,
-            iterations_per_dispatch=5
+            iterations_per_dispatch=5,
+            has_obstacles=self._has_obstacles
         )
         if result != self._velocity.texture:
             self._velocity.swap()
@@ -417,16 +478,19 @@ class FluidFlow3D:
             self._obstacle,
             self._curl_vol,
             self._grid_scale, self._aspect, self._depth_scale,
-            vorticity_radius
+            vorticity_radius,
+            has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # 4b. Compute confinement force
         self._vorticity_force_shader.use(
             self._curl_vol,
+            self._obstacle,
             self._vorticity_force_vol,
             self._grid_scale, self._aspect, self._depth_scale,
-            vorticity_force
+            vorticity_force,
+            has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -451,7 +515,8 @@ class FluidFlow3D:
             self._obstacle,
             self._aspect, self._depth_scale,
             advect_step, dissipation,
-            internal_format=GL_R16F
+            internal_format=GL_R16F,
+            has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -462,8 +527,10 @@ class FluidFlow3D:
         self._buoyancy_shader.use(
             self._temperature.texture,
             self._density.texture,
+            self._obstacle,
             self._buoyancy_force_vol,
-            sigma, kappa, self.config.temperature.ambient
+            sigma, kappa, self.config.temperature.ambient,
+            has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -485,7 +552,8 @@ class FluidFlow3D:
             self._obstacle,
             self._aspect, self._depth_scale,
             advect_step, dissipation,
-            internal_format=GL_R16F
+            internal_format=GL_R16F,
+            has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -496,7 +564,8 @@ class FluidFlow3D:
             self._velocity.texture,
             self._obstacle,
             self._divergence_vol,
-            self._grid_scale, self._aspect, self._depth_scale
+            self._grid_scale, self._aspect, self._depth_scale,
+            has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -508,7 +577,8 @@ class FluidFlow3D:
             self._obstacle,
             self._grid_scale, self._aspect, self._depth_scale,
             total_iterations=self.config.pressure.iterations,
-            iterations_per_dispatch=5
+            iterations_per_dispatch=5,
+            has_obstacles=self._has_obstacles
         )
         if result != self._pressure.texture:
             self._pressure.swap()
@@ -521,7 +591,26 @@ class FluidFlow3D:
             self._pressure.texture,
             self._obstacle,
             self._velocity.texture,
-            self._grid_scale, self._aspect, self._depth_scale
+            self._grid_scale, self._aspect, self._depth_scale,
+            has_obstacles=self._has_obstacles
+        )
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+
+    def _advect_density(self) -> None:
+        """Step 1: Advect & dissipate density field."""
+        advect_step = self._dt * (self.config.speed + self.config.density.speed_offset)
+        dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
+
+        self._density.swap()
+        self._advect_shader.advect(
+            self._density.back_texture,
+            self._density.texture,
+            self._velocity.texture,
+            self._obstacle,
+            self._aspect, self._depth_scale,
+            advect_step, dissipation,
+            internal_format=GL_RGBA16F,
+            has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -733,6 +822,31 @@ class FluidFlow3D:
             internal_format=GL_R16F
         )
         glMemoryBarrier(_BARRIER_IMAGE)
+
+    # ----- Obstacles -----
+    def set_obstacle(self, texture: Texture) -> None:
+        """Replace obstacle volume with a 2D mask projected through all layers.
+
+        Args:
+            texture: 2D obstacle mask (any channel > 0.5 = obstacle)
+        """
+        if not self._allocated:
+            return
+        self._inject_binary_shader.use(texture, self._obstacle, mode=1)
+        glMemoryBarrier(_BARRIER_IMAGE)
+        self._has_obstacles = True
+
+    def add_obstacle(self, texture: Texture) -> None:
+        """Add to obstacle volume (boolean OR with existing obstacles).
+
+        Args:
+            texture: 2D obstacle mask to add (any channel > 0.5 = obstacle)
+        """
+        if not self._allocated:
+            return
+        self._inject_binary_shader.use(texture, self._obstacle, mode=0)
+        glMemoryBarrier(_BARRIER_IMAGE)
+        self._has_obstacles = True
 
     # ========== Properties ==========
 

@@ -3,7 +3,7 @@
     "layer": {
       "select": {
         "preview": [
-          "fluid"
+          "fluid3D"
         ],
         "final": [
           "fluid3D"
@@ -278,7 +278,7 @@
     },
     "window": {
       "title": "Poser",
-      "v_sync": true,
+      "v_sync": false,
       "fullscreen": false,
       "monitor": 0,
       "x": 20,

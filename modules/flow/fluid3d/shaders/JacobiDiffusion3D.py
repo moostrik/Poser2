@@ -28,7 +28,8 @@ class JacobiDiffusion3D(ComputeShader):
             obstacle: Texture3D,
             grid_scale: float, aspect: float, depth_scale: float,
             viscosity_dt: float,
-            iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH) -> None:
+            iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
+            has_obstacles: bool = True) -> None:
         """Run multiple 3D Jacobi diffusion iterations.
 
         Args:
@@ -40,6 +41,7 @@ class JacobiDiffusion3D(ComputeShader):
             depth_scale: Z grid spacing relative to XY
             viscosity_dt: Viscosity * delta_time
             iterations: Iterations per dispatch
+            has_obstacles: Whether obstacle logic is active
         """
         if not self.allocated or not self.shader_program:
             return
@@ -67,6 +69,7 @@ class JacobiDiffusion3D(ComputeShader):
         glUniform1i(self.get_uniform_loc("uIterations"), iterations)
         glUniform3i(self.get_uniform_loc("uSize"),
                     velocity_in.width, velocity_in.height, velocity_in.depth)
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         self.dispatch(velocity_in.width, velocity_in.height, velocity_in.depth)
 
@@ -75,7 +78,8 @@ class JacobiDiffusion3D(ComputeShader):
               grid_scale: float, aspect: float, depth_scale: float,
               viscosity_dt: float,
               total_iterations: int = 20,
-              iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH) -> Texture3D:
+              iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
+              has_obstacles: bool = True) -> Texture3D:
         """Full diffusion solve with automatic ping-pong.
 
         Returns:
@@ -90,7 +94,8 @@ class JacobiDiffusion3D(ComputeShader):
             iters = min(iterations_per_dispatch,
                         total_iterations - i * iterations_per_dispatch)
             self.use(src, dst, obstacle,
-                     grid_scale, aspect, depth_scale, viscosity_dt, iters)
+                     grid_scale, aspect, depth_scale, viscosity_dt, iters,
+                     has_obstacles)
             src, dst = dst, src
 
         return velocity_a if (num_dispatches % 2 == 0) else velocity_b

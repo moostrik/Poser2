@@ -20,6 +20,7 @@ layout(rgba16f, binding = 0) writeonly uniform image3D uCurl;
 uniform vec3  uHalfRdxInv;  // (0.5/dx, 0.5/dy, 0.5/dz)
 uniform float uRadius;       // Sampling radius in texels
 uniform ivec3 uSize;
+uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
@@ -27,10 +28,12 @@ void main() {
 
     vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
 
-    float obs = texture(uObstacle, st).r;
-    if (obs > 0.5) {
-        imageStore(uCurl, gid, vec4(0.0));
-        return;
+    if (uHasObstacles) {
+        float obs = texture(uObstacle, st).r;
+        if (obs > 0.5) {
+            imageStore(uCurl, gid, vec4(0.0));
+            return;
+        }
     }
 
     // Sampling offsets scaled by radius

@@ -9,6 +9,7 @@
  * Boundary conditions:
  *   - Pressure uses CLAMP_TO_EDGE → Neumann (∂p/∂n ≈ 0) at walls
  *   - Interior obstacles: Neumann via pCenter substitution
+ *   - No-penetration: velocity cannot flow into obstacle faces
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
@@ -22,8 +23,9 @@ layout(binding = 2) uniform sampler3D uObstacle;    // Obstacle mask (R8)
 layout(rgba16f, binding = 0) writeonly uniform image3D uResult;
 
 // Parameters
-uniform vec3  uHalfRdxInv;  // (0.5/dx, 0.5/dy, 0.5/dz)
+uniform vec3  uHalfRdxInv;    // (0.5/dx, 0.5/dy, 0.5/dz)
 uniform ivec3 uSize;
+uniform bool  uHasObstacles;   // Skip obstacle logic when no obstacles present
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
@@ -32,11 +34,24 @@ void main() {
     vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
     vec3 texel = 1.0 / vec3(uSize);
 
-    // Obstacle check
-    float obstacle = texture(uObstacle, st).r;
-    if (obstacle > 0.5) {
-        imageStore(uResult, gid, vec4(0.0));
-        return;
+    // Obstacle neighbor flags (default 0.0 = no obstacle)
+    float oR = 0.0, oL = 0.0, oT = 0.0, oB = 0.0, oF = 0.0, oK = 0.0;
+
+    if (uHasObstacles) {
+        // Center obstacle check
+        float obstacle = texture(uObstacle, st).r;
+        if (obstacle > 0.5) {
+            imageStore(uResult, gid, vec4(0.0));
+            return;
+        }
+
+        // Read neighbor obstacle status
+        oR = texture(uObstacle, st + vec3(texel.x, 0.0, 0.0)).r;
+        oL = texture(uObstacle, st - vec3(texel.x, 0.0, 0.0)).r;
+        oT = texture(uObstacle, st + vec3(0.0, texel.y, 0.0)).r;
+        oB = texture(uObstacle, st - vec3(0.0, texel.y, 0.0)).r;
+        oF = texture(uObstacle, st + vec3(0.0, 0.0, texel.z)).r;
+        oK = texture(uObstacle, st - vec3(0.0, 0.0, texel.z)).r;
     }
 
     // Center pressure
@@ -51,13 +66,6 @@ void main() {
     float pK = texture(uPressure, st - vec3(0.0, 0.0, texel.z)).r;
 
     // Neumann BCs for interior obstacles: use pCenter if neighbor is obstacle
-    float oR = texture(uObstacle, st + vec3(texel.x, 0.0, 0.0)).r;
-    float oL = texture(uObstacle, st - vec3(texel.x, 0.0, 0.0)).r;
-    float oT = texture(uObstacle, st + vec3(0.0, texel.y, 0.0)).r;
-    float oB = texture(uObstacle, st - vec3(0.0, texel.y, 0.0)).r;
-    float oF = texture(uObstacle, st + vec3(0.0, 0.0, texel.z)).r;
-    float oK = texture(uObstacle, st - vec3(0.0, 0.0, texel.z)).r;
-
     pR = mix(pR, pC, step(0.5, oR));
     pL = mix(pL, pC, step(0.5, oL));
     pT = mix(pT, pC, step(0.5, oT));
@@ -75,6 +83,14 @@ void main() {
     // Subtract gradient from velocity
     vec3 vOld = texture(uVelocity, st).xyz;
     vec3 vNew = vOld - grad;
+
+    // No-penetration: zero velocity component pointing into obstacle neighbors
+    if (oR > 0.5) vNew.x = min(vNew.x, 0.0);
+    if (oL > 0.5) vNew.x = max(vNew.x, 0.0);
+    if (oT > 0.5) vNew.y = min(vNew.y, 0.0);
+    if (oB > 0.5) vNew.y = max(vNew.y, 0.0);
+    if (oF > 0.5) vNew.z = min(vNew.z, 0.0);
+    if (oK > 0.5) vNew.z = max(vNew.z, 0.0);
 
     imageStore(uResult, gid, vec4(vNew, 0.0));
 }

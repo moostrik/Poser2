@@ -187,7 +187,7 @@ class FluidFlow(FlowBase):
         self._add_boolean_shader.allocate()
 
         # DEBUG: inject test obstacle shapes
-        self._debug_inject_obstacle_shapes()
+        # self._debug_inject_obstacle_shapes()
 
     def _debug_inject_obstacle_shapes(self) -> None:
         """Draw circle, triangle, cross, and line into the obstacle buffer for visual verification."""
@@ -354,20 +354,21 @@ class FluidFlow(FlowBase):
         self._dt = 1.0 / max(1, self.config.fps)
         self._aspect = self._width / self._height if self._height > 0 else 1.0
 
-        # Dampen inputs before simulation
-        vel = self.config.velocity
-        den = self.config.density
-        self._dampen(self._input_fbo,  vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
-        self._dampen(self._output_fbo, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
-
         # Simulation steps
-        self._advect_density()
         self._advect_velocity()
         self._diffuse_velocity()
         self._apply_vorticity()
         self._advect_temperature_and_buoyancy()
         self._advect_pressure()
         self._project_pressure()
+        self._advect_density()
+
+        # Dampen inputs before simulation
+        vel = self.config.velocity
+        den = self.config.density
+        self._dampen(self._input_fbo,  vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
+        self._dampen(self._output_fbo, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
+
 
     # ========== Pipeline Steps ==========
 
@@ -379,24 +380,6 @@ class FluidFlow(FlowBase):
         _add_force_to_velocity for 2D/3D parity.
         """
         FlowUtil.add(self._input_fbo, texture, strength)
-
-    def _advect_density(self) -> None:
-        """Step 1: Advect & dissipate density field."""
-        advect_step = self._dt * (self.config.speed + self.config.density.speed_offset)
-        dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
-
-        self._output_fbo.swap()
-        self._output_fbo.begin()
-        self._advect_shader.use(
-            self._output_fbo.back_texture,  # Source density
-            self._input_fbo.texture,        # Velocity
-            self._density_obstacle_fbo.texture,  # Obstacles (full density resolution)
-            self._aspect,
-            advect_step,
-            dissipation,
-            has_obstacles=self._has_obstacles
-        )
-        self._output_fbo.end()
 
     def _advect_velocity(self) -> None:
         """Step 2: Self-advect & dissipate velocity field."""
@@ -603,6 +586,24 @@ class FluidFlow(FlowBase):
             has_obstacles=self._has_obstacles
         )
         self._input_fbo.end()
+
+    def _advect_density(self) -> None:
+        """Step 1: Advect & dissipate density field."""
+        advect_step = self._dt * (self.config.speed + self.config.density.speed_offset)
+        dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
+
+        self._output_fbo.swap()
+        self._output_fbo.begin()
+        self._advect_shader.use(
+            self._output_fbo.back_texture,  # Source density
+            self._input_fbo.texture,        # Velocity
+            self._density_obstacle_fbo.texture,  # Obstacles (full density resolution)
+            self._aspect,
+            advect_step,
+            dissipation,
+            has_obstacles=self._has_obstacles
+        )
+        self._output_fbo.end()
 
     def _dampen(self, fbo: SwapFbo, threshold: float, dampen_time: float,
                delta_time: float, include_alpha: bool) -> None:

@@ -30,6 +30,7 @@ uniform float uGamma;       // 1/(ν·Δt)
 uniform float uBeta;        // 1/(2αx + 2αy + 2αz + γ)
 uniform int   uIterations;
 uniform ivec3 uSize;
+uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 
 // Shared memory: store xyz velocity for XY tile with halo
 shared vec4 s_velocity[18][18];
@@ -52,11 +53,15 @@ void main() {
     int z = int(gl_WorkGroupID.z);
 
     bool validPixel = all(lessThan(gid, uSize));
-    bool obstacle = validPixel && isObstacle(gid);
+    bool obstacle = uHasObstacles && validPixel && isObstacle(gid);
 
     // Check Z neighbor obstacles
-    bool obsFront = (z + 1 < uSize.z) ? isObstacle(ivec3(gid.xy, z + 1)) : false;
-    bool obsBack  = (z - 1 >= 0)      ? isObstacle(ivec3(gid.xy, z - 1)) : false;
+    bool obsFront = false;
+    bool obsBack  = false;
+    if (uHasObstacles) {
+        obsFront = (z + 1 < uSize.z) ? isObstacle(ivec3(gid.xy, z + 1)) : false;
+        obsBack  = (z - 1 >= 0)      ? isObstacle(ivec3(gid.xy, z - 1)) : false;
+    }
 
     // Initial shared memory load
     vec4 myVelocity = validPixel ? loadVelocity(gid) : vec4(0.0);
@@ -92,20 +97,22 @@ void main() {
             vec4 vF = (z + 1 < uSize.z) ? loadVelocity(ivec3(gid.xy, z + 1)) : vC;
             vec4 vK = (z - 1 >= 0)      ? loadVelocity(ivec3(gid.xy, z - 1)) : vC;
 
-            // Neumann BCs for interior obstacles
-            vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
-            vec3 texel = 1.0 / vec3(uSize);
-            float oR = texture(uObstacle, st + vec3(texel.x, 0, 0)).r;
-            float oL = texture(uObstacle, st - vec3(texel.x, 0, 0)).r;
-            float oT = texture(uObstacle, st + vec3(0, texel.y, 0)).r;
-            float oB = texture(uObstacle, st - vec3(0, texel.y, 0)).r;
+            // No-slip BCs for interior obstacles
+            if (uHasObstacles) {
+                vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+                vec3 texel = 1.0 / vec3(uSize);
+                float oR = texture(uObstacle, st + vec3(texel.x, 0, 0)).r;
+                float oL = texture(uObstacle, st - vec3(texel.x, 0, 0)).r;
+                float oT = texture(uObstacle, st + vec3(0, texel.y, 0)).r;
+                float oB = texture(uObstacle, st - vec3(0, texel.y, 0)).r;
 
-            vR = mix(vR, vC, step(0.5, oR));
-            vL = mix(vL, vC, step(0.5, oL));
-            vT = mix(vT, vC, step(0.5, oT));
-            vB = mix(vB, vC, step(0.5, oB));
-            vF = obsFront ? vC : vF;
-            vK = obsBack  ? vC : vK;
+                vR = mix(vR, vec4(0.0), step(0.5, oR));
+                vL = mix(vL, vec4(0.0), step(0.5, oL));
+                vT = mix(vT, vec4(0.0), step(0.5, oT));
+                vB = mix(vB, vec4(0.0), step(0.5, oB));
+                vF = obsFront ? vec4(0.0) : vF;
+                vK = obsBack  ? vec4(0.0) : vK;
+            }
 
             // Jacobi diffusion: v^(k+1) = β * (αx*(vL+vR) + αy*(vB+vT) + αz*(vK+vF) + γ*v_old)
             // v_old is the ORIGINAL velocity, not the evolving iterate

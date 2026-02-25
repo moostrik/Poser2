@@ -1,0 +1,41 @@
+#version 460 core
+
+/*
+ * InjectBinary3D - Project a 2D binary mask uniformly into all layers
+ *                  of a 3D R8 volume.
+ *
+ * Used for obstacle injection: a 2D obstacle applies at every depth.
+ * Input values are binarised (step at 0.5).
+ *
+ * Mode 0 = OR  (max of existing and input)
+ * Mode 1 = SET (replace with input)
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// 2D binary input (read .r)
+layout(binding = 0) uniform sampler2D uInput;
+
+// 3D R8 obstacle volume (read-write)
+layout(r8, binding = 0) uniform image3D uVolume;
+
+uniform ivec3 uSize;
+uniform int   uMode;  // 0 = OR, 1 = SET
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    // Sample 2D input at this XY position, binarise
+    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    float val = step(0.5, texture(uInput, uv).r);
+
+    if (uMode == 0) {
+        // Boolean OR: keep whichever is larger
+        float cur = imageLoad(uVolume, gid).r;
+        imageStore(uVolume, gid, vec4(max(cur, val)));
+    } else {
+        // Set: replace
+        imageStore(uVolume, gid, vec4(val));
+    }
+}

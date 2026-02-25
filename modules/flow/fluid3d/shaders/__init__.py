@@ -14,3 +14,4 @@ from .Clamp3D import Clamp3D
 from .Dampen3D import Dampen3D
 from .Composite3D import Composite3D
 from .Add3D import Add3D
+from .InjectBinary3D import InjectBinary3D
