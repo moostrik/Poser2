@@ -10,7 +10,6 @@ from .JacobiDiffusionCompute import JacobiDiffusionCompute
 from .VorticityCurl import VorticityCurl
 from .VorticityForce import VorticityForce
 from .Buoyancy import Buoyancy
-from .ObstacleOffset import ObstacleOffset
 from .AddBoolean import AddBoolean
 
 

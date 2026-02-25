@@ -11,14 +11,13 @@ class JacobiDiffusion(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, source: Texture, obstacle: Texture, obstacle_offset: Texture,
+    def use(self, source: Texture, obstacle: Texture,
             grid_scale: float, aspect: float, viscosity_dt: float) -> None:
         """Apply one Jacobi iteration for diffusion.
 
         Args:
             source: Previous iteration of field to diffuse (velocity RG32F)
-            obstacle: Obstacle mask (R8/R32F)
-            obstacle_offset: Neighbor obstacle info (RGBA8)
+            obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
             grid_scale: Grid spacing (typically 1.0)
             aspect: Aspect ratio (width/height)
             viscosity_dt: Viscosity * delta_time (diffusion rate)
@@ -48,10 +47,6 @@ class JacobiDiffusion(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
         glUniform1i(self.get_uniform_loc("uObstacle"), 1)
-
-        glActiveTexture(GL_TEXTURE2)
-        glBindTexture(GL_TEXTURE_2D, obstacle_offset.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacleOffset"), 2)
 
         # Set uniforms
         glUniform2f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y)

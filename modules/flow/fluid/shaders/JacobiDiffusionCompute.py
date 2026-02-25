@@ -37,7 +37,6 @@ class JacobiDiffusionCompute(ComputeShader):
         velocity_in: Texture,
         velocity_out: Texture,
         obstacle: Texture,
-        obstacle_offset: Texture,
         grid_scale: float,
         aspect: float,
         viscosity_dt: float,
@@ -48,8 +47,7 @@ class JacobiDiffusionCompute(ComputeShader):
         Args:
             velocity_in: Input velocity field (RG32F) - read via image
             velocity_out: Output velocity field (RG32F) - write via image
-            obstacle: Obstacle mask (R8/R32F) - read via sampler
-            obstacle_offset: Neighbor obstacle info (RGBA8) - read via sampler
+            obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1) - read via sampler
             grid_scale: Grid scaling factor
             aspect: Aspect ratio (width/height)
             viscosity_dt: Viscosity * delta_time (diffusion rate)
@@ -60,7 +58,7 @@ class JacobiDiffusionCompute(ComputeShader):
             return
 
         # Validate inputs
-        if not all(t.allocated for t in [velocity_in, velocity_out, obstacle, obstacle_offset]):
+        if not all(t.allocated for t in [velocity_in, velocity_out, obstacle]):
             print("JacobiDiffusionCompute: input texture(s) not allocated.")
             return
 
@@ -85,10 +83,6 @@ class JacobiDiffusionCompute(ComputeShader):
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
         glUniform1i(self.get_uniform_loc("uObstacle"), 0)
 
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, obstacle_offset.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacleOffset"), 1)
-
         # Bind velocity textures as images
         self.bind_image_read(0, velocity_in, GL_RG16F)
         self.bind_image_write(1, velocity_out, GL_RG16F)
@@ -108,7 +102,6 @@ class JacobiDiffusionCompute(ComputeShader):
         velocity_a: Texture,
         velocity_b: Texture,
         obstacle: Texture,
-        obstacle_offset: Texture,
         grid_scale: float,
         aspect: float,
         viscosity_dt: float,
@@ -120,8 +113,7 @@ class JacobiDiffusionCompute(ComputeShader):
         Args:
             velocity_a: First velocity buffer (RG32F)
             velocity_b: Second velocity buffer (RG32F) - used for ping-pong
-            obstacle: Obstacle mask
-            obstacle_offset: Neighbor obstacle info
+            obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
             grid_scale: Grid scaling factor
             aspect: Aspect ratio
             viscosity_dt: Viscosity * delta_time
@@ -144,7 +136,7 @@ class JacobiDiffusionCompute(ComputeShader):
 
             self.use(
                 src, dst,
-                obstacle, obstacle_offset,
+                obstacle,
                 grid_scale, aspect,
                 viscosity_dt,
                 iters

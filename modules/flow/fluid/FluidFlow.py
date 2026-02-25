@@ -18,7 +18,7 @@ from .fluid_config import VelocityConfig, DensityConfig, TemperatureConfig, Pres
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
-    VorticityCurl, VorticityForce, Buoyancy, ObstacleOffset, AddBoolean
+    VorticityCurl, VorticityForce, Buoyancy, AddBoolean
 )
 
 from modules.utils.HotReloadMethods import HotReloadMethods
@@ -115,7 +115,6 @@ class FluidFlow(FlowBase):
         self._vorticity_curl_fbo: Fbo = Fbo()
         self._vorticity_force_fbo: Fbo = Fbo()
         self._buoyancy_fbo: Fbo = Fbo()
-        self._obstacle_offset_fbo: Fbo = Fbo()
 
         # Simulation parameters
         self._width: int = 0
@@ -141,7 +140,6 @@ class FluidFlow(FlowBase):
         self._vorticity_curl_shader: VorticityCurl = VorticityCurl()
         self._vorticity_force_shader: VorticityForce = VorticityForce()
         self._buoyancy_shader: Buoyancy = Buoyancy()
-        self._obstacle_offset_shader: ObstacleOffset = ObstacleOffset()
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
@@ -182,11 +180,7 @@ class FluidFlow(FlowBase):
         self._vorticity_curl_shader.allocate()
         self._vorticity_force_shader.allocate()
         self._buoyancy_shader.allocate()
-        self._obstacle_offset_shader.allocate()
         self._add_boolean_shader.allocate()
-
-        # Initialize obstacle offset (border handled by GL_CLAMP_TO_BORDER)
-        self._init_obstacle()
 
     def _allocate_fbos(self) -> None:
         """(Re)allocate all simulation FBOs at current dimensions.
@@ -221,9 +215,6 @@ class FluidFlow(FlowBase):
         self._buoyancy_fbo.allocate(self._width, self._height, GL_RG16F)
         FlowUtil.zero(self._buoyancy_fbo)
 
-        self._obstacle_offset_fbo.allocate(self._width, self._height, GL_RGBA8)
-        FlowUtil.zero(self._obstacle_offset_fbo)
-
     def deallocate(self) -> None:
         """Release all FBO resources."""
         super().deallocate()
@@ -234,7 +225,6 @@ class FluidFlow(FlowBase):
         self._vorticity_curl_fbo.deallocate()
         self._vorticity_force_fbo.deallocate()
         self._buoyancy_fbo.deallocate()
-        self._obstacle_offset_fbo.deallocate()
 
         self._advect_shader.deallocate()
         self._divergence_shader.deallocate()
@@ -246,7 +236,6 @@ class FluidFlow(FlowBase):
         self._vorticity_curl_shader.deallocate()
         self._vorticity_force_shader.deallocate()
         self._buoyancy_shader.deallocate()
-        self._obstacle_offset_shader.deallocate()
         self._add_boolean_shader.deallocate()
 
     def _reload_shaders(self) -> None:
@@ -261,7 +250,6 @@ class FluidFlow(FlowBase):
         self._vorticity_curl_shader.reload()
         self._vorticity_force_shader.reload()
         self._buoyancy_shader.reload()
-        self._obstacle_offset_shader.reload()
         self._add_boolean_shader.reload()
 
     # ========== Update Pipeline ==========
@@ -358,7 +346,6 @@ class FluidFlow(FlowBase):
                 self._input_fbo.texture,
                 self._input_fbo.back_texture,
                 self._obstacle_fbo.texture,
-                self._obstacle_offset_fbo.texture,
                 self.config.simulation_scale,
                 self._aspect,
                 viscosity_dt,
@@ -374,7 +361,6 @@ class FluidFlow(FlowBase):
                 self._jacobi_diffusion_shader.use(
                     self._input_fbo.back_texture,
                     self._obstacle_fbo.texture,
-                    self._obstacle_offset_fbo.texture,
                     self.config.simulation_scale,
                     self._aspect,
                     viscosity_dt
@@ -479,7 +465,6 @@ class FluidFlow(FlowBase):
         self._divergence_shader.use(
             self._input_fbo.texture,
             self._obstacle_fbo.texture,
-            self._obstacle_offset_fbo.texture,
             self.config.simulation_scale,
             self._aspect
         )
@@ -492,7 +477,6 @@ class FluidFlow(FlowBase):
                 self._pressure_fbo.back_texture,
                 self._divergence_fbo.texture,
                 self._obstacle_fbo.texture,
-                self._obstacle_offset_fbo.texture,
                 self.config.simulation_scale,
                 self._aspect,
                 total_iterations=self.config.pressure.iterations,
@@ -508,7 +492,6 @@ class FluidFlow(FlowBase):
                     self._pressure_fbo.back_texture,
                     self._divergence_fbo.texture,
                     self._obstacle_fbo.texture,
-                    self._obstacle_offset_fbo.texture,
                     self.config.simulation_scale,
                     self._aspect
                 )
@@ -521,7 +504,6 @@ class FluidFlow(FlowBase):
             self._input_fbo.back_texture,
             self._pressure_fbo.texture,
             self._obstacle_fbo.texture,
-            self._obstacle_offset_fbo.texture,
             self.config.simulation_scale,
             self._aspect
         )
@@ -561,7 +543,6 @@ class FluidFlow(FlowBase):
                 self._height = new_h
                 self._aspect = self._width / self._height if self._height > 0 else 1.0
                 self._allocate_fbos()
-                self._init_obstacle()
 
     def _request_reset(self) -> None:
         """Thread-safe reset request — deferred to next update() on the GL thread."""
@@ -591,45 +572,19 @@ class FluidFlow(FlowBase):
         """
         return pow(0.01, delta_time / max(0.001, decay_time))
 
-    # ========== Obstacle Initialization ==========
-
-    def _init_obstacle(self) -> None:
-        """Initialize obstacles — clear to zero, recompute offset.
-
-        Domain boundaries are handled by GL_CLAMP_TO_BORDER on the obstacle
-        texture (border_color=1 → out-of-bounds reads as obstacle). The
-        ObstacleOffset shader's textureOffset calls at edge pixels will
-        sample the border color, correctly flagging wall neighbors.
-        """
-        FlowUtil.zero(self._obstacle_fbo)
-
-        # Compute obstacle offset (neighbor flags)
-        self._obstacle_offset_fbo.begin()
-        self._obstacle_offset_shader.use(self._obstacle_fbo.texture)
-        self._obstacle_offset_fbo.end()
+    # ========== Obstacles ==========
 
     def set_obstacle(self, texture: Texture) -> None:
-        """Replace obstacle mask with texture.
+        """Replace obstacle mask with texture (boolean OR with empty field).
 
         Args:
             texture: Obstacle mask (any channel > 0 = obstacle)
         """
-        # Reset to border
-        self._init_obstacle()
-
-        # Add user obstacles
+        FlowUtil.zero(self._obstacle_fbo)
         self._obstacle_fbo.swap()
         self._obstacle_fbo.begin()
-        self._add_boolean_shader.use(
-            self._obstacle_fbo.back_texture,
-            texture
-        )
+        self._add_boolean_shader.use(self._obstacle_fbo.back_texture, texture)
         self._obstacle_fbo.end()
-
-        # Update offset
-        self._obstacle_offset_fbo.begin()
-        self._obstacle_offset_shader.use(self._obstacle_fbo.texture)
-        self._obstacle_offset_fbo.end()
 
     def add_obstacle(self, texture: Texture) -> None:
         """Add to obstacle mask (boolean OR).
@@ -639,16 +594,8 @@ class FluidFlow(FlowBase):
         """
         self._obstacle_fbo.swap()
         self._obstacle_fbo.begin()
-        self._add_boolean_shader.use(
-            self._obstacle_fbo.back_texture,
-            texture
-        )
+        self._add_boolean_shader.use(self._obstacle_fbo.back_texture, texture)
         self._obstacle_fbo.end()
-
-        # Update offset
-        self._obstacle_offset_fbo.begin()
-        self._obstacle_offset_shader.use(self._obstacle_fbo.texture)
-        self._obstacle_offset_fbo.end()
 
     # ========== Input Methods ==========
 

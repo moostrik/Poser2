@@ -14,9 +14,8 @@
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 // Input textures (read via sampler for boundary handling)
-layout(binding = 0) uniform sampler2D uDivergence;      // Velocity divergence (R32F)
-layout(binding = 1) uniform sampler2D uObstacle;        // Obstacle mask (R8/R32F)
-layout(binding = 2) uniform sampler2D uObstacleOffset;  // Neighbor obstacle info (RGBA8)
+layout(binding = 0) uniform sampler2D uDivergence;  // Velocity divergence (R32F)
+layout(binding = 1) uniform sampler2D uObstacle;    // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 
 // Pressure field - read/write via image
 layout(r16f, binding = 0) uniform image2D uPressureIn;   // Previous pressure
@@ -29,8 +28,8 @@ uniform int uIterations;  // Number of iterations to perform in this dispatch
 uniform ivec2 uSize;      // Texture dimensions
 
 // Shared memory tile: 16x16 interior + 1-pixel halo on each side = 18x18
-// We store pressure values for fast neighbor access
 shared float s_pressure[18][18];
+shared float s_obstacle[18][18];
 
 // Helper to load pressure from input image with bounds checking
 float loadPressure(ivec2 coord) {
@@ -38,16 +37,10 @@ float loadPressure(ivec2 coord) {
     return imageLoad(uPressureIn, coord).r;
 }
 
-// Helper to sample obstacle offset at normalized coords
-vec4 sampleObstacleOffset(ivec2 coord) {
-    vec2 uv = (vec2(coord) + 0.5) / vec2(uSize);
-    return texture(uObstacleOffset, uv);
-}
-
 // Helper to check if coord is obstacle
-bool isObstacle(ivec2 coord) {
+float sampleObstacle(ivec2 coord) {
     vec2 uv = (vec2(coord) + 0.5) / vec2(uSize);
-    return texture(uObstacle, uv).r > 0.5;
+    return texture(uObstacle, uv).r;
 }
 
 // Sample divergence at coord
@@ -73,52 +66,62 @@ void main() {
     bool validPixel = all(lessThan(gid, uSize));
 
     // Check if this pixel is an obstacle (obstacles have zero pressure)
-    bool obstacle = isObstacle(gid);
+    float myObstacle = sampleObstacle(gid);
+    bool obstacle = myObstacle > 0.5;
 
     // Load divergence (constant across iterations)
     float divergence = sampleDivergence(gid);
 
     // Load obstacle offset for boundary conditions
-    vec4 obsOffset = sampleObstacleOffset(gid);
+    // (not needed - we use shared obstacle tile instead)
 
     // ===== Initial shared memory load =====
     // Each thread loads its center pixel
     float myPressure = validPixel ? loadPressure(gid) : 0.0;
     s_pressure[sid.y][sid.x] = myPressure;
+    s_obstacle[sid.y][sid.x] = myObstacle;
 
     // Load halo pixels (threads on edges load extra pixels)
     // Top halo (lid.y == 0 loads row above)
     if (lid.y == 0) {
         ivec2 haloCoord = tileBase + ivec2(lid.x, -1);
         s_pressure[0][sid.x] = loadPressure(haloCoord);
+        s_obstacle[0][sid.x] = sampleObstacle(haloCoord);
     }
     // Bottom halo (lid.y == 15 loads row below)
     if (lid.y == 15) {
         ivec2 haloCoord = tileBase + ivec2(lid.x, 16);
         s_pressure[17][sid.x] = loadPressure(haloCoord);
+        s_obstacle[17][sid.x] = sampleObstacle(haloCoord);
     }
     // Left halo (lid.x == 0 loads column left)
     if (lid.x == 0) {
         ivec2 haloCoord = tileBase + ivec2(-1, lid.y);
         s_pressure[sid.y][0] = loadPressure(haloCoord);
+        s_obstacle[sid.y][0] = sampleObstacle(haloCoord);
     }
     // Right halo (lid.x == 15 loads column right)
     if (lid.x == 15) {
         ivec2 haloCoord = tileBase + ivec2(16, lid.y);
         s_pressure[sid.y][17] = loadPressure(haloCoord);
+        s_obstacle[sid.y][17] = sampleObstacle(haloCoord);
     }
     // Corner halos
     if (lid.x == 0 && lid.y == 0) {
         s_pressure[0][0] = loadPressure(tileBase + ivec2(-1, -1));
+        s_obstacle[0][0] = sampleObstacle(tileBase + ivec2(-1, -1));
     }
     if (lid.x == 15 && lid.y == 0) {
         s_pressure[0][17] = loadPressure(tileBase + ivec2(16, -1));
+        s_obstacle[0][17] = sampleObstacle(tileBase + ivec2(16, -1));
     }
     if (lid.x == 0 && lid.y == 15) {
         s_pressure[17][0] = loadPressure(tileBase + ivec2(-1, 16));
+        s_obstacle[17][0] = sampleObstacle(tileBase + ivec2(-1, 16));
     }
     if (lid.x == 15 && lid.y == 15) {
         s_pressure[17][17] = loadPressure(tileBase + ivec2(16, 16));
+        s_obstacle[17][17] = sampleObstacle(tileBase + ivec2(16, 16));
     }
 
     barrier();
@@ -135,11 +138,16 @@ void main() {
             float pL = s_pressure[sid.y][sid.x - 1];  // Left
             float pC = s_pressure[sid.y][sid.x];      // Center
 
-            // Apply Neumann boundary conditions (zero gradient at obstacles)
-            pT = mix(pT, pC, obsOffset.x);
-            pB = mix(pB, pC, obsOffset.y);
-            pR = mix(pR, pC, obsOffset.z);
-            pL = mix(pL, pC, obsOffset.w);
+            // Neumann boundary conditions from shared obstacle tile
+            float oT = s_obstacle[sid.y + 1][sid.x];
+            float oB = s_obstacle[sid.y - 1][sid.x];
+            float oR = s_obstacle[sid.y][sid.x + 1];
+            float oL = s_obstacle[sid.y][sid.x - 1];
+
+            pT = mix(pT, pC, oT);
+            pB = mix(pB, pC, oB);
+            pR = mix(pR, pC, oR);
+            pL = mix(pL, pC, oL);
 
             // Jacobi iteration
             newPressure = uBeta * (uAlpha.x * (pL + pR) + uAlpha.y * (pB + pT) - divergence);

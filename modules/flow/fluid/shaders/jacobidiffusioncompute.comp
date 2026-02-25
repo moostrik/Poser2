@@ -20,8 +20,7 @@
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 // Input textures (read via sampler for boundary handling)
-layout(binding = 0) uniform sampler2D uObstacle;        // Obstacle mask (R8/R32F)
-layout(binding = 1) uniform sampler2D uObstacleOffset;  // Neighbor obstacle info (RGBA8)
+layout(binding = 0) uniform sampler2D uObstacle;  // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 
 // Velocity field - read/write via image (RG32F for velocity x,y)
 layout(rg16f, binding = 0) uniform image2D uVelocityIn;
@@ -35,8 +34,8 @@ uniform int uIterations;  // Number of iterations to perform in this dispatch
 uniform ivec2 uSize;      // Texture dimensions
 
 // Shared memory tile: 16x16 interior + 1-pixel halo on each side = 18x18
-// We store velocity (x, y) for fast neighbor access
 shared vec2 s_velocity[18][18];
+shared float s_obstacle[18][18];
 
 // Helper to load velocity from input image with bounds checking
 vec2 loadVelocity(ivec2 coord) {
@@ -44,16 +43,10 @@ vec2 loadVelocity(ivec2 coord) {
     return imageLoad(uVelocityIn, coord).rg;
 }
 
-// Helper to sample obstacle offset at pixel coords
-vec4 sampleObstacleOffset(ivec2 coord) {
+// Helper to sample obstacle at pixel coords
+float sampleObstacle(ivec2 coord) {
     vec2 uv = (vec2(coord) + 0.5) / vec2(uSize);
-    return texture(uObstacleOffset, uv);
-}
-
-// Helper to check if coord is obstacle
-bool isObstacle(ivec2 coord) {
-    vec2 uv = (vec2(coord) + 0.5) / vec2(uSize);
-    return texture(uObstacle, uv).r > 0.5;
+    return texture(uObstacle, uv).r;
 }
 
 void main() {
@@ -73,50 +66,57 @@ void main() {
     bool validPixel = all(lessThan(gid, uSize));
 
     // Check if this pixel is an obstacle
-    bool obstacle = isObstacle(gid);
-
-    // Load obstacle offset for boundary conditions
-    vec4 obsOffset = sampleObstacleOffset(gid);
+    float myObstacle = sampleObstacle(gid);
+    bool obstacle = myObstacle > 0.5;
 
     // ===== Initial shared memory load =====
     // Each thread loads its center pixel
     vec2 myVelocity = validPixel ? loadVelocity(gid) : vec2(0.0);
     vec2 v_old = myVelocity;  // preserve original for source term
     s_velocity[sid.y][sid.x] = myVelocity;
+    s_obstacle[sid.y][sid.x] = myObstacle;
 
     // Load halo pixels (threads on edges load extra pixels)
     // Top halo (lid.y == 0 loads row above)
     if (lid.y == 0) {
         ivec2 haloCoord = tileBase + ivec2(lid.x, -1);
         s_velocity[0][sid.x] = loadVelocity(haloCoord);
+        s_obstacle[0][sid.x] = sampleObstacle(haloCoord);
     }
     // Bottom halo (lid.y == 15 loads row below)
     if (lid.y == 15) {
         ivec2 haloCoord = tileBase + ivec2(lid.x, 16);
         s_velocity[17][sid.x] = loadVelocity(haloCoord);
+        s_obstacle[17][sid.x] = sampleObstacle(haloCoord);
     }
     // Left halo (lid.x == 0 loads column left)
     if (lid.x == 0) {
         ivec2 haloCoord = tileBase + ivec2(-1, lid.y);
         s_velocity[sid.y][0] = loadVelocity(haloCoord);
+        s_obstacle[sid.y][0] = sampleObstacle(haloCoord);
     }
     // Right halo (lid.x == 15 loads column right)
     if (lid.x == 15) {
         ivec2 haloCoord = tileBase + ivec2(16, lid.y);
         s_velocity[sid.y][17] = loadVelocity(haloCoord);
+        s_obstacle[sid.y][17] = sampleObstacle(haloCoord);
     }
     // Corner halos
     if (lid.x == 0 && lid.y == 0) {
         s_velocity[0][0] = loadVelocity(tileBase + ivec2(-1, -1));
+        s_obstacle[0][0] = sampleObstacle(tileBase + ivec2(-1, -1));
     }
     if (lid.x == 15 && lid.y == 0) {
         s_velocity[0][17] = loadVelocity(tileBase + ivec2(16, -1));
+        s_obstacle[0][17] = sampleObstacle(tileBase + ivec2(16, -1));
     }
     if (lid.x == 0 && lid.y == 15) {
         s_velocity[17][0] = loadVelocity(tileBase + ivec2(-1, 16));
+        s_obstacle[17][0] = sampleObstacle(tileBase + ivec2(-1, 16));
     }
     if (lid.x == 15 && lid.y == 15) {
         s_velocity[17][17] = loadVelocity(tileBase + ivec2(16, 16));
+        s_obstacle[17][17] = sampleObstacle(tileBase + ivec2(16, 16));
     }
 
     barrier();
@@ -133,11 +133,16 @@ void main() {
             vec2 vL = s_velocity[sid.y][sid.x - 1];  // Left
             vec2 vC = s_velocity[sid.y][sid.x];      // Center
 
-            // Apply Neumann boundary conditions (zero gradient at obstacles)
-            vT = mix(vT, vC, obsOffset.x);
-            vB = mix(vB, vC, obsOffset.y);
-            vR = mix(vR, vC, obsOffset.z);
-            vL = mix(vL, vC, obsOffset.w);
+            // Neumann boundary conditions from shared obstacle tile
+            float oT = s_obstacle[sid.y + 1][sid.x];
+            float oB = s_obstacle[sid.y - 1][sid.x];
+            float oR = s_obstacle[sid.y][sid.x + 1];
+            float oL = s_obstacle[sid.y][sid.x - 1];
+
+            vT = mix(vT, vC, oT);
+            vB = mix(vB, vC, oB);
+            vR = mix(vR, vC, oR);
+            vL = mix(vL, vC, oL);
 
             // Jacobi iteration for diffusion:
             // x^(k+1) = β * (αx*(xL + xR) + αy*(xB + xT) + γ*v_old)

@@ -40,7 +40,6 @@ class JacobiPressureCompute(ComputeShader):
         pressure_out: Texture,
         divergence: Texture,
         obstacle: Texture,
-        obstacle_offset: Texture,
         grid_scale: float,
         aspect: float,
         iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH
@@ -51,8 +50,7 @@ class JacobiPressureCompute(ComputeShader):
             pressure_in: Input pressure field (R32F) - read via image
             pressure_out: Output pressure field (R32F) - write via image
             divergence: Velocity divergence (R32F) - read via sampler
-            obstacle: Obstacle mask (R8/R32F) - read via sampler
-            obstacle_offset: Neighbor obstacle info (RGBA8) - read via sampler
+            obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1) - read via sampler
             grid_scale: Grid scaling factor
             aspect: Aspect ratio (width/height)
             iterations: Number of Jacobi iterations to perform in this dispatch
@@ -66,7 +64,7 @@ class JacobiPressureCompute(ComputeShader):
             return
 
         # Validate inputs
-        if not all(t.allocated for t in [pressure_in, pressure_out, divergence, obstacle, obstacle_offset]):
+        if not all(t.allocated for t in [pressure_in, pressure_out, divergence, obstacle]):
             print("JacobiPressureCompute: input texture(s) not allocated.")
             return
 
@@ -90,10 +88,6 @@ class JacobiPressureCompute(ComputeShader):
         glBindTexture(GL_TEXTURE_2D, obstacle.tex_id)
         glUniform1i(self.get_uniform_loc("uObstacle"), 1)
 
-        glActiveTexture(GL_TEXTURE2)
-        glBindTexture(GL_TEXTURE_2D, obstacle_offset.tex_id)
-        glUniform1i(self.get_uniform_loc("uObstacleOffset"), 2)
-
         # Bind pressure textures as images for imageLoad/imageStore
         self.bind_image_read(0, pressure_in, GL_R16F)
         self.bind_image_write(1, pressure_out, GL_R16F)
@@ -113,7 +107,6 @@ class JacobiPressureCompute(ComputeShader):
         pressure_b: Texture,
         divergence: Texture,
         obstacle: Texture,
-        obstacle_offset: Texture,
         grid_scale: float,
         aspect: float,
         total_iterations: int = 40,
@@ -127,8 +120,7 @@ class JacobiPressureCompute(ComputeShader):
             pressure_a: First pressure buffer (R32F)
             pressure_b: Second pressure buffer (R32F) - used for ping-pong
             divergence: Velocity divergence (R32F)
-            obstacle: Obstacle mask
-            obstacle_offset: Neighbor obstacle info
+            obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
             grid_scale: Grid scaling factor
             aspect: Aspect ratio
             total_iterations: Total Jacobi iterations to perform
@@ -150,7 +142,7 @@ class JacobiPressureCompute(ComputeShader):
 
             self.use(
                 src, dst,
-                divergence, obstacle, obstacle_offset,
+                divergence, obstacle,
                 grid_scale, aspect,
                 iters
             )

@@ -9,9 +9,8 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 // Input textures
-uniform sampler2D uSource;         // Previous iteration of field to diffuse
-uniform sampler2D uObstacle;       // Obstacle mask (1.0 = obstacle, 0.0 = fluid)
-uniform sampler2D uObstacleOffset; // Neighbor obstacle flags (RGBA)
+uniform sampler2D uSource;    // Previous iteration of field to diffuse
+uniform sampler2D uObstacle;  // Obstacle mask (R8, CLAMP_TO_BORDER=1)
 
 // Parameters
 uniform vec2 uAlpha;   // (1/dx², 1/dy²) Laplacian weights
@@ -35,12 +34,17 @@ void main() {
     vec4 xL = textureOffset(uSource, st, ivec2(-1, 0));
     vec4 xC = texture(uSource, st);
 
-    // Boundary conditions: if neighbor is obstacle, use center value
-    vec4 oN = texture(uObstacleOffset, st);
-    xT = mix(xT, xC, oN.r);  // Top neighbor
-    xB = mix(xB, xC, oN.g);  // Bottom neighbor
-    xR = mix(xR, xC, oN.b);  // Right neighbor
-    xL = mix(xL, xC, oN.a);  // Left neighbor
+    // Inline neighbor obstacle sampling
+    float oT = textureOffset(uObstacle, st, ivec2(0, 1)).r;
+    float oB = textureOffset(uObstacle, st, ivec2(0, -1)).r;
+    float oR = textureOffset(uObstacle, st, ivec2(1, 0)).r;
+    float oL = textureOffset(uObstacle, st, ivec2(-1, 0)).r;
+
+    // Neumann boundary conditions: zero gradient at obstacles
+    xT = mix(xT, xC, oT);
+    xB = mix(xB, xC, oB);
+    xR = mix(xR, xC, oR);
+    xL = mix(xL, xC, oL);
 
     // Jacobi iteration for anisotropic diffusion:
     // (alpha_x*(xL + xR) + alpha_y*(xB + xT) + gamma*xC) * beta
