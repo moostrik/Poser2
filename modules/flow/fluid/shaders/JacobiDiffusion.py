@@ -12,7 +12,8 @@ class JacobiDiffusion(Shader):
         super().__init__()
 
     def use(self, source: Texture, obstacle: Texture,
-            grid_scale: float, aspect: float, viscosity_dt: float) -> None:
+            grid_scale: float, aspect: float, viscosity_dt: float,
+            has_obstacles: bool = True) -> None:
         """Apply one Jacobi iteration for diffusion.
 
         Args:
@@ -21,6 +22,7 @@ class JacobiDiffusion(Shader):
             grid_scale: Grid spacing (typically 1.0)
             aspect: Aspect ratio (width/height)
             viscosity_dt: Viscosity * delta_time (diffusion rate)
+            has_obstacles: When False, skip obstacle texture reads for performance
         """
         # Anisotropic grid spacing
         dx = grid_scale
@@ -38,6 +40,9 @@ class JacobiDiffusion(Shader):
 
         # Bind shader program
         glUseProgram(self.shader_program)
+
+        # Obstacle flag
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         # Bind textures
         glActiveTexture(GL_TEXTURE0)

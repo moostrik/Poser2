@@ -32,6 +32,7 @@ uniform float uGamma;     // 1/(ν·Δt) central coefficient
 uniform float uBeta;      // 1 / (2*αx + 2*αy + γ)
 uniform int uIterations;  // Number of iterations to perform in this dispatch
 uniform ivec2 uSize;      // Texture dimensions
+uniform bool uHasObstacles;  // Skip obstacle handling when false
 
 // Shared memory tile: 16x16 interior + 1-pixel halo on each side = 18x18
 shared vec2 s_velocity[18][18];
@@ -66,7 +67,7 @@ void main() {
     bool validPixel = all(lessThan(gid, uSize));
 
     // Check if this pixel is an obstacle
-    float myObstacle = sampleObstacle(gid);
+    float myObstacle = uHasObstacles ? sampleObstacle(gid) : 0.0;
     bool obstacle = myObstacle > 0.5;
 
     // ===== Initial shared memory load =====
@@ -74,49 +75,53 @@ void main() {
     vec2 myVelocity = validPixel ? loadVelocity(gid) : vec2(0.0);
     vec2 v_old = myVelocity;  // preserve original for source term
     s_velocity[sid.y][sid.x] = myVelocity;
-    s_obstacle[sid.y][sid.x] = myObstacle;
+
+    // Load obstacle tile into shared memory (skip when no obstacles)
+    if (uHasObstacles) {
+        s_obstacle[sid.y][sid.x] = myObstacle;
+    }
 
     // Load halo pixels (threads on edges load extra pixels)
     // Top halo (lid.y == 0 loads row above)
     if (lid.y == 0) {
         ivec2 haloCoord = tileBase + ivec2(lid.x, -1);
         s_velocity[0][sid.x] = loadVelocity(haloCoord);
-        s_obstacle[0][sid.x] = sampleObstacle(haloCoord);
+        if (uHasObstacles) s_obstacle[0][sid.x] = sampleObstacle(haloCoord);
     }
     // Bottom halo (lid.y == 15 loads row below)
     if (lid.y == 15) {
         ivec2 haloCoord = tileBase + ivec2(lid.x, 16);
         s_velocity[17][sid.x] = loadVelocity(haloCoord);
-        s_obstacle[17][sid.x] = sampleObstacle(haloCoord);
+        if (uHasObstacles) s_obstacle[17][sid.x] = sampleObstacle(haloCoord);
     }
     // Left halo (lid.x == 0 loads column left)
     if (lid.x == 0) {
         ivec2 haloCoord = tileBase + ivec2(-1, lid.y);
         s_velocity[sid.y][0] = loadVelocity(haloCoord);
-        s_obstacle[sid.y][0] = sampleObstacle(haloCoord);
+        if (uHasObstacles) s_obstacle[sid.y][0] = sampleObstacle(haloCoord);
     }
     // Right halo (lid.x == 15 loads column right)
     if (lid.x == 15) {
         ivec2 haloCoord = tileBase + ivec2(16, lid.y);
         s_velocity[sid.y][17] = loadVelocity(haloCoord);
-        s_obstacle[sid.y][17] = sampleObstacle(haloCoord);
+        if (uHasObstacles) s_obstacle[sid.y][17] = sampleObstacle(haloCoord);
     }
     // Corner halos
     if (lid.x == 0 && lid.y == 0) {
         s_velocity[0][0] = loadVelocity(tileBase + ivec2(-1, -1));
-        s_obstacle[0][0] = sampleObstacle(tileBase + ivec2(-1, -1));
+        if (uHasObstacles) s_obstacle[0][0] = sampleObstacle(tileBase + ivec2(-1, -1));
     }
     if (lid.x == 15 && lid.y == 0) {
         s_velocity[0][17] = loadVelocity(tileBase + ivec2(16, -1));
-        s_obstacle[0][17] = sampleObstacle(tileBase + ivec2(16, -1));
+        if (uHasObstacles) s_obstacle[0][17] = sampleObstacle(tileBase + ivec2(16, -1));
     }
     if (lid.x == 0 && lid.y == 15) {
         s_velocity[17][0] = loadVelocity(tileBase + ivec2(-1, 16));
-        s_obstacle[17][0] = sampleObstacle(tileBase + ivec2(-1, 16));
+        if (uHasObstacles) s_obstacle[17][0] = sampleObstacle(tileBase + ivec2(-1, 16));
     }
     if (lid.x == 15 && lid.y == 15) {
         s_velocity[17][17] = loadVelocity(tileBase + ivec2(16, 16));
-        s_obstacle[17][17] = sampleObstacle(tileBase + ivec2(16, 16));
+        if (uHasObstacles) s_obstacle[17][17] = sampleObstacle(tileBase + ivec2(16, 16));
     }
 
     barrier();
@@ -133,17 +138,18 @@ void main() {
             vec2 vL = s_velocity[sid.y][sid.x - 1];  // Left
             vec2 vC = s_velocity[sid.y][sid.x];      // Center
 
-            // Neumann boundary conditions from shared obstacle tile
-            float oT = s_obstacle[sid.y + 1][sid.x];
-            float oB = s_obstacle[sid.y - 1][sid.x];
-            float oR = s_obstacle[sid.y][sid.x + 1];
-            float oL = s_obstacle[sid.y][sid.x - 1];
+            if (uHasObstacles) {
+                // No-slip boundary conditions from shared obstacle tile
+                float oT = s_obstacle[sid.y + 1][sid.x];
+                float oB = s_obstacle[sid.y - 1][sid.x];
+                float oR = s_obstacle[sid.y][sid.x + 1];
+                float oL = s_obstacle[sid.y][sid.x - 1];
 
-            // No-slip boundary conditions: use zero velocity at obstacle walls
-            vT = mix(vT, vec2(0.0), oT);
-            vB = mix(vB, vec2(0.0), oB);
-            vR = mix(vR, vec2(0.0), oR);
-            vL = mix(vL, vec2(0.0), oL);
+                vT = mix(vT, vec2(0.0), oT);
+                vB = mix(vB, vec2(0.0), oB);
+                vR = mix(vR, vec2(0.0), oR);
+                vL = mix(vL, vec2(0.0), oL);
+            }
 
             // Jacobi iteration for diffusion:
             // x^(k+1) = β * (αx*(xL + xR) + αy*(xB + xT) + γ*v_old)

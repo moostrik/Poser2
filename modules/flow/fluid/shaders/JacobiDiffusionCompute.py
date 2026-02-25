@@ -40,7 +40,8 @@ class JacobiDiffusionCompute(ComputeShader):
         grid_scale: float,
         aspect: float,
         viscosity_dt: float,
-        iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH
+        iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
+        has_obstacles: bool = True
     ) -> None:
         """Run multiple Jacobi diffusion iterations in a single dispatch.
 
@@ -52,6 +53,7 @@ class JacobiDiffusionCompute(ComputeShader):
             aspect: Aspect ratio (width/height)
             viscosity_dt: Viscosity * delta_time (diffusion rate)
             iterations: Number of Jacobi iterations to perform in this dispatch
+            has_obstacles: When False, skip obstacle texture reads for performance
         """
         if not self.allocated or not self.shader_program:
             print("JacobiDiffusionCompute shader not allocated.")
@@ -77,6 +79,9 @@ class JacobiDiffusionCompute(ComputeShader):
         beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y + gamma)
 
         glUseProgram(self.shader_program)
+
+        # Obstacle flag
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         # Bind textures via samplers
         glActiveTexture(GL_TEXTURE0)
@@ -106,7 +111,8 @@ class JacobiDiffusionCompute(ComputeShader):
         aspect: float,
         viscosity_dt: float,
         total_iterations: int = 20,
-        iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH
+        iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
+        has_obstacles: bool = True
     ) -> Texture:
         """Run full diffusion solve with automatic ping-pong.
 
@@ -119,6 +125,7 @@ class JacobiDiffusionCompute(ComputeShader):
             viscosity_dt: Viscosity * delta_time
             total_iterations: Total Jacobi iterations to perform
             iterations_per_dispatch: Iterations per compute dispatch
+            has_obstacles: When False, skip obstacle texture reads for performance
 
         Returns:
             The texture containing the final velocity result
@@ -139,7 +146,8 @@ class JacobiDiffusionCompute(ComputeShader):
                 obstacle,
                 grid_scale, aspect,
                 viscosity_dt,
-                iters
+                iters,
+                has_obstacles
             )
 
             # Swap buffers for next iteration

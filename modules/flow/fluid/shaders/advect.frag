@@ -13,6 +13,7 @@ out vec4 fragColor;
 uniform sampler2D uVelocity;   // Velocity field (RG32F)
 uniform sampler2D uSource;     // Field to advect (any format)
 uniform sampler2D uObstacle;   // Obstacle mask (R8 or R32F)
+uniform bool uHasObstacles;    // Skip obstacle checks when false
 
 uniform float uTimestep;       // dt * speed — advection rate
 uniform vec2  uRdx;            // (1.0, 1.0/aspect) — aspect-corrected inverse grid scale
@@ -21,10 +22,12 @@ uniform float uDissipation;    // Energy loss multiplier per frame
 void main() {
     vec2 st = texCoord;
 
-    float obstacle = texture(uObstacle, st).x;
-    if (obstacle > 0.5) {
-        fragColor = vec4(0.0);
-        return;
+    if (uHasObstacles) {
+        float obstacle = texture(uObstacle, st).x;
+        if (obstacle > 0.5) {
+            fragColor = vec4(0.0);
+            return;
+        }
     }
 
     // Backward trace along velocity (aspect-corrected)

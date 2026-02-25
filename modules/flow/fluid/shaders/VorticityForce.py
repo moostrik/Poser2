@@ -11,7 +11,8 @@ class VorticityForce(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, curl: Texture, obstacle: Texture, grid_scale: float, aspect: float, timestep: float) -> None:
+    def use(self, curl: Texture, obstacle: Texture, grid_scale: float, aspect: float, timestep: float,
+            has_obstacles: bool = True) -> None:
         """Compute vorticity confinement force.
 
         Args:
@@ -20,12 +21,16 @@ class VorticityForce(Shader):
             grid_scale: Grid spacing (typically simulation_scale)
             aspect: Aspect ratio (width/height) for isotropic derivatives
             timestep: Vorticity timestep (controls turbulence strength)
+            has_obstacles: When False, skip obstacle texture reads for performance
         """
         half_rdx_x = 0.5 / grid_scale
         half_rdx_y = (0.5 / grid_scale) / aspect
 
         # Bind shader program
         glUseProgram(self.shader_program)
+
+        # Obstacle flag
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         # Bind textures
         glActiveTexture(GL_TEXTURE0)

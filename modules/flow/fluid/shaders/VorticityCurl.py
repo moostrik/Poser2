@@ -11,7 +11,8 @@ class VorticityCurl(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, velocity: Texture, obstacle: Texture, grid_scale: float, aspect: float, radius: float) -> None:
+    def use(self, velocity: Texture, obstacle: Texture, grid_scale: float, aspect: float, radius: float,
+            has_obstacles: bool = True) -> None:
         """Compute velocity curl.
 
         Args:
@@ -19,12 +20,16 @@ class VorticityCurl(Shader):
             obstacle: Obstacle mask (R8/R32F)
             grid_scale: Grid spacing (typically simulation_scale)
             aspect: Aspect ratio (width/height) for isotropic derivatives
+            has_obstacles: When False, skip obstacle texture reads for performance
         """
         half_rdx_x = 0.5 / grid_scale
         half_rdx_y = (0.5 / grid_scale) / aspect
 
         # Bind shader program
         glUseProgram(self.shader_program)
+
+        # Obstacle flag
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         # Bind textures
         glActiveTexture(GL_TEXTURE0)

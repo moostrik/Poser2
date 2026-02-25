@@ -12,7 +12,8 @@ class Buoyancy(Shader):
         super().__init__()
 
     def use(self, velocity: Texture, temperature: Texture, density: Texture,
-            obstacle: Texture, sigma: float, kappa: float, ambient_temperature: float) -> None:
+            obstacle: Texture, sigma: float, kappa: float, ambient_temperature: float,
+            has_obstacles: bool = True) -> None:
         """Compute buoyancy force: F = σ(T - T_ambient) - κρ
 
         Args:
@@ -23,9 +24,13 @@ class Buoyancy(Shader):
             sigma: Thermal buoyancy coefficient σ (already includes dt * scale)
             kappa: Density weight coefficient κ (already includes dt * scale)
             ambient_temperature: Reference temperature
+            has_obstacles: When False, skip obstacle texture reads for performance
         """
         # Bind shader program
         glUseProgram(self.shader_program)
+
+        # Obstacle flag
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         # Bind textures
         glActiveTexture(GL_TEXTURE0)

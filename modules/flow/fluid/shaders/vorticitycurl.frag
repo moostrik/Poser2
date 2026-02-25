@@ -11,6 +11,7 @@ out float fragColor;
 // Input textures
 uniform sampler2D uVelocity; // Velocity field (RG32F)
 uniform sampler2D uObstacle; // Obstacle mask (1.0 = obstacle, 0.0 = fluid)
+uniform bool uHasObstacles;  // Skip obstacle checks when false
 
 // Parameters
 uniform vec2 uHalfRdxInv; // (0.5/gridScale_x, 0.5/gridScale_y) for aspect correction
@@ -20,7 +21,7 @@ void main() {
     vec2 st = texCoord;
 
     // Early exit for obstacle pixels
-    if (texture(uObstacle, st).r > 0.5) {
+    if (uHasObstacles && texture(uObstacle, st).r > 0.5) {
         fragColor = 0.0;
         return;
     }

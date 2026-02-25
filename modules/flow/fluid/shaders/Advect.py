@@ -17,7 +17,8 @@ class Advect(Shader):
         super().__init__()
 
     def use(self, source: Texture, velocity: Texture, obstacle: Texture,
-            aspect: float, timestep: float, dissipation: float) -> None:
+            aspect: float, timestep: float, dissipation: float,
+            has_obstacles: bool = True) -> None:
         """Apply advection.
 
         Args:
@@ -27,6 +28,7 @@ class Advect(Shader):
             aspect: Width/height ratio for isotropic advection
             timestep: dt × speed — advection distance per frame in UV space
             dissipation: Exponential decay multiplier (0.99 = 1% loss per frame)
+            has_obstacles: When False, skip obstacle texture reads for performance
         """
         if not self.allocated or not self.shader_program:
             print("Advect shader not allocated or shader program missing.")
@@ -36,6 +38,9 @@ class Advect(Shader):
             return
 
         glUseProgram(self.shader_program)
+
+        # Obstacle flag
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         # Bind textures
         glActiveTexture(GL_TEXTURE0)

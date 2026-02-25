@@ -94,6 +94,16 @@ class FluidFlow(FlowBase):
 
         self.config: FluidFlowConfig = config or FluidFlowConfig()
 
+        # ---- Simulation dimensions and state ---
+        self._width: int = 0
+        self._height: int = 0
+        self._density_width: int = 0
+        self._density_height: int = 0
+        self._dt: float = 1.0 / 60.0
+        self._has_obstacles: bool = False
+        self._reset_pending: bool = False
+        self._reallocate_pending: bool = False
+
         # Define formats for FlowBase
         self._input_internal_format = GL_RG16F     # Velocity (inherited as _input_fbo)
         self._output_internal_format = GL_RGBA16F  # Density (inherited as _output_fbo)
@@ -109,6 +119,8 @@ class FluidFlow(FlowBase):
         self._pressure_fbo: SwapFbo = SwapFbo()      # CLAMP_TO_EDGE = zero-gradient walls (Neumann)
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds reads as obstacle
         self._obstacle_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 1.0, 1.0, 1.0))
+        # Full-resolution obstacle for density advection (same wrap)
+        self._density_obstacle_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 1.0, 1.0, 1.0))
 
         # Intermediate result FBOs (single buffer, no ping-pong)
         self._divergence_fbo: Fbo = Fbo()
@@ -116,14 +128,6 @@ class FluidFlow(FlowBase):
         self._vorticity_force_fbo: Fbo = Fbo()
         self._buoyancy_fbo: Fbo = Fbo()
 
-        # Simulation parameters
-        self._width: int = 0
-        self._height: int = 0
-        self._density_width: int = 0
-        self._density_height: int = 0
-        self._dt: float = 1.0 / 60.0
-        self._reset_pending: bool = False
-        self._reallocate_pending: bool = False
 
         # Shaders
         self._advect_shader: Advect = Advect()
@@ -272,6 +276,11 @@ class FluidFlow(FlowBase):
         self._obstacle_fbo.allocate(self._width, self._height, GL_R8)
         FlowUtil.zero(self._obstacle_fbo)
 
+        self._density_obstacle_fbo.allocate(self._density_width, self._density_height, GL_R8)
+        FlowUtil.zero(self._density_obstacle_fbo)
+
+        self._has_obstacles = False
+
         # Intermediate FBOs
         self._divergence_fbo.allocate(self._width, self._height, GL_R16F)
         FlowUtil.zero(self._divergence_fbo)
@@ -291,6 +300,7 @@ class FluidFlow(FlowBase):
         self._temperature_fbo.deallocate()
         self._pressure_fbo.deallocate()
         self._obstacle_fbo.deallocate()
+        self._density_obstacle_fbo.deallocate()
         self._divergence_fbo.deallocate()
         self._vorticity_curl_fbo.deallocate()
         self._vorticity_force_fbo.deallocate()
@@ -380,10 +390,11 @@ class FluidFlow(FlowBase):
         self._advect_shader.use(
             self._output_fbo.back_texture,  # Source density
             self._input_fbo.texture,        # Velocity
-            self._obstacle_fbo.texture,     # Obstacles
+            self._density_obstacle_fbo.texture,  # Obstacles (full density resolution)
             self._aspect,
             advect_step,
-            dissipation
+            dissipation,
+            has_obstacles=self._has_obstacles
         )
         self._output_fbo.end()
 
@@ -400,7 +411,8 @@ class FluidFlow(FlowBase):
             self._obstacle_fbo.texture,     # Obstacles
             self._aspect,
             advect_step,
-            dissipation
+            dissipation,
+            has_obstacles=self._has_obstacles
         )
         self._input_fbo.end()
 
@@ -420,7 +432,8 @@ class FluidFlow(FlowBase):
                 self._aspect,
                 viscosity_dt,
                 total_iterations=self.config.velocity.viscosity_iter,
-                iterations_per_dispatch=5
+                iterations_per_dispatch=5,
+                has_obstacles=self._has_obstacles
             )
             if result != self._input_fbo.texture:
                 self._input_fbo.swap()
@@ -433,7 +446,8 @@ class FluidFlow(FlowBase):
                     self._obstacle_fbo.texture,
                     self.config.simulation_scale,
                     self._aspect,
-                    viscosity_dt
+                    viscosity_dt,
+                    has_obstacles=self._has_obstacles
                 )
                 self._input_fbo.end()
 
@@ -452,7 +466,8 @@ class FluidFlow(FlowBase):
             self._obstacle_fbo.texture,
             self.config.simulation_scale,
             self._aspect,
-            vorticity_radius
+            vorticity_radius,
+            has_obstacles=self._has_obstacles
         )
         self._vorticity_curl_fbo.end()
 
@@ -463,7 +478,8 @@ class FluidFlow(FlowBase):
             self._obstacle_fbo.texture,
             self.config.simulation_scale,
             self._aspect,
-            vorticity_force
+            vorticity_force,
+            has_obstacles=self._has_obstacles
         )
         self._vorticity_force_fbo.end()
 
@@ -488,7 +504,8 @@ class FluidFlow(FlowBase):
             self._obstacle_fbo.texture,
             self._aspect,
             advect_step,
-            dissipation
+            dissipation,
+            has_obstacles=self._has_obstacles
         )
         self._temperature_fbo.end()
 
@@ -504,7 +521,8 @@ class FluidFlow(FlowBase):
             self._obstacle_fbo.texture,
             sigma,
             kappa,
-            self.config.temperature.ambient
+            self.config.temperature.ambient,
+            has_obstacles=self._has_obstacles
         )
         self._buoyancy_fbo.end()
 
@@ -526,7 +544,8 @@ class FluidFlow(FlowBase):
             self._obstacle_fbo.texture,
             self._aspect,
             advect_step,
-            dissipation
+            dissipation,
+            has_obstacles=self._has_obstacles
         )
         self._pressure_fbo.end()
 
@@ -538,7 +557,8 @@ class FluidFlow(FlowBase):
             self._input_fbo.texture,
             self._obstacle_fbo.texture,
             self.config.simulation_scale,
-            self._aspect
+            self._aspect,
+            has_obstacles=self._has_obstacles
         )
         self._divergence_fbo.end()
 
@@ -552,7 +572,8 @@ class FluidFlow(FlowBase):
                 self.config.simulation_scale,
                 self._aspect,
                 total_iterations=self.config.pressure.iterations,
-                iterations_per_dispatch=5
+                iterations_per_dispatch=5,
+                has_obstacles=self._has_obstacles
             )
             if result != self._pressure_fbo.texture:
                 self._pressure_fbo.swap()
@@ -565,7 +586,8 @@ class FluidFlow(FlowBase):
                     self._divergence_fbo.texture,
                     self._obstacle_fbo.texture,
                     self.config.simulation_scale,
-                    self._aspect
+                    self._aspect,
+                    has_obstacles=self._has_obstacles
                 )
                 self._pressure_fbo.end()
 
@@ -577,7 +599,8 @@ class FluidFlow(FlowBase):
             self._pressure_fbo.texture,
             self._obstacle_fbo.texture,
             self.config.simulation_scale,
-            self._aspect
+            self._aspect,
+            has_obstacles=self._has_obstacles
         )
         self._input_fbo.end()
 
@@ -645,29 +668,6 @@ class FluidFlow(FlowBase):
         return pow(0.01, delta_time / max(0.001, decay_time))
 
     # ========== Obstacles ==========
-
-    def set_obstacle(self, texture: Texture) -> None:
-        """Replace obstacle mask with texture (boolean OR with empty field).
-
-        Args:
-            texture: Obstacle mask (any channel > 0 = obstacle)
-        """
-        FlowUtil.zero(self._obstacle_fbo)
-        self._obstacle_fbo.swap()
-        self._obstacle_fbo.begin()
-        self._add_boolean_shader.use(self._obstacle_fbo.back_texture, texture)
-        self._obstacle_fbo.end()
-
-    def add_obstacle(self, texture: Texture) -> None:
-        """Add to obstacle mask (boolean OR).
-
-        Args:
-            texture: Obstacle mask to add
-        """
-        self._obstacle_fbo.swap()
-        self._obstacle_fbo.begin()
-        self._add_boolean_shader.use(self._obstacle_fbo.back_texture, texture)
-        self._obstacle_fbo.end()
 
     # ========== Input Methods ==========
 
@@ -763,6 +763,49 @@ class FluidFlow(FlowBase):
         """Add pressure to a specific region."""
         FlowUtil.add_region(self._pressure_fbo, texture, x, y, w, h, strength)
 
+    # ---- Obstacles -----
+    def set_obstacle(self, texture: Texture) -> None:
+        """Replace obstacle mask with texture (boolean OR with empty field).
+
+        Updates both sim-resolution and density-resolution obstacle buffers.
+
+        Args:
+            texture: Obstacle mask (any channel > 0 = obstacle)
+        """
+        FlowUtil.zero(self._obstacle_fbo)
+        self._obstacle_fbo.swap()
+        self._obstacle_fbo.begin()
+        self._add_boolean_shader.use(self._obstacle_fbo.back_texture, texture)
+        self._obstacle_fbo.end()
+
+        FlowUtil.zero(self._density_obstacle_fbo)
+        self._density_obstacle_fbo.swap()
+        self._density_obstacle_fbo.begin()
+        self._add_boolean_shader.use(self._density_obstacle_fbo.back_texture, texture)
+        self._density_obstacle_fbo.end()
+
+        self._has_obstacles = True
+
+    def add_obstacle(self, texture: Texture) -> None:
+        """Add to obstacle mask (boolean OR).
+
+        Updates both sim-resolution and density-resolution obstacle buffers.
+
+        Args:
+            texture: Obstacle mask to add
+        """
+        self._obstacle_fbo.swap()
+        self._obstacle_fbo.begin()
+        self._add_boolean_shader.use(self._obstacle_fbo.back_texture, texture)
+        self._obstacle_fbo.end()
+
+        self._density_obstacle_fbo.swap()
+        self._density_obstacle_fbo.begin()
+        self._add_boolean_shader.use(self._density_obstacle_fbo.back_texture, texture)
+        self._density_obstacle_fbo.end()
+
+        self._has_obstacles = True
+
     # ========== Properties ==========
 
     @property
@@ -803,7 +846,7 @@ class FluidFlow(FlowBase):
     @property
     def obstacle(self) -> Texture:
         """R8 obstacle mask."""
-        return self._obstacle_fbo.texture
+        return self._density_obstacle_fbo.texture
 
     @property
     def sim_width(self) -> int:

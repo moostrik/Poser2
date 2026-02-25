@@ -42,7 +42,8 @@ class JacobiPressureCompute(ComputeShader):
         obstacle: Texture,
         grid_scale: float,
         aspect: float,
-        iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH
+        iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
+        has_obstacles: bool = True
     ) -> None:
         """Run multiple Jacobi iterations in a single dispatch.
 
@@ -54,6 +55,7 @@ class JacobiPressureCompute(ComputeShader):
             grid_scale: Grid scaling factor
             aspect: Aspect ratio (width/height)
             iterations: Number of Jacobi iterations to perform in this dispatch
+            has_obstacles: When False, skip obstacle texture reads for performance
 
         Note:
             For 40 total iterations with iterations=5, call this 8 times,
@@ -78,6 +80,9 @@ class JacobiPressureCompute(ComputeShader):
         beta = 1.0 / (2.0 * alpha_x + 2.0 * alpha_y)
 
         glUseProgram(self.shader_program)
+
+        # Obstacle flag
+        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 
         # Bind textures via samplers (for filtered access to divergence, obstacles)
         glActiveTexture(GL_TEXTURE0)
@@ -110,7 +115,8 @@ class JacobiPressureCompute(ComputeShader):
         grid_scale: float,
         aspect: float,
         total_iterations: int = 40,
-        iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH
+        iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
+        has_obstacles: bool = True
     ) -> Texture:
         """Run full pressure solve with automatic ping-pong.
 
@@ -125,6 +131,7 @@ class JacobiPressureCompute(ComputeShader):
             aspect: Aspect ratio
             total_iterations: Total Jacobi iterations to perform
             iterations_per_dispatch: Iterations per compute dispatch
+            has_obstacles: When False, skip obstacle texture reads for performance
 
         Returns:
             The texture containing the final pressure result (either pressure_a or pressure_b)
@@ -144,7 +151,8 @@ class JacobiPressureCompute(ComputeShader):
                 src, dst,
                 divergence, obstacle,
                 grid_scale, aspect,
-                iters
+                iters,
+                has_obstacles
             )
 
             # Swap buffers for next iteration
